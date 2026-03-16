@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { getApiBase } from '../lib/api'
+import { useHub } from '../hooks/useHub'
 import type { AnalyticsResponse, AnalyticsPeriod } from '../types'
 import { PeriodSelector } from '../components/analytics/PeriodSelector'
 import { KpiCards } from '../components/analytics/KpiCards'
@@ -52,6 +53,7 @@ function ErrorBanner({ message, onRetry }: ErrorBannerProps) {
 }
 
 export default function AnalyticsPage() {
+  const { activeProjectId } = useHub()
   const [period, setPeriod] = useState<AnalyticsPeriod>('7d')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -92,7 +94,7 @@ export default function AnalyticsPage() {
       })
 
     return () => controller.abort()
-  }, [period, from, to, retryKey])
+  }, [period, from, to, retryKey, activeProjectId])
 
   function handlePeriodChange(newPeriod: AnalyticsPeriod, newFrom?: string, newTo?: string) {
     setPeriod(newPeriod)

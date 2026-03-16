@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getApiBase } from '../lib/api'
 import { formatDistanceToNow } from 'date-fns'
@@ -12,6 +12,7 @@ import { LogViewer } from '../components/LogViewer'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import type { JobSummary, EventRow, PhaseDefinition } from '../types'
 import type { PhaseMap, PhaseState } from '../hooks/usePipeline'
+import { useHub } from '../hooks/useHub'
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'running' | 'queued' | 'failed' | 'canceled'
 
@@ -25,6 +26,7 @@ const STATUS_BADGE: Record<string, { variant: BadgeVariant; label: string; toolt
 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const { activeProjectId } = useHub()
   const [job, setJob] = useState<JobSummary | null>(null)
   const [events, setEvents] = useState<EventRow[]>([])
   const [phaseDefinitions, setPhaseDefinitions] = useState<PhaseDefinition[]>([])
@@ -32,9 +34,16 @@ export default function JobDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
-  // Fetch initial job data + historical events
+  // Reset and re-fetch when project or job id changes
   useEffect(() => {
     if (!id) return
+    setJob(null)
+    setEvents([])
+    setPhaseDefinitions([])
+    setPhases({})
+    setIsLoading(true)
+    setNotFound(false)
+
     async function loadJob() {
       try {
         const res = await fetch(`${getApiBase()}/jobs/${id}`)
@@ -53,11 +62,19 @@ export default function JobDetailPage() {
       }
     }
     loadJob()
-  }, [id])
+  }, [id, activeProjectId])
 
   // Subscribe to live WebSocket updates for this job
+  const activeProjectRef = useRef(activeProjectId)
+  activeProjectRef.current = activeProjectId
+
   const handleMessage = useCallback((data: unknown) => {
-    const msg = data as { type: string } & Record<string, unknown>
+    const msg = data as { type: string; projectId?: string } & Record<string, unknown>
+
+    // Filter by active project
+    if (activeProjectRef.current && msg.projectId && msg.projectId !== activeProjectRef.current) {
+      return
+    }
 
     if (msg.type === 'init') {
       const defs = (msg.phaseDefinitions ?? []) as PhaseDefinition[]

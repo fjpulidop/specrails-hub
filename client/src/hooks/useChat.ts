@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useLayoutEffect } from 'react'
 import { useSharedWebSocket } from './useSharedWebSocket'
 import type { ChatConversationSummary, ChatMessage } from '../types'
 import { getApiBase } from '../lib/api'
+import { useHub } from './useHub'
 
 const PANEL_OPEN_KEY = 'specrails.chatPanelOpen'
 
@@ -30,6 +31,7 @@ export interface UseChatReturn {
 }
 
 export function useChat(): UseChatReturn {
+  const { activeProjectId } = useHub()
   const [conversations, setConversations] = useState<ChatConversation[]>([])
   const [activeTabIndex, setActiveTabIndex] = useState(0)
   const [isPanelOpen, setIsPanelOpen] = useState<boolean>(() => {
@@ -42,8 +44,10 @@ export function useChat(): UseChatReturn {
 
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
 
-  // Load existing conversations on mount
+  // Load conversations — re-fetch when project changes
   useEffect(() => {
+    setConversations([])
+    setActiveTabIndex(0)
     async function load() {
       try {
         const base = getApiBase()
@@ -85,7 +89,7 @@ export function useChat(): UseChatReturn {
       }
     }
     load()
-  }, [])
+  }, [activeProjectId])
 
   const handleMessage = useCallback((raw: unknown) => {
     const msg = raw as Record<string, unknown>
