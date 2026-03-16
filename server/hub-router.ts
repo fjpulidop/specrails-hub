@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import path from 'path'
+import fs from 'fs'
 import type { WsMessage } from './types'
 import type { ProjectRegistry } from './project-registry'
 import { getHubSetting, setHubSetting, listProjects } from './hub-db'
@@ -10,6 +11,10 @@ function slugify(name: string): string {
 
 function deriveProjectName(projectPath: string): string {
   return path.basename(projectPath)
+}
+
+function hasSpecrails(projectPath: string): boolean {
+  return fs.existsSync(path.join(projectPath, '.claude', 'commands', 'sr'))
 }
 
 export function createHubRouter(
@@ -33,11 +38,19 @@ export function createHubRouter(
     }
 
     const resolvedPath = path.resolve(projectPath)
+
+    // Validate path exists
+    if (!fs.existsSync(resolvedPath)) {
+      res.status(400).json({ error: `Path does not exist: ${resolvedPath}` })
+      return
+    }
+
     const derivedName = (name && typeof name === 'string' && name.trim())
       ? name.trim()
       : deriveProjectName(resolvedPath)
     const slug = slugify(derivedName)
     const id = crypto.randomUUID()
+    const specrailsInstalled = hasSpecrails(resolvedPath)
 
     try {
       const ctx = registry.addProject({ id, slug, name: derivedName, path: resolvedPath })
@@ -46,7 +59,7 @@ export function createHubRouter(
         project: ctx.project,
         timestamp: new Date().toISOString(),
       })
-      res.status(201).json({ project: ctx.project })
+      res.status(201).json({ project: ctx.project, has_specrails: specrailsInstalled })
     } catch (err) {
       const message = (err as Error).message ?? ''
       // SQLite UNIQUE constraint violation means path or slug already registered
