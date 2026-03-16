@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, BarChart3, MessageSquare, Settings } from 'lucide-react'
+import { LayoutDashboard, BarChart3, Settings } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import type { HubProject } from '../hooks/useHub'
@@ -12,7 +12,6 @@ export function ProjectNavbar({ project }: ProjectNavbarProps) {
   const navItems = [
     { to: '/', end: true, icon: LayoutDashboard, label: 'Home' },
     { to: '/analytics', end: false, icon: BarChart3, label: 'Analytics' },
-    { to: '/conversations', end: false, icon: MessageSquare, label: 'Conversations' },
   ]
 
   return (

@@ -5,7 +5,7 @@ import DashboardPage from './pages/DashboardPage'
 import JobDetailPage from './pages/JobDetailPage'
 import SettingsPage from './pages/SettingsPage'
 import AnalyticsPage from './pages/AnalyticsPage'
-import ConversationsPage from './pages/ConversationsPage'
+// ConversationsPage removed — chat lives as a sidebar panel in ProjectLayout
 import SettingsDialog from './pages/GlobalSettingsPage'
 import { ProjectLayout } from './components/ProjectLayout'
 import { WelcomeScreen } from './components/WelcomeScreen'
@@ -97,7 +97,6 @@ function HubApp() {
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/jobs/:id" element={<JobDetailPage />} />
                 <Route path="/analytics" element={<AnalyticsPage />} />
-                <Route path="/conversations" element={<ConversationsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
