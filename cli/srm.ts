@@ -2,13 +2,13 @@
 /**
  * srm — specrails CLI bridge
  *
- * Routes commands to the web-manager when running, or falls back to invoking
- * claude directly when the web-manager is not reachable.
+ * Routes commands to the manager when running, or falls back to invoking
+ * claude directly when the manager is not reachable.
  *
  * Usage:
- *   srm implement #42           → /sr:implement #42 (via web-manager or direct)
+ *   srm implement #42           → /sr:implement #42 (via manager or direct)
  *   srm "any raw prompt"        → raw prompt (no /sr: prefix)
- *   srm --status                → print web-manager state
+ *   srm --status                → print manager state
  *   srm --jobs                  → print job history table
  *   srm --port 5000 <command>   → use port 5000 instead of 4200
  *   srm --help                  → print usage and exit 0
@@ -147,20 +147,20 @@ ${bold('Usage:')}
   srm implement #42                Run a known specrails verb (prepends /sr:)
   srm batch-implement #40 #41      Known verbs: ${[...KNOWN_VERBS].join(', ')}
   srm "any raw prompt"             Pass a raw prompt directly to claude
-  srm --status                     Print web-manager status and exit
+  srm --status                     Print manager status and exit
   srm --jobs                       Print recent job history and exit
   srm hub <subcommand>             Manage the hub (multi-project mode)
   srm --port <n>                   Override default port (${DEFAULT_PORT})
   srm --help                       Show this help text
 
 ${bold('Execution paths:')}
-  Web-manager running → POST /api/spawn + stream logs via WebSocket
-  Web-manager not running → spawn claude directly with stream-json output
+  Manager running → POST /api/spawn + stream logs via WebSocket
+  Manager not running → spawn claude directly with stream-json output
 `.trimStart())
 }
 
 // ---------------------------------------------------------------------------
-// Web-manager detection
+// Manager detection
 // ---------------------------------------------------------------------------
 
 export interface DetectionResult {
@@ -285,7 +285,7 @@ export function printSummary(data: SummaryData): void {
 }
 
 // ---------------------------------------------------------------------------
-// Web-manager path
+// Manager path
 // ---------------------------------------------------------------------------
 
 interface WsLogMessage {
@@ -362,12 +362,12 @@ async function runViaWebManager(command: string, baseUrl: string): Promise<numbe
   try {
     spawnRes = await httpPost(spawnUrl, { command })
   } catch (err) {
-    srmError('failed to connect to web-manager')
+    srmError('failed to connect to manager')
     return 1
   }
 
   if (spawnRes.status === 409) {
-    srmError('web-manager is busy (another job is running)')
+    srmError('manager is busy (another job is running)')
     return 1
   }
 
@@ -458,7 +458,7 @@ async function runViaWebManager(command: string, baseUrl: string): Promise<numbe
 
     ws.on('close', () => {
       if (!resolved) {
-        srmWarn('lost connection to web-manager')
+        srmWarn('lost connection to manager')
         resolved = true
         resolve()
       }
@@ -618,14 +618,14 @@ async function handleStatus(port: number): Promise<number> {
   const detection = await detectWebManager(port)
 
   if (!detection.running) {
-    process.stdout.write(`web-manager: not running (${baseUrl})\n`)
+    process.stdout.write(`manager: not running (${baseUrl})\n`)
     return 1
   }
 
   try {
     const res = await httpGet(`${baseUrl}/api/state`)
     if (res.status !== 200) {
-      process.stdout.write(`web-manager: not running (${baseUrl})\n`)
+      process.stdout.write(`manager: not running (${baseUrl})\n`)
       return 1
     }
 
@@ -637,7 +637,7 @@ async function handleStatus(port: number): Promise<number> {
     }
 
     const version = state.version ? `  (v${state.version})` : ''
-    process.stdout.write(`web-manager: running${version}\n`)
+    process.stdout.write(`manager: running${version}\n`)
     process.stdout.write(`project:     ${state.projectName ?? 'unknown'}\n`)
     process.stdout.write(`busy:        ${state.busy ? 'true' : 'false'}\n`)
 
@@ -650,7 +650,7 @@ async function handleStatus(port: number): Promise<number> {
 
     return 0
   } catch {
-    process.stdout.write(`web-manager: not running (${baseUrl})\n`)
+    process.stdout.write(`manager: not running (${baseUrl})\n`)
     return 1
   }
 }
@@ -697,7 +697,7 @@ async function handleJobs(port: number): Promise<number> {
   const detection = await detectWebManager(port)
 
   if (!detection.running) {
-    srmError(`web-manager is not running (${baseUrl})`)
+    srmError(`manager is not running (${baseUrl})`)
     return 1
   }
 
@@ -710,7 +710,7 @@ async function handleJobs(port: number): Promise<number> {
   }
 
   if (res.status === 501 || res.status === 404) {
-    srmLog('jobs history requires web-manager with SQLite persistence (#57)')
+    srmLog('jobs history requires manager with SQLite persistence (#57)')
     return 1
   }
 
@@ -765,7 +765,7 @@ async function handleJobs(port: number): Promise<number> {
 // Hub subcommand group
 // ---------------------------------------------------------------------------
 
-const HUB_PID_FILE = path.join(os.homedir(), '.specrails', 'web-manager.pid')
+const HUB_PID_FILE = path.join(os.homedir(), '.specrails', 'manager.pid')
 
 function readPid(): number | null {
   try {
@@ -1057,10 +1057,10 @@ async function main(): Promise<void> {
   let exitCode: number
 
   if (detection.running) {
-    srmLog(`routing via web-manager at ${detection.baseUrl}`)
+    srmLog(`routing via manager at ${detection.baseUrl}`)
     exitCode = await runViaWebManager(command, detection.baseUrl)
   } else {
-    srmLog('web-manager not running — invoking claude directly')
+    srmLog('manager not running — invoking claude directly')
     exitCode = await runDirect(command)
   }
 

@@ -212,7 +212,7 @@ function loadPersistedConfig(db: any): { active: string | null; labelFilter: str
 
 export function getConfig(cwd: string, db?: any, projectName?: string): ProjectConfig {
   // Resolve project root.
-  // In single-project mode: web-manager lives at <project>/specrails/web-manager/,
+  // In single-project mode: manager lives at <project>/specrails/manager/,
   // so we walk up two levels to find the project root.
   // In hub mode: cwd is the project root directly — we detect this by checking
   // if the .claude directory already lives at cwd.

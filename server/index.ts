@@ -66,7 +66,7 @@ for (let i = 2; i < process.argv.length; i++) {
 // ─── PID file management ──────────────────────────────────────────────────────
 
 const PID_DIR = path.join(os.homedir(), '.specrails')
-const PID_FILE = path.join(PID_DIR, 'web-manager.pid')
+const PID_FILE = path.join(PID_DIR, 'manager.pid')
 
 function writePidFile(): void {
   try {
@@ -435,7 +435,7 @@ if (isHubMode) {
 
 server.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
-    console.error(`[error] Port ${port} is already in use. Is another web-manager instance running?`)
+    console.error(`[error] Port ${port} is already in use. Is another manager instance running?`)
     console.error(`[error] Try stopping it first: srm hub stop`)
     process.exit(1)
   }

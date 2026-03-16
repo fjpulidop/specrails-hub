@@ -264,7 +264,7 @@ describe('detectWebManager', () => {
 // Web-manager path integration test (Task 12)
 // ---------------------------------------------------------------------------
 
-describe('web-manager path (integration)', () => {
+describe('manager path (integration)', () => {
   let httpServer: http.Server
   let wss: WebSocketServer
   let serverPort: number

@@ -1,5 +1,5 @@
 {
-  "name": "specrails-web-manager",
+  "name": "specrails-manager",
   "version": "0.1.0",
   "private": true,
   "bin": {
