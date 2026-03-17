@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { RootLayout } from './components/RootLayout'
 import DashboardPage from './pages/DashboardPage'
 import JobDetailPage from './pages/JobDetailPage'
 import SettingsPage from './pages/SettingsPage'
 import AnalyticsPage from './pages/AnalyticsPage'
-// ConversationsPage removed — chat lives as a sidebar panel in ProjectLayout
 import SettingsDialog from './pages/GlobalSettingsPage'
 import { ProjectLayout } from './components/ProjectLayout'
 import { WelcomeScreen } from './components/WelcomeScreen'
@@ -36,12 +35,44 @@ function useHubMode(): boolean {
   return isHub
 }
 
+// ─── Per-project route memory ─────────────────────────────────────────────────
+
+function useProjectRouteMemory(activeProjectId: string | null) {
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  // Map of projectId → last visited path
+  const routeMemory = useRef<Map<string, string>>(new Map())
+  const prevProjectId = useRef<string | null>(null)
+
+  useEffect(() => {
+    // Save the current route for the outgoing project
+    if (prevProjectId.current && prevProjectId.current !== activeProjectId) {
+      routeMemory.current.set(prevProjectId.current, location.pathname)
+    }
+
+    // Restore route for the incoming project
+    if (activeProjectId && activeProjectId !== prevProjectId.current) {
+      const savedRoute = routeMemory.current.get(activeProjectId)
+      const targetRoute = savedRoute ?? '/'
+      if (location.pathname !== targetRoute) {
+        navigate(targetRoute, { replace: true })
+      }
+    }
+
+    prevProjectId.current = activeProjectId
+  }, [activeProjectId, location.pathname, navigate])
+}
+
 // ─── Hub app shell ────────────────────────────────────────────────────────────
 
 function HubApp() {
   const { projects, activeProjectId, isLoading, setupProjectIds, completeSetupWizard } = useHub()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+
+  // Remember which page each project was on
+  useProjectRouteMemory(activeProjectId)
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
   const isInSetup = activeProjectId !== null && setupProjectIds.has(activeProjectId)
