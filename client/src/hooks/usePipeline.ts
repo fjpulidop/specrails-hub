@@ -47,14 +47,44 @@ export function usePipeline(activeProjectId?: string | null) {
   const activeProjectRef = useRef(activeProjectId)
   activeProjectRef.current = activeProjectId
 
-  // Reset state when active project changes
+  // Per-project cache to avoid flicker on tab switch
+  interface PipelineSnapshot {
+    phaseDefinitions: PhaseDefinition[]
+    phases: PhaseMap
+    projectName: string
+    recentJobs: JobSummary[]
+    queueState: QueueState
+  }
+  const cacheRef = useRef<Map<string, PipelineSnapshot>>(new Map())
+  const prevProjectRef = useRef<string | null | undefined>(undefined)
+
+  // On project switch: save outgoing, restore incoming
   useEffect(() => {
-    setPhaseDefinitions([])
-    setPhases({})
-    setProjectName('')
+    // Save outgoing project state
+    if (prevProjectRef.current && prevProjectRef.current !== activeProjectId) {
+      // We can't read state directly in useEffect, so we save on each update instead (see below)
+    }
+    prevProjectRef.current = activeProjectId
+
+    // Restore incoming project state from cache
+    if (activeProjectId) {
+      const cached = cacheRef.current.get(activeProjectId)
+      if (cached) {
+        setPhaseDefinitions(cached.phaseDefinitions)
+        setPhases(cached.phases)
+        setProjectName(cached.projectName)
+        setRecentJobs(cached.recentJobs)
+        setQueueState(cached.queueState)
+      } else {
+        setPhaseDefinitions([])
+        setPhases({})
+        setProjectName('')
+        setRecentJobs([])
+        setQueueState(INITIAL_QUEUE)
+      }
+    }
+    // Always clear logs on switch (too large to cache)
     setLogLines([])
-    setRecentJobs([])
-    setQueueState(INITIAL_QUEUE)
   }, [activeProjectId])
 
   const handleMessage = useCallback((data: unknown) => {
@@ -67,19 +97,29 @@ export function usePipeline(activeProjectId?: string | null) {
     }
 
     if (msg.type === 'init') {
-      setProjectName((msg.projectName as string) ?? '')
+      const name = (msg.projectName as string) ?? ''
       const defs = (msg.phaseDefinitions ?? []) as PhaseDefinition[]
-      setPhaseDefinitions(defs)
       const initialPhases: PhaseMap = {}
       for (const def of defs) {
         initialPhases[def.key] = ((msg.phases as Record<string, PhaseState>)?.[def.key]) ?? 'idle'
       }
+      const jobs = (msg.recentJobs as JobSummary[]) ?? []
+      const q = (msg.queue as QueueState) ?? INITIAL_QUEUE
+
+      setProjectName(name)
+      setPhaseDefinitions(defs)
       setPhases(initialPhases)
-      const buf = (msg.logBuffer as LogLine[]) ?? []
-      setLogLines(buf)
-      setRecentJobs((msg.recentJobs as JobSummary[]) ?? [])
-      const q = msg.queue as QueueState | undefined
-      if (q) setQueueState(q)
+      setLogLines((msg.logBuffer as LogLine[]) ?? [])
+      setRecentJobs(jobs)
+      setQueueState(q)
+
+      // Cache for instant restore on tab switch
+      if (currentProjectId) {
+        cacheRef.current.set(currentProjectId, {
+          phaseDefinitions: defs, phases: initialPhases,
+          projectName: name, recentJobs: jobs, queueState: q,
+        })
+      }
     } else if (msg.type === 'phase') {
       setPhases((prev) => ({
         ...prev,

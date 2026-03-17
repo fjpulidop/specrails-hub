@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useLayoutEffect } from 'react'
+import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useSharedWebSocket } from './useSharedWebSocket'
 import type { ChatConversationSummary, ChatMessage } from '../types'
 import { getApiBase } from '../lib/api'
@@ -44,10 +44,30 @@ export function useChat(): UseChatReturn {
 
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
 
+  // Per-project conversation cache
+  const convCacheRef = useRef<Map<string, ChatConversation[]>>(new Map())
+  const prevProjectRef = useRef<string | null>(null)
+
   // Load conversations — re-fetch when project changes
   useEffect(() => {
-    setConversations([])
-    setActiveTabIndex(0)
+    // Save outgoing project conversations
+    if (prevProjectRef.current && prevProjectRef.current !== activeProjectId) {
+      convCacheRef.current.set(prevProjectRef.current, conversations)
+    }
+    prevProjectRef.current = activeProjectId
+
+    // Restore cached conversations instantly
+    if (activeProjectId) {
+      const cached = convCacheRef.current.get(activeProjectId)
+      if (cached) {
+        setConversations(cached)
+        setActiveTabIndex(0)
+      } else {
+        setConversations([])
+        setActiveTabIndex(0)
+      }
+    }
+
     async function load() {
       try {
         const base = getApiBase()
@@ -84,11 +104,13 @@ export function useChat(): UseChatReturn {
           })
         )
         setConversations(withMessages)
+        if (activeProjectId) convCacheRef.current.set(activeProjectId, withMessages)
       } catch {
         // ignore fetch errors on mount
       }
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProjectId])
 
   const handleMessage = useCallback((raw: unknown) => {

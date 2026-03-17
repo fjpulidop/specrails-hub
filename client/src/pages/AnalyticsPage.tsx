@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
@@ -62,9 +62,23 @@ export default function AnalyticsPage() {
   const [error, setError] = useState<string | null>(null)
   const [retryKey, setRetryKey] = useState(0)
 
+  // Per-project cache for analytics
+  const cacheRef = useRef<Map<string, AnalyticsResponse>>(new Map())
+
   useEffect(() => {
+    // On project switch, restore cached data instantly
+    if (activeProjectId) {
+      const cached = cacheRef.current.get(activeProjectId)
+      if (cached) {
+        setData(cached)
+        setLoading(false)
+      }
+    }
+
     const controller = new AbortController()
-    setLoading(true)
+    if (!data && !cacheRef.current.get(activeProjectId ?? '')) {
+      setLoading(true)
+    }
     setError(null)
 
     const params = new URLSearchParams({ period })
@@ -85,6 +99,7 @@ export default function AnalyticsPage() {
       })
       .then((responseData) => {
         setData(responseData)
+        if (activeProjectId) cacheRef.current.set(activeProjectId, responseData)
         setLoading(false)
       })
       .catch((err: Error) => {

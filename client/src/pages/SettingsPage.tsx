@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { toast } from 'sonner'
 import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
@@ -17,9 +17,21 @@ export default function SettingsPage() {
   const [activeTracker, setActiveTracker] = useState<'github' | 'jira' | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
+  const cacheRef = useRef<Map<string, ProjectConfig>>(new Map())
+
   useEffect(() => {
-    setConfig(null)
-    setIsLoading(true)
+    // Restore cache instantly on project switch
+    if (activeProjectId) {
+      const cached = cacheRef.current.get(activeProjectId)
+      if (cached) {
+        setConfig(cached)
+        setLabelFilter(cached.issueTracker.labelFilter)
+        setActiveTracker(cached.issueTracker.active)
+        setIsLoading(false)
+      } else {
+        setIsLoading(true)
+      }
+    }
     async function loadConfig() {
       try {
         const res = await fetch(`${getApiBase()}/config`)
@@ -28,6 +40,7 @@ export default function SettingsPage() {
         setConfig(data)
         setLabelFilter(data.issueTracker.labelFilter)
         setActiveTracker(data.issueTracker.active)
+        if (activeProjectId) cacheRef.current.set(activeProjectId, data)
       } catch {
         // ignore
       } finally {
