@@ -164,22 +164,28 @@ function InstallingStep({
 // ─── Phase 5: Complete ────────────────────────────────────────────────────────
 
 function CompleteStep({
+  projectName,
   summary,
   onGoToProject,
 }: {
+  projectName: string
   summary: SetupSummary
   onGoToProject: () => void
 }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto px-6 gap-6">
+    <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto px-6 gap-8">
       <div className="w-16 h-16 rounded-2xl bg-dracula-green/20 flex items-center justify-center">
         <Check className="w-8 h-8 text-dracula-green" />
       </div>
 
-      <div className="text-center space-y-2">
-        <h2 className="text-base font-semibold">specrails is ready!</h2>
-        <p className="text-sm text-muted-foreground">
-          Your project has been fully configured with AI workflows.
+      <div className="text-center space-y-3">
+        <h2 className="text-lg font-semibold">
+          Welcome to <span className="text-dracula-purple">spec</span><span className="text-dracula-pink">rails</span>
+        </h2>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          <strong className="text-foreground">{projectName}</strong> is now configured with
+          AI-powered development workflows. Your specialized agents, personas, and commands
+          are ready to use.
         </p>
       </div>
 
@@ -200,8 +206,22 @@ function CompleteStep({
         </div>
       </div>
 
+      <div className="text-center space-y-1">
+        <p className="text-xs text-muted-foreground">
+          Learn how to get the most out of specrails:
+        </p>
+        <a
+          href="https://specrails.dev/docs"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-dracula-purple hover:underline"
+        >
+          specrails.dev/docs
+        </a>
+      </div>
+
       <Button size="sm" className="gap-2" onClick={onGoToProject}>
-        Go to project
+        Continue to project
         <ArrowRight className="w-3.5 h-3.5" />
       </Button>
     </div>
@@ -605,6 +625,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
 
         {wizardStep.step === 'complete' && (
           <CompleteStep
+            projectName={project.name}
             summary={wizardStep.summary}
             onGoToProject={onComplete}
           />
