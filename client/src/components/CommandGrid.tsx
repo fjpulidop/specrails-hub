@@ -20,6 +20,11 @@ import { cn } from '../lib/utils'
 import type { CommandInfo } from '../types'
 
 const COMMAND_META: Record<string, { icon: LucideIcon; color: string; glow: string }> = {
+  'propose-spec': {
+    icon: Sparkles,
+    color: 'text-dracula-cyan',
+    glow: 'hover:glow-cyan hover:border-dracula-cyan/40',
+  },
   implement: {
     icon: Rocket,
     color: 'text-dracula-purple',
@@ -68,7 +73,68 @@ const FALLBACK_META = {
   glow: 'hover:glow-purple hover:border-dracula-purple/40',
 }
 
+const DISCOVERY_ORDER = ['propose-spec', 'update-product-driven-backlog', 'product-backlog'] as const
+const DELIVERY_ORDER  = ['implement', 'batch-implement'] as const
+const DISCOVERY_SET   = new Set<string>(DISCOVERY_ORDER)
+const DELIVERY_SET    = new Set<string>(DELIVERY_ORDER)
+const DISPLAY_NAMES: Record<string, string> = {
+  'update-product-driven-backlog': 'Auto-propose Specs',
+  'product-backlog': 'Auto-Select Specs',
+}
+const HIDDEN_SLUGS = new Set(['propose-feature'])
+
 const WIZARD_COMMANDS = new Set(['implement', 'batch-implement'])
+
+interface SectionHeaderProps {
+  label: string
+  subtitle?: string
+  accent?: 'cyan' | 'purple' | 'muted'
+  collapsible?: boolean
+  open?: boolean
+  count?: number
+  onToggle?: () => void
+}
+
+function SectionHeader({ label, subtitle, accent = 'muted', collapsible, open, count, onToggle }: SectionHeaderProps) {
+  const dotColor =
+    accent === 'cyan' ? 'text-dracula-cyan'
+    : accent === 'purple' ? 'text-dracula-purple'
+    : 'text-muted-foreground'
+  const labelColor =
+    accent === 'cyan' ? 'text-dracula-cyan'
+    : accent === 'purple' ? 'text-dracula-purple'
+    : 'text-muted-foreground'
+  const ruleColor =
+    accent === 'cyan' ? 'border-dracula-cyan/25'
+    : accent === 'purple' ? 'border-dracula-purple/25'
+    : ''
+
+  if (collapsible) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2 hover:text-foreground transition-colors cursor-pointer"
+      >
+        <ChevronRight className={cn('w-3 h-3 transition-transform', open && 'rotate-90')} />
+        {label} ({count})
+      </button>
+    )
+  }
+
+  return (
+    <div className="mb-3">
+      <div className="flex items-baseline gap-1.5 mb-0.5">
+        <span className={cn('text-[8px]', dotColor)}>●</span>
+        <span className={cn('text-[10px] font-semibold uppercase tracking-widest', labelColor)}>{label}</span>
+      </div>
+      {subtitle && (
+        <p className="text-[11px] text-muted-foreground/70 mb-2 pl-3.5">{subtitle}</p>
+      )}
+      {ruleColor && <hr className={cn('border-t mb-3', ruleColor)} />}
+    </div>
+  )
+}
 
 interface CommandGridProps {
   commands: CommandInfo[]
@@ -99,6 +165,7 @@ export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
   }
 
   async function handleCommandClick(cmd: CommandInfo) {
+    const displayName = DISPLAY_NAMES[cmd.slug] ?? cmd.name
     if (WIZARD_COMMANDS.has(cmd.slug)) {
       onOpenWizard(cmd.slug)
       return
@@ -106,8 +173,8 @@ export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
 
     try {
       toast.promise(spawnCommand(cmd.slug), {
-        loading: `Queuing ${cmd.name}...`,
-        success: `${cmd.name} queued`,
+        loading: `Queuing ${displayName}...`,
+        success: `${displayName} queued`,
         error: (err: Error) => err.message,
       })
     } catch {
@@ -115,21 +182,30 @@ export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
     }
   }
 
-  const DISCOVERY_SLUGS = new Set(['product-backlog', 'update-product-driven-backlog'])
-  const DELIVERY_SLUGS = new Set(['implement', 'batch-implement'])
-
-  const discovery = commands.filter((c) => DISCOVERY_SLUGS.has(c.slug))
-  const delivery = commands.filter((c) => DELIVERY_SLUGS.has(c.slug))
-  const others = commands
-    .filter((c) => !DISCOVERY_SLUGS.has(c.slug) && !DELIVERY_SLUGS.has(c.slug))
+  const visibleCommands = commands.filter((c) => !HIDDEN_SLUGS.has(c.slug))
+  const bySlug = new Map(visibleCommands.map((c) => [c.slug, c]))
+  const discovery = DISCOVERY_ORDER
+    .map((s) => bySlug.get(s))
+    .filter((c): c is CommandInfo => c !== undefined)
+  const delivery = DELIVERY_ORDER
+    .map((s) => bySlug.get(s))
+    .filter((c): c is CommandInfo => c !== undefined)
+  const others = visibleCommands
+    .filter((c) => !DISCOVERY_SET.has(c.slug) && !DELIVERY_SET.has(c.slug))
     .sort((a, b) => a.name.localeCompare(b.name))
 
   const [othersOpen, setOthersOpen] = useState(false)
 
-  const sections: { label: string; commands: CommandInfo[]; collapsible?: boolean }[] = [
-    { label: 'Discovery', commands: discovery },
-    { label: 'Delivery', commands: delivery },
-    { label: 'Others', commands: others, collapsible: true },
+  const sections: {
+    label: string
+    subtitle?: string
+    accent?: 'cyan' | 'purple' | 'muted'
+    commands: CommandInfo[]
+    collapsible?: boolean
+  }[] = [
+    { label: 'Discovery', subtitle: 'Explore & define your product', accent: 'cyan' as const,   commands: discovery },
+    { label: 'Delivery',  subtitle: 'Build & ship features',         accent: 'purple' as const, commands: delivery },
+    { label: 'Others',                                                                            commands: others, collapsible: true },
   ].filter((s) => s.commands.length > 0)
 
   return (
@@ -138,26 +214,22 @@ export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
         const isCollapsed = section.collapsible && !othersOpen
         return (
         <div key={section.label}>
-          {section.collapsible ? (
-            <button
-              type="button"
-              onClick={() => setOthersOpen(!othersOpen)}
-              className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2 hover:text-foreground transition-colors cursor-pointer"
-            >
-              <ChevronRight className={cn('w-3 h-3 transition-transform', othersOpen && 'rotate-90')} />
-              {section.label} ({section.commands.length})
-            </button>
-          ) : (
-            <h3 className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
-              {section.label}
-            </h3>
-          )}
+          <SectionHeader
+            label={section.label}
+            subtitle={section.subtitle}
+            accent={section.accent}
+            collapsible={section.collapsible}
+            open={othersOpen}
+            count={section.commands.length}
+            onToggle={() => setOthersOpen(!othersOpen)}
+          />
           {!isCollapsed && (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {section.commands.map((cmd) => {
               const isWizard = WIZARD_COMMANDS.has(cmd.slug)
               const meta = COMMAND_META[cmd.slug] ?? FALLBACK_META
               const Icon = meta.icon
+              const displayName = DISPLAY_NAMES[cmd.slug] ?? cmd.name
 
               return (
                 <Tooltip key={cmd.id}>
@@ -180,7 +252,7 @@ export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
 
                       {/* Text */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium leading-tight truncate">{cmd.name}</p>
+                        <p className="text-sm font-medium leading-tight truncate">{displayName}</p>
                         {cmd.description && (
                           <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight line-clamp-1">
                             {cmd.description}

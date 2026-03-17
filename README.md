@@ -7,7 +7,7 @@ A local dashboard and CLI for managing all your [specrails](https://github.com/f
 - **Multi-project hub** — register multiple specrails projects and switch between them with browser-style tabs
 - **Live pipeline visualization** — see Architect, Developer, Reviewer, and Ship phases update in real-time
 - **Streaming logs** — all `claude` CLI output streamed via WebSocket to the browser
-- **Command launcher** — run `/sr:implement`, `/sr:product-backlog`, and other commands from the dashboard
+- **Command launcher** — organized into Discovery (propose-spec, auto-propose specs, auto-select specs) and Delivery (implement, batch-implement) sections; other commands available in a collapsible group
 - **Analytics** — cost, duration, token usage, and throughput metrics per project
 - **Conversations** — full-page chat interface with Claude, scoped per project
 - **`srm` CLI** — terminal bridge that auto-routes commands to the correct project
@@ -85,7 +85,7 @@ A single Express process (port 4200) manages all projects. Each project gets its
 ```
 
 - **Tabs** — one per project, green dot when a job is active
-- **Home** — command grid, recent jobs, pipeline phase indicators
+- **Home** — command grid (Discovery and Delivery sections), recent jobs, pipeline phase indicators
 - **Analytics** — cost and token metrics
 - **Conversations** — Claude chat sessions scoped to the project
 - **Settings** (gear icon) — global hub configuration, registered projects
@@ -166,9 +166,12 @@ All under `/api/projects/:projectId/`:
 ```bash
 git clone https://github.com/fjpulidop/specrails-manager.git
 cd specrails-manager
-npm install
+npm install          # install root (server + CLI) dependencies
+cd client && npm install && cd ..   # install client dependencies separately
 npm run dev          # starts server (4200) + client (4201) concurrently
 ```
+
+> **Note:** This repo has two separate `node_modules` trees — one at the root (server + CLI) and one inside `client/` (Vite + React). Both `npm install` calls are required. If you see `sh: tsc: command not found` during `npm run build`, it means one of them is missing.
 
 | Script | Description |
 |--------|-------------|

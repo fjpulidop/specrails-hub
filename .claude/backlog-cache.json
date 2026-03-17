@@ -1,0 +1,18 @@
+{
+  "schema_version": "1",
+  "provider": "github",
+  "last_updated": "2026-03-17T22:30:00Z",
+  "written_by": "implement",
+  "issues": {
+    "10": {
+      "number": 10,
+      "title": "feat(CommandGrid): Reorganize Home commands into visual Discovery & Delivery sections",
+      "state": "OPEN",
+      "assignees": [],
+      "labels": ["product-driven-backlog"],
+      "body_sha": "73f17b006c7affebdd895b7a4edb8b10764dc9b605a020a0ff924009bf241dd7",
+      "updated_at": "2026-03-17T20:03:33Z",
+      "captured_at": "2026-03-17T22:30:00Z"
+    }
+  }
+}

@@ -15,9 +15,13 @@ import { getConfig, fetchIssues } from './config'
 
 const mockExecSync = execSync as ReturnType<typeof vi.fn>
 
-let existsSyncSpy: ReturnType<typeof vi.spyOn>
-let readdirSyncSpy: ReturnType<typeof vi.spyOn>
-let readFileSyncSpy: ReturnType<typeof vi.spyOn>
+// Spy references — typed as any to avoid overloaded-signature inference conflicts
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let existsSyncSpy: any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let readdirSyncSpy: any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let readFileSyncSpy: any
 
 describe('getConfig', () => {
   beforeEach(() => {

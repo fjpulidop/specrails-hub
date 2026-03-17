@@ -3,3 +3,6 @@ dist/
 cli/dist/
 client/dist/
 data/
+
+# specrails installer (one-time setup tool, not part of the project)
+specrails/
