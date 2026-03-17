@@ -60,7 +60,7 @@ const bold = (t: string) => ansi('1', t)
 const dimCyan = (t: string) => ansi('2;36', t)
 
 function srmPrefix(): string {
-  return dim('[srm]')
+  return dim('[specrails-hub]')
 }
 
 function srmLog(msg: string): void {
@@ -86,6 +86,8 @@ export type ParsedArgs =
   | { mode: 'hub'; subArgs: string[]; port: number }
   | { mode: 'command'; resolved: string; port: number }
   | { mode: 'raw'; resolved: string; port: number }
+
+const HUB_SUBCOMMANDS = new Set(['start', 'stop', 'status', 'add', 'remove', 'list'])
 
 export function parseArgs(argv: string[]): ParsedArgs {
   // argv is process.argv.slice(2)
@@ -116,8 +118,13 @@ export function parseArgs(argv: string[]): ParsedArgs {
     return { mode: 'jobs', port }
   }
 
+  // Hub subcommands — top-level (no `hub` prefix needed)
+  // backward compat: `specrails-hub hub start` still works
   if (args[0] === 'hub') {
     return { mode: 'hub', subArgs: args.slice(1), port }
+  }
+  if (HUB_SUBCOMMANDS.has(args[0])) {
+    return { mode: 'hub', subArgs: args, port }
   }
 
   const first = args[0]
@@ -141,17 +148,21 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
 function printHelp(): void {
   process.stdout.write(`
-${bold('srm')} — specrails CLI bridge
+${bold('specrails-hub')} — specrails CLI bridge
 
 ${bold('Usage:')}
-  srm implement #42                Run a known specrails verb (prepends /sr:)
-  srm batch-implement #40 #41      Known verbs: ${[...KNOWN_VERBS].join(', ')}
-  srm "any raw prompt"             Pass a raw prompt directly to claude
-  srm --status                     Print manager status and exit
-  srm --jobs                       Print recent job history and exit
-  srm hub <subcommand>             Manage the hub (multi-project mode)
-  srm --port <n>                   Override default port (${DEFAULT_PORT})
-  srm --help                       Show this help text
+  specrails-hub start                        Start the hub server
+  specrails-hub stop                         Stop the hub server
+  specrails-hub status                       Show hub status and registered projects
+  specrails-hub add <path>                   Register a project
+  specrails-hub remove <id>                  Unregister a project
+  specrails-hub list                         List all registered projects
+  specrails-hub implement #42                Run a known specrails verb (prepends /sr:)
+  specrails-hub batch-implement #40 #41      Known verbs: ${[...KNOWN_VERBS].join(', ')}
+  specrails-hub "any raw prompt"             Pass a raw prompt directly to claude
+  specrails-hub --jobs                       Print recent job history and exit
+  specrails-hub --port <n>                   Override default port (${DEFAULT_PORT})
+  specrails-hub --help                       Show this help text
 
 ${bold('Execution paths:')}
   Manager running → POST /api/spawn + stream logs via WebSocket
@@ -275,7 +286,7 @@ export interface SummaryData {
 }
 
 export function printSummary(data: SummaryData): void {
-  const doneLabel = isTTY ? bold('[srm] done') : '[srm] done'
+  const doneLabel = isTTY ? bold('[specrails-hub] done') : '[specrails-hub] done'
   const durationPart = `duration: ${formatDuration(data.durationMs)}`
   const costPart = data.costUsd != null ? `  cost: $${data.costUsd.toFixed(2)}` : ''
   const tokenPart = data.totalTokens != null ? `  tokens: ${formatTokens(data.totalTokens)}` : ''
@@ -345,7 +356,7 @@ async function runViaWebManager(command: string, baseUrl: string): Promise<numbe
       if (!project) {
         srmError(
           'hub is running but no project registered for the current directory.\n' +
-          `  Run: srm hub add ${process.cwd()}`
+          `  Run: specrails-hub hub add ${process.cwd()}`
         )
         return 1
       }
@@ -787,11 +798,11 @@ function isProcessRunning(pid: number): boolean {
 }
 
 function hubServerPath(): string {
-  // srm lives at cli/dist/srm.js; server is at ../server/index.js (built)
-  // In dev mode with tsx, we resolve from __filename
+  // cli/dist/srm.js → base is the package root
   const base = path.resolve(__dirname, '..')
-  // Try compiled JS first, then fall back to tsx dev path
-  const compiled = path.join(base, 'server', 'index.js')
+  // npm install: compiled server at dist/server/index.js
+  const compiled = path.join(base, 'dist', 'server', 'index.js')
+  // dev fallback: run TypeScript source directly via tsx
   const devTs = path.join(base, 'server', 'index.ts')
   if (fs.existsSync(compiled)) return compiled
   if (fs.existsSync(devTs)) return devTs
@@ -879,7 +890,7 @@ async function hubStatus(port: number): Promise<number> {
 async function hubAdd(projectPath: string, port: number): Promise<number> {
   const detection = await detectWebManager(port)
   if (!detection.running) {
-    srmError('hub is not running. Start it first with: srm hub start')
+    srmError('hub is not running. Start it first with: specrails-hub start')
     return 1
   }
   try {
@@ -972,15 +983,15 @@ async function handleHub(subArgs: string[], port: number): Promise<number> {
 
   if (!sub || sub === 'help' || sub === '--help' || sub === '-h') {
     process.stdout.write(`
-${bold('srm hub')} — manage the specrails hub (multi-project mode)
+${bold('specrails-hub')} — manage the specrails hub (multi-project mode)
 
 ${bold('Usage:')}
-  srm hub start              Start the hub server
-  srm hub stop               Stop the hub server
-  srm hub status             Show hub status and registered projects
-  srm hub add <path>         Register a project by path
-  srm hub remove <id>        Unregister a project by ID
-  srm hub list               List all registered projects
+  specrails-hub start              Start the hub server
+  specrails-hub stop               Stop the hub server
+  specrails-hub status             Show hub status and registered projects
+  specrails-hub add <path>         Register a project by path
+  specrails-hub remove <id>        Unregister a project by ID
+  specrails-hub list               List all registered projects
 `.trimStart())
     return 0
   }
@@ -997,7 +1008,7 @@ ${bold('Usage:')}
   if (sub === 'add') {
     const projectPath = subArgs[1]
     if (!projectPath) {
-      srmError('usage: srm hub add <path>')
+      srmError('usage: specrails-hub add <path>')
       return 1
     }
     return hubAdd(projectPath, port)
@@ -1005,7 +1016,7 @@ ${bold('Usage:')}
   if (sub === 'remove') {
     const projectId = subArgs[1]
     if (!projectId) {
-      srmError('usage: srm hub remove <id>')
+      srmError('usage: specrails-hub remove <id>')
       return 1
     }
     return hubRemove(projectId, port)

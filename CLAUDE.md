@@ -30,7 +30,7 @@ npx vitest run server/db.test.ts
 ```
 server/     → Express + WebSocket + SQLite (TypeScript, CommonJS)
 client/     → React + Vite + Tailwind v4 (TypeScript, ESM)
-cli/        → srm CLI bridge (TypeScript, CommonJS)
+cli/        → specrails-hub CLI bridge (TypeScript, CommonJS)
 ```
 
 Server and CLI compile to CommonJS (`tsconfig.json`). Client is ESM with its own `client/tsconfig.json`. Two separate `npm install` are needed (root + `client/`).

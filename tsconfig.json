@@ -10,5 +10,5 @@
     "skipLibCheck": true
   },
   "include": ["server/**/*.ts"],
-  "exclude": ["node_modules", "client"]
+  "exclude": ["node_modules", "client", "server/**/*.test.ts"]
 }

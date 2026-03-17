@@ -1,16 +1,42 @@
 {
   "name": "specrails-hub",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.1.2",
+  "description": "Local dashboard and CLI for managing multiple specrails projects from a single interface",
+  "keywords": [
+    "specrails",
+    "claude",
+    "ai",
+    "pipeline",
+    "dashboard",
+    "cli"
+  ],
+  "author": "fjpulidop",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fjpulidop/specrails-hub.git"
+  },
+  "homepage": "https://github.com/fjpulidop/specrails-hub#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "cli/dist",
+    "dist/server",
+    "client/dist",
+    "README.md",
+    "LICENSE"
+  ],
   "bin": {
-    "srm": "./cli/dist/srm.js"
+    "specrails-hub": "cli/dist/srm.js"
   },
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "cd client && npm run dev",
+    "build:server": "tsc",
     "build:cli": "tsc --project tsconfig.cli.json",
-    "build": "cd client && npm run build && cd .. && npm run build:cli",
+    "build": "cd client && npm run build && cd .. && npm run build:server && npm run build:cli",
     "typecheck": "tsc --noEmit && cd client && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

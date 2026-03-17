@@ -509,12 +509,29 @@ if (isHubMode) {
   })
 }
 
+// ─── Serve client static files (production / npm install) ─────────────────────
+
+// When compiled: __dirname = dist/server/ → client/dist is at ../../client/dist
+// When dev (tsx): __dirname = server/ → client/dist is at ../client/dist
+const clientDistPaths = [
+  path.join(__dirname, '..', '..', 'client', 'dist'),
+  path.join(__dirname, '..', 'client', 'dist'),
+]
+const clientDist = clientDistPaths.find((p) => fs.existsSync(path.join(p, 'index.html')))
+
+if (clientDist) {
+  app.use(express.static(clientDist))
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'))
+  })
+}
+
 // ─── Start server ─────────────────────────────────────────────────────────────
 
 server.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`[error] Port ${port} is already in use. Is another manager instance running?`)
-    console.error(`[error] Try stopping it first: srm hub stop`)
+    console.error(`[error] Try stopping it first: specrails-hub stop`)
     process.exit(1)
   }
   throw err
