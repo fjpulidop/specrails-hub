@@ -122,57 +122,71 @@ export function useProposal(projectId: string | null): {
   }, [projectId, registerHandler, unregisterHandler])
 
   const startProposal = useCallback(async (idea: string): Promise<void> => {
-    const res = await fetch(`${getApiBase()}/propose`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idea }),
-    })
-    if (!res.ok) {
-      const data = await res.json() as { error?: string }
-      dispatch({ type: 'ERROR', errorMessage: data.error ?? 'Failed to start proposal' })
-      return
+    try {
+      const res = await fetch(`${getApiBase()}/propose`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idea }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string }
+        dispatch({ type: 'ERROR', errorMessage: data.error ?? `Server error (${res.status})` })
+        return
+      }
+      const data = await res.json() as { proposalId: string }
+      // Set proposalId immediately so WS messages arriving before re-render are filtered correctly
+      proposalIdRef.current = data.proposalId
+      dispatch({ type: 'START_EXPLORING', proposalId: data.proposalId })
+    } catch (err) {
+      dispatch({ type: 'ERROR', errorMessage: `Connection failed: ${(err as Error).message}` })
     }
-    const data = await res.json() as { proposalId: string }
-    // Set proposalId immediately so WS messages arriving before re-render are filtered correctly
-    proposalIdRef.current = data.proposalId
-    dispatch({ type: 'START_EXPLORING', proposalId: data.proposalId })
   }, [])
 
   const sendRefinement = useCallback(async (feedback: string): Promise<void> => {
     if (!state.proposalId) return
-    const res = await fetch(`${getApiBase()}/propose/${state.proposalId}/refine`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ feedback }),
-    })
-    if (!res.ok) {
-      const data = await res.json() as { error?: string }
-      dispatch({ type: 'ERROR', errorMessage: data.error ?? 'Failed to send refinement' })
-      return
+    try {
+      const res = await fetch(`${getApiBase()}/propose/${state.proposalId}/refine`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedback }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string }
+        dispatch({ type: 'ERROR', errorMessage: data.error ?? 'Failed to send refinement' })
+        return
+      }
+      dispatch({ type: 'APPEND_STREAM', delta: '' })  // clear streaming indicator implicitly via status
+      // Status will transition via WS: refining -> review
+    } catch (err) {
+      dispatch({ type: 'ERROR', errorMessage: `Connection failed: ${(err as Error).message}` })
     }
-    dispatch({ type: 'APPEND_STREAM', delta: '' })  // clear streaming indicator implicitly via status
-    // Status will transition via WS: refining -> review
   }, [state.proposalId])
 
   const createIssue = useCallback(async (): Promise<void> => {
     if (!state.proposalId) return
-    const res = await fetch(`${getApiBase()}/propose/${state.proposalId}/create-issue`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    })
-    if (!res.ok) {
-      const data = await res.json() as { error?: string }
-      dispatch({ type: 'ERROR', errorMessage: data.error ?? 'Failed to create issue' })
+    try {
+      const res = await fetch(`${getApiBase()}/propose/${state.proposalId}/create-issue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string }
+        dispatch({ type: 'ERROR', errorMessage: data.error ?? 'Failed to create issue' })
+      }
+      // Success transitions via WS: proposal_issue_created
+    } catch (err) {
+      dispatch({ type: 'ERROR', errorMessage: `Connection failed: ${(err as Error).message}` })
     }
-    // Success transitions via WS: proposal_issue_created
   }, [state.proposalId])
 
   const cancel = useCallback(async (): Promise<void> => {
     if (!state.proposalId) return
     dispatch({ type: 'CANCELLED' })
-    await fetch(`${getApiBase()}/propose/${state.proposalId}`, {
-      method: 'DELETE',
-    })
+    try {
+      await fetch(`${getApiBase()}/propose/${state.proposalId}`, {
+        method: 'DELETE',
+      })
+    } catch { /* best-effort */ }
   }, [state.proposalId])
 
   const reset = useCallback((): void => {

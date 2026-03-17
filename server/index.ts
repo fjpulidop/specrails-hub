@@ -12,8 +12,10 @@ import { createHooksRouter, getPhaseStates, getPhaseDefinitions } from './hooks'
 import { QueueManager, ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
 import { initDb, listJobs, getJob, getJobEvents, getStats, purgeJobs,
   createConversation, listConversations, getConversation,
-  deleteConversation, updateConversation, addMessage, getMessages } from './db'
+  deleteConversation, updateConversation, addMessage, getMessages,
+  createProposal, getProposal, listProposals, deleteProposal } from './db'
 import { ChatManager } from './chat-manager'
+import { ProposalManager } from './proposal-manager'
 import type { ChatConversationRow } from './types'
 import { getConfig, fetchIssues } from './config'
 import { getAnalytics } from './analytics'
@@ -150,6 +152,7 @@ if (isHubMode) {
   const db = initDb(path.join(process.cwd(), 'data', 'jobs.sqlite'))
   const queueManager = new QueueManager(broadcast, db)
   const chatManager = new ChatManager(broadcast, db)
+  const proposalManager = new ProposalManager(broadcast, db, process.cwd())
 
   try {
     const initialConfig = getConfig(process.cwd(), db, projectName)
@@ -427,6 +430,75 @@ if (isHubMode) {
       res.status(404).json({ error: 'No active stream for this conversation' }); return
     }
     chatManager.abort(req.params.id)
+    res.json({ ok: true })
+  })
+
+  // ─── Proposal routes (legacy mode) ──────────────────────────────────────────
+
+  app.get('/api/propose', (_req, res) => {
+    const limit = Math.min(parseInt(String(_req.query.limit ?? '20'), 10) || 20, 100)
+    const offset = parseInt(String(_req.query.offset ?? '0'), 10) || 0
+    const result = listProposals(db, { limit, offset })
+    res.json(result)
+  })
+
+  app.post('/api/propose', (req, res) => {
+    const { idea } = req.body ?? {}
+    if (!idea || typeof idea !== 'string' || !idea.trim()) {
+      res.status(400).json({ error: 'idea is required' }); return
+    }
+    const id = uuidv4()
+    createProposal(db, { id, idea: idea.trim() })
+    res.status(202).json({ proposalId: id })
+    proposalManager.startExploration(id, idea.trim()).catch((err) => {
+      console.error('[propose] startExploration error:', err)
+    })
+  })
+
+  app.get('/api/propose/:id', (req, res) => {
+    const proposal = getProposal(db, req.params.id)
+    if (!proposal) { res.status(404).json({ error: 'Proposal not found' }); return }
+    res.json({ proposal })
+  })
+
+  app.post('/api/propose/:id/refine', (req, res) => {
+    const proposal = getProposal(db, req.params.id)
+    if (!proposal) { res.status(404).json({ error: 'Proposal not found' }); return }
+    const { feedback } = req.body ?? {}
+    if (!feedback || typeof feedback !== 'string' || !feedback.trim()) {
+      res.status(400).json({ error: 'feedback is required' }); return
+    }
+    if (proposalManager.isActive(req.params.id)) {
+      res.status(409).json({ error: 'PROPOSAL_BUSY' }); return
+    }
+    if (proposal.status !== 'review') {
+      res.status(409).json({ error: 'Proposal is not in review state' }); return
+    }
+    res.status(202).json({ ok: true })
+    proposalManager.sendRefinement(req.params.id, feedback.trim()).catch((err) => {
+      console.error('[propose] sendRefinement error:', err)
+    })
+  })
+
+  app.post('/api/propose/:id/create-issue', (req, res) => {
+    const proposal = getProposal(db, req.params.id)
+    if (!proposal) { res.status(404).json({ error: 'Proposal not found' }); return }
+    if (proposalManager.isActive(req.params.id)) {
+      res.status(409).json({ error: 'PROPOSAL_BUSY' }); return
+    }
+    if (proposal.status !== 'review') {
+      res.status(409).json({ error: 'Proposal is not in review state' }); return
+    }
+    res.status(202).json({ ok: true })
+    proposalManager.createIssue(req.params.id).catch((err) => {
+      console.error('[propose] createIssue error:', err)
+    })
+  })
+
+  app.delete('/api/propose/:id', (req, res) => {
+    const proposal = getProposal(db, req.params.id)
+    if (!proposal) { res.status(404).json({ error: 'Proposal not found' }); return }
+    proposalManager.cancel(req.params.id)
     res.json({ ok: true })
   })
 }
