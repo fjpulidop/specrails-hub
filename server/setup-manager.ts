@@ -55,9 +55,9 @@ function checkFilesystem(projectPath: string): Partial<Record<string, boolean>> 
     product_discovery: hasPersonas,
     agent_generation: hasAgents,
     command_config: hasCommands,
-    // Final verification requires actual generated artifacts
-    final_verification: existsSync(join(projectPath, '.specrails-manifest.json')) &&
-      hasAgents && hasCommands,
+    // Final verification: agents + commands must exist (manifest from install.sh is unreliable —
+    // it's created during scaffolding before /setup generates the actual artifacts)
+    final_verification: hasAgents && hasCommands,
   }
 }
 
@@ -321,13 +321,12 @@ export class SetupManager {
         // Sync filesystem checkpoints
         this._syncFilesystemCheckpoints(projectId, projectPath)
 
-        // Check if setup is truly complete — manifest exists AND real artifacts generated
+        // Check if setup is truly complete — real artifacts must exist
         const hasAgents = existsSync(join(projectPath, '.claude', 'agents')) &&
           hasFiles(join(projectPath, '.claude', 'agents'), /^sr-.*\.md$/)
         const hasCommands = existsSync(join(projectPath, '.claude', 'commands', 'sr')) &&
           hasFiles(join(projectPath, '.claude', 'commands', 'sr'), /\.md$/)
-        const isComplete = existsSync(join(projectPath, '.specrails-manifest.json')) &&
-          hasAgents && hasCommands
+        const isComplete = hasAgents && hasCommands
 
         if (isComplete) {
           const summary = computeSummary(projectPath)
