@@ -33,18 +33,29 @@ export interface CheckpointStatus {
 }
 
 function checkFilesystem(projectPath: string): Partial<Record<string, boolean>> {
+  const hasBaseInstall = existsSync(join(projectPath, '.specrails-version'))
+  const hasSetupTemplates = existsSync(join(projectPath, '.claude', 'setup-templates'))
+  const hasRules = existsSync(join(projectPath, '.claude', 'rules')) &&
+    hasFiles(join(projectPath, '.claude', 'rules'), /\.md$/)
+  const hasPersonas = existsSync(join(projectPath, '.claude', 'agents', 'personas')) &&
+    hasFiles(join(projectPath, '.claude', 'agents', 'personas'), /\.md$/)
   const hasAgents = existsSync(join(projectPath, '.claude', 'agents')) &&
     hasFiles(join(projectPath, '.claude', 'agents'), /^sr-.*\.md$/)
   const hasCommands = existsSync(join(projectPath, '.claude', 'commands', 'sr')) &&
     hasFiles(join(projectPath, '.claude', 'commands', 'sr'), /\.md$/)
+  const hasCLAUDE = existsSync(join(projectPath, 'CLAUDE.md'))
 
   return {
-    base_install: existsSync(join(projectPath, '.specrails-version')),
-    product_discovery: existsSync(join(projectPath, '.claude', 'agents', 'personas')) &&
-      hasFiles(join(projectPath, '.claude', 'agents', 'personas'), /\.md$/),
+    base_install: hasBaseInstall,
+    // repo_analysis: detected when setup templates exist and CLAUDE.md is written
+    // (Claude writes CLAUDE.md after analyzing the repo)
+    repo_analysis: hasBaseInstall && (hasCLAUDE || hasSetupTemplates),
+    // stack_conventions: detected when rules files are generated
+    stack_conventions: hasRules,
+    product_discovery: hasPersonas,
     agent_generation: hasAgents,
     command_config: hasCommands,
-    // Final verification requires BOTH the manifest AND actual generated artifacts
+    // Final verification requires actual generated artifacts
     final_verification: existsSync(join(projectPath, '.specrails-manifest.json')) &&
       hasAgents && hasCommands,
   }
@@ -136,6 +147,7 @@ export class SetupManager {
     this._setupProcesses = new Map()
     this._checkpoints = new Map()
     this._checkpointStart = new Map()
+    this._pollTimers = new Map()
   }
 
   // ─── Install: npx specrails ──────────────────────────────────────────────────
@@ -221,6 +233,25 @@ export class SetupManager {
     this._spawnSetup(projectId, projectPath, args)
   }
 
+  // Active filesystem poll timers per project
+  private _pollTimers: Map<string, ReturnType<typeof setInterval>>
+
+  private _startFilesystemPoll(projectId: string, projectPath: string): void {
+    this._stopFilesystemPoll(projectId)
+    const timer = setInterval(() => {
+      this._syncFilesystemCheckpoints(projectId, projectPath)
+    }, 3000)
+    this._pollTimers.set(projectId, timer)
+  }
+
+  private _stopFilesystemPoll(projectId: string): void {
+    const timer = this._pollTimers.get(projectId)
+    if (timer) {
+      clearInterval(timer)
+      this._pollTimers.delete(projectId)
+    }
+  }
+
   private _spawnSetup(projectId: string, projectPath: string, args: string[]): void {
     const child = spawn('claude', args, {
       cwd: projectPath,
@@ -230,6 +261,9 @@ export class SetupManager {
     })
 
     this._setupProcesses.set(projectId, child)
+
+    // Start periodic filesystem polling for checkpoint detection
+    this._startFilesystemPoll(projectId, projectPath)
 
     let capturedSessionId: string | null = null
 
@@ -250,12 +284,6 @@ export class SetupManager {
       } else {
         // Plain text line — broadcast as log
         this._broadcast({ type: 'setup_log', projectId, line, stream: 'stdout' })
-
-        // Attempt checkpoint detection from plain text
-        const hit = detectCheckpointFromLine(line)
-        if (hit) {
-          this._advanceCheckpoint(projectId, hit.key, hit.detail)
-        }
       }
     })
 
@@ -265,6 +293,10 @@ export class SetupManager {
 
     child.on('close', (code) => {
       this._setupProcesses.delete(projectId)
+      this._stopFilesystemPoll(projectId)
+
+      // Final filesystem sync
+      this._syncFilesystemCheckpoints(projectId, projectPath)
 
       if (code === 0) {
         // Sync filesystem checkpoints
@@ -421,6 +453,8 @@ export class SetupManager {
   // ─── Abort ────────────────────────────────────────────────────────────────────
 
   abort(projectId: string): void {
+    this._stopFilesystemPoll(projectId)
+
     const installChild = this._installProcesses.get(projectId)
     if (installChild?.pid) {
       treeKill(installChild.pid, 'SIGTERM')

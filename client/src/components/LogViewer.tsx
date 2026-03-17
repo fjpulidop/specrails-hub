@@ -6,38 +6,13 @@ import { Input } from './ui/input'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
 import type { EventRow } from '../types'
+import { hasMarkdownSyntax } from '../lib/markdown-detect'
 
 interface FormattedLine {
   id: string
   content: string
   type: 'phase' | 'tool-use' | 'tool-result' | 'assistant' | 'stderr' | 'result' | 'log' | 'plain'
   timestamp?: string
-}
-
-// Detect lines that contain markdown formatting
-function hasMarkdownSyntax(line: string): boolean {
-  const trimmed = line.trimStart()
-  // Headers
-  if (/^#{1,6}\s/.test(trimmed)) return true
-  // Unordered lists
-  if (/^[-*+]\s/.test(trimmed)) return true
-  // Ordered lists
-  if (/^\d+\.\s/.test(trimmed)) return true
-  // Tables
-  if (/^\|.+\|/.test(trimmed)) return true
-  // Code blocks
-  if (trimmed.startsWith('```')) return true
-  // Blockquotes
-  if (trimmed.startsWith('> ')) return true
-  // Bold, italic, inline code, links (within normal text)
-  if (/\*\*[^*]+\*\*/.test(line)) return true
-  if (/`[^`]+`/.test(line)) return true
-  if (/\[.+\]\(.+\)/.test(line)) return true
-  // Horizontal rules
-  if (/^(-{3,}|_{3,}|\*{3,})$/.test(trimmed)) return true
-  // Checkboxes
-  if (/^- \[[ x]\]\s/.test(trimmed)) return true
-  return false
 }
 
 function parseEvent(event: EventRow, idx: number): FormattedLine | null {

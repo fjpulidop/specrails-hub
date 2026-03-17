@@ -1,6 +1,9 @@
-import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useCallback, useLayoutEffect, memo } from 'react'
 import { Check, ArrowRight, Package, Bot, Terminal, Users, RotateCcw } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Button } from './ui/button'
+import { hasMarkdownSyntax } from '../lib/markdown-detect'
 import { CheckpointTracker, type CheckpointState } from './CheckpointTracker'
 import { SetupChat, type SetupChatMessage } from './SetupChat'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
@@ -103,6 +106,52 @@ function ProposalStep({
   )
 }
 
+// ─── Shared log renderer with markdown support ───────────────────────────────
+
+const SetupLogLines = memo(function SetupLogLines({ lines }: { lines: string[] }) {
+  // Merge consecutive markdown lines into blocks
+  const blocks: { isMarkdown: boolean; content: string }[] = []
+  for (const line of lines) {
+    const isMd = hasMarkdownSyntax(line)
+    const prev = blocks.length > 0 ? blocks[blocks.length - 1] : null
+    if (isMd && prev?.isMarkdown) {
+      prev.content += '\n' + line
+    } else {
+      blocks.push({ isMarkdown: isMd, content: line })
+    }
+  }
+
+  return (
+    <>
+      {blocks.map((block, i) =>
+        block.isMarkdown ? (
+          <div
+            key={i}
+            className="prose prose-invert prose-xs max-w-none
+              prose-p:my-1 prose-p:leading-relaxed
+              prose-headings:mt-2 prose-headings:mb-1 prose-headings:text-sm prose-headings:font-semibold
+              prose-ul:my-1 prose-ol:my-1 prose-li:my-0
+              prose-code:text-cyan-300 prose-code:text-[10px] prose-code:bg-muted/40 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
+              prose-pre:my-1 prose-pre:bg-muted/30 prose-pre:rounded-md prose-pre:p-2 prose-pre:text-[10px]
+              prose-strong:text-foreground prose-em:text-foreground/70
+              prose-table:my-2 prose-table:text-[10px]
+              prose-thead:border-border prose-thead:bg-muted/30
+              prose-th:px-2 prose-th:py-1 prose-th:text-left prose-th:font-semibold
+              prose-td:px-2 prose-td:py-1 prose-td:border-border
+              text-foreground/80"
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.content}</ReactMarkdown>
+          </div>
+        ) : (
+          <div key={i} className="whitespace-pre-wrap break-all leading-tight font-mono text-[10px]">
+            {block.content}
+          </div>
+        )
+      )}
+    </>
+  )
+})
+
 // ─── Phase 3: Installing ──────────────────────────────────────────────────────
 
 function InstallingStep({
@@ -122,15 +171,11 @@ function InstallingStep({
         </div>
       </div>
 
-      <div className="flex-1 rounded-lg border border-border/30 bg-muted/10 overflow-auto p-3 font-mono text-[9px] text-muted-foreground space-y-0.5">
+      <div className="flex-1 rounded-lg border border-border/30 bg-muted/10 overflow-auto p-3 text-[11px] text-muted-foreground space-y-0.5">
         {logLines.length === 0 ? (
           <p className="text-center text-muted-foreground mt-4">Waiting for output...</p>
         ) : (
-          logLines.slice(-300).map((line, i) => (
-            <div key={i} className="whitespace-pre-wrap break-all leading-tight">
-              {line}
-            </div>
-          ))
+          <SetupLogLines lines={logLines.slice(-300)} />
         )}
       </div>
     </div>
