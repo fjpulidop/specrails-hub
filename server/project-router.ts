@@ -10,6 +10,7 @@ import {
   createProposal, getProposal, listProposals, deleteProposal,
 } from './db'
 import { ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
+import { resolveCommand } from './command-resolver'
 import { createHooksRouter, getPhaseStates } from './hooks'
 import { getConfig, fetchIssues } from './config'
 import { getAnalytics } from './analytics'
@@ -384,6 +385,12 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const { idea } = req.body ?? {}
     if (!idea || typeof idea !== 'string' || !idea.trim()) {
       res.status(400).json({ error: 'idea is required' }); return
+    }
+    // Pre-check: does the propose-feature command exist in this project?
+    const testCmd = `/sr:propose-feature test`
+    const resolved = resolveCommand(testCmd, ctx(req).project.path)
+    if (resolved === testCmd) {
+      res.status(400).json({ error: 'This project does not have the /sr:propose-feature command installed. Run "npx specrails" to update.' }); return
     }
     const id = uuidv4()
     createProposal(ctx(req).db, { id, idea: idea.trim() })

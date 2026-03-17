@@ -19,6 +19,7 @@ import { ProposalManager } from './proposal-manager'
 import type { ChatConversationRow } from './types'
 import { getConfig, fetchIssues } from './config'
 import { getAnalytics } from './analytics'
+import { resolveCommand } from './command-resolver'
 import { v4 as uuidv4 } from 'uuid'
 
 // Read package.json version once at startup
@@ -446,6 +447,11 @@ if (isHubMode) {
     const { idea } = req.body ?? {}
     if (!idea || typeof idea !== 'string' || !idea.trim()) {
       res.status(400).json({ error: 'idea is required' }); return
+    }
+    const testCmd = `/sr:propose-feature test`
+    const resolved = resolveCommand(testCmd, process.cwd())
+    if (resolved === testCmd) {
+      res.status(400).json({ error: 'This project does not have the /sr:propose-feature command installed. Run "npx specrails" to update.' }); return
     }
     const id = uuidv4()
     createProposal(db, { id, idea: idea.trim() })

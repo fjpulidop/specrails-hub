@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+// Mock command-resolver to always return a resolved prompt (command exists)
+vi.mock('./command-resolver', () => ({
+  resolveCommand: vi.fn(() => 'Resolved prompt for testing'),
+}))
+
 // Mock config module
 vi.mock('./config', () => ({
   getConfig: vi.fn().mockReturnValue({
