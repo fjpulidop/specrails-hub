@@ -9,6 +9,7 @@ export type ProposalStatus =
   | 'exploring'
   | 'review'
   | 'refining'
+  | 'creating_issue'
   | 'created'
   | 'cancelled'
   | 'error'
@@ -27,6 +28,7 @@ type ProposalAction =
   | { type: 'APPEND_STREAM'; delta: string }
   | { type: 'PROPOSAL_READY'; markdown: string }
   | { type: 'PROPOSAL_REFINED'; markdown: string }
+  | { type: 'CREATING_ISSUE' }
   | { type: 'ISSUE_CREATED'; issueUrl: string }
   | { type: 'ERROR'; errorMessage: string }
   | { type: 'CANCELLED' }
@@ -57,8 +59,10 @@ function proposalReducer(state: ProposalState, action: ProposalAction): Proposal
       return { ...state, status: 'review', resultMarkdown: stripToolMarkers(action.markdown), streamingText: '' }
     case 'PROPOSAL_REFINED':
       return { ...state, status: 'review', resultMarkdown: stripToolMarkers(action.markdown), streamingText: '' }
+    case 'CREATING_ISSUE':
+      return { ...state, status: 'creating_issue', streamingText: '', errorMessage: null }
     case 'ISSUE_CREATED':
-      return { ...state, status: 'created', issueUrl: action.issueUrl }
+      return { ...state, status: 'created', issueUrl: action.issueUrl, streamingText: '' }
     case 'ERROR':
       return { ...state, status: 'error', errorMessage: action.errorMessage }
     case 'CANCELLED':
@@ -168,6 +172,7 @@ export function useProposal(projectId: string | null): {
 
   const createIssue = useCallback(async (): Promise<void> => {
     if (!state.proposalId) return
+    dispatch({ type: 'CREATING_ISSUE' })
     try {
       const res = await fetch(`${getApiBase()}/propose/${state.proposalId}/create-issue`, {
         method: 'POST',
