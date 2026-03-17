@@ -11,9 +11,9 @@ vi.mock('tree-kill', () => ({
   default: vi.fn(),
 }))
 
-// Mock command-resolver to return the raw command for testing
+// Mock command-resolver to return a resolved prompt (different from raw command)
 vi.mock('./command-resolver', () => ({
-  resolveCommand: vi.fn((command: string) => command),
+  resolveCommand: vi.fn((command: string) => 'Resolved prompt for: ' + command),
 }))
 
 import { spawn as mockSpawn } from 'child_process'
