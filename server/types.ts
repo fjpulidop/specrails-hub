@@ -295,6 +295,12 @@ export interface SetupErrorMessage {
   error: string
 }
 
+export interface SetupTurnDoneMessage {
+  type: 'setup_turn_done'
+  projectId: string
+  sessionId?: string
+}
+
 export type WsMessage =
   | LogMessage | PhaseMessage | InitMessage | QueueMessage | EventMessage
   | ChatStreamMessage | ChatDoneMessage | ChatErrorMessage
@@ -302,4 +308,5 @@ export type WsMessage =
   | HubProjectsMessage | HubProjectAddedMessage | HubProjectRemovedMessage
   | SetupLogMessage | SetupCheckpointMessage | SetupChatMessage
   | SetupInstallDoneMessage | SetupCompleteMessage | SetupErrorMessage
+  | SetupTurnDoneMessage
 

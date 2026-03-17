@@ -260,16 +260,29 @@ export class SetupManager {
       this._setupProcesses.delete(projectId)
 
       if (code === 0) {
-        // Mark final_verification done if manifest exists
+        // Sync filesystem checkpoints
         this._syncFilesystemCheckpoints(projectId, projectPath)
 
-        const summary = computeSummary(projectPath)
-        this._broadcast({
-          type: 'setup_complete',
-          projectId,
-          sessionId: capturedSessionId ?? undefined,
-          summary,
-        })
+        // Check if setup is truly complete (.specrails-manifest.json exists)
+        const isComplete = existsSync(join(projectPath, '.specrails-manifest.json'))
+
+        if (isComplete) {
+          const summary = computeSummary(projectPath)
+          this._broadcast({
+            type: 'setup_complete',
+            projectId,
+            sessionId: capturedSessionId ?? undefined,
+            summary,
+          })
+        } else {
+          // Claude finished one turn but setup isn't done yet.
+          // Emit turn_done so the wizard knows to wait for user input.
+          this._broadcast({
+            type: 'setup_turn_done',
+            projectId,
+            sessionId: capturedSessionId ?? undefined,
+          })
+        }
       } else {
         this._broadcast({
           type: 'setup_error',

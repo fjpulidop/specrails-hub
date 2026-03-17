@@ -270,6 +270,22 @@ export function SetupWizard({ project, onComplete, onSkip }: SetupWizardProps) {
         break
       }
 
+      case 'setup_turn_done': {
+        // Claude finished one turn but setup isn't complete yet.
+        // Save session ID and flush streaming text — wait for user input.
+        const turnSid = msg.sessionId as string | undefined
+        if (turnSid) setSessionId(turnSid)
+
+        setStreamingText((prev) => {
+          if (prev) {
+            setChatMessages((msgs) => [...msgs, { role: 'assistant', text: prev }])
+          }
+          return ''
+        })
+        setIsStreaming(false)
+        break
+      }
+
       case 'setup_complete': {
         const sid = msg.sessionId as string | undefined
         if (sid) setSessionId(sid)
