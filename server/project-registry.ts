@@ -4,6 +4,7 @@ import { initDb } from './db'
 import { QueueManager } from './queue-manager'
 import { ChatManager } from './chat-manager'
 import { SetupManager } from './setup-manager'
+import { ProposalManager } from './proposal-manager'
 import type { WsMessage } from './types'
 import {
   initHubDb,
@@ -26,6 +27,7 @@ export interface ProjectContext {
   queueManager: QueueManager
   chatManager: ChatManager
   setupManager: SetupManager
+  proposalManager: ProposalManager
   broadcast: (msg: WsMessage) => void
 }
 
@@ -111,6 +113,7 @@ export class ProjectRegistry {
     const queueManager = new QueueManager(boundBroadcast, db, undefined, project.path)
     const chatManager = new ChatManager(boundBroadcast, db, project.path)
     const setupManager = new SetupManager(boundBroadcast)
+    const proposalManager = new ProposalManager(boundBroadcast, db, project.path)
 
     // Load commands for this project
     try {
@@ -120,7 +123,7 @@ export class ProjectRegistry {
       // Non-fatal: project may not have commands yet
     }
 
-    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, broadcast: boundBroadcast }
+    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, broadcast: boundBroadcast }
     this._contexts.set(project.id, ctx)
     return ctx
   }

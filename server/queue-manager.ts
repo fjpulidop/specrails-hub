@@ -1,10 +1,9 @@
 import { spawn, execSync, ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
-import { readFileSync, existsSync } from 'fs'
-import { join } from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import treeKill from 'tree-kill'
 import type { WsMessage, LogMessage, Job, PhaseDefinition } from './types'
+import { resolveCommand } from './command-resolver'
 import { resetPhases, setActivePhases } from './hooks'
 import { createJob, finishJob, appendEvent } from './db'
 import type { JobResult } from './db'
@@ -227,46 +226,10 @@ export class QueueManager {
 
   /**
    * Resolve a slash command into a full prompt with $ARGUMENTS substituted.
-   * For /sr:implement #130 → reads .claude/commands/sr/implement.md, strips
-   * frontmatter, replaces $ARGUMENTS with "#130". Non-slash commands pass through.
+   * Delegates to the shared resolveCommand utility in command-resolver.ts.
    */
   private _resolveCommand(command: string): string {
-    const match = command.match(/^\/([^\s]+)\s*(.*)$/s)
-    if (!match) return command
-
-    const commandPath = match[1] // e.g. "sr:implement" or "sr:batch-implement"
-    const commandArgs = match[2].trim() // e.g. "#130 #132 #133"
-
-    // Convert "sr:implement" → ".claude/commands/sr/implement.md"
-    const filePath = join(
-      process.cwd(),
-      '.claude', 'commands',
-      ...commandPath.split(':').map((p) => p),
-    ) + '.md'
-
-    // Also try skills directory
-    const skillPath = join(
-      process.cwd(),
-      '.claude', 'skills',
-      ...commandPath.split(':').map((p) => p),
-    ) + '.md'
-
-    const resolvedPath = existsSync(filePath) ? filePath : existsSync(skillPath) ? skillPath : null
-
-    if (!resolvedPath) {
-      // Can't find the command file — pass through as-is
-      return command
-    }
-
-    let content = readFileSync(resolvedPath, 'utf-8')
-
-    // Strip YAML frontmatter
-    content = content.replace(/^---[\s\S]*?---\s*/, '')
-
-    // Substitute $ARGUMENTS
-    content = content.replace(/\$ARGUMENTS/g, commandArgs)
-
-    return content.trim()
+    return resolveCommand(command, this._cwd ?? process.cwd())
   }
 
   private _phasesForCommand(command: string): PhaseDefinition[] {

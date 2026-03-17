@@ -265,14 +265,15 @@ export interface IssueItem {
 
 export function fetchIssues(
   tracker: 'github' | 'jira',
-  opts: { search?: string; label?: string; repo?: string | null }
+  opts: { search?: string; label?: string; repo?: string | null; cwd?: string }
 ): IssueItem[] {
   if (tracker === 'github') {
     const args = ['gh', 'issue', 'list', '--json', 'number,title,labels,body,url', '--limit', '50']
+    if (opts.repo) args.push('--repo', opts.repo)
     if (opts.label) args.push('--label', opts.label)
     if (opts.search) args.push('--search', opts.search)
 
-    const output = runCommand(args.join(' '))
+    const output = runCommand(args.join(' '), opts.cwd)
     if (!output) return []
 
     try {

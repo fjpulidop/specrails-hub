@@ -7,8 +7,10 @@ import {
   createConversation, listConversations, getConversation,
   deleteConversation, updateConversation, getMessages,
   getStats,
+  createProposal, getProposal, listProposals, deleteProposal,
 } from './db'
 import { ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
+import { resolveCommand } from './command-resolver'
 import { createHooksRouter, getPhaseStates } from './hooks'
 import { getConfig, fetchIssues } from './config'
 import { getAnalytics } from './analytics'
@@ -233,7 +235,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       }
       const search = req.query.search as string | undefined
       const label = req.query.label as string | undefined
-      const issues = fetchIssues(tracker, { search, label, repo: config.project.repo })
+      const issues = fetchIssues(tracker, { search, label, repo: config.project.repo, cwd: project.path })
       res.json(issues)
     } catch (err) {
       console.error('[project-router] issues error:', err)
@@ -367,6 +369,81 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   router.post('/:projectId/setup/abort', (req: Request, res: Response) => {
     const { project, setupManager } = ctx(req)
     setupManager.abort(project.id)
+    res.json({ ok: true })
+  })
+
+  // ─── Proposal routes ──────────────────────────────────────────────────────
+
+  router.get('/:projectId/propose', (req: Request, res: Response) => {
+    const limit = Math.min(parseInt(String(req.query.limit ?? '20'), 10) || 20, 100)
+    const offset = parseInt(String(req.query.offset ?? '0'), 10) || 0
+    const result = listProposals(ctx(req).db, { limit, offset })
+    res.json(result)
+  })
+
+  router.post('/:projectId/propose', async (req: Request, res: Response) => {
+    const { idea } = req.body ?? {}
+    if (!idea || typeof idea !== 'string' || !idea.trim()) {
+      res.status(400).json({ error: 'idea is required' }); return
+    }
+    // Pre-check: does the propose-feature command exist in this project?
+    const testCmd = `/sr:propose-feature test`
+    const resolved = resolveCommand(testCmd, ctx(req).project.path)
+    if (resolved === testCmd) {
+      res.status(400).json({ error: 'This project does not have the /sr:propose-feature command installed. Run "npx specrails" to update.' }); return
+    }
+    const id = uuidv4()
+    createProposal(ctx(req).db, { id, idea: idea.trim() })
+    res.status(202).json({ proposalId: id })
+    ctx(req).proposalManager.startExploration(id, idea.trim()).catch((err) => {
+      console.error('[project-router] proposal startExploration error:', err)
+    })
+  })
+
+  router.get('/:projectId/propose/:id', (req: Request, res: Response) => {
+    const proposal = getProposal(ctx(req).db, req.params.id)
+    if (!proposal) { res.status(404).json({ error: 'Proposal not found' }); return }
+    res.json({ proposal })
+  })
+
+  router.post('/:projectId/propose/:id/refine', async (req: Request, res: Response) => {
+    const proposal = getProposal(ctx(req).db, req.params.id)
+    if (!proposal) { res.status(404).json({ error: 'Proposal not found' }); return }
+    const { feedback } = req.body ?? {}
+    if (!feedback || typeof feedback !== 'string' || !feedback.trim()) {
+      res.status(400).json({ error: 'feedback is required' }); return
+    }
+    if (ctx(req).proposalManager.isActive(req.params.id)) {
+      res.status(409).json({ error: 'PROPOSAL_BUSY' }); return
+    }
+    if (proposal.status !== 'review') {
+      res.status(409).json({ error: 'Proposal is not in review state' }); return
+    }
+    res.status(202).json({ ok: true })
+    ctx(req).proposalManager.sendRefinement(req.params.id, feedback.trim()).catch((err) => {
+      console.error('[project-router] proposal sendRefinement error:', err)
+    })
+  })
+
+  router.post('/:projectId/propose/:id/create-issue', async (req: Request, res: Response) => {
+    const proposal = getProposal(ctx(req).db, req.params.id)
+    if (!proposal) { res.status(404).json({ error: 'Proposal not found' }); return }
+    if (ctx(req).proposalManager.isActive(req.params.id)) {
+      res.status(409).json({ error: 'PROPOSAL_BUSY' }); return
+    }
+    if (proposal.status !== 'review') {
+      res.status(409).json({ error: 'Proposal is not in review state' }); return
+    }
+    res.status(202).json({ ok: true })
+    ctx(req).proposalManager.createIssue(req.params.id).catch((err) => {
+      console.error('[project-router] proposal createIssue error:', err)
+    })
+  })
+
+  router.delete('/:projectId/propose/:id', (req: Request, res: Response) => {
+    const proposal = getProposal(ctx(req).db, req.params.id)
+    if (!proposal) { res.status(404).json({ error: 'Proposal not found' }); return }
+    ctx(req).proposalManager.cancel(req.params.id)
     res.json({ ok: true })
   })
 

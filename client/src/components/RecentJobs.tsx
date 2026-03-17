@@ -54,9 +54,11 @@ interface RecentJobsProps {
   jobs: JobSummary[]
   isLoading?: boolean
   onJobsCleared?: () => void
+  onProposalClick?: (proposalId: string) => void
+  onProposalDelete?: (proposalId: string) => void
 }
 
-export function RecentJobs({ jobs, isLoading, onJobsCleared }: RecentJobsProps) {
+export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, onProposalDelete }: RecentJobsProps) {
   const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState<JobStatus | null>(null)
   const [dateFrom, setDateFrom] = useState('')
@@ -220,11 +222,21 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared }: RecentJobsProps) 
           const duration = formatDuration(job.duration_ms)
           const tokens = formatTokens(job.tokens_out)
 
+          const isProposal = job.id.startsWith('proposal:')
+          const proposalId = isProposal ? job.id.replace('proposal:', '') : null
+
           return (
             <div
               key={job.id}
+              role="button"
               className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent/50 transition-colors cursor-pointer group"
-              onClick={() => navigate(`/jobs/${job.id}`)}
+              onClick={() => {
+                if (isProposal && proposalId) {
+                  onProposalClick?.(proposalId)
+                } else {
+                  navigate(`/jobs/${job.id}`)
+                }
+              }}
             >
               {/* Status badge */}
               <Tooltip>
@@ -247,6 +259,16 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared }: RecentJobsProps) 
                 <span className="w-12 text-right">{tokens ? `${tokens}` : '—'}</span>
                 <span className="w-12 text-right">{cost ?? '—'}</span>
                 <span className="w-20 text-right">{formatRelTime(job.started_at)}</span>
+                {isProposal && proposalId && (
+                  <button
+                    type="button"
+                    className="w-4 h-4 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
+                    onClick={(e) => { e.stopPropagation(); onProposalDelete?.(proposalId) }}
+                    title="Delete proposal"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
               </div>
             </div>
           )

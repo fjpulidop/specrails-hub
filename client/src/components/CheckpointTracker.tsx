@@ -15,11 +15,6 @@ interface CheckpointTrackerProps {
   logLines: string[]
 }
 
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`
-  return `${(ms / 1000).toFixed(1)}s`
-}
-
 function CheckpointNode({ checkpoint, index }: { checkpoint: CheckpointState; index: number }) {
   const isDone = checkpoint.status === 'done'
   const isRunning = checkpoint.status === 'running'
@@ -61,11 +56,7 @@ function CheckpointNode({ checkpoint, index }: { checkpoint: CheckpointState; in
           >
             {checkpoint.name}
           </span>
-          {isDone && checkpoint.duration_ms !== undefined && (
-            <span className="text-[10px] text-muted-foreground">
-              {formatDuration(checkpoint.duration_ms)}
-            </span>
-          )}
+          {/* duration intentionally hidden — it clutters the UI */}
         </div>
         {(isRunning || isDone) && checkpoint.detail && (
           <p className="text-[10px] text-muted-foreground mt-0.5 truncate">

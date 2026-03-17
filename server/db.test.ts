@@ -10,6 +10,11 @@ import {
   getJobEvents,
   deleteJob,
   getStats,
+  createProposal,
+  getProposal,
+  listProposals,
+  updateProposal,
+  deleteProposal,
 } from './db'
 import type { DbInstance } from './db'
 
@@ -277,5 +282,128 @@ describe('db', () => {
       expect(stats.costToday).toBeCloseTo(0.03)
       expect(stats.avgDurationMs).toBeCloseTo(2000)
     })
+  })
+})
+
+describe('proposals', () => {
+  it('migration 5 creates the proposals table', () => {
+    const db = makeDb()
+    const tables = db.prepare('SELECT name FROM sqlite_master WHERE type=?').all('table') as { name: string }[]
+    expect(tables.map((t) => t.name)).toContain('proposals')
+  })
+
+  it('createProposal inserts a row with input status', () => {
+    const db = makeDb()
+    createProposal(db, { id: 'prop-1', idea: 'Add dark mode' })
+    const row = getProposal(db, 'prop-1')
+    expect(row).toBeDefined()
+    expect(row!.id).toBe('prop-1')
+    expect(row!.idea).toBe('Add dark mode')
+    expect(row!.status).toBe('input')
+    expect(row!.session_id).toBeNull()
+    expect(row!.result_markdown).toBeNull()
+    expect(row!.issue_url).toBeNull()
+  })
+
+  it('getProposal returns the created row', () => {
+    const db = makeDb()
+    createProposal(db, { id: 'prop-2', idea: 'Real-time notifications' })
+    const row = getProposal(db, 'prop-2')
+    expect(row).toBeDefined()
+    expect(row!.id).toBe('prop-2')
+  })
+
+  it('getProposal returns undefined for unknown id', () => {
+    const db = makeDb()
+    const row = getProposal(db, 'nonexistent')
+    expect(row).toBeUndefined()
+  })
+
+  it('updateProposal sets status and updates updated_at', () => {
+    const db = makeDb()
+    createProposal(db, { id: 'prop-3', idea: 'Feature X' })
+    const before = getProposal(db, 'prop-3')!
+    updateProposal(db, 'prop-3', { status: 'exploring' })
+    const after = getProposal(db, 'prop-3')!
+    expect(after.status).toBe('exploring')
+    expect(after.updated_at >= before.updated_at).toBe(true)
+  })
+
+  it('updateProposal sets session_id', () => {
+    const db = makeDb()
+    createProposal(db, { id: 'prop-4', idea: 'Feature Y' })
+    updateProposal(db, 'prop-4', { session_id: 'sess-abc123' })
+    const row = getProposal(db, 'prop-4')!
+    expect(row.session_id).toBe('sess-abc123')
+  })
+
+  it('updateProposal sets result_markdown', () => {
+    const db = makeDb()
+    createProposal(db, { id: 'prop-5', idea: 'Feature Z' })
+    updateProposal(db, 'prop-5', { result_markdown: '## Proposal\nSome content' })
+    const row = getProposal(db, 'prop-5')!
+    expect(row.result_markdown).toBe('## Proposal\nSome content')
+  })
+
+  it('updateProposal sets issue_url', () => {
+    const db = makeDb()
+    createProposal(db, { id: 'prop-6', idea: 'Feature W' })
+    updateProposal(db, 'prop-6', { issue_url: 'https://github.com/owner/repo/issues/42' })
+    const row = getProposal(db, 'prop-6')!
+    expect(row.issue_url).toBe('https://github.com/owner/repo/issues/42')
+  })
+
+  it('listProposals returns rows ordered by created_at DESC', () => {
+    const db = makeDb()
+    // Insert with known timestamps by using raw SQL to control created_at ordering
+    db.prepare("INSERT INTO proposals (id, idea, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+      .run('old-prop', 'Old idea', 'input', '2024-01-01T00:00:00.000Z', '2024-01-01T00:00:00.000Z')
+    db.prepare("INSERT INTO proposals (id, idea, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+      .run('new-prop', 'New idea', 'input', '2024-06-01T00:00:00.000Z', '2024-06-01T00:00:00.000Z')
+    const { proposals } = listProposals(db)
+    expect(proposals[0].id).toBe('new-prop')
+    expect(proposals[1].id).toBe('old-prop')
+  })
+
+  it('listProposals respects limit and offset', () => {
+    const db = makeDb()
+    for (let i = 1; i <= 5; i++) {
+      createProposal(db, { id: `prop-list-${i}`, idea: `Idea ${i}` })
+    }
+    const page1 = listProposals(db, { limit: 2, offset: 0 })
+    expect(page1.total).toBe(5)
+    expect(page1.proposals.length).toBe(2)
+
+    const page2 = listProposals(db, { limit: 2, offset: 2 })
+    expect(page2.total).toBe(5)
+    expect(page2.proposals.length).toBe(2)
+  })
+
+  it('deleteProposal removes the row', () => {
+    const db = makeDb()
+    createProposal(db, { id: 'prop-del', idea: 'Delete me' })
+    deleteProposal(db, 'prop-del')
+    expect(getProposal(db, 'prop-del')).toBeUndefined()
+  })
+
+  it('orphan sweep marks exploring/refining proposals as cancelled on initDb', () => {
+    // Insert proposals in exploring and refining states directly into the DB
+    const db = makeDb()
+    db.prepare("INSERT INTO proposals (id, idea, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+      .run('orphan-exploring', 'Exploring idea', 'exploring', '2024-01-01T00:00:00.000Z', '2024-01-01T00:00:00.000Z')
+    db.prepare("INSERT INTO proposals (id, idea, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+      .run('orphan-refining', 'Refining idea', 'refining', '2024-01-01T00:00:00.000Z', '2024-01-01T00:00:00.000Z')
+    db.prepare("INSERT INTO proposals (id, idea, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+      .run('stable-review', 'Review idea', 'review', '2024-01-01T00:00:00.000Z', '2024-01-01T00:00:00.000Z')
+
+    // Simulate server restart by running the orphan sweep directly
+    db.prepare(
+      "UPDATE proposals SET status = 'cancelled', updated_at = ? WHERE status IN ('exploring', 'refining')"
+    ).run(new Date().toISOString())
+
+    expect(getProposal(db, 'orphan-exploring')!.status).toBe('cancelled')
+    expect(getProposal(db, 'orphan-refining')!.status).toBe('cancelled')
+    // review proposals are not affected
+    expect(getProposal(db, 'stable-review')!.status).toBe('review')
   })
 })

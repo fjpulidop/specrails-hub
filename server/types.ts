@@ -12,6 +12,10 @@ export interface PhaseDefinition {
 import type { ProjectRow } from './hub-db'
 export type { ProjectRow }
 
+// ─── ProposalRow re-export ────────────────────────────────────────────────────
+
+export type { ProposalRow } from './db'
+
 export interface LogMessage {
   type: 'log'
   source: 'stdout' | 'stderr'
@@ -301,6 +305,48 @@ export interface SetupTurnDoneMessage {
   sessionId?: string
 }
 
+// ─── Proposal message types ───────────────────────────────────────────────────
+
+export interface ProposalStreamMessage {
+  type: 'proposal_stream'
+  projectId: string
+  proposalId: string
+  delta: string
+  timestamp: string
+}
+
+export interface ProposalReadyMessage {
+  type: 'proposal_ready'
+  projectId: string
+  proposalId: string
+  markdown: string
+  timestamp: string
+}
+
+export interface ProposalRefinedMessage {
+  type: 'proposal_refined'
+  projectId: string
+  proposalId: string
+  markdown: string
+  timestamp: string
+}
+
+export interface ProposalIssueCreatedMessage {
+  type: 'proposal_issue_created'
+  projectId: string
+  proposalId: string
+  issueUrl: string
+  timestamp: string
+}
+
+export interface ProposalErrorMessage {
+  type: 'proposal_error'
+  projectId: string
+  proposalId: string
+  error: string
+  timestamp: string
+}
+
 export type WsMessage =
   | LogMessage | PhaseMessage | InitMessage | QueueMessage | EventMessage
   | ChatStreamMessage | ChatDoneMessage | ChatErrorMessage
@@ -309,4 +355,6 @@ export type WsMessage =
   | SetupLogMessage | SetupCheckpointMessage | SetupChatMessage
   | SetupInstallDoneMessage | SetupCompleteMessage | SetupErrorMessage
   | SetupTurnDoneMessage
+  | ProposalStreamMessage | ProposalReadyMessage | ProposalRefinedMessage
+  | ProposalIssueCreatedMessage | ProposalErrorMessage
 

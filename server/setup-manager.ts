@@ -300,6 +300,19 @@ export class SetupManager {
           const sid = parsed.session_id as string | undefined
           if (sid) capturedSessionId = sid
         }
+
+        // Also broadcast as raw log for the collapsible log viewer
+        const eventType = parsed.type as string
+        if (eventType === 'assistant') {
+          const message = parsed.message as { content?: Array<{ type: string; text?: string; name?: string }> } | undefined
+          for (const block of message?.content ?? []) {
+            if (block.type === 'text' && block.text) {
+              this._broadcast({ type: 'setup_log', projectId, line: block.text, stream: 'stdout' })
+            } else if (block.type === 'tool_use' && block.name) {
+              this._broadcast({ type: 'setup_log', projectId, line: `[tool] ${block.name}`, stream: 'stdout' })
+            }
+          }
+        }
       } else {
         // Plain text line — broadcast as log
         this._broadcast({ type: 'setup_log', projectId, line, stream: 'stdout' })
