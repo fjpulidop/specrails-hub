@@ -71,28 +71,47 @@ function hasFiles(dir: string, pattern: RegExp): boolean {
 
 // ─── Stream-based checkpoint detection ───────────────────────────────────────
 
-function detectCheckpointFromLine(
-  line: string
-): { key: string; detail?: string } | null {
-  // Tool use events writing to checkpoint paths
-  if (line.includes('.specrails-version')) return { key: 'base_install' }
-  if (line.includes('stack') || line.includes('language') || line.includes('framework')) {
-    return { key: 'repo_analysis', detail: 'Analyzing stack...' }
+function detectCheckpointFromText(
+  text: string
+): { key: string; detail?: string }[] {
+  const hits: { key: string; detail?: string }[] = []
+
+  // Match phase headers from Claude's /setup output
+  if (/phase\s*1|codebase\s*analysis|repository\s*analysis/i.test(text)) {
+    hits.push({ key: 'repo_analysis', detail: 'Analyzing codebase...' })
   }
-  if (line.includes('layers') || line.includes('conventions') || line.includes('rules')) {
-    return { key: 'stack_conventions', detail: 'Generating conventions...' }
+  if (/phase\s*2|user\s*personas|product\s*discovery/i.test(text)) {
+    hits.push({ key: 'product_discovery', detail: 'Generating personas...' })
   }
-  if (line.includes('personas') || (line.includes('.claude/agents') && line.includes('personas'))) {
-    return { key: 'product_discovery', detail: 'Discovering product context...' }
+  if (/phase\s*3|configuration|agent\s*selection|backlog\s*provider/i.test(text)) {
+    hits.push({ key: 'stack_conventions', detail: 'Configuring stack...' })
   }
-  if (line.includes('.claude/agents/sr-') || (line.includes('sr-') && line.includes('.md'))) {
-    return { key: 'agent_generation', detail: 'Generating agents...' }
+  if (/generating\s*all\s*files|writing.*agent|sr-architect|sr-developer|sr-reviewer/i.test(text)) {
+    hits.push({ key: 'agent_generation', detail: 'Generating agents...' })
   }
-  if (line.includes('.claude/commands/sr') || (line.includes('commands') && line.includes('sr'))) {
-    return { key: 'command_config', detail: 'Configuring commands...' }
+  if (/command\s*selection|installing.*commands|\.claude\/commands\/sr/i.test(text)) {
+    hits.push({ key: 'command_config', detail: 'Configuring commands...' })
   }
-  if (line.includes('.specrails-manifest.json')) return { key: 'final_verification' }
-  return null
+
+  // File path detection in tool_use events
+  if (text.includes('.specrails-version')) hits.push({ key: 'base_install' })
+  if (text.includes('/agents/personas/') && text.includes('.md')) {
+    hits.push({ key: 'product_discovery', detail: 'Writing personas...' })
+  }
+  if (/\/agents\/sr-[^/]+\.md/.test(text)) {
+    hits.push({ key: 'agent_generation', detail: 'Writing agents...' })
+  }
+  if (text.includes('/commands/sr/') && text.includes('.md')) {
+    hits.push({ key: 'command_config', detail: 'Writing commands...' })
+  }
+  if (text.includes('/rules/') && text.includes('.md')) {
+    hits.push({ key: 'stack_conventions', detail: 'Writing conventions...' })
+  }
+  if (text.includes('.specrails-manifest.json')) {
+    hits.push({ key: 'final_verification' })
+  }
+
+  return hits
 }
 
 // ─── Setup summary computation ────────────────────────────────────────────────
@@ -344,7 +363,7 @@ export class SetupManager {
   ): void {
     const eventType = event.type as string
 
-    // Extract text for chat messages
+    // Extract text for chat messages + detect checkpoints from content
     if (eventType === 'assistant') {
       const message = event.message as { content?: Array<{ type: string; text?: string }> } | undefined
       const texts = (message?.content ?? [])
@@ -353,14 +372,20 @@ export class SetupManager {
       const text = texts.join('')
       if (text) {
         this._broadcast({ type: 'setup_chat', projectId, text, role: 'assistant' })
+
+        // Detect phase transitions from Claude's output text
+        const hits = detectCheckpointFromText(text)
+        for (const hit of hits) {
+          this._advanceCheckpoint(projectId, hit.key, hit.detail)
+        }
       }
     }
 
     // Tool use events — check if writing to checkpoint-relevant paths
     if (eventType === 'tool_use') {
       const inputStr = JSON.stringify(event.input ?? {})
-      const hit = detectCheckpointFromLine(inputStr)
-      if (hit) {
+      const hits = detectCheckpointFromText(inputStr)
+      for (const hit of hits) {
         this._advanceCheckpoint(projectId, hit.key, hit.detail)
       }
     }
@@ -387,6 +412,17 @@ export class SetupManager {
     if (!checkpoint || checkpoint.status === 'done') return
 
     const starts = this._checkpointStart.get(projectId)!
+
+    // When a later checkpoint starts, auto-complete all earlier ones
+    const checkpointKeys = CHECKPOINTS.map((c) => c.key)
+    const targetIdx = checkpointKeys.indexOf(key)
+    for (let i = 0; i < targetIdx; i++) {
+      const prevKey = checkpointKeys[i]
+      const prev = statuses.get(prevKey)
+      if (prev && prev.status !== 'done') {
+        this._completeCheckpoint(projectId, prevKey)
+      }
+    }
 
     if (checkpoint.status === 'pending') {
       checkpoint.status = 'running'
