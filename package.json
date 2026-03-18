@@ -13,7 +13,9 @@
     "build": "cd client && npm run build && cd .. && npm run build:cli",
     "typecheck": "tsc --noEmit && cd client && tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:client": "cd client && npx vitest run",
+    "test:all": "vitest run && cd client && npx vitest run"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
