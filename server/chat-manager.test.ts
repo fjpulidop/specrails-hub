@@ -213,4 +213,130 @@ describe('ChatManager', () => {
     await sendPromise
     expect(cm.isActive(convId)).toBe(false)
   })
+
+  // ─── Test 7: claude not on path ────────────────────────────────────────────
+
+  it('broadcasts chat_error CLAUDE_NOT_FOUND when claude is not on PATH', async () => {
+    vi.mocked(mockExecSync).mockImplementation(() => { throw new Error('not found') })
+    const convId = setupConversation()
+
+    await cm.sendMessage(convId, 'Hello')
+
+    const errors = getBroadcastedByType(broadcast, 'chat_error')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].error).toBe('CLAUDE_NOT_FOUND')
+    expect(errors[0].conversationId).toBe(convId)
+  })
+
+  // ─── Test 8: non-existent conversation ─────────────────────────────────────
+
+  it('returns silently for non-existent conversation', async () => {
+    await cm.sendMessage('nonexistent-conv', 'Hello')
+
+    // No crash, no broadcast
+    expect(broadcast).not.toHaveBeenCalled()
+  })
+
+  // ─── Test 9: process exits with non-zero code ──────────────────────────────
+
+  it('broadcasts chat_error when process exits with non-zero code', async () => {
+    const convId = setupConversation()
+    const child = createMockChildProcess()
+    vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+    const sendPromise = cm.sendMessage(convId, 'Fail please')
+    await finishProcess(child, 1)
+    await sendPromise
+
+    const errors = getBroadcastedByType(broadcast, 'chat_error')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].error).toContain('code 1')
+  })
+
+  // ─── Test 10: already active conversation ──────────────────────────────────
+
+  it('returns silently if conversation already has active stream', async () => {
+    const convId = setupConversation()
+    const child = createMockChildProcess()
+    vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+    const sendPromise = cm.sendMessage(convId, 'First message')
+    expect(cm.isActive(convId)).toBe(true)
+
+    // Second message should be ignored
+    await cm.sendMessage(convId, 'Second message')
+
+    // Only one spawn call
+    expect(mockSpawn).toHaveBeenCalledTimes(1)
+
+    await finishProcess(child, 0)
+    await sendPromise
+  })
+
+  // ─── Test 11: abort on non-active conversation does nothing ────────────────
+
+  it('abort on non-active conversation does nothing', () => {
+    cm.abort('nonexistent')
+    expect(treeKill).not.toHaveBeenCalled()
+    expect(broadcast).not.toHaveBeenCalled()
+  })
+
+  // ─── Test 12: auto-title spawns separate process on first turn ─────────────
+
+  it('auto-title spawns a separate process on first turn', async () => {
+    const convId = setupConversation()
+    const mainChild = createMockChildProcess()
+    const titleChild = createMockChildProcess()
+    vi.mocked(mockSpawn)
+      .mockReturnValueOnce(mainChild as any)
+      .mockReturnValueOnce(titleChild as any)
+
+    const sendPromise = cm.sendMessage(convId, 'Hello world')
+
+    pushLine(mainChild, assistantEvent('Hi there!'))
+    pushLine(mainChild, resultEvent('sess-title'))
+    await finishProcess(mainChild, 0)
+    await sendPromise
+
+    // Auto-title should have spawned a second process
+    expect(mockSpawn).toHaveBeenCalledTimes(2)
+  })
+
+  // ─── Test 13: session resumption uses --resume flag ─────────────────────────
+
+  it('uses --resume flag when conversation has session_id', async () => {
+    const convId = setupConversation()
+    const child1 = createMockChildProcess()
+    const titleChild = createMockChildProcess()
+    vi.mocked(mockSpawn)
+      .mockReturnValueOnce(child1 as any)
+      .mockReturnValueOnce(titleChild as any)
+
+    // First turn: establishes session
+    const send1 = cm.sendMessage(convId, 'First')
+    pushLine(child1, assistantEvent('Hello'))
+    pushLine(child1, resultEvent('sess-resume'))
+    await finishProcess(child1, 0)
+    await send1
+
+    // Verify session stored
+    const conv = getConversation(db, convId)
+    expect(conv?.session_id).toBe('sess-resume')
+
+    // Second turn: should use --resume
+    const child2 = createMockChildProcess()
+    vi.mocked(mockSpawn).mockReturnValue(child2 as any)
+    const send2 = cm.sendMessage(convId, 'Second')
+    pushLine(child2, assistantEvent('World'))
+    pushLine(child2, resultEvent('sess-resume'))
+    await finishProcess(child2, 0)
+    await send2
+
+    // Check spawn args for the second main call (skip title child)
+    const spawnCalls = vi.mocked(mockSpawn).mock.calls
+    // Find the call that has --resume
+    const resumeCall = spawnCalls.find((c) => (c[1] as string[]).includes('--resume'))
+    expect(resumeCall).toBeDefined()
+    expect(resumeCall![1]).toContain('sess-resume')
+  })
 })

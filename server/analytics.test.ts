@@ -148,6 +148,178 @@ describe('getAnalytics', () => {
     expect(result.kpi.successRate).toBe(0)
   })
 
+  it('percentiles return correct values for multiple durations', () => {
+    // Insert 10 jobs with known durations
+    for (let i = 1; i <= 10; i++) {
+      insertJob(db, {
+        id: `job-${i}`,
+        started_at: new Date().toISOString(),
+        status: 'completed',
+        duration_ms: i * 10000,
+      })
+    }
+
+    const result = getAnalytics(db, { period: 'all' })
+
+    expect(result.durationPercentiles.p50).not.toBeNull()
+    expect(result.durationPercentiles.p75).not.toBeNull()
+    expect(result.durationPercentiles.p95).not.toBeNull()
+    // p50 should be around 50000ms (5th of 10)
+    expect(result.durationPercentiles.p50).toBeLessThanOrEqual(60000)
+    expect(result.durationPercentiles.p50).toBeGreaterThanOrEqual(40000)
+  })
+
+  it('percentiles return null for no completed jobs', () => {
+    insertJob(db, {
+      id: 'failed-job',
+      started_at: new Date().toISOString(),
+      status: 'failed',
+      duration_ms: 5000,
+    })
+
+    const result = getAnalytics(db, { period: 'all' })
+    expect(result.durationPercentiles.p50).toBeNull()
+  })
+
+  it('bonus metrics include costPerSuccess, apiEfficiencyPct, failureCostUsd', () => {
+    insertJob(db, {
+      id: 'success-1',
+      started_at: new Date().toISOString(),
+      status: 'completed',
+      total_cost_usd: 0.01,
+      duration_ms: 60000,
+      duration_api_ms: 30000,
+    })
+    insertJob(db, {
+      id: 'fail-1',
+      started_at: new Date().toISOString(),
+      status: 'failed',
+      total_cost_usd: 0.005,
+    })
+
+    const result = getAnalytics(db, { period: 'all' })
+
+    expect(result.bonusMetrics.costPerSuccess).toBeCloseTo(0.015 / 1, 5) // total cost / success count
+    expect(result.bonusMetrics.failureCostUsd).toBeCloseTo(0.005)
+    expect(result.bonusMetrics.apiEfficiencyPct).not.toBeNull()
+    expect(result.bonusMetrics.apiEfficiencyPct!).toBeCloseTo(50, 0) // 30000/60000 = 50%
+  })
+
+  it('model breakdown groups by model', () => {
+    insertJob(db, {
+      id: 'j1',
+      started_at: new Date().toISOString(),
+      status: 'completed',
+      total_cost_usd: 0.01,
+      model: 'claude-sonnet-4-5',
+    })
+    insertJob(db, {
+      id: 'j2',
+      started_at: new Date().toISOString(),
+      status: 'completed',
+      total_cost_usd: 0.02,
+      model: 'claude-opus-4-6',
+    })
+
+    const result = getAnalytics(db, { period: 'all' })
+
+    expect(result.bonusMetrics.modelBreakdown).toHaveLength(2)
+    const opus = result.bonusMetrics.modelBreakdown.find((m: any) => m.model === 'claude-opus-4-6')
+    expect(opus).toBeDefined()
+    expect(opus!.totalCostUsd).toBeCloseTo(0.02)
+  })
+
+  it('token efficiency aggregates by command', () => {
+    insertJob(db, {
+      id: 'j1',
+      started_at: new Date().toISOString(),
+      status: 'completed',
+      command: 'implement',
+      tokens_in: 1000,
+      tokens_out: 500,
+      tokens_cache_read: 200,
+    })
+
+    const result = getAnalytics(db, { period: 'all' })
+
+    expect(result.tokenEfficiency).toHaveLength(1)
+    expect(result.tokenEfficiency[0].tokensOut).toBe(500)
+    expect(result.tokenEfficiency[0].tokensCacheRead).toBe(200)
+    expect(result.tokenEfficiency[0].totalTokens).toBe(1500) // in + out
+  })
+
+  it('command performance calculates per-command success rate', () => {
+    insertJob(db, { id: 'j1', started_at: new Date().toISOString(), status: 'completed', command: 'implement', total_cost_usd: 0.01 })
+    insertJob(db, { id: 'j2', started_at: new Date().toISOString(), status: 'failed', command: 'implement', total_cost_usd: 0.005 })
+
+    const result = getAnalytics(db, { period: 'all' })
+
+    const impl = result.commandPerformance.find((c: any) => c.command === 'implement')
+    expect(impl).toBeDefined()
+    expect(impl!.totalRuns).toBe(2)
+    expect(impl!.successRate).toBeCloseTo(0.5)
+  })
+
+  it('daily throughput includes completed, failed, canceled counts', () => {
+    const today = new Date().toISOString().slice(0, 10)
+    insertJob(db, { id: 'j1', started_at: `${today}T10:00:00Z`, status: 'completed' })
+    insertJob(db, { id: 'j2', started_at: `${today}T11:00:00Z`, status: 'failed' })
+    insertJob(db, { id: 'j3', started_at: `${today}T12:00:00Z`, status: 'canceled' })
+
+    const result = getAnalytics(db, { period: 'all' })
+
+    expect(result.dailyThroughput.length).toBeGreaterThan(0)
+    const todayRow = result.dailyThroughput.find((r: any) => r.date === today)
+    expect(todayRow).toBeDefined()
+    expect(todayRow!.completed).toBe(1)
+    expect(todayRow!.failed).toBe(1)
+    expect(todayRow!.canceled).toBe(1)
+  })
+
+  it('cost per command aggregates correctly', () => {
+    insertJob(db, { id: 'j1', started_at: new Date().toISOString(), status: 'completed', command: 'cmd-a', total_cost_usd: 0.01 })
+    insertJob(db, { id: 'j2', started_at: new Date().toISOString(), status: 'completed', command: 'cmd-a', total_cost_usd: 0.02 })
+    insertJob(db, { id: 'j3', started_at: new Date().toISOString(), status: 'completed', command: 'cmd-b', total_cost_usd: 0.005 })
+
+    const result = getAnalytics(db, { period: 'all' })
+
+    expect(result.costPerCommand.length).toBe(2)
+    const cmdA = result.costPerCommand.find((c: any) => c.command === 'cmd-a')
+    expect(cmdA!.totalCostUsd).toBeCloseTo(0.03)
+    expect(cmdA!.jobCount).toBe(2)
+  })
+
+  it('status breakdown groups by status', () => {
+    insertJob(db, { id: 'j1', started_at: new Date().toISOString(), status: 'completed' })
+    insertJob(db, { id: 'j2', started_at: new Date().toISOString(), status: 'completed' })
+    insertJob(db, { id: 'j3', started_at: new Date().toISOString(), status: 'failed' })
+
+    const result = getAnalytics(db, { period: 'all' })
+
+    const completed = result.statusBreakdown.find((s: any) => s.status === 'completed')
+    expect(completed!.count).toBe(2)
+    const failed = result.statusBreakdown.find((s: any) => s.status === 'failed')
+    expect(failed!.count).toBe(1)
+  })
+
+  it('7d period returns correct label and deltas', () => {
+    // Insert a job in the current 7d period
+    insertJob(db, {
+      id: 'recent',
+      started_at: new Date().toISOString(),
+      status: 'completed',
+      total_cost_usd: 0.01,
+    })
+
+    const result = getAnalytics(db, { period: '7d' })
+
+    expect(result.period.label).toBe('Last 7 days')
+    expect(result.period.from).toBeTruthy()
+    expect(result.period.to).toBeTruthy()
+    // Deltas should be numbers (not null) because there's a previous period
+    expect(result.kpi.costDelta).not.toBeNull()
+  })
+
   it('duration histogram returns fixed bucket order', () => {
     // Insert jobs spanning multiple buckets
     insertJob(db, { id: 'j1', started_at: new Date().toISOString(), status: 'completed', duration_ms: 30000 })  // <1m
