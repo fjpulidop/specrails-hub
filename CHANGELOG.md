@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/fjpulidop/specrails-hub/compare/v1.1.0...v1.1.1) (2026-03-19)
+
+
+### Bug Fixes
+
+* remove invalid ./ prefix from bin path in package.json ([6e208df](https://github.com/fjpulidop/specrails-hub/commit/6e208df42496b2fd8a32a78fc22cecea51d28148))
+
 ## [1.1.0](https://github.com/fjpulidop/specrails-hub/compare/v1.0.0...v1.1.0) (2026-03-19)
 
 
