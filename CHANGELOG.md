@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0](https://github.com/fjpulidop/specrails-hub/compare/v1.2.1...v1.3.0) (2026-03-19)
+
+
+### Features
+
+* add /docs documentation portal ([fcf6842](https://github.com/fjpulidop/specrails-hub/commit/fcf684288b7df7c37cc9aa340d71203bcd2c3e3d))
+
+
+### Bug Fixes
+
+* improve hub startup stability on user laptops ([ad607c8](https://github.com/fjpulidop/specrails-hub/commit/ad607c87d4c30cd5fce3d820bfd268c7fdcd8cd6))
+* improve hub startup stability on user laptops ([34f840d](https://github.com/fjpulidop/specrails-hub/commit/34f840d0c6b8d2a0b479f16e90d7cfbaf94c3969))
+
 ## [1.2.1](https://github.com/fjpulidop/specrails-hub/compare/v1.2.0...v1.2.1) (2026-03-19)
 
 
