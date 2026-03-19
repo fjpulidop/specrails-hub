@@ -15,6 +15,7 @@
  */
 
 import http from 'http'
+import net from 'net'
 import { spawn } from 'child_process'
 import { spawn as spawnProc } from 'child_process'
 import { createInterface } from 'readline'
@@ -777,6 +778,21 @@ async function handleJobs(port: number): Promise<number> {
 // ---------------------------------------------------------------------------
 
 const HUB_PID_FILE = path.join(os.homedir(), '.specrails', 'manager.pid')
+const HUB_LOG_FILE = path.join(os.homedir(), '.specrails', 'hub.log')
+
+function isPortInUse(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const srv = net.createServer()
+    srv.once('error', (err: NodeJS.ErrnoException) => {
+      resolve(err.code === 'EADDRINUSE')
+    })
+    srv.once('listening', () => {
+      srv.close()
+      resolve(false)
+    })
+    srv.listen(port, '127.0.0.1')
+  })
+}
 
 function readPid(): number | null {
   try {
@@ -818,27 +834,57 @@ async function hubStart(port: number): Promise<number> {
     return 0
   }
 
+  // Check if port is already in use by another process
+  const portBusy = await isPortInUse(port)
+  if (portBusy) {
+    cliError(`port ${port} is already in use by another process`)
+    cliError(`if a previous hub is stale, run: specrails-hub stop`)
+    cliError(`or use a different port: specrails-hub --port <port> start`)
+    return 1
+  }
+
   const serverPath = hubServerPath()
   const isTs = serverPath.endsWith('.ts')
   const args = isTs
     ? ['tsx', serverPath, '--port', String(port)]
     : ['node', serverPath, '--port', String(port)]
 
+  // Ensure log dir exists and open log file for server output
+  try {
+    fs.mkdirSync(path.dirname(HUB_LOG_FILE), { recursive: true })
+  } catch { /* ignore */ }
+
+  let logFd: number | undefined
+  try {
+    logFd = fs.openSync(HUB_LOG_FILE, 'a')
+  } catch { /* ignore — fall back to silent */ }
+
+  const stdio: ['ignore', number | 'ignore', number | 'ignore'] = [
+    'ignore',
+    logFd ?? 'ignore',
+    logFd ?? 'ignore',
+  ]
+
   const child = spawnProc(args[0], args.slice(1), {
     detached: true,
-    stdio: 'ignore',
+    stdio,
     env: { ...process.env },
   })
+
+  if (logFd !== undefined) {
+    try { fs.closeSync(logFd) } catch { /* ignore */ }
+  }
+
   child.unref()
 
-  // Wait briefly and confirm it started
-  await new Promise<void>((resolve) => setTimeout(resolve, 800))
+  // Wait for server to be ready (longer window for slow machines)
+  await new Promise<void>((resolve) => setTimeout(resolve, 2000))
   const detection = await detectWebManager(port)
   if (detection.running) {
     cliLog(`hub started on http://127.0.0.1:${port}`)
     return 0
   }
-  cliError('hub failed to start (check logs)')
+  cliError(`hub failed to start — logs: ${HUB_LOG_FILE}`)
   return 1
 }
 
