@@ -1,6 +1,7 @@
 node_modules/
 dist/
 cli/dist/
+server/dist/
 client/dist/
 data/
 
