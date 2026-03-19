@@ -120,6 +120,16 @@ export function parseArgs(argv: string[]): ParsedArgs {
     return { mode: 'hub', subArgs: args.slice(1), port }
   }
 
+  // Allow hub subcommands directly without the 'hub' prefix:
+  //   specrails-hub start  →  specrails-hub hub start
+  //   specrails-hub stop   →  specrails-hub hub stop
+  //   specrails-hub add    →  specrails-hub hub add
+  //   etc.
+  const HUB_SUBCOMMANDS = new Set(['start', 'stop', 'add', 'remove', 'list'])
+  if (HUB_SUBCOMMANDS.has(args[0])) {
+    return { mode: 'hub', subArgs: args, port }
+  }
+
   const first = args[0]
 
   // Slash-prefixed command: pass through unchanged
@@ -149,7 +159,8 @@ ${bold('Usage:')}
   specrails-hub "any raw prompt"             Pass a raw prompt directly to claude
   specrails-hub --status                     Print manager status and exit
   specrails-hub --jobs                       Print recent job history and exit
-  specrails-hub hub <subcommand>             Manage the hub (multi-project mode)
+  specrails-hub start|stop|add|list         Manage the hub (shorthand, no 'hub' prefix needed)
+  specrails-hub hub <subcommand>             Same, with explicit 'hub' prefix
   specrails-hub --port <n>                   Override default port (${DEFAULT_PORT})
   specrails-hub --help                       Show this help text
 
@@ -879,7 +890,7 @@ async function hubStatus(port: number): Promise<number> {
 async function hubAdd(projectPath: string, port: number): Promise<number> {
   const detection = await detectWebManager(port)
   if (!detection.running) {
-    cliError('hub is not running. Start it first with: specrails-hub hub start')
+    cliError('hub is not running. Start it first with: specrails-hub start')
     return 1
   }
   try {
@@ -972,15 +983,15 @@ async function handleHub(subArgs: string[], port: number): Promise<number> {
 
   if (!sub || sub === 'help' || sub === '--help' || sub === '-h') {
     process.stdout.write(`
-${bold('specrails-hub hub')} — manage the specrails hub (multi-project mode)
+${bold('specrails-hub')} — hub management
 
 ${bold('Usage:')}
-  specrails-hub hub start              Start the hub server
-  specrails-hub hub stop               Stop the hub server
+  specrails-hub start                  Start the hub server
+  specrails-hub stop                   Stop the hub server
   specrails-hub hub status             Show hub status and registered projects
-  specrails-hub hub add <path>         Register a project by path
-  specrails-hub hub remove <id>        Unregister a project by ID
-  specrails-hub hub list               List all registered projects
+  specrails-hub add <path>             Register a project by path
+  specrails-hub remove <id>            Unregister a project by ID
+  specrails-hub list                   List all registered projects
 `.trimStart())
     return 0
   }
