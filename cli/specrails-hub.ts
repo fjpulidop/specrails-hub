@@ -798,15 +798,17 @@ function isProcessRunning(pid: number): boolean {
 }
 
 function hubServerPath(): string {
-  // CLI lives at cli/dist/specrails-hub.js; server is at server/dist/index.js (built)
-  // In dev mode with tsx, we resolve from __filename
-  const base = path.resolve(__dirname, '..')
-  // Try compiled JS first, then fall back to tsx dev path
-  const compiled = path.join(base, 'server', 'dist', 'index.js')
-  const devTs = path.join(base, 'server', 'index.ts')
-  if (fs.existsSync(compiled)) return compiled
-  if (fs.existsSync(devTs)) return devTs
-  return compiled
+  // __dirname differs by runtime:
+  //   compiled (npm install): <root>/cli/dist/  → need ../../server/dist/index.js
+  //   tsx dev:                <root>/cli/        → need ../server/dist/index.js
+  // Try both, compiled path first.
+  const fromDist = path.resolve(__dirname, '..', '..', 'server', 'dist', 'index.js')
+  const fromSrc  = path.resolve(__dirname, '..', 'server', 'dist', 'index.js')
+  const devTs    = path.resolve(__dirname, '..', 'server', 'index.ts')
+  if (fs.existsSync(fromDist)) return fromDist
+  if (fs.existsSync(fromSrc))  return fromSrc
+  if (fs.existsSync(devTs))    return devTs
+  return fromDist
 }
 
 async function hubStart(port: number): Promise<number> {
