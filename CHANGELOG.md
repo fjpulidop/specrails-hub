@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/fjpulidop/specrails-hub/compare/v1.2.0...v1.2.1) (2026-03-19)
+
+
+### Bug Fixes
+
+* resolve server path correctly when installed via npm ([2fe85fc](https://github.com/fjpulidop/specrails-hub/commit/2fe85fc21c0039876d9c3948f6d5709c1fdaa7dc))
+* resolve server path correctly when installed via npm ([f0eb8eb](https://github.com/fjpulidop/specrails-hub/commit/f0eb8eb8f449ab4aefa8bb0cfd60ae4f82d892d2))
+
 ## [1.2.0](https://github.com/fjpulidop/specrails-hub/compare/v1.1.1...v1.2.0) (2026-03-19)
 
 
