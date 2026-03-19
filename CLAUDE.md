@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is this
 
-specrails-hub is a local dashboard and CLI for managing multiple [specrails](https://github.com/fjpulidop/specrails) projects from a single interface. It visualizes AI pipeline phases (Architect → Developer → Reviewer → Ship), streams Claude CLI logs in real-time, and provides job queues, analytics, and chat per project.
+specrails-hub is a local dashboard and CLI for managing multiple [specrails-core](https://github.com/fjpulidop/specrails-core) projects from a single interface. It visualizes AI pipeline phases (Architect → Developer → Reviewer → Ship), streams Claude CLI logs in real-time, and provides job queues, analytics, and chat per project.
 
 ## Commands
 
@@ -30,7 +30,7 @@ npx vitest run server/db.test.ts
 ```
 server/     → Express + WebSocket + SQLite (TypeScript, CommonJS)
 client/     → React + Vite + Tailwind v4 (TypeScript, ESM)
-cli/        → srm CLI bridge (TypeScript, CommonJS)
+cli/        → specrails-hub CLI bridge (TypeScript, CommonJS)
 ```
 
 Server and CLI compile to CommonJS (`tsconfig.json`). Client is ESM with its own `client/tsconfig.json`. Two separate `npm install` are needed (root + `client/`).
@@ -79,7 +79,7 @@ Single WS connection broadcasts all messages. Every project-scoped message inclu
 When adding a project without specrails, a 5-phase wizard runs:
 1. Path input (AddProjectDialog)
 2. Installation proposal
-3. `npx specrails` execution with streaming log
+3. `npx specrails-core` execution with streaming log
 4. Split-view: CheckpointTracker (left) + SetupChat with Claude `/setup` (right)
 5. Completion summary
 
@@ -98,3 +98,14 @@ Managed by `SetupManager` (server) and `SetupWizard` component (client). Hub con
 
 - `4200` — Express server (API + WebSocket)
 - `4201` — Vite dev server (proxies `/api` and `/hooks` to 4200)
+
+## Release pipeline
+
+Releases are automated via release-please + GitHub Actions:
+
+- **CI** (`.github/workflows/ci.yml`) — runs `typecheck` + `vitest` on every push and PR
+- **Release** (`.github/workflows/release.yml`) — on every push to `main`:
+  - release-please creates/updates a Release PR (bumps version in `package.json` + `CHANGELOG.md`)
+  - When the Release PR is merged, release-please creates the GitHub Release and `npm publish` runs automatically
+
+Commit message prefixes that affect versioning: `feat:` → minor, `fix:` → patch, `feat!:` → major. Commits without a conventional prefix are ignored by release-please.

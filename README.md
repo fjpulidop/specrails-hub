@@ -1,6 +1,6 @@
 # specrails hub
 
-A local dashboard and CLI for managing all your [specrails](https://github.com/fjpulidop/specrails) projects from a single interface. Visualizes the AI pipeline phases (Architect, Developer, Reviewer, Ship), streams logs in real-time, and lets you launch commands from the browser or terminal.
+A local dashboard and CLI for managing all your [specrails-core](https://github.com/fjpulidop/specrails-core) projects from a single interface. Visualizes the AI pipeline phases (Architect, Developer, Reviewer, Ship), streams logs in real-time, and lets you launch commands from the browser or terminal.
 
 ## Features
 
@@ -16,12 +16,12 @@ A local dashboard and CLI for managing all your [specrails](https://github.com/f
 
 - Node.js 18+
 - `claude` CLI on your PATH ([Claude Code](https://claude.com/claude-code))
-- At least one project with specrails installed (`npx specrails`)
+- At least one project with specrails-core installed (`npx specrails-core`)
 
 ## Installation
 
 ```bash
-npm install -g @specrails/hub
+npm install -g specrails-hub
 ```
 
 ## Quick Start
