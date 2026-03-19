@@ -28,10 +28,10 @@ npm install -g specrails-hub
 
 ```bash
 # Start the hub server
-specrails-hub hub start
+specrails-hub start
 
 # Register a project
-specrails-hub hub add /path/to/your/project
+specrails-hub add /path/to/your/project
 
 # Open in browser
 open http://localhost:4200
@@ -96,12 +96,12 @@ A single Express process (port 4200) manages all projects. Each project gets its
 
 | Command | Description |
 |---------|-------------|
-| `specrails-hub hub start [--port N]` | Start the hub server (default port 4200) |
-| `specrails-hub hub stop` | Stop the hub server |
+| `specrails-hub start [--port N]` | Start the hub server (default port 4200) |
+| `specrails-hub stop` | Stop the hub server |
 | `specrails-hub hub status` | Show hub state and registered projects |
-| `specrails-hub hub list` | List all registered projects |
-| `specrails-hub hub add <path>` | Register a project |
-| `specrails-hub hub remove <id>` | Unregister a project |
+| `specrails-hub list` | List all registered projects |
+| `specrails-hub add <path>` | Register a project |
+| `specrails-hub remove <id>` | Unregister a project |
 
 ### Running commands
 
