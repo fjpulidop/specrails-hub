@@ -24,7 +24,7 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
           <main className="flex-1 overflow-auto">
             <Outlet />
           </main>
-          <ChatPanel chat={chat} />
+          <ChatPanel chat={chat} project={project} />
         </div>
         <StatusBar connectionStatus={connectionStatus} />
       </div>

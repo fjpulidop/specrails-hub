@@ -4,12 +4,14 @@ import { ChatHeader } from './ChatHeader'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import type { UseChatReturn } from '../hooks/useChat'
+import type { HubProject } from '../hooks/useHub'
 
 interface ChatPanelProps {
   chat: UseChatReturn
+  project?: HubProject
 }
 
-export function ChatPanel({ chat }: ChatPanelProps) {
+export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
   const {
     conversations,
     activeTabIndex,
@@ -19,6 +21,7 @@ export function ChatPanel({ chat }: ChatPanelProps) {
     createConversation,
     deleteConversation,
     sendMessage,
+    startWithMessage,
     abortStream,
     confirmCommand,
     dismissCommandProposal,
@@ -51,6 +54,7 @@ export function ChatPanel({ chat }: ChatPanelProps) {
     <div className="flex w-80 shrink-0 flex-col border-l border-border/30 bg-background/80 backdrop-blur-sm">
       <ChatHeader
         title={activeConversation?.title ?? null}
+        projectName={project?.name}
         canCreateNew={conversations.length < 3}
         hasActiveConversation={activeConversation !== null}
         onToggle={togglePanel}
@@ -102,8 +106,10 @@ export function ChatPanel({ chat }: ChatPanelProps) {
             messages={activeConversation.messages}
             streamingText={activeConversation.streamingText}
             isStreaming={activeConversation.isStreaming}
+            project={project}
             onConfirmCommand={confirmCommand}
             onDismissCommand={(cmd) => dismissCommandProposal(activeConversation.id, cmd)}
+            onSuggestion={(text) => sendMessage(activeConversation.id, text)}
           />
           <ChatInput
             conversationId={activeConversation.id}
@@ -116,11 +122,30 @@ export function ChatPanel({ chat }: ChatPanelProps) {
         </div>
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-4">
-          <p className="text-center text-xs text-muted-foreground">
-            No conversations yet
+          {project && (
+            <div className="flex flex-col items-center gap-1 text-center">
+              <p className="text-xs font-medium text-foreground">{project.name}</p>
+              <p className="text-[10px] text-muted-foreground/60 max-w-[180px] truncate">{project.path}</p>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground/70">
+            {project ? 'Start a conversation about this project' : 'No conversations yet'}
           </p>
+          {project && (
+            <div className="flex flex-col gap-1.5 w-full">
+              {['What\'s the project status?', 'Show recent job failures', 'What commands should I run?', 'Explain the codebase'].map((suggestion) => (
+                <button
+                  key={suggestion}
+                  className="rounded-md border border-border/30 px-2.5 py-1.5 text-left text-[11px] text-muted-foreground hover:border-dracula-purple/40 hover:text-foreground transition-colors"
+                  onClick={() => startWithMessage(suggestion)}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
           <button
-            className="rounded-md bg-dracula-purple/20 px-3 py-1.5 text-xs text-dracula-purple hover:bg-dracula-purple/30 transition-colors"
+            className="mt-1 rounded-md bg-dracula-purple/20 px-3 py-1.5 text-xs text-dracula-purple hover:bg-dracula-purple/30 transition-colors"
             onClick={() => createConversation()}
           >
             New conversation

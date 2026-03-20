@@ -2,6 +2,7 @@ import { Button } from './ui/button'
 
 interface ChatHeaderProps {
   title: string | null
+  projectName?: string
   canCreateNew: boolean
   onToggle: () => void
   onNewConversation: () => void
@@ -11,6 +12,7 @@ interface ChatHeaderProps {
 
 export function ChatHeader({
   title,
+  projectName,
   canCreateNew,
   onToggle,
   onNewConversation,
@@ -19,9 +21,16 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   return (
     <div className="flex h-9 shrink-0 items-center justify-between border-b border-border/30 px-2.5">
-      <span className="truncate text-xs font-medium text-foreground">
-        {title ?? 'Chat'}
-      </span>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className="truncate text-xs font-medium text-foreground">
+          {title ?? 'Chat'}
+        </span>
+        {projectName && (
+          <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-medium bg-dracula-purple/15 text-dracula-purple/80 leading-none">
+            {projectName}
+          </span>
+        )}
+      </div>
       <div className="flex items-center gap-0.5">
         <Button
           size="icon"

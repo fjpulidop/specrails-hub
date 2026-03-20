@@ -2,21 +2,33 @@ import { useEffect, useRef } from 'react'
 import { MessageSquare } from 'lucide-react'
 import { MessageBubble } from './MessageBubble'
 import type { ChatMessage } from '../types'
+import type { HubProject } from '../hooks/useHub'
+
+const SUGGESTIONS = [
+  'What\'s the current project status?',
+  'Show me recent job failures',
+  'What tests should I run?',
+  'Explain the main architecture',
+]
 
 interface MessageListProps {
   messages: ChatMessage[]
   streamingText: string
   isStreaming: boolean
+  project?: HubProject
   onConfirmCommand: (command: string) => void
   onDismissCommand: (command: string) => void
+  onSuggestion?: (text: string) => void
 }
 
 export function MessageList({
   messages,
   streamingText,
   isStreaming,
+  project,
   onConfirmCommand,
   onDismissCommand,
+  onSuggestion,
 }: MessageListProps) {
   const sentinelRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -43,12 +55,34 @@ export function MessageList({
       onScroll={handleScroll}
     >
       {messages.length === 0 && !isStreaming && (
-        <div className="flex h-full flex-col items-center justify-center gap-2 py-12 text-center">
-          <MessageSquare className="w-6 h-6 text-muted-foreground/40" />
-          <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
-          <p className="text-xs text-muted-foreground/60 max-w-[200px]">
-            Ask Claude anything about your project to get started
-          </p>
+        <div className="flex h-full flex-col items-center justify-center gap-3 px-3 py-8 text-center">
+          <MessageSquare className="w-5 h-5 text-muted-foreground/30" />
+          {project ? (
+            <>
+              <div className="flex flex-col gap-0.5">
+                <p className="text-xs font-medium text-foreground">{project.name}</p>
+                <p className="text-[10px] text-muted-foreground/50">Context loaded — ready to help</p>
+              </div>
+              <div className="flex flex-col gap-1.5 w-full">
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    className="rounded border border-border/30 px-2.5 py-1.5 text-left text-[11px] text-muted-foreground hover:border-dracula-purple/40 hover:text-foreground transition-colors"
+                    onClick={() => onSuggestion?.(s)}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-xs font-medium text-muted-foreground">No messages yet</p>
+              <p className="text-[11px] text-muted-foreground/60 max-w-[180px]">
+                Ask Claude anything about your project
+              </p>
+            </>
+          )}
         </div>
       )}
 
