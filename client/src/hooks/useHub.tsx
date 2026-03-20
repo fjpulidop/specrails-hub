@@ -7,6 +7,7 @@ import {
   useLayoutEffect,
   type ReactNode,
 } from 'react'
+import { toast } from 'sonner'
 import { useSharedWebSocket } from './useSharedWebSocket'
 import { setApiContext } from '../lib/api'
 
@@ -92,10 +93,12 @@ export function HubProvider({ children }: { children: ReactNode }) {
         if (prev.find((p) => p.id === project.id)) return prev
         return [...prev, project]
       })
+      toast.success(`Project added: ${project.name}`)
       // Activate the newly added project
       setActiveProjectId(project.id)
     } else if (msg.type === 'hub.project_removed') {
       const projectId = msg.projectId as string
+      toast.success('Project removed')
       setProjects((prev) => prev.filter((p) => p.id !== projectId))
       setActiveProjectIdRaw((prev) => {
         if (prev !== projectId) return prev

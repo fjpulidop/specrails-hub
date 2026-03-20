@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate, NavLink } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import { RootLayout } from './components/RootLayout'
 import DashboardPage from './pages/DashboardPage'
 import JobDetailPage from './pages/JobDetailPage'
@@ -9,6 +10,7 @@ import HubAnalyticsPage from './pages/HubAnalyticsPage'
 import SettingsDialog from './pages/GlobalSettingsPage'
 import DocsPage from './pages/DocsPage'
 import { ProjectLayout } from './components/ProjectLayout'
+import { ProjectErrorBoundary } from './components/ProjectErrorBoundary'
 import { WelcomeScreen } from './components/WelcomeScreen'
 import { SetupWizard } from './components/SetupWizard'
 import { TabBar } from './components/TabBar'
@@ -167,7 +169,11 @@ function HubApp() {
             {projects.length === 0 ? (
               <Route path="*" element={<WelcomeScreen onAddProject={() => setAddDialogOpen(true)} />} />
             ) : activeProject ? (
-              <Route element={<ProjectLayout project={activeProject} />}>
+              <Route element={
+                <ProjectErrorBoundary key={activeProject.id} projectName={activeProject.name}>
+                  <ProjectLayout project={activeProject} />
+                </ProjectErrorBoundary>
+              }>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/jobs/:id" element={<JobDetailPage />} />
                 <Route path="/analytics" element={<AnalyticsPage />} />
@@ -215,6 +221,7 @@ export default function App() {
           </Route>
         </Routes>
       )}
+      <Toaster position="bottom-right" richColors />
     </SharedWebSocketProvider>
   )
 }
