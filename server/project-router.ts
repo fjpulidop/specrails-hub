@@ -32,7 +32,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
   // Middleware: resolve project from :projectId param
   router.use('/:projectId', (req: Request, res: Response, next: NextFunction) => {
-    const { projectId } = req.params
+    const projectId = req.params.projectId as string
     const ctx = registry.getContext(projectId)
     if (!ctx) {
       res.status(404).json({ error: 'Project not found' })
@@ -99,7 +99,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
   router.delete('/:projectId/jobs/:id', (req: Request, res: Response) => {
     try {
-      const result = ctx(req).queueManager.cancel(req.params.id)
+      const result = ctx(req).queueManager.cancel(req.params.id as string)
       res.json({ ok: true, status: result })
     } catch (err) {
       if (err instanceof JobNotFoundError) {
@@ -157,9 +157,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
   router.get('/:projectId/jobs/:id', (req: Request, res: Response) => {
     const { db, queueManager } = ctx(req)
-    const job = getJob(db, req.params.id)
+    const job = getJob(db, req.params.id as string)
     if (!job) { res.status(404).json({ error: 'Job not found' }); return }
-    const events = getJobEvents(db, req.params.id)
+    const events = getJobEvents(db, req.params.id as string)
     const phaseDefinitions = queueManager.phasesForCommand(job.command)
     res.json({ job, events, phaseDefinitions })
   })
@@ -334,62 +334,62 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
   router.get('/:projectId/chat/conversations/:id', (req: Request, res: Response) => {
     const { db } = ctx(req)
-    const conversation = getConversation(db, req.params.id)
+    const conversation = getConversation(db, req.params.id as string)
     if (!conversation) { res.status(404).json({ error: 'Conversation not found' }); return }
-    const messages = getMessages(db, req.params.id)
+    const messages = getMessages(db, req.params.id as string)
     res.json({ conversation, messages })
   })
 
   router.delete('/:projectId/chat/conversations/:id', (req: Request, res: Response) => {
     const { db } = ctx(req)
-    const conversation = getConversation(db, req.params.id)
+    const conversation = getConversation(db, req.params.id as string)
     if (!conversation) { res.status(404).json({ error: 'Conversation not found' }); return }
-    deleteConversation(db, req.params.id)
+    deleteConversation(db, req.params.id as string)
     res.json({ ok: true })
   })
 
   router.patch('/:projectId/chat/conversations/:id', (req: Request, res: Response) => {
     const { db } = ctx(req)
-    const conversation = getConversation(db, req.params.id)
+    const conversation = getConversation(db, req.params.id as string)
     if (!conversation) { res.status(404).json({ error: 'Conversation not found' }); return }
     const { title, model } = req.body ?? {}
     const patch: { title?: string; model?: string } = {}
     if (title !== undefined) patch.title = title
     if (model !== undefined) patch.model = model
-    updateConversation(db, req.params.id, patch)
-    const updated = getConversation(db, req.params.id) as ChatConversationRow
+    updateConversation(db, req.params.id as string, patch)
+    const updated = getConversation(db, req.params.id as string) as ChatConversationRow
     res.json({ ok: true, conversation: updated })
   })
 
   router.get('/:projectId/chat/conversations/:id/messages', (req: Request, res: Response) => {
     const { db } = ctx(req)
-    const conversation = getConversation(db, req.params.id)
+    const conversation = getConversation(db, req.params.id as string)
     if (!conversation) { res.status(404).json({ error: 'Conversation not found' }); return }
-    const messages = getMessages(db, req.params.id)
+    const messages = getMessages(db, req.params.id as string)
     res.json({ messages })
   })
 
   router.post('/:projectId/chat/conversations/:id/messages', async (req: Request, res: Response) => {
     const { db, chatManager } = ctx(req)
-    const conversation = getConversation(db, req.params.id)
+    const conversation = getConversation(db, req.params.id as string)
     if (!conversation) { res.status(404).json({ error: 'Conversation not found' }); return }
     const text = req.body?.text as string | undefined
     if (!text || !text.trim()) { res.status(400).json({ error: 'text is required' }); return }
-    if (chatManager.isActive(req.params.id)) {
+    if (chatManager.isActive(req.params.id as string)) {
       res.status(409).json({ error: 'CONVERSATION_BUSY' }); return
     }
     res.status(202).json({ ok: true })
-    chatManager.sendMessage(req.params.id, text.trim()).catch((err) => {
+    chatManager.sendMessage(req.params.id as string, text.trim()).catch((err) => {
       console.error('[project-router] chat sendMessage error:', err)
     })
   })
 
   router.delete('/:projectId/chat/conversations/:id/messages/stream', (req: Request, res: Response) => {
     const { chatManager } = ctx(req)
-    if (!chatManager.isActive(req.params.id)) {
+    if (!chatManager.isActive(req.params.id as string)) {
       res.status(404).json({ error: 'No active stream for this conversation' }); return
     }
-    chatManager.abort(req.params.id)
+    chatManager.abort(req.params.id as string)
     res.json({ ok: true })
   })
 
@@ -476,49 +476,49 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   router.get('/:projectId/propose/:id', (req: Request, res: Response) => {
-    const proposal = getProposal(ctx(req).db, req.params.id)
+    const proposal = getProposal(ctx(req).db, req.params.id as string)
     if (!proposal) { res.status(404).json({ error: 'Proposal not found' }); return }
     res.json({ proposal })
   })
 
   router.post('/:projectId/propose/:id/refine', async (req: Request, res: Response) => {
-    const proposal = getProposal(ctx(req).db, req.params.id)
+    const proposal = getProposal(ctx(req).db, req.params.id as string)
     if (!proposal) { res.status(404).json({ error: 'Proposal not found' }); return }
     const { feedback } = req.body ?? {}
     if (!feedback || typeof feedback !== 'string' || !feedback.trim()) {
       res.status(400).json({ error: 'feedback is required' }); return
     }
-    if (ctx(req).proposalManager.isActive(req.params.id)) {
+    if (ctx(req).proposalManager.isActive(req.params.id as string)) {
       res.status(409).json({ error: 'PROPOSAL_BUSY' }); return
     }
     if (proposal.status !== 'review') {
       res.status(409).json({ error: 'Proposal is not in review state' }); return
     }
     res.status(202).json({ ok: true })
-    ctx(req).proposalManager.sendRefinement(req.params.id, feedback.trim()).catch((err) => {
+    ctx(req).proposalManager.sendRefinement(req.params.id as string, feedback.trim()).catch((err) => {
       console.error('[project-router] proposal sendRefinement error:', err)
     })
   })
 
   router.post('/:projectId/propose/:id/create-issue', async (req: Request, res: Response) => {
-    const proposal = getProposal(ctx(req).db, req.params.id)
+    const proposal = getProposal(ctx(req).db, req.params.id as string)
     if (!proposal) { res.status(404).json({ error: 'Proposal not found' }); return }
-    if (ctx(req).proposalManager.isActive(req.params.id)) {
+    if (ctx(req).proposalManager.isActive(req.params.id as string)) {
       res.status(409).json({ error: 'PROPOSAL_BUSY' }); return
     }
     if (proposal.status !== 'review') {
       res.status(409).json({ error: 'Proposal is not in review state' }); return
     }
     res.status(202).json({ ok: true })
-    ctx(req).proposalManager.createIssue(req.params.id).catch((err) => {
+    ctx(req).proposalManager.createIssue(req.params.id as string).catch((err) => {
       console.error('[project-router] proposal createIssue error:', err)
     })
   })
 
   router.delete('/:projectId/propose/:id', (req: Request, res: Response) => {
-    const proposal = getProposal(ctx(req).db, req.params.id)
+    const proposal = getProposal(ctx(req).db, req.params.id as string)
     if (!proposal) { res.status(404).json({ error: 'Proposal not found' }); return }
-    ctx(req).proposalManager.cancel(req.params.id)
+    ctx(req).proposalManager.cancel(req.params.id as string)
     res.json({ ok: true })
   })
 
@@ -538,7 +538,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   const ALLOWED_ARTIFACTS = new Set(['proposal.md', 'design.md', 'tasks.md', 'delta-spec.md', 'context-bundle.md'])
 
   router.get('/:projectId/changes/:changeId/artifacts/:artifact', (req: Request, res: Response) => {
-    const { changeId, artifact } = req.params
+    const changeId = req.params.changeId as string
+    const artifact = req.params.artifact as string
     if (!ALLOWED_ARTIFACTS.has(artifact)) {
       res.status(400).json({ error: 'Invalid artifact name' }); return
     }
@@ -580,10 +581,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
   router.delete('/:projectId/spec-launcher/:launchId', (req: Request, res: Response) => {
     const { specLauncherManager } = ctx(req)
-    if (!specLauncherManager.isActive(req.params.launchId)) {
+    if (!specLauncherManager.isActive(req.params.launchId as string)) {
       res.status(404).json({ error: 'No active launch with that ID' }); return
     }
-    specLauncherManager.cancel(req.params.launchId)
+    specLauncherManager.cancel(req.params.launchId as string)
     res.json({ ok: true })
   })
 
