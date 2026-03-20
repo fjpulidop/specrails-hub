@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
@@ -61,6 +61,22 @@ export default function DashboardPage() {
     },
     pollInterval: 10_000,
   })
+
+  // Per-command stats derived from the recent jobs already in state
+  const enrichedCommands = useMemo(() => {
+    const statsMap: Record<string, { totalRuns: number; lastRunAt: string | null }> = {}
+    for (const job of rawJobs) {
+      const match = job.command.match(/^\/sr:([^\s]+)/)
+      if (!match) continue
+      const slug = match[1]
+      if (!statsMap[slug]) statsMap[slug] = { totalRuns: 0, lastRunAt: null }
+      statsMap[slug].totalRuns += 1
+      if (!statsMap[slug].lastRunAt || job.started_at > statsMap[slug].lastRunAt!) {
+        statsMap[slug].lastRunAt = job.started_at
+      }
+    }
+    return commands.map((cmd) => ({ ...cmd, ...statsMap[cmd.slug] }))
+  }, [commands, rawJobs])
 
   const PROPOSAL_STATUS_MAP: Record<string, JobSummary['status']> = {
     input: 'queued',
@@ -125,7 +141,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           <CommandGrid
-            commands={commands}
+            commands={enrichedCommands}
             onOpenWizard={(slug) => setWizardOpen(slug)}
           />
         )}

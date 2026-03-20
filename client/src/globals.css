@@ -90,6 +90,33 @@
 @utility glow-orange  { box-shadow: 0 0 20px hsl(31 100% 71% / 0.2); }
 @utility glow-yellow  { box-shadow: 0 0 20px hsl(65 92% 76% / 0.2); }
 
+/* ── Highlight.js — Dracula-themed syntax colours ─────────────────────────── */
+.hljs { background: transparent; color: hsl(60 30% 96%); }
+.hljs-keyword,
+.hljs-selector-tag          { color: hsl(326 100% 74%); }    /* pink */
+.hljs-string,
+.hljs-attr,
+.hljs-attribute             { color: hsl(65 92% 76%); }      /* yellow */
+.hljs-comment,
+.hljs-quote                 { color: hsl(225 27% 51%); font-style: italic; }
+.hljs-number,
+.hljs-literal               { color: hsl(191 97% 77%); }     /* cyan */
+.hljs-title,
+.hljs-title.function_,
+.hljs-name                  { color: hsl(135 94% 65%); }     /* green */
+.hljs-type,
+.hljs-class,
+.hljs-built_in              { color: hsl(191 97% 77%); }     /* cyan */
+.hljs-variable,
+.hljs-params                { color: hsl(31 100% 71%); }     /* orange */
+.hljs-tag                   { color: hsl(326 100% 74%); }
+.hljs-selector-class,
+.hljs-selector-id           { color: hsl(135 94% 65%); }
+.hljs-addition              { background: hsl(135 94% 65% / 0.12); color: hsl(135 94% 65%); }
+.hljs-deletion              { background: hsl(0 100% 67% / 0.12); color: hsl(0 100% 67%); }
+.hljs-emphasis              { font-style: italic; }
+.hljs-strong                { font-weight: 700; }
+
 /* Log viewer markdown tables */
 .prose table {
   border-collapse: collapse;

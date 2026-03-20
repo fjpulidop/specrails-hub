@@ -1,19 +1,44 @@
 import { useEffect, useRef, useState, useCallback, memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Search, ChevronDown } from 'lucide-react'
+import rehypeHighlight from 'rehype-highlight'
+import { Search, ChevronDown, ChevronRight } from 'lucide-react'
 import { Input } from './ui/input'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
 import type { EventRow } from '../types'
 import { hasMarkdownSyntax } from '../lib/markdown-detect'
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type FormattedLineType =
+  | 'phase'
+  | 'tool-use'
+  | 'tool-result'
+  | 'assistant'
+  | 'stderr'
+  | 'result'
+  | 'log'
+  | 'plain'
+  | 'diff-add'
+  | 'diff-remove'
+  | 'diff-meta'
+  | 'diff-hunk'
+
 interface FormattedLine {
   id: string
   content: string
-  type: 'phase' | 'tool-use' | 'tool-result' | 'assistant' | 'stderr' | 'result' | 'log' | 'plain'
+  type: FormattedLineType
   timestamp?: string
 }
+
+interface PhaseGroup {
+  key: string
+  header: FormattedLine | null  // null = preamble before first phase
+  lines: FormattedLine[]
+}
+
+// ─── Event parsing ────────────────────────────────────────────────────────────
 
 function parseEvent(event: EventRow, idx: number): FormattedLine | null {
   const id = `${event.id ?? idx}`
@@ -77,6 +102,64 @@ function parseEvent(event: EventRow, idx: number): FormattedLine | null {
   return null
 }
 
+// ─── Diff detection ───────────────────────────────────────────────────────────
+// Detects unified-diff lines (--- a/… +++ b/… @@ … +line -line)
+// Only marks lines as diff types after seeing a proper diff header sequence.
+
+function applyDiffDetection(lines: FormattedLine[]): FormattedLine[] {
+  type DiffState = 'none' | 'saw_minus' | 'active'
+  let diffState: DiffState = 'none'
+  const out: FormattedLine[] = []
+
+  for (const line of lines) {
+    const t = line.type
+    // Only scan plain/log lines for diff markers; phase/result/stderr etc. reset state
+    if (t !== 'plain' && t !== 'log') {
+      diffState = 'none'
+      out.push(line)
+      continue
+    }
+    const c = line.content
+    if (c.startsWith('--- ')) {
+      diffState = 'saw_minus'
+      out.push({ ...line, type: 'diff-meta' })
+    } else if (diffState === 'saw_minus' && c.startsWith('+++ ')) {
+      diffState = 'active'
+      out.push({ ...line, type: 'diff-meta' })
+    } else if (diffState === 'active' && c.startsWith('@@ ')) {
+      out.push({ ...line, type: 'diff-hunk' })
+    } else if (diffState === 'active' && c.startsWith('+') && !c.startsWith('+++')) {
+      out.push({ ...line, type: 'diff-add' })
+    } else if (diffState === 'active' && c.startsWith('-') && !c.startsWith('---')) {
+      out.push({ ...line, type: 'diff-remove' })
+    } else if (diffState === 'active' && (c.startsWith(' ') || c === '')) {
+      // unchanged line — keep plain but stay in diff mode
+      out.push(line)
+    } else {
+      diffState = 'none'
+      out.push(line)
+    }
+  }
+  return out
+}
+
+// ─── Phase grouping ───────────────────────────────────────────────────────────
+
+function groupByPhase(lines: FormattedLine[]): PhaseGroup[] {
+  const groups: PhaseGroup[] = [{ key: '__preamble__', header: null, lines: [] }]
+  for (const line of lines) {
+    if (line.type === 'phase') {
+      groups.push({ key: line.id, header: line, lines: [] })
+    } else {
+      groups[groups.length - 1].lines.push(line)
+    }
+  }
+  // Drop empty preamble
+  return groups.filter((g) => g.header !== null || g.lines.length > 0)
+}
+
+// ─── LogViewer ────────────────────────────────────────────────────────────────
+
 interface LogViewerProps {
   events: EventRow[]
   isLoading?: boolean
@@ -85,37 +168,40 @@ interface LogViewerProps {
 export function LogViewer({ events, isLoading }: LogViewerProps) {
   const [filter, setFilter] = useState('')
   const [autoScroll, setAutoScroll] = useState(true)
+  const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
   const bottomRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // Parse → merge markdown → detect diffs
   const rawLines = events
     .map((ev, idx) => parseEvent(ev, idx))
     .filter((l): l is FormattedLine => l !== null)
 
-  // Merge consecutive 'assistant' (markdown) lines into single blocks
-  const lines: FormattedLine[] = []
+  const merged: FormattedLine[] = []
   for (const line of rawLines) {
-    const prev = lines.length > 0 ? lines[lines.length - 1] : null
+    const prev = merged.length > 0 ? merged[merged.length - 1] : null
     if (line.type === 'assistant' && prev?.type === 'assistant') {
-      // Merge into previous block
       prev.content += '\n' + line.content
     } else {
-      lines.push({ ...line })
+      merged.push({ ...line })
     }
   }
 
-  const filtered = filter
-    ? lines.filter((l) => l.content.toLowerCase().includes(filter.toLowerCase()))
-    : lines
+  const processedLines = applyDiffDetection(merged)
+  const groups = groupByPhase(processedLines)
+  const totalLines = processedLines.length
+
+  // Filter count: lines matching filter across all groups
+  const filteredCount = filter
+    ? processedLines.filter((l) => l.content.toLowerCase().includes(filter.toLowerCase())).length
+    : totalLines
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
   useEffect(() => {
-    if (autoScroll) {
-      scrollToBottom()
-    }
+    if (autoScroll) scrollToBottom()
   }, [events.length, autoScroll, scrollToBottom])
 
   function handleScroll() {
@@ -123,6 +209,15 @@ export function LogViewer({ events, isLoading }: LogViewerProps) {
     if (!el) return
     const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50
     setAutoScroll(isAtBottom)
+  }
+
+  function togglePhase(key: string) {
+    setCollapsedPhases((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
   if (isLoading) {
@@ -133,7 +228,7 @@ export function LogViewer({ events, isLoading }: LogViewerProps) {
     )
   }
 
-  if (lines.length === 0) {
+  if (totalLines === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <p className="text-xs text-muted-foreground">No log output yet</p>
@@ -155,7 +250,7 @@ export function LogViewer({ events, isLoading }: LogViewerProps) {
           />
         </div>
         <span className="text-[10px] text-muted-foreground ml-auto">
-          {filtered.length} / {lines.length} lines
+          {filteredCount} / {totalLines} lines
         </span>
       </div>
 
@@ -165,8 +260,14 @@ export function LogViewer({ events, isLoading }: LogViewerProps) {
         className="flex-1 overflow-y-auto p-2 text-xs relative"
         onScroll={handleScroll}
       >
-        {filtered.map((line, idx) => (
-          <LogLine key={line.id} line={line} even={idx % 2 === 0} />
+        {groups.map((group) => (
+          <PhaseGroupSection
+            key={group.key}
+            group={group}
+            filter={filter}
+            collapsed={collapsedPhases.has(group.key)}
+            onToggle={() => togglePhase(group.key)}
+          />
         ))}
         <div ref={bottomRef} />
       </div>
@@ -187,16 +288,115 @@ export function LogViewer({ events, isLoading }: LogViewerProps) {
   )
 }
 
+// ─── PhaseGroupSection ────────────────────────────────────────────────────────
+
+interface PhaseGroupSectionProps {
+  group: PhaseGroup
+  filter: string
+  collapsed: boolean
+  onToggle: () => void
+}
+
+const PhaseGroupSection = memo(function PhaseGroupSection({
+  group,
+  filter,
+  collapsed,
+  onToggle,
+}: PhaseGroupSectionProps) {
+  const visibleLines = filter
+    ? group.lines.filter((l) => l.content.toLowerCase().includes(filter.toLowerCase()))
+    : group.lines
+
+  // Preamble: render lines without a phase header
+  if (group.header === null) {
+    if (visibleLines.length === 0) return null
+    return (
+      <div>
+        {visibleLines.map((line, idx) => (
+          <LogLine key={line.id} line={line} even={idx % 2 === 0} />
+        ))}
+      </div>
+    )
+  }
+
+  const phaseContent = group.header.content
+
+  return (
+    <div className="mt-3 rounded-md overflow-hidden border border-border/20">
+      {/* Phase header — clickable to collapse */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className={cn(
+          'flex items-center gap-2 w-full text-left px-3 py-2',
+          'bg-primary/5 border-b border-primary/20',
+          'hover:bg-primary/10 transition-colors duration-150 cursor-pointer',
+        )}
+      >
+        <ChevronRight
+          className={cn(
+            'w-3 h-3 text-primary/60 shrink-0 transition-transform duration-150',
+            !collapsed && 'rotate-90',
+          )}
+        />
+        <span className="flex-1 text-[12px] font-semibold text-foreground leading-none">
+          {phaseContent}
+        </span>
+        {group.header.timestamp && (
+          <span className="text-[10px] text-muted-foreground/40 font-mono tabular-nums shrink-0">
+            {new Date(group.header.timestamp).toLocaleTimeString('en', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: false,
+            })}
+          </span>
+        )}
+        <span className="text-[10px] text-muted-foreground/40 shrink-0">
+          {group.lines.length} lines
+        </span>
+      </button>
+
+      {/* Phase content */}
+      {!collapsed && (
+        <div className="bg-muted/5">
+          {visibleLines.length === 0 ? (
+            <p className="px-4 py-2 text-[10px] text-muted-foreground/40 italic">
+              {filter ? 'No matching lines' : 'No output'}
+            </p>
+          ) : (
+            visibleLines.map((line, idx) => (
+              <LogLine key={line.id} line={line} even={idx % 2 === 0} />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+})
+
+// ─── LogLine ──────────────────────────────────────────────────────────────────
+
+const REHYPE_PLUGINS = [rehypeHighlight]
+
 const LogLine = memo(function LogLine({ line, even }: { line: FormattedLine; even: boolean }) {
   const isMarkdown = line.type === 'assistant'
+  const isDiffAdd = line.type === 'diff-add'
+  const isDiffRemove = line.type === 'diff-remove'
+  const isDiffMeta = line.type === 'diff-meta'
+  const isDiffHunk = line.type === 'diff-hunk'
+  const isDiff = isDiffAdd || isDiffRemove || isDiffMeta || isDiffHunk
 
   return (
     <div
       className={cn(
-        'flex items-start gap-2 group px-2 py-1 rounded-sm',
-        even ? 'bg-muted/20' : 'bg-transparent',
-        line.type === 'phase' && 'bg-primary/5 border-l-2 border-primary/40 mt-3 mb-1 py-2',
+        'flex items-start gap-2 group px-2 py-0.5 rounded-sm',
+        !isDiff && (even ? 'bg-muted/20' : 'bg-transparent'),
         line.type === 'result' && 'bg-emerald-500/5 border-l-2 border-emerald-500/40 mt-2 py-2',
+        isDiffAdd    && 'bg-emerald-500/8 border-l-2 border-emerald-500/50',
+        isDiffRemove && 'bg-red-500/8 border-l-2 border-red-500/50',
+        isDiffMeta   && 'bg-dracula-purple/5 border-l-2 border-dracula-purple/30',
+        isDiffHunk   && 'bg-dracula-cyan/5 border-l-2 border-dracula-cyan/30',
       )}
     >
       {line.timestamp && (
@@ -227,19 +427,24 @@ const LogLine = memo(function LogLine({ line, even }: { line: FormattedLine; eve
             prose-tr:border-border
             text-foreground/80"
         >
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{line.content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={REHYPE_PLUGINS}>
+            {line.content}
+          </ReactMarkdown>
         </div>
       ) : (
         <span
           className={cn(
             'flex-1 break-all leading-relaxed whitespace-pre-wrap font-mono',
-            line.type === 'phase' && 'text-foreground font-semibold text-[13px]',
-            line.type === 'tool-use' && 'text-cyan-400/80 text-[11px]',
-            line.type === 'stderr' && 'text-orange-400',
-            line.type === 'result' && 'text-emerald-400 font-medium',
-            line.type === 'log' && 'text-foreground/60',
-            line.type === 'plain' && 'text-foreground/70',
-            line.type === 'tool-result' && 'text-muted-foreground/50'
+            line.type === 'tool-use'    && 'text-cyan-400/80 text-[11px]',
+            line.type === 'stderr'      && 'text-orange-400',
+            line.type === 'result'      && 'text-emerald-400 font-medium',
+            line.type === 'log'         && 'text-foreground/60',
+            line.type === 'plain'       && 'text-foreground/70',
+            line.type === 'tool-result' && 'text-muted-foreground/50',
+            isDiffAdd    && 'text-emerald-400',
+            isDiffRemove && 'text-red-400',
+            isDiffMeta   && 'text-dracula-purple/80',
+            isDiffHunk   && 'text-dracula-cyan/80',
           )}
         >
           {line.content}

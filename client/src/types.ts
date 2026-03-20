@@ -37,6 +37,8 @@ export interface CommandInfo {
   name: string
   description: string
   slug: string
+  totalRuns?: number
+  lastRunAt?: string | null
 }
 
 export interface ProjectConfig {
