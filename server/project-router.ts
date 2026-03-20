@@ -19,6 +19,7 @@ import { getConfig, fetchIssues } from './config'
 import { getAnalytics, getTrends } from './analytics'
 import type { ChatConversationRow, TrendsPeriod } from './types'
 import { readChanges } from './changes-reader'
+import { getProjectMetrics } from './metrics'
 
 // Extend Express Request to carry resolved ProjectContext
 declare module 'express-serve-static-core' {
@@ -186,6 +187,16 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
   router.get('/:projectId/stats', (req: Request, res: Response) => {
     res.json(getStats(ctx(req).db))
+  })
+
+  router.get('/:projectId/metrics', (req: Request, res: Response) => {
+    const { project, db } = ctx(req)
+    try {
+      res.json(getProjectMetrics(project.path, db))
+    } catch (err) {
+      console.error('[project-router] metrics error:', err)
+      res.status(500).json({ error: 'Failed to compute metrics' })
+    }
   })
 
   router.get('/:projectId/analytics', (req: Request, res: Response) => {
