@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.10.0](https://github.com/fjpulidop/specrails-hub/compare/v1.9.0...v1.10.0) (2026-03-20)
+
+
+### Features
+
+* **hub:** Feature Funnel, OpenSpec Launcher, Active Changes Tracker, Spec Artifact Browser ([#44](https://github.com/fjpulidop/specrails-hub/issues/44)) ([710e2ba](https://github.com/fjpulidop/specrails-hub/commit/710e2baaf39673a0f4cf20954b47b6b5d7176e07))
+
+
+### Bug Fixes
+
+* **ci:** add missing permissions to sync-core-contract workflow ([#45](https://github.com/fjpulidop/specrails-hub/issues/45)) ([83c1cb0](https://github.com/fjpulidop/specrails-hub/commit/83c1cb0ed453f0d7dbd1a31d25eda502974cf4a1))
+* **ci:** skip bot and merge commits in DCO sign-off check ([#67](https://github.com/fjpulidop/specrails-hub/issues/67)) ([cf65b9a](https://github.com/fjpulidop/specrails-hub/commit/cf65b9a4f706beebd89c5e95107db7c464dccd2e))
+
 ## [1.9.0](https://github.com/fjpulidop/specrails-hub/compare/v1.8.0...v1.9.0) (2026-03-20)
 
 
