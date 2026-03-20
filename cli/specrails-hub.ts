@@ -188,7 +188,7 @@ export function detectWebManager(port: number): Promise<DetectionResult> {
       resolve({ running: false, baseUrl })
     }, DETECTION_TIMEOUT_MS)
 
-    const req = http.get(`${baseUrl}/api/state`, { timeout: DETECTION_TIMEOUT_MS }, (res) => {
+    const req = http.get(`${baseUrl}/api/health`, { timeout: DETECTION_TIMEOUT_MS }, (res) => {
       clearTimeout(timer)
       res.resume() // drain the response
       if (res.statusCode !== undefined && res.statusCode >= 200 && res.statusCode < 300) {
@@ -635,29 +635,45 @@ async function handleStatus(port: number): Promise<number> {
   }
 
   try {
-    const res = await httpGet(`${baseUrl}/api/state`)
-    if (res.status !== 200) {
+    const healthRes = await httpGet(`${baseUrl}/api/health`)
+    if (healthRes.status !== 200) {
       process.stdout.write(`manager: not running (${baseUrl})\n`)
       return 1
     }
 
-    const state = JSON.parse(res.body) as {
-      projectName?: string
-      busy?: boolean
-      phases?: Record<string, string>
+    const health = JSON.parse(healthRes.body) as {
+      status?: string
       version?: string
+      uptime?: number
+      projects?: number
+      mode?: string
     }
 
-    const version = state.version ? `  (v${state.version})` : ''
+    const version = health.version ? `  (v${health.version})` : ''
     process.stdout.write(`manager: running${version}\n`)
-    process.stdout.write(`project:     ${state.projectName ?? 'unknown'}\n`)
-    process.stdout.write(`busy:        ${state.busy ? 'true' : 'false'}\n`)
+    process.stdout.write(`mode:        ${health.mode ?? 'unknown'}\n`)
+    if (health.projects !== undefined) {
+      process.stdout.write(`projects:    ${health.projects}\n`)
+    }
 
-    if (state.phases) {
-      const phaseStr = Object.entries(state.phases)
-        .map(([phase, st]) => `${phase}=${st}`)
-        .join('  ')
-      process.stdout.write(`phases:      ${phaseStr}\n`)
+    // Legacy mode: fetch additional per-project details from /api/state
+    if (health.mode !== 'hub') {
+      const stateRes = await httpGet(`${baseUrl}/api/state`)
+      if (stateRes.status === 200) {
+        const state = JSON.parse(stateRes.body) as {
+          projectName?: string
+          busy?: boolean
+          phases?: Record<string, string>
+        }
+        process.stdout.write(`project:     ${state.projectName ?? 'unknown'}\n`)
+        process.stdout.write(`busy:        ${state.busy ? 'true' : 'false'}\n`)
+        if (state.phases) {
+          const phaseStr = Object.entries(state.phases)
+            .map(([phase, st]) => `${phase}=${st}`)
+            .join('  ')
+          process.stdout.write(`phases:      ${phaseStr}\n`)
+        }
+      }
     }
 
     return 0
