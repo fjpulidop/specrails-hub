@@ -8,6 +8,8 @@ jobs:
   dco-check:
     name: DCO Sign-off Check
     runs-on: ubuntu-latest
+    # Skip DCO check for Dependabot and other automated bots
+    if: github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.user.login != 'github-actions[bot]'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
