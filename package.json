@@ -26,7 +26,8 @@
     "build:cli": "tsc --project tsconfig.cli.json",
     "build": "npm run build:server && cd client && npm run build && cd .. && npm run build:cli",
     "typecheck": "tsc --noEmit && cd client && tsc --noEmit",
-    "test": "vitest run",
+    "check-core-compat": "tsx scripts/check-core-compat.ts",
+    "test": "vitest run && tsx scripts/check-core-compat.ts",
     "test:watch": "vitest",
     "test:client": "cd client && npx vitest run",
     "test:all": "vitest run && cd client && npx vitest run"

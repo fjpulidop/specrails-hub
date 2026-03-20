@@ -1,0 +1,37 @@
+name: Sync Core Contract
+
+on:
+  repository_dispatch:
+    types: [specrails-core-released]
+
+jobs:
+  check-compat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install specrails-core
+        run: npm install -g specrails-core@${{ github.event.client_payload.core_version }}
+
+      - name: Run compat check
+        run: npx tsx scripts/check-core-compat.ts
+
+      - name: Open issue on drift
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'core-sync-required: specrails-core ${{ github.event.client_payload.core_version }} has breaking changes',
+              body: 'The `sync-core-contract` workflow detected drift between specrails-core and specrails-hub.\n\nRun `npx tsx scripts/check-core-compat.ts` locally after installing the new core version to see the full diff.',
+              labels: ['core-sync-required']
+            })

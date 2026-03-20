@@ -11,7 +11,7 @@ import { createProjectRouter } from './project-router'
 import { createHooksRouter, getPhaseStates, getPhaseDefinitions } from './hooks'
 import { createDocsRouter } from './docs-router'
 import { QueueManager, ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
-import { initDb, listJobs, getJob, getJobEvents, getStats, purgeJobs,
+import { initDb, type DbInstance, listJobs, getJob, getJobEvents, getStats, purgeJobs,
   createConversation, listConversations, getConversation,
   deleteConversation, updateConversation, addMessage, getMessages,
   createProposal, getProposal, listProposals, deleteProposal } from './db'
@@ -107,6 +107,11 @@ function broadcast(msg: WsMessage): void {
   }
 }
 
+// ─── Health endpoint state (populated in mode blocks) ─────────────────────────
+
+let _getProjectCount: () => number = () => 0
+let _legacyDb: DbInstance | null = null
+
 server.on('upgrade', (request, socket, head) => {
   wss.handleUpgrade(request, socket, head, (ws) => {
     wss.emit('connection', ws, request)
@@ -122,6 +127,7 @@ app.use('/api/docs', createDocsRouter())
 if (isHubMode) {
   const registry = new ProjectRegistry(broadcast)
   registry.loadAll()
+  _getProjectCount = () => registry.listContexts().length
 
   // Hub-level routes
   app.use('/api/hub', createHubRouter(registry, broadcast))
@@ -156,6 +162,8 @@ if (isHubMode) {
   // ─── Single-project (legacy) mode ─────────────────────────────────────────
 
   const db = initDb(path.join(process.cwd(), 'data', 'jobs.sqlite'))
+  _getProjectCount = () => 1
+  _legacyDb = db
   const queueManager = new QueueManager(broadcast, db)
   const chatManager = new ChatManager(broadcast, db)
   const proposalManager = new ProposalManager(broadcast, db, process.cwd())
@@ -513,6 +521,28 @@ if (isHubMode) {
     res.json({ ok: true })
   })
 }
+
+// ─── Health check (available in all modes) ────────────────────────────────────
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    version: PKG_VERSION,
+    uptime: Math.floor(process.uptime()),
+    projects: _getProjectCount(),
+    mode: isHubMode ? 'hub' : 'legacy',
+  })
+})
+
+// ─── Global async error handler ────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[unhandled error]', err)
+  if (!res.headersSent) {
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
 
 // ─── Serve built React client (production) ────────────────────────────────────
 

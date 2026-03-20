@@ -4,6 +4,7 @@ import { existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
+import { findCoreContract } from './core-compat'
 
 // ─── Checkpoint definitions ───────────────────────────────────────────────────
 
@@ -148,6 +149,42 @@ function computeSummary(projectPath: string): SetupSummary {
   return { agents, personas, commands }
 }
 
+// ─── Core contract validation ────────────────────────────────────────────────
+
+async function validateCoreContract(): Promise<void> {
+  const contractPath = await findCoreContract()
+  if (!contractPath) {
+    console.warn('[Hub] ⚠️  Could not find integration-contract.json from specrails-core')
+    return
+  }
+
+  let contract: { checkpoints?: string[]; commands?: string[] }
+  try {
+    const raw = require('fs').readFileSync(contractPath, 'utf-8') as string
+    contract = JSON.parse(raw) as { checkpoints?: string[]; commands?: string[] }
+  } catch {
+    console.warn('[Hub] ⚠️  Failed to parse integration-contract.json')
+    return
+  }
+
+  if (contract.checkpoints) {
+    const missingCheckpoints = contract.checkpoints.filter(
+      (c) => !CHECKPOINTS.some((cp) => cp.key === c)
+    )
+    const extraCheckpoints = CHECKPOINTS
+      .filter((cp) => !contract.checkpoints!.includes(cp.key))
+      .map((cp) => cp.key)
+
+    if (missingCheckpoints.length > 0 || extraCheckpoints.length > 0) {
+      console.warn('[Hub] ⚠️  specrails-core contract checkpoint mismatch:')
+      if (missingCheckpoints.length > 0)
+        console.warn(`  Checkpoints in Core but not in Hub: ${missingCheckpoints.join(', ')}`)
+      if (extraCheckpoints.length > 0)
+        console.warn(`  Checkpoints in Hub but not in Core: ${extraCheckpoints.join(', ')}`)
+    }
+  }
+}
+
 // ─── SetupManager ─────────────────────────────────────────────────────────────
 
 export class SetupManager {
@@ -205,6 +242,8 @@ export class SetupManager {
           projectId,
           timestamp: new Date().toISOString(),
         })
+        // Validate that hub constants are in sync with the installed core contract
+        validateCoreContract().catch(() => { /* non-fatal */ })
       } else {
         this._broadcast({
           type: 'setup_error',

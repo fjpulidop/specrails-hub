@@ -31,7 +31,7 @@ import fs from 'fs'
 const DEFAULT_PORT = 4200
 const DETECTION_TIMEOUT_MS = 500
 
-const KNOWN_VERBS = new Set([
+export const KNOWN_VERBS = new Set([
   'implement',
   'batch-implement',
   'why',

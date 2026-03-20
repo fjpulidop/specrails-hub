@@ -5,6 +5,7 @@ import type { WsMessage } from './types'
 import type { ProjectRegistry } from './project-registry'
 import { getHubSetting, setHubSetting, listProjects } from './hub-db'
 import { createSpecrailsTechClient } from './specrails-tech-client'
+import { checkCoreCompat } from './core-compat'
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -139,6 +140,12 @@ export function createHubRouter(
       setHubSetting(registry.hubDb, 'specrails_tech_url', specrailsTechUrl.trim())
     }
     res.json({ ok: true })
+  })
+
+  // GET /api/hub/core-compat — compatibility status between hub and specrails-core
+  router.get('/core-compat', async (_req, res) => {
+    const result = await checkCoreCompat()
+    res.json(result)
   })
 
   // ─── specrails-tech proxy routes ────────────────────────────────────────────
