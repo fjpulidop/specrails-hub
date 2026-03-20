@@ -181,6 +181,108 @@ export function getHubAnalytics(
   }
 }
 
+// ─── Recent jobs across all projects ─────────────────────────────────────────
+
+export interface HubRecentJob {
+  id: string
+  command: string
+  started_at: string
+  finished_at: string | null
+  status: string
+  total_cost_usd: number | null
+  projectId: string
+  projectName: string
+}
+
+export function getHubRecentJobs(registry: ProjectRegistry, limit = 10): HubRecentJob[] {
+  const all: HubRecentJob[] = []
+
+  for (const ctx of registry.listContexts()) {
+    const rows = ctx.db.prepare(`
+      SELECT id, command, started_at, finished_at, status, total_cost_usd
+      FROM jobs
+      ORDER BY started_at DESC
+      LIMIT ?
+    `).all(limit) as Array<{
+      id: string
+      command: string
+      started_at: string
+      finished_at: string | null
+      status: string
+      total_cost_usd: number | null
+    }>
+
+    for (const row of rows) {
+      all.push({ ...row, projectId: ctx.project.id, projectName: ctx.project.name })
+    }
+  }
+
+  return all
+    .sort((a, b) => b.started_at.localeCompare(a.started_at))
+    .slice(0, limit)
+}
+
+// ─── Cross-project search ─────────────────────────────────────────────────────
+
+export interface HubSearchResultGroup {
+  projectId: string
+  projectName: string
+  jobs: Array<{ id: string; command: string; started_at: string; status: string }>
+  proposals: Array<{ id: string; idea: string; status: string; created_at: string }>
+  messages: Array<{ id: number; content: string; role: string; created_at: string }>
+}
+
+export interface HubSearchResponse {
+  query: string
+  groups: HubSearchResultGroup[]
+  total: number
+}
+
+export function searchHubContent(registry: ProjectRegistry, query: string): HubSearchResponse {
+  const term = `%${query}%`
+  const groups: HubSearchResultGroup[] = []
+  let total = 0
+
+  for (const ctx of registry.listContexts()) {
+    const jobs = ctx.db.prepare(`
+      SELECT id, command, started_at, status
+      FROM jobs
+      WHERE command LIKE ?
+      ORDER BY started_at DESC
+      LIMIT 5
+    `).all(term) as Array<{ id: string; command: string; started_at: string; status: string }>
+
+    const proposals = ctx.db.prepare(`
+      SELECT id, idea, status, created_at
+      FROM proposals
+      WHERE idea LIKE ?
+      ORDER BY created_at DESC
+      LIMIT 5
+    `).all(term) as Array<{ id: string; idea: string; status: string; created_at: string }>
+
+    const messages = ctx.db.prepare(`
+      SELECT id, content, role, created_at
+      FROM chat_messages
+      WHERE content LIKE ?
+      ORDER BY created_at DESC
+      LIMIT 5
+    `).all(term) as Array<{ id: number; content: string; role: string; created_at: string }>
+
+    if (jobs.length > 0 || proposals.length > 0 || messages.length > 0) {
+      groups.push({
+        projectId: ctx.project.id,
+        projectName: ctx.project.name,
+        jobs,
+        proposals,
+        messages,
+      })
+      total += jobs.length + proposals.length + messages.length
+    }
+  }
+
+  return { query, groups, total }
+}
+
 // ─── Quick today stats (for /api/hub/state) ────────────────────────────────────
 
 export interface HubTodayStats {

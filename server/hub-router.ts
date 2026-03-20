@@ -6,7 +6,7 @@ import type { ProjectRegistry } from './project-registry'
 import { getHubSetting, setHubSetting, listProjects, listAgents, getAgent, addAgent, updateAgent } from './hub-db'
 import { createSpecrailsTechClient } from './specrails-tech-client'
 import { checkCoreCompat } from './core-compat'
-import { getHubAnalytics, getHubTodayStats } from './hub-analytics'
+import { getHubAnalytics, getHubTodayStats, getHubRecentJobs, searchHubContent } from './hub-analytics'
 import type { AnalyticsOpts, AnalyticsPeriod } from './types'
 
 function slugify(name: string): string {
@@ -112,6 +112,28 @@ export function createHubRouter(
     const to = req.query.to as string | undefined
     const opts: AnalyticsOpts = { period, from, to }
     const result = getHubAnalytics(registry, opts)
+    res.json(result)
+  })
+
+  // GET /api/hub/recent-jobs?limit= — last N jobs across all projects
+  router.get('/recent-jobs', (req, res) => {
+    const limit = Math.min(Math.max(parseInt((req.query.limit as string) ?? '10', 10) || 10, 1), 50)
+    const jobs = getHubRecentJobs(registry, limit)
+    res.json({ jobs })
+  })
+
+  // GET /api/hub/search?q= — search across all project jobs, proposals, chat messages
+  router.get('/search', (req, res) => {
+    const query = ((req.query.q as string) ?? '').trim()
+    if (!query) {
+      res.json({ query: '', groups: [], total: 0 })
+      return
+    }
+    if (query.length < 2) {
+      res.status(400).json({ error: 'Query must be at least 2 characters' })
+      return
+    }
+    const result = searchHubContent(registry, query)
     res.json(result)
   })
 

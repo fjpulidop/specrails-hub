@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getHubAnalytics, getHubTodayStats } from './hub-analytics'
+import { getHubAnalytics, getHubTodayStats, getHubRecentJobs, searchHubContent } from './hub-analytics'
 import { initDb } from './db'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import type { DbInstance } from './db'
@@ -161,5 +161,92 @@ describe('getHubTodayStats', () => {
     const stats = getHubTodayStats(registry)
     expect(stats.jobsToday).toBe(2)
     expect(stats.costToday).toBeCloseTo(0.12, 5)
+  })
+})
+
+// ─── getHubRecentJobs ─────────────────────────────────────────────────────────
+
+describe('getHubRecentJobs', () => {
+  it('returns empty list when no projects', () => {
+    const registry = makeRegistry([])
+    expect(getHubRecentJobs(registry)).toEqual([])
+  })
+
+  it('returns jobs sorted by started_at descending', () => {
+    const today = new Date().toISOString().slice(0, 10)
+    const db = makeProjectDb([
+      { costUsd: 0.01, status: 'completed', startedAt: `${today}T08:00:00.000Z` },
+      { costUsd: 0.02, status: 'completed', startedAt: `${today}T10:00:00.000Z` },
+    ])
+    const registry = makeRegistry([{ id: 'p1', name: 'Proj', db }])
+    const jobs = getHubRecentJobs(registry)
+    expect(jobs[0].started_at > jobs[1].started_at).toBe(true)
+  })
+
+  it('merges jobs across projects and respects limit', () => {
+    const today = new Date().toISOString().slice(0, 10)
+    const db1 = makeProjectDb([
+      { costUsd: 0.01, status: 'completed', startedAt: `${today}T09:00:00.000Z` },
+      { costUsd: 0.01, status: 'completed', startedAt: `${today}T11:00:00.000Z` },
+    ])
+    const db2 = makeProjectDb([
+      { costUsd: 0.01, status: 'running', startedAt: `${today}T10:00:00.000Z` },
+    ])
+    const registry = makeRegistry([
+      { id: 'p1', name: 'Alpha', db: db1 },
+      { id: 'p2', name: 'Beta', db: db2 },
+    ])
+    const jobs = getHubRecentJobs(registry, 2)
+    expect(jobs).toHaveLength(2)
+    expect(jobs[0].started_at >= jobs[1].started_at).toBe(true)
+  })
+
+  it('includes projectId and projectName on each job', () => {
+    const db = makeProjectDb([{ costUsd: 0.01, status: 'completed' }])
+    const registry = makeRegistry([{ id: 'proj-1', name: 'MyProject', db }])
+    const jobs = getHubRecentJobs(registry)
+    expect(jobs[0].projectId).toBe('proj-1')
+    expect(jobs[0].projectName).toBe('MyProject')
+  })
+})
+
+// ─── searchHubContent ─────────────────────────────────────────────────────────
+
+describe('searchHubContent', () => {
+  it('returns empty groups when no projects', () => {
+    const registry = makeRegistry([])
+    const result = searchHubContent(registry, 'test')
+    expect(result.groups).toEqual([])
+    expect(result.total).toBe(0)
+    expect(result.query).toBe('test')
+  })
+
+  it('finds jobs matching command', () => {
+    const db = makeProjectDb([
+      { costUsd: 0.01, status: 'completed' }, // command = 'implement'
+    ])
+    const registry = makeRegistry([{ id: 'p1', name: 'Project', db }])
+    const result = searchHubContent(registry, 'implement')
+    expect(result.total).toBeGreaterThan(0)
+    expect(result.groups[0].jobs).toHaveLength(1)
+  })
+
+  it('returns no results for non-matching query', () => {
+    const db = makeProjectDb([{ costUsd: 0.01, status: 'completed' }])
+    const registry = makeRegistry([{ id: 'p1', name: 'Project', db }])
+    const result = searchHubContent(registry, 'zzz_no_match_xyzzy')
+    expect(result.groups).toHaveLength(0)
+    expect(result.total).toBe(0)
+  })
+
+  it('omits projects with no matches', () => {
+    const db1 = makeProjectDb([{ costUsd: 0.01, status: 'completed' }]) // command = 'implement'
+    const db2 = makeProjectDb([{ costUsd: 0.01, status: 'completed' }]) // command = 'implement'
+    const registry = makeRegistry([
+      { id: 'p1', name: 'A', db: db1 },
+      { id: 'p2', name: 'B', db: db2 },
+    ])
+    const result = searchHubContent(registry, 'implement')
+    expect(result.groups).toHaveLength(2)
   })
 })

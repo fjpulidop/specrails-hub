@@ -6,6 +6,7 @@ import fs from 'fs'
 
 import { createHubRouter } from './hub-router'
 import { initHubDb, addProject, removeProject as removeProjectFromHub, getHubSetting, setHubSetting, addAgent, getAgent } from './hub-db'
+import { initDb } from './db'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import type { WsMessage } from './types'
 import type { DbInstance } from './db'
@@ -382,6 +383,125 @@ describe('hub-router', () => {
       const res = await request(app).put('/api/hub/settings').send({})
       expect(res.status).toBe(200)
       expect(res.body.ok).toBe(true)
+    })
+  })
+
+  // ─── GET /recent-jobs ───────────────────────────────────────────────────────
+
+  describe('GET /api/hub/recent-jobs', () => {
+    it('returns empty list when no projects have jobs', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/recent-jobs')
+      expect(res.status).toBe(200)
+      expect(res.body.jobs).toEqual([])
+    })
+
+    it('returns jobs from project contexts', async () => {
+      const { app, contexts } = createApp()
+      const today = new Date().toISOString().slice(0, 10)
+      const db = initDb(':memory:')
+      db.prepare(`
+        INSERT INTO jobs (id, command, started_at, status, total_cost_usd)
+        VALUES (?, 'implement', ?, 'completed', 0.01)
+      `).run('job-1', `${today}T10:00:00.000Z`)
+
+      contexts.set('p1', {
+        project: { id: 'p1', name: 'TestProj', slug: 'testproj', path: '/tmp', db_path: ':memory:', added_at: '', last_seen_at: '' },
+        db,
+        queueManager: {} as any,
+        chatManager: {} as any,
+        setupManager: {} as any,
+        proposalManager: {} as any,
+        broadcast: vi.fn(),
+      })
+
+      const res = await request(app).get('/api/hub/recent-jobs')
+      expect(res.status).toBe(200)
+      expect(res.body.jobs).toHaveLength(1)
+      expect(res.body.jobs[0].projectId).toBe('p1')
+      expect(res.body.jobs[0].projectName).toBe('TestProj')
+    })
+
+    it('respects limit query param', async () => {
+      const { app, contexts } = createApp()
+      const today = new Date().toISOString().slice(0, 10)
+      const db = initDb(':memory:')
+      for (let i = 0; i < 5; i++) {
+        db.prepare(`
+          INSERT INTO jobs (id, command, started_at, status)
+          VALUES (?, 'implement', ?, 'completed')
+        `).run(`job-${i}`, `${today}T0${i}:00:00.000Z`)
+      }
+      contexts.set('p1', {
+        project: { id: 'p1', name: 'P', slug: 'p', path: '/tmp', db_path: ':memory:', added_at: '', last_seen_at: '' },
+        db,
+        queueManager: {} as any, chatManager: {} as any, setupManager: {} as any, proposalManager: {} as any, broadcast: vi.fn(),
+      })
+
+      const res = await request(app).get('/api/hub/recent-jobs?limit=3')
+      expect(res.status).toBe(200)
+      expect(res.body.jobs).toHaveLength(3)
+    })
+  })
+
+  // ─── GET /search ────────────────────────────────────────────────────────────
+
+  describe('GET /api/hub/search', () => {
+    it('returns empty result for missing query', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/search')
+      expect(res.status).toBe(200)
+      expect(res.body.groups).toEqual([])
+      expect(res.body.total).toBe(0)
+    })
+
+    it('returns 400 for single-char query', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/search?q=x')
+      expect(res.status).toBe(400)
+    })
+
+    it('finds jobs matching the query', async () => {
+      const { app, contexts } = createApp()
+      const db = initDb(':memory:')
+      const today = new Date().toISOString().slice(0, 10)
+      db.prepare(`
+        INSERT INTO jobs (id, command, started_at, status)
+        VALUES ('j1', 'sr:implement', ?, 'completed')
+      `).run(`${today}T10:00:00.000Z`)
+
+      contexts.set('p1', {
+        project: { id: 'p1', name: 'MyProject', slug: 'my', path: '/tmp', db_path: ':memory:', added_at: '', last_seen_at: '' },
+        db,
+        queueManager: {} as any, chatManager: {} as any, setupManager: {} as any, proposalManager: {} as any, broadcast: vi.fn(),
+      })
+
+      const res = await request(app).get('/api/hub/search?q=implement')
+      expect(res.status).toBe(200)
+      expect(res.body.total).toBeGreaterThan(0)
+      expect(res.body.groups[0].projectName).toBe('MyProject')
+      expect(res.body.groups[0].jobs).toHaveLength(1)
+    })
+
+    it('returns no groups when nothing matches', async () => {
+      const { app, contexts } = createApp()
+      const db = initDb(':memory:')
+      const today = new Date().toISOString().slice(0, 10)
+      db.prepare(`
+        INSERT INTO jobs (id, command, started_at, status)
+        VALUES ('j1', 'implement', ?, 'completed')
+      `).run(`${today}T10:00:00.000Z`)
+
+      contexts.set('p1', {
+        project: { id: 'p1', name: 'P', slug: 'p', path: '/tmp', db_path: ':memory:', added_at: '', last_seen_at: '' },
+        db,
+        queueManager: {} as any, chatManager: {} as any, setupManager: {} as any, proposalManager: {} as any, broadcast: vi.fn(),
+      })
+
+      const res = await request(app).get('/api/hub/search?q=zzzNOTHING')
+      expect(res.status).toBe(200)
+      expect(res.body.groups).toHaveLength(0)
+      expect(res.body.total).toBe(0)
     })
   })
 })

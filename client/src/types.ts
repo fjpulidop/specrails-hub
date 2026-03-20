@@ -133,6 +133,31 @@ export interface HubAnalyticsResponse {
   costTimeline: Array<{ date: string; costUsd: number }>
 }
 
+export interface HubRecentJob {
+  id: string
+  command: string
+  started_at: string
+  finished_at: string | null
+  status: string
+  total_cost_usd: number | null
+  projectId: string
+  projectName: string
+}
+
+export interface HubSearchResultGroup {
+  projectId: string
+  projectName: string
+  jobs: Array<{ id: string; command: string; started_at: string; status: string }>
+  proposals: Array<{ id: string; idea: string; status: string; created_at: string }>
+  messages: Array<{ id: number; content: string; role: string; created_at: string }>
+}
+
+export interface HubSearchResponse {
+  query: string
+  groups: HubSearchResultGroup[]
+  total: number
+}
+
 export interface ChatConversationSummary {
   id: string
   title: string | null
