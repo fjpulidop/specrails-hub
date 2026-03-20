@@ -8,6 +8,7 @@ import SettingsPage from './pages/SettingsPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import HubAnalyticsPage from './pages/HubAnalyticsPage'
 import ActivityFeedPage from './pages/ActivityFeedPage'
+import ChangesPage from './pages/ChangesPage'
 import HubOverviewPage from './pages/HubOverviewPage'
 import SettingsDialog from './pages/GlobalSettingsPage'
 import DocsPage from './pages/DocsPage'
@@ -180,6 +181,7 @@ function HubApp() {
                 <Route path="/jobs/:id" element={<JobDetailPage />} />
                 <Route path="/analytics" element={<AnalyticsPage />} />
                 <Route path="/activity" element={<ActivityFeedPage />} />
+                <Route path="/changes" element={<ChangesPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>

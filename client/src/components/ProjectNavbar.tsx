@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, BarChart3, Settings, Activity, GitBranch, Sparkles } from 'lucide-react'
 import { cn } from '../lib/utils'
@@ -7,6 +7,7 @@ import type { HubProject } from '../hooks/useHub'
 import { NotificationCenter } from './NotificationCenter'
 import FeatureFunnelDialog from './FeatureFunnelDialog'
 import { SpecLauncherModal } from './SpecLauncherModal'
+import { getApiBase } from '../lib/api'
 
 interface ProjectNavbarProps {
   project: HubProject
@@ -15,6 +16,21 @@ interface ProjectNavbarProps {
 export function ProjectNavbar({ project }: ProjectNavbarProps) {
   const [funnelOpen, setFunnelOpen] = useState(false)
   const [launcherOpen, setLauncherOpen] = useState(false)
+  const [activeChangesCount, setActiveChangesCount] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch(`${getApiBase()}/changes`)
+        if (!res.ok || cancelled) return
+        const data = await res.json() as { changes: { isArchived: boolean }[] }
+        if (!cancelled) setActiveChangesCount(data.changes.filter((c) => !c.isArchived).length)
+      } catch { /* ignore */ }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [project.id])
 
   const navItems = [
     { to: '/', end: true, icon: LayoutDashboard, label: 'Home' },
@@ -56,11 +72,36 @@ export function ProjectNavbar({ project }: ProjectNavbarProps) {
 
         <Tooltip>
           <TooltipTrigger asChild>
+            <NavLink
+              to="/changes"
+              className={({ isActive }) =>
+                cn(
+                  'h-7 px-2 flex items-center gap-1.5 rounded-md text-xs transition-colors',
+                  isActive
+                    ? 'text-foreground bg-accent'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                )
+              }
+            >
+              <GitBranch className="w-3.5 h-3.5" />
+              <span>Changes</span>
+              {activeChangesCount > 0 && (
+                <span className="text-[9px] px-1 py-0 rounded-full bg-dracula-purple/20 text-dracula-purple font-medium leading-4">
+                  {activeChangesCount}
+                </span>
+              )}
+            </NavLink>
+          </TooltipTrigger>
+          <TooltipContent>Active OpenSpec Changes</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
             <button
               onClick={() => setFunnelOpen(true)}
               className="h-7 px-2 flex items-center gap-1.5 rounded-md text-xs transition-colors text-muted-foreground hover:text-foreground hover:bg-accent"
             >
-              <GitBranch className="w-3.5 h-3.5" />
+              <GitBranch className="w-3.5 h-3.5 opacity-60" />
               <span>Funnel</span>
             </button>
           </TooltipTrigger>

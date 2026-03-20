@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
 import express from 'express'
 import request from 'supertest'
 
@@ -632,6 +635,47 @@ describe('project-router', () => {
       expect(res.status).toBe(200)
       expect(res.body.ok).toBe(true)
       expect(cancel).toHaveBeenCalledWith('some-launch-id')
+    })
+  })
+
+  // ─── Changes endpoint ─────────────────────────────────────────────────────
+
+  describe('GET /:projectId/changes', () => {
+    let tmpDir: string
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-hub-changes-test-'))
+    })
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    })
+
+    it('returns empty changes array when no openspec/changes dir', async () => {
+      const ctx = makeContext(db, {
+        project: { id: 'proj-1', slug: 'proj', name: 'Test', path: tmpDir, db_path: ':memory:', added_at: '', last_seen_at: '' },
+      })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/changes')
+      expect(res.status).toBe(200)
+      expect(res.body.changes).toEqual([])
+    })
+
+    it('returns active changes from openspec/changes/', async () => {
+      const changesDir = path.join(tmpDir, 'openspec', 'changes')
+      fs.mkdirSync(path.join(changesDir, 'my-feature'), { recursive: true })
+      fs.writeFileSync(path.join(changesDir, 'my-feature', 'proposal.md'), '# Proposal')
+
+      const ctx = makeContext(db, {
+        project: { id: 'proj-1', slug: 'proj', name: 'Test', path: tmpDir, db_path: ':memory:', added_at: '', last_seen_at: '' },
+      })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/changes')
+      expect(res.status).toBe(200)
+      const change = res.body.changes.find((c: { id: string }) => c.id === 'my-feature')
+      expect(change).toBeDefined()
+      expect(change.artifacts.proposal).toBe(true)
+      expect(change.isArchived).toBe(false)
     })
   })
 })
