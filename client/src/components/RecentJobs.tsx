@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getApiBase } from '../lib/api'
 import { formatDistanceToNow } from 'date-fns'
@@ -59,6 +59,8 @@ interface RecentJobsProps {
   onProposalDelete?: (proposalId: string) => void
 }
 
+const PAGE_SIZE = 10
+
 export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, onProposalDelete }: RecentJobsProps) {
   const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState<JobStatus | null>(null)
@@ -69,6 +71,12 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
   const [clearTo, setClearTo] = useState('')
   const [isClearing, setIsClearing] = useState(false)
   const [confirmDeleteProposalId, setConfirmDeleteProposalId] = useState<string | null>(null)
+  const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE)
+
+  // Reset display limit when jobs list changes (new job added, etc.)
+  useEffect(() => {
+    setDisplayLimit(PAGE_SIZE)
+  }, [jobs.length])
 
   const filteredJobs = jobs.filter((j) => {
     if (statusFilter && j.status !== statusFilter) return false
@@ -219,7 +227,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
 
       {/* Job rows */}
       <div className="space-y-0.5">
-        {filteredJobs.map((job) => {
+        {filteredJobs.slice(0, displayLimit).map((job) => {
           const statusInfo = STATUS_BADGE[job.status] ?? STATUS_BADGE.queued
           const cost = formatCost(job.total_cost_usd)
           const duration = formatDuration(job.duration_ms)
@@ -277,6 +285,19 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
           )
         })}
       </div>
+
+      {/* Load more */}
+      {filteredJobs.length > displayLimit && (
+        <div className="pt-1 text-center">
+          <button
+            type="button"
+            onClick={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
+            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded hover:bg-accent/50"
+          >
+            Load more ({filteredJobs.length - displayLimit} remaining)
+          </button>
+        </div>
+      )}
 
       {/* Clear jobs modal */}
       {showClearModal && (

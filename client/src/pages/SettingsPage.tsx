@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { toast } from 'sonner'
+import { useBlocker } from 'react-router-dom'
 import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
 import { CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
@@ -7,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Separator } from '../components/ui/separator'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog'
 import type { ProjectConfig } from '../types'
 
 export default function SettingsPage() {
@@ -17,7 +19,16 @@ export default function SettingsPage() {
   const [activeTracker, setActiveTracker] = useState<'github' | 'jira' | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
+  // Track saved values to detect unsaved changes
+  const savedLabelFilter = useRef('')
+  const savedActiveTracker = useRef<'github' | 'jira' | null>(null)
+  const hasChanges =
+    labelFilter !== savedLabelFilter.current || activeTracker !== savedActiveTracker.current
+
   const cacheRef = useRef<Map<string, ProjectConfig>>(new Map())
+
+  // Block navigation when there are unsaved changes
+  const blocker = useBlocker(hasChanges)
 
   useEffect(() => {
     // Restore cache instantly on project switch
@@ -27,6 +38,8 @@ export default function SettingsPage() {
         setConfig(cached)
         setLabelFilter(cached.issueTracker.labelFilter)
         setActiveTracker(cached.issueTracker.active)
+        savedLabelFilter.current = cached.issueTracker.labelFilter
+        savedActiveTracker.current = cached.issueTracker.active
         setIsLoading(false)
       } else {
         setIsLoading(true)
@@ -40,6 +53,8 @@ export default function SettingsPage() {
         setConfig(data)
         setLabelFilter(data.issueTracker.labelFilter)
         setActiveTracker(data.issueTracker.active)
+        savedLabelFilter.current = data.issueTracker.labelFilter
+        savedActiveTracker.current = data.issueTracker.active
         if (activeProjectId) cacheRef.current.set(activeProjectId, data)
       } catch {
         // ignore
@@ -59,6 +74,8 @@ export default function SettingsPage() {
         body: JSON.stringify({ active: activeTracker, labelFilter }),
       })
       if (!res.ok) throw new Error('Failed to save')
+      savedLabelFilter.current = labelFilter
+      savedActiveTracker.current = activeTracker
       toast.success('Settings saved')
     } catch (err) {
       toast.error('Failed to save settings', { description: (err as Error).message })
@@ -169,11 +186,40 @@ export default function SettingsPage() {
       </Card>
 
       {/* Save */}
-      <div className="flex justify-end">
-        <Button size="sm" onClick={saveSettings} disabled={isSaving}>
+      <div className="flex items-center justify-end gap-2">
+        {hasChanges && (
+          <span className="text-xs text-amber-400">Unsaved changes</span>
+        )}
+        <Button size="sm" onClick={saveSettings} disabled={isSaving} className="relative">
+          {hasChanges && !isSaving && (
+            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400" />
+          )}
           {isSaving ? 'Saving...' : 'Save Settings'}
         </Button>
       </div>
+
+      {/* Unsaved changes navigation guard */}
+      <Dialog
+        open={blocker.state === 'blocked'}
+        onOpenChange={(open) => { if (!open) blocker.reset?.() }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Unsaved changes</DialogTitle>
+            <DialogDescription>
+              You have unsaved changes. If you leave now, your changes will be lost.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => blocker.reset?.()}>
+              Stay
+            </Button>
+            <Button variant="destructive" size="sm" onClick={() => blocker.proceed?.()}>
+              Leave anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

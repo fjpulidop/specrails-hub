@@ -55,8 +55,15 @@ function DocsSidebar({
       <div className="space-y-4">
         {categories.map((cat) => (
           <div key={cat.slug}>
-            <div className="px-2 mb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              {cat.name}
+            <div className="px-2 mb-1 flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {cat.name}
+              </span>
+              {cat.docs.length > 0 && (
+                <span className="text-[9px] font-medium text-muted-foreground/60 bg-muted/40 rounded px-1 py-0.5 leading-none">
+                  {cat.docs.length}
+                </span>
+              )}
             </div>
             {cat.docs.length === 0 ? (
               <p className="px-2 text-xs text-muted-foreground italic">No docs yet</p>

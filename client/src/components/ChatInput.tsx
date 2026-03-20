@@ -1,5 +1,6 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
 import { Button } from './ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { cn } from '../lib/utils'
 
 const MODEL_OPTIONS = [
@@ -58,22 +59,33 @@ export function ChatInput({
     <div className="border-t border-border/30 p-2">
       {/* Model selector */}
       <div className="mb-1.5 flex items-center justify-between">
-        <select
-          value={model}
-          disabled={hasMessages}
-          className={cn(
-            'rounded bg-transparent text-[10px] text-muted-foreground outline-none',
-            'border border-border/20 px-1.5 py-0.5',
-            hasMessages && 'opacity-50 cursor-not-allowed'
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className={hasMessages ? 'cursor-not-allowed' : undefined}>
+              <select
+                value={model}
+                disabled={hasMessages}
+                className={cn(
+                  'rounded bg-transparent text-[10px] text-muted-foreground outline-none',
+                  'border border-border/20 px-1.5 py-0.5',
+                  hasMessages && 'opacity-50 pointer-events-none'
+                )}
+                onChange={() => { /* model is per-conversation and locked after first message */ }}
+              >
+                {MODEL_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value} className="bg-background">
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </span>
+          </TooltipTrigger>
+          {hasMessages && (
+            <TooltipContent side="top">
+              Cannot change model during an active conversation
+            </TooltipContent>
           )}
-          onChange={() => { /* model is per-conversation and locked after first message */ }}
-        >
-          {MODEL_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value} className="bg-background">
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        </Tooltip>
         {isStreaming && (
           <Button
             size="sm"

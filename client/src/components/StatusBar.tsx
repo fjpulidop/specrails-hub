@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { cn } from '../lib/utils'
 import { getApiBase } from '../lib/api'
 
@@ -15,6 +16,31 @@ interface StatusBarProps {
 
 export function StatusBar({ connectionStatus }: StatusBarProps) {
   const [stats, setStats] = useState<Stats | null>(null)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const prevStatusRef = useRef<'connecting' | 'connected' | 'disconnected'>('connecting')
+  const isFirstMount = useRef(true)
+
+  // Detect reconnect: was previously connected/connecting-after-disconnect, now connected again
+  useEffect(() => {
+    const prev = prevStatusRef.current
+    if (connectionStatus === 'connected' && !isFirstMount.current && prev !== 'connected') {
+      toast.success('Connection restored')
+      setIsSyncing(true)
+      const t = setTimeout(() => setIsSyncing(false), 2000)
+      return () => clearTimeout(t)
+    }
+    if (isFirstMount.current && connectionStatus === 'connected') {
+      isFirstMount.current = false
+    }
+    prevStatusRef.current = connectionStatus
+  }, [connectionStatus])
+
+  // Mark first mount resolved once we hit any status change
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false
+    }
+  }, [])
 
   useEffect(() => {
     async function fetchStats() {
@@ -41,21 +67,25 @@ export function StatusBar({ connectionStatus }: StatusBarProps) {
       <div className="flex items-center gap-1.5">
         <span
           className={cn(
-            'w-1.5 h-1.5 rounded-full',
-            connectionStatus === 'connected' && 'bg-dracula-green',
-            connectionStatus === 'connecting' && 'bg-dracula-orange animate-pulse',
+            'w-1.5 h-1.5 rounded-full transition-colors',
+            connectionStatus === 'connected' && !isSyncing && 'bg-dracula-green',
+            connectionStatus === 'connected' && isSyncing && 'bg-dracula-cyan animate-pulse',
+            connectionStatus === 'connecting' && 'bg-dracula-orange animate-[pulse_0.75s_ease-in-out_infinite]',
             connectionStatus === 'disconnected' && 'bg-dracula-red'
           )}
         />
         <span
           className={cn(
-            connectionStatus === 'connected' && 'text-dracula-green',
+            'transition-colors',
+            connectionStatus === 'connected' && !isSyncing && 'text-dracula-green',
+            connectionStatus === 'connected' && isSyncing && 'text-dracula-cyan',
             connectionStatus === 'connecting' && 'text-dracula-orange',
             connectionStatus === 'disconnected' && 'text-dracula-red'
           )}
         >
-          {connectionStatus === 'connected' && 'connected'}
-          {connectionStatus === 'connecting' && 'connecting...'}
+          {connectionStatus === 'connected' && !isSyncing && 'connected'}
+          {connectionStatus === 'connected' && isSyncing && 'syncing...'}
+          {connectionStatus === 'connecting' && 'reconnecting...'}
           {connectionStatus === 'disconnected' && 'disconnected'}
         </span>
       </div>
