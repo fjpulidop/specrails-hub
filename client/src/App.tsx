@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Routes, Route, Navigate, useLocation, useNavigate, NavLink } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { RootLayout } from './components/RootLayout'
 import DashboardPage from './pages/DashboardPage'
@@ -11,6 +11,8 @@ import ActivityFeedPage from './pages/ActivityFeedPage'
 import HubOverviewPage from './pages/HubOverviewPage'
 import SettingsDialog from './pages/GlobalSettingsPage'
 import DocsPage from './pages/DocsPage'
+import DocsDialog from './components/DocsDialog'
+import { Dialog, DialogContent } from './components/ui/dialog'
 import { ProjectLayout } from './components/ProjectLayout'
 import { ProjectErrorBoundary } from './components/ProjectErrorBoundary'
 import { WelcomeScreen } from './components/WelcomeScreen'
@@ -20,7 +22,6 @@ import { AddProjectDialog } from './components/AddProjectDialog'
 import { SharedWebSocketProvider } from './hooks/useSharedWebSocket'
 import { HubProvider, useHub } from './hooks/useHub'
 import { WS_URL } from './lib/ws-url'
-import { cn } from './lib/utils'
 
 // ─── Hub mode detection ───────────────────────────────────────────────────────
 
@@ -87,6 +88,9 @@ function HubApp() {
   const { projects, activeProjectId, isLoading, setupProjectIds, completeSetupWizard } = useHub()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [overviewOpen, setOverviewOpen] = useState(false)
+  const [analyticsOpen, setAnalyticsOpen] = useState(false)
+  const [docsOpen, setDocsOpen] = useState(false)
 
   // Remember which page each project was on
   useProjectRouteMemory(activeProjectId)
@@ -115,39 +119,27 @@ function HubApp() {
           <span className="text-muted-foreground text-xs font-normal ml-1">/ hub</span>
         </span>
         <div className="flex items-center gap-3">
-          <NavLink
-            to="/hub/overview"
-            className={({ isActive }) =>
-              cn(
-                'text-xs transition-colors',
-                isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
-              )
-            }
+          <button
+            type="button"
+            onClick={() => setOverviewOpen(true)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Overview
-          </NavLink>
-          <NavLink
-            to="/hub/analytics"
-            className={({ isActive }) =>
-              cn(
-                'text-xs transition-colors',
-                isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
-              )
-            }
+          </button>
+          <button
+            type="button"
+            onClick={() => setAnalyticsOpen(true)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Analytics
-          </NavLink>
-          <NavLink
-            to="/docs"
-            className={({ isActive }) =>
-              cn(
-                'text-xs transition-colors',
-                isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
-              )
-            }
+          </button>
+          <button
+            type="button"
+            onClick={() => setDocsOpen(true)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Docs
-          </NavLink>
+          </button>
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
@@ -173,12 +165,6 @@ function HubApp() {
           />
         ) : (
           <Routes>
-            {/* Hub-level routes */}
-            <Route path="/docs" element={<DocsPage />} />
-            <Route path="/docs/:category/:slug" element={<DocsPage />} />
-            <Route path="/hub/overview" element={<HubOverviewPage />} />
-            <Route path="/hub/analytics" element={<HubAnalyticsPage />} />
-
             {/* Project routes */}
             {projects.length === 0 ? (
               <Route path="*" element={<WelcomeScreen onAddProject={() => setAddDialogOpen(true)} />} />
@@ -208,6 +194,20 @@ function HubApp() {
 
       <AddProjectDialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      <Dialog open={overviewOpen} onOpenChange={setOverviewOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0">
+          <HubOverviewPage />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0">
+          <HubAnalyticsPage />
+        </DialogContent>
+      </Dialog>
+
+      <DocsDialog open={docsOpen} onClose={() => setDocsOpen(false)} />
     </div>
   )
 }
