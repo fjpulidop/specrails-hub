@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
-import type { AnalyticsResponse, AnalyticsPeriod } from '../types'
+import type { AnalyticsResponse, AnalyticsPeriod, TrendsResponse, TrendsPeriod } from '../types'
 import { PeriodSelector } from '../components/analytics/PeriodSelector'
 import { KpiCards } from '../components/analytics/KpiCards'
 import { CostTimeline } from '../components/analytics/CostTimeline'
@@ -13,6 +13,7 @@ import { CommandPerformance } from '../components/analytics/CommandPerformance'
 import { DailyThroughput } from '../components/analytics/DailyThroughput'
 import { CostTreemap } from '../components/analytics/CostTreemap'
 import { BonusMetrics } from '../components/analytics/BonusMetrics'
+import { TrendsChart } from '../components/analytics/TrendsChart'
 
 function SkeletonGrid() {
   return (
@@ -52,6 +53,12 @@ function ErrorBanner({ message, onRetry }: ErrorBannerProps) {
   )
 }
 
+const TRENDS_PERIODS: { value: TrendsPeriod; label: string }[] = [
+  { value: '1d', label: '1d' },
+  { value: '7d', label: '7d' },
+  { value: '30d', label: '30d' },
+]
+
 export default function AnalyticsPage() {
   const { activeProjectId } = useHub()
   const [period, setPeriod] = useState<AnalyticsPeriod>('7d')
@@ -61,6 +68,9 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [retryKey, setRetryKey] = useState(0)
+
+  const [trendsPeriod, setTrendsPeriod] = useState<TrendsPeriod>('7d')
+  const [trendsData, setTrendsData] = useState<TrendsResponse | null>(null)
 
   // Per-project cache for analytics
   const cacheRef = useRef<Map<string, AnalyticsResponse>>(new Map())
@@ -110,6 +120,15 @@ export default function AnalyticsPage() {
 
     return () => controller.abort()
   }, [period, from, to, retryKey, activeProjectId])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetch(`${getApiBase()}/trends?period=${trendsPeriod}`, { signal: controller.signal })
+      .then((res) => res.ok ? res.json() as Promise<TrendsResponse> : Promise.reject(new Error(`HTTP ${res.status}`)))
+      .then((d) => setTrendsData(d))
+      .catch((err: Error) => { if (err.name !== 'AbortError') console.warn('[analytics] trends fetch failed:', err.message) })
+    return () => controller.abort()
+  }, [trendsPeriod, activeProjectId])
 
   function handlePeriodChange(newPeriod: AnalyticsPeriod, newFrom?: string, newTo?: string) {
     setPeriod(newPeriod)
@@ -161,6 +180,32 @@ export default function AnalyticsPage() {
           </div>
 
           <BonusMetrics data={data.bonusMetrics} />
+
+          {/* Trends chart */}
+          {trendsData && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <h2 className="text-sm font-medium">Trends</h2>
+                <div className="flex items-center gap-1">
+                  {TRENDS_PERIODS.map((p) => (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => setTrendsPeriod(p.value)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                        trendsPeriod === p.value
+                          ? 'bg-accent text-foreground'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <TrendsChart points={trendsData.points} />
+            </div>
+          )}
         </div>
       )}
     </div>

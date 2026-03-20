@@ -14,8 +14,8 @@ import { ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from '
 import { resolveCommand } from './command-resolver'
 import { createHooksRouter, getPhaseStates } from './hooks'
 import { getConfig, fetchIssues } from './config'
-import { getAnalytics } from './analytics'
-import type { ChatConversationRow } from './types'
+import { getAnalytics, getTrends } from './analytics'
+import type { ChatConversationRow, TrendsPeriod } from './types'
 
 // Extend Express Request to carry resolved ProjectContext
 declare module 'express-serve-static-core' {
@@ -204,6 +204,66 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       console.error('[project-router] analytics error:', err)
       res.status(500).json({ error: 'Failed to compute analytics' })
     }
+  })
+
+  router.get('/:projectId/trends', (req: Request, res: Response) => {
+    const period = (req.query.period as string) || '7d'
+    const validPeriods: TrendsPeriod[] = ['1d', '7d', '30d']
+    if (!validPeriods.includes(period as TrendsPeriod)) {
+      res.status(400).json({ error: 'Invalid period. Must be one of: 1d, 7d, 30d' })
+      return
+    }
+    try {
+      res.json(getTrends(ctx(req).db, period as TrendsPeriod))
+    } catch (err) {
+      console.error('[project-router] trends error:', err)
+      res.status(500).json({ error: 'Failed to compute trends' })
+    }
+  })
+
+  router.get('/:projectId/jobs/compare', (req: Request, res: Response) => {
+    const raw = req.query.jobIds as string | undefined
+    if (!raw) {
+      res.status(400).json({ error: 'jobIds query param required (comma-separated, exactly 2)' })
+      return
+    }
+    const ids = raw.split(',').map((s) => s.trim()).filter(Boolean)
+    if (ids.length !== 2) {
+      res.status(400).json({ error: 'Exactly 2 jobIds are required' })
+      return
+    }
+    const { db } = ctx(req)
+    const rows = ids.map((id) => {
+      const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as {
+        id: string; command: string; status: string; started_at: string; finished_at: string | null
+        duration_ms: number | null; tokens_in: number | null; tokens_out: number | null
+        tokens_cache_read: number | null; total_cost_usd: number | null; model: string | null
+      } | undefined
+      if (!job) return null
+      const phases = db.prepare(
+        "SELECT phase FROM job_phases WHERE job_id = ? AND state = 'done' ORDER BY updated_at ASC"
+      ).all(id) as Array<{ phase: string }>
+      return {
+        id: job.id,
+        command: job.command,
+        status: job.status,
+        startedAt: job.started_at,
+        finishedAt: job.finished_at,
+        durationMs: job.duration_ms,
+        tokensIn: job.tokens_in,
+        tokensOut: job.tokens_out,
+        tokensCacheRead: job.tokens_cache_read,
+        totalCostUsd: job.total_cost_usd,
+        model: job.model,
+        phasesCompleted: phases.map((p) => p.phase),
+      }
+    })
+    const missing = ids.filter((_, i) => rows[i] === null)
+    if (missing.length > 0) {
+      res.status(404).json({ error: `Jobs not found: ${missing.join(', ')}` })
+      return
+    }
+    res.json({ jobs: rows })
   })
 
   router.get('/:projectId/config', (req: Request, res: Response) => {

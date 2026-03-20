@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { initDb } from './db'
 import type { DbInstance } from './db'
-import { getAnalytics } from './analytics'
+import { getAnalytics, getTrends } from './analytics'
 
 function insertJob(
   db: DbInstance,
@@ -334,5 +334,63 @@ describe('getAnalytics', () => {
     expect(result.durationHistogram.find((r) => r.bucket === '1-3m')?.count).toBe(1)
     expect(result.durationHistogram.find((r) => r.bucket === '3-5m')?.count).toBe(0)
     expect(result.durationHistogram.find((r) => r.bucket === '>10m')?.count).toBe(1)
+  })
+})
+
+describe('getTrends', () => {
+  let db: DbInstance
+
+  beforeEach(() => {
+    db = initDb(':memory:')
+  })
+
+  it('empty DB returns zero-filled points for the period', () => {
+    const result = getTrends(db, '7d')
+    expect(result.period).toBe('7d')
+    expect(result.points).toHaveLength(7)
+    for (const pt of result.points) {
+      expect(pt.jobCount).toBe(0)
+      expect(pt.avgDurationMs).toBeNull()
+      expect(pt.avgCostUsd).toBeNull()
+      expect(pt.successRate).toBe(0)
+    }
+  })
+
+  it('1d period returns exactly 1 point', () => {
+    const result = getTrends(db, '1d')
+    expect(result.points).toHaveLength(1)
+  })
+
+  it('30d period returns exactly 30 points', () => {
+    const result = getTrends(db, '30d')
+    expect(result.points).toHaveLength(30)
+  })
+
+  it('aggregates job metrics correctly for a given day', () => {
+    const today = new Date().toISOString().slice(0, 10)
+    insertJob(db, { id: 'j1', started_at: `${today}T10:00:00.000Z`, status: 'completed', total_cost_usd: 0.01, duration_ms: 60000, tokens_out: 500 })
+    insertJob(db, { id: 'j2', started_at: `${today}T11:00:00.000Z`, status: 'failed', total_cost_usd: 0.02, duration_ms: 30000, tokens_out: 200 })
+
+    const result = getTrends(db, '1d')
+    expect(result.points).toHaveLength(1)
+    const pt = result.points[0]
+    expect(pt.jobCount).toBe(2)
+    expect(pt.successRate).toBeCloseTo(0.5)
+    expect(pt.avgCostUsd).toBeCloseTo(0.015)
+  })
+
+  it('fills zero-count gaps between days with no jobs', () => {
+    // Use 7d period and only insert on today — all other days should be 0
+    const today = new Date().toISOString().slice(0, 10)
+    insertJob(db, { id: 'j1', started_at: `${today}T10:00:00.000Z`, status: 'completed', total_cost_usd: 0.005 })
+
+    const result = getTrends(db, '7d')
+    expect(result.points).toHaveLength(7)
+    const todayPt = result.points.find((p) => p.date === today)
+    expect(todayPt?.jobCount).toBe(1)
+    const zeroDays = result.points.filter((p) => p.date !== today)
+    for (const pt of zeroDays) {
+      expect(pt.jobCount).toBe(0)
+    }
   })
 })

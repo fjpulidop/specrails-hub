@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getApiBase } from '../lib/api'
 import { formatDistanceToNow } from 'date-fns'
-import { Trash2, ClipboardList } from 'lucide-react'
+import { Trash2, ClipboardList, GitCompareArrows } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
+import { JobComparisonModal } from './JobComparisonModal'
 import type { JobSummary, JobStatus } from '../types'
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'running' | 'queued' | 'failed' | 'canceled'
@@ -72,11 +73,29 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
   const [isClearing, setIsClearing] = useState(false)
   const [confirmDeleteProposalId, setConfirmDeleteProposalId] = useState<string | null>(null)
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE)
+  const [compareMode, setCompareMode] = useState(false)
+  const [compareSelection, setCompareSelection] = useState<string[]>([])
+  const [compareJobIds, setCompareJobIds] = useState<[string, string] | null>(null)
 
   // Reset display limit when jobs list changes (new job added, etc.)
   useEffect(() => {
     setDisplayLimit(PAGE_SIZE)
   }, [jobs.length])
+
+  function toggleCompareMode() {
+    setCompareMode((prev) => !prev)
+    setCompareSelection([])
+  }
+
+  function toggleCompareSelect(jobId: string) {
+    setCompareSelection((prev) => {
+      if (prev.includes(jobId)) return prev.filter((id) => id !== jobId)
+      if (prev.length >= 2) return prev
+      const next = [...prev, jobId]
+      if (next.length === 2) setCompareJobIds(next as [string, string])
+      return next
+    })
+  }
 
   const filteredJobs = jobs.filter((j) => {
     if (statusFilter && j.status !== statusFilter) return false
@@ -202,6 +221,19 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
               <Button
                 variant="ghost"
                 size="sm"
+                className={`h-6 w-6 p-0 transition-colors ${compareMode ? 'text-foreground bg-accent' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={toggleCompareMode}
+              >
+                <GitCompareArrows className="w-3.5 h-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{compareMode ? 'Exit compare mode' : 'Compare 2 jobs'}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
                 className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
                 onClick={() => setShowClearModal(true)}
               >
@@ -212,6 +244,26 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
           </Tooltip>
         </div>
       </div>
+
+      {/* Compare mode banner */}
+      {compareMode && (
+        <div className="flex items-center justify-between rounded-md bg-accent/40 px-3 py-1.5 text-[10px] text-muted-foreground">
+          <span>
+            {compareSelection.length === 0 && 'Select 2 jobs to compare'}
+            {compareSelection.length === 1 && 'Select 1 more job'}
+            {compareSelection.length === 2 && 'Ready — click compare'}
+          </span>
+          {compareSelection.length === 2 && (
+            <button
+              type="button"
+              className="text-[10px] font-medium text-foreground hover:underline"
+              onClick={() => setCompareJobIds(compareSelection as [string, string])}
+            >
+              Compare →
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Column headers */}
       <div className="flex items-center gap-3 px-3 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -236,12 +288,26 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
           const isProposal = job.id.startsWith('proposal:')
           const proposalId = isProposal ? job.id.replace('proposal:', '') : null
 
+          const isSelected = compareSelection.includes(job.id)
+          const isDisabled = compareMode && !isProposal && compareSelection.length === 2 && !isSelected
+
           return (
             <div
               key={job.id}
               role="button"
-              className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent/50 transition-colors cursor-pointer group"
+              tabIndex={0}
+              className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors cursor-pointer group ${
+                isSelected
+                  ? 'bg-accent/70 ring-1 ring-border'
+                  : isDisabled
+                  ? 'opacity-40 cursor-not-allowed'
+                  : 'hover:bg-accent/50'
+              }`}
               onClick={() => {
+                if (compareMode && !isProposal) {
+                  toggleCompareSelect(job.id)
+                  return
+                }
                 if (isProposal && proposalId) {
                   onProposalClick?.(proposalId)
                 } else {
@@ -382,6 +448,18 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Job comparison modal */}
+      {compareJobIds && (
+        <JobComparisonModal
+          jobIds={compareJobIds}
+          onClose={() => {
+            setCompareJobIds(null)
+            setCompareSelection([])
+            setCompareMode(false)
+          }}
+        />
+      )}
     </div>
   )
 }

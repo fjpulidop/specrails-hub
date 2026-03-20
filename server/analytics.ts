@@ -1,5 +1,5 @@
 import type { DbInstance } from './db'
-import type { AnalyticsOpts, AnalyticsResponse } from './types'
+import type { AnalyticsOpts, AnalyticsResponse, TrendsPeriod, TrendsResponse, TrendPoint } from './types'
 
 // ─── Period resolution ────────────────────────────────────────────────────────
 
@@ -86,6 +86,58 @@ function fillDateSeries(
     result.push(filled)
   }
   return result
+}
+
+// ─── Trends ──────────────────────────────────────────────────────────────────
+
+export function getTrends(db: DbInstance, period: TrendsPeriod): TrendsResponse {
+  const now = new Date()
+  const toISO = (d: Date) => d.toISOString().slice(0, 10)
+
+  const days = period === '1d' ? 1 : period === '7d' ? 7 : 30
+  const from = toISO(new Date(now.getTime() - (days - 1) * 86400000))
+  const to = toISO(now)
+  const nextDay = toISO(new Date(now.getTime() + 86400000))
+
+  const rawRows = db.prepare(`
+    SELECT
+      strftime('%Y-%m-%d', started_at) as date,
+      COUNT(*) as jobCount,
+      AVG(CASE WHEN duration_ms IS NOT NULL THEN duration_ms END) as avgDurationMs,
+      AVG(CASE WHEN tokens_out IS NOT NULL THEN CAST(tokens_in AS REAL) + CAST(tokens_out AS REAL) END) as avgTokens,
+      AVG(CASE WHEN total_cost_usd IS NOT NULL THEN total_cost_usd END) as avgCostUsd,
+      CAST(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS REAL) / COUNT(*) as successRate
+    FROM jobs
+    WHERE started_at >= ? AND started_at < ?
+    GROUP BY date
+    ORDER BY date ASC
+  `).all(from, nextDay) as Array<{
+    date: string
+    jobCount: number
+    avgDurationMs: number | null
+    avgTokens: number | null
+    avgCostUsd: number | null
+    successRate: number
+  }>
+
+  const byDate = new Map(rawRows.map((r) => [r.date, r]))
+  const points: TrendPoint[] = []
+  const start = new Date(from)
+  const end = new Date(to)
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const date = d.toISOString().slice(0, 10)
+    const row = byDate.get(date)
+    points.push({
+      date,
+      jobCount: row?.jobCount ?? 0,
+      avgDurationMs: row?.avgDurationMs ?? null,
+      avgTokens: row?.avgTokens ?? null,
+      avgCostUsd: row?.avgCostUsd ?? null,
+      successRate: row?.successRate ?? 0,
+    })
+  }
+
+  return { period, points }
 }
 
 // ─── Main export ─────────────────────────────────────────────────────────────

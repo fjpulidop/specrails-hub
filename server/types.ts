@@ -125,6 +125,45 @@ export interface AnalyticsResponse {
   }
 }
 
+// ─── Trends ──────────────────────────────────────────────────────────────────
+
+export type TrendsPeriod = '1d' | '7d' | '30d'
+
+export interface TrendPoint {
+  date: string
+  jobCount: number
+  avgDurationMs: number | null
+  avgTokens: number | null
+  avgCostUsd: number | null
+  successRate: number
+}
+
+export interface TrendsResponse {
+  period: TrendsPeriod
+  points: TrendPoint[]
+}
+
+// ─── Job comparison ───────────────────────────────────────────────────────────
+
+export interface JobCompareEntry {
+  id: string
+  command: string
+  status: JobStatus
+  startedAt: string
+  finishedAt: string | null
+  durationMs: number | null
+  tokensIn: number | null
+  tokensOut: number | null
+  tokensCacheRead: number | null
+  totalCostUsd: number | null
+  model: string | null
+  phasesCompleted: string[]
+}
+
+export interface JobCompareResponse {
+  jobs: [JobCompareEntry, JobCompareEntry]
+}
+
 export interface ChatConversationRow {
   id: string
   title: string | null
