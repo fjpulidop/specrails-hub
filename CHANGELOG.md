@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/fjpulidop/specrails-hub/compare/v1.5.0...v1.6.0) (2026-03-20)
+
+
+### Features
+
+* **hub:** cross-project search, recent jobs, Hub Overview page (SPEA-118) ([#35](https://github.com/fjpulidop/specrails-hub/issues/35)) ([c92392f](https://github.com/fjpulidop/specrails-hub/commit/c92392f7714f7c8ffcbe570dcaba3d890accae75))
+
 ## [1.5.0](https://github.com/fjpulidop/specrails-hub/compare/v1.4.1...v1.5.0) (2026-03-20)
 
 
