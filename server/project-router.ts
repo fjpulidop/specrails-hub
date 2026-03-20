@@ -16,6 +16,7 @@ import { createHooksRouter, getPhaseStates } from './hooks'
 import { getConfig, fetchIssues } from './config'
 import { getAnalytics, getTrends } from './analytics'
 import type { ChatConversationRow, TrendsPeriod } from './types'
+import { readChanges } from './changes-reader'
 
 // Extend Express Request to carry resolved ProjectContext
 declare module 'express-serve-static-core' {
@@ -517,6 +518,17 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     if (!proposal) { res.status(404).json({ error: 'Proposal not found' }); return }
     ctx(req).proposalManager.cancel(req.params.id)
     res.json({ ok: true })
+  })
+
+  // ─── Feature Funnel ─────────────────────────────────────────────────────────
+
+  router.get('/:projectId/changes', (req: Request, res: Response) => {
+    const { project, queueManager } = ctx(req)
+    const activeCommands = queueManager.getJobs()
+      .filter((j) => j.status === 'running' || j.status === 'queued')
+      .map((j) => j.command)
+    const changes = readChanges(project.path, activeCommands)
+    res.json({ changes })
   })
 
   return router

@@ -1,15 +1,19 @@
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, BarChart3, Settings, Activity } from 'lucide-react'
+import { LayoutDashboard, BarChart3, Settings, Activity, GitBranch } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import type { HubProject } from '../hooks/useHub'
 import { NotificationCenter } from './NotificationCenter'
+import FeatureFunnelDialog from './FeatureFunnelDialog'
 
 interface ProjectNavbarProps {
   project: HubProject
 }
 
 export function ProjectNavbar({ project }: ProjectNavbarProps) {
+  const [funnelOpen, setFunnelOpen] = useState(false)
+
   const navItems = [
     { to: '/', end: true, icon: LayoutDashboard, label: 'Home' },
     { to: '/analytics', end: false, icon: BarChart3, label: 'Analytics' },
@@ -17,6 +21,9 @@ export function ProjectNavbar({ project }: ProjectNavbarProps) {
   ]
 
   return (
+    <>
+      <FeatureFunnelDialog open={funnelOpen} onClose={() => setFunnelOpen(false)} />
+
     <nav className="flex items-center justify-between h-9 px-3 border-b border-border bg-background/50">
       {/* Project name */}
       <span className="text-xs text-muted-foreground truncate max-w-[160px]">
@@ -43,6 +50,19 @@ export function ProjectNavbar({ project }: ProjectNavbarProps) {
             <span>{label}</span>
           </NavLink>
         ))}
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setFunnelOpen(true)}
+              className="h-7 px-2 flex items-center gap-1.5 rounded-md text-xs transition-colors text-muted-foreground hover:text-foreground hover:bg-accent"
+            >
+              <GitBranch className="w-3.5 h-3.5" />
+              <span>Funnel</span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Feature Funnel — pipeline visual</TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Right actions */}
@@ -69,5 +89,6 @@ export function ProjectNavbar({ project }: ProjectNavbarProps) {
         </Tooltip>
       </div>
     </nav>
+    </>
   )
 }
