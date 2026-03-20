@@ -7,6 +7,7 @@ interface CostTreemapProps {
 }
 
 interface TreemapNode {
+  [key: string]: unknown
   name: string
   size: number
   jobCount: number
