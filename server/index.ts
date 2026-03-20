@@ -3,6 +3,7 @@ import path from 'path'
 import fs from 'fs'
 import os from 'os'
 import express from 'express'
+import type { Request, Response, NextFunction } from 'express'
 import { WebSocketServer, WebSocket } from 'ws'
 import type { WsMessage } from './types'
 import { ProjectRegistry } from './project-registry'
@@ -10,6 +11,7 @@ import { createHubRouter } from './hub-router'
 import { createProjectRouter } from './project-router'
 import { createHooksRouter, getPhaseStates, getPhaseDefinitions } from './hooks'
 import { createDocsRouter } from './docs-router'
+import { requireAuth, loadOrGenerateToken } from './auth'
 import { QueueManager, ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
 import { initDb, type DbInstance, listJobs, getJob, getJobEvents, getStats, purgeJobs,
   createConversation, listConversations, getConversation,
@@ -92,7 +94,39 @@ function removePidFile(): void {
 // ─── Express + WebSocket setup ────────────────────────────────────────────────
 
 const app = express()
-app.use(express.json())
+
+// ─── CORS — allow only localhost origins (CRIT-02) ────────────────────────────
+
+const ALLOWED_ORIGIN_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
+
+function corsMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const origin = req.headers['origin']
+  if (origin) {
+    if (ALLOWED_ORIGIN_PATTERN.test(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin)
+      res.setHeader('Vary', 'Origin')
+    } else {
+      // Non-localhost origin — reject with 403
+      res.status(403).json({ error: 'Forbidden: cross-origin requests not allowed' })
+      return
+    }
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Hub-Token')
+  res.setHeader('Access-Control-Max-Age', '600')
+
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204)
+    return
+  }
+  next()
+}
+
+app.use(corsMiddleware)
+
+// ─── Body size limit (MED-02) ─────────────────────────────────────────────────
+
+app.use(express.json({ limit: '1mb' }))
 
 const server = http.createServer(app)
 const wss = new WebSocketServer({ noServer: true })
@@ -122,6 +156,53 @@ server.on('upgrade', (request, socket, head) => {
 
 app.use('/api/docs', createDocsRouter())
 
+// ─── Auth — protect all /api/* except /api/health and /api/hub/token ─────────
+// (CRIT-01) Token is served publicly so the local client can bootstrap itself.
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    version: PKG_VERSION,
+    uptime: Math.floor(process.uptime()),
+    projects: _getProjectCount(),
+    mode: isHubMode ? 'hub' : 'legacy',
+  })
+})
+
+app.get('/api/hub/token', (_req, res) => {
+  res.json({ token: loadOrGenerateToken() })
+})
+
+app.use('/api', requireAuth)
+
+// ─── WebSocket rate limiting helper (LOW-03) ──────────────────────────────────
+
+const WS_MAX_MESSAGES_PER_MINUTE = 120
+const WS_MAX_MESSAGE_BYTES = 65_536 // 64 KB
+
+function applyWsRateLimiting(ws: WebSocket): void {
+  let messageCount = 0
+  const resetTimer = setInterval(() => { messageCount = 0 }, 60_000)
+
+  ws.on('message', (data: Buffer | string) => {
+    const size = typeof data === 'string' ? Buffer.byteLength(data) : data.byteLength
+
+    if (size > WS_MAX_MESSAGE_BYTES) {
+      ws.close(1009, 'Message too large')
+      return
+    }
+
+    messageCount++
+    if (messageCount > WS_MAX_MESSAGES_PER_MINUTE) {
+      ws.close(1008, 'Rate limit exceeded')
+    }
+  })
+
+  ws.on('close', () => {
+    clearInterval(resetTimer)
+  })
+}
+
 // ─── Hub mode ─────────────────────────────────────────────────────────────────
 
 if (isHubMode) {
@@ -144,6 +225,7 @@ if (isHubMode) {
 
   wss.on('connection', (ws: WebSocket) => {
     clients.add(ws)
+    applyWsRateLimiting(ws)
 
     // Send hub state init
     const projects = registry.listContexts().map((ctx) => ctx.project)
@@ -177,6 +259,7 @@ if (isHubMode) {
 
   wss.on('connection', (ws: WebSocket) => {
     clients.add(ws)
+    applyWsRateLimiting(ws)
 
     const initMsg: WsMessage = {
       type: 'init',
@@ -522,17 +605,6 @@ if (isHubMode) {
   })
 }
 
-// ─── Health check (available in all modes) ────────────────────────────────────
-
-app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    version: PKG_VERSION,
-    uptime: Math.floor(process.uptime()),
-    projects: _getProjectCount(),
-    mode: isHubMode ? 'hub' : 'legacy',
-  })
-})
 
 // ─── Global async error handler ────────────────────────────────────────────────
 

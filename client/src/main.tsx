@@ -3,11 +3,19 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './globals.css'
 import App from './App'
+import { initAuth, installFetchInterceptor } from './lib/auth'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </StrictMode>
-)
+async function bootstrap() {
+  await initAuth()
+  installFetchInterceptor()
+
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </StrictMode>
+  )
+}
+
+bootstrap()
