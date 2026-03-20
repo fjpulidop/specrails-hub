@@ -158,6 +158,31 @@ export interface HubSearchResponse {
   total: number
 }
 
+export interface HubProjectOverview {
+  projectId: string
+  projectName: string
+  healthScore: number
+  activeJobs: number
+  jobsToday: number
+  lastRunAt: string | null
+  lastRunStatus: string | null
+  lastRunCommand: string | null
+  coveragePct: number | null
+}
+
+export interface HubOverviewResponse {
+  projects: HubProjectOverview[]
+  aggregated: {
+    totalCount: number
+    healthyCount: number
+    warningCount: number
+    criticalCount: number
+    jobsToday: number
+    activeJobs: number
+  }
+  recentJobs: HubRecentJob[]
+}
+
 export interface ChatConversationSummary {
   id: string
   title: string | null

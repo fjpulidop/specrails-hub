@@ -6,7 +6,7 @@ import type { ProjectRegistry } from './project-registry'
 import { getHubSetting, setHubSetting, listProjects, listAgents, getAgent, addAgent, updateAgent } from './hub-db'
 import { createSpecrailsTechClient } from './specrails-tech-client'
 import { checkCoreCompat } from './core-compat'
-import { getHubAnalytics, getHubTodayStats, getHubRecentJobs, searchHubContent } from './hub-analytics'
+import { getHubAnalytics, getHubTodayStats, getHubRecentJobs, searchHubContent, getHubOverview } from './hub-analytics'
 import type { AnalyticsOpts, AnalyticsPeriod } from './types'
 
 function slugify(name: string): string {
@@ -139,6 +139,12 @@ export function createHubRouter(
     const limit = Math.min(Math.max(parseInt((req.query.limit as string) ?? '10', 10) || 10, 1), 50)
     const jobs = getHubRecentJobs(registry, limit)
     res.json({ jobs })
+  })
+
+  // GET /api/hub/overview — per-project overview with health scores and aggregated stats
+  router.get('/overview', (_req, res) => {
+    const result = getHubOverview(registry)
+    res.json(result)
   })
 
   // GET /api/hub/search?q= — search across all project jobs, proposals, chat messages
