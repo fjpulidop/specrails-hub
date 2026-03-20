@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { formatDistanceToNow } from 'date-fns'
 import { getApiBase } from '../lib/api'
 import {
   Rocket,
@@ -193,6 +194,23 @@ function CommandCard({ cmd, onClick }: CommandCardProps) {
               <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-tight line-clamp-1">
                 {cmd.description}
               </p>
+            )}
+            {(cmd.totalRuns !== undefined || cmd.lastRunAt) && (
+              <div className="flex items-center gap-1.5 mt-1">
+                {cmd.totalRuns !== undefined && cmd.totalRuns > 0 && (
+                  <span className="text-[10px] text-muted-foreground/40 tabular-nums">
+                    {cmd.totalRuns} run{cmd.totalRuns !== 1 ? 's' : ''}
+                  </span>
+                )}
+                {cmd.totalRuns !== undefined && cmd.totalRuns > 0 && cmd.lastRunAt && (
+                  <span className="text-[10px] text-muted-foreground/30">·</span>
+                )}
+                {cmd.lastRunAt && (
+                  <span className="text-[10px] text-muted-foreground/40">
+                    {formatDistanceToNow(new Date(cmd.lastRunAt), { addSuffix: true })}
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
