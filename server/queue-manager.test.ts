@@ -566,5 +566,53 @@ describe('QueueManager', () => {
       vi.clearAllTimers()
       vi.useRealTimers()
     })
+
+    it('sets status to zombie_terminated (not canceled) when auto-terminated', () => {
+      vi.useFakeTimers()
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('job-zombie-status' as any)
+
+      const qmZombieStatus = new QueueManager(broadcast, undefined, undefined, undefined, { zombieTimeoutMs: 10_000 })
+      qmZombieStatus.enqueue('/implement #1')
+
+      // Trigger zombie timeout
+      vi.advanceTimersByTime(10_100)
+
+      // Simulate process exit after SIGTERM
+      child.emit('close', null)
+
+      const jobs = qmZombieStatus.getJobs()
+      const job = jobs.find((j) => j.id === 'job-zombie-status')
+      expect(job?.status).toBe('zombie_terminated')
+
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    })
+
+    it('sets status to canceled (not zombie_terminated) when manually canceled', () => {
+      vi.useFakeTimers()
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('job-manual-cancel' as any)
+
+      const qmManual = new QueueManager(broadcast, undefined, undefined, undefined, { zombieTimeoutMs: 30_000 })
+      qmManual.enqueue('/implement #1')
+
+      // Manually cancel before zombie timeout
+      qmManual.cancel('job-manual-cancel')
+
+      // Simulate process exit
+      child.emit('close', null)
+
+      const jobs = qmManual.getJobs()
+      const job = jobs.find((j) => j.id === 'job-manual-cancel')
+      expect(job?.status).toBe('canceled')
+
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    })
   })
 })

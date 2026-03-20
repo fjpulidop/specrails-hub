@@ -356,7 +356,7 @@ export function purgeJobs(
   db: DbInstance,
   opts?: { from?: string; to?: string }
 ): number {
-  const conditions: string[] = ["status IN ('completed', 'failed', 'canceled')"]
+  const conditions: string[] = ["status IN ('completed', 'failed', 'canceled', 'zombie_terminated')"]
   const params: unknown[] = []
 
   if (opts?.from) {
@@ -402,11 +402,11 @@ export function getProjectActivity(db: DbInstance, opts: ActivityQueryOpts): Act
     .all(...params, limit) as JobRow[]
 
   return jobs.map((j) => {
-    const isTerminal = j.status === 'completed' || j.status === 'failed' || j.status === 'canceled'
+    const isTerminal = j.status === 'completed' || j.status === 'failed' || j.status === 'canceled' || j.status === 'zombie_terminated'
     const type: ActivityItem['type'] =
       j.status === 'completed' ? 'job_completed'
       : j.status === 'failed' ? 'job_failed'
-      : j.status === 'canceled' ? 'job_canceled'
+      : (j.status === 'canceled' || j.status === 'zombie_terminated') ? 'job_canceled'
       : 'job_started'
     const timestamp = isTerminal && j.finished_at ? j.finished_at : j.started_at
     const shortCmd = j.command.length > 60 ? j.command.slice(0, 57) + '...' : j.command
@@ -414,6 +414,7 @@ export function getProjectActivity(db: DbInstance, opts: ActivityQueryOpts): Act
       type === 'job_started' ? `Job started: ${shortCmd}`
       : type === 'job_completed' ? `Job completed: ${shortCmd}`
       : type === 'job_failed' ? `Job failed: ${shortCmd}`
+      : j.status === 'zombie_terminated' ? `Job auto-terminated (zombie): ${shortCmd}`
       : `Job canceled: ${shortCmd}`
     return {
       id: j.id,
@@ -539,10 +540,11 @@ export function getStats(db: DbInstance): StatsRow {
   const totalRow = db.prepare(`
     SELECT
       COUNT(*) as totalJobs,
+      SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failedJobs,
       SUM(total_cost_usd) as totalCostUsd,
       AVG(duration_ms) as avgDurationMs
     FROM jobs
-  `).get() as { totalJobs: number; totalCostUsd: number | null; avgDurationMs: number | null }
+  `).get() as { totalJobs: number; failedJobs: number; totalCostUsd: number | null; avgDurationMs: number | null }
 
   const todayRow = db.prepare(`
     SELECT
@@ -554,6 +556,7 @@ export function getStats(db: DbInstance): StatsRow {
 
   return {
     totalJobs: totalRow.totalJobs,
+    failedJobs: totalRow.failedJobs ?? 0,
     jobsToday: todayRow.jobsToday,
     totalCostUsd: totalRow.totalCostUsd ?? 0,
     costToday: todayRow.costToday ?? 0,

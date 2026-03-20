@@ -67,7 +67,7 @@ function extractDisplayText(event: Record<string, unknown>): string | null {
   return null
 }
 
-const TERMINAL_STATUSES = new Set(['completed', 'failed', 'canceled'])
+const TERMINAL_STATUSES = new Set(['completed', 'failed', 'canceled', 'zombie_terminated'])
 
 // ─── QueueManager ─────────────────────────────────────────────────────────────
 
@@ -79,6 +79,7 @@ export class QueueManager {
   private _paused: boolean
   private _killTimer: ReturnType<typeof setTimeout> | null
   private _cancelingJobs: Set<string>
+  private _zombieJobs: Set<string>
   private _broadcast: (msg: WsMessage) => void
   private _db: any
   private _logBuffer: LogMessage[]
@@ -101,6 +102,7 @@ export class QueueManager {
     this._paused = false
     this._killTimer = null
     this._cancelingJobs = new Set()
+    this._zombieJobs = new Set()
     this._broadcast = broadcast
     this._db = db ?? null
     this._logBuffer = []
@@ -416,11 +418,15 @@ export class QueueManager {
     const job = this._jobs.get(jobId)
     if (!job) return
 
+    const wasZombie = this._zombieJobs.has(jobId)
     const wasCanceling = this._cancelingJobs.has(jobId)
+    this._zombieJobs.delete(jobId)
     this._cancelingJobs.delete(jobId)
 
     let finalStatus: Job['status']
-    if (wasCanceling) {
+    if (wasZombie) {
+      finalStatus = 'zombie_terminated'
+    } else if (wasCanceling) {
       finalStatus = 'canceled'
     } else if (code === 0) {
       finalStatus = 'completed'
@@ -513,6 +519,7 @@ export class QueueManager {
     }
     this._broadcast(msg)
 
+    this._zombieJobs.add(jobId)
     this._kill(jobId)
   }
 

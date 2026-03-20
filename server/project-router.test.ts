@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
 import express from 'express'
 import request from 'supertest'
 
@@ -83,6 +86,18 @@ function makeProposalManager(overrides: Partial<{
   }
 }
 
+function makeSpecLauncherManager(overrides: Partial<{
+  isActive: (id: string) => boolean
+  launch: () => Promise<void>
+  cancel: () => void
+}> = {}) {
+  return {
+    isActive: overrides.isActive ?? vi.fn(() => false),
+    launch: overrides.launch ?? vi.fn(async () => {}),
+    cancel: overrides.cancel ?? vi.fn(),
+  }
+}
+
 function makeContext(db: DbInstance, overrides: Partial<ProjectContext> = {}): ProjectContext {
   return {
     project: { id: 'proj-1', slug: 'proj', name: 'Test Project', path: '/tmp', db_path: ':memory:', added_at: '', last_seen_at: '' },
@@ -91,6 +106,7 @@ function makeContext(db: DbInstance, overrides: Partial<ProjectContext> = {}): P
     chatManager: makeChatManager() as any,
     setupManager: makeSetupManager() as any,
     proposalManager: makeProposalManager() as any,
+    specLauncherManager: makeSpecLauncherManager() as any,
     broadcast: vi.fn(),
     ...overrides,
   }
@@ -555,6 +571,177 @@ describe('project-router', () => {
       const ids = res.body.map((i: any) => i.jobId)
       expect(ids).toContain('before-old')
       expect(ids).not.toContain('before-new')
+    })
+  })
+
+  // ─── Spec Launcher ───────────────────────────────────────────────────────────
+
+  describe('POST /:projectId/spec-launcher/start', () => {
+    it('returns 400 if description is missing', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/spec-launcher/start')
+        .send({})
+      expect(res.status).toBe(400)
+      expect(res.body.error).toBeTruthy()
+    })
+
+    it('returns 400 if description is empty string', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/spec-launcher/start')
+        .send({ description: '   ' })
+      expect(res.status).toBe(400)
+    })
+
+    it('returns 202 with launchId and calls launch', async () => {
+      const launch = vi.fn(async () => {})
+      const slm = makeSpecLauncherManager({ launch })
+      const ctx = makeContext(db, { specLauncherManager: slm as any })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/spec-launcher/start')
+        .send({ description: 'feat: add dark mode toggle' })
+      expect(res.status).toBe(202)
+      expect(typeof res.body.launchId).toBe('string')
+      expect(res.body.launchId).toBeTruthy()
+      // launch is called asynchronously — wait a tick
+      await new Promise((r) => setTimeout(r, 10))
+      expect(launch).toHaveBeenCalledWith(res.body.launchId, 'feat: add dark mode toggle')
+    })
+  })
+
+  describe('DELETE /:projectId/spec-launcher/:launchId', () => {
+    it('returns 404 if no active launch', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .delete('/api/projects/proj-1/spec-launcher/nonexistent-id')
+      expect(res.status).toBe(404)
+    })
+
+    it('cancels an active launch and returns ok', async () => {
+      const cancel = vi.fn()
+      const slm = makeSpecLauncherManager({
+        isActive: vi.fn(() => true),
+        cancel,
+      })
+      const ctx = makeContext(db, { specLauncherManager: slm as any })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .delete('/api/projects/proj-1/spec-launcher/some-launch-id')
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+      expect(cancel).toHaveBeenCalledWith('some-launch-id')
+    })
+  })
+
+  // ─── Changes endpoint ─────────────────────────────────────────────────────
+
+  describe('GET /:projectId/changes', () => {
+    let tmpDir: string
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-hub-changes-test-'))
+    })
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    })
+
+    it('returns empty changes array when no openspec/changes dir', async () => {
+      const ctx = makeContext(db, {
+        project: { id: 'proj-1', slug: 'proj', name: 'Test', path: tmpDir, db_path: ':memory:', added_at: '', last_seen_at: '' },
+      })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/changes')
+      expect(res.status).toBe(200)
+      expect(res.body.changes).toEqual([])
+    })
+
+    it('returns active changes from openspec/changes/', async () => {
+      const changesDir = path.join(tmpDir, 'openspec', 'changes')
+      fs.mkdirSync(path.join(changesDir, 'my-feature'), { recursive: true })
+      fs.writeFileSync(path.join(changesDir, 'my-feature', 'proposal.md'), '# Proposal')
+
+      const ctx = makeContext(db, {
+        project: { id: 'proj-1', slug: 'proj', name: 'Test', path: tmpDir, db_path: ':memory:', added_at: '', last_seen_at: '' },
+      })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/changes')
+      expect(res.status).toBe(200)
+      const change = res.body.changes.find((c: { id: string }) => c.id === 'my-feature')
+      expect(change).toBeDefined()
+      expect(change.artifacts.proposal).toBe(true)
+      expect(change.isArchived).toBe(false)
+    })
+  })
+
+  // ─── Change Artifact Browser ──────────────────────────────────────────────
+
+  describe('GET /:projectId/changes/:changeId/artifacts/:artifact', () => {
+    let tmpDir: string
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-hub-artifacts-test-'))
+    })
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    })
+
+    function makeCtxWithPath(p: string) {
+      return makeContext(db, {
+        project: { id: 'proj-1', slug: 'proj', name: 'Test', path: p, db_path: ':memory:', added_at: '', last_seen_at: '' },
+      })
+    }
+
+    it('returns 400 for disallowed artifact names', async () => {
+      const ctx = makeCtxWithPath(tmpDir)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/changes/my-change/artifacts/package.json')
+      expect(res.status).toBe(400)
+    })
+
+    it('rejects change IDs with special characters', async () => {
+      const ctx = makeCtxWithPath(tmpDir)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/changes/my%2Fevil/artifacts/proposal.md')
+      expect(res.status).toBe(400)
+    })
+
+    it('returns 404 when artifact file does not exist', async () => {
+      fs.mkdirSync(path.join(tmpDir, 'openspec', 'changes', 'my-change'), { recursive: true })
+      const ctx = makeCtxWithPath(tmpDir)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/changes/my-change/artifacts/proposal.md')
+      expect(res.status).toBe(404)
+    })
+
+    it('returns artifact content from active changes dir', async () => {
+      const changeDir = path.join(tmpDir, 'openspec', 'changes', 'my-change')
+      fs.mkdirSync(changeDir, { recursive: true })
+      fs.writeFileSync(path.join(changeDir, 'proposal.md'), '# My Proposal')
+      const ctx = makeCtxWithPath(tmpDir)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/changes/my-change/artifacts/proposal.md')
+      expect(res.status).toBe(200)
+      expect(res.body.content).toBe('# My Proposal')
+      expect(res.body.artifact).toBe('proposal.md')
+      expect(res.body.changeId).toBe('my-change')
+    })
+
+    it('returns artifact content from archive dir', async () => {
+      const archiveDir = path.join(tmpDir, 'openspec', 'changes', 'archive', 'old-change')
+      fs.mkdirSync(archiveDir, { recursive: true })
+      fs.writeFileSync(path.join(archiveDir, 'design.md'), '# Design')
+      const ctx = makeCtxWithPath(tmpDir)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/changes/old-change/artifacts/design.md')
+      expect(res.status).toBe(200)
+      expect(res.body.content).toBe('# Design')
     })
   })
 })

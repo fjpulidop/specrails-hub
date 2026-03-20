@@ -19,9 +19,10 @@ const STATUS_BADGE: Record<JobStatus, { variant: BadgeVariant; label: string; to
   failed: { variant: 'failed', label: 'failed', tooltip: 'Job exited with a non-zero exit code' },
   canceled: { variant: 'canceled', label: 'canceled', tooltip: 'Job was manually canceled' },
   queued: { variant: 'queued', label: 'queued', tooltip: 'Job is waiting to run' },
+  zombie_terminated: { variant: 'failed', label: 'zombie', tooltip: 'Job was auto-terminated after prolonged inactivity' },
 }
 
-const ALL_STATUSES: JobStatus[] = ['running', 'completed', 'failed', 'canceled', 'queued']
+const ALL_STATUSES: JobStatus[] = ['running', 'completed', 'failed', 'canceled', 'zombie_terminated', 'queued']
 
 function formatCost(cost: number | null | undefined): string | null {
   if (cost == null || cost === 0) return null

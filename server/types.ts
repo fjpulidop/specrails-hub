@@ -33,7 +33,7 @@ export interface PhaseMessage {
   projectId?: string
 }
 
-export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled'
+export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled' | 'zombie_terminated'
 
 export interface JobRow {
   id: string
@@ -67,6 +67,7 @@ export interface EventRow {
 
 export interface StatsRow {
   totalJobs: number
+  failedJobs: number
   jobsToday: number
   totalCostUsd: number
   costToday: number
@@ -396,6 +397,32 @@ export interface ProposalErrorMessage {
   timestamp: string
 }
 
+// ─── Spec Launcher message types ─────────────────────────────────────────────
+
+export interface SpecLauncherStreamMessage {
+  type: 'spec_launcher_stream'
+  projectId: string
+  launchId: string
+  delta: string
+  timestamp: string
+}
+
+export interface SpecLauncherDoneMessage {
+  type: 'spec_launcher_done'
+  projectId: string
+  launchId: string
+  changeId: string | null
+  timestamp: string
+}
+
+export interface SpecLauncherErrorMessage {
+  type: 'spec_launcher_error'
+  projectId: string
+  launchId: string
+  error: string
+  timestamp: string
+}
+
 export type WsMessage =
   | LogMessage | PhaseMessage | InitMessage | QueueMessage | EventMessage
   | ChatStreamMessage | ChatDoneMessage | ChatErrorMessage
@@ -406,4 +433,5 @@ export type WsMessage =
   | SetupTurnDoneMessage
   | ProposalStreamMessage | ProposalReadyMessage | ProposalRefinedMessage
   | ProposalIssueCreatedMessage | ProposalErrorMessage
+  | SpecLauncherStreamMessage | SpecLauncherDoneMessage | SpecLauncherErrorMessage
 

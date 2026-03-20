@@ -893,12 +893,18 @@ async function hubStart(port: number): Promise<number> {
 
   child.unref()
 
-  // Wait for server to be ready (longer window for slow machines)
-  await new Promise<void>((resolve) => setTimeout(resolve, 2000))
-  const detection = await detectWebManager(port)
-  if (detection.running) {
-    cliLog(`hub started on http://127.0.0.1:${port}`)
-    return 0
+  // Poll until the server is ready (up to 15 seconds, checking every 300ms)
+  const pollTimeoutMs = 15000
+  const pollIntervalMs = 300
+  const startPoll = Date.now()
+
+  while (Date.now() - startPoll < pollTimeoutMs) {
+    await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs))
+    const detection = await detectWebManager(port)
+    if (detection.running) {
+      cliLog(`hub started on http://127.0.0.1:${port}`)
+      return 0
+    }
   }
   cliError(`hub failed to start — logs: ${HUB_LOG_FILE}`)
   return 1

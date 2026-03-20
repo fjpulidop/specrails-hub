@@ -22,6 +22,7 @@ const STATUS_BADGE: Record<string, { variant: BadgeVariant; label: string; toolt
   failed: { variant: 'failed', label: 'failed', tooltip: 'Job exited with a non-zero exit code' },
   canceled: { variant: 'canceled', label: 'canceled', tooltip: 'Job was manually canceled' },
   queued: { variant: 'queued', label: 'queued', tooltip: 'Job is waiting in the queue' },
+  zombie_terminated: { variant: 'failed', label: 'zombie', tooltip: 'Job was auto-terminated after prolonged inactivity' },
 }
 
 interface JobDetailModalProps {

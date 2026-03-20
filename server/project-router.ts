@@ -1,3 +1,5 @@
+import fs from 'fs'
+import path from 'path'
 import { Router, Request, Response, NextFunction } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import type { AnalyticsOpts } from './types'
@@ -16,6 +18,7 @@ import { createHooksRouter, getPhaseStates } from './hooks'
 import { getConfig, fetchIssues } from './config'
 import { getAnalytics, getTrends } from './analytics'
 import type { ChatConversationRow, TrendsPeriod } from './types'
+import { readChanges } from './changes-reader'
 
 // Extend Express Request to carry resolved ProjectContext
 declare module 'express-serve-static-core' {
@@ -516,6 +519,71 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const proposal = getProposal(ctx(req).db, req.params.id)
     if (!proposal) { res.status(404).json({ error: 'Proposal not found' }); return }
     ctx(req).proposalManager.cancel(req.params.id)
+    res.json({ ok: true })
+  })
+
+  // ─── Feature Funnel ─────────────────────────────────────────────────────────
+
+  router.get('/:projectId/changes', (req: Request, res: Response) => {
+    const { project, queueManager } = ctx(req)
+    const activeCommands = queueManager.getJobs()
+      .filter((j) => j.status === 'running' || j.status === 'queued')
+      .map((j) => j.command)
+    const changes = readChanges(project.path, activeCommands)
+    res.json({ changes })
+  })
+
+  // ─── Change Artifact Browser ─────────────────────────────────────────────────
+
+  const ALLOWED_ARTIFACTS = new Set(['proposal.md', 'design.md', 'tasks.md', 'delta-spec.md', 'context-bundle.md'])
+
+  router.get('/:projectId/changes/:changeId/artifacts/:artifact', (req: Request, res: Response) => {
+    const { changeId, artifact } = req.params
+    if (!ALLOWED_ARTIFACTS.has(artifact)) {
+      res.status(400).json({ error: 'Invalid artifact name' }); return
+    }
+    // Sanitize changeId to prevent path traversal
+    if (!/^[\w-]+$/.test(changeId)) {
+      res.status(400).json({ error: 'Invalid change ID' }); return
+    }
+    const { project } = ctx(req)
+    const changesRoot = path.join(project.path, 'openspec', 'changes')
+    // Check active dir first, then archive
+    let filePath = path.join(changesRoot, changeId, artifact)
+    if (!fs.existsSync(filePath)) {
+      filePath = path.join(changesRoot, 'archive', changeId, artifact)
+    }
+    if (!fs.existsSync(filePath)) {
+      res.status(404).json({ error: 'Artifact not found' }); return
+    }
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8')
+      res.json({ content, artifact, changeId })
+    } catch {
+      res.status(500).json({ error: 'Failed to read artifact' })
+    }
+  })
+
+  // ─── Spec Launcher ───────────────────────────────────────────────────────────
+
+  router.post('/:projectId/spec-launcher/start', (req: Request, res: Response) => {
+    const { description } = req.body ?? {}
+    if (!description || typeof description !== 'string' || !description.trim()) {
+      res.status(400).json({ error: 'description is required' }); return
+    }
+    const launchId = uuidv4()
+    res.status(202).json({ launchId })
+    ctx(req).specLauncherManager.launch(launchId, description.trim()).catch((err) => {
+      console.error('[project-router] spec-launcher error:', err)
+    })
+  })
+
+  router.delete('/:projectId/spec-launcher/:launchId', (req: Request, res: Response) => {
+    const { specLauncherManager } = ctx(req)
+    if (!specLauncherManager.isActive(req.params.launchId)) {
+      res.status(404).json({ error: 'No active launch with that ID' }); return
+    }
+    specLauncherManager.cancel(req.params.launchId)
     res.json({ ok: true })
   })
 
