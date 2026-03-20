@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/fjpulidop/specrails-hub/compare/v1.4.0...v1.4.1) (2026-03-20)
+
+
+### Bug Fixes
+
+* **cli:** use /api/health for hub start detection ([#30](https://github.com/fjpulidop/specrails-hub/issues/30)) ([d36727b](https://github.com/fjpulidop/specrails-hub/commit/d36727be20ccfc268b412e724f8ad64140ccd40a))
+
 ## [1.4.0](https://github.com/fjpulidop/specrails-hub/compare/v1.3.1...v1.4.0) (2026-03-20)
 
 
