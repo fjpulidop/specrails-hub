@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.1](https://github.com/fjpulidop/specrails-hub/compare/v1.10.0...v1.10.1) (2026-03-20)
+
+
+### Bug Fixes
+
+* **ci:** add job-level if condition to exempt Dependabot from DCO check ([#69](https://github.com/fjpulidop/specrails-hub/issues/69)) ([eb22048](https://github.com/fjpulidop/specrails-hub/commit/eb220482b2545f464d1ac7284df2d157d0122070))
+
 ## [1.10.0](https://github.com/fjpulidop/specrails-hub/compare/v1.9.0...v1.10.0) (2026-03-20)
 
 
