@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/fjpulidop/specrails-hub/compare/v1.7.0...v1.8.0) (2026-03-20)
+
+
+### Features
+
+* **hub:** chat panel context injection — dashboard state in system prompt (SPEA-144) ([#40](https://github.com/fjpulidop/specrails-hub/issues/40)) ([040e91a](https://github.com/fjpulidop/specrails-hub/commit/040e91a812c6939e69f35f11fd3f71a96a717a6d))
+
 ## [1.7.0](https://github.com/fjpulidop/specrails-hub/compare/v1.6.0...v1.7.0) (2026-03-20)
 
 
