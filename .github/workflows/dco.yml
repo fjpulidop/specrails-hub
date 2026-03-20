@@ -40,6 +40,13 @@ jobs:
             fi
 
             message=$(git log --format=%B -n 1 "$commit")
+
+            # Skip commits co-authored by Paperclip automation
+            if echo "$message" | grep -qE "Co-Authored-By:.*noreply@paperclip\.ing"; then
+              echo "SKIP (Paperclip co-authored): $commit — $subject"
+              continue
+            fi
+
             if ! echo "$message" | grep -qE "^Signed-off-by: .+ <.+@.+>$"; then
               echo "ERROR: Commit $commit is missing a 'Signed-off-by:' sign-off."
               echo "  Subject: $subject"
