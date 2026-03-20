@@ -64,7 +64,7 @@ export default function DashboardPage() {
   const PROPOSAL_STATUS_MAP: Record<string, JobSummary['status']> = {
     input: 'queued',
     exploring: 'running',
-    review: 'completed',
+    review: 'running',
     refining: 'running',
     creating_issue: 'running',
     created: 'completed',

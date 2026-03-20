@@ -13,6 +13,7 @@ import {
   HelpCircle,
   Play,
   ArrowRight,
+  Terminal,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
@@ -155,10 +156,11 @@ async function spawnCommand(command: string): Promise<void> {
 export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
   if (commands.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border/30 p-8 text-center">
-        <p className="text-sm text-muted-foreground">No commands found</p>
-        <p className="text-xs text-muted-foreground/60 mt-1">
-          Run /setup in Claude Code to install specrails commands
+      <div className="rounded-lg border border-dashed border-border/30 p-8 text-center space-y-2">
+        <Terminal className="w-8 h-8 text-muted-foreground/30 mx-auto" />
+        <p className="text-sm font-medium text-muted-foreground">No commands installed</p>
+        <p className="text-xs text-muted-foreground/60">
+          Run <code className="font-mono">/setup</code> in Claude Code to install specrails commands
         </p>
       </div>
     )
@@ -264,7 +266,7 @@ export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
                       {isWizard ? (
                         <ArrowRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-dracula-purple transition-colors shrink-0" />
                       ) : (
-                        <Play className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-dracula-cyan transition-colors shrink-0 opacity-0 group-hover:opacity-100" />
+                        <Play className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-dracula-cyan transition-colors shrink-0 md:opacity-0 md:group-hover:opacity-100" />
                       )}
                     </button>
                   </TooltipTrigger>

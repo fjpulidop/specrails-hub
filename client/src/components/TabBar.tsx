@@ -69,7 +69,7 @@ function ProjectTab({
             : 'w-3.5 h-3.5',
           !confirming && (isActive
             ? 'opacity-50 hover:opacity-100 hover:bg-muted'
-            : 'opacity-0 group-hover:opacity-50 hover:!opacity-100 hover:bg-muted')
+            : 'opacity-50 md:opacity-0 md:group-hover:opacity-50 hover:!opacity-100 hover:bg-muted')
         )}
         aria-label={confirming ? `Confirm remove ${project.name}` : `Remove ${project.name}`}
       >

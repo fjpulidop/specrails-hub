@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getApiBase } from '../lib/api'
 import { formatDistanceToNow } from 'date-fns'
-import { Trash2 } from 'lucide-react'
+import { Trash2, ClipboardList } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import type { JobSummary, JobStatus } from '../types'
 
@@ -14,7 +15,7 @@ type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'succe
 const STATUS_BADGE: Record<JobStatus, { variant: BadgeVariant; label: string; tooltip: string }> = {
   running: { variant: 'running', label: 'running', tooltip: 'Job is actively executing' },
   completed: { variant: 'success', label: 'done', tooltip: 'Job completed successfully' },
-  failed: { variant: 'failed', label: 'failed', tooltip: 'Job exited with an error code' },
+  failed: { variant: 'failed', label: 'failed', tooltip: 'Job exited with a non-zero exit code' },
   canceled: { variant: 'canceled', label: 'canceled', tooltip: 'Job was manually canceled' },
   queued: { variant: 'queued', label: 'queued', tooltip: 'Job is waiting to run' },
 }
@@ -67,6 +68,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
   const [clearFrom, setClearFrom] = useState('')
   const [clearTo, setClearTo] = useState('')
   const [isClearing, setIsClearing] = useState(false)
+  const [confirmDeleteProposalId, setConfirmDeleteProposalId] = useState<string | null>(null)
 
   const filteredJobs = jobs.filter((j) => {
     if (statusFilter && j.status !== statusFilter) return false
@@ -117,10 +119,11 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
 
   if (jobs.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border/40 bg-card/50 p-6 text-center">
-        <p className="text-sm text-muted-foreground">No jobs yet</p>
-        <p className="text-xs text-muted-foreground/60 mt-1">
-          Jobs will appear here after you run a command
+      <div className="rounded-lg border border-dashed border-border/40 bg-card/50 p-8 text-center space-y-2">
+        <ClipboardList className="w-8 h-8 text-muted-foreground/30 mx-auto" />
+        <p className="text-sm font-medium text-muted-foreground">No jobs yet</p>
+        <p className="text-xs text-muted-foreground/60">
+          Run a command above to see your job history here
         </p>
       </div>
     )
@@ -262,8 +265,8 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                 {isProposal && proposalId && (
                   <button
                     type="button"
-                    className="w-4 h-4 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
-                    onClick={(e) => { e.stopPropagation(); onProposalDelete?.(proposalId) }}
+                    className="w-4 h-4 md:opacity-0 md:group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
+                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteProposalId(proposalId) }}
                     title="Delete proposal"
                   >
                     <Trash2 className="w-3 h-3" />
@@ -331,6 +334,33 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
           </div>
         </div>
       )}
+
+      {/* Delete proposal confirmation */}
+      <Dialog open={confirmDeleteProposalId !== null} onOpenChange={(o) => !o && setConfirmDeleteProposalId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete proposal?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the proposal. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteProposalId(null)}>
+              Keep
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                if (confirmDeleteProposalId) onProposalDelete?.(confirmDeleteProposalId)
+                setConfirmDeleteProposalId(null)
+              }}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

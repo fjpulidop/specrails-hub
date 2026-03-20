@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { MessageSquare } from 'lucide-react'
 import { MessageBubble } from './MessageBubble'
 import type { ChatMessage } from '../types'
 
@@ -42,8 +43,12 @@ export function MessageList({
       onScroll={handleScroll}
     >
       {messages.length === 0 && !isStreaming && (
-        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-          Start a conversation
+        <div className="flex h-full flex-col items-center justify-center gap-2 py-12 text-center">
+          <MessageSquare className="w-6 h-6 text-muted-foreground/40" />
+          <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
+          <p className="text-xs text-muted-foreground/60 max-w-[200px]">
+            Ask Claude anything about your project to get started
+          </p>
         </div>
       )}
 
