@@ -103,9 +103,10 @@ Managed by `SetupManager` (server) and `SetupWizard` component (client). Hub con
 
 Releases are automated via release-please + GitHub Actions:
 
-- **CI** (`.github/workflows/ci.yml`) — runs `typecheck` + `vitest` on every push and PR
+- **CI** (`.github/workflows/ci.yml`) — runs `typecheck` + `vitest` + coverage enforcement on every push and PR. Coverage thresholds are hard gates: **70% global** (lines/functions/statements) and **80% server** (lines/functions/statements, 70% branches). CI fails if thresholds are not met.
 - **Release** (`.github/workflows/release.yml`) — on every push to `main`:
   - release-please creates/updates a Release PR (bumps version in `package.json` + `CHANGELOG.md`)
   - When the Release PR is merged, release-please creates the GitHub Release and `npm publish` runs automatically
+  - Publishes with **npm provenance attestation** (`--provenance --access public`) for SLSA Level 2 supply chain security. Requires `id-token: write` permission in the workflow.
 
 Commit message prefixes that affect versioning: `feat:` → minor, `fix:` → patch, `feat!:` → major. Commits without a conventional prefix are ignored by release-please.
