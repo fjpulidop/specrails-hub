@@ -19,6 +19,7 @@ vi.mock('tree-kill', () => ({
 // Mock hooks to avoid side effects in tests
 vi.mock('./hooks', () => ({
   resetPhases: vi.fn(),
+  setActivePhases: vi.fn(),
 }))
 
 import { spawn as mockSpawn, execSync as mockExecSync } from 'child_process'
@@ -395,6 +396,175 @@ describe('QueueManager', () => {
       qm.pause()
       qm.resume()
       expect(qm.isPaused()).toBe(false)
+    })
+  })
+
+  // ─── zombie detection ─────────────────────────────────────────────────────
+
+  describe('zombie detection', () => {
+    it('auto-terminates a job with no output after the configured timeout', () => {
+      vi.useFakeTimers()
+      vi.mocked(treeKill).mockClear()
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('job-zombie' as any)
+
+      const qmZombie = new QueueManager(broadcast, undefined, undefined, undefined, { zombieTimeoutMs: 30_000 })
+      qmZombie.enqueue('/implement #1')
+
+      // Advance past the 30s zombie timeout
+      vi.advanceTimersByTime(30_100)
+
+      expect(vi.mocked(treeKill)).toHaveBeenCalledWith(12345, 'SIGTERM')
+
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    })
+
+    it('resets the zombie timer on each output data chunk', async () => {
+      vi.useFakeTimers()
+      vi.mocked(treeKill).mockClear()
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('job-active' as any)
+
+      const qmActive = new QueueManager(broadcast, undefined, undefined, undefined, { zombieTimeoutMs: 30_000 })
+      qmActive.enqueue('/implement #1')
+
+      // Advance 25s without any output — timer is still counting (fires at 30s)
+      vi.advanceTimersByTime(25_000)
+
+      // Push output — the 'data' event is emitted via process.nextTick by Node.js streams.
+      // Awaiting a nextTick-based promise flushes the nextTick queue, causing the 'data'
+      // event to fire and reset the zombie timer before we advance time further.
+      child.stdout.push('still alive\n')
+      await new Promise<void>(resolve => process.nextTick(resolve))
+
+      // Advance another 25s — timer was reset at ~25s (fires at ~55s), so at t=50s it has NOT fired
+      vi.advanceTimersByTime(25_000)
+
+      expect(vi.mocked(treeKill)).not.toHaveBeenCalled()
+
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    })
+
+    it('clears the zombie timer when the job exits normally', async () => {
+      vi.useFakeTimers()
+      vi.mocked(treeKill).mockClear()
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('job-clean' as any)
+
+      const qmClean = new QueueManager(broadcast, undefined, undefined, undefined, { zombieTimeoutMs: 30_000 })
+      qmClean.enqueue('/implement #1')
+
+      // Job exits normally before timeout
+      child.emit('close', 0)
+
+      // Advance past timeout — timer should have been cleared, no SIGTERM
+      vi.advanceTimersByTime(40_000)
+
+      expect(vi.mocked(treeKill)).not.toHaveBeenCalled()
+
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    })
+
+    it('clears the zombie timer when the job is cancelled', () => {
+      vi.useFakeTimers()
+      vi.mocked(treeKill).mockClear()
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('job-cancel' as any)
+
+      const qmCancel = new QueueManager(broadcast, undefined, undefined, undefined, { zombieTimeoutMs: 30_000 })
+      qmCancel.enqueue('/implement #1')
+
+      // Cancel explicitly before zombie timeout fires
+      vi.mocked(treeKill).mockClear()
+      qmCancel.cancel('job-cancel')
+
+      // The cancel itself sends SIGTERM
+      expect(vi.mocked(treeKill)).toHaveBeenCalledWith(12345, 'SIGTERM')
+
+      // Advance well past the zombie timeout — kill timer (5s) will fire SIGKILL,
+      // but the zombie timer (30s) should have been cleared by cancel
+      vi.advanceTimersByTime(40_000)
+
+      // Only SIGTERM (from cancel) and SIGKILL (from kill timer) — no additional SIGTERM from zombie
+      const sigtermCalls = vi.mocked(treeKill).mock.calls.filter((c) => c[1] === 'SIGTERM')
+      expect(sigtermCalls.length).toBe(1)
+
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    })
+
+    it('does not auto-terminate when zombieTimeoutMs is 0', () => {
+      vi.useFakeTimers()
+      vi.mocked(treeKill).mockClear()
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('job-no-zombie' as any)
+
+      const qmNoZombie = new QueueManager(broadcast, undefined, undefined, undefined, { zombieTimeoutMs: 0 })
+      qmNoZombie.enqueue('/implement #1')
+
+      // Advance far past any threshold
+      vi.advanceTimersByTime(600_000)
+
+      expect(vi.mocked(treeKill)).not.toHaveBeenCalled()
+
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    })
+
+    it('emits a zombie-detection log line to stderr when triggered', () => {
+      vi.useFakeTimers()
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('job-log' as any)
+
+      const qmLog = new QueueManager(broadcast, undefined, undefined, undefined, { zombieTimeoutMs: 10_000 })
+      qmLog.enqueue('/implement #1')
+
+      vi.advanceTimersByTime(10_100)
+
+      const zombieMsgs = (broadcast.mock.calls as Array<[WsMessage]>)
+        .map((c) => c[0])
+        .filter((m) => m.type === 'log' && 'line' in m && (m as any).line.includes('zombie-detection'))
+      expect(zombieMsgs.length).toBeGreaterThan(0)
+
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    })
+
+    it('reads zombieTimeoutMs from WM_ZOMBIE_TIMEOUT_MS env var', () => {
+      vi.useFakeTimers()
+      vi.mocked(treeKill).mockClear()
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('job-env' as any)
+
+      process.env.WM_ZOMBIE_TIMEOUT_MS = '5000'
+      const qmEnv = new QueueManager(broadcast)
+      delete process.env.WM_ZOMBIE_TIMEOUT_MS
+
+      qmEnv.enqueue('/implement #1')
+
+      vi.advanceTimersByTime(5_100)
+
+      expect(vi.mocked(treeKill)).toHaveBeenCalledWith(12345, 'SIGTERM')
+
+      vi.clearAllTimers()
+      vi.useRealTimers()
     })
   })
 })

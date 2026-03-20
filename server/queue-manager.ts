@@ -11,6 +11,7 @@ import type { CommandInfo } from './config'
 
 const LOG_BUFFER_MAX = 5000
 const LOG_BUFFER_DROP = 1000
+const DEFAULT_ZOMBIE_TIMEOUT_MS = 300_000 // 5 minutes
 
 // ─── Error classes ────────────────────────────────────────────────────────────
 
@@ -83,8 +84,16 @@ export class QueueManager {
   private _logBuffer: LogMessage[]
   private _commands: CommandInfo[]
   private _cwd: string | undefined
+  private _zombieTimeoutMs: number
+  private _inactivityTimer: ReturnType<typeof setTimeout> | null
 
-  constructor(broadcast: (msg: WsMessage) => void, db?: any, commands?: CommandInfo[], cwd?: string) {
+  constructor(
+    broadcast: (msg: WsMessage) => void,
+    db?: any,
+    commands?: CommandInfo[],
+    cwd?: string,
+    options?: { zombieTimeoutMs?: number }
+  ) {
     this._queue = []
     this._jobs = new Map()
     this._activeProcess = null
@@ -97,6 +106,13 @@ export class QueueManager {
     this._logBuffer = []
     this._commands = commands ?? []
     this._cwd = cwd
+    this._inactivityTimer = null
+
+    const envTimeout = process.env.WM_ZOMBIE_TIMEOUT_MS !== undefined
+      ? parseInt(process.env.WM_ZOMBIE_TIMEOUT_MS, 10)
+      : null
+    this._zombieTimeoutMs = options?.zombieTimeoutMs
+      ?? (envTimeout !== null && !isNaN(envTimeout) ? envTimeout : DEFAULT_ZOMBIE_TIMEOUT_MS)
 
     if (this._db) {
       this._restoreFromDb()
@@ -286,6 +302,13 @@ export class QueueManager {
     this._activeProcess = child
     this._activeJobId = jobId
 
+    // Start zombie detection timer. Reset on any raw data from the process.
+    // Using 'data' events (not readline 'line') ensures the timer resets
+    // synchronously in test environments with fake timers.
+    this._resetZombieTimer()
+    child.stdout!.on('data', () => { this._resetZombieTimer() })
+    child.stderr!.on('data', () => { this._resetZombieTimer() })
+
     let eventSeq = 0
     let lastResultEvent: Record<string, unknown> | null = null
 
@@ -383,6 +406,8 @@ export class QueueManager {
     lastResultEvent: Record<string, unknown> | null,
     emitLine: (source: 'stdout' | 'stderr', line: string) => void
   ): void {
+    this._clearZombieTimer()
+
     if (this._killTimer !== null) {
       clearTimeout(this._killTimer)
       this._killTimer = null
@@ -444,9 +469,57 @@ export class QueueManager {
     this._drainQueue()
   }
 
+  private _resetZombieTimer(): void {
+    if (this._zombieTimeoutMs <= 0) return
+    if (this._inactivityTimer !== null) {
+      clearTimeout(this._inactivityTimer)
+    }
+    const jobId = this._activeJobId
+    if (!jobId) return
+    this._inactivityTimer = setTimeout(() => {
+      this._inactivityTimer = null
+      this._onZombieDetected(jobId)
+    }, this._zombieTimeoutMs)
+  }
+
+  private _clearZombieTimer(): void {
+    if (this._inactivityTimer !== null) {
+      clearTimeout(this._inactivityTimer)
+      this._inactivityTimer = null
+    }
+  }
+
+  private _onZombieDetected(jobId: string): void {
+    const job = this._jobs.get(jobId)
+    if (!job || job.status !== 'running') return
+
+    this._clearZombieTimer()
+
+    const timeoutSec = Math.round(this._zombieTimeoutMs / 1000)
+    const line = `[zombie-detection] Job ${jobId} has been inactive for ${timeoutSec}s — auto-terminating`
+    console.error(line)
+
+    // Emit directly without going through emitLine (which would reset the zombie timer)
+    const msg: LogMessage = {
+      type: 'log',
+      source: 'stderr',
+      line,
+      timestamp: new Date().toISOString(),
+      processId: jobId,
+    }
+    this._logBuffer.push(msg)
+    if (this._logBuffer.length > LOG_BUFFER_MAX) {
+      this._logBuffer.splice(0, LOG_BUFFER_DROP)
+    }
+    this._broadcast(msg)
+
+    this._kill(jobId)
+  }
+
   private _kill(jobId: string): void {
     if (!this._activeProcess || !this._activeProcess.pid) return
 
+    this._clearZombieTimer()
     this._cancelingJobs.add(jobId)
     treeKill(this._activeProcess.pid, 'SIGTERM')
 
