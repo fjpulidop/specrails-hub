@@ -7,6 +7,7 @@ import JobDetailPage from './pages/JobDetailPage'
 import SettingsPage from './pages/SettingsPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import HubAnalyticsPage from './pages/HubAnalyticsPage'
+import HubOverviewPage from './pages/HubOverviewPage'
 import SettingsDialog from './pages/GlobalSettingsPage'
 import DocsPage from './pages/DocsPage'
 import { ProjectLayout } from './components/ProjectLayout'
@@ -114,6 +115,17 @@ function HubApp() {
         </span>
         <div className="flex items-center gap-3">
           <NavLink
+            to="/hub/overview"
+            className={({ isActive }) =>
+              cn(
+                'text-xs transition-colors',
+                isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+              )
+            }
+          >
+            Overview
+          </NavLink>
+          <NavLink
             to="/hub/analytics"
             className={({ isActive }) =>
               cn(
@@ -163,6 +175,7 @@ function HubApp() {
             {/* Hub-level routes */}
             <Route path="/docs" element={<DocsPage />} />
             <Route path="/docs/:category/:slug" element={<DocsPage />} />
+            <Route path="/hub/overview" element={<HubOverviewPage />} />
             <Route path="/hub/analytics" element={<HubAnalyticsPage />} />
 
             {/* Project routes */}
