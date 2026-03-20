@@ -13,6 +13,19 @@ function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
+// LOW-04: Deny registration of system-critical directory paths.
+const DENIED_PATH_PREFIXES = [
+  '/etc', '/usr', '/bin', '/sbin', '/lib', '/lib64',
+  '/sys', '/proc', '/dev', '/boot', '/run',
+]
+
+function isPathSafe(resolvedPath: string): boolean {
+  const normalized = resolvedPath.endsWith('/') ? resolvedPath : resolvedPath + '/'
+  return !DENIED_PATH_PREFIXES.some(
+    (prefix) => normalized.startsWith(prefix + '/') || normalized === prefix + '/'
+  )
+}
+
 function deriveProjectName(projectPath: string): string {
   return path.basename(projectPath)
 }
@@ -46,6 +59,12 @@ export function createHubRouter(
     // Validate path exists
     if (!fs.existsSync(resolvedPath)) {
       res.status(400).json({ error: `Path does not exist: ${resolvedPath}` })
+      return
+    }
+
+    // LOW-04: Reject registration of system-critical directories
+    if (!isPathSafe(resolvedPath)) {
+      res.status(400).json({ error: 'Registering system directories is not allowed' })
       return
     }
 
