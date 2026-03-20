@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Pre-commit hook: scan staged files for secrets before committing.
+# Setup: git config core.hooksPath .githooks
+set -euo pipefail
+
+# Patterns that indicate leaked secrets
+PATTERNS=(
+  'ANTHROPIC_API_KEY\s*=\s*sk-ant-[A-Za-z0-9_-]{20,}'
+  'sk-ant-api[0-9A-Za-z_-]{40,}'
+  'npm_[A-Za-z0-9]{36}'
+  'ghp_[A-Za-z0-9]{36}'
+  'github_pat_[A-Za-z0-9_]{82}'
+  'AWS_SECRET_ACCESS_KEY\s*=\s*[A-Za-z0-9/+=]{40}'
+  'AKIA[0-9A-Z]{16}'
+  'PRIVATE KEY-----'
+)
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+FOUND=0
+for file in $STAGED; do
+  if [ ! -f "$file" ]; then
+    continue
+  fi
+  for pattern in "${PATTERNS[@]}"; do
+    if git show ":$file" | grep -qP "$pattern" 2>/dev/null; then
+      echo "::error:: Possible secret detected in $file matching pattern: $pattern"
+      FOUND=1
+    fi
+  done
+done
+
+if [ "$FOUND" -eq 1 ]; then
+  echo ""
+  echo "Commit blocked. Remove secrets before committing."
+  echo "To skip (dangerous — only if false positive): git commit --no-verify"
+  exit 1
+fi
+
+exit 0
