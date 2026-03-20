@@ -1,18 +1,20 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { RootLayout } from './components/RootLayout'
 import DashboardPage from './pages/DashboardPage'
-import JobDetailPage from './pages/JobDetailPage'
 import SettingsPage from './pages/SettingsPage'
-import AnalyticsPage from './pages/AnalyticsPage'
-import HubAnalyticsPage from './pages/HubAnalyticsPage'
-import ActivityFeedPage from './pages/ActivityFeedPage'
-import HubOverviewPage from './pages/HubOverviewPage'
 import SettingsDialog from './pages/GlobalSettingsPage'
-import DocsPage from './pages/DocsPage'
-import DocsDialog from './components/DocsDialog'
 import { Dialog, DialogContent } from './components/ui/dialog'
+
+// Lazy-loaded pages — never visible at initial render
+const JobDetailPage = lazy(() => import('./pages/JobDetailPage'))
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'))
+const ActivityFeedPage = lazy(() => import('./pages/ActivityFeedPage'))
+const HubAnalyticsPage = lazy(() => import('./pages/HubAnalyticsPage'))
+const HubOverviewPage = lazy(() => import('./pages/HubOverviewPage'))
+const DocsPage = lazy(() => import('./pages/DocsPage'))
+const DocsDialog = lazy(() => import('./components/DocsDialog'))
 import { ProjectLayout } from './components/ProjectLayout'
 import { ProjectErrorBoundary } from './components/ProjectErrorBoundary'
 import { WelcomeScreen } from './components/WelcomeScreen'
@@ -164,33 +166,35 @@ function HubApp() {
             onSkip={() => completeSetupWizard(activeProject.id)}
           />
         ) : (
-          <Routes>
-            <Route path="/docs" element={<DocsPage />} />
-            <Route path="/docs/:category/:slug" element={<DocsPage />} />
-            {/* Project routes */}
-            {projects.length === 0 ? (
-              <Route path="*" element={<WelcomeScreen onAddProject={() => setAddDialogOpen(true)} />} />
-            ) : activeProject ? (
-              <Route element={
-                <ProjectErrorBoundary key={activeProject.id} projectName={activeProject.name}>
-                  <ProjectLayout project={activeProject} />
-                </ProjectErrorBoundary>
-              }>
-                <Route path="/" element={<DashboardPage />} />
-                <Route path="/jobs/:id" element={<JobDetailPage />} />
-                <Route path="/analytics" element={<AnalyticsPage />} />
-                <Route path="/activity" element={<ActivityFeedPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Route>
-            ) : (
-              <Route path="*" element={
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-sm text-muted-foreground">Select a project</p>
-                </div>
-              } />
-            )}
-          </Routes>
+          <Suspense fallback={<div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
+            <Routes>
+              <Route path="/docs" element={<DocsPage />} />
+              <Route path="/docs/:category/:slug" element={<DocsPage />} />
+              {/* Project routes */}
+              {projects.length === 0 ? (
+                <Route path="*" element={<WelcomeScreen onAddProject={() => setAddDialogOpen(true)} />} />
+              ) : activeProject ? (
+                <Route element={
+                  <ProjectErrorBoundary key={activeProject.id} projectName={activeProject.name}>
+                    <ProjectLayout project={activeProject} />
+                  </ProjectErrorBoundary>
+                }>
+                  <Route path="/" element={<DashboardPage />} />
+                  <Route path="/jobs/:id" element={<JobDetailPage />} />
+                  <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="/activity" element={<ActivityFeedPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Route>
+              ) : (
+                <Route path="*" element={
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-sm text-muted-foreground">Select a project</p>
+                  </div>
+                } />
+              )}
+            </Routes>
+          </Suspense>
         )}
       </div>
 
@@ -199,17 +203,23 @@ function HubApp() {
 
       <Dialog open={overviewOpen} onOpenChange={setOverviewOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0">
-          <HubOverviewPage />
+          <Suspense fallback={<div className="flex items-center justify-center h-40"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
+            <HubOverviewPage />
+          </Suspense>
         </DialogContent>
       </Dialog>
 
       <Dialog open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0">
-          <HubAnalyticsPage />
+          <Suspense fallback={<div className="flex items-center justify-center h-40"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
+            <HubAnalyticsPage />
+          </Suspense>
         </DialogContent>
       </Dialog>
 
-      <DocsDialog open={docsOpen} onClose={() => setDocsOpen(false)} />
+      <Suspense fallback={null}>
+        <DocsDialog open={docsOpen} onClose={() => setDocsOpen(false)} />
+      </Suspense>
     </div>
   )
 }
@@ -226,18 +236,20 @@ export default function App() {
           <HubApp />
         </HubProvider>
       ) : (
-        <Routes>
-          <Route path="/docs" element={<DocsPage />} />
-          <Route path="/docs/:category/:slug" element={<DocsPage />} />
-          <Route element={<RootLayout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="/jobs/:id" element={<JobDetailPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/activity" element={<ActivityFeedPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
+          <Routes>
+            <Route path="/docs" element={<DocsPage />} />
+            <Route path="/docs/:category/:slug" element={<DocsPage />} />
+            <Route element={<RootLayout />}>
+              <Route index element={<DashboardPage />} />
+              <Route path="/jobs/:id" element={<JobDetailPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/activity" element={<ActivityFeedPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </Suspense>
       )}
       <Toaster position="bottom-right" richColors />
     </SharedWebSocketProvider>
