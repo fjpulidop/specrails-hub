@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import express from 'express'
-import { createHooksRouter, getPhaseStates, resetPhases } from './hooks'
-import type { WsMessage, PhaseName, PhaseState } from './types'
+import { createHooksRouter, getPhaseStates, getPhaseDefinitions, setActivePhases, resetPhases } from './hooks'
+import type { WsMessage, PhaseName, PhaseDefinition } from './types'
 
 // The hooks module uses module-level state, so we need a fresh import for isolation.
 // Since we can't easily re-import, we'll use resetPhases to clean up between tests.
@@ -192,5 +192,124 @@ describe('POST /hooks/events', () => {
       .post('/hooks/events')
       .send({ event: 'agent_error', agent: 'architect' })
     expect(getPhaseStates().architect).toBe('error')
+  })
+})
+
+describe('getPhaseDefinitions', () => {
+  it('returns the default phase definitions', () => {
+    const defs = getPhaseDefinitions()
+    expect(defs).toHaveLength(4)
+    expect(defs.map((d: PhaseDefinition) => d.key)).toEqual(['architect', 'developer', 'reviewer', 'ship'])
+  })
+
+  it('returns a copy, not a reference', () => {
+    const defs = getPhaseDefinitions()
+    defs.push({ key: 'extra', label: 'Extra', description: 'Extra phase' })
+    expect(getPhaseDefinitions()).toHaveLength(4)
+  })
+})
+
+describe('setActivePhases', () => {
+  const DEFAULT_PHASES: PhaseDefinition[] = [
+    { key: 'architect', label: 'Architect', description: 'Architect phase' },
+    { key: 'developer', label: 'Developer', description: 'Developer phase' },
+    { key: 'reviewer', label: 'Reviewer', description: 'Reviewer phase' },
+    { key: 'ship', label: 'Ship', description: 'Ship phase' },
+  ]
+
+  beforeEach(() => {
+    setActivePhases(DEFAULT_PHASES, vi.fn())
+  })
+
+  it('replaces active phases with new definitions', () => {
+    const custom: PhaseDefinition[] = [
+      { key: 'plan', label: 'Plan', description: 'Planning phase' },
+      { key: 'build', label: 'Build', description: 'Build phase' },
+    ]
+    setActivePhases(custom, vi.fn())
+
+    const defs = getPhaseDefinitions()
+    expect(defs).toHaveLength(2)
+    expect(defs[0].key).toBe('plan')
+  })
+
+  it('initializes new phases to idle state', () => {
+    const custom: PhaseDefinition[] = [
+      { key: 'plan', label: 'Plan', description: 'Planning phase' },
+    ]
+    setActivePhases(custom, vi.fn())
+
+    expect(getPhaseStates().plan).toBe('idle')
+  })
+
+  it('broadcasts idle state for each new phase', () => {
+    const broadcast = vi.fn()
+    const custom: PhaseDefinition[] = [
+      { key: 'plan', label: 'Plan', description: 'Planning phase' },
+      { key: 'build', label: 'Build', description: 'Build phase' },
+    ]
+    setActivePhases(custom, broadcast)
+
+    expect(broadcast).toHaveBeenCalledTimes(2)
+    expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ type: 'phase', phase: 'plan', state: 'idle' }))
+    expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ type: 'phase', phase: 'build', state: 'idle' }))
+  })
+
+  it('removes old phase keys from state', () => {
+    const custom: PhaseDefinition[] = [
+      { key: 'custom1', label: 'Custom1', description: 'Custom phase 1' },
+    ]
+    setActivePhases(custom, vi.fn())
+
+    const states = getPhaseStates()
+    expect(states.architect).toBeUndefined()
+    expect(states.custom1).toBe('idle')
+  })
+})
+
+describe('POST /hooks/events with db and activeJobRef', () => {
+  beforeEach(() => {
+    // Restore defaults after each test
+    const defaults: PhaseDefinition[] = [
+      { key: 'architect', label: 'Architect', description: 'Architect phase' },
+      { key: 'developer', label: 'Developer', description: 'Developer phase' },
+      { key: 'reviewer', label: 'Reviewer', description: 'Reviewer phase' },
+      { key: 'ship', label: 'Ship', description: 'Ship phase' },
+    ]
+    setActivePhases(defaults, vi.fn())
+  })
+
+  it('calls db.prepare when db and activeJobRef.current are provided', async () => {
+    const broadcast = vi.fn()
+    const mockDb = { prepare: vi.fn(() => ({ run: vi.fn(), get: vi.fn() })) } as any
+    const activeJobRef = { current: 'job-123' }
+
+    const app = express()
+    app.use(express.json())
+    app.use('/hooks', createHooksRouter(broadcast, mockDb, activeJobRef))
+
+    const { default: request } = await import('supertest')
+    await request(app)
+      .post('/hooks/events')
+      .send({ event: 'agent_start', agent: 'architect' })
+
+    expect(mockDb.prepare).toHaveBeenCalled()
+  })
+
+  it('skips upsertPhase when activeJobRef.current is null', async () => {
+    const broadcast = vi.fn()
+    const mockDb = { prepare: vi.fn(() => ({ run: vi.fn(), get: vi.fn() })) } as any
+    const activeJobRef = { current: null }
+
+    const app = express()
+    app.use(express.json())
+    app.use('/hooks', createHooksRouter(broadcast, mockDb, activeJobRef))
+
+    const { default: request } = await import('supertest')
+    await request(app)
+      .post('/hooks/events')
+      .send({ event: 'agent_start', agent: 'developer' })
+
+    expect(mockDb.prepare).not.toHaveBeenCalled()
   })
 })

@@ -744,4 +744,166 @@ describe('project-router', () => {
       expect(res.body.content).toBe('# Design')
     })
   })
+
+  // ─── Trends endpoint ────────────────────────────────────────────────────────
+
+  describe('GET /:projectId/trends', () => {
+    it('returns 400 for invalid period', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/trends?period=invalid')
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('Invalid period')
+    })
+
+    it('returns trends data for valid period 7d', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/trends?period=7d')
+      expect(res.status).toBe(200)
+    })
+
+    it('uses 7d as default period', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/trends')
+      expect(res.status).toBe(200)
+    })
+
+    it('accepts 1d and 30d periods', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      expect((await request(app).get('/api/projects/proj-1/trends?period=1d')).status).toBe(200)
+      expect((await request(app).get('/api/projects/proj-1/trends?period=30d')).status).toBe(200)
+    })
+  })
+
+  // ─── Config routes ──────────────────────────────────────────────────────────
+
+  describe('GET /:projectId/config', () => {
+    it('returns config object with project, issueTracker, commands', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/config')
+      expect(res.status).toBe(200)
+      expect(res.body).toHaveProperty('project')
+      expect(res.body).toHaveProperty('issueTracker')
+      expect(res.body).toHaveProperty('commands')
+    })
+  })
+
+  describe('POST /:projectId/config', () => {
+    it('persists active tracker', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/config')
+        .send({ active: 'github' })
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+    })
+
+    it('persists label filter', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/config')
+        .send({ labelFilter: 'bug' })
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+    })
+
+    it('accepts empty body without error', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).post('/api/projects/proj-1/config').send({})
+      expect(res.status).toBe(200)
+    })
+  })
+
+  // ─── Issues endpoint ────────────────────────────────────────────────────────
+
+  describe('GET /:projectId/issues', () => {
+    it('returns 503 or 200 depending on tracker availability', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/issues')
+      expect([200, 503]).toContain(res.status)
+    })
+  })
+
+  // ─── GET /stats ─────────────────────────────────────────────────────────────
+
+  describe('GET /:projectId/stats', () => {
+    it('returns stats object', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/stats')
+      expect(res.status).toBe(200)
+    })
+  })
+
+  // ─── DELETE /jobs (purge) ────────────────────────────────────────────────────
+
+  describe('DELETE /:projectId/jobs', () => {
+    it('returns ok with deleted count', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).delete('/api/projects/proj-1/jobs').send({})
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+      expect(typeof res.body.deleted).toBe('number')
+    })
+  })
+
+  // ─── Full conversation lifecycle ─────────────────────────────────────────────
+
+  describe('full conversation lifecycle', () => {
+    it('creates, reads, updates, and deletes a conversation', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+
+      // Create
+      const createRes = await request(app)
+        .post('/api/projects/proj-1/chat/conversations')
+        .send({ model: 'claude-sonnet-4-5' })
+      expect(createRes.status).toBe(201)
+      const convId = createRes.body.conversation.id
+
+      // Read
+      const getRes = await request(app).get(`/api/projects/proj-1/chat/conversations/${convId}`)
+      expect(getRes.status).toBe(200)
+      expect(getRes.body.conversation.id).toBe(convId)
+
+      // Get messages
+      const msgsRes = await request(app).get(`/api/projects/proj-1/chat/conversations/${convId}/messages`)
+      expect(msgsRes.status).toBe(200)
+      expect(Array.isArray(msgsRes.body.messages)).toBe(true)
+
+      // Update
+      const patchRes = await request(app)
+        .patch(`/api/projects/proj-1/chat/conversations/${convId}`)
+        .send({ title: 'Updated Title' })
+      expect(patchRes.status).toBe(200)
+      expect(patchRes.body.ok).toBe(true)
+
+      // Delete
+      const deleteRes = await request(app).delete(`/api/projects/proj-1/chat/conversations/${convId}`)
+      expect(deleteRes.status).toBe(200)
+      expect(deleteRes.body.ok).toBe(true)
+
+      // Verify deleted
+      const afterDelete = await request(app).get(`/api/projects/proj-1/chat/conversations/${convId}`)
+      expect(afterDelete.status).toBe(404)
+    })
+
+    it('returns 404 for DELETE /conversations/:id/messages/stream when no active stream', async () => {
+      const chatManager = makeChatManager({ isActive: vi.fn(() => false) })
+      const ctx = makeContext(db, { chatManager: chatManager as any })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .delete('/api/projects/proj-1/chat/conversations/some-id/messages/stream')
+      expect(res.status).toBe(404)
+    })
+  })
 })

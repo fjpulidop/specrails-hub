@@ -155,6 +155,108 @@ describe('getConfig', () => {
 
     expect(config.issueTracker.active).toBe('github')
   })
+
+  it('uses hub mode when .claude directory exists at cwd', () => {
+    existsSyncSpy.mockImplementation((p: unknown) => String(p).endsWith('.claude'))
+    readdirSyncSpy.mockReturnValue([])
+
+    const config = getConfig('/my/project', undefined, 'MyProject')
+
+    expect(config.project.name).toBe('MyProject')
+  })
+
+  it('accepts custom projectName parameter', () => {
+    const config = getConfig('/some/project/specrails/web-manager', undefined, 'CustomName')
+
+    expect(config.project.name).toBe('CustomName')
+  })
+})
+
+describe('getConfig with db parameter', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockExecSync.mockReturnValue(Buffer.from(''))
+    existsSyncSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(false)
+    readdirSyncSpy = vi.spyOn(fs, 'readdirSync').mockReturnValue([])
+    readFileSyncSpy = vi.spyOn(fs, 'readFileSync').mockReturnValue('')
+  })
+
+  afterEach(() => {
+    existsSyncSpy.mockRestore()
+    readdirSyncSpy.mockRestore()
+    readFileSyncSpy.mockRestore()
+  })
+
+  it('uses persisted active tracker from db', () => {
+    const mockDb = {
+      prepare: vi.fn((sql: string) => ({
+        get: vi.fn(() => {
+          if (sql.includes('active_tracker')) return { value: 'jira' }
+          if (sql.includes('label_filter')) return { value: 'my-label' }
+          return undefined
+        }),
+      })),
+    }
+
+    const config = getConfig('/some/project/specrails/web-manager', mockDb)
+
+    expect(config.issueTracker.active).toBe('jira')
+    expect(config.issueTracker.labelFilter).toBe('my-label')
+  })
+
+  it('uses persisted labelFilter from db when active_tracker is null', () => {
+    const mockDb = {
+      prepare: vi.fn((sql: string) => ({
+        get: vi.fn(() => {
+          if (sql.includes('label_filter')) return { value: 'bug' }
+          return undefined
+        }),
+      })),
+    }
+
+    const config = getConfig('/some/project/specrails/web-manager', mockDb)
+
+    expect(config.issueTracker.labelFilter).toBe('bug')
+  })
+
+  it('falls back gracefully when db.prepare throws', () => {
+    const mockDb = {
+      prepare: vi.fn(() => { throw new Error('DB error') }),
+    }
+
+    const config = getConfig('/some/project/specrails/web-manager', mockDb)
+
+    expect(config.issueTracker.active).toBeNull()
+    expect(config.issueTracker.labelFilter).toBe('')
+  })
+})
+
+describe('getConfig with phases in command frontmatter', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockExecSync.mockReturnValue(Buffer.from(''))
+    existsSyncSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(true)
+    readdirSyncSpy = vi.spyOn(fs, 'readdirSync').mockReturnValue(['implement.md'] as unknown as fs.Dirent[])
+    readFileSyncSpy = vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      `---\nname: Implement\ndescription: Run implementation\nphases:\n  - key: architect\n    label: Architect\n    description: Plan the work\n  - key: developer\n    label: Developer\n    description: Build the feature\n---\n# Content`
+    )
+  })
+
+  afterEach(() => {
+    existsSyncSpy.mockRestore()
+    readdirSyncSpy.mockRestore()
+    readFileSyncSpy.mockRestore()
+  })
+
+  it('parses phases from command frontmatter', () => {
+    const config = getConfig('/some/project/specrails/web-manager')
+
+    expect(config.commands).toHaveLength(1)
+    expect(config.commands[0].phases).toHaveLength(2)
+    expect(config.commands[0].phases[0].key).toBe('architect')
+    expect(config.commands[0].phases[0].label).toBe('Architect')
+    expect(config.commands[0].phases[1].key).toBe('developer')
+  })
 })
 
 describe('fetchIssues', () => {
@@ -184,6 +286,48 @@ describe('fetchIssues', () => {
     const issues = fetchIssues('github', {})
 
     expect(issues).toEqual([])
+  })
+
+  it('passes repo and label args to gh command', () => {
+    mockExecSync.mockReturnValue(Buffer.from('[]'))
+
+    fetchIssues('github', { repo: 'owner/repo', label: 'bug', search: 'auth' })
+
+    const callArgs = mockExecSync.mock.calls[0][0]
+    expect(callArgs).toContain('--repo owner/repo')
+    expect(callArgs).toContain('--label bug')
+    expect(callArgs).toContain('--search auth')
+  })
+
+  it('returns issues from jira tracker', () => {
+    const jiraOutput = `KEY\tSUMMARY\tLABELS\tSTATUS\nPROJ-1\tFix auth bug\tbug,urgent\tOpen\nPROJ-2\tAdd dashboard\t\tIn Progress`
+    mockExecSync.mockReturnValue(Buffer.from(jiraOutput))
+
+    const issues = fetchIssues('jira', {})
+
+    expect(issues).toHaveLength(2)
+    expect(issues[0].title).toBe('Fix auth bug')
+    expect(issues[0].labels).toEqual(['bug', 'urgent'])
+    expect(issues[1].title).toBe('Add dashboard')
+    expect(issues[1].labels).toEqual([])
+  })
+
+  it('returns empty array when jira command fails', () => {
+    mockExecSync.mockImplementation(() => { throw new Error('jira not found') })
+
+    const issues = fetchIssues('jira', {})
+
+    expect(issues).toEqual([])
+  })
+
+  it('passes search query to jira command', () => {
+    mockExecSync.mockReturnValue(Buffer.from('KEY\tSUMMARY\tLABELS\tSTATUS'))
+
+    fetchIssues('jira', { search: 'auth' })
+
+    const callArgs = mockExecSync.mock.calls[0][0]
+    expect(callArgs).toContain('--jql')
+    expect(callArgs).toContain('auth')
   })
 
   it('returns empty array for unsupported tracker', () => {
