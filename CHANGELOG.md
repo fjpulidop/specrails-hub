@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/fjpulidop/specrails-hub/compare/v1.4.1...v1.5.0) (2026-03-20)
+
+
+### Features
+
+* **ux:** unsaved changes guard, tooltips, WS reconnect feedback, pagination (SPEA-110) ([#34](https://github.com/fjpulidop/specrails-hub/issues/34)) ([35afc75](https://github.com/fjpulidop/specrails-hub/commit/35afc75e32287591db394a2dc07e7c2444e7d106))
+
 ## [1.4.1](https://github.com/fjpulidop/specrails-hub/compare/v1.4.0...v1.4.1) (2026-03-20)
 
 
