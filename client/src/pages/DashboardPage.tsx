@@ -22,7 +22,7 @@ export default function DashboardPage() {
   const { recentJobs } = usePipeline(activeProjectId)
   const [wizardOpen, setWizardOpen] = useState<string | null>(null)
 
-  const { data: commands } = useProjectCache<CommandInfo[]>({
+  const { data: commands, isFirstLoad: isLoadingCommands } = useProjectCache<CommandInfo[]>({
     namespace: 'commands',
     projectId: activeProjectId,
     initialValue: [],
@@ -114,10 +114,18 @@ export default function DashboardPage() {
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
           Commands
         </h2>
-        <CommandGrid
-          commands={commands}
-          onOpenWizard={(slug) => setWizardOpen(slug)}
-        />
+        {isLoadingCommands ? (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-16 rounded-lg border border-border/40 bg-card/50 animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <CommandGrid
+            commands={commands}
+            onOpenWizard={(slug) => setWizardOpen(slug)}
+          />
+        )}
       </section>
 
       <section>
