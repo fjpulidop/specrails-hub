@@ -8,3 +8,4 @@ data/
 # specrails installer (one-time setup tool, not part of the project)
 specrails/
 .claude/worktrees/
+coverage/
