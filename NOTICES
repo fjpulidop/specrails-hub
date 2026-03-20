@@ -1,0 +1,140 @@
+NOTICES — Third-Party Software Attributions
+===========================================
+
+This product (specrails-hub) is licensed under the MIT License.
+See LICENSE for full terms.
+
+This file contains required attribution notices for third-party software
+components used in specrails-hub. These notices are required by the respective
+licenses of each component.
+
+For the full Software Bill of Materials (SBOM), see the specrails-tech repo at:
+docs/compliance/sbom.json
+
+---
+
+## 1. highlight.js
+
+**License:** BSD-3-Clause
+**Used in:** specrails-hub/client (runtime bundle)
+**Version:** ^11.11.1
+
+Copyright (c) 2006, Ivan Sagalaev
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+---
+
+## 2. qs
+
+**License:** BSD-3-Clause
+**Used in:** specrails-hub server (runtime — transitive via express)
+**Version:** ^6.14.2
+
+Copyright (c) 2014 Nathan LaFreniere and other contributors
+All rights reserved.
+
+[BSD-3-Clause terms as stated in section 1 apply]
+
+---
+
+## 3. ieee754
+
+**License:** BSD-3-Clause
+**Used in:** specrails-hub server (runtime — transitive)
+**Version:** ^1.2.1
+
+Copyright (c) 2008, Fair Oaks Labs, Inc.
+All rights reserved.
+
+[BSD-3-Clause terms as stated in section 1 apply]
+
+---
+
+## 4. react-transition-group
+
+**License:** BSD-3-Clause
+**Used in:** specrails-hub/client (runtime — transitive via recharts)
+**Version:** ^4.4.5
+
+Copyright (c) 2018, React Community
+Portions Copyright (c) 2013-present, Facebook, Inc.
+
+[BSD-3-Clause terms as stated in section 1 apply]
+
+---
+
+## 5. d3-ease
+
+**License:** BSD-3-Clause
+**Used in:** specrails-hub/client (runtime — transitive via recharts)
+**Version:** ^3.0.1
+
+Copyright 2010-2021 Mike Bostock
+
+[BSD-3-Clause terms as stated in section 1 apply]
+
+---
+
+## 6. class-variance-authority
+
+**License:** Apache-2.0
+**Used in:** specrails-hub/client (runtime)
+**Version:** ^0.7.1
+
+Copyright (c) 2022 Joe Bell
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+---
+
+## 7. Additional Permissive Licenses
+
+The following license types appear in the dependency tree and require no
+special attribution beyond this notice:
+
+- **MIT**: The majority of dependencies. Standard copyright and permission
+  notice included in each package's own LICENSE file.
+- **ISC**: Functionally equivalent to MIT for attribution purposes.
+- **0BSD / MIT-0**: No attribution requirements.
+- **BlueOak-1.0.0**: Permissive, OSI-approved. No attribution requirements
+  beyond preservation in source.
+
+---
+
+*Generated: 2026-03-20*
+*Auditor: Legal Counsel (SPEA-397)*
+*SBOM: specrails-tech/docs/compliance/sbom.json*
