@@ -6,6 +6,7 @@ import { X, ExternalLink } from 'lucide-react'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
 import { PipelineProgress } from './PipelineProgress'
 import { LogViewer } from './LogViewer'
 import { useWebSocket } from '../hooks/useWebSocket'
@@ -18,7 +19,7 @@ type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'succe
 const STATUS_BADGE: Record<string, { variant: BadgeVariant; label: string; tooltip: string }> = {
   running: { variant: 'running', label: 'running', tooltip: 'Job is actively executing' },
   completed: { variant: 'success', label: 'completed', tooltip: 'Job completed successfully' },
-  failed: { variant: 'failed', label: 'failed', tooltip: 'Job exited with a non-zero code' },
+  failed: { variant: 'failed', label: 'failed', tooltip: 'Job exited with a non-zero exit code' },
   canceled: { variant: 'canceled', label: 'canceled', tooltip: 'Job was manually canceled' },
   queued: { variant: 'queued', label: 'queued', tooltip: 'Job is waiting in the queue' },
 }
@@ -35,6 +36,7 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
   const [phases, setPhases] = useState<PhaseMap>({})
   const [isLoading, setIsLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
   // Fetch initial job data + historical events
   useEffect(() => {
@@ -186,7 +188,7 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleCancel}
+                onClick={() => setShowCancelConfirm(true)}
                 className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
               >
                 Cancel
@@ -227,6 +229,30 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
           )}
         </div>
       </div>
+
+      {/* Cancel confirmation dialog */}
+      <Dialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Cancel job?</DialogTitle>
+            <DialogDescription>
+              The job will stop at the next safe point. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setShowCancelConfirm(false)}>
+              Keep running
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => { setShowCancelConfirm(false); handleCancel() }}
+            >
+              Cancel job
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
