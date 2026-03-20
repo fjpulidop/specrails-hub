@@ -1,3 +1,5 @@
+import fs from 'fs'
+import path from 'path'
 import type { ProjectRegistry } from './project-registry'
 import type { AnalyticsOpts } from './types'
 import type { DbInstance } from './db'
@@ -288,6 +290,152 @@ export function searchHubContent(registry: ProjectRegistry, query: string): HubS
 export interface HubTodayStats {
   costToday: number
   jobsToday: number
+}
+
+// ─── Hub projects overview ────────────────────────────────────────────────────
+
+export interface HubProjectOverview {
+  projectId: string
+  projectName: string
+  healthScore: number
+  activeJobs: number
+  jobsToday: number
+  lastRunAt: string | null
+  lastRunStatus: string | null
+  lastRunCommand: string | null
+  coveragePct: number | null
+}
+
+export interface HubOverviewResponse {
+  projects: HubProjectOverview[]
+  aggregated: {
+    totalCount: number
+    healthyCount: number
+    warningCount: number
+    criticalCount: number
+    jobsToday: number
+    activeJobs: number
+  }
+  recentJobs: HubRecentJob[]
+}
+
+function readCoveragePct(projectPath: string): number | null {
+  const candidates = [
+    path.join(projectPath, 'coverage', 'coverage-summary.json'),
+    path.join(projectPath, 'coverage', 'coverage-final.json'),
+  ]
+  for (const filePath of candidates) {
+    if (!fs.existsSync(filePath)) continue
+    try {
+      const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Record<string, { lines?: { pct: number } }>
+      return raw['total']?.lines?.pct ?? null
+    } catch { /* try next */ }
+  }
+  return null
+}
+
+function computeProjectHealthScore(
+  coveragePct: number | null,
+  lastJobStatus: string | null,
+  hasRecentJob: boolean
+): number {
+  let score = 0
+  if (coveragePct !== null) score += 15
+  if (coveragePct !== null && coveragePct >= 70) score += 25
+  if (lastJobStatus === 'completed') score += 40
+  if (hasRecentJob) score += 20
+  return Math.min(100, score)
+}
+
+function getProjectOverview(
+  projectId: string,
+  projectName: string,
+  projectPath: string,
+  db: DbInstance
+): HubProjectOverview {
+  const today = new Date().toISOString().slice(0, 10)
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString()
+
+  const activeRow = db.prepare(
+    `SELECT COUNT(*) as count FROM jobs WHERE status IN ('running', 'queued')`
+  ).get() as { count: number }
+
+  const todayRow = db.prepare(
+    `SELECT COUNT(*) as count FROM jobs WHERE started_at >= ? AND started_at < ?`
+  ).get(today, tomorrow) as { count: number }
+
+  const lastJobRow = db.prepare(
+    `SELECT status, command, finished_at FROM jobs
+     WHERE status IN ('completed','failed','canceled','zombie_terminated')
+     ORDER BY finished_at DESC LIMIT 1`
+  ).get() as { status: string; command: string; finished_at: string } | undefined
+
+  const recentJobRow = db.prepare(
+    `SELECT id FROM jobs WHERE started_at >= ? LIMIT 1`
+  ).get(sevenDaysAgo) as { id: string } | undefined
+
+  const coveragePct = readCoveragePct(projectPath)
+  const healthScore = computeProjectHealthScore(
+    coveragePct,
+    lastJobRow?.status ?? null,
+    !!recentJobRow
+  )
+
+  return {
+    projectId,
+    projectName,
+    healthScore,
+    activeJobs: activeRow.count,
+    jobsToday: todayRow.count,
+    lastRunAt: lastJobRow?.finished_at ?? null,
+    lastRunStatus: lastJobRow?.status ?? null,
+    lastRunCommand: lastJobRow?.command ?? null,
+    coveragePct,
+  }
+}
+
+export function getHubOverview(registry: ProjectRegistry, recentLimit = 15): HubOverviewResponse {
+  const projects: HubProjectOverview[] = []
+  let totalActiveJobs = 0
+  let totalJobsToday = 0
+
+  for (const ctx of registry.listContexts()) {
+    const overview = getProjectOverview(
+      ctx.project.id,
+      ctx.project.name,
+      ctx.project.path,
+      ctx.db
+    )
+    projects.push(overview)
+    totalActiveJobs += overview.activeJobs
+    totalJobsToday += overview.jobsToday
+  }
+
+  const healthyCount = projects.filter((p) => p.healthScore >= 60).length
+  const warningCount = projects.filter((p) => p.healthScore >= 30 && p.healthScore < 60).length
+  const criticalCount = projects.filter((p) => p.healthScore < 30).length
+
+  // Sort by most active/problematic first
+  projects.sort((a, b) => {
+    // Active jobs first
+    if (b.activeJobs !== a.activeJobs) return b.activeJobs - a.activeJobs
+    // Then by health score ascending (most problematic first)
+    return a.healthScore - b.healthScore
+  })
+
+  return {
+    projects,
+    aggregated: {
+      totalCount: projects.length,
+      healthyCount,
+      warningCount,
+      criticalCount,
+      jobsToday: totalJobsToday,
+      activeJobs: totalActiveJobs,
+    },
+    recentJobs: getHubRecentJobs(registry, recentLimit),
+  }
 }
 
 export function getHubTodayStats(registry: ProjectRegistry): HubTodayStats {

@@ -1,43 +1,34 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Search, Activity, Layers, DollarSign, CheckCircle, X } from 'lucide-react'
+import { Search, Activity, Layers, CheckCircle, AlertTriangle, XCircle, Clock, X, Zap } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
-import type { HubAnalyticsResponse, HubRecentJob, HubSearchResponse } from '../types'
+import type { HubOverviewResponse, HubProjectOverview, HubRecentJob, HubSearchResponse } from '../types'
 import { STATUS_COLORS } from '../lib/dracula-colors'
 import { useHub } from '../hooks/useHub'
 
-// ─── Global Stats ─────────────────────────────────────────────────────────────
+// ─── Aggregated Stats Bar ─────────────────────────────────────────────────────
 
-interface OverviewStats {
-  projectCount: number
-  totalJobs: number
-  totalCostUsd: number
-  activeJobs: number
-  successRate: number
-}
-
-function StatsGrid({ stats }: { stats: OverviewStats }) {
+function AggregatedStats({ data }: { data: HubOverviewResponse['aggregated'] }) {
   const cards = [
     {
       icon: <Layers className="w-4 h-4" />,
       label: 'Projects',
-      value: stats.projectCount.toString(),
+      value: data.totalCount.toString(),
+    },
+    {
+      icon: <Zap className="w-4 h-4 text-[#f1fa8c]" />,
+      label: 'Active Jobs',
+      value: data.activeJobs.toString(),
     },
     {
       icon: <Activity className="w-4 h-4" />,
-      label: 'Total Jobs',
-      value: stats.totalJobs.toLocaleString(),
-      sub: `${stats.activeJobs} active`,
+      label: 'Jobs Today',
+      value: data.jobsToday.toString(),
     },
     {
-      icon: <DollarSign className="w-4 h-4" />,
-      label: 'Total Cost',
-      value: `$${stats.totalCostUsd.toFixed(4)}`,
-    },
-    {
-      icon: <CheckCircle className="w-4 h-4" />,
-      label: 'Success Rate',
-      value: `${(stats.successRate * 100).toFixed(1)}%`,
-      sub: 'all time',
+      icon: <CheckCircle className="w-4 h-4 text-[#50fa7b]" />,
+      label: 'Healthy',
+      value: data.healthyCount.toString(),
+      sub: `${data.warningCount} warning · ${data.criticalCount} critical`,
     },
   ]
 
@@ -57,12 +48,137 @@ function StatsGrid({ stats }: { stats: OverviewStats }) {
   )
 }
 
-// ─── Recent Activity ──────────────────────────────────────────────────────────
+// ─── Health indicator ─────────────────────────────────────────────────────────
+
+function HealthBadge({ score }: { score: number }) {
+  if (score >= 60) {
+    return (
+      <span className="flex items-center gap-1 text-[#50fa7b] text-xs font-medium">
+        <CheckCircle className="w-3 h-3" />
+        {score}
+      </span>
+    )
+  }
+  if (score >= 30) {
+    return (
+      <span className="flex items-center gap-1 text-[#f1fa8c] text-xs font-medium">
+        <AlertTriangle className="w-3 h-3" />
+        {score}
+      </span>
+    )
+  }
+  return (
+    <span className="flex items-center gap-1 text-[#ff5555] text-xs font-medium">
+      <XCircle className="w-3 h-3" />
+      {score}
+    </span>
+  )
+}
 
 function statusDot(status: string) {
   const color = STATUS_COLORS[status] ?? 'hsl(225 27% 51%)'
   return <span className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
 }
+
+function timeAgo(iso: string): string {
+  try {
+    return formatDistanceToNow(new Date(iso), { addSuffix: true })
+  } catch {
+    return iso
+  }
+}
+
+// ─── Project Cards Grid ───────────────────────────────────────────────────────
+
+function ProjectCard({ project, onSwitch }: { project: HubProjectOverview; onSwitch: () => void }) {
+  const healthColor = project.healthScore >= 60
+    ? 'border-l-[#50fa7b]/60'
+    : project.healthScore >= 30
+      ? 'border-l-[#f1fa8c]/60'
+      : 'border-l-[#ff5555]/60'
+
+  return (
+    <button
+      type="button"
+      onClick={onSwitch}
+      className={`w-full text-left rounded-lg border border-border/40 border-l-2 ${healthColor} bg-card/50 p-4 hover:bg-card/80 transition-colors group`}
+    >
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <p className="text-sm font-medium truncate group-hover:text-foreground transition-colors">
+          {project.projectName}
+        </p>
+        <HealthBadge score={project.healthScore} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <Activity className="w-3 h-3 flex-shrink-0" />
+          <span>{project.activeJobs > 0 ? (
+            <span className="text-[#f1fa8c]">{project.activeJobs} running</span>
+          ) : (
+            'idle'
+          )}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Zap className="w-3 h-3 flex-shrink-0" />
+          <span>{project.jobsToday} today</span>
+        </div>
+        {project.coveragePct !== null && (
+          <div className="flex items-center gap-1.5 col-span-2">
+            <span className="text-muted-foreground/60">cov</span>
+            <div className="flex-1 h-1 rounded-full bg-border/30 overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${Math.min(100, project.coveragePct)}%`,
+                  backgroundColor: project.coveragePct >= 70 ? '#50fa7b' : project.coveragePct >= 50 ? '#f1fa8c' : '#ff5555',
+                }}
+              />
+            </div>
+            <span className="font-mono text-foreground/70">{project.coveragePct.toFixed(0)}%</span>
+          </div>
+        )}
+      </div>
+
+      {project.lastRunAt && (
+        <div className="mt-3 pt-2.5 border-t border-border/20 flex items-center gap-1.5 text-xs text-muted-foreground">
+          {project.lastRunStatus && statusDot(project.lastRunStatus)}
+          <span className="truncate font-mono text-[10px]">{project.lastRunCommand}</span>
+          <span className="flex-shrink-0 flex items-center gap-0.5 ml-auto">
+            <Clock className="w-2.5 h-2.5" />
+            {timeAgo(project.lastRunAt)}
+          </span>
+        </div>
+      )}
+    </button>
+  )
+}
+
+function ProjectsGrid({
+  projects,
+  onSwitchProject,
+}: {
+  projects: HubProjectOverview[]
+  onSwitchProject: (projectId: string) => void
+}) {
+  if (projects.length === 0) {
+    return (
+      <div className="rounded-lg border border-border/40 bg-card/50 p-6 text-center">
+        <p className="text-xs text-muted-foreground">No projects registered yet.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {projects.map((p) => (
+        <ProjectCard key={p.projectId} project={p} onSwitch={() => onSwitchProject(p.projectId)} />
+      ))}
+    </div>
+  )
+}
+
+// ─── Recent Activity Feed ─────────────────────────────────────────────────────
 
 function RecentActivity({ jobs }: { jobs: HubRecentJob[] }) {
   if (jobs.length === 0) {
@@ -88,7 +204,7 @@ function RecentActivity({ jobs }: { jobs: HubRecentJob[] }) {
               {job.command}
             </span>
             <span className="text-muted-foreground flex-shrink-0">
-              {formatDistanceToNow(new Date(job.started_at), { addSuffix: true })}
+              {timeAgo(job.started_at)}
             </span>
           </div>
         ))}
@@ -184,9 +300,8 @@ function SearchResults({ results, onClear }: { results: HubSearchResponse; onCle
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function HubOverviewPage() {
-  const { projects } = useHub()
-  const [stats, setStats] = useState<OverviewStats | null>(null)
-  const [recentJobs, setRecentJobs] = useState<HubRecentJob[]>([])
+  const { projects, setActiveProjectId } = useHub()
+  const [overview, setOverview] = useState<HubOverviewResponse | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<HubSearchResponse | null>(null)
   const [searching, setSearching] = useState(false)
@@ -196,29 +311,14 @@ export default function HubOverviewPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [analyticsRes, recentRes] = await Promise.all([
-        fetch('/api/hub/analytics?period=all'),
-        fetch('/api/hub/recent-jobs?limit=10'),
-      ])
-
-      if (analyticsRes.ok) {
-        const analytics = await analyticsRes.json() as HubAnalyticsResponse
-        // Compute activeJobs from recentJobs data
-        const recentData = recentRes.ok ? (await recentRes.json() as { jobs: HubRecentJob[] }) : { jobs: [] }
-        const activeJobs = recentData.jobs.filter((j) => j.status === 'running' || j.status === 'queued').length
-        setStats({
-          projectCount: projects.length,
-          totalJobs: analytics.kpi.totalJobs,
-          totalCostUsd: analytics.kpi.totalCostUsd,
-          activeJobs,
-          successRate: analytics.kpi.successRate,
-        })
-        setRecentJobs(recentData.jobs)
+      const res = await fetch('/api/hub/overview')
+      if (res.ok) {
+        setOverview(await res.json() as HubOverviewResponse)
       }
     } finally {
       setLoading(false)
     }
-  }, [projects.length])
+  }, [])
 
   useEffect(() => {
     void load()
@@ -255,6 +355,13 @@ export default function HubOverviewPage() {
     setSearchResults(null)
   }
 
+  function handleSwitchProject(projectId: string) {
+    const project = projects.find((p) => p.id === projectId)
+    if (project) {
+      setActiveProjectId(projectId)
+    }
+  }
+
   return (
     <div className="flex flex-col h-full overflow-auto bg-background">
       <div className="p-4 space-y-4">
@@ -284,7 +391,7 @@ export default function HubOverviewPage() {
           <SearchResults results={searchResults} onClear={handleClearSearch} />
         ) : (
           <>
-            {/* Stats skeleton */}
+            {/* Aggregated stats skeleton */}
             {loading && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {Array.from({ length: 4 }).map((_, i) => (
@@ -292,17 +399,28 @@ export default function HubOverviewPage() {
                 ))}
               </div>
             )}
+            {!loading && overview && <AggregatedStats data={overview.aggregated} />}
 
-            {/* Stats */}
-            {!loading && stats && <StatsGrid stats={stats} />}
+            {/* Project cards skeleton */}
+            {loading && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {Array.from({ length: Math.max(2, projects.length) }).map((_, i) => (
+                  <div key={i} className="h-[120px] rounded-lg border border-border/40 bg-card/50 animate-pulse" />
+                ))}
+              </div>
+            )}
+            {!loading && overview && (
+              <ProjectsGrid
+                projects={overview.projects}
+                onSwitchProject={handleSwitchProject}
+              />
+            )}
 
             {/* Recent activity skeleton */}
             {loading && (
               <div className="h-[180px] rounded-lg border border-border/40 bg-card/50 animate-pulse" />
             )}
-
-            {/* Recent activity */}
-            {!loading && <RecentActivity jobs={recentJobs} />}
+            {!loading && overview && <RecentActivity jobs={overview.recentJobs} />}
           </>
         )}
       </div>
