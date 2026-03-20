@@ -539,10 +539,11 @@ export function getStats(db: DbInstance): StatsRow {
   const totalRow = db.prepare(`
     SELECT
       COUNT(*) as totalJobs,
+      SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failedJobs,
       SUM(total_cost_usd) as totalCostUsd,
       AVG(duration_ms) as avgDurationMs
     FROM jobs
-  `).get() as { totalJobs: number; totalCostUsd: number | null; avgDurationMs: number | null }
+  `).get() as { totalJobs: number; failedJobs: number; totalCostUsd: number | null; avgDurationMs: number | null }
 
   const todayRow = db.prepare(`
     SELECT
@@ -554,6 +555,7 @@ export function getStats(db: DbInstance): StatsRow {
 
   return {
     totalJobs: totalRow.totalJobs,
+    failedJobs: totalRow.failedJobs ?? 0,
     jobsToday: todayRow.jobsToday,
     totalCostUsd: totalRow.totalCostUsd ?? 0,
     costToday: todayRow.costToday ?? 0,

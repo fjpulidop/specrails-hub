@@ -93,9 +93,7 @@ export class ChatManager {
 
       const successRate =
         stats.totalJobs > 0
-          ? Math.round(
-              ((stats.totalJobs - (recentJobs.filter((j) => j.status === 'failed').length)) / stats.totalJobs) * 100
-            )
+          ? Math.round(((stats.totalJobs - stats.failedJobs) / stats.totalJobs) * 100)
           : null
 
       contextSection =

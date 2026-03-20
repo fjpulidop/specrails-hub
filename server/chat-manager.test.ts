@@ -332,6 +332,38 @@ describe('ChatManager', () => {
       expect(systemPrompt).toContain('/sr:implement #42')
     })
 
+    it('success rate uses all-time failedJobs count, not just recent jobs', async () => {
+      // Create 10 jobs: 8 completed, 2 failed (historical)
+      for (let i = 1; i <= 8; i++) {
+        createJob(db, { id: `job-sr-ok-${i}`, command: `/sr:implement #${i}`, started_at: new Date().toISOString() })
+        finishJob(db, `job-sr-ok-${i}`, { exit_code: 0, status: 'completed', total_cost_usd: 0.01, duration_ms: 5000 })
+      }
+      for (let i = 1; i <= 2; i++) {
+        createJob(db, { id: `job-sr-fail-${i}`, command: `/sr:implement #fail-${i}`, started_at: new Date().toISOString() })
+        finishJob(db, `job-sr-fail-${i}`, { exit_code: 1, status: 'failed', total_cost_usd: 0, duration_ms: 1000 })
+      }
+
+      const cmSr = new ChatManager(broadcast, db, undefined, 'sr-project')
+      createConversation(db, { id: 'conv-sr-rate', model: 'claude-sonnet-4-5' })
+      const child = createMockChildProcess()
+      const titleChild = createMockChildProcess()
+      vi.mocked(mockSpawn)
+        .mockReturnValueOnce(child as any)
+        .mockReturnValueOnce(titleChild as any)
+
+      const sendPromise = cmSr.sendMessage('conv-sr-rate', 'What is the success rate?')
+      pushLine(child, assistantEvent('80% success rate.'))
+      pushLine(child, resultEvent('sess-sr-rate'))
+      await finishProcess(child, 0)
+      await sendPromise
+
+      const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      const sysPromptIdx = spawnArgs.indexOf('--system-prompt')
+      const systemPrompt = spawnArgs[sysPromptIdx + 1]
+      // 8 out of 10 = 80%
+      expect(systemPrompt).toContain('success rate: 80%')
+    })
+
     it('system prompt still works gracefully when DB is empty', async () => {
       const cmEmpty = new ChatManager(broadcast, db, undefined, 'empty-project')
       createConversation(db, { id: 'conv-ctx-3', model: 'claude-sonnet-4-5' })

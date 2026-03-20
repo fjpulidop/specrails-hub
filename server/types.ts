@@ -67,6 +67,7 @@ export interface EventRow {
 
 export interface StatsRow {
   totalJobs: number
+  failedJobs: number
   jobsToday: number
   totalCostUsd: number
   costToday: number
