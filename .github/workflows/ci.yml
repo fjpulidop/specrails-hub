@@ -19,3 +19,5 @@ jobs:
       - run: cd client && npm ci
       - run: npm run typecheck
       - run: npm test
+      - name: Coverage report (informational — 80% threshold pending more tests)
+        run: npm run test:coverage || true
