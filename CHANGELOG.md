@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/fjpulidop/specrails-hub/compare/v1.8.0...v1.9.0) (2026-03-20)
+
+
+### Features
+
+* **queue:** zombie job detection and auto-termination ([#42](https://github.com/fjpulidop/specrails-hub/issues/42)) ([dbde0b4](https://github.com/fjpulidop/specrails-hub/commit/dbde0b4fc337337f0254ca128d848e4a2b56dd4c))
+
 ## [1.8.0](https://github.com/fjpulidop/specrails-hub/compare/v1.7.0...v1.8.0) (2026-03-20)
 
 
