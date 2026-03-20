@@ -31,42 +31,48 @@ vi.mock('./queue-manager', async () => {
   const JobAlreadyTerminalError = class extends Error {
     constructor() { super('Job is already in terminal state'); this.name = 'JobAlreadyTerminalError' }
   }
-  const QueueManager = vi.fn().mockImplementation(() => ({
-    enqueue: vi.fn(),
-    cancel: vi.fn(),
-    pause: vi.fn(),
-    resume: vi.fn(),
-    reorder: vi.fn(),
-    getJobs: vi.fn().mockReturnValue([]),
-    getActiveJobId: vi.fn().mockReturnValue(null),
-    isPaused: vi.fn().mockReturnValue(false),
-    getLogBuffer: vi.fn().mockReturnValue([]),
-    phasesForCommand: vi.fn().mockReturnValue([]),
-    setCommands: vi.fn(),
-  }))
+  const QueueManager = vi.fn(function () {
+    return {
+      enqueue: vi.fn(),
+      cancel: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
+      reorder: vi.fn(),
+      getJobs: vi.fn().mockReturnValue([]),
+      getActiveJobId: vi.fn().mockReturnValue(null),
+      isPaused: vi.fn().mockReturnValue(false),
+      getLogBuffer: vi.fn().mockReturnValue([]),
+      phasesForCommand: vi.fn().mockReturnValue([]),
+      setCommands: vi.fn(),
+    }
+  })
   return { QueueManager, ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError }
 })
 
 // Mock ChatManager
 vi.mock('./chat-manager', () => ({
-  ChatManager: vi.fn().mockImplementation(() => ({
-    isActive: vi.fn().mockReturnValue(false),
-    sendMessage: vi.fn(),
-    abort: vi.fn(),
-  })),
+  ChatManager: vi.fn(function () {
+    return {
+      isActive: vi.fn().mockReturnValue(false),
+      sendMessage: vi.fn(),
+      abort: vi.fn(),
+    }
+  }),
 }))
 
 // Mock SetupManager
 vi.mock('./setup-manager', () => ({
-  SetupManager: vi.fn().mockImplementation(() => ({
-    isInstalling: vi.fn().mockReturnValue(false),
-    isSettingUp: vi.fn().mockReturnValue(false),
-    startInstall: vi.fn(),
-    startSetup: vi.fn(),
-    resumeSetup: vi.fn(),
-    abort: vi.fn(),
-    getCheckpointStatus: vi.fn().mockReturnValue([]),
-  })),
+  SetupManager: vi.fn(function () {
+    return {
+      isInstalling: vi.fn().mockReturnValue(false),
+      isSettingUp: vi.fn().mockReturnValue(false),
+      startInstall: vi.fn(),
+      startSetup: vi.fn(),
+      resumeSetup: vi.fn(),
+      abort: vi.fn(),
+      getCheckpointStatus: vi.fn().mockReturnValue([]),
+    }
+  }),
 }))
 
 // Mock ProposalManager — will be the mock instance
@@ -79,7 +85,7 @@ let mockProposalManagerInstance: {
 }
 
 vi.mock('./proposal-manager', () => {
-  const ProposalManager = vi.fn().mockImplementation(() => {
+  const ProposalManager = vi.fn(function () {
     mockProposalManagerInstance = {
       isActive: vi.fn().mockReturnValue(false),
       startExploration: vi.fn().mockResolvedValue(undefined),

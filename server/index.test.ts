@@ -42,17 +42,20 @@ vi.mock('./queue-manager', async () => {
 
   // QueueManager is a class mock — each call to `new QueueManager()` returns a fresh
   // object with vi.fn() methods so tests can control behavior per-test.
-  const QueueManager = vi.fn().mockImplementation(() => ({
-    enqueue: vi.fn(),
-    cancel: vi.fn(),
-    pause: vi.fn(),
-    resume: vi.fn(),
-    reorder: vi.fn(),
-    getJobs: vi.fn().mockReturnValue([]),
-    getActiveJobId: vi.fn().mockReturnValue(null),
-    isPaused: vi.fn().mockReturnValue(false),
-    getLogBuffer: vi.fn().mockReturnValue([]),
-  }))
+  // Note: vitest 4.x requires function() or class (not arrow functions) with new.
+  const QueueManager = vi.fn(function () {
+    return {
+      enqueue: vi.fn(),
+      cancel: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
+      reorder: vi.fn(),
+      getJobs: vi.fn().mockReturnValue([]),
+      getActiveJobId: vi.fn().mockReturnValue(null),
+      isPaused: vi.fn().mockReturnValue(false),
+      getLogBuffer: vi.fn().mockReturnValue([]),
+    }
+  })
 
   return { QueueManager, ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError }
 })
