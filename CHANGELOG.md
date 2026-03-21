@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.1](https://github.com/fjpulidop/specrails-hub/compare/v1.11.0...v1.11.1) (2026-03-21)
+
+
+### Bug Fixes
+
+* **setup:** pass --root-dir to npx specrails-core init (SPEA-478) ([8da2f8b](https://github.com/fjpulidop/specrails-hub/commit/8da2f8bce3a682ab4cd68ef40ca3af0ce1035b19))
+
 ## [1.11.0](https://github.com/fjpulidop/specrails-hub/compare/v1.10.1...v1.11.0) (2026-03-21)
 
 
