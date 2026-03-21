@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/fjpulidop/specrails-hub/compare/v1.12.0...v1.13.0) (2026-03-21)
+
+
+### Features
+
+* UX improvements, CLI --version, and installer fix (SPEA-489/490/491/492/493/497/498) ([#89](https://github.com/fjpulidop/specrails-hub/issues/89)) ([45872eb](https://github.com/fjpulidop/specrails-hub/commit/45872ebecbfebc95cfbd11fbc2e4931f9873e859))
+
 ## [1.12.0](https://github.com/fjpulidop/specrails-hub/compare/v1.11.1...v1.12.0) (2026-03-21)
 
 
