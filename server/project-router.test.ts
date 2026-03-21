@@ -957,4 +957,367 @@ describe('project-router', () => {
       expect(res.status).toBe(404)
     })
   })
+
+  // ─── Config routes (dailyBudgetUsd) ──────────────────────────────────────────
+
+  describe('Config routes', () => {
+    describe('GET /:projectId/config', () => {
+      it('returns config with null dailyBudgetUsd when not set', async () => {
+        const ctx = makeContext(db)
+        const { app } = createApp(new Map([['proj-1', ctx]]))
+        const res = await request(app).get('/api/projects/proj-1/config')
+        expect(res.status).toBe(200)
+        expect(res.body.dailyBudgetUsd).toBeNull()
+      })
+
+      it('returns config with dailyBudgetUsd when set', async () => {
+        db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.daily_budget_usd', '25.5')`).run()
+        const ctx = makeContext(db)
+        const { app } = createApp(new Map([['proj-1', ctx]]))
+        const res = await request(app).get('/api/projects/proj-1/config')
+        expect(res.status).toBe(200)
+        expect(res.body.dailyBudgetUsd).toBe(25.5)
+      })
+    })
+
+    describe('POST /:projectId/config', () => {
+      it('sets dailyBudgetUsd', async () => {
+        const ctx = makeContext(db)
+        const { app } = createApp(new Map([['proj-1', ctx]]))
+        const res = await request(app)
+          .post('/api/projects/proj-1/config')
+          .send({ dailyBudgetUsd: 10.0 })
+        expect(res.status).toBe(200)
+        expect(res.body.ok).toBe(true)
+        const row = db.prepare(`SELECT value FROM queue_state WHERE key = 'config.daily_budget_usd'`).get() as { value: string }
+        expect(row.value).toBe('10')
+      })
+
+      it('clears dailyBudgetUsd when null', async () => {
+        db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.daily_budget_usd', '10')`).run()
+        const ctx = makeContext(db)
+        const { app } = createApp(new Map([['proj-1', ctx]]))
+        const res = await request(app)
+          .post('/api/projects/proj-1/config')
+          .send({ dailyBudgetUsd: null })
+        expect(res.status).toBe(200)
+        const row = db.prepare(`SELECT value FROM queue_state WHERE key = 'config.daily_budget_usd'`).get()
+        expect(row).toBeUndefined()
+      })
+
+      it('ignores dailyBudgetUsd when not a positive number', async () => {
+        const ctx = makeContext(db)
+        const { app } = createApp(new Map([['proj-1', ctx]]))
+        const res = await request(app)
+          .post('/api/projects/proj-1/config')
+          .send({ dailyBudgetUsd: -5 })
+        expect(res.status).toBe(200)
+        const row = db.prepare(`SELECT value FROM queue_state WHERE key = 'config.daily_budget_usd'`).get()
+        expect(row).toBeUndefined()
+      })
+
+      it('sets active and labelFilter together', async () => {
+        const ctx = makeContext(db)
+        const { app } = createApp(new Map([['proj-1', ctx]]))
+        const res = await request(app)
+          .post('/api/projects/proj-1/config')
+          .send({ active: 'tracker1', labelFilter: 'bug' })
+        expect(res.status).toBe(200)
+        expect(res.body.ok).toBe(true)
+      })
+    })
+  })
+
+  // ─── Spec Launcher routes ────────────────────────────────────────────────────
+
+  describe('Spec Launcher routes', () => {
+    it('POST /spec-launcher/start returns 400 without description', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/spec-launcher/start')
+        .send({})
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('description is required')
+    })
+
+    it('POST /spec-launcher/start returns 400 for empty string description', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/spec-launcher/start')
+        .send({ description: '   ' })
+      expect(res.status).toBe(400)
+    })
+
+    it('POST /spec-launcher/start returns 202 with valid description', async () => {
+      const launchFn = vi.fn(async () => {})
+      const ctx = makeContext(db, { specLauncherManager: makeSpecLauncherManager({ launch: launchFn }) as any })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/spec-launcher/start')
+        .send({ description: 'Add user auth' })
+      expect(res.status).toBe(202)
+      expect(res.body.launchId).toBeDefined()
+    })
+
+    it('DELETE /spec-launcher/:launchId returns 404 for unknown launch', async () => {
+      const ctx = makeContext(db, { specLauncherManager: makeSpecLauncherManager({ isActive: vi.fn(() => false) }) as any })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .delete('/api/projects/proj-1/spec-launcher/unknown-id')
+      expect(res.status).toBe(404)
+    })
+
+    it('DELETE /spec-launcher/:launchId cancels active launch', async () => {
+      const cancelFn = vi.fn()
+      const ctx = makeContext(db, { specLauncherManager: makeSpecLauncherManager({ isActive: vi.fn(() => true), cancel: cancelFn }) as any })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .delete('/api/projects/proj-1/spec-launcher/active-id')
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+      expect(cancelFn).toHaveBeenCalledWith('active-id')
+    })
+  })
+
+  // ─── Change Artifact Browser routes ──────────────────────────────────────────
+
+  describe('Change Artifact Browser', () => {
+    it('returns 400 for invalid artifact name', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/changes/chg-1/artifacts/malicious.js')
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('Invalid artifact')
+    })
+
+    it('returns 400 for path traversal in changeId', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/changes/chg%2F..%2F..%2Fetc/artifacts/proposal.md')
+      expect(res.status).toBe(400)
+    })
+
+    it('returns 404 when artifact file does not exist', async () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(false)
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/changes/chg-1/artifacts/proposal.md')
+      expect(res.status).toBe(404)
+      vi.restoreAllMocks()
+    })
+
+    it('falls back to archive dir when active dir has no artifact', async () => {
+      let callCount = 0
+      vi.spyOn(fs, 'existsSync').mockImplementation(() => {
+        callCount++
+        return callCount > 1 // first call (active) returns false, second (archive) returns true
+      })
+      vi.spyOn(fs, 'readFileSync').mockReturnValue('# Archived')
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/changes/chg-1/artifacts/design.md')
+      expect(res.status).toBe(200)
+      expect(res.body.content).toBe('# Archived')
+      vi.restoreAllMocks()
+    })
+
+    it('returns artifact content when file exists', async () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true)
+      vi.spyOn(fs, 'readFileSync').mockReturnValue('# Proposal Content')
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/changes/chg-1/artifacts/proposal.md')
+      expect(res.status).toBe(200)
+      expect(res.body.content).toBe('# Proposal Content')
+      expect(res.body.artifact).toBe('proposal.md')
+      vi.restoreAllMocks()
+    })
+  })
+
+  // ─── Template routes ─────────────────────────────────────────────────────────
+
+  describe('Template routes', () => {
+    it('GET /templates returns empty list initially', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/templates')
+      expect(res.status).toBe(200)
+      expect(res.body.templates).toEqual([])
+    })
+
+    it('POST /templates creates and returns a template', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'Deploy', commands: ['build', 'deploy'] })
+      expect(res.status).toBe(201)
+      expect(res.body.template.name).toBe('Deploy')
+      expect(res.body.template.commands).toEqual(['build', 'deploy'])
+    })
+
+    it('POST /templates returns 400 without name', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ commands: ['build'] })
+      expect(res.status).toBe(400)
+    })
+
+    it('POST /templates returns 400 with empty commands', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'Test', commands: [] })
+      expect(res.status).toBe(400)
+    })
+
+    it('POST /templates returns 400 with non-string command', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'Test', commands: [123] })
+      expect(res.status).toBe(400)
+    })
+
+    it('POST /templates returns 409 for duplicate name', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      await request(app).post('/api/projects/proj-1/templates').send({ name: 'Deploy', commands: ['build'] })
+      const res = await request(app).post('/api/projects/proj-1/templates').send({ name: 'Deploy', commands: ['test'] })
+      expect(res.status).toBe(409)
+    })
+
+    it('GET /templates/:id returns 404 for unknown template', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/templates/nonexistent')
+      expect(res.status).toBe(404)
+    })
+
+    it('PATCH /templates/:id updates template name', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'Old', commands: ['cmd'] })
+      const id = createRes.body.template.id
+      const res = await request(app).patch(`/api/projects/proj-1/templates/${id}`).send({ name: 'New' })
+      expect(res.status).toBe(200)
+      expect(res.body.template.name).toBe('New')
+    })
+
+    it('PATCH /templates/:id returns 404 for unknown template', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).patch('/api/projects/proj-1/templates/nonexistent').send({ name: 'New' })
+      expect(res.status).toBe(404)
+    })
+
+    it('PATCH /templates/:id returns 400 for empty name', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'T', commands: ['c'] })
+      const id = createRes.body.template.id
+      const res = await request(app).patch(`/api/projects/proj-1/templates/${id}`).send({ name: '' })
+      expect(res.status).toBe(400)
+    })
+
+    it('PATCH /templates/:id returns 400 for empty commands array', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'T', commands: ['c'] })
+      const id = createRes.body.template.id
+      const res = await request(app).patch(`/api/projects/proj-1/templates/${id}`).send({ commands: [] })
+      expect(res.status).toBe(400)
+    })
+
+    it('PATCH /templates/:id returns 400 for non-string commands', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'T', commands: ['c'] })
+      const id = createRes.body.template.id
+      const res = await request(app).patch(`/api/projects/proj-1/templates/${id}`).send({ commands: [42] })
+      expect(res.status).toBe(400)
+    })
+
+    it('PATCH /templates/:id updates description to null', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'T', description: 'orig', commands: ['c'] })
+      const id = createRes.body.template.id
+      const res = await request(app).patch(`/api/projects/proj-1/templates/${id}`).send({ description: null })
+      expect(res.status).toBe(200)
+      expect(res.body.template.description).toBeNull()
+    })
+
+    it('PATCH /templates/:id updates commands', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'T', commands: ['old'] })
+      const id = createRes.body.template.id
+      const res = await request(app).patch(`/api/projects/proj-1/templates/${id}`).send({ commands: ['new1', 'new2'] })
+      expect(res.status).toBe(200)
+      expect(res.body.template.commands).toEqual(['new1', 'new2'])
+    })
+
+    it('PATCH /templates/:id returns 409 for duplicate name', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      await request(app).post('/api/projects/proj-1/templates').send({ name: 'A', commands: ['c'] })
+      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'B', commands: ['c'] })
+      const id = createRes.body.template.id
+      const res = await request(app).patch(`/api/projects/proj-1/templates/${id}`).send({ name: 'A' })
+      expect(res.status).toBe(409)
+    })
+
+    it('DELETE /templates/:id removes a template', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'Tmp', commands: ['c'] })
+      const id = createRes.body.template.id
+      const res = await request(app).delete(`/api/projects/proj-1/templates/${id}`)
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+    })
+
+    it('DELETE /templates/:id returns 404 for unknown template', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).delete('/api/projects/proj-1/templates/nonexistent')
+      expect(res.status).toBe(404)
+    })
+
+    it('POST /templates/:id/run enqueues template commands', async () => {
+      const enqueueFn = vi.fn(() => ({ id: `job-${Math.random().toString(36).slice(2, 6)}`, queuePosition: 0 }))
+      const ctx = makeContext(db, { queueManager: makeQueueManager({ enqueue: enqueueFn }) as any })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'Run', commands: ['cmd1', 'cmd2'] })
+      const id = createRes.body.template.id
+      const res = await request(app).post(`/api/projects/proj-1/templates/${id}/run`)
+      expect(res.status).toBe(202)
+      expect(res.body.jobIds).toHaveLength(2)
+      expect(enqueueFn).toHaveBeenCalledTimes(2)
+    })
+
+    it('POST /templates/:id/run returns 404 for unknown template', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).post('/api/projects/proj-1/templates/nonexistent/run')
+      expect(res.status).toBe(404)
+    })
+
+    it('POST /templates/:id/run returns 400 when claude not found', async () => {
+      const enqueueFn = vi.fn(() => { throw new ClaudeNotFoundError('Claude CLI not found') })
+      const ctx = makeContext(db, { queueManager: makeQueueManager({ enqueue: enqueueFn }) as any })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'Fail', commands: ['cmd'] })
+      const id = createRes.body.template.id
+      const res = await request(app).post(`/api/projects/proj-1/templates/${id}/run`)
+      expect(res.status).toBe(400)
+    })
+  })
 })
