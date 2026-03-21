@@ -8,6 +8,35 @@ interface WsJob {
   command?: string
 }
 
+export type OsNotificationFilter = 'all' | 'completed' | 'failed'
+
+export interface OsNotificationPrefs {
+  enabled: boolean
+  filter: OsNotificationFilter
+}
+
+const STORAGE_KEY = 'specrails-os-notifications'
+
+const DEFAULT_PREFS: OsNotificationPrefs = { enabled: true, filter: 'all' }
+
+export function getOsNotificationPrefs(): OsNotificationPrefs {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return DEFAULT_PREFS
+    const parsed = JSON.parse(raw) as Partial<OsNotificationPrefs>
+    return {
+      enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_PREFS.enabled,
+      filter: parsed.filter === 'completed' || parsed.filter === 'failed' ? parsed.filter : DEFAULT_PREFS.filter,
+    }
+  } catch {
+    return DEFAULT_PREFS
+  }
+}
+
+export function setOsNotificationPrefs(prefs: OsNotificationPrefs): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs))
+}
+
 interface UseOsNotificationsOpts {
   /** Called on notification click to switch to the job's project (hub mode) */
   setActiveProjectId?: (id: string) => void
@@ -20,6 +49,9 @@ interface UseOsNotificationsOpts {
  * from running → completed or running → failed. Clicking a notification
  * focuses the window, optionally switches the active project, and navigates
  * to the job detail page.
+ *
+ * Only fires when the tab does NOT have focus (document.hidden === true).
+ * Respects user preferences stored in localStorage (enabled, filter).
  */
 export function useOsNotifications({
   setActiveProjectId,
@@ -66,6 +98,15 @@ export function useOsNotifications({
   function fireOsNotification(job: WsJob, projectId: string | null): void {
     if (typeof Notification === 'undefined') return
 
+    // Only notify when the tab does NOT have focus
+    if (typeof document !== 'undefined' && !document.hidden) return
+
+    // Check user preferences
+    const prefs = getOsNotificationPrefs()
+    if (!prefs.enabled) return
+    if (prefs.filter === 'completed' && job.status !== 'completed') return
+    if (prefs.filter === 'failed' && job.status !== 'failed') return
+
     function show(): void {
       const title = job.status === 'completed' ? 'Job completed' : 'Job failed'
       const projectName = projectId ? (projectsByIdRef.current?.get(projectId) ?? '') : ''
@@ -84,7 +125,6 @@ export function useOsNotifications({
         window.focus()
         if (targetProjectId && setActiveProjectIdRef.current) {
           setActiveProjectIdRef.current(targetProjectId)
-          // Navigate after project switch settles (useProjectRouteMemory runs in useEffect)
           setTimeout(() => {
             navigateRef.current(`/jobs/${jobId}`)
           }, 100)

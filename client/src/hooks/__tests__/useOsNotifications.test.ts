@@ -3,7 +3,6 @@ import { renderHook, act } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 
-// We need to mock useSharedWebSocket before importing the hook
 const mockRegisterHandler = vi.fn()
 const mockUnregisterHandler = vi.fn()
 let capturedHandler: ((data: unknown) => void) | null = null
@@ -22,7 +21,6 @@ vi.mock('../useSharedWebSocket', () => ({
   }),
 }))
 
-// Mock useNavigate
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
@@ -32,7 +30,7 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-import { useOsNotifications } from '../useOsNotifications'
+import { useOsNotifications, getOsNotificationPrefs, setOsNotificationPrefs } from '../useOsNotifications'
 
 // ─── Notification API mock ────────────────────────────────────────────────────
 
@@ -89,6 +87,11 @@ function sendQueueMessage(jobs: Array<{ id: string; status: string; command?: st
   })
 }
 
+function triggerTransition(jobId: string, toStatus: 'completed' | 'failed', command?: string, projectId?: string) {
+  sendQueueMessage([{ id: jobId, status: 'running', command }], projectId)
+  sendQueueMessage([{ id: jobId, status: toStatus, command }], projectId)
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('useOsNotifications', () => {
@@ -98,6 +101,9 @@ describe('useOsNotifications', () => {
     capturedHandler = null
     setupNotificationMock('granted')
     vi.useFakeTimers()
+    localStorage.clear()
+    // Tab hidden by default — notifications should fire
+    Object.defineProperty(document, 'hidden', { value: true, writable: true, configurable: true })
   })
 
   afterEach(() => {
@@ -120,25 +126,20 @@ describe('useOsNotifications', () => {
 
   it('fires notification when job transitions running → completed', () => {
     renderOsNotifications()
-    sendQueueMessage([{ id: 'job-1', status: 'running', command: '/architect' }])
-    sendQueueMessage([{ id: 'job-1', status: 'completed', command: '/architect' }])
-
+    triggerTransition('job-1', 'completed', '/architect')
     expect(MockNotification.instances).toHaveLength(1)
     expect(MockNotification.instances[0].title).toBe('Job completed')
   })
 
   it('fires notification when job transitions running → failed', () => {
     renderOsNotifications()
-    sendQueueMessage([{ id: 'job-1', status: 'running', command: '/developer' }])
-    sendQueueMessage([{ id: 'job-1', status: 'failed', command: '/developer' }])
-
+    triggerTransition('job-1', 'failed', '/developer')
     expect(MockNotification.instances).toHaveLength(1)
     expect(MockNotification.instances[0].title).toBe('Job failed')
   })
 
   it('does not fire notification for jobs already completed on first message', () => {
     renderOsNotifications()
-    // First message: job already completed (e.g. page loaded after job finished)
     sendQueueMessage([{ id: 'job-1', status: 'completed', command: '/architect' }])
     expect(MockNotification.instances).toHaveLength(0)
   })
@@ -152,62 +153,43 @@ describe('useOsNotifications', () => {
 
   it('includes command in notification body', () => {
     renderOsNotifications()
-    sendQueueMessage([{ id: 'job-1', status: 'running', command: '/architect --spec SPEA-100' }])
-    sendQueueMessage([{ id: 'job-1', status: 'completed', command: '/architect --spec SPEA-100' }])
-
+    triggerTransition('job-1', 'completed', '/architect --spec SPEA-100')
     expect(MockNotification.instances[0].options.body).toContain('/architect --spec SPEA-100')
   })
 
   it('includes project name in body when projectsById is provided', () => {
     const projectsById = new Map([['proj-1', 'my-project']])
     renderOsNotifications({ projectsById })
-
-    sendQueueMessage([{ id: 'job-1', status: 'running', command: '/architect' }], 'proj-1')
-    sendQueueMessage([{ id: 'job-1', status: 'completed', command: '/architect' }], 'proj-1')
-
+    triggerTransition('job-1', 'completed', '/architect', 'proj-1')
     expect(MockNotification.instances[0].options.body).toContain('[my-project]')
   })
 
   it('uses tag to deduplicate notifications', () => {
     renderOsNotifications()
-    sendQueueMessage([{ id: 'job-1', status: 'running' }])
-    sendQueueMessage([{ id: 'job-1', status: 'completed' }])
-
+    triggerTransition('job-1', 'completed')
     expect(MockNotification.instances[0].options.tag).toBe('specrails-job:job-1:completed')
   })
 
   it('does not fire when Notification permission is denied', () => {
     setupNotificationMock('denied')
     renderOsNotifications()
-    sendQueueMessage([{ id: 'job-1', status: 'running' }])
-    sendQueueMessage([{ id: 'job-1', status: 'completed' }])
+    triggerTransition('job-1', 'completed')
     expect(MockNotification.instances).toHaveLength(0)
   })
 
   it('requests permission when permission is default', async () => {
     setupNotificationMock('default')
     renderOsNotifications()
-    sendQueueMessage([{ id: 'job-1', status: 'running' }])
-    sendQueueMessage([{ id: 'job-1', status: 'completed' }])
-
+    triggerTransition('job-1', 'completed')
     expect(MockNotification.requestPermission).toHaveBeenCalled()
   })
 
   it('navigates to job detail on notification click (same project)', () => {
     const setActiveProjectId = vi.fn()
     renderOsNotifications({ setActiveProjectId })
-
-    sendQueueMessage([{ id: 'job-42', status: 'running' }])
-    sendQueueMessage([{ id: 'job-42', status: 'completed' }])
-
+    triggerTransition('job-42', 'completed')
     expect(MockNotification.instances).toHaveLength(1)
-
-    // Simulate click without projectId (legacy or same project)
-    act(() => {
-      MockNotification.instances[0].onclick?.()
-    })
-
-    // No projectId → navigate immediately
+    act(() => { MockNotification.instances[0].onclick?.() })
     expect(mockNavigate).toHaveBeenCalledWith('/jobs/job-42')
     expect(setActiveProjectId).not.toHaveBeenCalled()
   })
@@ -215,21 +197,11 @@ describe('useOsNotifications', () => {
   it('switches project and navigates after delay on cross-project click', () => {
     const setActiveProjectId = vi.fn()
     renderOsNotifications({ setActiveProjectId })
-
-    sendQueueMessage([{ id: 'job-99', status: 'running', command: '/ship' }], 'proj-B')
-    sendQueueMessage([{ id: 'job-99', status: 'completed', command: '/ship' }], 'proj-B')
-
-    act(() => {
-      MockNotification.instances[0].onclick?.()
-    })
-
+    triggerTransition('job-99', 'completed', '/ship', 'proj-B')
+    act(() => { MockNotification.instances[0].onclick?.() })
     expect(setActiveProjectId).toHaveBeenCalledWith('proj-B')
-    // Navigation delayed by 100ms
     expect(mockNavigate).not.toHaveBeenCalled()
-
-    act(() => {
-      vi.advanceTimersByTime(100)
-    })
+    act(() => { vi.advanceTimersByTime(100) })
     expect(mockNavigate).toHaveBeenCalledWith('/jobs/job-99')
   })
 
@@ -246,24 +218,97 @@ describe('useOsNotifications', () => {
     const original = (window as Record<string, unknown>)['Notification']
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete (window as Record<string, unknown>)['Notification']
-
     expect(() => {
       renderOsNotifications()
       sendQueueMessage([{ id: 'job-1', status: 'running' }])
       sendQueueMessage([{ id: 'job-1', status: 'completed' }])
     }).not.toThrow()
-
-    // Restore
     Object.defineProperty(window, 'Notification', { value: original, writable: true, configurable: true })
   })
 
   it('truncates long commands to 80 chars in body', () => {
     renderOsNotifications()
     const longCommand = '/architect ' + 'x'.repeat(100)
-    sendQueueMessage([{ id: 'job-1', status: 'running', command: longCommand }])
-    sendQueueMessage([{ id: 'job-1', status: 'completed', command: longCommand }])
-
+    triggerTransition('job-1', 'completed', longCommand)
     const body = MockNotification.instances[0].options.body as string
     expect(body.length).toBeLessThanOrEqual(80)
+  })
+
+  // ─── document.hidden tests ──────────────────────────────────────────────────
+
+  it('does not fire notification when tab has focus (document.hidden = false)', () => {
+    Object.defineProperty(document, 'hidden', { value: false, writable: true, configurable: true })
+    renderOsNotifications()
+    triggerTransition('job-1', 'completed', '/architect')
+    expect(MockNotification.instances).toHaveLength(0)
+  })
+
+  it('fires notification when tab is hidden', () => {
+    Object.defineProperty(document, 'hidden', { value: true, writable: true, configurable: true })
+    renderOsNotifications()
+    triggerTransition('job-1', 'completed', '/architect')
+    expect(MockNotification.instances).toHaveLength(1)
+  })
+
+  // ─── preferences tests ─────────────────────────────────────────────────────
+
+  it('does not fire when notifications are disabled in preferences', () => {
+    setOsNotificationPrefs({ enabled: false, filter: 'all' })
+    renderOsNotifications()
+    triggerTransition('job-1', 'completed', '/architect')
+    expect(MockNotification.instances).toHaveLength(0)
+  })
+
+  it('filters to completed-only when filter is "completed"', () => {
+    setOsNotificationPrefs({ enabled: true, filter: 'completed' })
+    renderOsNotifications()
+    triggerTransition('job-1', 'failed', '/developer')
+    expect(MockNotification.instances).toHaveLength(0)
+    triggerTransition('job-2', 'completed', '/architect')
+    expect(MockNotification.instances).toHaveLength(1)
+    expect(MockNotification.instances[0].title).toBe('Job completed')
+  })
+
+  it('filters to failed-only when filter is "failed"', () => {
+    setOsNotificationPrefs({ enabled: true, filter: 'failed' })
+    renderOsNotifications()
+    triggerTransition('job-1', 'completed', '/architect')
+    expect(MockNotification.instances).toHaveLength(0)
+    triggerTransition('job-2', 'failed', '/developer')
+    expect(MockNotification.instances).toHaveLength(1)
+    expect(MockNotification.instances[0].title).toBe('Job failed')
+  })
+
+  it('fires for both statuses when filter is "all"', () => {
+    setOsNotificationPrefs({ enabled: true, filter: 'all' })
+    renderOsNotifications()
+    triggerTransition('job-1', 'completed', '/architect')
+    triggerTransition('job-2', 'failed', '/developer')
+    expect(MockNotification.instances).toHaveLength(2)
+  })
+})
+
+// ─── Preferences helpers ──────────────────────────────────────────────────────
+
+describe('getOsNotificationPrefs / setOsNotificationPrefs', () => {
+  beforeEach(() => { localStorage.clear() })
+
+  it('returns defaults when nothing stored', () => {
+    expect(getOsNotificationPrefs()).toEqual({ enabled: true, filter: 'all' })
+  })
+
+  it('round-trips stored preferences', () => {
+    setOsNotificationPrefs({ enabled: false, filter: 'failed' })
+    expect(getOsNotificationPrefs()).toEqual({ enabled: false, filter: 'failed' })
+  })
+
+  it('handles corrupted localStorage gracefully', () => {
+    localStorage.setItem('specrails-os-notifications', 'not-json')
+    expect(getOsNotificationPrefs()).toEqual({ enabled: true, filter: 'all' })
+  })
+
+  it('handles partial stored data', () => {
+    localStorage.setItem('specrails-os-notifications', JSON.stringify({ enabled: false }))
+    expect(getOsNotificationPrefs()).toEqual({ enabled: false, filter: 'all' })
   })
 })

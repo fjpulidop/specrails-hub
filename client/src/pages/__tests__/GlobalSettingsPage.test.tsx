@@ -533,3 +533,79 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
     expect((checkbox as HTMLInputElement).checked).toBe(true)
   })
 })
+
+// ─── OS Notifications section ────────────────────────────────────────────────
+
+describe('GlobalSettingsPage — OS Notifications', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    mockProjects = []
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
+        return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => hubSettings })
+    })
+  })
+
+  it('renders OS Notifications section header', async () => {
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByText('OS Notifications')).toBeInTheDocument()
+    })
+  })
+
+  it('renders enable checkbox checked by default', async () => {
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByText('Enable OS Notifications')).toBeInTheDocument()
+    })
+    const toggle = screen.getByTestId('notif-toggle') as HTMLInputElement
+    expect(toggle.checked).toBe(true)
+  })
+
+  it('shows filter options when notifications are enabled', async () => {
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByText('All (completed & failed)')).toBeInTheDocument()
+      expect(screen.getByText('Completed only')).toBeInTheDocument()
+      expect(screen.getByText('Failed only')).toBeInTheDocument()
+    })
+  })
+
+  it('hides filter options when notifications are disabled', async () => {
+    const user = userEvent.setup()
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('notif-toggle')).toBeInTheDocument()
+    })
+    await user.click(screen.getByTestId('notif-toggle'))
+    expect(screen.queryByText('All (completed & failed)')).not.toBeInTheDocument()
+  })
+
+  it('persists toggle to localStorage', async () => {
+    const user = userEvent.setup()
+    const { toast } = await import('sonner')
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('notif-toggle')).toBeInTheDocument()
+    })
+    await user.click(screen.getByTestId('notif-toggle'))
+    const stored = JSON.parse(localStorage.getItem('specrails-os-notifications')!)
+    expect(stored.enabled).toBe(false)
+    expect(toast.success).toHaveBeenCalledWith('OS notifications disabled')
+  })
+
+  it('changes filter to failed-only via radio', async () => {
+    const user = userEvent.setup()
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByText('Failed only')).toBeInTheDocument()
+    })
+    const failedRadio = screen.getByRole('radio', { name: /failed only/i })
+    await user.click(failedRadio)
+    const stored = JSON.parse(localStorage.getItem('specrails-os-notifications')!)
+    expect(stored.filter).toBe('failed')
+  })
+})

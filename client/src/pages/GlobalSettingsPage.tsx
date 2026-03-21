@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Settings, Trash2, Zap, Plus } from 'lucide-react'
+import { Settings, Trash2, Zap, Plus, Bell } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import {
@@ -12,6 +12,11 @@ import {
 } from '../components/ui/dialog'
 import { useHub } from '../hooks/useHub'
 import type { HubProject } from '../hooks/useHub'
+import {
+  getOsNotificationPrefs,
+  setOsNotificationPrefs,
+  type OsNotificationFilter,
+} from '../hooks/useOsNotifications'
 
 type WebhookEvent = 'job.completed' | 'job.failed' | 'daily_budget_exceeded'
 
@@ -82,6 +87,21 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [newWebhookSecret, setNewWebhookSecret] = useState('')
   const [newWebhookEvents, setNewWebhookEvents] = useState<WebhookEvent[]>(['job.completed', 'job.failed'])
   const [isAddingWebhook, setIsAddingWebhook] = useState(false)
+
+  // OS Notification preferences (localStorage)
+  const [notifEnabled, setNotifEnabled] = useState(() => getOsNotificationPrefs().enabled)
+  const [notifFilter, setNotifFilter] = useState<OsNotificationFilter>(() => getOsNotificationPrefs().filter)
+
+  function handleToggleNotifications(enabled: boolean) {
+    setNotifEnabled(enabled)
+    setOsNotificationPrefs({ enabled, filter: notifFilter })
+    toast.success(enabled ? 'OS notifications enabled' : 'OS notifications disabled')
+  }
+
+  function handleNotifFilterChange(filter: OsNotificationFilter) {
+    setNotifFilter(filter)
+    setOsNotificationPrefs({ enabled: notifEnabled, filter })
+  }
 
   const loadWebhooks = useCallback(async () => {
     try {
@@ -345,6 +365,52 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                     Save
                   </Button>
                 </div>
+              </div>
+            </div>
+
+            {/* OS Notifications */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                OS Notifications
+              </h3>
+              <div className="rounded-md border border-border p-3 space-y-3">
+                <p className="text-[10px] text-muted-foreground">
+                  Show native desktop notifications when jobs complete or fail. Notifications only appear when the tab is not focused.
+                </p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifEnabled}
+                    onChange={(e) => handleToggleNotifications(e.target.checked)}
+                    className="w-3.5 h-3.5"
+                    data-testid="notif-toggle"
+                  />
+                  <Bell className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-xs">Enable OS Notifications</span>
+                </label>
+                {notifEnabled && (
+                  <div className="space-y-1.5 pl-6">
+                    <p className="text-[10px] text-muted-foreground">Notify on:</p>
+                    <div className="flex flex-wrap gap-3">
+                      {([
+                        { value: 'all' as const, label: 'All (completed & failed)' },
+                        { value: 'completed' as const, label: 'Completed only' },
+                        { value: 'failed' as const, label: 'Failed only' },
+                      ]).map(({ value, label }) => (
+                        <label key={value} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                          <input
+                            type="radio"
+                            name="notif-filter"
+                            checked={notifFilter === value}
+                            onChange={() => handleNotifFilterChange(value)}
+                            className="w-3 h-3"
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
