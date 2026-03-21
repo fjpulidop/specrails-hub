@@ -164,7 +164,7 @@ describe('RecentJobs - extended coverage', () => {
       fireEvent.change(clearToInput, { target: { value: '2024-06-01' } })
 
       // Click "Clear range"
-      const clearRangeBtn = screen.getByRole('button', { name: /clear range/i })
+      const clearRangeBtn = screen.getByRole('button', { name: /clear.*(range|jobs? in range)/i })
       fireEvent.click(clearRangeBtn)
 
       await waitFor(() => {
@@ -192,7 +192,7 @@ describe('RecentJobs - extended coverage', () => {
       const clearFromInput = screen.getByPlaceholderText('From')
       fireEvent.change(clearFromInput, { target: { value: '2024-01-01' } })
 
-      const clearRangeBtn = screen.getByRole('button', { name: /clear range/i })
+      const clearRangeBtn = screen.getByRole('button', { name: /clear.*(range|jobs? in range)/i })
       fireEvent.click(clearRangeBtn)
 
       await waitFor(() => {
@@ -211,7 +211,7 @@ describe('RecentJobs - extended coverage', () => {
       const trashButtons = document.querySelectorAll('button[class*="text-muted-foreground hover:text-destructive"]')
       await user.click(trashButtons[0] as HTMLElement)
 
-      fireEvent.click(screen.getByRole('button', { name: /clear all jobs/i }))
+      fireEvent.click(screen.getByRole('button', { name: /clear all \d+ jobs?/i }))
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('Network error')
@@ -370,10 +370,64 @@ describe('RecentJobs - extended coverage', () => {
       const rowTrashBtns = document.querySelectorAll('[title="Delete proposal"]')
       if (rowTrashBtns.length > 0) {
         await user.click(rowTrashBtns[0] as HTMLElement)
-        const keepBtn = screen.getByRole('button', { name: /keep/i })
+        const keepBtn = screen.getByRole('button', { name: /cancel/i })
         await user.click(keepBtn)
         expect(screen.queryByText('Delete proposal?')).not.toBeInTheDocument()
       }
+    })
+
+    it('shows count of 1 proposal in delete confirmation dialog', async () => {
+      const user = userEvent.setup()
+      const proposalJob: JobSummary = {
+        id: 'proposal:abc123',
+        command: '/sr:propose-feature',
+        started_at: new Date().toISOString(),
+        status: 'completed',
+      }
+      render(<RecentJobs jobs={[proposalJob]} onProposalDelete={vi.fn()} />)
+
+      const rowTrashBtns = document.querySelectorAll('[title="Delete proposal"]')
+      if (rowTrashBtns.length > 0) {
+        await user.click(rowTrashBtns[0] as HTMLElement)
+        expect(screen.getByText(/1 proposal/i)).toBeInTheDocument()
+      }
+    })
+  })
+
+  describe('confirmation dialog job counts', () => {
+    const jobs: JobSummary[] = [
+      { id: 'j1', command: '/cmd1', started_at: new Date().toISOString(), status: 'completed' },
+      { id: 'j2', command: '/cmd2', started_at: new Date().toISOString(), status: 'failed' },
+      { id: 'j3', command: '/cmd3', started_at: new Date().toISOString(), status: 'completed' },
+    ]
+
+    it('clear all button shows correct job count', async () => {
+      const user = userEvent.setup()
+      render(<RecentJobs jobs={jobs} />)
+      const trashBtn = document.querySelector('button[class*="text-muted-foreground hover:text-destructive"]') as HTMLElement
+      await user.click(trashBtn)
+      expect(screen.getByRole('button', { name: /clear all 3 jobs/i })).toBeInTheDocument()
+    })
+
+    it('shows total job count in modal header', async () => {
+      const user = userEvent.setup()
+      render(<RecentJobs jobs={jobs} />)
+      const trashBtn = document.querySelector('button[class*="text-muted-foreground hover:text-destructive"]') as HTMLElement
+      await user.click(trashBtn)
+      expect(screen.getByText(/3 jobs in history/i)).toBeInTheDocument()
+    })
+
+    it('clear range button shows count of jobs matching the selected range', async () => {
+      const user = userEvent.setup()
+      render(<RecentJobs jobs={jobs} />)
+      const trashBtn = document.querySelector('button[class*="text-muted-foreground hover:text-destructive"]') as HTMLElement
+      await user.click(trashBtn)
+
+      const fromInput = screen.getByPlaceholderText('From')
+      fireEvent.change(fromInput, { target: { value: '2020-01-01' } })
+
+      // All 3 jobs match range from 2020 onwards
+      expect(screen.getByRole('button', { name: /clear 3 jobs in range/i })).toBeInTheDocument()
     })
   })
 })

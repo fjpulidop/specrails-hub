@@ -272,4 +272,52 @@ describe('useHub - error paths', () => {
     // active project stays 'existing' since it's still in the list
     expect(result.current.activeProjectId).toBe('existing')
   })
+
+  describe('isSwitchingProject', () => {
+    it('starts as false after initial load', async () => {
+      ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ projects: [makeProject({ id: 'p1' }), makeProject({ id: 'p2' })] }),
+      })
+      const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+      await waitFor(() => expect(result.current.isLoading).toBe(false))
+      expect(result.current.isSwitchingProject).toBe(false)
+    })
+
+    it('becomes true immediately when switching to a different project', async () => {
+      ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ projects: [makeProject({ id: 'p1' }), makeProject({ id: 'p2' })] }),
+      })
+      const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+      await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+      act(() => { result.current.setActiveProjectId('p2') })
+      expect(result.current.isSwitchingProject).toBe(true)
+    })
+
+    it('clears isSwitchingProject after 400ms', async () => {
+      ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ projects: [makeProject({ id: 'p1' }), makeProject({ id: 'p2' })] }),
+      })
+      const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+      await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+      act(() => { result.current.setActiveProjectId('p2') })
+      await waitFor(() => expect(result.current.isSwitchingProject).toBe(false), { timeout: 1000 })
+    })
+
+    it('stays false when setting the same project id', async () => {
+      ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ projects: [makeProject({ id: 'p1' })] }),
+      })
+      const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+      await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+      act(() => { result.current.setActiveProjectId('p1') })
+      expect(result.current.isSwitchingProject).toBe(false)
+    })
+  })
 })
