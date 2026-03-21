@@ -30,6 +30,7 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
     abortStream,
     confirmCommand,
     dismissCommandProposal,
+    changeConversationModel,
   } = chat
 
   const [isMaximized, setIsMaximized] = useState(false)
@@ -160,6 +161,7 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
             isStreaming={activeConversation.isStreaming}
             onSend={sendMessage}
             onAbort={abortStream}
+            onModelChange={(m) => changeConversationModel(activeConversation.id, m)}
           />
         </div>
       ) : (

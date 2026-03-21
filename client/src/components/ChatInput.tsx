@@ -16,6 +16,7 @@ interface ChatInputProps {
   isStreaming: boolean
   onSend: (conversationId: string, text: string) => void
   onAbort: (conversationId: string) => void
+  onModelChange: (model: string) => void
 }
 
 export function ChatInput({
@@ -25,6 +26,7 @@ export function ChatInput({
   isStreaming,
   onSend,
   onAbort,
+  onModelChange,
 }: ChatInputProps) {
   const [text, setText] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -70,7 +72,7 @@ export function ChatInput({
                   'border border-border/20 px-1.5 py-0.5',
                   hasMessages && 'opacity-50 pointer-events-none'
                 )}
-                onChange={() => { /* model is per-conversation and locked after first message */ }}
+                onChange={(e) => onModelChange(e.target.value)}
               >
                 {MODEL_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value} className="bg-background">

@@ -6,11 +6,12 @@ import { ChatInput } from '../ChatInput'
 
 const defaultProps = {
   conversationId: 'conv-1',
-  model: 'claude-sonnet-4-5',
+  model: 'claude-sonnet-4-6',
   hasMessages: false,
   isStreaming: false,
   onSend: vi.fn(),
   onAbort: vi.fn(),
+  onModelChange: vi.fn(),
 }
 
 describe('ChatInput', () => {
@@ -128,5 +129,14 @@ describe('ChatInput', () => {
     render(<ChatInput {...defaultProps} hasMessages={false} />)
     const select = screen.getByRole('combobox')
     expect(select).not.toBeDisabled()
+  })
+
+  it('model selector calls onModelChange when changed', async () => {
+    const user = userEvent.setup()
+    const onModelChange = vi.fn()
+    render(<ChatInput {...defaultProps} onModelChange={onModelChange} />)
+    const select = screen.getByRole('combobox')
+    await user.selectOptions(select, 'claude-opus-4-6')
+    expect(onModelChange).toHaveBeenCalledWith('claude-opus-4-6')
   })
 })

@@ -30,6 +30,7 @@ export interface UseChatReturn {
   abortStream: (conversationId: string) => Promise<void>
   confirmCommand: (command: string) => Promise<void>
   dismissCommandProposal: (conversationId: string, command: string) => void
+  changeConversationModel: (id: string, model: string) => Promise<void>
 }
 
 export const ChatContext = createContext<UseChatReturn | null>(null)
@@ -310,6 +311,19 @@ export function useChat(): UseChatReturn {
     )
   }, [])
 
+  const changeConversationModel = useCallback(async (id: string, model: string) => {
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, model } : c))
+    )
+    try {
+      await fetch(`${getApiBase()}/chat/conversations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model }),
+      })
+    } catch { /* ignore */ }
+  }, [])
+
   // Create a conversation and immediately send the first message
   const startWithMessage = useCallback(async (text: string) => {
     try {
@@ -355,5 +369,6 @@ export function useChat(): UseChatReturn {
     abortStream,
     confirmCommand,
     dismissCommandProposal,
+    changeConversationModel,
   }
 }
