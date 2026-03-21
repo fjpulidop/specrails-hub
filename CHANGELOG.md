@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.1](https://github.com/fjpulidop/specrails-hub/compare/v1.14.0...v1.14.1) (2026-03-21)
+
+
+### Bug Fixes
+
+* **client:** scroll dialogs, model 4.6, useBlocker crash, toast truncation (SPEA-539) ([#94](https://github.com/fjpulidop/specrails-hub/issues/94)) ([668c5a6](https://github.com/fjpulidop/specrails-hub/commit/668c5a67703e3f83a9c858c1d38c9ae321ffdb24))
+
 ## [1.14.0](https://github.com/fjpulidop/specrails-hub/compare/v1.13.0...v1.14.0) (2026-03-21)
 
 
