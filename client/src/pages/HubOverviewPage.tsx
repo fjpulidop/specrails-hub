@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Search, Activity, Layers, CheckCircle, AlertTriangle, XCircle, Clock, X, Zap, HeartPulse } from 'lucide-react'
+import { Search, Activity, Layers, CheckCircle, AlertTriangle, XCircle, Clock, X, Zap, HeartPulse, DollarSign } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { HubOverviewResponse, HubProjectOverview, HubRecentJob, HubSearchResponse, HubHealthResponse } from '../types'
 import { STATUS_COLORS } from '../lib/dracula-colors'
@@ -45,6 +45,37 @@ function AggregatedStats({ data }: { data: HubOverviewResponse['aggregated'] }) 
           {card.sub && <p className="text-xs text-muted-foreground mt-1">{card.sub}</p>}
         </div>
       ))}
+    </div>
+  )
+}
+
+// ─── Budget Status Card ───────────────────────────────────────────────────────
+
+function BudgetStatusCard({ costToday, budget }: { costToday: number; budget: number | null }) {
+  if (budget == null) return null
+
+  const pct = Math.min((costToday / budget) * 100, 100)
+  const color = pct >= 90 ? '#ff5555' : pct >= 60 ? '#f1fa8c' : '#50fa7b'
+
+  return (
+    <div className="rounded-lg border border-border/40 bg-card/50 p-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <DollarSign className="w-4 h-4" />
+          <p className="text-xs">Daily Budget</p>
+        </div>
+        <p className="text-xs font-mono text-muted-foreground">{pct.toFixed(0)}%</p>
+      </div>
+      <p className="text-xl font-semibold font-mono">
+        ${costToday.toFixed(2)}{' '}
+        <span className="text-sm text-muted-foreground">/ ${budget.toFixed(2)}</span>
+      </p>
+      <div className="mt-2 h-1.5 rounded-full bg-border/30 overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${pct}%`, backgroundColor: color }}
+        />
+      </div>
     </div>
   )
 }
@@ -408,6 +439,12 @@ export default function HubOverviewPage() {
               </div>
             )}
             {!loading && overview && <AggregatedStats data={overview.aggregated} />}
+            {!loading && overview && (
+              <BudgetStatusCard
+                costToday={overview.aggregated.costToday}
+                budget={overview.aggregated.hubDailyBudgetUsd}
+              />
+            )}
 
             {/* Project cards skeleton */}
             {loading && (

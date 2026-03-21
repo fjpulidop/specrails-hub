@@ -25,7 +25,7 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
   useEffect(() => {
     const id = `cost-alerts-${project.id}`
     registerHandler(id, (raw) => {
-      const msg = raw as { type: string; projectId?: string; jobId?: string; cost?: number; threshold?: number; dailySpend?: number; budget?: number; queuePaused?: boolean }
+      const msg = raw as { type: string; projectId?: string; jobId?: string; cost?: number; threshold?: number; dailySpend?: number; budget?: number; queuePaused?: boolean; hubDailySpend?: number; hubBudget?: number }
       if (msg.projectId !== undefined && msg.projectId !== '' && msg.projectId !== projectIdRef.current) return
       if (msg.type === 'cost_alert') {
         toast.warning('Cost alert', {
@@ -37,6 +37,11 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
           duration: Infinity,
         })
         setBudgetExceeded({ dailySpend: msg.dailySpend ?? 0, budget: msg.budget ?? 0 })
+      } else if (msg.type === 'hub_daily_budget_exceeded') {
+        toast.error('Hub daily budget exceeded', {
+          description: `Total hub spend $${(msg.hubDailySpend ?? 0).toFixed(2)} of $${(msg.hubBudget ?? 0).toFixed(2)}. Queue paused.`,
+          duration: Infinity,
+        })
       }
     })
     return () => unregisterHandler(id)

@@ -18,6 +18,8 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [dailyBudget, setDailyBudget] = useState('')
   const [isSavingBudget, setIsSavingBudget] = useState(false)
+  const [jobCostThreshold, setJobCostThreshold] = useState('')
+  const [isSavingJobThreshold, setIsSavingJobThreshold] = useState(false)
 
   // Track saved values to detect unsaved changes
   const savedLabelFilter = useRef('')
@@ -74,6 +76,23 @@ export default function SettingsPage() {
     loadConfig()
   }, [activeProjectId])
 
+  useEffect(() => {
+    if (!activeProjectId) return
+    async function loadBudget() {
+      try {
+        const res = await fetch(`${getApiBase()}/budget`)
+        if (!res.ok) return
+        const data = await res.json() as { dailyBudgetUsd?: number | null; jobCostThresholdUsd?: number | null }
+        if (data.dailyBudgetUsd != null) setDailyBudget(String(data.dailyBudgetUsd))
+        if (data.jobCostThresholdUsd != null) setJobCostThreshold(String(data.jobCostThresholdUsd))
+        else setJobCostThreshold('')
+      } catch {
+        // ignore
+      }
+    }
+    void loadBudget()
+  }, [activeProjectId])
+
   async function saveSettings() {
     setIsSaving(true)
     try {
@@ -101,8 +120,8 @@ export default function SettingsPage() {
         toast.error('Enter a positive number or leave blank to disable')
         return
       }
-      const res = await fetch(`${getApiBase()}/config`, {
-        method: 'POST',
+      const res = await fetch(`${getApiBase()}/budget`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dailyBudgetUsd: parsed }),
       })
@@ -112,6 +131,28 @@ export default function SettingsPage() {
       toast.error('Failed to save budget', { description: (err as Error).message })
     } finally {
       setIsSavingBudget(false)
+    }
+  }
+
+  async function saveJobCostThreshold() {
+    setIsSavingJobThreshold(true)
+    try {
+      const parsed = jobCostThreshold.trim() === '' ? null : parseFloat(jobCostThreshold)
+      if (parsed !== null && (isNaN(parsed) || parsed <= 0)) {
+        toast.error('Enter a positive number or leave blank to disable')
+        return
+      }
+      const res = await fetch(`${getApiBase()}/budget`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobCostThresholdUsd: parsed }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      toast.success(parsed == null ? 'Per-job cost alert disabled' : `Alert set for jobs over $${parsed}`)
+    } catch (err) {
+      toast.error('Failed to save threshold', { description: (err as Error).message })
+    } finally {
+      setIsSavingJobThreshold(false)
     }
   }
 
@@ -194,7 +235,7 @@ export default function SettingsPage() {
             Set a daily spend cap for this project. The queue auto-pauses when the limit is hit.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-xs font-medium">Daily budget (USD)</label>
             <div className="flex gap-2 max-w-xs">
@@ -219,6 +260,35 @@ export default function SettingsPage() {
             </div>
             <p className="text-[10px] text-muted-foreground">
               Leave blank to disable. Spend is calculated over the last 24 hours.
+            </p>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">Per-job cost alert (USD)</label>
+            <div className="flex gap-2 max-w-xs">
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={jobCostThreshold}
+                onChange={(e) => setJobCostThreshold(e.target.value)}
+                placeholder="e.g. 0.50"
+                className="h-8 text-xs font-mono"
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-8 text-xs shrink-0"
+                disabled={isSavingJobThreshold}
+                onClick={saveJobCostThreshold}
+              >
+                {isSavingJobThreshold ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Alert when a single job in this project exceeds this amount.
             </p>
           </div>
         </CardContent>

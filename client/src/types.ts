@@ -191,6 +191,7 @@ export interface HubProjectOverview {
   lastRunStatus: string | null
   lastRunCommand: string | null
   coveragePct: number | null
+  costToday: number
 }
 
 export interface HubOverviewResponse {
@@ -202,6 +203,8 @@ export interface HubOverviewResponse {
     criticalCount: number
     jobsToday: number
     activeJobs: number
+    costToday: number
+    hubDailyBudgetUsd: number | null
   }
   recentJobs: HubRecentJob[]
 }

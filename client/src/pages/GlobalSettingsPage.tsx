@@ -80,6 +80,8 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [isSavingUrl, setIsSavingUrl] = useState(false)
   const [costAlertThreshold, setCostAlertThreshold] = useState('')
   const [isSavingThreshold, setIsSavingThreshold] = useState(false)
+  const [hubDailyBudget, setHubDailyBudget] = useState('')
+  const [isSavingHubBudget, setIsSavingHubBudget] = useState(false)
 
   // Webhook state
   const [webhooks, setWebhooks] = useState<WebhookRow[]>([])
@@ -135,6 +137,17 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     void loadWebhooks()
   }, [open, loadWebhooks])
 
+  useEffect(() => {
+    if (!open) return
+    fetch('/api/hub/budget')
+      .then((r) => r.json())
+      .then((data: { hubDailyBudgetUsd?: number | null }) => {
+        if (data.hubDailyBudgetUsd != null) setHubDailyBudget(String(data.hubDailyBudgetUsd))
+        else setHubDailyBudget('')
+      })
+      .catch(() => {})
+  }, [open])
+
   async function handleSaveSpecrailsTechUrl() {
     if (!specrailsTechUrl.trim()) return
     setIsSavingUrl(true)
@@ -178,6 +191,31 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
       toast.error('Failed to save threshold')
     } finally {
       setIsSavingThreshold(false)
+    }
+  }
+
+  async function handleSaveHubDailyBudget() {
+    setIsSavingHubBudget(true)
+    try {
+      const val = hubDailyBudget.trim() === '' ? null : parseFloat(hubDailyBudget)
+      if (val !== null && (isNaN(val) || val <= 0)) {
+        toast.error('Enter a positive number or leave blank to disable')
+        return
+      }
+      const res = await fetch('/api/hub/budget', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hubDailyBudgetUsd: val }),
+      })
+      if (res.ok) {
+        toast.success(val == null ? 'Hub daily budget removed' : `Hub daily budget set to $${val}`)
+      } else {
+        toast.error('Failed to save hub daily budget')
+      }
+    } catch {
+      toast.error('Failed to save hub daily budget')
+    } finally {
+      setIsSavingHubBudget(false)
     }
   }
 
@@ -336,34 +374,66 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               </div>
             </div>
 
-            {/* Cost alerts */}
+            {/* Budget & Alerts */}
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Cost Alerts
+                Budget &amp; Alerts
               </h3>
-              <div className="rounded-md border border-border p-3 space-y-2">
-                <p className="text-[10px] text-muted-foreground">
-                  Alert when a single job exceeds this amount (USD). Leave blank to disable.
-                </p>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={costAlertThreshold}
-                    onChange={(e) => setCostAlertThreshold(e.target.value)}
-                    placeholder="e.g. 0.50"
-                    className="h-7 text-xs font-mono"
-                  />
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-7 text-xs shrink-0"
-                    disabled={isSavingThreshold}
-                    onClick={handleSaveCostAlertThreshold}
-                  >
-                    Save
-                  </Button>
+              <div className="rounded-md border border-border p-3 space-y-4">
+                {/* Hub daily budget */}
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium">Hub daily budget (USD)</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Global daily spend limit across all projects. Queues auto-pause when exceeded.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={hubDailyBudget}
+                      onChange={(e) => setHubDailyBudget(e.target.value)}
+                      placeholder="e.g. 10.00"
+                      className="h-7 text-xs font-mono"
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 text-xs shrink-0"
+                      disabled={isSavingHubBudget}
+                      onClick={() => void handleSaveHubDailyBudget()}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Per-job cost alert threshold */}
+                <div className="space-y-1.5 border-t border-border pt-3">
+                  <p className="text-xs font-medium">Per-job cost alert (USD)</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Alert when a single job exceeds this amount. Leave blank to disable.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={costAlertThreshold}
+                      onChange={(e) => setCostAlertThreshold(e.target.value)}
+                      placeholder="e.g. 0.50"
+                      className="h-7 text-xs font-mono"
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 text-xs shrink-0"
+                      disabled={isSavingThreshold}
+                      onClick={handleSaveCostAlertThreshold}
+                    >
+                      Save
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
