@@ -6,6 +6,8 @@ import DashboardPage from './pages/DashboardPage'
 import SettingsPage from './pages/SettingsPage'
 import SettingsDialog from './pages/GlobalSettingsPage'
 import { Dialog, DialogContent } from './components/ui/dialog'
+import { useKeyboardShortcuts, useCheatsheetState } from './hooks/useKeyboardShortcuts'
+import { KeyboardShortcutsCheatsheet } from './components/KeyboardShortcutsCheatsheet'
 
 // Lazy-loaded pages — never visible at initial render
 const JobDetailPage = lazy(() => import('./pages/JobDetailPage'))
@@ -98,6 +100,10 @@ function HubApp() {
 
   // Remember which page each project was on
   useProjectRouteMemory(activeProjectId)
+
+  // Keyboard shortcuts
+  const { cheatsheetOpen, setCheatsheetOpen, openCheatsheet } = useCheatsheetState()
+  useKeyboardShortcuts({ onOpenCheatsheet: openCheatsheet })
 
   // OS notifications for job completions/failures
   const projectsById = useMemo(
@@ -248,6 +254,7 @@ function HubApp() {
         onOpenAnalytics={() => setAnalyticsOpen(true)}
         onOpenDocs={() => setDocsOpen(true)}
       />
+      <KeyboardShortcutsCheatsheet open={cheatsheetOpen} onOpenChange={setCheatsheetOpen} />
     </div>
   )
 }
@@ -257,6 +264,14 @@ function HubApp() {
 function LegacyOsNotifications() {
   useOsNotifications()
   return null
+}
+
+// ─── Legacy mode keyboard shortcuts ──────────────────────────────────────────
+
+function LegacyKeyboardShortcuts() {
+  const { cheatsheetOpen, setCheatsheetOpen, openCheatsheet } = useCheatsheetState()
+  useKeyboardShortcuts({ onOpenCheatsheet: openCheatsheet })
+  return <KeyboardShortcutsCheatsheet open={cheatsheetOpen} onOpenChange={setCheatsheetOpen} />
 }
 
 // ─── Root App ─────────────────────────────────────────────────────────────────
@@ -273,6 +288,7 @@ export default function App() {
       ) : (
         <Suspense fallback={<div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
           <LegacyOsNotifications />
+          <LegacyKeyboardShortcuts />
           <Routes>
             <Route path="/docs" element={<DocsPage />} />
             <Route path="/docs/:category/:slug" element={<DocsPage />} />
