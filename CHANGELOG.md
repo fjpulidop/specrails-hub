@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/fjpulidop/specrails-hub/compare/v1.11.1...v1.12.0) (2026-03-21)
+
+
+### Features
+
+* **client:** UX improvements batch — SPEA-489/490/491/492/493 ([#87](https://github.com/fjpulidop/specrails-hub/issues/87)) ([a23fb3c](https://github.com/fjpulidop/specrails-hub/commit/a23fb3c2898863afdb9b02a5920d50276381871c))
+
 ## [1.11.1](https://github.com/fjpulidop/specrails-hub/compare/v1.11.0...v1.11.1) (2026-03-21)
 
 
