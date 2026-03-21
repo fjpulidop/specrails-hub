@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useLayoutEffect, useRef, createContext, useContext } from 'react'
 import { useSharedWebSocket } from './useSharedWebSocket'
 import type { ChatConversationSummary, ChatMessage } from '../types'
 import { getApiBase } from '../lib/api'
@@ -30,6 +30,12 @@ export interface UseChatReturn {
   abortStream: (conversationId: string) => Promise<void>
   confirmCommand: (command: string) => Promise<void>
   dismissCommandProposal: (conversationId: string, command: string) => void
+}
+
+export const ChatContext = createContext<UseChatReturn | null>(null)
+
+export function useChatContext(): UseChatReturn | null {
+  return useContext(ChatContext)
 }
 
 export function useChat(): UseChatReturn {

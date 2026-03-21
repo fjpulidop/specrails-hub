@@ -5,7 +5,7 @@ import { ProjectNavbar } from './ProjectNavbar'
 import { StatusBar } from './StatusBar'
 import { ChatPanel } from './ChatPanel'
 import { usePipeline } from '../hooks/usePipeline'
-import { useChat } from '../hooks/useChat'
+import { useChat, ChatContext } from '../hooks/useChat'
 import type { HubProject } from '../hooks/useHub'
 
 interface ProjectLayoutProps {
@@ -18,6 +18,7 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
 
   return (
     <TooltipProvider delayDuration={400}>
+      <ChatContext.Provider value={chat}>
       <div className="flex flex-col h-full overflow-hidden">
         <ProjectNavbar project={project} />
         <div className="flex flex-1 overflow-hidden">
@@ -28,6 +29,7 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
         </div>
         <StatusBar connectionStatus={connectionStatus} />
       </div>
+      </ChatContext.Provider>
       <Toaster
         position="bottom-right"
         toastOptions={{
