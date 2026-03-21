@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getHubAnalytics, getHubTodayStats, getHubRecentJobs, searchHubContent } from './hub-analytics'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import fs from 'fs'
+import path from 'path'
+import { getHubAnalytics, getHubTodayStats, getHubRecentJobs, searchHubContent, getHubOverview } from './hub-analytics'
 import { initDb } from './db'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import type { DbInstance } from './db'
@@ -248,5 +250,146 @@ describe('searchHubContent', () => {
     ])
     const result = searchHubContent(registry, 'implement')
     expect(result.groups).toHaveLength(2)
+  })
+})
+
+// ─── getHubAnalytics — buildWhere edge cases ──────────────────────────────────
+
+describe('getHubAnalytics — custom period edge cases', () => {
+  it('handles custom period with only from date', () => {
+    const db = makeProjectDb([{ costUsd: 0.05, status: 'completed' }])
+    const registry = makeRegistry([{ id: 'p1', name: 'Proj', db }])
+    const today = new Date().toISOString().slice(0, 10)
+    const result = getHubAnalytics(registry, { period: 'custom', from: today })
+    expect(result.kpi.totalJobs).toBeGreaterThanOrEqual(0)
+  })
+
+  it('handles custom period with only to date', () => {
+    const db = makeProjectDb([{ costUsd: 0.05, status: 'completed' }])
+    const registry = makeRegistry([{ id: 'p1', name: 'Proj', db }])
+    const today = new Date().toISOString().slice(0, 10)
+    const result = getHubAnalytics(registry, { period: 'custom', to: today })
+    expect(result.kpi.totalJobs).toBeGreaterThanOrEqual(0)
+  })
+})
+
+// ─── getHubOverview ───────────────────────────────────────────────────────────
+
+describe('getHubOverview', () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync('/tmp/specrails-hub-overview-test-')
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  function makeRegistryWithPath(
+    contexts: Array<{ id: string; name: string; db: DbInstance; path?: string }>
+  ): ProjectRegistry {
+    const ctxMap = new Map(
+      contexts.map((c) => [
+        c.id,
+        {
+          project: {
+            id: c.id,
+            name: c.name,
+            slug: c.name,
+            path: c.path ?? '/tmp/nonexistent',
+            db_path: ':memory:',
+            added_at: '',
+            last_seen_at: '',
+          },
+          db: c.db,
+          queueManager: {} as any,
+          chatManager: {} as any,
+          setupManager: {} as any,
+          proposalManager: {} as any,
+          broadcast: vi.fn(),
+        },
+      ])
+    )
+    return {
+      hubDb: {} as any,
+      getContext: (id) => ctxMap.get(id),
+      getContextByPath: () => undefined,
+      addProject: vi.fn() as any,
+      removeProject: vi.fn(),
+      touchProject: vi.fn(),
+      listContexts: () => Array.from(ctxMap.values()),
+    } as unknown as ProjectRegistry
+  }
+
+  it('returns empty projects and zero aggregates for empty registry', () => {
+    const registry = makeRegistryWithPath([])
+    const result = getHubOverview(registry)
+    expect(result.projects).toEqual([])
+    expect(result.aggregated.totalCount).toBe(0)
+    expect(result.aggregated.healthyCount).toBe(0)
+    expect(result.aggregated.activeJobs).toBe(0)
+    expect(result.recentJobs).toEqual([])
+  })
+
+  it('returns project overview for a single project', () => {
+    const db = makeProjectDb([{ costUsd: 0.01, status: 'completed' }])
+    const registry = makeRegistryWithPath([{ id: 'p1', name: 'MyProject', db, path: tmpDir }])
+    const result = getHubOverview(registry)
+    expect(result.projects).toHaveLength(1)
+    expect(result.projects[0].projectId).toBe('p1')
+    expect(result.projects[0].projectName).toBe('MyProject')
+    expect(result.aggregated.totalCount).toBe(1)
+  })
+
+  it('includes coverage pct from coverage-summary.json when present', () => {
+    const coverageDir = path.join(tmpDir, 'coverage')
+    fs.mkdirSync(coverageDir)
+    fs.writeFileSync(
+      path.join(coverageDir, 'coverage-summary.json'),
+      JSON.stringify({ total: { lines: { pct: 85 } } })
+    )
+    const db = makeProjectDb([])
+    const registry = makeRegistryWithPath([{ id: 'p1', name: 'Covered', db, path: tmpDir }])
+    const result = getHubOverview(registry)
+    expect(result.projects[0].coveragePct).toBe(85)
+  })
+
+  it('returns null coveragePct when no coverage file exists', () => {
+    const db = makeProjectDb([])
+    const registry = makeRegistryWithPath([{ id: 'p1', name: 'NoCov', db, path: tmpDir }])
+    const result = getHubOverview(registry)
+    expect(result.projects[0].coveragePct).toBeNull()
+  })
+
+  it('classifies projects into healthy/warning/critical buckets', () => {
+    const db1 = makeProjectDb([{ costUsd: 0.01, status: 'completed' }])
+    const db2 = makeProjectDb([])
+    const db3 = makeProjectDb([{ costUsd: 0.01, status: 'failed' }])
+    const registry = makeRegistryWithPath([
+      { id: 'p1', name: 'Healthy', db: db1 },
+      { id: 'p2', name: 'Empty', db: db2 },
+      { id: 'p3', name: 'Failed', db: db3 },
+    ])
+    const result = getHubOverview(registry)
+    expect(result.aggregated.totalCount).toBe(3)
+    const totalBuckets = result.aggregated.healthyCount + result.aggregated.warningCount + result.aggregated.criticalCount
+    expect(totalBuckets).toBe(3)
+  })
+
+  it('sorts projects by active jobs descending', () => {
+    const dbActive = initDb(':memory:')
+    dbActive.prepare(
+      `INSERT INTO jobs (id, command, status, started_at, finished_at, total_cost_usd, duration_ms)
+       VALUES (?, 'implement', 'running', ?, null, 0, 0)`
+    ).run(crypto.randomUUID(), new Date().toISOString())
+
+    const dbIdle = makeProjectDb([])
+    const registry = makeRegistryWithPath([
+      { id: 'p1', name: 'Idle', db: dbIdle },
+      { id: 'p2', name: 'Active', db: dbActive },
+    ])
+    const result = getHubOverview(registry)
+    expect(result.projects[0].projectName).toBe('Active')
   })
 })

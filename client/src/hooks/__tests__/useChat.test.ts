@@ -364,4 +364,123 @@ describe('useChat', () => {
 
     expect(result.current.conversations[0].streamingText).toBe('')
   })
+
+  it('dismissCommandProposal: removes specific command from proposals', async () => {
+    ;(global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          conversations: [{ id: 'c1', title: null, model: 'claude-sonnet-4-5', created_at: '', updated_at: '' }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ messages: [] }),
+      })
+
+    const { result } = renderHook(() => useChat())
+    await waitFor(() => expect(result.current.conversations).toHaveLength(1))
+
+    // Add command proposals via WS
+    act(() => {
+      wsHandler?.({ type: 'chat_command_proposal', conversationId: 'c1', command: 'npm test' })
+      wsHandler?.({ type: 'chat_command_proposal', conversationId: 'c1', command: 'npm build' })
+    })
+
+    expect(result.current.conversations[0].commandProposals).toHaveLength(2)
+
+    act(() => {
+      result.current.dismissCommandProposal('c1', 'npm test')
+    })
+
+    expect(result.current.conversations[0].commandProposals).toEqual(['npm build'])
+  })
+
+  it('confirmCommand: sends POST to /spawn endpoint', async () => {
+    ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true } as Response)
+
+    const { result } = renderHook(() => useChat())
+    await act(async () => {
+      await result.current.confirmCommand('npm test')
+    })
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/spawn'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ command: 'npm test' }),
+      })
+    )
+  })
+
+  it('startWithMessage: creates conversation then sends message', async () => {
+    ;(global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversations: [] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          conversation: { id: 'new-c1', title: null, model: 'claude-sonnet-4-5', created_at: '', updated_at: '' },
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) } as unknown as Response) // sendMessage POST
+
+    const { result } = renderHook(() => useChat())
+    await waitFor(() => expect(result.current.conversations).toHaveLength(0))
+
+    await act(async () => {
+      await result.current.startWithMessage('What is the project status?')
+    })
+
+    // Conversation was created
+    expect(result.current.conversations).toHaveLength(1)
+    expect(result.current.conversations[0].id).toBe('new-c1')
+    // Message was sent
+    expect(result.current.conversations[0].messages).toHaveLength(1)
+    expect(result.current.conversations[0].messages[0].content).toBe('What is the project status?')
+  })
+
+  it('startWithMessage: ignores non-ok response', async () => {
+    ;(global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversations: [] }),
+      })
+      .mockResolvedValueOnce({ ok: false } as Response)
+
+    const { result } = renderHook(() => useChat())
+    await waitFor(() => expect(result.current.conversations).toHaveLength(0))
+
+    await act(async () => {
+      await result.current.startWithMessage('Will fail silently')
+    })
+
+    // No conversation created
+    expect(result.current.conversations).toHaveLength(0)
+  })
+
+  it('WS chat_title_update: updates conversation title', async () => {
+    ;(global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          conversations: [{ id: 'c1', title: null, model: 'claude-sonnet-4-5', created_at: '', updated_at: '' }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ messages: [] }),
+      })
+
+    const { result } = renderHook(() => useChat())
+    await waitFor(() => expect(result.current.conversations).toHaveLength(1))
+
+    act(() => {
+      wsHandler?.({ type: 'chat_title_update', conversationId: 'c1', title: 'New Title' })
+    })
+
+    expect(result.current.conversations[0].title).toBe('New Title')
+  })
 })

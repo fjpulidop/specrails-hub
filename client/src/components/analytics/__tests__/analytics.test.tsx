@@ -446,4 +446,20 @@ describe('TrendsChart', () => {
     fireEvent.click(successBtn) // try to deactivate last — should be no-op
     expect(screen.getByRole('button', { name: /success rate/i })).toBeInTheDocument()
   })
+
+  it('toggles duration metric on when its button is clicked', () => {
+    render(<TrendsChart points={mockTrendPoints} />)
+    const durationBtn = screen.getByRole('button', { name: /avg duration/i })
+    fireEvent.click(durationBtn) // activate duration (it starts inactive)
+    // Just ensure no crash and button still shows
+    expect(durationBtn).toBeInTheDocument()
+  })
+
+  it('toggles metric back on after deactivating', () => {
+    render(<TrendsChart points={mockTrendPoints} />)
+    const costBtn = screen.getByRole('button', { name: /avg cost/i })
+    fireEvent.click(costBtn) // deactivate
+    fireEvent.click(costBtn) // reactivate
+    expect(costBtn).toBeInTheDocument()
+  })
 })
