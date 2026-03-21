@@ -241,3 +241,14 @@ export interface JobCompareResponse {
   jobs: [JobCompareEntry, JobCompareEntry]
 }
 
+// ─── Job Templates ────────────────────────────────────────────────────────────
+
+export interface JobTemplate {
+  id: string
+  name: string
+  description: string | null
+  commands: string[]
+  created_at: string
+  updated_at: string
+}
+

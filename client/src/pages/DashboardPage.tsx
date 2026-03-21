@@ -11,10 +11,11 @@ import { BatchImplementWizard } from '../components/BatchImplementWizard'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
-import type { CommandInfo, JobSummary } from '../types'
+import type { CommandInfo, JobSummary, JobTemplate } from '../types'
 import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
 import { ProjectHealthWidget } from '../components/ProjectHealthWidget'
+import { TemplateLibrary } from '../components/TemplateLibrary'
 
 export default function DashboardPage() {
   const { activeProjectId } = useHub()
@@ -30,6 +31,18 @@ export default function DashboardPage() {
       if (!res.ok) return []
       const data = await res.json() as { commands: CommandInfo[] }
       return data.commands
+    },
+  })
+
+  const { data: templates, isFirstLoad: isLoadingTemplates, refresh: refreshTemplates } = useProjectCache<JobTemplate[]>({
+    namespace: 'templates',
+    projectId: activeProjectId,
+    initialValue: [],
+    fetcher: async () => {
+      const res = await fetch(`${getApiBase()}/templates`)
+      if (!res.ok) return []
+      const data = await res.json() as { templates: JobTemplate[] }
+      return data.templates
     },
   })
 
@@ -141,6 +154,17 @@ export default function DashboardPage() {
             onOpenWizard={(slug) => setWizardOpen(slug)}
           />
         )}
+      </section>
+
+      <section>
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+          Runbooks
+        </h2>
+        <TemplateLibrary
+          templates={templates}
+          isLoading={isLoadingTemplates}
+          onTemplatesChanged={refreshTemplates}
+        />
       </section>
 
       <section>

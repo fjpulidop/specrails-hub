@@ -10,6 +10,7 @@ import {
   deleteConversation, updateConversation, getMessages,
   getStats,
   createProposal, getProposal, listProposals, deleteProposal,
+  createTemplate, listTemplates, getTemplate, updateTemplate, deleteTemplate,
 } from './db'
 import { getProjectSetupSession } from './hub-db'
 import { ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
@@ -17,7 +18,7 @@ import { resolveCommand } from './command-resolver'
 import { createHooksRouter, getPhaseStates } from './hooks'
 import { getConfig, fetchIssues } from './config'
 import { getAnalytics, getTrends } from './analytics'
-import type { ChatConversationRow, TrendsPeriod } from './types'
+import type { ChatConversationRow, TrendsPeriod, JobTemplate } from './types'
 import { readChanges } from './changes-reader'
 import { getProjectMetrics } from './metrics'
 
@@ -607,6 +608,131 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     }
     specLauncherManager.cancel(req.params.launchId as string)
     res.json({ ok: true })
+  })
+
+  // ─── Job Templates ────────────────────────────────────────────────────────
+
+  function templateToPublic(row: ReturnType<typeof getTemplate>): JobTemplate | null {
+    if (!row) return null
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      commands: JSON.parse(row.commands) as string[],
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }
+  }
+
+  router.get('/:projectId/templates', (req: Request, res: Response) => {
+    const rows = listTemplates(ctx(req).db)
+    const templates = rows.map((r) => templateToPublic(r)!)
+    res.json({ templates })
+  })
+
+  router.post('/:projectId/templates', (req: Request, res: Response) => {
+    const { name, description, commands } = req.body ?? {}
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      res.status(400).json({ error: 'name is required' }); return
+    }
+    if (!Array.isArray(commands) || commands.length === 0) {
+      res.status(400).json({ error: 'commands must be a non-empty array' }); return
+    }
+    if (commands.some((c: unknown) => typeof c !== 'string' || !String(c).trim())) {
+      res.status(400).json({ error: 'each command must be a non-empty string' }); return
+    }
+    const id = uuidv4()
+    try {
+      createTemplate(ctx(req).db, {
+        id,
+        name: name.trim(),
+        description: description && typeof description === 'string' ? description.trim() : undefined,
+        commands: commands.map((c: string) => c.trim()),
+      })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg.includes('UNIQUE constraint failed')) {
+        res.status(409).json({ error: 'A template with that name already exists' }); return
+      }
+      console.error('[project-router] create template error:', err)
+      res.status(500).json({ error: 'Internal server error' }); return
+    }
+    const created = templateToPublic(getTemplate(ctx(req).db, id))!
+    res.status(201).json({ template: created })
+  })
+
+  router.get('/:projectId/templates/:templateId', (req: Request, res: Response) => {
+    const row = getTemplate(ctx(req).db, req.params.templateId as string)
+    if (!row) { res.status(404).json({ error: 'Template not found' }); return }
+    res.json({ template: templateToPublic(row)! })
+  })
+
+  router.patch('/:projectId/templates/:templateId', (req: Request, res: Response) => {
+    const { db } = ctx(req)
+    const templateId = req.params.templateId as string
+    const row = getTemplate(db, templateId)
+    if (!row) { res.status(404).json({ error: 'Template not found' }); return }
+    const { name, description, commands } = req.body ?? {}
+    const patch: { name?: string; description?: string | null; commands?: string[] } = {}
+    if (name !== undefined) {
+      if (typeof name !== 'string' || !name.trim()) {
+        res.status(400).json({ error: 'name must be a non-empty string' }); return
+      }
+      patch.name = name.trim()
+    }
+    if (description !== undefined) {
+      patch.description = description === null ? null : String(description).trim() || null
+    }
+    if (commands !== undefined) {
+      if (!Array.isArray(commands) || commands.length === 0) {
+        res.status(400).json({ error: 'commands must be a non-empty array' }); return
+      }
+      if (commands.some((c: unknown) => typeof c !== 'string' || !String(c).trim())) {
+        res.status(400).json({ error: 'each command must be a non-empty string' }); return
+      }
+      patch.commands = commands.map((c: string) => c.trim())
+    }
+    try {
+      updateTemplate(db, templateId, patch)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg.includes('UNIQUE constraint failed')) {
+        res.status(409).json({ error: 'A template with that name already exists' }); return
+      }
+      console.error('[project-router] update template error:', err)
+      res.status(500).json({ error: 'Internal server error' }); return
+    }
+    const updated = templateToPublic(getTemplate(db, templateId))!
+    res.json({ ok: true, template: updated })
+  })
+
+  router.delete('/:projectId/templates/:templateId', (req: Request, res: Response) => {
+    const { db } = ctx(req)
+    const row = getTemplate(db, req.params.templateId as string)
+    if (!row) { res.status(404).json({ error: 'Template not found' }); return }
+    deleteTemplate(db, req.params.templateId as string)
+    res.json({ ok: true })
+  })
+
+  router.post('/:projectId/templates/:templateId/run', (req: Request, res: Response) => {
+    const { db, queueManager } = ctx(req)
+    const row = getTemplate(db, req.params.templateId as string)
+    if (!row) { res.status(404).json({ error: 'Template not found' }); return }
+    const commands = JSON.parse(row.commands) as string[]
+    const jobIds: string[] = []
+    try {
+      for (const command of commands) {
+        const job = queueManager.enqueue(command)
+        jobIds.push(job.id)
+      }
+    } catch (err) {
+      if (err instanceof ClaudeNotFoundError) {
+        res.status(400).json({ error: err.message }); return
+      }
+      console.error('[project-router] template run error:', err)
+      res.status(500).json({ error: 'Internal server error' }); return
+    }
+    res.status(202).json({ ok: true, jobIds, templateId: row.id, templateName: row.name })
   })
 
   return router

@@ -10,8 +10,21 @@ vi.mock('./core-compat', async (importActual) => {
     ...actual,
     checkCoreCompat: vi.fn().mockResolvedValue({ compatible: true, contractFound: false }),
     getCLIStatus: vi.fn().mockReturnValue({ provider: 'claude', version: '1.2.3' }),
+    detectAvailableCLIs: vi.fn().mockReturnValue({ claude: true, codex: false }),
   }
 })
+
+const mockSpecrailsTechClient = {
+  health: vi.fn(),
+  listAgents: vi.fn(),
+  getAgent: vi.fn(),
+  listDocs: vi.fn(),
+  getDoc: vi.fn(),
+}
+
+vi.mock('./specrails-tech-client', () => ({
+  createSpecrailsTechClient: vi.fn(() => mockSpecrailsTechClient),
+}))
 
 import { createHubRouter } from './hub-router'
 import { initHubDb, addProject, removeProject as removeProjectFromHub, getHubSetting, setHubSetting, addAgent, getAgent } from './hub-db'
@@ -524,6 +537,263 @@ describe('hub-router', () => {
       expect(res.status).toBe(200)
       expect(res.body.provider).toBe('claude')
       expect(res.body.version).toBe('1.2.3')
+    })
+  })
+
+  // ─── GET /api/hub/available-providers ───────────────────────────────────────
+
+  describe('GET /api/hub/available-providers', () => {
+    it('returns available CLI providers', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/available-providers')
+      expect(res.status).toBe(200)
+      expect(res.body).toHaveProperty('claude')
+      expect(res.body).toHaveProperty('codex')
+    })
+  })
+
+  // ─── POST /projects — provider validation ───────────────────────────────────
+
+  describe('POST /api/hub/projects — provider field', () => {
+    it('returns 400 for invalid provider value', async () => {
+      const { app } = createApp()
+      const res = await request(app).post('/api/hub/projects').send({
+        path: '/home/user/proj',
+        provider: 'gemini',
+      })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('provider')
+    })
+
+    it('creates project with explicit codex provider', async () => {
+      const { app } = createApp()
+      const res = await request(app).post('/api/hub/projects').send({
+        path: '/home/user/proj-codex',
+        provider: 'codex',
+      })
+      expect(res.status).toBe(201)
+      expect(res.body.project).toBeDefined()
+    })
+
+    it('returns 400 when path is a system-critical directory', async () => {
+      const { app } = createApp()
+      const res = await request(app).post('/api/hub/projects').send({ path: '/etc' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('system')
+    })
+  })
+
+  // ─── GET /api/hub/analytics ──────────────────────────────────────────────────
+
+  describe('GET /api/hub/analytics', () => {
+    it('returns analytics data with default period', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/analytics')
+      expect(res.status).toBe(200)
+    })
+
+    it('accepts period query param', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/analytics?period=30d')
+      expect(res.status).toBe(200)
+    })
+
+    it('accepts from and to query params', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/analytics?period=custom&from=2026-01-01&to=2026-03-01')
+      expect(res.status).toBe(200)
+    })
+  })
+
+  // ─── GET /api/hub/overview ───────────────────────────────────────────────────
+
+  describe('GET /api/hub/overview', () => {
+    it('returns hub overview', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/overview')
+      expect(res.status).toBe(200)
+    })
+  })
+
+  // ─── GET /api/hub/core-compat ───────────────────────────────────────────────
+
+  describe('GET /api/hub/core-compat', () => {
+    it('returns compatibility result', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/core-compat')
+      expect(res.status).toBe(200)
+      expect(res.body.compatible).toBe(true)
+    })
+  })
+
+  // ─── PUT /api/hub/settings — additional fields ──────────────────────────────
+
+  describe('PUT /api/hub/settings — extended fields', () => {
+    it('updates specrailsTechUrl', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .put('/api/hub/settings')
+        .send({ specrailsTechUrl: 'http://my-specrails.internal' })
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+      expect(getHubSetting(hubDb, 'specrails_tech_url')).toBe('http://my-specrails.internal')
+    })
+
+    it('ignores non-string specrailsTechUrl', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .put('/api/hub/settings')
+        .send({ specrailsTechUrl: 42 })
+      expect(res.status).toBe(200)
+      // Should not have been saved
+      expect(getHubSetting(hubDb, 'specrails_tech_url')).toBeUndefined()
+    })
+
+    it('sets costAlertThresholdUsd', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .put('/api/hub/settings')
+        .send({ costAlertThresholdUsd: 5.0 })
+      expect(res.status).toBe(200)
+      expect(getHubSetting(hubDb, 'cost_alert_threshold_usd')).toBe('5')
+    })
+
+    it('clears costAlertThresholdUsd when null', async () => {
+      setHubSetting(hubDb, 'cost_alert_threshold_usd', '5')
+      const { app } = createApp()
+      const res = await request(app)
+        .put('/api/hub/settings')
+        .send({ costAlertThresholdUsd: null })
+      expect(res.status).toBe(200)
+      expect(getHubSetting(hubDb, 'cost_alert_threshold_usd')).toBeUndefined()
+    })
+
+    it('returns costAlertThresholdUsd from GET /settings', async () => {
+      setHubSetting(hubDb, 'cost_alert_threshold_usd', '10.5')
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/settings')
+      expect(res.status).toBe(200)
+      expect(res.body.costAlertThresholdUsd).toBe(10.5)
+    })
+
+    it('returns null costAlertThresholdUsd when not set', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/settings')
+      expect(res.status).toBe(200)
+      expect(res.body.costAlertThresholdUsd).toBeNull()
+    })
+  })
+
+  // ─── specrails-tech proxy routes ────────────────────────────────────────────
+
+  describe('GET /api/hub/specrails-tech/status', () => {
+    it('returns connected:true when service is reachable', async () => {
+      mockSpecrailsTechClient.health.mockResolvedValue({ connected: true, data: { status: 'ok' } })
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/specrails-tech/status')
+      expect(res.status).toBe(200)
+      expect(res.body.connected).toBe(true)
+      expect(res.body.data.status).toBe('ok')
+    })
+
+    it('returns connected:false when service is unreachable', async () => {
+      mockSpecrailsTechClient.health.mockResolvedValue({ connected: false, error: 'ECONNREFUSED' })
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/specrails-tech/status')
+      expect(res.status).toBe(200)
+      expect(res.body.connected).toBe(false)
+      expect(res.body.error).toBeDefined()
+    })
+  })
+
+  describe('GET /api/hub/specrails-tech/agents', () => {
+    it('returns agents list when connected', async () => {
+      mockSpecrailsTechClient.listAgents.mockResolvedValue({ connected: true, data: [{ slug: 'cto' }] })
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/specrails-tech/agents')
+      expect(res.status).toBe(200)
+      expect(res.body.connected).toBe(true)
+      expect(res.body.data).toHaveLength(1)
+    })
+
+    it('returns empty data when disconnected', async () => {
+      mockSpecrailsTechClient.listAgents.mockResolvedValue({ connected: false, error: 'offline' })
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/specrails-tech/agents')
+      expect(res.status).toBe(200)
+      expect(res.body.connected).toBe(false)
+      expect(res.body.data).toEqual([])
+    })
+  })
+
+  describe('GET /api/hub/specrails-tech/agents/:slug', () => {
+    it('returns agent detail when connected', async () => {
+      mockSpecrailsTechClient.getAgent.mockResolvedValue({ connected: true, data: { slug: 'cto', name: 'CTO' } })
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/specrails-tech/agents/cto')
+      expect(res.status).toBe(200)
+      expect(res.body.connected).toBe(true)
+      expect(res.body.data.slug).toBe('cto')
+    })
+
+    it('returns 503 when disconnected', async () => {
+      mockSpecrailsTechClient.getAgent.mockResolvedValue({ connected: false, error: 'offline' })
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/specrails-tech/agents/cto')
+      expect(res.status).toBe(503)
+      expect(res.body.connected).toBe(false)
+    })
+  })
+
+  describe('GET /api/hub/specrails-tech/docs', () => {
+    it('returns docs list when connected', async () => {
+      mockSpecrailsTechClient.listDocs.mockResolvedValue({ connected: true, data: [{ page: 'intro' }] })
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/specrails-tech/docs')
+      expect(res.status).toBe(200)
+      expect(res.body.connected).toBe(true)
+      expect(res.body.data).toHaveLength(1)
+    })
+
+    it('returns empty data when disconnected', async () => {
+      mockSpecrailsTechClient.listDocs.mockResolvedValue({ connected: false, error: 'offline' })
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/specrails-tech/docs')
+      expect(res.status).toBe(200)
+      expect(res.body.data).toEqual([])
+    })
+  })
+
+  describe('GET /api/hub/specrails-tech/docs/:page', () => {
+    it('returns doc detail when connected', async () => {
+      mockSpecrailsTechClient.getDoc.mockResolvedValue({ connected: true, data: { page: 'intro', content: '...' } })
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/specrails-tech/docs/intro')
+      expect(res.status).toBe(200)
+      expect(res.body.connected).toBe(true)
+      expect(res.body.data.page).toBe('intro')
+    })
+
+    it('returns 503 when disconnected', async () => {
+      mockSpecrailsTechClient.getDoc.mockResolvedValue({ connected: false, error: 'offline' })
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/specrails-tech/docs/intro')
+      expect(res.status).toBe(503)
+    })
+  })
+
+  // ─── PATCH /agents/:id — extended fields ────────────────────────────────────
+
+  describe('PATCH /api/hub/agents/:id — extended fields', () => {
+    it('updates last_heartbeat_at and config', async () => {
+      addAgent(hubDb, { id: 'a2', slug: 'extended-agent', name: 'Extended' })
+      const { app } = createApp()
+      const heartbeat = new Date().toISOString()
+      const res = await request(app)
+        .patch('/api/hub/agents/a2')
+        .send({ last_heartbeat_at: heartbeat, config: '{"model":"claude"}' })
+      expect(res.status).toBe(200)
+      expect(res.body.agent.last_heartbeat_at).toBe(heartbeat)
     })
   })
 })

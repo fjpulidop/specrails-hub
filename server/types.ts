@@ -397,6 +397,17 @@ export interface ProposalErrorMessage {
   timestamp: string
 }
 
+// ─── Job Templates ────────────────────────────────────────────────────────────
+
+export interface JobTemplate {
+  id: string
+  name: string
+  description: string | null
+  commands: string[]
+  created_at: string
+  updated_at: string
+}
+
 // ─── Spec Launcher message types ─────────────────────────────────────────────
 
 export interface SpecLauncherStreamMessage {

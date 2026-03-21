@@ -15,6 +15,11 @@ import {
   listProposals,
   updateProposal,
   deleteProposal,
+  createTemplate,
+  listTemplates,
+  getTemplate,
+  updateTemplate,
+  deleteTemplate,
 } from './db'
 import type { DbInstance } from './db'
 
@@ -405,5 +410,72 @@ describe('proposals', () => {
     expect(getProposal(db, 'orphan-refining')!.status).toBe('cancelled')
     // review proposals are not affected
     expect(getProposal(db, 'stable-review')!.status).toBe('review')
+  })
+})
+
+describe('job templates', () => {
+  let db: ReturnType<typeof makeDb>
+
+  beforeEach(() => {
+    db = makeDb()
+  })
+
+  it('creates and retrieves a template', () => {
+    createTemplate(db, { id: 'tpl-1', name: 'My Runbook', commands: ['/sr:health-check', '/sr:implement #1'] })
+    const row = getTemplate(db, 'tpl-1')
+    expect(row).toBeDefined()
+    expect(row!.name).toBe('My Runbook')
+    const commands = JSON.parse(row!.commands) as string[]
+    expect(commands).toEqual(['/sr:health-check', '/sr:implement #1'])
+    expect(row!.description).toBeNull()
+  })
+
+  it('stores optional description', () => {
+    createTemplate(db, { id: 'tpl-2', name: 'With Desc', description: 'Does stuff', commands: ['/sr:implement'] })
+    const row = getTemplate(db, 'tpl-2')!
+    expect(row.description).toBe('Does stuff')
+  })
+
+  it('lists templates ordered by created_at desc', () => {
+    createTemplate(db, { id: 'tpl-a', name: 'A', commands: ['/cmd-a'] })
+    createTemplate(db, { id: 'tpl-b', name: 'B', commands: ['/cmd-b'] })
+    const rows = listTemplates(db)
+    expect(rows.length).toBe(2)
+    // Both are present; names are correct
+    expect(rows.map((r) => r.name)).toContain('A')
+    expect(rows.map((r) => r.name)).toContain('B')
+  })
+
+  it('returns undefined for unknown id', () => {
+    expect(getTemplate(db, 'nonexistent')).toBeUndefined()
+  })
+
+  it('updates name, description, and commands', () => {
+    createTemplate(db, { id: 'tpl-3', name: 'Old Name', commands: ['/old'] })
+    updateTemplate(db, 'tpl-3', { name: 'New Name', description: 'Updated', commands: ['/new-1', '/new-2'] })
+    const row = getTemplate(db, 'tpl-3')!
+    expect(row.name).toBe('New Name')
+    expect(row.description).toBe('Updated')
+    const commands = JSON.parse(row.commands) as string[]
+    expect(commands).toEqual(['/new-1', '/new-2'])
+  })
+
+  it('deletes a template', () => {
+    createTemplate(db, { id: 'tpl-4', name: 'To Delete', commands: ['/cmd'] })
+    deleteTemplate(db, 'tpl-4')
+    expect(getTemplate(db, 'tpl-4')).toBeUndefined()
+  })
+
+  it('enforces name uniqueness', () => {
+    createTemplate(db, { id: 'tpl-5', name: 'Unique', commands: ['/cmd'] })
+    expect(() => {
+      createTemplate(db, { id: 'tpl-6', name: 'Unique', commands: ['/cmd2'] })
+    }).toThrow()
+  })
+
+  it('migration 6 creates job_templates table', () => {
+    const result = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='job_templates'")
+      .get() as { name: string } | undefined
+    expect(result?.name).toBe('job_templates')
   })
 })
