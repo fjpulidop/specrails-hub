@@ -5,7 +5,7 @@ import type { WsMessage } from './types'
 import type { ProjectRegistry } from './project-registry'
 import { getHubSetting, setHubSetting, listProjects, listAgents, getAgent, addAgent, updateAgent } from './hub-db'
 import { createSpecrailsTechClient } from './specrails-tech-client'
-import { checkCoreCompat, getCLIStatus } from './core-compat'
+import { checkCoreCompat, getCLIStatus, detectAvailableCLIs } from './core-compat'
 import { getHubAnalytics, getHubTodayStats, getHubRecentJobs, searchHubContent, getHubOverview } from './hub-analytics'
 import type { AnalyticsOpts, AnalyticsPeriod } from './types'
 
@@ -46,11 +46,20 @@ export function createHubRouter(
     res.json({ projects })
   })
 
+  // GET /api/hub/available-providers — which AI CLIs are installed
+  router.get('/available-providers', (_req, res) => {
+    res.json(detectAvailableCLIs())
+  })
+
   // POST /api/hub/projects — register a new project by path
   router.post('/projects', (req, res) => {
-    const { path: projectPath, name } = req.body ?? {}
+    const { path: projectPath, name, provider } = req.body ?? {}
     if (!projectPath || typeof projectPath !== 'string') {
       res.status(400).json({ error: 'path is required' })
+      return
+    }
+    if (provider !== undefined && provider !== 'claude' && provider !== 'codex') {
+      res.status(400).json({ error: 'provider must be "claude" or "codex"' })
       return
     }
 
@@ -76,7 +85,7 @@ export function createHubRouter(
     const specrailsInstalled = hasSpecrails(resolvedPath)
 
     try {
-      const ctx = registry.addProject({ id, slug, name: derivedName, path: resolvedPath })
+      const ctx = registry.addProject({ id, slug, name: derivedName, path: resolvedPath, provider: provider ?? 'claude' })
       broadcast({
         type: 'hub.project_added',
         project: ctx.project,

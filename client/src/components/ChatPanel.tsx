@@ -159,6 +159,7 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
             model={activeConversation.model}
             hasMessages={activeConversation.messages.length > 0}
             isStreaming={activeConversation.isStreaming}
+            provider={project?.provider ?? 'claude'}
             onSend={sendMessage}
             onAbort={abortStream}
             onModelChange={(m) => changeConversationModel(activeConversation.id, m)}

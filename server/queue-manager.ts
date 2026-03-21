@@ -22,6 +22,13 @@ export class ClaudeNotFoundError extends Error {
   }
 }
 
+export class CodexNotFoundError extends Error {
+  constructor() {
+    super('codex binary not found')
+    this.name = 'CodexNotFoundError'
+  }
+}
+
 export class JobNotFoundError extends Error {
   constructor() {
     super('Job not found')
@@ -41,6 +48,15 @@ export class JobAlreadyTerminalError extends Error {
 function claudeOnPath(): boolean {
   try {
     execSync('which claude', { stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+function codexOnPath(): boolean {
+  try {
+    execSync('which codex', { stdio: 'ignore' })
     return true
   } catch {
     return false
@@ -89,13 +105,14 @@ export class QueueManager {
   private _inactivityTimer: ReturnType<typeof setTimeout> | null
 
   private _getCostAlertThreshold: (() => number | null) | null
+  private _provider: 'claude' | 'codex'
 
   constructor(
     broadcast: (msg: WsMessage) => void,
     db?: any,
     commands?: CommandInfo[],
     cwd?: string,
-    options?: { zombieTimeoutMs?: number; getCostAlertThreshold?: () => number | null }
+    options?: { zombieTimeoutMs?: number; getCostAlertThreshold?: () => number | null; provider?: 'claude' | 'codex' }
   ) {
     this._queue = []
     this._jobs = new Map()
@@ -113,6 +130,7 @@ export class QueueManager {
     this._inactivityTimer = null
 
     this._getCostAlertThreshold = options?.getCostAlertThreshold ?? null
+    this._provider = options?.provider ?? 'claude'
 
     const envTimeout = process.env.WM_ZOMBIE_TIMEOUT_MS !== undefined
       ? parseInt(process.env.WM_ZOMBIE_TIMEOUT_MS, 10)
@@ -132,8 +150,10 @@ export class QueueManager {
   // ─── Public API ─────────────────────────────────────────────────────────────
 
   enqueue(command: string): Job {
-    if (!claudeOnPath()) {
-      throw new ClaudeNotFoundError()
+    if (this._provider === 'codex') {
+      if (!codexOnPath()) throw new CodexNotFoundError()
+    } else {
+      if (!claudeOnPath()) throw new ClaudeNotFoundError()
     }
 
     const id = uuidv4()
@@ -290,15 +310,25 @@ export class QueueManager {
     }
 
     const trimmedCommand = job.command.trim()
-    const args = [
-      '--dangerously-skip-permissions',
-      '--output-format', 'stream-json',
-      '--verbose',
-      '-p',
-      this._resolveCommand(trimmedCommand),
-    ]
+    const resolvedCmd = this._resolveCommand(trimmedCommand)
 
-    const child = spawn('claude', args, {
+    let binary: string
+    let args: string[]
+    if (this._provider === 'codex') {
+      binary = 'codex'
+      args = ['exec', resolvedCmd]
+    } else {
+      binary = 'claude'
+      args = [
+        '--dangerously-skip-permissions',
+        '--output-format', 'stream-json',
+        '--verbose',
+        '-p',
+        resolvedCmd,
+      ]
+    }
+
+    const child = spawn(binary, args, {
       env: process.env,
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],

@@ -66,6 +66,7 @@ export class ProjectRegistry {
     slug: string
     name: string
     path: string
+    provider?: 'claude' | 'codex'
   }): ProjectContext {
     const row = addProjectToHub(this._hubDb, opts)
     return this._loadProjectContext(row)
@@ -127,12 +128,13 @@ export class ProjectRegistry {
     }
 
     const queueManager = new QueueManager(boundBroadcast, db, undefined, project.path, {
+      provider: project.provider ?? 'claude',
       getCostAlertThreshold: () => {
         const val = getHubSetting(this._hubDb, 'cost_alert_threshold_usd')
         return val != null ? parseFloat(val) : null
       },
     })
-    const chatManager = new ChatManager(boundBroadcast, db, project.path, project.name)
+    const chatManager = new ChatManager(boundBroadcast, db, project.path, project.name, project.provider ?? 'claude')
     const setupManager = new SetupManager(
       boundBroadcast,
       (pid, sid) => setProjectSetupSession(this._hubDb, pid, sid),

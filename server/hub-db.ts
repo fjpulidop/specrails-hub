@@ -12,6 +12,7 @@ export interface ProjectRow {
   name: string
   path: string
   db_path: string
+  provider: 'claude' | 'codex'
   added_at: string
   last_seen_at: string
 }
@@ -97,6 +98,10 @@ function applyHubMigrations(db: DbInstance): void {
         CREATE INDEX IF NOT EXISTS idx_agents_current_job_id ON agents(current_job_id);
       `)
     },
+    // Migration 3: add provider column to projects
+    () => {
+      db.exec(`ALTER TABLE projects ADD COLUMN provider TEXT NOT NULL DEFAULT 'claude'`)
+    },
   ]
 
   for (let i = 0; i < migrations.length; i++) {
@@ -142,13 +147,14 @@ export function getProjectByPath(db: DbInstance, projectPath: string): ProjectRo
 
 export function addProject(
   db: DbInstance,
-  project: { id: string; slug: string; name: string; path: string }
+  project: { id: string; slug: string; name: string; path: string; provider?: 'claude' | 'codex' }
 ): ProjectRow {
   const dbPath = getProjectDbPath(project.slug)
+  const provider = project.provider ?? 'claude'
   db.prepare(`
-    INSERT INTO projects (id, slug, name, path, db_path)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(project.id, project.slug, project.name, project.path, dbPath)
+    INSERT INTO projects (id, slug, name, path, db_path, provider)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(project.id, project.slug, project.name, project.path, dbPath, provider)
   return db.prepare('SELECT * FROM projects WHERE id = ?').get(project.id) as ProjectRow
 }
 

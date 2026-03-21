@@ -3,10 +3,15 @@ import { Button } from './ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { cn } from '../lib/utils'
 
-const MODEL_OPTIONS = [
+const CLAUDE_MODEL_OPTIONS = [
   { value: 'claude-opus-4-6', label: 'Opus 4.6' },
   { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
   { value: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
+]
+
+const CODEX_MODEL_OPTIONS = [
+  { value: 'o4-mini', label: 'o4-mini' },
+  { value: 'o3', label: 'o3' },
 ]
 
 interface ChatInputProps {
@@ -14,6 +19,7 @@ interface ChatInputProps {
   model: string
   hasMessages: boolean
   isStreaming: boolean
+  provider?: 'claude' | 'codex'
   onSend: (conversationId: string, text: string) => void
   onAbort: (conversationId: string) => void
   onModelChange: (model: string) => void
@@ -24,10 +30,12 @@ export function ChatInput({
   model,
   hasMessages,
   isStreaming,
+  provider = 'claude',
   onSend,
   onAbort,
   onModelChange,
 }: ChatInputProps) {
+  const MODEL_OPTIONS = provider === 'codex' ? CODEX_MODEL_OPTIONS : CLAUDE_MODEL_OPTIONS
   const [text, setText] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 

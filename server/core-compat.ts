@@ -88,6 +88,18 @@ export function detectCLISync(): CLIProvider | null {
 }
 
 /**
+ * Check which AI CLIs are available in the user's PATH.
+ * Returns a map of provider → available flag.
+ */
+export function detectAvailableCLIs(): { claude: boolean; codex: boolean } {
+  let claude = false
+  let codex = false
+  try { execSync('which claude', { stdio: 'ignore' }); claude = true } catch { /* not found */ }
+  try { execSync('which codex', { stdio: 'ignore' }); codex = true } catch { /* not found */ }
+  return { claude, codex }
+}
+
+/**
  * Async wrapper around detectCLISync for callers that prefer Promise-based API.
  */
 export async function detectCLI(): Promise<CLIProvider | null> {

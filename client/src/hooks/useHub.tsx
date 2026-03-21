@@ -18,6 +18,7 @@ export interface HubProject {
   name: string
   path: string
   db_path: string
+  provider: 'claude' | 'codex'
   added_at: string
   last_seen_at: string
 }

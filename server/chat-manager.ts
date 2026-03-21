@@ -19,6 +19,15 @@ function claudeOnPath(): boolean {
   }
 }
 
+function codexOnPath(): boolean {
+  try {
+    execSync('which codex', { stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+}
+
 function extractTextFromEvent(event: Record<string, unknown>): string | null {
   const type = event.type as string
   if (type === 'assistant') {
@@ -53,12 +62,14 @@ export class ChatManager {
 
   private _cwd: string | undefined
   private _projectName: string | undefined
+  private _provider: 'claude' | 'codex'
 
-  constructor(broadcast: (msg: WsMessage) => void, db: DbInstance, cwd?: string, projectName?: string) {
+  constructor(broadcast: (msg: WsMessage) => void, db: DbInstance, cwd?: string, projectName?: string, provider?: 'claude' | 'codex') {
     this._broadcast = broadcast
     this._db = db
     this._cwd = cwd
     this._projectName = projectName
+    this._provider = provider ?? 'claude'
     this._activeProcesses = new Map()
     this._buffers = new Map()
     this._emittedProposals = new Map()
@@ -129,14 +140,26 @@ export class ChatManager {
       return
     }
 
-    if (!claudeOnPath()) {
-      this._broadcast({
-        type: 'chat_error',
-        conversationId,
-        error: 'CLAUDE_NOT_FOUND',
-        timestamp: new Date().toISOString(),
-      })
-      return
+    if (this._provider === 'codex') {
+      if (!codexOnPath()) {
+        this._broadcast({
+          type: 'chat_error',
+          conversationId,
+          error: 'CODEX_NOT_FOUND',
+          timestamp: new Date().toISOString(),
+        })
+        return
+      }
+    } else {
+      if (!claudeOnPath()) {
+        this._broadcast({
+          type: 'chat_error',
+          conversationId,
+          error: 'CLAUDE_NOT_FOUND',
+          timestamp: new Date().toISOString(),
+        })
+        return
+      }
     }
 
     const conversation = getConversation(this._db, conversationId)
@@ -151,22 +174,32 @@ export class ChatManager {
     // Persist user message
     addMessage(this._db, { conversation_id: conversationId, role: 'user', content: userText })
 
-    // Build spawn args with contextual system prompt
-    const systemPrompt = this._buildSystemPrompt()
-    const args: string[] = [
-      '--model', conversation.model,
-      '--dangerously-skip-permissions',
-      '--output-format', 'stream-json',
-      '--verbose',
-      '--system-prompt', systemPrompt,
-      '-p', userText,
-    ]
+    // Build spawn args based on provider
+    let binary: string
+    let args: string[]
 
-    if (conversation.session_id) {
-      args.push('--resume', conversation.session_id)
+    if (this._provider === 'codex') {
+      binary = 'codex'
+      // Codex: single-turn exec with model selection
+      const model = conversation.model || 'o4-mini'
+      args = ['exec', userText, '--model', model]
+    } else {
+      binary = 'claude'
+      const systemPrompt = this._buildSystemPrompt()
+      args = [
+        '--model', conversation.model,
+        '--dangerously-skip-permissions',
+        '--output-format', 'stream-json',
+        '--verbose',
+        '--system-prompt', systemPrompt,
+        '-p', userText,
+      ]
+      if (conversation.session_id) {
+        args.push('--resume', conversation.session_id)
+      }
     }
 
-    const child = spawn('claude', args, {
+    const child = spawn(binary, args, {
       env: process.env,
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -181,47 +214,55 @@ export class ChatManager {
 
     const stdoutReader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
 
-    stdoutReader.on('line', (line) => {
-      let parsed: Record<string, unknown> | null = null
-      try { parsed = JSON.parse(line) } catch { /* skip non-JSON */ }
-      if (!parsed) return
+    const emitDelta = (newText: string) => {
+      const prev = this._buffers.get(conversationId) ?? ''
+      const updated = prev + newText
+      this._buffers.set(conversationId, updated)
 
-      const eventType = parsed.type as string
+      this._broadcast({
+        type: 'chat_stream',
+        conversationId,
+        delta: newText,
+        timestamp: new Date().toISOString(),
+      })
 
-      if (eventType === 'result') {
-        const sid = parsed.session_id as string | undefined
-        if (sid) capturedSessionId = sid
-      }
-
-      const newText = extractTextFromEvent(parsed)
-      if (newText) {
-        const prev = this._buffers.get(conversationId) ?? ''
-        const updated = prev + newText
-        this._buffers.set(conversationId, updated)
-
-        this._broadcast({
-          type: 'chat_stream',
-          conversationId,
-          delta: newText,
-          timestamp: new Date().toISOString(),
-        })
-
-        // Check for new command proposals
-        const proposals = extractCommandProposals(updated)
-        const emitted = this._emittedProposals.get(conversationId)
-        if (emitted) {
-          for (const proposal of proposals) {
-            if (!emitted.has(proposal)) {
-              emitted.add(proposal)
-              this._broadcast({
-                type: 'chat_command_proposal',
-                conversationId,
-                command: proposal,
-                timestamp: new Date().toISOString(),
-              })
-            }
+      // Check for new command proposals
+      const proposals = extractCommandProposals(updated)
+      const emitted = this._emittedProposals.get(conversationId)
+      if (emitted) {
+        for (const proposal of proposals) {
+          if (!emitted.has(proposal)) {
+            emitted.add(proposal)
+            this._broadcast({
+              type: 'chat_command_proposal',
+              conversationId,
+              command: proposal,
+              timestamp: new Date().toISOString(),
+            })
           }
         }
+      }
+    }
+
+    stdoutReader.on('line', (line) => {
+      if (this._provider === 'codex') {
+        // Codex outputs plain text
+        if (line) emitDelta(line + '\n')
+      } else {
+        // Claude outputs JSON stream
+        let parsed: Record<string, unknown> | null = null
+        try { parsed = JSON.parse(line) } catch { /* skip non-JSON */ }
+        if (!parsed) return
+
+        const eventType = parsed.type as string
+
+        if (eventType === 'result') {
+          const sid = parsed.session_id as string | undefined
+          if (sid) capturedSessionId = sid
+        }
+
+        const newText = extractTextFromEvent(parsed)
+        if (newText) emitDelta(newText)
       }
     })
 
@@ -298,6 +339,9 @@ export class ChatManager {
       const titlePrompt =
         `Generate a 4-6 word title for this conversation. Output ONLY the title text, no quotes or punctuation.\n\n` +
         `User: ${firstUserMsg.slice(0, 200)}\nAssistant: ${firstResponse.slice(0, 300)}`
+
+      // Auto-title only available with Claude (needs JSON stream parsing)
+      if (this._provider !== 'claude') return
 
       const child = spawn('claude', [
         '--dangerously-skip-permissions',
