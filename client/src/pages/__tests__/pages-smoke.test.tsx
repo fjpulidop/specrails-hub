@@ -214,9 +214,14 @@ describe('ActivityFeedPage', () => {
 describe('GlobalSettingsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => ({ port: 4200, specrailsTechUrl: 'http://localhost:3000' }),
+    ;(global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
+        return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ port: 4200, specrailsTechUrl: 'http://localhost:3000' }),
+      })
     })
   })
 

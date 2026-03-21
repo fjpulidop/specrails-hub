@@ -39,9 +39,11 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockProjects = []
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => hubSettings,
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
+        return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => hubSettings })
     })
   })
 
@@ -206,8 +208,9 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     const { toast } = await import('sonner')
 
     global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings }) // GET
-      .mockResolvedValueOnce({ ok: true, json: async () => ({}) })         // PUT
+      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) })                 // PUT settings
 
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
 
@@ -227,8 +230,9 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     const { toast } = await import('sonner')
 
     global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings }) // GET
-      .mockResolvedValueOnce({ ok: false })                                // PUT fails
+      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
+      .mockResolvedValueOnce({ ok: false })                                         // PUT fails
 
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
 
@@ -306,8 +310,9 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
     global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })
-      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
+      .mockResolvedValueOnce({ ok: true })                                          // PUT threshold
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/e\.g\. 0\.50/i)).toBeInTheDocument()
@@ -324,8 +329,9 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
     global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })
-      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
+      .mockResolvedValueOnce({ ok: true })                                          // PUT threshold
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/e\.g\. 0\.50/i)).toBeInTheDocument()
@@ -339,7 +345,12 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
   it('shows error when cost alert threshold is invalid', async () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => hubSettings })
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
+        return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => hubSettings })
+    })
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/e\.g\. 0\.50/i)).toBeInTheDocument()
@@ -350,5 +361,175 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Enter a positive number or leave blank to disable')
     })
+  })
+})
+
+// ─── Outbound Webhooks section ────────────────────────────────────────────────
+
+const mockWebhook = {
+  id: 'wh-1',
+  project_id: null,
+  url: 'https://example.com/hook',
+  secret: '',
+  events: JSON.stringify(['job.completed']),
+  enabled: 1,
+  created_at: '2024-01-01T00:00:00Z',
+}
+
+function makeFetchWithWebhooks(webhooks: typeof mockWebhook[]) {
+  return vi.fn().mockImplementation((url: string) => {
+    if (typeof url === 'string' && url === '/api/hub/webhooks') {
+      return Promise.resolve({ ok: true, json: async () => ({ webhooks }) })
+    }
+    return Promise.resolve({ ok: true, json: async () => hubSettings })
+  })
+}
+
+describe('GlobalSettingsPage — Outbound Webhooks', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockProjects = []
+    global.fetch = makeFetchWithWebhooks([])
+  })
+
+  it('renders Outbound Webhooks section header', async () => {
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByText('Outbound Webhooks')).toBeInTheDocument()
+    })
+  })
+
+  it('renders the Add webhook URL input', async () => {
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/https:\/\/hooks\.example\.com/)).toBeInTheDocument()
+    })
+  })
+
+  it('disables Add Webhook button when URL is empty', async () => {
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /add webhook/i })).toBeInTheDocument()
+    })
+    const btn = screen.getByRole('button', { name: /add webhook/i })
+    expect(btn).toBeDisabled()
+  })
+
+  it('adds a webhook successfully and reloads list', async () => {
+    const user = userEvent.setup()
+    const { toast } = await import('sonner')
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })            // GET settings
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })     // GET webhooks (initial)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhook: mockWebhook }) }) // POST webhook
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [mockWebhook] }) }) // GET webhooks (reload)
+
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/https:\/\/hooks\.example\.com/)).toBeInTheDocument()
+    })
+    await user.type(screen.getByPlaceholderText(/https:\/\/hooks\.example\.com/), 'https://example.com/hook')
+    await user.click(screen.getByRole('button', { name: /add webhook/i }))
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Webhook added')
+    })
+  })
+
+  it('shows error when adding webhook fails with server message', async () => {
+    const user = userEvent.setup()
+    const { toast } = await import('sonner')
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'Invalid URL' }) })
+
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/https:\/\/hooks\.example\.com/)).toBeInTheDocument()
+    })
+    await user.type(screen.getByPlaceholderText(/https:\/\/hooks\.example\.com/), 'https://example.com/hook')
+    await user.click(screen.getByRole('button', { name: /add webhook/i }))
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Invalid URL')
+    })
+  })
+
+  it('renders a listed webhook URL', async () => {
+    global.fetch = makeFetchWithWebhooks([mockWebhook])
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByText('https://example.com/hook')).toBeInTheDocument()
+    })
+  })
+
+  it('toggles a webhook on/off', async () => {
+    const user = userEvent.setup()
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/hub/webhooks') {
+        return Promise.resolve({ ok: true, json: async () => ({ webhooks: [mockWebhook] }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => hubSettings })
+    })
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByTitle('Disable')).toBeInTheDocument()
+    })
+    await user.click(screen.getByTitle('Disable'))
+    // Patch call should have been made
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/hub/webhooks/wh-1'),
+      expect.objectContaining({ method: 'PATCH' })
+    )
+  })
+
+  it('deletes a webhook and shows success toast', async () => {
+    const user = userEvent.setup()
+    const { toast } = await import('sonner')
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/hub/webhooks') {
+        return Promise.resolve({ ok: true, json: async () => ({ webhooks: [mockWebhook] }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => hubSettings })
+    })
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByTitle('Remove')).toBeInTheDocument()
+    })
+    await user.click(screen.getByTitle('Remove'))
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Webhook removed')
+    })
+  })
+
+  it('sends a test ping and shows success toast', async () => {
+    const user = userEvent.setup()
+    const { toast } = await import('sonner')
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/hub/webhooks') {
+        return Promise.resolve({ ok: true, json: async () => ({ webhooks: [mockWebhook] }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => hubSettings })
+    })
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByTitle('Send test ping')).toBeInTheDocument()
+    })
+    await user.click(screen.getByTitle('Send test ping'))
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Test ping sent')
+    })
+  })
+
+  it('toggles event checkbox selection', async () => {
+    const user = userEvent.setup()
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByText('Outbound Webhooks')).toBeInTheDocument()
+    })
+    // Find the "Daily budget exceeded" checkbox and toggle it
+    const checkbox = screen.getByRole('checkbox', { name: /daily budget exceeded/i })
+    expect((checkbox as HTMLInputElement).checked).toBe(false)
+    await user.click(checkbox)
+    expect((checkbox as HTMLInputElement).checked).toBe(true)
   })
 })
