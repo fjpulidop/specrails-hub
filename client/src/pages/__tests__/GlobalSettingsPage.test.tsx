@@ -35,16 +35,23 @@ const hubSettings = {
   specrailsTechUrl: 'http://localhost:3000',
 }
 
+const budgetResponse = { hubDailyBudgetUsd: null, costToday: 0, budgetUtilizationPct: null }
+
+function defaultFetchMock(url: string) {
+  if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
+    return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
+  }
+  if (typeof url === 'string' && url.includes('/api/hub/budget')) {
+    return Promise.resolve({ ok: true, json: async () => budgetResponse })
+  }
+  return Promise.resolve({ ok: true, json: async () => hubSettings })
+}
+
 describe('GlobalSettingsPage (Hub Settings dialog)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockProjects = []
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
-        return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
-      }
-      return Promise.resolve({ ok: true, json: async () => hubSettings })
-    })
+    global.fetch = vi.fn().mockImplementation(defaultFetchMock)
   })
 
   it('renders Hub Settings title when open', async () => {
@@ -210,6 +217,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
+      .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })       // GET budget
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) })                 // PUT settings
 
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
@@ -232,6 +240,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
+      .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })       // GET budget
       .mockResolvedValueOnce({ ok: false })                                         // PUT fails
 
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
@@ -312,6 +321,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
+      .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })       // GET budget
       .mockResolvedValueOnce({ ok: true })                                          // PUT threshold
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
@@ -331,6 +341,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
+      .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })       // GET budget
       .mockResolvedValueOnce({ ok: true })                                          // PUT threshold
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
@@ -345,12 +356,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
   it('shows error when cost alert threshold is invalid', async () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
-        return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
-      }
-      return Promise.resolve({ ok: true, json: async () => hubSettings })
-    })
+    global.fetch = vi.fn().mockImplementation(defaultFetchMock)
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/e\.g\. 0\.50/i)).toBeInTheDocument()
@@ -360,6 +366,71 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     await user.click(screen.getAllByRole('button', { name: /save/i })[1])
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Enter a positive number or leave blank to disable')
+    })
+  })
+
+  it('renders hub daily budget input', async () => {
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/e\.g\. 10\.00/i)).toBeInTheDocument()
+    })
+  })
+
+  it('saves hub daily budget successfully', async () => {
+    const user = userEvent.setup()
+    const { toast } = await import('sonner')
+    global.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
+        return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
+      }
+      if (typeof url === 'string' && url.includes('/api/hub/budget')) {
+        if (opts?.method === 'PATCH') {
+          return Promise.resolve({ ok: true })
+        }
+        return Promise.resolve({ ok: true, json: async () => budgetResponse })
+      }
+      return Promise.resolve({ ok: true, json: async () => hubSettings })
+    })
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/e\.g\. 10\.00/i)).toBeInTheDocument()
+    })
+    const input = screen.getByPlaceholderText(/e\.g\. 10\.00/i) as HTMLInputElement
+    await user.type(input, '10')
+    // Find the Save buttons — hub budget save comes before cost alert save
+    const saveButtons = screen.getAllByRole('button', { name: /^save$/i })
+    // Click the hub budget Save (second save after specrails-tech URL)
+    await user.click(saveButtons[saveButtons.length - 2])
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Hub daily budget set to $10')
+    })
+  })
+
+  it('removes hub daily budget when input is blank', async () => {
+    const user = userEvent.setup()
+    const { toast } = await import('sonner')
+    global.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
+        return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
+      }
+      if (typeof url === 'string' && url.includes('/api/hub/budget')) {
+        if (opts?.method === 'PATCH') {
+          return Promise.resolve({ ok: true })
+        }
+        return Promise.resolve({ ok: true, json: async () => ({ hubDailyBudgetUsd: 10 }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => hubSettings })
+    })
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/e\.g\. 10\.00/i)).toBeInTheDocument()
+    })
+    const input = screen.getByPlaceholderText(/e\.g\. 10\.00/i) as HTMLInputElement
+    await user.clear(input)
+    const saveButtons = screen.getAllByRole('button', { name: /^save$/i })
+    await user.click(saveButtons[saveButtons.length - 2])
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Hub daily budget removed')
     })
   })
 })
@@ -380,6 +451,9 @@ function makeFetchWithWebhooks(webhooks: typeof mockWebhook[]) {
   return vi.fn().mockImplementation((url: string) => {
     if (typeof url === 'string' && url === '/api/hub/webhooks') {
       return Promise.resolve({ ok: true, json: async () => ({ webhooks }) })
+    }
+    if (typeof url === 'string' && url.includes('/api/hub/budget')) {
+      return Promise.resolve({ ok: true, json: async () => budgetResponse })
     }
     return Promise.resolve({ ok: true, json: async () => hubSettings })
   })
@@ -421,6 +495,7 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })            // GET settings
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })     // GET webhooks (initial)
+      .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })         // GET budget
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhook: mockWebhook }) }) // POST webhook
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [mockWebhook] }) }) // GET webhooks (reload)
 
@@ -441,6 +516,7 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })
       .mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'Invalid URL' }) })
 
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
@@ -468,6 +544,9 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
       if (url === '/api/hub/webhooks') {
         return Promise.resolve({ ok: true, json: async () => ({ webhooks: [mockWebhook] }) })
       }
+      if (url === '/api/hub/budget') {
+        return Promise.resolve({ ok: true, json: async () => budgetResponse })
+      }
       return Promise.resolve({ ok: true, json: async () => hubSettings })
     })
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
@@ -489,6 +568,9 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
       if (url === '/api/hub/webhooks') {
         return Promise.resolve({ ok: true, json: async () => ({ webhooks: [mockWebhook] }) })
       }
+      if (url === '/api/hub/budget') {
+        return Promise.resolve({ ok: true, json: async () => budgetResponse })
+      }
       return Promise.resolve({ ok: true, json: async () => hubSettings })
     })
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
@@ -507,6 +589,9 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url === '/api/hub/webhooks') {
         return Promise.resolve({ ok: true, json: async () => ({ webhooks: [mockWebhook] }) })
+      }
+      if (url === '/api/hub/budget') {
+        return Promise.resolve({ ok: true, json: async () => budgetResponse })
       }
       return Promise.resolve({ ok: true, json: async () => hubSettings })
     })
