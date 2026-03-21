@@ -1,7 +1,61 @@
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { Settings, BookOpen, LayoutDashboard, BarChart3 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
+
+interface CLIStatus {
+  provider: 'claude' | 'codex' | null
+  version: string | null
+}
+
+function CLIBadge() {
+  const [status, setStatus] = useState<CLIStatus | null>(null)
+
+  useEffect(() => {
+    fetch('/api/hub/cli-status')
+      .then((r) => r.json() as Promise<CLIStatus>)
+      .then(setStatus)
+      .catch(() => setStatus({ provider: null, version: null }))
+  }, [])
+
+  if (!status) return null
+
+  const label =
+    status.provider === 'claude'
+      ? `Claude Code${status.version ? ` v${status.version}` : ''}`
+      : status.provider === 'codex'
+        ? `Codex CLI${status.version ? ` v${status.version}` : ''}`
+        : 'No AI CLI'
+
+  const badgeClass =
+    status.provider === 'claude'
+      ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+      : status.provider === 'codex'
+        ? 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+        : 'bg-red-500/15 text-red-400 border-red-500/30'
+
+  const tooltip =
+    status.provider === null
+      ? 'No AI CLI detected. Install Claude Code or Codex CLI.'
+      : `Active CLI: ${label}`
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={cn(
+            'h-5 px-2 flex items-center rounded text-[10px] font-mono border cursor-default select-none',
+            badgeClass
+          )}
+        >
+          {label}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
+  )
+}
 
 export function Navbar() {
   return (
@@ -49,7 +103,8 @@ export function Navbar() {
       </div>
 
       {/* Right-side actions */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
+        <CLIBadge />
         <Tooltip>
           <TooltipTrigger asChild>
             <a

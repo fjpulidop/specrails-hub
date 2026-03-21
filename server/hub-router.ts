@@ -5,7 +5,7 @@ import type { WsMessage } from './types'
 import type { ProjectRegistry } from './project-registry'
 import { getHubSetting, setHubSetting, listProjects, listAgents, getAgent, addAgent, updateAgent } from './hub-db'
 import { createSpecrailsTechClient } from './specrails-tech-client'
-import { checkCoreCompat } from './core-compat'
+import { checkCoreCompat, getCLIStatus } from './core-compat'
 import { getHubAnalytics, getHubTodayStats, getHubRecentJobs, searchHubContent, getHubOverview } from './hub-analytics'
 import type { AnalyticsOpts, AnalyticsPeriod } from './types'
 
@@ -269,6 +269,11 @@ export function createHubRouter(
   router.get('/core-compat', async (_req, res) => {
     const result = await checkCoreCompat()
     res.json(result)
+  })
+
+  // GET /api/hub/cli-status — detected AI CLI provider and version
+  router.get('/cli-status', (_req, res) => {
+    res.json(getCLIStatus())
   })
 
 

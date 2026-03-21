@@ -94,6 +94,33 @@ export async function detectCLI(): Promise<CLIProvider | null> {
   return detectCLISync()
 }
 
+export interface CLIStatus {
+  provider: CLIProvider | null
+  version: string | null
+}
+
+/**
+ * Detect the active CLI and its version.
+ */
+export function getCLIStatus(): CLIStatus {
+  const provider = detectCLISync()
+  if (!provider) return { provider: null, version: null }
+
+  try {
+    const versionFlag = provider === 'codex' ? '--version' : '--version'
+    const raw = execSync(`${provider} ${versionFlag}`, {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+      timeout: 3000,
+    }).trim()
+    // Extract semver-like token from output (e.g. "Claude Code 1.2.3" → "1.2.3")
+    const match = raw.match(/\d+\.\d+\.\d+[\w.-]*/)
+    return { provider, version: match ? match[0] : raw }
+  } catch {
+    return { provider, version: null }
+  }
+}
+
 function readHubVersion(): string {
   // __dirname is server/ in dev (tsx) or server/dist/ when compiled
   const candidates = [

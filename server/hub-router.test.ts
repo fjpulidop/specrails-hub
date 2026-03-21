@@ -4,6 +4,15 @@ import request from 'supertest'
 import path from 'path'
 import fs from 'fs'
 
+vi.mock('./core-compat', async (importActual) => {
+  const actual = await importActual<typeof import('./core-compat')>()
+  return {
+    ...actual,
+    checkCoreCompat: vi.fn().mockResolvedValue({ compatible: true, contractFound: false }),
+    getCLIStatus: vi.fn().mockReturnValue({ provider: 'claude', version: '1.2.3' }),
+  }
+})
+
 import { createHubRouter } from './hub-router'
 import { initHubDb, addProject, removeProject as removeProjectFromHub, getHubSetting, setHubSetting, addAgent, getAgent } from './hub-db'
 import { initDb } from './db'
@@ -502,6 +511,19 @@ describe('hub-router', () => {
       expect(res.status).toBe(200)
       expect(res.body.groups).toHaveLength(0)
       expect(res.body.total).toBe(0)
+    })
+  })
+
+  // ─── GET /api/hub/cli-status ────────────────────────────────────────────────
+
+  describe('GET /api/hub/cli-status', () => {
+    it('returns provider and version from getCLIStatus', async () => {
+      const { app } = createApp()
+
+      const res = await request(app).get('/api/hub/cli-status')
+      expect(res.status).toBe(200)
+      expect(res.body.provider).toBe('claude')
+      expect(res.body.version).toBe('1.2.3')
     })
   })
 })
