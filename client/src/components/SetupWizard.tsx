@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect, memo } from 'react'
-import { Check, ArrowRight, Package, Bot, Terminal, Users, RotateCcw } from 'lucide-react'
+import { Check, ArrowRight, Package, Bot, Terminal, Users, RotateCcw, ChevronLeft } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Button } from './ui/button'
@@ -135,19 +135,27 @@ const SetupLogLines = memo(function SetupLogLines({ lines }: { lines: string[] }
 
 function InstallingStep({
   logLines,
+  onBack,
 }: {
   logLines: string[]
+  onBack: () => void
 }) {
   return (
     <div className="flex flex-col h-full max-w-lg mx-auto px-6 py-8 gap-4">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-dracula-purple/20 flex items-center justify-center flex-shrink-0">
-          <Package className="w-4 h-4 text-dracula-purple animate-pulse" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-dracula-purple/20 flex items-center justify-center flex-shrink-0">
+            <Package className="w-4 h-4 text-dracula-purple animate-pulse" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold">Installing specrails...</h2>
+            <p className="text-xs text-muted-foreground">Running npx specrails-core in your project</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-sm font-semibold">Installing specrails...</h2>
-          <p className="text-xs text-muted-foreground">Running npx specrails-core in your project</p>
-        </div>
+        <Button variant="ghost" size="sm" onClick={onBack} className="h-7 gap-1.5 text-xs">
+          <ChevronLeft className="w-3.5 h-3.5" />
+          Back
+        </Button>
       </div>
 
       <div className="flex-1 rounded-lg border border-border/30 bg-muted/10 overflow-auto p-3 text-[11px] text-muted-foreground space-y-0.5">
@@ -602,28 +610,44 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
         )}
 
         {wizardStep.step === 'installing' && (
-          <InstallingStep logLines={logLines} />
+          <InstallingStep
+            logLines={logLines}
+            onBack={() => setWizardStep({ step: 'proposal' })}
+          />
         )}
 
         {wizardStep.step === 'setup' && (
-          <div className="flex h-full">
-            {/* Left: checkpoint tracker */}
-            <div className="w-72 flex-shrink-0 border-r border-border/30 overflow-hidden">
-              <CheckpointTracker
-                checkpoints={checkpoints}
-                logLines={logLines}
-              />
+          <div className="flex flex-col h-full">
+            {/* Back navigation */}
+            <div className="flex-shrink-0 px-3 py-1.5 border-b border-border/20">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => setWizardStep({ step: 'installing' })}
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                Back
+              </Button>
             </div>
-            {/* Right: setup chat */}
-            <div className="flex-1 overflow-hidden">
-              <SetupChat
-                projectId={project.id}
-                messages={chatMessages}
-                isStreaming={isStreaming}
-                streamingText={streamingText}
-                sessionId={sessionId}
-                onSendMessage={handleSendMessage}
-              />
+            {/* Left: checkpoint tracker + Right: setup chat */}
+            <div className="flex flex-1 overflow-hidden">
+              <div className="w-72 flex-shrink-0 border-r border-border/30 overflow-hidden">
+                <CheckpointTracker
+                  checkpoints={checkpoints}
+                  logLines={logLines}
+                />
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <SetupChat
+                  projectId={project.id}
+                  messages={chatMessages}
+                  isStreaming={isStreaming}
+                  streamingText={streamingText}
+                  sessionId={sessionId}
+                  onSendMessage={handleSendMessage}
+                />
+              </div>
             </div>
           </div>
         )}

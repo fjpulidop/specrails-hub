@@ -9,6 +9,13 @@ import type { CommandInfo } from '../../types'
 // Mocks
 // ---------------------------------------------------------------------------
 
+const mockNavigate = vi.fn()
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
+  return { ...actual, useNavigate: () => mockNavigate }
+})
+
 vi.mock('sonner', () => ({
   toast: {
     promise: vi.fn(),
@@ -22,6 +29,7 @@ vi.mock('../../lib/api', () => ({
 }))
 
 beforeEach(() => {
+  mockNavigate.mockClear()
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({ jobId: 'test-job-id' }),
@@ -288,5 +296,22 @@ describe('Click behaviour', () => {
     // The first button is the command card button
     await user.click(btns[0])
     expect(onOpenWizard).not.toHaveBeenCalled()
+  })
+
+  it('clicking propose-spec navigates to job detail after spawn', async () => {
+    const user = userEvent.setup()
+    renderGrid()
+    const btns = screen.getAllByRole('button', { name: /Propose Spec/i })
+    await user.click(btns[0])
+    // navigate is called asynchronously after the fetch resolves
+    await vi.waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/jobs/test-job-id'))
+  })
+
+  it('clicking wizard commands (implement) does NOT navigate', async () => {
+    const user = userEvent.setup()
+    renderGrid()
+    const btn = screen.getAllByRole('button').find((b) => b.textContent?.includes('Implement') && !b.textContent?.includes('Batch'))
+    await user.click(btn!)
+    expect(mockNavigate).not.toHaveBeenCalled()
   })
 })

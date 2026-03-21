@@ -25,12 +25,15 @@ vi.mock('../../lib/markdown-detect', () => ({
   hasMarkdownSyntax: () => false,
 }))
 
-// Mock useParams
+const mockNavigate = vi.fn()
+
+// Mock useParams + useNavigate
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
   return {
     ...actual,
     useParams: () => ({ id: 'job-abc123' }),
+    useNavigate: () => mockNavigate,
   }
 })
 
@@ -85,6 +88,7 @@ const mockEvents: EventRow[] = [
 describe('JobDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockNavigate.mockClear()
   })
 
   it('shows loading state initially', () => {
@@ -233,6 +237,66 @@ describe('JobDetailPage', () => {
     render(<JobDetailPage />)
     await waitFor(() => {
       expect(screen.getByRole('link', { name: /Dashboard/i })).toBeInTheDocument()
+    })
+  })
+
+  it('shows Re-execute button for completed jobs', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ job: mockJob, events: mockEvents }),
+    })
+    render(<JobDetailPage />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Re-execute/i })).toBeInTheDocument()
+    })
+  })
+
+  it('shows Re-execute button for failed jobs', async () => {
+    const failedJob = { ...mockJob, status: 'failed' as const }
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ job: failedJob, events: [] }),
+    })
+    render(<JobDetailPage />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Re-execute/i })).toBeInTheDocument()
+    })
+  })
+
+  it('does not show Re-execute button for running jobs', async () => {
+    const runningJob = { ...mockJob, status: 'running' as const }
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ job: runningJob, events: [] }),
+    })
+    render(<JobDetailPage />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Cancel Job/i })).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('button', { name: /Re-execute/i })).not.toBeInTheDocument()
+  })
+
+  it('Re-execute spawns new job and navigates to new job detail', async () => {
+    const user = userEvent.setup()
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ job: mockJob, events: mockEvents }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ jobId: 'new-job-id' }) })
+
+    render(<JobDetailPage />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Re-execute/i })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: /Re-execute/i }))
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/spawn',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ command: '/sr:implement' }),
+        })
+      )
+      expect(mockNavigate).toHaveBeenCalledWith('/jobs/new-job-id')
     })
   })
 })
