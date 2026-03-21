@@ -113,9 +113,9 @@ describe('ChatInput', () => {
   })
 
   it('model selector shows current model', () => {
-    render(<ChatInput {...defaultProps} model="claude-sonnet-4-5" />)
+    render(<ChatInput {...defaultProps} model="claude-sonnet-4-6" />)
     const select = screen.getByRole('combobox') as HTMLSelectElement
-    expect(select.value).toBe('claude-sonnet-4-5')
+    expect(select.value).toBe('claude-sonnet-4-6')
   })
 
   it('model selector is disabled when hasMessages is true', () => {

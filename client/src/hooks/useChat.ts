@@ -207,7 +207,7 @@ export function useChat(): UseChatReturn {
     })
   }, [])
 
-  const createConversation = useCallback(async (model = 'claude-sonnet-4-5') => {
+  const createConversation = useCallback(async (model = 'claude-sonnet-4-6') => {
     try {
       const res = await fetch(`${getApiBase()}/chat/conversations`, {
         method: 'POST',
@@ -316,7 +316,7 @@ export function useChat(): UseChatReturn {
       const res = await fetch(`${getApiBase()}/chat/conversations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-sonnet-4-5' }),
+        body: JSON.stringify({ model: 'claude-sonnet-4-6' }),
       })
       if (!res.ok) return
       const data = await res.json() as { conversation: ChatConversationSummary }

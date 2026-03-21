@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
 import { toast } from 'sonner'
-import { useBlocker } from 'react-router-dom'
 import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
 import { CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
@@ -8,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Separator } from '../components/ui/separator'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog'
 import type { ProjectConfig } from '../types'
 
 export default function SettingsPage() {
@@ -29,8 +27,15 @@ export default function SettingsPage() {
 
   const cacheRef = useRef<Map<string, ProjectConfig>>(new Map())
 
-  // Block navigation when there are unsaved changes
-  const blocker = useBlocker(hasChanges)
+  // Warn on browser-level navigation (refresh/close) when there are unsaved changes
+  useEffect(() => {
+    if (!hasChanges) return
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault()
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [hasChanges])
 
   useEffect(() => {
     // Restore cache instantly on project switch
@@ -262,28 +267,6 @@ export default function SettingsPage() {
         </Button>
       </div>
 
-      {/* Unsaved changes navigation guard */}
-      <Dialog
-        open={blocker.state === 'blocked'}
-        onOpenChange={(open) => { if (!open) blocker.reset?.() }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Unsaved changes</DialogTitle>
-            <DialogDescription>
-              You have unsaved changes. If you leave now, your changes will be lost.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="ghost" size="sm" onClick={() => blocker.reset?.()}>
-              Stay
-            </Button>
-            <Button variant="destructive" size="sm" onClick={() => blocker.proceed?.()}>
-              Leave anyway
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

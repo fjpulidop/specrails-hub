@@ -95,7 +95,12 @@ export function ImplementWizard({ open, onClose }: ImplementWizardProps) {
       })
       const data = await res.json() as { jobId?: string; error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Failed to queue job')
-      toast.success('Job queued', { description: command })
+      const toastDesc = state.path === 'from-issues'
+        ? state.selectedIssues.length === 1
+          ? `#${state.selectedIssues[0].number}: ${state.selectedIssues[0].title}`
+          : `${state.selectedIssues.length} issues`
+        : state.freeFormTitle.trim()
+      toast.success('Job queued', { description: toastDesc })
       handleClose()
     } catch (err) {
       toast.error('Failed to queue job', { description: (err as Error).message })
