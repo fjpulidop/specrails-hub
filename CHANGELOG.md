@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.14.0](https://github.com/fjpulidop/specrails-hub/compare/v1.13.0...v1.14.0) (2026-03-21)
+
+
+### Features
+
+* **client:** OS notifications for job completion and failure (SPEA-521) ([#92](https://github.com/fjpulidop/specrails-hub/issues/92)) ([343ea54](https://github.com/fjpulidop/specrails-hub/commit/343ea54b0975c3b653ae886cb2cd57fc3a4f86b4))
+* cost alerts and daily budget guardrails (SPEA-518) ([#91](https://github.com/fjpulidop/specrails-hub/issues/91)) ([0b6223f](https://github.com/fjpulidop/specrails-hub/commit/0b6223f13d8f449de2ff0c3ad62126ef63fb99cb))
+
 ## [1.13.0](https://github.com/fjpulidop/specrails-hub/compare/v1.12.0...v1.13.0) (2026-03-21)
 
 
