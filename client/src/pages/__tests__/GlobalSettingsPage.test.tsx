@@ -280,4 +280,16 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
       expect(screen.queryByText('Hub Settings')).toBeInTheDocument()
     })
   })
+
+  it('updates URL input when user types', async () => {
+    const user = userEvent.setup()
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('http://localhost:3000')).toBeInTheDocument()
+    })
+    const input = screen.getByPlaceholderText('http://localhost:3000') as HTMLInputElement
+    await user.clear(input)
+    await user.type(input, 'http://localhost:4000')
+    expect(input.value).toBe('http://localhost:4000')
+  })
 })
