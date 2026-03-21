@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { RootLayout } from './components/RootLayout'
@@ -23,6 +23,7 @@ import { TabBar } from './components/TabBar'
 import { AddProjectDialog } from './components/AddProjectDialog'
 import { SharedWebSocketProvider } from './hooks/useSharedWebSocket'
 import { HubProvider, useHub } from './hooks/useHub'
+import { useOsNotifications } from './hooks/useOsNotifications'
 import { WS_URL } from './lib/ws-url'
 
 // ─── Hub mode detection ───────────────────────────────────────────────────────
@@ -87,7 +88,7 @@ function useProjectRouteMemory(activeProjectId: string | null) {
 // ─── Hub app shell ────────────────────────────────────────────────────────────
 
 function HubApp() {
-  const { projects, activeProjectId, isLoading, isSwitchingProject, setupProjectIds, completeSetupWizard } = useHub()
+  const { projects, activeProjectId, isLoading, isSwitchingProject, setupProjectIds, completeSetupWizard, setActiveProjectId } = useHub()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [overviewOpen, setOverviewOpen] = useState(false)
@@ -96,6 +97,13 @@ function HubApp() {
 
   // Remember which page each project was on
   useProjectRouteMemory(activeProjectId)
+
+  // OS notifications for job completions/failures
+  const projectsById = useMemo(
+    () => new Map(projects.map((p) => [p.id, p.name])),
+    [projects]
+  )
+  useOsNotifications({ setActiveProjectId, projectsById })
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
   const isInSetup = activeProjectId !== null && setupProjectIds.has(activeProjectId)
@@ -232,6 +240,13 @@ function HubApp() {
   )
 }
 
+// ─── Legacy mode OS notification hook ────────────────────────────────────────
+
+function LegacyOsNotifications() {
+  useOsNotifications()
+  return null
+}
+
 // ─── Root App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -245,6 +260,7 @@ export default function App() {
         </HubProvider>
       ) : (
         <Suspense fallback={<div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
+          <LegacyOsNotifications />
           <Routes>
             <Route path="/docs" element={<DocsPage />} />
             <Route path="/docs/:category/:slug" element={<DocsPage />} />
