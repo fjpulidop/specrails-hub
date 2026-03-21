@@ -1,3 +1,4 @@
+import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import { render } from '../../test-utils'
@@ -22,6 +23,15 @@ vi.mock('../../hooks/usePipeline', () => ({
   }),
 }))
 
+// Mock useSharedWebSocket
+vi.mock('../../hooks/useSharedWebSocket', () => ({
+  useSharedWebSocket: () => ({
+    registerHandler: vi.fn(),
+    unregisterHandler: vi.fn(),
+    connectionStatus: 'connected',
+  }),
+}))
+
 // Mock useChat
 vi.mock('../../hooks/useChat', () => ({
   useChat: () => ({
@@ -40,6 +50,7 @@ vi.mock('../../hooks/useChat', () => ({
     newConversation: vi.fn(),
     deleteConversation: vi.fn(),
   }),
+  ChatContext: { Provider: ({ children }: { children: React.ReactNode }) => children },
 }))
 
 // Mock child components

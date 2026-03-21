@@ -196,7 +196,8 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
   it('renders Save button for specrails-tech URL', async () => {
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument()
+      const saveButtons = screen.getAllByRole('button', { name: /save/i })
+      expect(saveButtons[0]).toBeInTheDocument()
     })
   })
 
@@ -214,7 +215,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
       expect(screen.getByPlaceholderText('http://localhost:3000')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: /save/i }))
+    await user.click(screen.getAllByRole('button', { name: /save/i })[0])
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('specrails-tech URL saved')
@@ -235,7 +236,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
       expect(screen.getByPlaceholderText('http://localhost:3000')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: /save/i }))
+    await user.click(screen.getAllByRole('button', { name: /save/i })[0])
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Failed to save URL')
