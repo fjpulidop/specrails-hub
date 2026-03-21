@@ -482,6 +482,14 @@ export interface DailyBudgetExceededMessage {
   queuePaused: boolean
 }
 
+export interface HubDailyBudgetExceededMessage {
+  type: 'hub_daily_budget_exceeded'
+  projectId: string
+  hubDailySpend: number
+  hubBudget: number
+  queuePaused: boolean
+}
+
 export type WsMessage =
   | LogMessage | PhaseMessage | InitMessage | QueueMessage | EventMessage
   | ChatStreamMessage | ChatDoneMessage | ChatErrorMessage
@@ -493,5 +501,5 @@ export type WsMessage =
   | ProposalStreamMessage | ProposalReadyMessage | ProposalRefinedMessage
   | ProposalIssueCreatedMessage | ProposalErrorMessage
   | SpecLauncherStreamMessage | SpecLauncherDoneMessage | SpecLauncherErrorMessage
-  | CostAlertMessage | DailyBudgetExceededMessage
+  | CostAlertMessage | DailyBudgetExceededMessage | HubDailyBudgetExceededMessage
 

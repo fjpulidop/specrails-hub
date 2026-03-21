@@ -230,6 +230,41 @@ export function createHubRouter(
     res.json({ ok: true })
   })
 
+  // ─── Budget routes ────────────────────────────────────────────────────────────
+
+  // GET /api/hub/budget — get hub-level budget status
+  router.get('/budget', (_req, res) => {
+    const hubDailyBudgetRaw = getHubSetting(registry.hubDb, 'hub_daily_budget_usd')
+    const hubDailyBudgetUsd = hubDailyBudgetRaw != null ? parseFloat(hubDailyBudgetRaw) : null
+    const costAlertRaw = getHubSetting(registry.hubDb, 'cost_alert_threshold_usd')
+    const costAlertThresholdUsd = costAlertRaw != null ? parseFloat(costAlertRaw) : null
+    const { costToday } = getHubTodayStats(registry)
+    const budgetUtilizationPct = hubDailyBudgetUsd != null && hubDailyBudgetUsd > 0
+      ? (costToday / hubDailyBudgetUsd) * 100
+      : null
+    res.json({ hubDailyBudgetUsd, costAlertThresholdUsd, costToday, budgetUtilizationPct })
+  })
+
+  // PATCH /api/hub/budget — update hub-level budget settings
+  router.patch('/budget', (req, res) => {
+    const { hubDailyBudgetUsd, costAlertThresholdUsd } = req.body ?? {}
+    if (hubDailyBudgetUsd !== undefined) {
+      if (hubDailyBudgetUsd === null) {
+        registry.hubDb.prepare('DELETE FROM hub_settings WHERE key = ?').run('hub_daily_budget_usd')
+      } else if (typeof hubDailyBudgetUsd === 'number' && hubDailyBudgetUsd > 0) {
+        setHubSetting(registry.hubDb, 'hub_daily_budget_usd', String(hubDailyBudgetUsd))
+      }
+    }
+    if (costAlertThresholdUsd !== undefined) {
+      if (costAlertThresholdUsd === null) {
+        registry.hubDb.prepare('DELETE FROM hub_settings WHERE key = ?').run('cost_alert_threshold_usd')
+      } else if (typeof costAlertThresholdUsd === 'number' && costAlertThresholdUsd > 0) {
+        setHubSetting(registry.hubDb, 'cost_alert_threshold_usd', String(costAlertThresholdUsd))
+      }
+    }
+    res.json({ ok: true })
+  })
+
   // ─── Agent routes ────────────────────────────────────────────────────────────
 
   // GET /api/hub/agents — list all registered agents
@@ -386,7 +421,7 @@ export function createHubRouter(
       return
     }
 
-    const validEvents: WebhookEvent[] = ['job.completed', 'job.failed', 'daily_budget_exceeded']
+    const validEvents: WebhookEvent[] = ['job.completed', 'job.failed', 'daily_budget_exceeded', 'hub_daily_budget_exceeded']
     const parsedEvents: WebhookEvent[] = Array.isArray(events)
       ? (events as string[]).filter((e): e is WebhookEvent => validEvents.includes(e as WebhookEvent))
       : ['job.completed', 'job.failed']
@@ -423,7 +458,7 @@ export function createHubRouter(
     }
 
     const { url, secret, events, enabled } = req.body ?? {}
-    const validEvents: WebhookEvent[] = ['job.completed', 'job.failed', 'daily_budget_exceeded']
+    const validEvents: WebhookEvent[] = ['job.completed', 'job.failed', 'daily_budget_exceeded', 'hub_daily_budget_exceeded']
     const parsedEvents: WebhookEvent[] | undefined = Array.isArray(events)
       ? (events as string[]).filter((e): e is WebhookEvent => validEvents.includes(e as WebhookEvent))
       : undefined

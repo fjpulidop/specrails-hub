@@ -3,6 +3,7 @@ import path from 'path'
 import type { ProjectRegistry } from './project-registry'
 import type { AnalyticsOpts } from './types'
 import type { DbInstance } from './db'
+import { getHubSetting } from './hub-db'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -300,6 +301,7 @@ export interface HubProjectOverview {
   healthScore: number
   activeJobs: number
   jobsToday: number
+  costToday: number
   lastRunAt: string | null
   lastRunStatus: string | null
   lastRunCommand: string | null
@@ -315,6 +317,8 @@ export interface HubOverviewResponse {
     criticalCount: number
     jobsToday: number
     activeJobs: number
+    costToday: number
+    hubDailyBudgetUsd: number | null
   }
   recentJobs: HubRecentJob[]
 }
@@ -362,8 +366,8 @@ function getProjectOverview(
   ).get() as { count: number }
 
   const todayRow = db.prepare(
-    `SELECT COUNT(*) as count FROM jobs WHERE started_at >= ? AND started_at < ?`
-  ).get(today, tomorrow) as { count: number }
+    `SELECT COUNT(*) as count, COALESCE(SUM(total_cost_usd), 0) as costToday FROM jobs WHERE started_at >= ? AND started_at < ?`
+  ).get(today, tomorrow) as { count: number; costToday: number }
 
   const lastJobRow = db.prepare(
     `SELECT status, command, finished_at FROM jobs
@@ -388,6 +392,7 @@ function getProjectOverview(
     healthScore,
     activeJobs: activeRow.count,
     jobsToday: todayRow.count,
+    costToday: todayRow.costToday,
     lastRunAt: lastJobRow?.finished_at ?? null,
     lastRunStatus: lastJobRow?.status ?? null,
     lastRunCommand: lastJobRow?.command ?? null,
@@ -399,6 +404,7 @@ export function getHubOverview(registry: ProjectRegistry, recentLimit = 15): Hub
   const projects: HubProjectOverview[] = []
   let totalActiveJobs = 0
   let totalJobsToday = 0
+  let totalCostToday = 0
 
   for (const ctx of registry.listContexts()) {
     const overview = getProjectOverview(
@@ -410,11 +416,20 @@ export function getHubOverview(registry: ProjectRegistry, recentLimit = 15): Hub
     projects.push(overview)
     totalActiveJobs += overview.activeJobs
     totalJobsToday += overview.jobsToday
+    totalCostToday += overview.costToday
   }
 
   const healthyCount = projects.filter((p) => p.healthScore >= 60).length
   const warningCount = projects.filter((p) => p.healthScore >= 30 && p.healthScore < 60).length
   const criticalCount = projects.filter((p) => p.healthScore < 30).length
+
+  let hubDailyBudgetUsd: number | null = null
+  try {
+    const hubDailyBudgetRaw = getHubSetting(registry.hubDb, 'hub_daily_budget_usd')
+    hubDailyBudgetUsd = hubDailyBudgetRaw != null ? parseFloat(hubDailyBudgetRaw) : null
+  } catch {
+    // hubDb may not be available in test contexts
+  }
 
   // Sort by most active/problematic first
   projects.sort((a, b) => {
@@ -433,6 +448,8 @@ export function getHubOverview(registry: ProjectRegistry, recentLimit = 15): Hub
       criticalCount,
       jobsToday: totalJobsToday,
       activeJobs: totalActiveJobs,
+      costToday: totalCostToday,
+      hubDailyBudgetUsd,
     },
     recentJobs: getHubRecentJobs(registry, recentLimit),
   }

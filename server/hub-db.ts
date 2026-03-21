@@ -261,7 +261,7 @@ export function clearAgentJob(db: DbInstance, jobId: string): void {
 
 // ─── Webhook CRUD ─────────────────────────────────────────────────────────────
 
-export type WebhookEvent = 'job.completed' | 'job.failed' | 'daily_budget_exceeded'
+export type WebhookEvent = 'job.completed' | 'job.failed' | 'daily_budget_exceeded' | 'hub_daily_budget_exceeded'
 
 export interface WebhookRow {
   id: string

@@ -137,6 +137,18 @@ export class ProjectRegistry {
         const val = getHubSetting(this._hubDb, 'cost_alert_threshold_usd')
         return val != null ? parseFloat(val) : null
       },
+      getHubDailyBudget: () => {
+        const val = getHubSetting(this._hubDb, 'hub_daily_budget_usd')
+        const budget = val != null ? parseFloat(val) : null
+        let totalSpend = 0
+        for (const c of this.listContexts()) {
+          const row = c.db.prepare(
+            `SELECT COALESCE(SUM(total_cost_usd), 0) as total FROM jobs WHERE status = 'completed' AND total_cost_usd IS NOT NULL AND started_at >= date('now')`
+          ).get() as { total: number }
+          totalSpend += row.total
+        }
+        return { budget, totalSpend }
+      },
       onJobFinished: (jobId, status, costUsd) => {
         const jobRow = db.prepare('SELECT command, duration_ms FROM jobs WHERE id = ?').get(jobId) as
           | { command: string; duration_ms: number | null }

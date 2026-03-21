@@ -106,6 +106,7 @@ export class QueueManager {
   private _inactivityTimer: ReturnType<typeof setTimeout> | null
 
   private _getCostAlertThreshold: (() => number | null) | null
+  private _getHubDailyBudget: (() => { budget: number | null; totalSpend: number }) | null
   private _provider: 'claude' | 'codex'
   private _onJobFinished: ((jobId: string, status: Job['status'], costUsd?: number) => void) | null
 
@@ -117,6 +118,7 @@ export class QueueManager {
     options?: {
       zombieTimeoutMs?: number
       getCostAlertThreshold?: () => number | null
+      getHubDailyBudget?: () => { budget: number | null; totalSpend: number }
       provider?: 'claude' | 'codex'
       onJobFinished?: (jobId: string, status: Job['status'], costUsd?: number) => void
     }
@@ -137,6 +139,7 @@ export class QueueManager {
     this._inactivityTimer = null
 
     this._getCostAlertThreshold = options?.getCostAlertThreshold ?? null
+    this._getHubDailyBudget = options?.getHubDailyBudget ?? null
     this._provider = options?.provider ?? 'claude'
     this._onJobFinished = options?.onJobFinished ?? null
 
@@ -552,14 +555,25 @@ export class QueueManager {
       const costStr = jobCost != null ? ` | cost: $${jobCost.toFixed(4)}` : ''
       emitLine('stdout', `[process exited with code ${code ?? 'unknown'}${costStr}]`)
 
-      // Cost alert: check per-job threshold
+      // Cost alert: check per-job threshold (hub-level, then per-project)
       if (jobCost != null && finalStatus === 'completed') {
-        const threshold = this._getCostAlertThreshold?.() ?? null
-        if (threshold != null && jobCost >= threshold) {
-          this._broadcast({ type: 'cost_alert', projectId: '', jobId, cost: jobCost, threshold })
+        const hubThreshold = this._getCostAlertThreshold?.() ?? null
+        if (hubThreshold != null && jobCost >= hubThreshold) {
+          this._broadcast({ type: 'cost_alert', projectId: '', jobId, cost: jobCost, threshold: hubThreshold })
         }
 
-        // Daily budget: check total spend for last 24h
+        // Per-project job cost threshold (alerts independently of hub threshold)
+        const projectThresholdRow = this._db.prepare(
+          `SELECT value FROM queue_state WHERE key = 'config.job_cost_threshold_usd'`
+        ).get() as { value: string } | undefined
+        if (projectThresholdRow) {
+          const projectThreshold = parseFloat(projectThresholdRow.value)
+          if (projectThreshold > 0 && jobCost >= projectThreshold) {
+            this._broadcast({ type: 'cost_alert', projectId: '', jobId, cost: jobCost, threshold: projectThreshold })
+          }
+        }
+
+        // Per-project daily budget: check total spend for today
         const dailyBudgetRow = this._db.prepare(
           `SELECT value FROM queue_state WHERE key = 'config.daily_budget_usd'`
         ).get() as { value: string } | undefined
@@ -567,7 +581,7 @@ export class QueueManager {
           const dailyBudget = parseFloat(dailyBudgetRow.value)
           if (dailyBudget > 0) {
             const spendRow = this._db.prepare(
-              `SELECT COALESCE(SUM(total_cost_usd), 0) as total FROM jobs WHERE status = 'completed' AND total_cost_usd IS NOT NULL AND started_at > datetime('now', '-1 day')`
+              `SELECT COALESCE(SUM(total_cost_usd), 0) as total FROM jobs WHERE status = 'completed' AND total_cost_usd IS NOT NULL AND started_at >= date('now')`
             ).get() as { total: number }
             const dailySpend = spendRow.total
             if (dailySpend >= dailyBudget) {
@@ -578,6 +592,19 @@ export class QueueManager {
               }
               this._broadcast({ type: 'daily_budget_exceeded', projectId: '', dailySpend, budget: dailyBudget, queuePaused: true })
             }
+          }
+        }
+
+        // Hub-level daily budget enforcement
+        if (this._getHubDailyBudget) {
+          const { budget: hubBudget, totalSpend: hubTotalSpend } = this._getHubDailyBudget()
+          if (hubBudget != null && hubBudget > 0 && hubTotalSpend >= hubBudget) {
+            const wasPaused = this._paused
+            this._paused = true
+            if (!wasPaused) {
+              this._db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('paused', 'true')`).run()
+            }
+            this._broadcast({ type: 'hub_daily_budget_exceeded', projectId: '', hubDailySpend: hubTotalSpend, hubBudget, queuePaused: true })
           }
         }
       }

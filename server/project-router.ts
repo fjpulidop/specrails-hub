@@ -342,6 +342,54 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     }
   })
 
+  // ─── Budget routes ────────────────────────────────────────────────────────────
+
+  router.get('/:projectId/budget', (req: Request, res: Response) => {
+    const { db } = ctx(req)
+    try {
+      const dailyBudgetRaw = (db.prepare(`SELECT value FROM queue_state WHERE key = 'config.daily_budget_usd'`).get() as { value: string } | undefined)?.value
+      const dailyBudgetUsd = dailyBudgetRaw != null ? parseFloat(dailyBudgetRaw) : null
+      const jobThresholdRaw = (db.prepare(`SELECT value FROM queue_state WHERE key = 'config.job_cost_threshold_usd'`).get() as { value: string } | undefined)?.value
+      const jobCostThresholdUsd = jobThresholdRaw != null ? parseFloat(jobThresholdRaw) : null
+      const costRow = db.prepare(
+        `SELECT COALESCE(SUM(total_cost_usd), 0) as costToday FROM jobs WHERE started_at >= date('now')`
+      ).get() as { costToday: number }
+      const costToday = costRow.costToday
+      const budgetUtilizationPct = dailyBudgetUsd != null && dailyBudgetUsd > 0
+        ? (costToday / dailyBudgetUsd) * 100
+        : null
+      res.json({ dailyBudgetUsd, jobCostThresholdUsd, costToday, budgetUtilizationPct })
+    } catch (err) {
+      console.error('[project-router] budget get error:', err)
+      res.status(500).json({ error: 'Failed to read budget' })
+    }
+  })
+
+  router.patch('/:projectId/budget', (req: Request, res: Response) => {
+    const { dailyBudgetUsd, jobCostThresholdUsd } = req.body ?? {}
+    const { db } = ctx(req)
+    try {
+      if (dailyBudgetUsd !== undefined) {
+        if (dailyBudgetUsd === null) {
+          db.prepare(`DELETE FROM queue_state WHERE key = 'config.daily_budget_usd'`).run()
+        } else if (typeof dailyBudgetUsd === 'number' && dailyBudgetUsd > 0) {
+          db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.daily_budget_usd', ?)`).run(String(dailyBudgetUsd))
+        }
+      }
+      if (jobCostThresholdUsd !== undefined) {
+        if (jobCostThresholdUsd === null) {
+          db.prepare(`DELETE FROM queue_state WHERE key = 'config.job_cost_threshold_usd'`).run()
+        } else if (typeof jobCostThresholdUsd === 'number' && jobCostThresholdUsd > 0) {
+          db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.job_cost_threshold_usd', ?)`).run(String(jobCostThresholdUsd))
+        }
+      }
+      res.json({ ok: true })
+    } catch (err) {
+      console.error('[project-router] budget patch error:', err)
+      res.status(500).json({ error: 'Failed to update budget' })
+    }
+  })
+
   router.get('/:projectId/issues', (req: Request, res: Response) => {
     const { project, db } = ctx(req)
     try {
