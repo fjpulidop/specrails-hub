@@ -73,6 +73,7 @@ export default function JobDetailPage() {
   // Reset and re-fetch when project or job id changes
   useEffect(() => {
     if (!id) return
+    const controller = new AbortController()
     setJob(null)
     setEvents([])
     setPhaseDefinitions([])
@@ -82,7 +83,7 @@ export default function JobDetailPage() {
 
     async function loadJob() {
       try {
-        const res = await fetch(`${getApiBase()}/jobs/${id}`)
+        const res = await fetch(`${getApiBase()}/jobs/${id}`, { signal: controller.signal })
         if (res.status === 404) {
           setNotFound(true)
           return
@@ -91,13 +92,17 @@ export default function JobDetailPage() {
         const data = await res.json() as { job: JobSummary; events: EventRow[] }
         setJob(data.job)
         setEvents(data.events)
-      } catch {
+      } catch (err) {
+        if ((err as DOMException).name === 'AbortError') return
         setNotFound(true)
       } finally {
-        setIsLoading(false)
+        if (!controller.signal.aborted) {
+          setIsLoading(false)
+        }
       }
     }
     loadJob()
+    return () => controller.abort()
   }, [id, activeProjectId])
 
   // Subscribe to live WebSocket updates for this job
