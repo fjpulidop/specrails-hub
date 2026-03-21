@@ -56,14 +56,6 @@ vi.mock('../../components/BatchImplementWizard', () => ({
     open ? <div data-testid="batch-wizard">BatchImplementWizard</div> : null,
 }))
 
-vi.mock('../../components/HubTodayWidget', () => ({
-  HubTodayWidget: () => null,
-}))
-
-vi.mock('../../components/SpecrailsTechPanel', () => ({
-  SpecrailsTechPanel: () => null,
-}))
-
 vi.mock('../../components/ProjectHealthWidget', () => ({
   ProjectHealthWidget: () => null,
 }))

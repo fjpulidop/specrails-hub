@@ -14,8 +14,6 @@ import { Badge } from '../components/ui/badge'
 import type { CommandInfo, JobSummary } from '../types'
 import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
-import { SpecrailsTechPanel } from '../components/SpecrailsTechPanel'
-import { HubTodayWidget } from '../components/HubTodayWidget'
 import { ProjectHealthWidget } from '../components/ProjectHealthWidget'
 
 export default function DashboardPage() {
@@ -125,8 +123,6 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-      <HubTodayWidget />
-
       <ProjectHealthWidget />
 
       <section>
@@ -158,10 +154,6 @@ export default function DashboardPage() {
           onProposalClick={handleProposalClick}
           onProposalDelete={handleProposalDelete}
         />
-      </section>
-
-      <section>
-        <SpecrailsTechPanel />
       </section>
 
       <ImplementWizard

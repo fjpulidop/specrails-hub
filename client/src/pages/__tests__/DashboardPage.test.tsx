@@ -69,15 +69,6 @@ vi.mock('../../components/BatchImplementWizard', () => ({
     open ? <div data-testid="batch-wizard">BatchImplementWizard</div> : null,
 }))
 
-// HubTodayWidget uses useSharedWebSocket which requires the provider
-vi.mock('../../components/HubTodayWidget', () => ({
-  HubTodayWidget: () => null,
-}))
-
-// SpecrailsTechPanel may have external deps
-vi.mock('../../components/SpecrailsTechPanel', () => ({
-  SpecrailsTechPanel: () => null,
-}))
 
 describe('DashboardPage', () => {
   beforeEach(() => {
