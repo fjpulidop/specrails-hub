@@ -166,7 +166,7 @@ describe('RecentJobs', () => {
       const trashButtons = document.querySelectorAll('[class*="text-muted-foreground hover:text-destructive"]')
       expect(trashButtons.length).toBeGreaterThan(0)
       await user.click(trashButtons[0] as HTMLElement)
-      expect(screen.getByText('Clear all jobs')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /clear all \d+ jobs?/i })).toBeInTheDocument()
     })
 
     it('clears all jobs on "Clear all jobs" click', async () => {
@@ -181,7 +181,7 @@ describe('RecentJobs', () => {
       const trashButtons = document.querySelectorAll('[class*="text-muted-foreground hover:text-destructive"]')
       await user.click(trashButtons[0] as HTMLElement)
       // Click clear all
-      fireEvent.click(screen.getByRole('button', { name: /clear all jobs/i }))
+      fireEvent.click(screen.getByRole('button', { name: /clear all \d+ jobs?/i }))
       await waitFor(() => {
         expect(onJobsCleared).toHaveBeenCalled()
       })
@@ -194,7 +194,7 @@ describe('RecentJobs', () => {
       render(<RecentJobs jobs={mockJobs} />)
       const trashButtons = document.querySelectorAll('[class*="text-muted-foreground hover:text-destructive"]')
       await user.click(trashButtons[0] as HTMLElement)
-      fireEvent.click(screen.getByRole('button', { name: /clear all jobs/i }))
+      fireEvent.click(screen.getByRole('button', { name: /clear all \d+ jobs?/i }))
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalled()
       })

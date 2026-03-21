@@ -105,6 +105,12 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
     return true
   })
 
+  const clearRangeCount = jobs.filter((j) => {
+    if (clearFrom && j.started_at < clearFrom) return false
+    if (clearTo && j.started_at > `${clearTo}T23:59:59`) return false
+    return true
+  }).length
+
   async function handleClear(mode: 'all' | 'range') {
     setIsClearing(true)
     try {
@@ -370,7 +376,12 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
       {showClearModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowClearModal(false)}>
           <div className="w-80 rounded-xl border border-border/30 bg-popover p-4 shadow-lg space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-sm font-semibold">Clear Jobs</h3>
+            <div>
+              <h3 className="text-sm font-semibold">Clear Jobs</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {jobs.length} job{jobs.length !== 1 ? 's' : ''} in history
+              </p>
+            </div>
 
             <Button
               variant="destructive"
@@ -379,7 +390,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
               disabled={isClearing}
               onClick={() => handleClear('all')}
             >
-              Clear all jobs
+              Clear all {jobs.length} job{jobs.length !== 1 ? 's' : ''}
             </Button>
 
             <div className="space-y-2">
@@ -407,7 +418,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                 disabled={isClearing || (!clearFrom && !clearTo)}
                 onClick={() => handleClear('range')}
               >
-                Clear range
+                {(clearFrom || clearTo) ? `Clear ${clearRangeCount} job${clearRangeCount !== 1 ? 's' : ''} in range` : 'Clear range'}
               </Button>
             </div>
 
@@ -429,12 +440,12 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
           <DialogHeader>
             <DialogTitle>Delete proposal?</DialogTitle>
             <DialogDescription>
-              This will permanently delete the proposal. This action cannot be undone.
+              This will permanently delete 1 proposal. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteProposalId(null)}>
-              Keep
+              Cancel
             </Button>
             <Button
               variant="destructive"
