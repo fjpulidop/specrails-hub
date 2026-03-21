@@ -217,6 +217,9 @@ describe('GlobalSettingsPage', () => {
       if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
         return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
       }
+      if (typeof url === 'string' && url.includes('/api/hub/budget')) {
+        return Promise.resolve({ ok: true, json: async () => ({ hubDailyBudgetUsd: null }) })
+      }
       return Promise.resolve({
         ok: true,
         json: async () => ({ port: 4200, specrailsTechUrl: 'http://localhost:3000' }),

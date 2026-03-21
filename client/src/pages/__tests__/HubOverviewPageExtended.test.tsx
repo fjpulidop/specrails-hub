@@ -42,6 +42,8 @@ const mockOverview: HubOverviewResponse = {
     criticalCount: 0,
     jobsToday: 5,
     activeJobs: 1,
+    costToday: 2.50,
+    hubDailyBudgetUsd: 10,
   },
   projects: [
     {
@@ -51,6 +53,7 @@ const mockOverview: HubOverviewResponse = {
       activeJobs: 1,
       jobsToday: 3,
       coveragePct: 82.5,
+      costToday: 1.50,
       lastRunAt: '2024-03-21T10:00:00Z',
       lastRunCommand: '/sr:implement',
       lastRunStatus: 'completed',
@@ -62,6 +65,7 @@ const mockOverview: HubOverviewResponse = {
       activeJobs: 0,
       jobsToday: 0,
       coveragePct: null,
+      costToday: 1.00,
       lastRunAt: null,
       lastRunCommand: null,
       lastRunStatus: null,

@@ -286,7 +286,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
   })
 
   it('handles fetch error gracefully (no crash)', async () => {
-    global.fetch = vi.fn().mockRejectedValueOnce(new Error('Network error'))
+    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'))
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     // Should not throw — isLoading goes false, settings stay null
     await waitFor(() => {
@@ -307,10 +307,10 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     expect(input.value).toBe('http://localhost:4000')
   })
 
-  it('renders Cost Alerts section', async () => {
+  it('renders Budget & Alerts section', async () => {
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
-      expect(screen.getByText('Cost Alerts')).toBeInTheDocument()
+      expect(screen.getByText('Budget & Alerts')).toBeInTheDocument()
       expect(screen.getByPlaceholderText(/e\.g\. 0\.50/i)).toBeInTheDocument()
     })
   })
@@ -329,7 +329,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     })
     const input = screen.getByPlaceholderText(/e\.g\. 0\.50/i) as HTMLInputElement
     await user.type(input, '0.50')
-    await user.click(screen.getAllByRole('button', { name: /save/i })[1])
+    await user.click(screen.getAllByRole('button', { name: /save/i })[2])
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Alert set for jobs over $0.5')
     })
@@ -347,7 +347,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/e\.g\. 0\.50/i)).toBeInTheDocument()
     })
-    await user.click(screen.getAllByRole('button', { name: /save/i })[1])
+    await user.click(screen.getAllByRole('button', { name: /save/i })[2])
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Cost alerts disabled')
     })
@@ -363,7 +363,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     })
     const input = screen.getByPlaceholderText(/e\.g\. 0\.50/i) as HTMLInputElement
     await user.type(input, '-1')
-    await user.click(screen.getAllByRole('button', { name: /save/i })[1])
+    await user.click(screen.getAllByRole('button', { name: /save/i })[2])
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Enter a positive number or leave blank to disable')
     })

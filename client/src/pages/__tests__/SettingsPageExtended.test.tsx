@@ -89,7 +89,8 @@ describe('SettingsPage - extended coverage', () => {
     const { toast } = await import('sonner')
 
     global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => mockConfig })    // GET
+      .mockResolvedValueOnce({ ok: true, json: async () => mockConfig })    // GET /config
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) })           // GET /budget
       .mockResolvedValueOnce({ ok: false, json: async () => ({}) })          // POST fails
 
     render(<SettingsPage />)
@@ -111,7 +112,8 @@ describe('SettingsPage - extended coverage', () => {
     const { toast } = await import('sonner')
 
     global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => mockConfig })   // GET
+      .mockResolvedValueOnce({ ok: true, json: async () => mockConfig })   // GET /config
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) })          // GET /budget
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) })          // POST succeeds
 
     render(<SettingsPage />)
@@ -275,8 +277,9 @@ describe('SettingsPage - extended coverage', () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
     global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => mockConfig }) // GET config
-      .mockResolvedValueOnce({ ok: true })                                 // POST budget save
+      .mockResolvedValueOnce({ ok: true, json: async () => mockConfig }) // GET /config
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) })        // GET /budget
+      .mockResolvedValueOnce({ ok: true })                                 // PATCH budget save
     render(<SettingsPage />)
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/e\.g\. 5\.00/i)).toBeInTheDocument()
@@ -312,8 +315,9 @@ describe('SettingsPage - extended coverage', () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
     global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...mockConfig, dailyBudgetUsd: 5.0 }) })
-      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...mockConfig, dailyBudgetUsd: 5.0 }) })  // GET /config
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ dailyBudgetUsd: 5.0 }) })                   // GET /budget
+      .mockResolvedValueOnce({ ok: true })                                                                  // PATCH /budget
     render(<SettingsPage />)
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/e\.g\. 5\.00/i)).toBeInTheDocument()
