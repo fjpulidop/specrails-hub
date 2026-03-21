@@ -21,6 +21,7 @@ import { WelcomeScreen } from './components/WelcomeScreen'
 import { SetupWizard } from './components/SetupWizard'
 import { TabBar } from './components/TabBar'
 import { AddProjectDialog } from './components/AddProjectDialog'
+import { CommandPalette } from './components/CommandPalette'
 import { SharedWebSocketProvider } from './hooks/useSharedWebSocket'
 import { HubProvider, useHub } from './hooks/useHub'
 import { useOsNotifications } from './hooks/useOsNotifications'
@@ -240,6 +241,13 @@ function HubApp() {
       <Suspense fallback={null}>
         <DocsDialog open={docsOpen} onClose={() => setDocsOpen(false)} />
       </Suspense>
+
+      <CommandPalette
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenOverview={() => setOverviewOpen(true)}
+        onOpenAnalytics={() => setAnalyticsOpen(true)}
+        onOpenDocs={() => setDocsOpen(true)}
+      />
     </div>
   )
 }
@@ -277,6 +285,7 @@ export default function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
+          <CommandPalette />
         </Suspense>
       )}
       <Toaster position="bottom-right" richColors />

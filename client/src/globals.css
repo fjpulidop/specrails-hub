@@ -117,6 +117,24 @@
 .hljs-emphasis              { font-style: italic; }
 .hljs-strong                { font-weight: 700; }
 
+/* Command palette (cmdk) */
+[cmdk-overlay] {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: hsl(0 0% 0% / 0.6);
+  backdrop-filter: blur(4px);
+}
+
+[cmdk-group-heading] {
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: hsl(225 27% 51%);
+}
+
 /* Log viewer markdown tables */
 .prose table {
   border-collapse: collapse;
