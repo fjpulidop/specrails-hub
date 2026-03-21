@@ -284,7 +284,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const { project, db } = ctx(req)
     try {
       const config = getConfig(project.path, db, project.name)
-      res.json(config)
+      const dailyBudgetRaw = (db.prepare(`SELECT value FROM queue_state WHERE key = 'config.daily_budget_usd'`).get() as { value: string } | undefined)?.value
+      const dailyBudgetUsd = dailyBudgetRaw != null ? parseFloat(dailyBudgetRaw) : null
+      res.json({ ...config, dailyBudgetUsd })
     } catch (err) {
       console.error('[project-router] config error:', err)
       res.status(500).json({ error: 'Failed to read config' })
@@ -292,7 +294,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   router.post('/:projectId/config', (req: Request, res: Response) => {
-    const { active, labelFilter } = req.body ?? {}
+    const { active, labelFilter, dailyBudgetUsd } = req.body ?? {}
     const { db } = ctx(req)
     try {
       if (active !== undefined) {
@@ -300,6 +302,13 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       }
       if (labelFilter !== undefined) {
         db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.label_filter', ?)`).run(labelFilter ?? '')
+      }
+      if (dailyBudgetUsd !== undefined) {
+        if (dailyBudgetUsd === null) {
+          db.prepare(`DELETE FROM queue_state WHERE key = 'config.daily_budget_usd'`).run()
+        } else if (typeof dailyBudgetUsd === 'number' && dailyBudgetUsd > 0) {
+          db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.daily_budget_usd', ?)`).run(String(dailyBudgetUsd))
+        }
       }
       res.json({ ok: true })
     } catch (err) {

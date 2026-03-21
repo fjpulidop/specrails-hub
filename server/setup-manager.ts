@@ -4,7 +4,7 @@ import { existsSync, readdirSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
-import { findCoreContract } from './core-compat'
+import { findCoreContract, detectCLISync } from './core-compat'
 
 // ─── Checkpoint definitions ───────────────────────────────────────────────────
 
@@ -332,7 +332,26 @@ export class SetupManager {
   }
 
   private _spawnSetup(projectId: string, projectPath: string, args: string[]): void {
-    const child = spawn('claude', args, {
+    const provider = detectCLISync()
+
+    let binary: string
+    let resolvedArgs: string[]
+    if (provider === 'codex') {
+      // Codex: extract the prompt value from claude-style args and use 'exec'
+      binary = 'codex'
+      const promptIdx = args.indexOf('-p')
+      const prompt = promptIdx >= 0 ? args[promptIdx + 1] : '/setup'
+      resolvedArgs = ['exec', prompt]
+    } else {
+      // Default to claude (also covers null — warns and tries claude as fallback)
+      if (provider === null) {
+        console.warn('[SetupManager] No AI CLI detected (claude/codex). Falling back to claude.')
+      }
+      binary = 'claude'
+      resolvedArgs = args
+    }
+
+    const child = spawn(binary, resolvedArgs, {
       cwd: projectPath,
       env: process.env,
       shell: false,
@@ -427,7 +446,7 @@ export class SetupManager {
         this._broadcast({
           type: 'setup_error',
           projectId,
-          error: `claude setup exited with code ${code ?? 'unknown'}`,
+          error: `${binary} setup exited with code ${code ?? 'unknown'}`,
         })
       }
     })

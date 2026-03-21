@@ -16,6 +16,7 @@ import type { HubProject } from '../hooks/useHub'
 interface HubSettings {
   port: number
   specrailsTechUrl: string
+  costAlertThresholdUsd: number | null
 }
 
 interface SettingsDialogProps {
@@ -54,6 +55,8 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [specrailsTechUrl, setSpecrailsTechUrl] = useState('')
   const [isSavingUrl, setIsSavingUrl] = useState(false)
+  const [costAlertThreshold, setCostAlertThreshold] = useState('')
+  const [isSavingThreshold, setIsSavingThreshold] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -65,6 +68,7 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
           const data = await res.json() as HubSettings
           setHubSettings(data)
           setSpecrailsTechUrl(data.specrailsTechUrl ?? 'http://localhost:3000')
+          setCostAlertThreshold(data.costAlertThresholdUsd != null ? String(data.costAlertThresholdUsd) : '')
         }
       } catch {
         // ignore
@@ -93,6 +97,31 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
       toast.error('Failed to save URL')
     } finally {
       setIsSavingUrl(false)
+    }
+  }
+
+  async function handleSaveCostAlertThreshold() {
+    setIsSavingThreshold(true)
+    try {
+      const parsed = costAlertThreshold.trim() === '' ? null : parseFloat(costAlertThreshold)
+      if (parsed !== null && (isNaN(parsed) || parsed <= 0)) {
+        toast.error('Enter a positive number or leave blank to disable')
+        return
+      }
+      const res = await fetch('/api/hub/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ costAlertThresholdUsd: parsed }),
+      })
+      if (res.ok) {
+        toast.success(parsed == null ? 'Cost alerts disabled' : `Alert set for jobs over $${parsed}`)
+      } else {
+        toast.error('Failed to save threshold')
+      }
+    } catch {
+      toast.error('Failed to save threshold')
+    } finally {
+      setIsSavingThreshold(false)
     }
   }
 
@@ -169,6 +198,38 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                     className="h-7 text-xs shrink-0"
                     disabled={isSavingUrl}
                     onClick={handleSaveSpecrailsTechUrl}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Cost alerts */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Cost Alerts
+              </h3>
+              <div className="rounded-md border border-border p-3 space-y-2">
+                <p className="text-[10px] text-muted-foreground">
+                  Alert when a single job exceeds this amount (USD). Leave blank to disable.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={costAlertThreshold}
+                    onChange={(e) => setCostAlertThreshold(e.target.value)}
+                    placeholder="e.g. 0.50"
+                    className="h-7 text-xs font-mono"
+                  />
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-7 text-xs shrink-0"
+                    disabled={isSavingThreshold}
+                    onClick={handleSaveCostAlertThreshold}
                   >
                     Save
                   </Button>

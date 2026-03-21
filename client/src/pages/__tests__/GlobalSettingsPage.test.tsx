@@ -196,7 +196,8 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
   it('renders Save button for specrails-tech URL', async () => {
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument()
+      const saveButtons = screen.getAllByRole('button', { name: /save/i })
+      expect(saveButtons[0]).toBeInTheDocument()
     })
   })
 
@@ -214,7 +215,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
       expect(screen.getByPlaceholderText('http://localhost:3000')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: /save/i }))
+    await user.click(screen.getAllByRole('button', { name: /save/i })[0])
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('specrails-tech URL saved')
@@ -235,7 +236,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
       expect(screen.getByPlaceholderText('http://localhost:3000')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: /save/i }))
+    await user.click(screen.getAllByRole('button', { name: /save/i })[0])
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Failed to save URL')
@@ -291,5 +292,63 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     await user.clear(input)
     await user.type(input, 'http://localhost:4000')
     expect(input.value).toBe('http://localhost:4000')
+  })
+
+  it('renders Cost Alerts section', async () => {
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByText('Cost Alerts')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText(/e\.g\. 0\.50/i)).toBeInTheDocument()
+    })
+  })
+
+  it('saves cost alert threshold successfully', async () => {
+    const user = userEvent.setup()
+    const { toast } = await import('sonner')
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })
+      .mockResolvedValueOnce({ ok: true })
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/e\.g\. 0\.50/i)).toBeInTheDocument()
+    })
+    const input = screen.getByPlaceholderText(/e\.g\. 0\.50/i) as HTMLInputElement
+    await user.type(input, '0.50')
+    await user.click(screen.getAllByRole('button', { name: /save/i })[1])
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Alert set for jobs over $0.5')
+    })
+  })
+
+  it('disables cost alert when threshold is blank', async () => {
+    const user = userEvent.setup()
+    const { toast } = await import('sonner')
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })
+      .mockResolvedValueOnce({ ok: true })
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/e\.g\. 0\.50/i)).toBeInTheDocument()
+    })
+    await user.click(screen.getAllByRole('button', { name: /save/i })[1])
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Cost alerts disabled')
+    })
+  })
+
+  it('shows error when cost alert threshold is invalid', async () => {
+    const user = userEvent.setup()
+    const { toast } = await import('sonner')
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => hubSettings })
+    render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/e\.g\. 0\.50/i)).toBeInTheDocument()
+    })
+    const input = screen.getByPlaceholderText(/e\.g\. 0\.50/i) as HTMLInputElement
+    await user.type(input, '-1')
+    await user.click(screen.getAllByRole('button', { name: /save/i })[1])
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Enter a positive number or leave blank to disable')
+    })
   })
 })

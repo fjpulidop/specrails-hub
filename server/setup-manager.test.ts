@@ -20,9 +20,16 @@ vi.mock('fs', async () => {
   }
 })
 
+// Default: claude is detected. Override per-test for Codex paths.
+vi.mock('./core-compat', () => ({
+  findCoreContract: vi.fn().mockResolvedValue(null),
+  detectCLISync: vi.fn().mockReturnValue('claude'),
+}))
+
 import { spawn as mockSpawn } from 'child_process'
 import treeKill from 'tree-kill'
 import { existsSync, readdirSync } from 'fs'
+import { detectCLISync } from './core-compat'
 import { SetupManager, CHECKPOINTS } from './setup-manager'
 
 function createMockChildProcess() {
@@ -278,6 +285,34 @@ describe('SetupManager', () => {
 
       const errors = getBroadcastedByType(broadcast, 'setup_error')
       expect(errors).toHaveLength(1)
+    })
+
+    it('spawns codex with exec /setup when codex is the detected CLI', () => {
+      vi.mocked(detectCLISync).mockReturnValue('codex')
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startSetup('p1', '/path/to/project')
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'codex',
+        ['exec', '/setup'],
+        expect.objectContaining({ cwd: '/path/to/project' })
+      )
+    })
+
+    it('falls back to claude binary when no CLI is detected', () => {
+      vi.mocked(detectCLISync).mockReturnValue(null)
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startSetup('p1', '/path/to/project')
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'claude',
+        expect.arrayContaining(['-p', '/setup']),
+        expect.any(Object)
+      )
     })
   })
 

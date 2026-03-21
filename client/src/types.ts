@@ -53,6 +53,7 @@ export interface ProjectConfig {
     labelFilter: string
   }
   commands: CommandInfo[]
+  dailyBudgetUsd: number | null
 }
 
 export interface IssueItem {

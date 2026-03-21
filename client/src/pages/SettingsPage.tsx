@@ -18,6 +18,8 @@ export default function SettingsPage() {
   const [labelFilter, setLabelFilter] = useState('')
   const [activeTracker, setActiveTracker] = useState<'github' | 'jira' | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [dailyBudget, setDailyBudget] = useState('')
+  const [isSavingBudget, setIsSavingBudget] = useState(false)
 
   // Track saved values to detect unsaved changes
   const savedLabelFilter = useRef('')
@@ -38,6 +40,7 @@ export default function SettingsPage() {
         setConfig(cached)
         setLabelFilter(cached.issueTracker.labelFilter)
         setActiveTracker(cached.issueTracker.active)
+        setDailyBudget(cached.dailyBudgetUsd != null ? String(cached.dailyBudgetUsd) : '')
         savedLabelFilter.current = cached.issueTracker.labelFilter
         savedActiveTracker.current = cached.issueTracker.active
         setIsLoading(false)
@@ -53,6 +56,7 @@ export default function SettingsPage() {
         setConfig(data)
         setLabelFilter(data.issueTracker.labelFilter)
         setActiveTracker(data.issueTracker.active)
+        setDailyBudget(data.dailyBudgetUsd != null ? String(data.dailyBudgetUsd) : '')
         savedLabelFilter.current = data.issueTracker.labelFilter
         savedActiveTracker.current = data.issueTracker.active
         if (activeProjectId) cacheRef.current.set(activeProjectId, data)
@@ -81,6 +85,28 @@ export default function SettingsPage() {
       toast.error('Failed to save settings', { description: (err as Error).message })
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  async function saveDailyBudget() {
+    setIsSavingBudget(true)
+    try {
+      const parsed = dailyBudget.trim() === '' ? null : parseFloat(dailyBudget)
+      if (parsed !== null && (isNaN(parsed) || parsed <= 0)) {
+        toast.error('Enter a positive number or leave blank to disable')
+        return
+      }
+      const res = await fetch(`${getApiBase()}/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dailyBudgetUsd: parsed }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      toast.success(parsed == null ? 'Daily budget removed' : `Daily budget set to $${parsed}`)
+    } catch (err) {
+      toast.error('Failed to save budget', { description: (err as Error).message })
+    } finally {
+      setIsSavingBudget(false)
     }
   }
 
@@ -150,6 +176,44 @@ export default function SettingsPage() {
             />
             <p className="text-[10px] text-muted-foreground">
               Filter issues by label when browsing in the Implement wizard
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Budget Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Budget</CardTitle>
+          <CardDescription>
+            Set a daily spend cap for this project. The queue auto-pauses when the limit is hit.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">Daily budget (USD)</label>
+            <div className="flex gap-2 max-w-xs">
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={dailyBudget}
+                onChange={(e) => setDailyBudget(e.target.value)}
+                placeholder="e.g. 5.00"
+                className="h-8 text-xs font-mono"
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-8 text-xs shrink-0"
+                disabled={isSavingBudget}
+                onClick={saveDailyBudget}
+              >
+                {isSavingBudget ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Leave blank to disable. Spend is calculated over the last 24 hours.
             </p>
           </div>
         </CardContent>

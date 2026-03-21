@@ -5,7 +5,7 @@ import type { WsMessage } from './types'
 import type { ProjectRegistry } from './project-registry'
 import { getHubSetting, setHubSetting, listProjects, listAgents, getAgent, addAgent, updateAgent } from './hub-db'
 import { createSpecrailsTechClient } from './specrails-tech-client'
-import { checkCoreCompat } from './core-compat'
+import { checkCoreCompat, getCLIStatus } from './core-compat'
 import { getHubAnalytics, getHubTodayStats, getHubRecentJobs, searchHubContent, getHubOverview } from './hub-analytics'
 import type { AnalyticsOpts, AnalyticsPeriod } from './types'
 
@@ -188,17 +188,26 @@ export function createHubRouter(
       getHubSetting(registry.hubDb, 'specrails_tech_url') ??
       process.env.SPECRAILS_TECH_URL ??
       'http://localhost:3000'
-    res.json({ port: parseInt(port, 10), specrailsTechUrl })
+    const costAlertThresholdRaw = getHubSetting(registry.hubDb, 'cost_alert_threshold_usd')
+    const costAlertThresholdUsd = costAlertThresholdRaw != null ? parseFloat(costAlertThresholdRaw) : null
+    res.json({ port: parseInt(port, 10), specrailsTechUrl, costAlertThresholdUsd })
   })
 
   // PUT /api/hub/settings — update hub-level settings
   router.put('/settings', (req, res) => {
-    const { port, specrailsTechUrl } = req.body ?? {}
+    const { port, specrailsTechUrl, costAlertThresholdUsd } = req.body ?? {}
     if (port !== undefined) {
       setHubSetting(registry.hubDb, 'port', String(port))
     }
     if (specrailsTechUrl !== undefined && typeof specrailsTechUrl === 'string') {
       setHubSetting(registry.hubDb, 'specrails_tech_url', specrailsTechUrl.trim())
+    }
+    if (costAlertThresholdUsd !== undefined) {
+      if (costAlertThresholdUsd === null) {
+        registry.hubDb.prepare('DELETE FROM hub_settings WHERE key = ?').run('cost_alert_threshold_usd')
+      } else if (typeof costAlertThresholdUsd === 'number' && costAlertThresholdUsd > 0) {
+        setHubSetting(registry.hubDb, 'cost_alert_threshold_usd', String(costAlertThresholdUsd))
+      }
     }
     res.json({ ok: true })
   })
@@ -269,6 +278,11 @@ export function createHubRouter(
   router.get('/core-compat', async (_req, res) => {
     const result = await checkCoreCompat()
     res.json(result)
+  })
+
+  // GET /api/hub/cli-status — detected AI CLI provider and version
+  router.get('/cli-status', (_req, res) => {
+    res.json(getCLIStatus())
   })
 
 

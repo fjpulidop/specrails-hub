@@ -48,6 +48,7 @@ const mockConfig: ProjectConfig = {
     labelFilter: 'backlog',
   },
   commands: [],
+  dailyBudgetUsd: null,
 }
 
 const mockConfigJiraNotInstalled: ProjectConfig = {
@@ -59,6 +60,7 @@ const mockConfigJiraNotInstalled: ProjectConfig = {
     labelFilter: '',
   },
   commands: [],
+  dailyBudgetUsd: null,
 }
 
 describe('SettingsPage - extended coverage', () => {
@@ -258,5 +260,69 @@ describe('SettingsPage - extended coverage', () => {
     await user.clear(input)
     await user.type(input, 'my-label')
     expect(input.value).toBe('my-label')
+  })
+
+  it('renders Budget section with daily budget input', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => mockConfig })
+    render(<SettingsPage />)
+    await waitFor(() => {
+      expect(screen.getByText('Budget')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText(/e\.g\. 5\.00/i)).toBeInTheDocument()
+    })
+  })
+
+  it('saves daily budget successfully', async () => {
+    const user = userEvent.setup()
+    const { toast } = await import('sonner')
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => mockConfig }) // GET config
+      .mockResolvedValueOnce({ ok: true })                                 // POST budget save
+    render(<SettingsPage />)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/e\.g\. 5\.00/i)).toBeInTheDocument()
+    })
+    const budgetInput = screen.getByPlaceholderText(/e\.g\. 5\.00/i) as HTMLInputElement
+    await user.type(budgetInput, '5.00')
+    const saveBtn = screen.getAllByRole('button', { name: /^save$/i }).find(
+      (btn) => (btn as HTMLButtonElement).closest('div')?.querySelector('input[placeholder*="5.00"]')
+    ) ?? screen.getAllByRole('button', { name: /^save$/i })[0]
+    await user.click(saveBtn)
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Daily budget set to $5')
+    })
+  })
+
+  it('shows error when daily budget is invalid (zero)', async () => {
+    const user = userEvent.setup()
+    const { toast } = await import('sonner')
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => mockConfig })
+    render(<SettingsPage />)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/e\.g\. 5\.00/i)).toBeInTheDocument()
+    })
+    const budgetInput = screen.getByPlaceholderText(/e\.g\. 5\.00/i) as HTMLInputElement
+    await user.type(budgetInput, '-1')
+    await user.click(screen.getAllByRole('button', { name: /^save$/i })[0])
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Enter a positive number or leave blank to disable')
+    })
+  })
+
+  it('removes daily budget when input is blank', async () => {
+    const user = userEvent.setup()
+    const { toast } = await import('sonner')
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...mockConfig, dailyBudgetUsd: 5.0 }) })
+      .mockResolvedValueOnce({ ok: true })
+    render(<SettingsPage />)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/e\.g\. 5\.00/i)).toBeInTheDocument()
+    })
+    const budgetInput = screen.getByPlaceholderText(/e\.g\. 5\.00/i) as HTMLInputElement
+    await user.clear(budgetInput)
+    await user.click(screen.getAllByRole('button', { name: /^save$/i })[0])
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Daily budget removed')
+    })
   })
 })

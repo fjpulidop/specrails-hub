@@ -423,6 +423,24 @@ export interface SpecLauncherErrorMessage {
   timestamp: string
 }
 
+// ─── Cost alert message types ─────────────────────────────────────────────────
+
+export interface CostAlertMessage {
+  type: 'cost_alert'
+  projectId: string
+  jobId: string
+  cost: number
+  threshold: number
+}
+
+export interface DailyBudgetExceededMessage {
+  type: 'daily_budget_exceeded'
+  projectId: string
+  dailySpend: number
+  budget: number
+  queuePaused: boolean
+}
+
 export type WsMessage =
   | LogMessage | PhaseMessage | InitMessage | QueueMessage | EventMessage
   | ChatStreamMessage | ChatDoneMessage | ChatErrorMessage
@@ -434,4 +452,5 @@ export type WsMessage =
   | ProposalStreamMessage | ProposalReadyMessage | ProposalRefinedMessage
   | ProposalIssueCreatedMessage | ProposalErrorMessage
   | SpecLauncherStreamMessage | SpecLauncherDoneMessage | SpecLauncherErrorMessage
+  | CostAlertMessage | DailyBudgetExceededMessage
 

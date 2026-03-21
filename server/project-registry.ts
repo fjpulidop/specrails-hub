@@ -19,6 +19,7 @@ import {
   setProjectSetupSession,
   clearProjectSetupSession,
   clearAgentJob,
+  getHubSetting,
   type ProjectRow,
 } from './hub-db'
 import { getConfig } from './config'
@@ -125,7 +126,12 @@ export class ProjectRegistry {
       }
     }
 
-    const queueManager = new QueueManager(boundBroadcast, db, undefined, project.path)
+    const queueManager = new QueueManager(boundBroadcast, db, undefined, project.path, {
+      getCostAlertThreshold: () => {
+        const val = getHubSetting(this._hubDb, 'cost_alert_threshold_usd')
+        return val != null ? parseFloat(val) : null
+      },
+    })
     const chatManager = new ChatManager(boundBroadcast, db, project.path, project.name)
     const setupManager = new SetupManager(
       boundBroadcast,

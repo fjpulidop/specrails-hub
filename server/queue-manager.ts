@@ -88,12 +88,14 @@ export class QueueManager {
   private _zombieTimeoutMs: number
   private _inactivityTimer: ReturnType<typeof setTimeout> | null
 
+  private _getCostAlertThreshold: (() => number | null) | null
+
   constructor(
     broadcast: (msg: WsMessage) => void,
     db?: any,
     commands?: CommandInfo[],
     cwd?: string,
-    options?: { zombieTimeoutMs?: number }
+    options?: { zombieTimeoutMs?: number; getCostAlertThreshold?: () => number | null }
   ) {
     this._queue = []
     this._jobs = new Map()
@@ -109,6 +111,8 @@ export class QueueManager {
     this._commands = commands ?? []
     this._cwd = cwd
     this._inactivityTimer = null
+
+    this._getCostAlertThreshold = options?.getCostAlertThreshold ?? null
 
     const envTimeout = process.env.WM_ZOMBIE_TIMEOUT_MS !== undefined
       ? parseInt(process.env.WM_ZOMBIE_TIMEOUT_MS, 10)
@@ -463,10 +467,39 @@ export class QueueManager {
         status: finalStatus,
         ...tokenData,
       })
-      const costStr = (lastResultEvent?.total_cost_usd as number | undefined) != null
-        ? ` | cost: $${(lastResultEvent!.total_cost_usd as number).toFixed(4)}`
-        : ''
+      const jobCost = lastResultEvent?.total_cost_usd as number | undefined
+      const costStr = jobCost != null ? ` | cost: $${jobCost.toFixed(4)}` : ''
       emitLine('stdout', `[process exited with code ${code ?? 'unknown'}${costStr}]`)
+
+      // Cost alert: check per-job threshold
+      if (jobCost != null && finalStatus === 'completed') {
+        const threshold = this._getCostAlertThreshold?.() ?? null
+        if (threshold != null && jobCost >= threshold) {
+          this._broadcast({ type: 'cost_alert', projectId: '', jobId, cost: jobCost, threshold })
+        }
+
+        // Daily budget: check total spend for last 24h
+        const dailyBudgetRow = this._db.prepare(
+          `SELECT value FROM queue_state WHERE key = 'config.daily_budget_usd'`
+        ).get() as { value: string } | undefined
+        if (dailyBudgetRow) {
+          const dailyBudget = parseFloat(dailyBudgetRow.value)
+          if (dailyBudget > 0) {
+            const spendRow = this._db.prepare(
+              `SELECT COALESCE(SUM(total_cost_usd), 0) as total FROM jobs WHERE status = 'completed' AND total_cost_usd IS NOT NULL AND started_at > datetime('now', '-1 day')`
+            ).get() as { total: number }
+            const dailySpend = spendRow.total
+            if (dailySpend >= dailyBudget) {
+              const wasPaused = this._paused
+              this._paused = true
+              if (!wasPaused) {
+                this._db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('paused', 'true')`).run()
+              }
+              this._broadcast({ type: 'daily_budget_exceeded', projectId: '', dailySpend, budget: dailyBudget, queuePaused: true })
+            }
+          }
+        }
+      }
     } else {
       emitLine('stdout', `[process exited with code ${code ?? 'unknown'}]`)
     }
