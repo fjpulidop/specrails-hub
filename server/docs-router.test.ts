@@ -50,13 +50,14 @@ describe('docs-router', () => {
       expect(Array.isArray(res.body.categories)).toBe(true)
     })
 
-    it('includes all four known categories in the response', async () => {
+    it('includes the three known categories in correct order', async () => {
       const res = await request(buildApp()).get('/docs')
       const slugs = res.body.categories.map((c: { slug: string }) => c.slug)
-      expect(slugs).toContain('engineering')
+      expect(slugs).toContain('general')
       expect(slugs).toContain('product')
       expect(slugs).toContain('operations')
-      expect(slugs).toContain('general')
+      expect(slugs).not.toContain('engineering')
+      expect(slugs[0]).toBe('general')
     })
 
     it('returns empty docs array for categories with no files', async () => {
@@ -69,43 +70,43 @@ describe('docs-router', () => {
     })
 
     it('lists markdown files from an existing category dir', async () => {
-      const engDir = path.join(docsDir, 'engineering')
-      fs.mkdirSync(engDir, { recursive: true })
-      fs.writeFileSync(path.join(engDir, 'my-guide.md'), '# My Guide\n\nContent.')
+      const opsDir = path.join(docsDir, 'operations')
+      fs.mkdirSync(opsDir, { recursive: true })
+      fs.writeFileSync(path.join(opsDir, 'my-guide.md'), '# My Guide\n\nContent.')
 
       const res = await request(buildApp()).get('/docs')
-      const engCat = res.body.categories.find(
-        (c: { slug: string }) => c.slug === 'engineering'
+      const opsCat = res.body.categories.find(
+        (c: { slug: string }) => c.slug === 'operations'
       )
-      expect(engCat.docs).toHaveLength(1)
-      expect(engCat.docs[0].slug).toBe('my-guide')
-      expect(engCat.docs[0].title).toBe('My Guide')
+      expect(opsCat.docs).toHaveLength(1)
+      expect(opsCat.docs[0].slug).toBe('my-guide')
+      expect(opsCat.docs[0].title).toBe('My Guide')
     })
 
     it('falls back to slug-derived title when no H1 in file', async () => {
-      const engDir = path.join(docsDir, 'engineering')
-      fs.mkdirSync(engDir, { recursive: true })
-      fs.writeFileSync(path.join(engDir, 'no-heading.md'), 'Just some content.')
+      const opsDir = path.join(docsDir, 'operations')
+      fs.mkdirSync(opsDir, { recursive: true })
+      fs.writeFileSync(path.join(opsDir, 'no-heading.md'), 'Just some content.')
 
       const res = await request(buildApp()).get('/docs')
-      const engCat = res.body.categories.find(
-        (c: { slug: string }) => c.slug === 'engineering'
+      const opsCat = res.body.categories.find(
+        (c: { slug: string }) => c.slug === 'operations'
       )
-      expect(engCat.docs[0].title).toBe('No Heading')
+      expect(opsCat.docs[0].title).toBe('No Heading')
     })
 
     it('does not include non-markdown files in docs list', async () => {
-      const engDir = path.join(docsDir, 'engineering')
-      fs.mkdirSync(engDir, { recursive: true })
-      fs.writeFileSync(path.join(engDir, 'guide.md'), '# Guide')
-      fs.writeFileSync(path.join(engDir, 'ignore.txt'), 'not markdown')
+      const opsDir = path.join(docsDir, 'operations')
+      fs.mkdirSync(opsDir, { recursive: true })
+      fs.writeFileSync(path.join(opsDir, 'guide.md'), '# Guide')
+      fs.writeFileSync(path.join(opsDir, 'ignore.txt'), 'not markdown')
 
       const res = await request(buildApp()).get('/docs')
-      const engCat = res.body.categories.find(
-        (c: { slug: string }) => c.slug === 'engineering'
+      const opsCat = res.body.categories.find(
+        (c: { slug: string }) => c.slug === 'operations'
       )
-      expect(engCat.docs).toHaveLength(1)
-      expect(engCat.docs[0].slug).toBe('guide')
+      expect(opsCat.docs).toHaveLength(1)
+      expect(opsCat.docs[0].slug).toBe('guide')
     })
   })
 
@@ -119,26 +120,31 @@ describe('docs-router', () => {
     })
 
     it('returns 404 when the document file does not exist', async () => {
-      const res = await request(buildApp()).get('/docs/engineering/nonexistent')
+      const res = await request(buildApp()).get('/docs/general/nonexistent')
       expect(res.status).toBe(404)
       expect(res.body.error).toMatch(/document not found/i)
     })
 
-    it('returns 200 with title, content, category, and slug for a valid doc', async () => {
-      const engDir = path.join(docsDir, 'engineering')
-      fs.mkdirSync(engDir, { recursive: true })
-      fs.writeFileSync(path.join(engDir, 'test-doc.md'), '# Test Doc\n\nHello world.')
+    it('returns 404 for engineering (removed section)', async () => {
+      const res = await request(buildApp()).get('/docs/engineering/some-doc')
+      expect(res.status).toBe(404)
+    })
 
-      const res = await request(buildApp()).get('/docs/engineering/test-doc')
+    it('returns 200 with title, content, category, and slug for a valid doc', async () => {
+      const opsDir = path.join(docsDir, 'operations')
+      fs.mkdirSync(opsDir, { recursive: true })
+      fs.writeFileSync(path.join(opsDir, 'test-doc.md'), '# Test Doc\n\nHello world.')
+
+      const res = await request(buildApp()).get('/docs/operations/test-doc')
       expect(res.status).toBe(200)
       expect(res.body.title).toBe('Test Doc')
       expect(res.body.content).toContain('Hello world.')
-      expect(res.body.category).toBe('engineering')
+      expect(res.body.category).toBe('operations')
       expect(res.body.slug).toBe('test-doc')
     })
 
-    it('works for all four valid categories', async () => {
-      const categories = ['engineering', 'product', 'operations', 'general']
+    it('works for all three valid categories', async () => {
+      const categories = ['general', 'product', 'operations']
       for (const cat of categories) {
         const catDir = path.join(docsDir, cat)
         fs.mkdirSync(catDir, { recursive: true })
@@ -151,11 +157,11 @@ describe('docs-router', () => {
     })
 
     it('derives title from slug when file has no H1', async () => {
-      const engDir = path.join(docsDir, 'engineering')
-      fs.mkdirSync(engDir, { recursive: true })
-      fs.writeFileSync(path.join(engDir, 'plain-doc.md'), 'No heading here.')
+      const genDir = path.join(docsDir, 'general')
+      fs.mkdirSync(genDir, { recursive: true })
+      fs.writeFileSync(path.join(genDir, 'plain-doc.md'), 'No heading here.')
 
-      const res = await request(buildApp()).get('/docs/engineering/plain-doc')
+      const res = await request(buildApp()).get('/docs/general/plain-doc')
       expect(res.status).toBe(200)
       expect(res.body.title).toBe('Plain Doc')
     })
@@ -163,7 +169,7 @@ describe('docs-router', () => {
     it('returns 400 for a slug containing backslash (invalid path)', async () => {
       // Express URL encoding usually handles this, but ensure the router
       // handles edge cases without crashing
-      const res = await request(buildApp()).get('/docs/engineering/bad%5Cslug')
+      const res = await request(buildApp()).get('/docs/general/bad%5Cslug')
       expect([400, 404]).toContain(res.status)
     })
   })
