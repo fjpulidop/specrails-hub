@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.11.0](https://github.com/fjpulidop/specrails-hub/compare/v1.10.1...v1.11.0) (2026-03-21)
+
+
+### Features
+
+* **client:** per-project chat improvements — context, suggestions, UX (SPEA-461) ([#82](https://github.com/fjpulidop/specrails-hub/issues/82)) ([8b5b636](https://github.com/fjpulidop/specrails-hub/commit/8b5b6368c255c2256cdf2b5bd0c2a65ff4572bb9))
+* SPEA-341, SPEA-451, SPEA-460, SPEA-462 — OpenSpec removal, performance, dashboard metrics, hub overview ([#81](https://github.com/fjpulidop/specrails-hub/issues/81)) ([eee56ea](https://github.com/fjpulidop/specrails-hub/commit/eee56ea8daf67576cdc534a8179bbc33c827516d))
+
 ## [1.10.1](https://github.com/fjpulidop/specrails-hub/compare/v1.10.0...v1.10.1) (2026-03-20)
 
 
