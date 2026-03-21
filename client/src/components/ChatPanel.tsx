@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { MessageSquare } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { ChatHeader } from './ChatHeader'
@@ -5,6 +6,10 @@ import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import type { UseChatReturn } from '../hooks/useChat'
 import type { HubProject } from '../hooks/useHub'
+
+const MIN_WIDTH = 240
+const MAX_WIDTH = 720
+const DEFAULT_WIDTH = 320
 
 interface ChatPanelProps {
   chat: UseChatReturn
@@ -26,6 +31,40 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
     confirmCommand,
     dismissCommandProposal,
   } = chat
+
+  const [isMaximized, setIsMaximized] = useState(false)
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH)
+  const dragState = useRef({ active: false, startX: 0, startWidth: DEFAULT_WIDTH })
+
+  // Global mouse handlers for drag-resize
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!dragState.current.active) return
+      const delta = dragState.current.startX - e.clientX
+      const newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, dragState.current.startWidth + delta))
+      setPanelWidth(newWidth)
+    }
+    const onUp = () => {
+      if (dragState.current.active) {
+        dragState.current.active = false
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [])
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    dragState.current = { active: true, startX: e.clientX, startWidth: panelWidth }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }
 
   const activeStreamCount = conversations.filter((c) => c.isStreaming).length
   const activeConversation = conversations[activeTabIndex] ?? null
@@ -50,14 +89,17 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
     )
   }
 
-  return (
-    <div className="flex w-80 shrink-0 flex-col border-l border-border/30 bg-background/80 backdrop-blur-sm">
+  const panelContent = (
+    <>
       <ChatHeader
         title={activeConversation?.title ?? null}
         projectName={project?.name}
         canCreateNew={conversations.length < 3}
+        isMaximized={isMaximized}
         hasActiveConversation={activeConversation !== null}
         onToggle={togglePanel}
+        onMaximize={() => setIsMaximized(true)}
+        onRestore={() => setIsMaximized(false)}
         onNewConversation={() => createConversation()}
         onDeleteConversation={() => {
           if (activeConversation) deleteConversation(activeConversation.id)
@@ -152,6 +194,33 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
           </button>
         </div>
       )}
+    </>
+  )
+
+  // Maximized: fixed overlay covering full viewport
+  if (isMaximized) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-md border-l border-border/30">
+        {panelContent}
+      </div>
+    )
+  }
+
+  // Normal: sidebar panel with draggable left border
+  return (
+    <div
+      className="relative flex shrink-0 flex-col border-l border-border/30 bg-background/80 backdrop-blur-sm"
+      style={{ width: panelWidth }}
+    >
+      {/* Drag handle — left border */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-10 hover:bg-dracula-purple/30 transition-colors"
+        onMouseDown={handleDragStart}
+        title="Drag to resize"
+        role="separator"
+        aria-orientation="vertical"
+      />
+      {panelContent}
     </div>
   )
 }

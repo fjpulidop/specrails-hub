@@ -4,7 +4,10 @@ interface ChatHeaderProps {
   title: string | null
   projectName?: string
   canCreateNew: boolean
+  isMaximized: boolean
   onToggle: () => void
+  onMaximize: () => void
+  onRestore: () => void
   onNewConversation: () => void
   onDeleteConversation: () => void
   hasActiveConversation: boolean
@@ -14,7 +17,10 @@ export function ChatHeader({
   title,
   projectName,
   canCreateNew,
+  isMaximized,
   onToggle,
+  onMaximize,
+  onRestore,
   onNewConversation,
   onDeleteConversation,
   hasActiveConversation,
@@ -52,6 +58,33 @@ export function ChatHeader({
           >
             <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth="1.5">
               <path strokeLinecap="round" d="M2 4h12M5.5 4V2.5h5V4M6 7v5M10 7v5M3 4l.9 8.5a1 1 0 001 .9h6.2a1 1 0 001-.9L13 4" />
+            </svg>
+          </Button>
+        )}
+        {isMaximized ? (
+          <Button
+            size="icon"
+            variant="ghost"
+            title="Restore chat panel"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            onClick={onRestore}
+          >
+            <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth="1.5">
+              <rect x="2" y="5" width="7" height="7" rx="1" />
+              <path strokeLinecap="round" d="M7 5V3h6v6h-2" />
+            </svg>
+          </Button>
+        ) : (
+          <Button
+            size="icon"
+            variant="ghost"
+            title="Maximize chat panel"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            onClick={onMaximize}
+          >
+            <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth="1.5">
+              <rect x="2" y="2" width="12" height="12" rx="1" />
+              <path strokeLinecap="round" d="M9 2v4h5M7 14v-4H2" />
             </svg>
           </Button>
         )}
