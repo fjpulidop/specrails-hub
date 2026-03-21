@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.2](https://github.com/fjpulidop/specrails-hub/compare/v1.14.1...v1.14.2) (2026-03-21)
+
+
+### Bug Fixes
+
+* **client:** project switch bugs + model selector onChange + test fix (SPEA-547, SPEA-548, SPEA-549) ([#96](https://github.com/fjpulidop/specrails-hub/issues/96)) ([4bcfbf0](https://github.com/fjpulidop/specrails-hub/commit/4bcfbf09c7d18fe253a9bf6ed2e98d1c28b925f0))
+
 ## [1.14.1](https://github.com/fjpulidop/specrails-hub/compare/v1.14.0...v1.14.1) (2026-03-21)
 
 
