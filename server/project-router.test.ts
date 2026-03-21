@@ -46,6 +46,7 @@ function makeSetupManager(overrides: Partial<{
   resumeSetup: () => void
   abort: () => void
   getCheckpointStatus: () => any[]
+  getInstallLog: () => string[]
 }> = {}) {
   return {
     isInstalling: overrides.isInstalling ?? vi.fn(() => false),
@@ -55,6 +56,7 @@ function makeSetupManager(overrides: Partial<{
     resumeSetup: overrides.resumeSetup ?? vi.fn(),
     abort: overrides.abort ?? vi.fn(),
     getCheckpointStatus: overrides.getCheckpointStatus ?? vi.fn(() => []),
+    getInstallLog: overrides.getInstallLog ?? vi.fn(() => []),
   }
 }
 
