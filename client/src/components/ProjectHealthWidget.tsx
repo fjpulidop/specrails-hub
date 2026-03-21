@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { GitCommit, CheckCircle2, XCircle, AlertCircle, Clock } from 'lucide-react'
+import { GitCommit, CheckCircle2, XCircle, AlertCircle, Clock, TriangleAlert } from 'lucide-react'
 import { RadialBarChart, RadialBar, ResponsiveContainer, Tooltip } from 'recharts'
 import { useProjectCache } from '../hooks/useProjectCache'
 import { useHub } from '../hooks/useHub'
@@ -14,6 +14,12 @@ interface CoverageInfo {
   functions: number | null
   branches: number | null
   source: string | null
+}
+
+interface FailurePattern {
+  command: string
+  count: number
+  lastFailedAt: string
 }
 
 interface HealthFactors {
@@ -34,6 +40,7 @@ interface ProjectMetrics {
     lastJobCommand: string | null
     lastJobAt: string | null
   }
+  failurePatterns: FailurePattern[]
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -121,6 +128,28 @@ function PipelineStatusBadge({ status }: { status: string | null }) {
   )
 }
 
+function FailureWarningBanner({ patterns }: { patterns: FailurePattern[] }) {
+  if (patterns.length === 0) return null
+  return (
+    <div className="mx-4 mb-3 rounded-lg border border-[#ff5555]/30 bg-[#ff5555]/10 px-3 py-2 flex flex-col gap-1">
+      <div className="flex items-center gap-1.5">
+        <TriangleAlert className="w-3.5 h-3.5 text-[#ff5555] flex-shrink-0" />
+        <span className="text-xs font-semibold text-[#ff5555]">Recurring failures detected</span>
+      </div>
+      <ul className="space-y-0.5 pl-5">
+        {patterns.map((p) => (
+          <li key={p.command} className="text-[11px] text-foreground/70">
+            <span className="font-mono text-foreground/90">{p.command}</span>
+            {' '}has failed{' '}
+            <span className="font-semibold text-[#ff5555]">{p.count}×</span>
+            {' '}this week — possible project issue.
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(ms / 60000)
@@ -158,7 +187,7 @@ export function ProjectHealthWidget() {
 
   if (!metrics) return null
 
-  const { coverage, healthScore, healthFactors, recentCommits, pipeline } = metrics
+  const { coverage, healthScore, healthFactors, recentCommits, pipeline, failurePatterns } = metrics
 
   return (
     <div className="rounded-xl border border-border/40 bg-card/30 overflow-hidden">
@@ -167,6 +196,8 @@ export function ProjectHealthWidget() {
           Project Health
         </h2>
       </div>
+
+      <FailureWarningBanner patterns={failurePatterns ?? []} />
 
       <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
 

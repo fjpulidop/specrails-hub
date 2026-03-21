@@ -35,12 +35,19 @@ export interface HealthFactors {
   hasRecentActivity: boolean
 }
 
+export interface FailurePattern {
+  command: string
+  count: number
+  lastFailedAt: string
+}
+
 export interface ProjectMetrics {
   coverage: CoverageInfo
   healthScore: number
   healthFactors: HealthFactors
   recentCommits: GitCommit[]
   pipeline: PipelineStatus
+  failurePatterns: FailurePattern[]
 }
 
 // ─── Coverage reader ──────────────────────────────────────────────────────────
@@ -102,6 +109,36 @@ function getGitCommits(projectPath: string, limit = 10): GitCommit[] {
   }
 }
 
+// ─── Failure pattern detection ────────────────────────────────────────────────
+
+const FAILURE_PATTERN_THRESHOLD = 3
+const FAILURE_PATTERN_WINDOW_DAYS = 7
+
+function getFailurePatterns(db: DbInstance): FailurePattern[] {
+  const rows = db.prepare(`
+    SELECT
+      CASE
+        WHEN instr(command, ' ') > 0 THEN substr(command, 1, instr(command, ' ') - 1)
+        ELSE command
+      END as command_key,
+      COUNT(*) as failure_count,
+      MAX(started_at) as last_failed_at
+    FROM jobs
+    WHERE status = 'failed'
+      AND started_at >= datetime('now', '-${FAILURE_PATTERN_WINDOW_DAYS} days')
+    GROUP BY command_key
+    HAVING COUNT(*) >= ${FAILURE_PATTERN_THRESHOLD}
+    ORDER BY failure_count DESC
+    LIMIT 10
+  `).all() as Array<{ command_key: string; failure_count: number; last_failed_at: string }>
+
+  return rows.map((r) => ({
+    command: r.command_key,
+    count: r.failure_count,
+    lastFailedAt: r.last_failed_at,
+  }))
+}
+
 // ─── Pipeline status ──────────────────────────────────────────────────────────
 
 function getPipelineStatus(db: DbInstance): PipelineStatus {
@@ -158,6 +195,7 @@ export function getProjectMetrics(projectPath: string, db: DbInstance): ProjectM
   const recentCommits = getGitCommits(projectPath, 10)
   const pipeline = getPipelineStatus(db)
   const { score, factors } = computeHealthScore(coverage, pipeline, recentCommits)
+  const failurePatterns = getFailurePatterns(db)
 
   return {
     coverage,
@@ -165,5 +203,6 @@ export function getProjectMetrics(projectPath: string, db: DbInstance): ProjectM
     healthFactors: factors,
     recentCommits,
     pipeline,
+    failurePatterns,
   }
 }

@@ -235,6 +235,105 @@ describe('getProjectMetrics', () => {
       expect(result).toHaveProperty('healthFactors')
       expect(result).toHaveProperty('recentCommits')
       expect(result).toHaveProperty('pipeline')
+      expect(result).toHaveProperty('failurePatterns')
+    })
+  })
+
+  describe('failure pattern detection', () => {
+    function insertJob(db: ReturnType<typeof initDb>, opts: {
+      command: string
+      status: string
+      startedAt?: string
+    }) {
+      db.prepare(
+        'INSERT INTO jobs (id, command, status, started_at, finished_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(
+        crypto.randomUUID(),
+        opts.command,
+        opts.status,
+        opts.startedAt ?? new Date().toISOString(),
+        new Date().toISOString()
+      )
+    }
+
+    it('returns empty array when no failures exist', () => {
+      const db = initDb(':memory:')
+      insertJob(db, { command: '/sr:health-check', status: 'completed' })
+      const result = getProjectMetrics(tmpDir, db)
+      expect(result.failurePatterns).toEqual([])
+    })
+
+    it('returns empty array when failures are below threshold (< 3)', () => {
+      const db = initDb(':memory:')
+      insertJob(db, { command: '/sr:health-check', status: 'failed' })
+      insertJob(db, { command: '/sr:health-check', status: 'failed' })
+      const result = getProjectMetrics(tmpDir, db)
+      expect(result.failurePatterns).toEqual([])
+    })
+
+    it('detects pattern when same command fails 3 times this week', () => {
+      const db = initDb(':memory:')
+      insertJob(db, { command: '/sr:health-check', status: 'failed' })
+      insertJob(db, { command: '/sr:health-check', status: 'failed' })
+      insertJob(db, { command: '/sr:health-check', status: 'failed' })
+      const result = getProjectMetrics(tmpDir, db)
+      expect(result.failurePatterns).toHaveLength(1)
+      expect(result.failurePatterns[0].command).toBe('/sr:health-check')
+      expect(result.failurePatterns[0].count).toBe(3)
+    })
+
+    it('groups commands by base command, ignoring arguments', () => {
+      const db = initDb(':memory:')
+      insertJob(db, { command: '/sr:implement #5', status: 'failed' })
+      insertJob(db, { command: '/sr:implement #6', status: 'failed' })
+      insertJob(db, { command: '/sr:implement #7', status: 'failed' })
+      const result = getProjectMetrics(tmpDir, db)
+      expect(result.failurePatterns).toHaveLength(1)
+      expect(result.failurePatterns[0].command).toBe('/sr:implement')
+      expect(result.failurePatterns[0].count).toBe(3)
+    })
+
+    it('ignores failures older than 7 days', () => {
+      const db = initDb(':memory:')
+      const oldDate = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString()
+      insertJob(db, { command: '/sr:health-check', status: 'failed', startedAt: oldDate })
+      insertJob(db, { command: '/sr:health-check', status: 'failed', startedAt: oldDate })
+      insertJob(db, { command: '/sr:health-check', status: 'failed', startedAt: oldDate })
+      const result = getProjectMetrics(tmpDir, db)
+      expect(result.failurePatterns).toEqual([])
+    })
+
+    it('counts only failed jobs, not completed or canceled', () => {
+      const db = initDb(':memory:')
+      insertJob(db, { command: '/sr:health-check', status: 'failed' })
+      insertJob(db, { command: '/sr:health-check', status: 'failed' })
+      insertJob(db, { command: '/sr:health-check', status: 'completed' })
+      insertJob(db, { command: '/sr:health-check', status: 'canceled' })
+      const result = getProjectMetrics(tmpDir, db)
+      expect(result.failurePatterns).toEqual([])
+    })
+
+    it('returns multiple patterns sorted by failure count descending', () => {
+      const db = initDb(':memory:')
+      // 4 failures for health-check
+      for (let i = 0; i < 4; i++) insertJob(db, { command: '/sr:health-check', status: 'failed' })
+      // 3 failures for typecheck
+      for (let i = 0; i < 3; i++) insertJob(db, { command: '/sr:typecheck', status: 'failed' })
+      const result = getProjectMetrics(tmpDir, db)
+      expect(result.failurePatterns).toHaveLength(2)
+      expect(result.failurePatterns[0].command).toBe('/sr:health-check')
+      expect(result.failurePatterns[0].count).toBe(4)
+      expect(result.failurePatterns[1].command).toBe('/sr:typecheck')
+      expect(result.failurePatterns[1].count).toBe(3)
+    })
+
+    it('includes lastFailedAt timestamp in result', () => {
+      const db = initDb(':memory:')
+      insertJob(db, { command: '/sr:health-check', status: 'failed' })
+      insertJob(db, { command: '/sr:health-check', status: 'failed' })
+      insertJob(db, { command: '/sr:health-check', status: 'failed' })
+      const result = getProjectMetrics(tmpDir, db)
+      expect(result.failurePatterns[0].lastFailedAt).toBeTruthy()
     })
   })
 })
