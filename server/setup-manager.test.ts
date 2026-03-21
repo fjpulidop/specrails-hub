@@ -114,7 +114,7 @@ describe('SetupManager', () => {
   // ─── startInstall ──────────────────────────────────────────────────────────
 
   describe('startInstall', () => {
-    it('spawns npx specrails-core init --yes', () => {
+    it('spawns npx specrails-core init --yes --root-dir <projectPath>', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
@@ -122,7 +122,7 @@ describe('SetupManager', () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'npx',
-        ['specrails-core', 'init', '--yes'],
+        ['specrails-core', 'init', '--yes', '--root-dir', '/path/to/project'],
         expect.objectContaining({ cwd: '/path/to/project' })
       )
     })
@@ -165,6 +165,20 @@ describe('SetupManager', () => {
       const errors = getBroadcastedByType(broadcast, 'setup_error')
       expect(errors).toHaveLength(1)
       expect(errors[0].error).toContain('code 1')
+    })
+
+    it('always passes --root-dir so install works outside a git repo', () => {
+      // Regression test: without --root-dir, install.sh would fail with exit code 1
+      // when the project path is not inside a git repo (REPO_ROOT empty → bash `read`
+      // fails on closed stdin → set -e exits with code 1).
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startInstall('p1', '/non-git/project')
+
+      const [, spawnArgs] = vi.mocked(mockSpawn).mock.calls[0]
+      expect(spawnArgs).toContain('--root-dir')
+      expect(spawnArgs).toContain('/non-git/project')
     })
 
     it('does not start install twice for same project', () => {
