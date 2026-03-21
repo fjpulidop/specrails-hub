@@ -314,6 +314,82 @@ describe('SetupWizard', () => {
     })
   })
 
+  describe('Back navigation', () => {
+    it('proposal step does not show a Back button', () => {
+      const project = makeProject()
+      render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      expect(screen.queryByRole('button', { name: /^back$/i })).not.toBeInTheDocument()
+    })
+
+    it('installing step shows a Back button', async () => {
+      const project = makeProject()
+      render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      fireEvent.click(screen.getByText('Install specrails'))
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /^back$/i })).toBeInTheDocument()
+      })
+    })
+
+    it('Back button in installing step returns to proposal', async () => {
+      const project = makeProject()
+      render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      fireEvent.click(screen.getByText('Install specrails'))
+      await waitFor(() => expect(screen.getByRole('button', { name: /^back$/i })).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: /^back$/i }))
+      await waitFor(() => {
+        expect(screen.getByText(/install specrails in my project/i)).toBeInTheDocument()
+      })
+    })
+
+    it('setup step shows a Back button', async () => {
+      const project = makeProject()
+      render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      fireEvent.click(screen.getByText('Install specrails'))
+      await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
+      const handler = mockRegisterHandler.mock.calls[0][1] as (msg: unknown) => void
+      act(() => {
+        handler({ type: 'setup_install_done', projectId: project.id })
+      })
+      await waitFor(() => expect(screen.getByTestId('checkpoint-tracker')).toBeInTheDocument())
+      expect(screen.getByRole('button', { name: /^back$/i })).toBeInTheDocument()
+    })
+
+    it('Back button in setup step returns to installing', async () => {
+      const project = makeProject()
+      render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      fireEvent.click(screen.getByText('Install specrails'))
+      await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
+      const handler = mockRegisterHandler.mock.calls[0][1] as (msg: unknown) => void
+      act(() => {
+        handler({ type: 'setup_install_done', projectId: project.id })
+      })
+      await waitFor(() => expect(screen.getByTestId('checkpoint-tracker')).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: /^back$/i }))
+      await waitFor(() => {
+        expect(screen.getByText(/installing specrails/i)).toBeInTheDocument()
+      })
+    })
+
+    it('user input in setup chat is preserved when navigating back and forward', async () => {
+      const project = makeProject()
+      render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      fireEvent.click(screen.getByText('Install specrails'))
+      await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
+      const handler = mockRegisterHandler.mock.calls[0][1] as (msg: unknown) => void
+      // Add some log lines
+      act(() => {
+        handler({ type: 'setup_log', projectId: project.id, line: 'Installing...' })
+        handler({ type: 'setup_install_done', projectId: project.id })
+      })
+      await waitFor(() => expect(screen.getByTestId('checkpoint-tracker')).toBeInTheDocument())
+      // Go back to installing — log lines should still be there
+      fireEvent.click(screen.getByRole('button', { name: /^back$/i }))
+      await waitFor(() => {
+        expect(screen.getByText('Installing...')).toBeInTheDocument()
+      })
+    })
+  })
+
   describe('Complete step', () => {
     async function renderCompleteStep(summary = { agents: 4, personas: 3, commands: 8 }) {
       const project = makeProject()

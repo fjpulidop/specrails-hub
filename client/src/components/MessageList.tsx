@@ -103,9 +103,13 @@ export function MessageList({
         </div>
       )}
 
-      {isStreaming && (
-        <div className="px-3 py-1">
-          <span className="animate-pulse text-xs text-muted-foreground">...</span>
+      {isStreaming && !streamingText && (
+        <div className="flex justify-start px-3 py-1" data-testid="thinking-indicator">
+          <div className="rounded-2xl rounded-bl-sm bg-dracula-current/30 px-3 py-2 flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0ms]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
+          </div>
         </div>
       )}
 

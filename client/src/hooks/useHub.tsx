@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   useCallback,
   useLayoutEffect,
@@ -28,6 +29,8 @@ interface HubContextValue {
   addProject: (path: string, name?: string) => Promise<HubProject | null>
   removeProject: (id: string) => Promise<void>
   isLoading: boolean
+  /** True briefly after switching active project — triggers the loading bar */
+  isSwitchingProject: boolean
   /** IDs of projects currently in the setup wizard */
   setupProjectIds: Set<string>
   startSetupWizard: (projectId: string) => void
@@ -40,11 +43,21 @@ export function HubProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<HubProject[]>([])
   const [activeProjectId, setActiveProjectIdRaw] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isSwitchingProject, setIsSwitchingProject] = useState(false)
   const [setupProjectIds, setSetupProjectIds] = useState<Set<string>>(new Set())
+  const switchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function setActiveProjectId(id: string | null): void {
     setApiContext(true, id)
-    setActiveProjectIdRaw(id)
+    setActiveProjectIdRaw((prev) => {
+      if (prev !== null && prev !== id) {
+        // Briefly flag project switching for the progress bar
+        if (switchTimerRef.current) clearTimeout(switchTimerRef.current)
+        setIsSwitchingProject(true)
+        switchTimerRef.current = setTimeout(() => setIsSwitchingProject(false), 400)
+      }
+      return id
+    })
   }
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
 
@@ -170,6 +183,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
       addProject,
       removeProject,
       isLoading,
+      isSwitchingProject,
       setupProjectIds,
       startSetupWizard,
       completeSetupWizard,
@@ -186,6 +200,7 @@ const LEGACY_FALLBACK: HubContextValue = {
   addProject: async () => null,
   removeProject: async () => {},
   isLoading: false,
+  isSwitchingProject: false,
   setupProjectIds: new Set(),
   startSetupWizard: () => {},
   completeSetupWizard: () => {},

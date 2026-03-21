@@ -87,7 +87,7 @@ function useProjectRouteMemory(activeProjectId: string | null) {
 // ─── Hub app shell ────────────────────────────────────────────────────────────
 
 function HubApp() {
-  const { projects, activeProjectId, isLoading, setupProjectIds, completeSetupWizard } = useHub()
+  const { projects, activeProjectId, isLoading, isSwitchingProject, setupProjectIds, completeSetupWizard } = useHub()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [overviewOpen, setOverviewOpen] = useState(false)
@@ -155,6 +155,14 @@ function HubApp() {
       {/* Project tabs */}
       {projects.length > 0 && (
         <TabBar onAddProject={() => setAddDialogOpen(true)} />
+      )}
+
+      {/* Project switching progress bar */}
+      {isSwitchingProject && (
+        <div
+          className="h-0.5 w-full bg-dracula-purple/70 animate-pulse shrink-0"
+          data-testid="project-switching-bar"
+        />
       )}
 
       {/* Main content */}

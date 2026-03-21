@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { getApiBase } from '../lib/api'
@@ -240,7 +241,7 @@ interface CommandGridProps {
   onOpenWizard: (commandSlug: string) => void
 }
 
-async function spawnCommand(command: string): Promise<void> {
+async function spawnCommand(command: string): Promise<string> {
   const res = await fetch(`${getApiBase()}/spawn`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -248,10 +249,12 @@ async function spawnCommand(command: string): Promise<void> {
   })
   const data = await res.json() as { jobId?: string; error?: string }
   if (!res.ok) throw new Error(data.error ?? 'Failed to spawn command')
+  return data.jobId!
 }
 
 export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
   const [othersOpen, setOthersOpen] = useState(false)
+  const navigate = useNavigate()
 
   if (commands.length === 0) {
     return (
@@ -271,12 +274,15 @@ export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
       onOpenWizard(cmd.slug)
       return
     }
+    const promise = spawnCommand(cmd.slug)
+    toast.promise(promise, {
+      loading: `Queuing ${displayName}...`,
+      success: `${displayName} queued`,
+      error: (err: Error) => err.message,
+    })
     try {
-      toast.promise(spawnCommand(cmd.slug), {
-        loading: `Queuing ${displayName}...`,
-        success: `${displayName} queued`,
-        error: (err: Error) => err.message,
-      })
+      const jobId = await promise
+      navigate(`/jobs/${jobId}`)
     } catch {
       // handled by toast.promise
     }

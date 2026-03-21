@@ -96,7 +96,7 @@ describe('MessageList', () => {
     expect(screen.getByText('Thinking about your question...')).toBeInTheDocument()
   })
 
-  it('shows streaming indicator (...) when streaming but no text yet', () => {
+  it('shows thinking indicator when streaming but no text yet', () => {
     render(
       <MessageList
         messages={[]}
@@ -106,10 +106,10 @@ describe('MessageList', () => {
         onDismissCommand={noOp}
       />
     )
-    expect(screen.getByText('...')).toBeInTheDocument()
+    expect(screen.getByTestId('thinking-indicator')).toBeInTheDocument()
   })
 
-  it('streaming indicator is present alongside streaming text', () => {
+  it('hides thinking indicator once streaming text arrives', () => {
     render(
       <MessageList
         messages={[]}
@@ -119,9 +119,9 @@ describe('MessageList', () => {
         onDismissCommand={noOp}
       />
     )
-    // Both the streaming text div and the pulsing indicator are present
+    // Streaming text is shown, thinking indicator is gone
     expect(screen.getByText('Hello')).toBeInTheDocument()
-    expect(screen.getByText('...')).toBeInTheDocument()
+    expect(screen.queryByTestId('thinking-indicator')).not.toBeInTheDocument()
   })
 
   it('does not show empty state when streaming', () => {

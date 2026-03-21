@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { getApiBase } from '../lib/api'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
-import { ChevronRight, Home } from 'lucide-react'
+import { ChevronRight, Home, RotateCcw } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
@@ -28,6 +28,7 @@ const STATUS_BADGE: Record<string, { variant: BadgeVariant; label: string; toolt
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { activeProjectId } = useHub()
+  const navigate = useNavigate()
   const [job, setJob] = useState<JobSummary | null>(null)
   const [events, setEvents] = useState<EventRow[]>([])
   const [phaseDefinitions, setPhaseDefinitions] = useState<PhaseDefinition[]>([])
@@ -138,6 +139,23 @@ export default function JobDetailPage() {
     }
   }
 
+  async function handleRerun() {
+    if (!job) return
+    try {
+      const res = await fetch(`${getApiBase()}/spawn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: job.command }),
+      })
+      const data = await res.json() as { jobId?: string; error?: string }
+      if (!res.ok) throw new Error(data.error ?? 'Failed to spawn job')
+      toast.success('Job re-queued')
+      navigate(`/jobs/${data.jobId}`)
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-6">
@@ -167,6 +185,7 @@ export default function JobDetailPage() {
 
   const statusInfo = STATUS_BADGE[job.status] ?? STATUS_BADGE.queued
   const isRunning = job.status === 'running'
+  const isFinished = job.status === 'completed' || job.status === 'failed'
 
   return (
     <div className="flex flex-col h-full max-w-5xl mx-auto w-full">
@@ -204,6 +223,24 @@ export default function JobDetailPage() {
 
           {/* Actions */}
           <div className="flex items-center gap-2 shrink-0">
+            {isFinished && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRerun}
+                    className="h-7"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                    Re-execute
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Spawn a new job with the same command
+                </TooltipContent>
+              </Tooltip>
+            )}
             {isRunning && (
               <Tooltip>
                 <TooltipTrigger asChild>
