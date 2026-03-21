@@ -132,6 +132,137 @@ describe('getAnalytics', () => {
     expect(result.kpi.jobsDelta).toBe(0)
   })
 
+  it('returns totalTokens KPI aggregating tokens_in + tokens_out', () => {
+    insertJob(db, {
+      id: 'tok-job',
+      started_at: new Date().toISOString(),
+      status: 'completed',
+      tokens_in: 5000,
+      tokens_out: 2000,
+    })
+
+    const result = getAnalytics(db, { period: 'all' })
+
+    expect(result.kpi.totalTokens).toBe(7000)
+  })
+
+  it('returns percentage deltas for period-over-period comparison', () => {
+    // Previous period: 2026-02-01 to 2026-02-07
+    insertJob(db, {
+      id: 'prev-job',
+      started_at: '2026-02-04T12:00:00.000Z',
+      status: 'completed',
+      total_cost_usd: 0.010,
+      duration_ms: 100000,
+      tokens_in: 1000,
+      tokens_out: 500,
+    })
+    // Current period: 2026-02-08 to 2026-02-14
+    insertJob(db, {
+      id: 'curr-job-1',
+      started_at: '2026-02-10T12:00:00.000Z',
+      status: 'completed',
+      total_cost_usd: 0.012,
+      duration_ms: 80000,
+      tokens_in: 1500,
+      tokens_out: 700,
+    })
+    insertJob(db, {
+      id: 'curr-job-2',
+      started_at: '2026-02-11T12:00:00.000Z',
+      status: 'failed',
+      total_cost_usd: 0.003,
+      duration_ms: 20000,
+      tokens_in: 300,
+      tokens_out: 100,
+    })
+
+    const result = getAnalytics(db, { period: 'custom', from: '2026-02-08', to: '2026-02-14' })
+
+    // costDeltaPct = ((0.015 - 0.010) / 0.010) * 100 = 50%
+    expect(result.kpi.costDeltaPct).not.toBeNull()
+    expect(result.kpi.costDeltaPct!).toBeCloseTo(50, 0)
+
+    // jobsDeltaPct = ((2 - 1) / 1) * 100 = 100%
+    expect(result.kpi.jobsDeltaPct).not.toBeNull()
+    expect(result.kpi.jobsDeltaPct!).toBeCloseTo(100, 0)
+
+    // totalTokensDeltaPct = ((2600 - 1500) / 1500) * 100 = ~73.3%
+    expect(result.kpi.totalTokensDeltaPct).not.toBeNull()
+    expect(result.kpi.totalTokensDeltaPct!).toBeCloseTo(73.3, 0)
+
+    // avgDurationDeltaPct: current avg = 50000, prev = 100000 => -50%
+    expect(result.kpi.avgDurationDeltaPct).not.toBeNull()
+    expect(result.kpi.avgDurationDeltaPct!).toBeCloseTo(-50, 0)
+  })
+
+  it('returns previousPeriod with raw values and label', () => {
+    insertJob(db, {
+      id: 'prev-job',
+      started_at: '2026-02-04T12:00:00.000Z',
+      status: 'completed',
+      total_cost_usd: 0.010,
+      tokens_in: 1000,
+      tokens_out: 500,
+    })
+    insertJob(db, {
+      id: 'curr-job',
+      started_at: '2026-02-11T12:00:00.000Z',
+      status: 'completed',
+      total_cost_usd: 0.004,
+      tokens_in: 2000,
+      tokens_out: 800,
+    })
+
+    const result = getAnalytics(db, { period: 'custom', from: '2026-02-08', to: '2026-02-14' })
+
+    expect(result.kpi.previousPeriod).not.toBeNull()
+    expect(result.kpi.previousPeriod!.totalCostUsd).toBeCloseTo(0.010)
+    expect(result.kpi.previousPeriod!.totalJobs).toBe(1)
+    expect(result.kpi.previousPeriod!.successRate).toBe(1)
+    expect(result.kpi.previousPeriod!.totalTokens).toBe(1500)
+    expect(result.kpi.previousPeriod!.from).toBeTruthy()
+    expect(result.kpi.previousPeriod!.to).toBeTruthy()
+  })
+
+  it('returns null previousPeriod and percentage deltas for "all" period', () => {
+    insertJob(db, {
+      id: 'job-1',
+      started_at: new Date().toISOString(),
+      status: 'completed',
+      total_cost_usd: 0.01,
+      tokens_in: 500,
+      tokens_out: 200,
+    })
+
+    const result = getAnalytics(db, { period: 'all' })
+
+    expect(result.kpi.previousPeriod).toBeNull()
+    expect(result.kpi.costDeltaPct).toBeNull()
+    expect(result.kpi.jobsDeltaPct).toBeNull()
+    expect(result.kpi.totalTokensDeltaPct).toBeNull()
+    expect(result.kpi.totalTokensDelta).toBeNull()
+  })
+
+  it('returns null percentage deltas when previous period has zero values', () => {
+    insertJob(db, {
+      id: 'curr-job',
+      started_at: '2026-02-11T12:00:00.000Z',
+      status: 'completed',
+      total_cost_usd: 0.005,
+      tokens_in: 1000,
+      tokens_out: 500,
+    })
+
+    const result = getAnalytics(db, { period: 'custom', from: '2026-02-08', to: '2026-02-14' })
+
+    expect(result.kpi.costDeltaPct).toBeNull()
+    expect(result.kpi.jobsDeltaPct).toBeNull()
+    expect(result.kpi.totalTokensDeltaPct).toBeNull()
+    expect(result.kpi.costDelta).not.toBeNull()
+    expect(result.kpi.totalTokensDelta).not.toBeNull()
+  })
+
   it('treats NULL cost job as 0 in aggregations', () => {
     insertJob(db, {
       id: 'null-cost-job',

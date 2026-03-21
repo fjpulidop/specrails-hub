@@ -93,10 +93,27 @@ export interface AnalyticsResponse {
     totalJobs: number
     successRate: number
     avgDurationMs: number | null
+    totalTokens: number
     costDelta: number | null
     jobsDelta: number | null
     successRateDelta: number | null
     avgDurationDelta: number | null
+    totalTokensDelta: number | null
+    costDeltaPct: number | null
+    jobsDeltaPct: number | null
+    successRateDeltaPct: number | null
+    avgDurationDeltaPct: number | null
+    totalTokensDeltaPct: number | null
+    previousPeriod: {
+      label: string
+      from: string | null
+      to: string | null
+      totalCostUsd: number
+      totalJobs: number
+      successRate: number
+      avgDurationMs: number | null
+      totalTokens: number
+    } | null
   }
   costTimeline: Array<{ date: string; costUsd: number }>
   statusBreakdown: Array<{ status: string; count: number }>
