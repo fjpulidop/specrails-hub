@@ -20,6 +20,12 @@ import {
   updateAgent,
   findAgentByCurrentJobId,
   clearAgentJob,
+  listWebhooks,
+  getWebhook,
+  addWebhook,
+  updateWebhook,
+  removeWebhook,
+  listWebhooksForProject,
 } from './hub-db'
 import type { DbInstance } from './db'
 
@@ -46,13 +52,14 @@ describe('hub-db', () => {
   // ─── Schema & Init ──────────────────────────────────────────────────────────
 
   describe('initHubDb', () => {
-    it('creates the projects, hub_settings and agents tables', () => {
+    it('creates the projects, hub_settings, agents and webhooks tables', () => {
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]
       const names = tables.map((t) => t.name)
       expect(names).toContain('projects')
       expect(names).toContain('hub_settings')
       expect(names).toContain('schema_migrations')
       expect(names).toContain('agents')
+      expect(names).toContain('webhooks')
     })
 
     it('creates indexes on slug and path', () => {
@@ -62,19 +69,20 @@ describe('hub-db', () => {
       expect(names).toContain('idx_projects_path')
     })
 
-    it('applies migrations 1, 2, and 3 and records them', () => {
+    it('applies migrations 1 through 4 and records them', () => {
       const versions = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as { version: number }[]
-      expect(versions).toHaveLength(3)
+      expect(versions).toHaveLength(4)
       expect(versions[0].version).toBe(1)
       expect(versions[1].version).toBe(2)
       expect(versions[2].version).toBe(3)
+      expect(versions[3].version).toBe(4)
     })
 
     it('is idempotent — calling initHubDb again does not fail', () => {
       // Re-init on same DB (in-memory so we just call again)
       const db2 = makeDb()
       const versions = db2.prepare('SELECT version FROM schema_migrations').all() as { version: number }[]
-      expect(versions).toHaveLength(3)
+      expect(versions).toHaveLength(4)
     })
   })
 
@@ -378,6 +386,69 @@ describe('hub-db', () => {
       // Agent is idle (default), clearing a non-matching job has no effect
       clearAgentJob(db, 'some-job')
       expect(getAgent(db, 'agent-1')?.status).toBe('idle')
+    })
+  })
+
+  // ─── Webhook CRUD ─────────────────────────────────────────────────────────
+
+  describe('webhooks', () => {
+    it('starts with no webhooks', () => {
+      expect(listWebhooks(db)).toHaveLength(0)
+    })
+
+    it('adds a webhook and retrieves it', () => {
+      const wh = addWebhook(db, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', secret: 'abc', events: ['job.completed'] })
+      expect(wh.id).toBe('wh-1')
+      expect(wh.url).toBe('https://example.com/hook')
+      expect(wh.secret).toBe('abc')
+      expect(wh.project_id).toBeNull()
+      expect(JSON.parse(wh.events)).toEqual(['job.completed'])
+      expect(wh.enabled).toBe(1)
+    })
+
+    it('lists all webhooks', () => {
+      addWebhook(db, { id: 'wh-1', projectId: null, url: 'https://a.com', events: ['job.failed'] })
+      addWebhook(db, { id: 'wh-2', projectId: null, url: 'https://b.com', events: ['job.completed'] })
+      expect(listWebhooks(db)).toHaveLength(2)
+    })
+
+    it('retrieves a webhook by id', () => {
+      addWebhook(db, { id: 'wh-1', projectId: null, url: 'https://a.com' })
+      expect(getWebhook(db, 'wh-1')?.id).toBe('wh-1')
+      expect(getWebhook(db, 'no-such')).toBeUndefined()
+    })
+
+    it('updates url, secret and enabled', () => {
+      addWebhook(db, { id: 'wh-1', projectId: null, url: 'https://old.com' })
+      const updated = updateWebhook(db, 'wh-1', { url: 'https://new.com', enabled: false })
+      expect(updated?.url).toBe('https://new.com')
+      expect(updated?.enabled).toBe(0)
+    })
+
+    it('removes a webhook', () => {
+      addWebhook(db, { id: 'wh-1', projectId: null, url: 'https://a.com' })
+      removeWebhook(db, 'wh-1')
+      expect(getWebhook(db, 'wh-1')).toBeUndefined()
+    })
+
+    it('listWebhooksForProject returns global and project-specific enabled webhooks', () => {
+      const project = addProject(db, makeProjectOpts('p1'))
+      const otherProject = addProject(db, makeProjectOpts('p9'))
+      addWebhook(db, { id: 'wh-global', projectId: null, url: 'https://global.com', events: ['job.completed'] })
+      addWebhook(db, { id: 'wh-project', projectId: project.id, url: 'https://project.com', events: ['job.failed'] })
+      addWebhook(db, { id: 'wh-other', projectId: otherProject.id, url: 'https://other.com', events: ['job.completed'] })
+      const results = listWebhooksForProject(db, project.id)
+      const ids = results.map((w) => w.id)
+      expect(ids).toContain('wh-global')
+      expect(ids).toContain('wh-project')
+      expect(ids).not.toContain('wh-other')
+    })
+
+    it('listWebhooksForProject excludes disabled webhooks', () => {
+      const project = addProject(db, makeProjectOpts('p2'))
+      addWebhook(db, { id: 'wh-disabled', projectId: null, url: 'https://disabled.com' })
+      updateWebhook(db, 'wh-disabled', { enabled: false })
+      expect(listWebhooksForProject(db, project.id)).toHaveLength(0)
     })
   })
 })

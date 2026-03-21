@@ -1,9 +1,12 @@
 import { Router } from 'express'
+import { v4 as uuidv4 } from 'uuid'
 import path from 'path'
 import fs from 'fs'
 import type { WsMessage } from './types'
 import type { ProjectRegistry } from './project-registry'
-import { getHubSetting, setHubSetting, listProjects, listAgents, getAgent, addAgent, updateAgent } from './hub-db'
+import { getHubSetting, setHubSetting, listProjects, listAgents, getAgent, addAgent, updateAgent, listWebhooks, getWebhook, addWebhook, updateWebhook, removeWebhook } from './hub-db'
+import type { WebhookEvent } from './hub-db'
+import { WebhookManager } from './webhook-manager'
 import { createSpecrailsTechClient } from './specrails-tech-client'
 import { checkCoreCompat, getCLIStatus, detectAvailableCLIs } from './core-compat'
 import { getHubAnalytics, getHubTodayStats, getHubRecentJobs, searchHubContent, getHubOverview } from './hub-analytics'
@@ -358,6 +361,96 @@ export function createHubRouter(
       return
     }
     res.json({ connected: true, data: result.data })
+  })
+
+  // ─── Webhook routes ──────────────────────────────────────────────────────────
+
+  const webhookManager = new WebhookManager(registry.hubDb)
+
+  // GET /api/hub/webhooks — list all webhooks
+  router.get('/webhooks', (_req, res) => {
+    res.json({ webhooks: listWebhooks(registry.hubDb) })
+  })
+
+  // POST /api/hub/webhooks — create a webhook
+  router.post('/webhooks', (req, res) => {
+    const { url, secret, events, projectId } = req.body ?? {}
+    if (!url || typeof url !== 'string') {
+      res.status(400).json({ error: 'url is required' })
+      return
+    }
+
+    const validEvents: WebhookEvent[] = ['job.completed', 'job.failed', 'daily_budget_exceeded']
+    const parsedEvents: WebhookEvent[] = Array.isArray(events)
+      ? (events as string[]).filter((e): e is WebhookEvent => validEvents.includes(e as WebhookEvent))
+      : ['job.completed', 'job.failed']
+
+    if (parsedEvents.length === 0) {
+      res.status(400).json({ error: 'at least one valid event is required' })
+      return
+    }
+
+    if (projectId != null) {
+      const ctx = registry.getContext(projectId)
+      if (!ctx) {
+        res.status(400).json({ error: 'project not found' })
+        return
+      }
+    }
+
+    const webhook = addWebhook(registry.hubDb, {
+      id: uuidv4(),
+      projectId: projectId ?? null,
+      url: url.trim(),
+      secret: typeof secret === 'string' ? secret.trim() : '',
+      events: parsedEvents,
+    })
+    res.status(201).json({ webhook })
+  })
+
+  // PATCH /api/hub/webhooks/:id — update a webhook
+  router.patch('/webhooks/:id', (req, res) => {
+    const existing = getWebhook(registry.hubDb, req.params.id)
+    if (!existing) {
+      res.status(404).json({ error: 'Webhook not found' })
+      return
+    }
+
+    const { url, secret, events, enabled } = req.body ?? {}
+    const validEvents: WebhookEvent[] = ['job.completed', 'job.failed', 'daily_budget_exceeded']
+    const parsedEvents: WebhookEvent[] | undefined = Array.isArray(events)
+      ? (events as string[]).filter((e): e is WebhookEvent => validEvents.includes(e as WebhookEvent))
+      : undefined
+
+    const updated = updateWebhook(registry.hubDb, req.params.id, {
+      url: typeof url === 'string' ? url.trim() : undefined,
+      secret: typeof secret === 'string' ? secret.trim() : undefined,
+      events: parsedEvents,
+      enabled: typeof enabled === 'boolean' ? enabled : undefined,
+    })
+    res.json({ webhook: updated })
+  })
+
+  // DELETE /api/hub/webhooks/:id — delete a webhook
+  router.delete('/webhooks/:id', (req, res) => {
+    const existing = getWebhook(registry.hubDb, req.params.id)
+    if (!existing) {
+      res.status(404).json({ error: 'Webhook not found' })
+      return
+    }
+    removeWebhook(registry.hubDb, req.params.id)
+    res.json({ ok: true })
+  })
+
+  // POST /api/hub/webhooks/:id/test — send a test ping
+  router.post('/webhooks/:id/test', (req, res) => {
+    const webhook = getWebhook(registry.hubDb, req.params.id)
+    if (!webhook) {
+      res.status(404).json({ error: 'Webhook not found' })
+      return
+    }
+    webhookManager.deliverTest(webhook)
+    res.json({ ok: true, message: 'Test ping queued' })
   })
 
   return router

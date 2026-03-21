@@ -106,13 +106,19 @@ export class QueueManager {
 
   private _getCostAlertThreshold: (() => number | null) | null
   private _provider: 'claude' | 'codex'
+  private _onJobFinished: ((jobId: string, status: Job['status'], costUsd?: number) => void) | null
 
   constructor(
     broadcast: (msg: WsMessage) => void,
     db?: any,
     commands?: CommandInfo[],
     cwd?: string,
-    options?: { zombieTimeoutMs?: number; getCostAlertThreshold?: () => number | null; provider?: 'claude' | 'codex' }
+    options?: {
+      zombieTimeoutMs?: number
+      getCostAlertThreshold?: () => number | null
+      provider?: 'claude' | 'codex'
+      onJobFinished?: (jobId: string, status: Job['status'], costUsd?: number) => void
+    }
   ) {
     this._queue = []
     this._jobs = new Map()
@@ -131,6 +137,7 @@ export class QueueManager {
 
     this._getCostAlertThreshold = options?.getCostAlertThreshold ?? null
     this._provider = options?.provider ?? 'claude'
+    this._onJobFinished = options?.onJobFinished ?? null
 
     const envTimeout = process.env.WM_ZOMBIE_TIMEOUT_MS !== undefined
       ? parseInt(process.env.WM_ZOMBIE_TIMEOUT_MS, 10)
@@ -532,6 +539,14 @@ export class QueueManager {
       }
     } else {
       emitLine('stdout', `[process exited with code ${code ?? 'unknown'}]`)
+    }
+
+    // Notify webhook handler (if any) about job completion/failure
+    if (this._onJobFinished && (finalStatus === 'completed' || finalStatus === 'failed')) {
+      const costUsd = this._db
+        ? (this._db.prepare('SELECT total_cost_usd FROM jobs WHERE id = ?').get(jobId) as { total_cost_usd: number | null } | undefined)?.total_cost_usd ?? undefined
+        : undefined
+      this._onJobFinished(jobId, finalStatus, costUsd ?? undefined)
     }
 
     this._broadcastQueueState()

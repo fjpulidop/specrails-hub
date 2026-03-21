@@ -6,6 +6,7 @@ import { ChatManager } from './chat-manager'
 import { SetupManager } from './setup-manager'
 import { ProposalManager } from './proposal-manager'
 import { SpecLauncherManager } from './spec-launcher-manager'
+import { WebhookManager } from './webhook-manager'
 import type { WsMessage } from './types'
 import {
   initHubDb,
@@ -43,11 +44,13 @@ export class ProjectRegistry {
   private _hubDb: DbInstance
   private _contexts: Map<string, ProjectContext>
   private _broadcast: (msg: WsMessage) => void
+  private _webhookManager: WebhookManager
 
   constructor(broadcast: (msg: WsMessage) => void, hubDbPath?: string) {
     this._broadcast = broadcast
     this._hubDb = initHubDb(hubDbPath ?? getHubDbPath())
     this._contexts = new Map()
+    this._webhookManager = new WebhookManager(this._hubDb)
   }
 
   get hubDb(): DbInstance {
@@ -127,11 +130,25 @@ export class ProjectRegistry {
       }
     }
 
+    const webhookManager = this._webhookManager
     const queueManager = new QueueManager(boundBroadcast, db, undefined, project.path, {
       provider: project.provider ?? 'claude',
       getCostAlertThreshold: () => {
         const val = getHubSetting(this._hubDb, 'cost_alert_threshold_usd')
         return val != null ? parseFloat(val) : null
+      },
+      onJobFinished: (jobId, status, costUsd) => {
+        const jobRow = db.prepare('SELECT command, duration_ms FROM jobs WHERE id = ?').get(jobId) as
+          | { command: string; duration_ms: number | null }
+          | undefined
+        const event = status === 'completed' ? 'job.completed' : 'job.failed'
+        webhookManager.deliver(project.id, event, {
+          jobId,
+          command: jobRow?.command ?? '',
+          status,
+          costUsd: costUsd ?? null,
+          durationMs: jobRow?.duration_ms ?? null,
+        })
       },
     })
     const chatManager = new ChatManager(boundBroadcast, db, project.path, project.name, project.provider ?? 'claude')

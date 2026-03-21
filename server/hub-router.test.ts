@@ -27,7 +27,7 @@ vi.mock('./specrails-tech-client', () => ({
 }))
 
 import { createHubRouter } from './hub-router'
-import { initHubDb, addProject, removeProject as removeProjectFromHub, getHubSetting, setHubSetting, addAgent, getAgent } from './hub-db'
+import { initHubDb, addProject, removeProject as removeProjectFromHub, getHubSetting, setHubSetting, addAgent, getAgent, addWebhook } from './hub-db'
 import { initDb } from './db'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import type { WsMessage } from './types'
@@ -794,6 +794,192 @@ describe('hub-router', () => {
         .send({ last_heartbeat_at: heartbeat, config: '{"model":"claude"}' })
       expect(res.status).toBe(200)
       expect(res.body.agent.last_heartbeat_at).toBe(heartbeat)
+    })
+  })
+
+  // ─── Webhook routes ──────────────────────────────────────────────────────────
+
+  describe('GET /api/hub/webhooks', () => {
+    it('returns empty list when no webhooks exist', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/webhooks')
+      expect(res.status).toBe(200)
+      expect(res.body.webhooks).toEqual([])
+    })
+
+    it('returns list of webhooks', async () => {
+      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/webhooks')
+      expect(res.status).toBe(200)
+      expect(res.body.webhooks).toHaveLength(1)
+      expect(res.body.webhooks[0].url).toBe('https://example.com/hook')
+    })
+  })
+
+  describe('POST /api/hub/webhooks', () => {
+    it('returns 400 when url is missing', async () => {
+      const { app } = createApp()
+      const res = await request(app).post('/api/hub/webhooks').send({ events: ['job.completed'] })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('url is required')
+    })
+
+    it('returns 400 when url is not a string', async () => {
+      const { app } = createApp()
+      const res = await request(app).post('/api/hub/webhooks').send({ url: 123 })
+      expect(res.status).toBe(400)
+    })
+
+    it('returns 400 when all provided events are invalid', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .post('/api/hub/webhooks')
+        .send({ url: 'https://example.com/hook', events: ['invalid.event'] })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('valid event')
+    })
+
+    it('creates webhook with default events when events not provided', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .post('/api/hub/webhooks')
+        .send({ url: 'https://example.com/hook' })
+      expect(res.status).toBe(201)
+      expect(res.body.webhook.url).toBe('https://example.com/hook')
+      const events = JSON.parse(res.body.webhook.events)
+      expect(events).toContain('job.completed')
+      expect(events).toContain('job.failed')
+    })
+
+    it('creates webhook with custom events', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .post('/api/hub/webhooks')
+        .send({ url: 'https://example.com/hook', events: ['job.completed', 'daily_budget_exceeded'] })
+      expect(res.status).toBe(201)
+      const events = JSON.parse(res.body.webhook.events)
+      expect(events).toContain('job.completed')
+      expect(events).toContain('daily_budget_exceeded')
+    })
+
+    it('creates webhook with secret', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .post('/api/hub/webhooks')
+        .send({ url: 'https://example.com/hook', secret: 'mysecret' })
+      expect(res.status).toBe(201)
+      expect(res.body.webhook.secret).toBe('mysecret')
+    })
+
+    it('returns 400 when projectId does not match a registered project', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .post('/api/hub/webhooks')
+        .send({ url: 'https://example.com/hook', projectId: 'nonexistent-project' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('project not found')
+    })
+
+    it('creates project-scoped webhook when projectId is valid', async () => {
+      const { app } = createApp()
+      const createRes = await request(app).post('/api/hub/projects').send({ path: '/home/user/myproj' })
+      const projectId = createRes.body.project.id
+
+      const res = await request(app)
+        .post('/api/hub/webhooks')
+        .send({ url: 'https://example.com/hook', projectId })
+      expect(res.status).toBe(201)
+      expect(res.body.webhook.project_id).toBe(projectId)
+    })
+  })
+
+  describe('PATCH /api/hub/webhooks/:id', () => {
+    it('returns 404 for non-existent webhook', async () => {
+      const { app } = createApp()
+      const res = await request(app).patch('/api/hub/webhooks/nonexistent').send({ enabled: false })
+      expect(res.status).toBe(404)
+      expect(res.body.error).toContain('Webhook not found')
+    })
+
+    it('updates webhook url', async () => {
+      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://old.example.com/hook', events: ['job.completed'] })
+      const { app } = createApp()
+      const res = await request(app)
+        .patch('/api/hub/webhooks/wh-1')
+        .send({ url: 'https://new.example.com/hook' })
+      expect(res.status).toBe(200)
+      expect(res.body.webhook.url).toBe('https://new.example.com/hook')
+    })
+
+    it('updates webhook enabled flag', async () => {
+      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
+      const { app } = createApp()
+      const res = await request(app).patch('/api/hub/webhooks/wh-1').send({ enabled: false })
+      expect(res.status).toBe(200)
+      expect(res.body.webhook.enabled).toBe(0)
+    })
+
+    it('updates webhook events', async () => {
+      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
+      const { app } = createApp()
+      const res = await request(app)
+        .patch('/api/hub/webhooks/wh-1')
+        .send({ events: ['job.failed', 'daily_budget_exceeded'] })
+      expect(res.status).toBe(200)
+      const events = JSON.parse(res.body.webhook.events)
+      expect(events).toContain('job.failed')
+    })
+
+    it('updates webhook secret', async () => {
+      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
+      const { app } = createApp()
+      const res = await request(app).patch('/api/hub/webhooks/wh-1').send({ secret: 'new-secret' })
+      expect(res.status).toBe(200)
+      expect(res.body.webhook.secret).toBe('new-secret')
+    })
+  })
+
+  describe('DELETE /api/hub/webhooks/:id', () => {
+    it('returns 404 for non-existent webhook', async () => {
+      const { app } = createApp()
+      const res = await request(app).delete('/api/hub/webhooks/nonexistent')
+      expect(res.status).toBe(404)
+      expect(res.body.error).toContain('Webhook not found')
+    })
+
+    it('deletes existing webhook', async () => {
+      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
+      const { app } = createApp()
+      const deleteRes = await request(app).delete('/api/hub/webhooks/wh-1')
+      expect(deleteRes.status).toBe(200)
+      expect(deleteRes.body.ok).toBe(true)
+
+      const listRes = await request(app).get('/api/hub/webhooks')
+      expect(listRes.body.webhooks).toHaveLength(0)
+    })
+  })
+
+  describe('POST /api/hub/webhooks/:id/test', () => {
+    it('returns 404 for non-existent webhook', async () => {
+      const { app } = createApp()
+      const res = await request(app).post('/api/hub/webhooks/nonexistent/test')
+      expect(res.status).toBe(404)
+      expect(res.body.error).toContain('Webhook not found')
+    })
+
+    it('queues a test ping and returns ok', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+      vi.stubGlobal('fetch', fetchMock)
+
+      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
+      const { app } = createApp()
+      const res = await request(app).post('/api/hub/webhooks/wh-1/test')
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+      expect(res.body.message).toContain('queued')
+
+      vi.unstubAllGlobals()
     })
   })
 })

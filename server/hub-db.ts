@@ -102,6 +102,23 @@ function applyHubMigrations(db: DbInstance): void {
     () => {
       db.exec(`ALTER TABLE projects ADD COLUMN provider TEXT NOT NULL DEFAULT 'claude'`)
     },
+    // Migration 4: webhooks table
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS webhooks (
+          id         TEXT PRIMARY KEY,
+          project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+          url        TEXT NOT NULL,
+          secret     TEXT NOT NULL DEFAULT '',
+          events     TEXT NOT NULL DEFAULT '["job.completed","job.failed"]',
+          enabled    INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_webhooks_project_id ON webhooks(project_id);
+      `)
+    },
   ]
 
   for (let i = 0; i < migrations.length; i++) {
@@ -240,4 +257,66 @@ export function clearAgentJob(db: DbInstance, jobId: string): void {
   db.prepare(
     "UPDATE agents SET status = 'idle', current_job_id = NULL WHERE current_job_id = ? AND status != 'idle'"
   ).run(jobId)
+}
+
+// ─── Webhook CRUD ─────────────────────────────────────────────────────────────
+
+export type WebhookEvent = 'job.completed' | 'job.failed' | 'daily_budget_exceeded'
+
+export interface WebhookRow {
+  id: string
+  project_id: string | null
+  url: string
+  secret: string
+  events: string // JSON array of WebhookEvent
+  enabled: number // 1 = enabled, 0 = disabled
+  created_at: string
+  updated_at: string
+}
+
+export function listWebhooks(db: DbInstance): WebhookRow[] {
+  return db.prepare('SELECT * FROM webhooks ORDER BY created_at ASC').all() as WebhookRow[]
+}
+
+export function listWebhooksForProject(db: DbInstance, projectId: string): WebhookRow[] {
+  return db.prepare(
+    'SELECT * FROM webhooks WHERE enabled = 1 AND (project_id IS NULL OR project_id = ?) ORDER BY created_at ASC'
+  ).all(projectId) as WebhookRow[]
+}
+
+export function getWebhook(db: DbInstance, id: string): WebhookRow | undefined {
+  return db.prepare('SELECT * FROM webhooks WHERE id = ?').get(id) as WebhookRow | undefined
+}
+
+export function addWebhook(
+  db: DbInstance,
+  webhook: { id: string; projectId: string | null; url: string; secret?: string; events?: WebhookEvent[] }
+): WebhookRow {
+  const events = JSON.stringify(webhook.events ?? ['job.completed', 'job.failed'])
+  db.prepare(`
+    INSERT INTO webhooks (id, project_id, url, secret, events)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(webhook.id, webhook.projectId ?? null, webhook.url, webhook.secret ?? '', events)
+  return db.prepare('SELECT * FROM webhooks WHERE id = ?').get(webhook.id) as WebhookRow
+}
+
+export function updateWebhook(
+  db: DbInstance,
+  id: string,
+  updates: { url?: string; secret?: string; events?: WebhookEvent[]; enabled?: boolean }
+): WebhookRow | undefined {
+  const fields: string[] = []
+  const values: unknown[] = []
+  if (updates.url !== undefined) { fields.push('url = ?'); values.push(updates.url) }
+  if (updates.secret !== undefined) { fields.push('secret = ?'); values.push(updates.secret) }
+  if (updates.events !== undefined) { fields.push('events = ?'); values.push(JSON.stringify(updates.events)) }
+  if (updates.enabled !== undefined) { fields.push('enabled = ?'); values.push(updates.enabled ? 1 : 0) }
+  if (fields.length === 0) return getWebhook(db, id)
+  fields.push("updated_at = datetime('now')")
+  db.prepare(`UPDATE webhooks SET ${fields.join(', ')} WHERE id = ?`).run(...values, id)
+  return db.prepare('SELECT * FROM webhooks WHERE id = ?').get(id) as WebhookRow | undefined
+}
+
+export function removeWebhook(db: DbInstance, id: string): void {
+  db.prepare('DELETE FROM webhooks WHERE id = ?').run(id)
 }
