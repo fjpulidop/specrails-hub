@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.18.0](https://github.com/fjpulidop/specrails-hub/compare/v1.17.0...v1.18.0) (2026-03-22)
+
+
+### Features
+
+* cost alerts & budget guardrails (SPEA-574) ([#111](https://github.com/fjpulidop/specrails-hub/issues/111)) ([e69a273](https://github.com/fjpulidop/specrails-hub/commit/e69a2730074833367192bece66f5ae2d56829b47))
+* data export — CSV/JSON export for jobs, analytics, and hub overview (SPEA-583) ([#112](https://github.com/fjpulidop/specrails-hub/issues/112)) ([ee27f63](https://github.com/fjpulidop/specrails-hub/commit/ee27f63989288eec5041c73609198b37d79137ed))
+* global keyboard shortcuts & cheatsheet modal (SPEA-581) ([#108](https://github.com/fjpulidop/specrails-hub/issues/108)) ([aa503c6](https://github.com/fjpulidop/specrails-hub/commit/aa503c695438e122da99095593ef9be7881b3b8f))
+* job dependencies and pipeline chains (SPEA-580) ([#114](https://github.com/fjpulidop/specrails-hub/issues/114)) ([db998d4](https://github.com/fjpulidop/specrails-hub/commit/db998d4db3710649c5009ed39a44916159ed2044))
+* period-over-period analytics — week/month comparison with delta indicators (SPEA-578) ([#109](https://github.com/fjpulidop/specrails-hub/issues/109)) ([4f09720](https://github.com/fjpulidop/specrails-hub/commit/4f097208c6dd82b7628ffc9853d20b5a2616706d))
+* project health dashboard with traffic light indicators (SPEA-582) ([#110](https://github.com/fjpulidop/specrails-hub/issues/110)) ([0e2f4b3](https://github.com/fjpulidop/specrails-hub/commit/0e2f4b3ccad204cbd7f45fe72e920b06fe8e02ff))
+
 ## [1.17.0](https://github.com/fjpulidop/specrails-hub/compare/v1.16.0...v1.17.0) (2026-03-22)
 
 
