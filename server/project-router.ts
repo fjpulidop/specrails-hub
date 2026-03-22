@@ -117,7 +117,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       let prevJobId: string | null = null
 
       for (let i = 0; i < steps.length; i++) {
-        const job = ctx(req).queueManager.enqueue(steps[i].command, {
+        const job = ctx(req).queueManager.enqueue(steps[i].command, 'normal', {
           dependsOnJobId: prevJobId ?? undefined,
           pipelineId,
         })
@@ -931,7 +931,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       const pipelineId = chain && commands.length > 1 ? uuidv4() : undefined
       let prevJobId: string | null = null
       for (const command of commands) {
-        const job = queueManager.enqueue(command, {
+        const job = queueManager.enqueue(command, 'normal', {
           dependsOnJobId: chain ? (prevJobId ?? undefined) : undefined,
           pipelineId,
         })

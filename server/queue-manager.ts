@@ -165,7 +165,16 @@ export class QueueManager {
 
   // ─── Public API ─────────────────────────────────────────────────────────────
 
-  enqueue(command: string, priority: JobPriority = 'normal', opts?: EnqueueOptions): Job {
+  enqueue(command: string, priorityOrOpts?: JobPriority | EnqueueOptions, opts?: EnqueueOptions): Job {
+    // Support both: enqueue(cmd, priority, opts) and enqueue(cmd, opts)
+    let priority: JobPriority = 'normal'
+    let resolvedOpts: EnqueueOptions | undefined = opts
+    if (typeof priorityOrOpts === 'string') {
+      priority = priorityOrOpts
+    } else if (priorityOrOpts && typeof priorityOrOpts === 'object') {
+      resolvedOpts = priorityOrOpts
+    }
+
     if (this._provider === 'codex') {
       if (!codexOnPath()) throw new CodexNotFoundError()
     } else {
@@ -182,8 +191,8 @@ export class QueueManager {
       startedAt: null,
       finishedAt: null,
       exitCode: null,
-      dependsOnJobId: opts?.dependsOnJobId ?? null,
-      pipelineId: opts?.pipelineId ?? null,
+      dependsOnJobId: resolvedOpts?.dependsOnJobId ?? null,
+      pipelineId: resolvedOpts?.pipelineId ?? null,
       skipReason: null,
     }
 

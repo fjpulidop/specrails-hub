@@ -205,7 +205,10 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const res = await request(app).post('/api/projects/proj-1/spawn').send({ command: 'sr:implement', priority: 'high' })
       expect(res.status).toBe(202)
-      expect(enqueueMock).toHaveBeenCalledWith('sr:implement', 'high')
+      expect(enqueueMock).toHaveBeenCalledWith('sr:implement', 'high', {
+        dependsOnJobId: undefined,
+        pipelineId: undefined,
+      })
     })
 
     it('returns 400 for invalid priority', async () => {
