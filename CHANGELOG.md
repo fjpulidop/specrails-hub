@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.2](https://github.com/fjpulidop/specrails-hub/compare/v1.19.1...v1.19.2) (2026-03-22)
+
+
+### Bug Fixes
+
+* use provider-aware directory paths in setup wizard (SPEA-612) ([#127](https://github.com/fjpulidop/specrails-hub/issues/127)) ([8cc4810](https://github.com/fjpulidop/specrails-hub/commit/8cc4810c3aa2d478d05e6c1861eb9712cc761ac1))
+
 ## [1.19.1](https://github.com/fjpulidop/specrails-hub/compare/v1.19.0...v1.19.1) (2026-03-22)
 
 
