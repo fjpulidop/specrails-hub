@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.1](https://github.com/fjpulidop/specrails-hub/compare/v1.19.0...v1.19.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* use project provider in setup wizard instead of PATH detection (SPEA-611) ([#125](https://github.com/fjpulidop/specrails-hub/issues/125)) ([7965789](https://github.com/fjpulidop/specrails-hub/commit/79657892e235b5f091fe95498410a1ad73067e7b))
+
 ## [1.19.0](https://github.com/fjpulidop/specrails-hub/compare/v1.18.0...v1.19.0) (2026-03-22)
 
 
