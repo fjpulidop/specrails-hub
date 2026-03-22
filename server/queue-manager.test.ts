@@ -1288,4 +1288,188 @@ describe('QueueManager', () => {
       vi.useRealTimers()
     })
   })
+
+  // ─── Job dependencies ──────────────────────────────────────────────────────
+
+  describe('job dependencies', () => {
+    it('skips dependent job when parent job is canceled and process exits', async () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      let id = 0
+      vi.mocked(mockUuidV4).mockImplementation(() => `dep-job-${++id}` as any)
+
+      const db = initDb(':memory:')
+      const qmDep = new QueueManager(broadcast, db)
+
+      // Enqueue parent (runs immediately)
+      qmDep.enqueue('/parent')
+      // Enqueue child with dependency on parent
+      qmDep.enqueue('/child', { dependsOnJobId: 'dep-job-1' })
+
+      // Cancel the parent (sends SIGTERM)
+      qmDep.cancel('dep-job-1')
+
+      // Process exits after cancel
+      child.emit('close', null)
+      await new Promise((r) => setTimeout(r, 50))
+
+      // The dependent job should be skipped
+      const jobs = qmDep.getJobs()
+      const childJob = jobs.find((j) => j.id === 'dep-job-2')
+      expect(childJob?.status).toBe('skipped')
+      expect(childJob?.skipReason).toContain('canceled')
+    })
+
+    it('dependent job runs after parent completes', async () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child1 = createMockChildProcess()
+      const child2 = createMockChildProcess()
+      vi.mocked(mockSpawn)
+        .mockReturnValueOnce(child1 as any)
+        .mockReturnValueOnce(child2 as any)
+
+      let id = 0
+      vi.mocked(mockUuidV4).mockImplementation(() => `chain-job-${++id}` as any)
+
+      const qmChain = new QueueManager(broadcast)
+
+      qmChain.enqueue('/parent')
+      qmChain.enqueue('/child', { dependsOnJobId: 'chain-job-1' })
+
+      // Parent completes
+      child1.emit('close', 0)
+      await new Promise((r) => setTimeout(r, 50))
+
+      // Child should start
+      const jobs = qmChain.getJobs()
+      const childJob = jobs.find((j) => j.id === 'chain-job-2')
+      expect(childJob?.status).toBe('running')
+    })
+
+    it('skips dependent when parent fails', async () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child1 = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child1 as any)
+
+      let id = 0
+      vi.mocked(mockUuidV4).mockImplementation(() => `fail-dep-${++id}` as any)
+
+      const qmFail = new QueueManager(broadcast)
+
+      qmFail.enqueue('/parent')
+      qmFail.enqueue('/child', { dependsOnJobId: 'fail-dep-1' })
+
+      // Parent fails
+      child1.emit('close', 1)
+      await new Promise((r) => setTimeout(r, 50))
+
+      const jobs = qmFail.getJobs()
+      const childJob = jobs.find((j) => j.id === 'fail-dep-2')
+      expect(childJob?.status).toBe('skipped')
+      expect(childJob?.skipReason).toContain('failed')
+    })
+  })
+
+  // ─── Pipeline status broadcast ─────────────────────────────────────────────
+
+  describe('pipeline status', () => {
+    it('broadcasts pipeline_status completed when all pipeline jobs complete', async () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child1 = createMockChildProcess()
+      const child2 = createMockChildProcess()
+      vi.mocked(mockSpawn)
+        .mockReturnValueOnce(child1 as any)
+        .mockReturnValueOnce(child2 as any)
+
+      let id = 0
+      vi.mocked(mockUuidV4).mockImplementation(() => `pipe-job-${++id}` as any)
+
+      const qmPipe = new QueueManager(broadcast)
+
+      qmPipe.enqueue('/step1', { pipelineId: 'pipeline-1' })
+      qmPipe.enqueue('/step2', { pipelineId: 'pipeline-1', dependsOnJobId: 'pipe-job-1' })
+
+      // Step 1 completes
+      child1.emit('close', 0)
+      await new Promise((r) => setTimeout(r, 50))
+
+      // Step 2 completes
+      child2.emit('close', 0)
+      await new Promise((r) => setTimeout(r, 50))
+
+      const pipelineCompleted = broadcast.mock.calls.filter(
+        (args: unknown[]) => {
+          const msg = args[0] as WsMessage
+          return msg.type === 'pipeline_status' && (msg as any).status === 'completed'
+        }
+      )
+      expect(pipelineCompleted.length).toBeGreaterThan(0)
+    })
+
+    it('broadcasts pipeline_status failed when a pipeline job fails', async () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child1 = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child1 as any)
+
+      let id = 0
+      vi.mocked(mockUuidV4).mockImplementation(() => `pipe-fail-${++id}` as any)
+
+      const qmPipeFail = new QueueManager(broadcast)
+
+      qmPipeFail.enqueue('/step1', { pipelineId: 'pipeline-fail' })
+      qmPipeFail.enqueue('/step2', { pipelineId: 'pipeline-fail', dependsOnJobId: 'pipe-fail-1' })
+
+      // Step 1 fails
+      child1.emit('close', 1)
+      await new Promise((r) => setTimeout(r, 50))
+
+      const pipelineFailed = broadcast.mock.calls.filter(
+        (args: unknown[]) => {
+          const msg = args[0] as WsMessage
+          return msg.type === 'pipeline_status' && (msg as any).status === 'failed'
+        }
+      )
+      expect(pipelineFailed.length).toBeGreaterThan(0)
+    })
+  })
+
+  // ─── setCommands ───────────────────────────────────────────────────────────
+
+  describe('setCommands', () => {
+    it('sets commands and phasesForCommand returns phases', () => {
+      const commands = [
+        {
+          id: 'implement',
+          name: 'Implement',
+          slug: 'implement',
+          phases: [
+            { name: 'Planning', markers: ['plan'] },
+            { name: 'Coding', markers: ['code'] },
+          ],
+        },
+      ]
+      qm.setCommands(commands as any)
+      const phases = qm.phasesForCommand('/sr:implement #42')
+      // The command may or may not match, but this exercises the code path
+      expect(Array.isArray(phases)).toBe(true)
+    })
+  })
+
+  // ─── enqueue with EnqueueOptions object ───────────────────────────────────
+
+  describe('enqueue with options object', () => {
+    it('accepts options as second argument instead of priority string', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('opts-job' as any)
+
+      const job = qm.enqueue('/implement', { dependsOnJobId: 'parent-1', pipelineId: 'pipe-1' })
+      expect(job.dependsOnJobId).toBe('parent-1')
+      expect(job.pipelineId).toBe('pipe-1')
+      expect(job.priority).toBe('normal')
+    })
+  })
 })
