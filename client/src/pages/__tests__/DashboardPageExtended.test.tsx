@@ -82,9 +82,20 @@ vi.mock('../../components/ProjectHealthWidget', () => ({
   ProjectHealthWidget: () => null,
 }))
 
+vi.mock('../../components/PipelineBuilder', () => ({
+  PipelineBuilder: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="pipeline-builder">PipelineBuilder</div> : null,
+}))
+
+/** Helper: expand a collapsed section by clicking its toggle */
+function expandSection(sectionId: string) {
+  fireEvent.click(screen.getByTestId(`toggle-${sectionId}`))
+}
+
 describe('DashboardPage - extended coverage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
     mockProjectCacheCall = 0
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -94,12 +105,13 @@ describe('DashboardPage - extended coverage', () => {
 
   it('renders Commands section with mocked commands', () => {
     render(<DashboardPage />)
-    // CommandGrid should be rendered with the implement command
+    // CommandGrid should be rendered with the implement command once expanded
     expect(screen.getByText('Commands')).toBeInTheDocument()
   })
 
-  it('renders proposal jobs from proposals list', () => {
+  it('renders proposal jobs from proposals list when jobs section is expanded', () => {
     render(<DashboardPage />)
+    expandSection('jobs')
     // The proposal gets converted to a job with /sr:propose-feature prefix
     expect(screen.getByText(/sr:propose-feature/)).toBeInTheDocument()
   })
@@ -120,9 +132,9 @@ describe('DashboardPage - extended coverage', () => {
     })
 
     render(<DashboardPage />)
+    expandSection('jobs')
 
     // Find the proposal job row and click it via onProposalClick
-    // The RecentJobs component receives onProposalClick — trigger it directly via the proposal row
     const proposalRow = screen.getByText(/sr:propose-feature/).closest('[role="button"]')
     if (proposalRow) {
       fireEvent.click(proposalRow)
@@ -130,7 +142,6 @@ describe('DashboardPage - extended coverage', () => {
 
     // After fetch, the proposal detail dialog should show
     await waitFor(() => {
-      // Verify fetch was called with the proposal endpoint
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining('/propose/')
       )
@@ -145,17 +156,13 @@ describe('DashboardPage - extended coverage', () => {
     })
 
     render(<DashboardPage />)
+    expandSection('jobs')
 
-    // Find proposal row and its delete button
-    // This is triggered via onProposalDelete prop in RecentJobs
-    // Simulate it by finding the trash/delete button if visible — but we need the proposal confirm dialog
-    // Just verify the component renders without error and RecentJobs receives the prop
     expect(screen.getByText('Recent Jobs')).toBeInTheDocument()
     void toast
   })
 
   it('shows loading skeleton when commands are loading', () => {
-    // Override to return isFirstLoad: true for commands
     vi.doMock('../../hooks/useProjectCache', () => ({
       useProjectCache: ({ namespace }: { namespace: string }) => ({
         data: [],
@@ -165,12 +172,10 @@ describe('DashboardPage - extended coverage', () => {
       }),
     }))
     render(<DashboardPage />)
-    // Commands section is still rendered
     expect(screen.getByText('Commands')).toBeInTheDocument()
   })
 
   it('ImplementWizard opens when wizard state is implement', () => {
-    // We can't easily trigger setWizardOpen from outside, but ensure initial state is closed
     render(<DashboardPage />)
     expect(screen.queryByTestId('implement-wizard')).not.toBeInTheDocument()
   })
@@ -181,15 +186,13 @@ describe('DashboardPage - extended coverage', () => {
   })
 
   it('proposal jobs with long idea text get truncated with ellipsis', () => {
-    // The proposals fixture above has idea 'Build a feature' (short) — just verify render
     render(<DashboardPage />)
+    expandSection('jobs')
     expect(screen.getByText(/sr:propose-feature/)).toBeInTheDocument()
   })
 
   it('enrichedCommands includes totalRuns from jobs matching command slug', () => {
     render(<DashboardPage />)
-    // The implement command slug matches '/sr:implement' from jobs fixture
-    // Just verify CommandGrid renders (enrichedCommands used in CommandGrid)
     expect(screen.getByText('Commands')).toBeInTheDocument()
   })
 })
@@ -197,6 +200,7 @@ describe('DashboardPage - extended coverage', () => {
 describe('DashboardPage - proposal dialog interactions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
     mockProjectCacheCall = 0
   })
 
@@ -216,8 +220,8 @@ describe('DashboardPage - proposal dialog interactions', () => {
     })
 
     render(<DashboardPage />)
+    expandSection('jobs')
 
-    // Trigger via the proposal job row
     const proposalRow = screen.getByText(/sr:propose-feature/).closest('[role="button"]')
     if (proposalRow) {
       fireEvent.click(proposalRow)
@@ -232,13 +236,13 @@ describe('DashboardPage - proposal dialog interactions', () => {
     global.fetch = vi.fn().mockResolvedValueOnce({ ok: false })
 
     render(<DashboardPage />)
+    expandSection('jobs')
 
     const proposalRow = screen.getByText(/sr:propose-feature/).closest('[role="button"]')
     if (proposalRow) {
       fireEvent.click(proposalRow)
     }
 
-    // Dialog should not appear
     await waitFor(() => {
       expect(screen.queryByText('Proposal')).toBeNull()
     })

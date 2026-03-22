@@ -115,10 +115,13 @@ describe('ProjectHealthWidget', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('renders Project Health heading when metrics are available', () => {
+  it('renders health content when metrics are available (heading now in CollapsibleSection)', () => {
     mockData = mockMetrics
     render(<ProjectHealthWidget />)
-    expect(screen.getByText('Project Health')).toBeInTheDocument()
+    // The "Project Health" heading was moved to CollapsibleSection
+    // Verify health content renders (score, factors, etc.)
+    expect(screen.getByText('75')).toBeInTheDocument()
+    expect(screen.getByText('health')).toBeInTheDocument()
   })
 
   it('renders health score gauge with score value', () => {

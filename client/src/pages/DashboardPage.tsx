@@ -2,12 +2,30 @@ import { useState, useCallback, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
+import { GitBranch } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
 import { usePipeline } from '../hooks/usePipeline'
 import { useProjectCache } from '../hooks/useProjectCache'
+import { useSectionPreferences, type SectionId } from '../hooks/useSectionPreferences'
 import { CommandGrid } from '../components/CommandGrid'
 import { RecentJobs } from '../components/RecentJobs'
 import { ImplementWizard } from '../components/ImplementWizard'
 import { BatchImplementWizard } from '../components/BatchImplementWizard'
+import { CollapsibleSection } from '../components/CollapsibleSection'
+import { HealthIndicatorBadge } from '../components/HealthIndicatorBadge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -19,10 +37,35 @@ import { TemplateLibrary } from '../components/TemplateLibrary'
 import { ExportDropdown } from '../components/ExportDropdown'
 
 
+const SECTION_TITLES: Record<SectionId, string> = {
+  health: 'Project Health',
+  commands: 'Commands',
+  runbooks: 'Runbooks',
+  jobs: 'Recent Jobs',
+}
+
 export default function DashboardPage() {
   const { activeProjectId } = useHub()
   const { recentJobs } = usePipeline(activeProjectId)
   const [wizardOpen, setWizardOpen] = useState<string | null>(null)
+
+  // Section preferences (order, pin, expand state)
+  const { order, reorder, togglePin, isPinned, toggleExpanded, isExpanded } = useSectionPreferences()
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor),
+  )
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (over && active.id !== over.id) {
+      const oldIndex = order.indexOf(active.id as SectionId)
+      const newIndex = order.indexOf(over.id as SectionId)
+      reorder(arrayMove(order, oldIndex, newIndex))
+    }
+  }
 
   const { data: commands, isFirstLoad: isLoadingCommands } = useProjectCache<CommandInfo[]>({
     namespace: 'commands',
@@ -136,58 +179,103 @@ export default function DashboardPage() {
     } catch { /* ignore */ }
   }, [refreshJobs])
 
+  // ─── Section renderers ───────────────────────────────────────────────────
+
+  function renderSectionContent(sectionId: SectionId) {
+    switch (sectionId) {
+      case 'health':
+        return <ProjectHealthWidget />
+      case 'commands':
+        return (
+          <>
+            {isLoadingCommands ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="h-16 rounded-lg border border-border/40 bg-card/50 animate-pulse" />
+                ))}
+              </div>
+            ) : (
+              <CommandGrid
+                commands={enrichedCommands}
+                onOpenWizard={(slug) => setWizardOpen(slug)}
+              />
+            )}
+            <div className="flex justify-end mt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWizardOpen('pipeline')}
+                className="text-xs"
+              >
+                <GitBranch className="w-3.5 h-3.5 mr-1.5" />
+                Create Pipeline
+              </Button>
+            </div>
+          </>
+        )
+      case 'runbooks':
+        return (
+          <TemplateLibrary
+            templates={templates}
+            isLoading={isLoadingTemplates}
+            onTemplatesChanged={refreshTemplates}
+          />
+        )
+      case 'jobs':
+        return (
+          <RecentJobs
+            jobs={jobs}
+            isLoading={isLoadingJobs}
+            onJobsCleared={refreshJobs}
+            onProposalClick={handleProposalClick}
+            onProposalDelete={handleProposalDelete}
+          />
+        )
+    }
+  }
+
+  function getSectionIndicator(sectionId: SectionId) {
+    if (sectionId === 'health') return <HealthIndicatorBadge />
+    return undefined
+  }
+
+  function getSectionTrailing(sectionId: SectionId) {
+    if (sectionId === 'jobs') {
+      return (
+        <ExportDropdown
+          baseUrl={`${getApiBase()}/jobs/export`}
+          label="Export Jobs"
+        />
+      )
+    }
+    return undefined
+  }
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-      <ProjectHealthWidget />
-
-      <section>
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-          Commands
-        </h2>
-        {isLoadingCommands ? (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-16 rounded-lg border border-border/40 bg-card/50 animate-pulse" />
-            ))}
-          </div>
-        ) : (
-          <CommandGrid
-            commands={enrichedCommands}
-            onOpenWizard={(slug) => setWizardOpen(slug)}
-          />
-        )}
-      </section>
-
-      <section>
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-          Runbooks
-        </h2>
-        <TemplateLibrary
-          templates={templates}
-          isLoading={isLoadingTemplates}
-          onTemplatesChanged={refreshTemplates}
-          commands={commands}
-        />
-      </section>
-
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Recent Jobs
-          </h2>
-          <ExportDropdown
-            baseUrl={`${getApiBase()}/jobs/export`}
-            label="Export Jobs"
-          />
-        </div>
-        <RecentJobs
-          jobs={jobs}
-          isLoading={isLoadingJobs}
-          onJobsCleared={refreshJobs}
-          onProposalClick={handleProposalClick}
-          onProposalDelete={handleProposalDelete}
-        />
-      </section>
+    <div className="max-w-4xl mx-auto px-4 py-6 space-y-3">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={order} strategy={verticalListSortingStrategy}>
+          {order.map((sectionId) => (
+            <CollapsibleSection
+              key={sectionId}
+              id={sectionId}
+              title={SECTION_TITLES[sectionId]}
+              indicator={getSectionIndicator(sectionId)}
+              expanded={isExpanded(sectionId)}
+              pinned={isPinned(sectionId)}
+              onToggleExpand={() => toggleExpanded(sectionId)}
+              onTogglePin={() => togglePin(sectionId)}
+              trailing={getSectionTrailing(sectionId)}
+            >
+              {renderSectionContent(sectionId)}
+            </CollapsibleSection>
+          ))}
+        </SortableContext>
+      </DndContext>
 
       <ImplementWizard
         open={wizardOpen === 'implement'}

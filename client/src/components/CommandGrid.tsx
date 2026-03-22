@@ -303,37 +303,45 @@ export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
     .sort((a, b) => a.name.localeCompare(b.name))
 
   return (
-    <div className="space-y-6">
-      {discovery.length > 0 && (
-        <section>
-          <SectionHeader
-            label="Discovery"
-            subtitle="Explore & define your product"
-            accent="cyan"
-          />
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {discovery.map((cmd) => (
-              <CommandCard key={cmd.id} cmd={cmd} onClick={() => handleCommandClick(cmd)} />
-            ))}
-          </div>
-        </section>
+    <div className="space-y-4">
+      {/* Discovery & Delivery side-by-side columns */}
+      {(discovery.length > 0 || delivery.length > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Discovery column (left) */}
+          {discovery.length > 0 && (
+            <div>
+              <SectionHeader
+                label="Discovery"
+                subtitle="Explore & define your product"
+                accent="cyan"
+              />
+              <div className="space-y-2">
+                {discovery.map((cmd) => (
+                  <CommandCard key={cmd.id} cmd={cmd} onClick={() => handleCommandClick(cmd)} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Delivery column (right) */}
+          {delivery.length > 0 && (
+            <div>
+              <SectionHeader
+                label="Delivery"
+                subtitle="Build & ship features"
+                accent="purple"
+              />
+              <div className="space-y-2">
+                {delivery.map((cmd) => (
+                  <CommandCard key={cmd.id} cmd={cmd} onClick={() => handleCommandClick(cmd)} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
-      {delivery.length > 0 && (
-        <section>
-          <SectionHeader
-            label="Delivery"
-            subtitle="Build & ship features"
-            accent="purple"
-          />
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {delivery.map((cmd) => (
-              <CommandCard key={cmd.id} cmd={cmd} onClick={() => handleCommandClick(cmd)} />
-            ))}
-          </div>
-        </section>
-      )}
-
+      {/* Others below the columns, collapsible */}
       {others.length > 0 && (
         <section>
           <SectionHeader

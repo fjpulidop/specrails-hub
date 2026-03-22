@@ -60,6 +60,11 @@ vi.mock('../../components/ProjectHealthWidget', () => ({
   ProjectHealthWidget: () => null,
 }))
 
+vi.mock('../../components/PipelineBuilder', () => ({
+  PipelineBuilder: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="pipeline-builder">PipelineBuilder</div> : null,
+}))
+
 // useProjectCache with proposal returning result_markdown and issue_url
 const mockRefreshJobs = vi.fn()
 
@@ -95,7 +100,10 @@ function setupWithProposal(proposalOverrides: Record<string, unknown> = {}) {
   })
 }
 
+/** Expand the Jobs section and then click the proposal row */
 async function openProposalDialog() {
+  // Jobs section is collapsed by default — expand it first
+  fireEvent.click(screen.getByTestId('toggle-jobs'))
   const proposalRow = screen.getByText(/sr:propose-feature/).closest('[role="button"]')
   if (proposalRow) {
     fireEvent.click(proposalRow)
@@ -108,6 +116,7 @@ async function openProposalDialog() {
 describe('DashboardPage - proposal dialog content', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
     setupWithProposal()
   })
 
@@ -261,6 +270,7 @@ describe('DashboardPage - proposal dialog content', () => {
   it('proposal idea shorter than 60 chars is not truncated in command', () => {
     // The mock proposal has idea 'Build amazing feature' (22 chars) — no truncation
     render(<DashboardPage />)
+    fireEvent.click(screen.getByTestId('toggle-jobs'))
     const row = screen.getByText(/sr:propose-feature/)
     expect(row.textContent).toContain('Build amazing feature')
     expect(row.textContent).not.toContain('...')

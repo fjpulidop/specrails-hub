@@ -181,7 +181,7 @@ export function ProjectHealthWidget() {
 
   if (isFirstLoad) {
     return (
-      <div className="rounded-xl border border-border/40 bg-card/30 p-4 animate-pulse h-32" />
+      <div className="p-4 animate-pulse h-32 rounded-lg bg-muted/20" />
     )
   }
 
@@ -190,16 +190,10 @@ export function ProjectHealthWidget() {
   const { coverage, healthScore, healthFactors, recentCommits, pipeline, failurePatterns } = metrics
 
   return (
-    <div className="rounded-xl border border-border/40 bg-card/30 overflow-hidden">
-      <div className="px-4 pt-3 pb-2 border-b border-border/20">
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Project Health
-        </h2>
-      </div>
-
+    <div>
       <FailureWarningBanner patterns={failurePatterns ?? []} />
 
-      <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
         {/* Health score + factors */}
         <div className="flex items-start gap-4">
