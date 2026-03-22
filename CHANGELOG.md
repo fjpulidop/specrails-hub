@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.19.1](https://github.com/fjpulidop/specrails-hub/compare/v1.19.0...v1.19.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* use project provider in setup wizard instead of PATH detection (SPEA-611) ([#125](https://github.com/fjpulidop/specrails-hub/issues/125)) ([7965789](https://github.com/fjpulidop/specrails-hub/commit/79657892e235b5f091fe95498410a1ad73067e7b))
+
+## [1.19.0](https://github.com/fjpulidop/specrails-hub/compare/v1.18.0...v1.19.0) (2026-03-22)
+
+
+### Features
+
+* **client:** redesign project dashboard with collapsible sections, DnD reordering, and pin (SPEA-608) ([#123](https://github.com/fjpulidop/specrails-hub/issues/123)) ([431f66d](https://github.com/fjpulidop/specrails-hub/commit/431f66d78552d9430f113f1f21349e90418816e6))
+
+
+### Bug Fixes
+
+* resolve 7 critical bugs — title, setup wizard, pipeline consolidation (SPEA-607) ([#122](https://github.com/fjpulidop/specrails-hub/issues/122)) ([8d7442d](https://github.com/fjpulidop/specrails-hub/commit/8d7442d7b1f16f480b6c6b0510da83e5267b7448))
+
 ## [1.18.0](https://github.com/fjpulidop/specrails-hub/compare/v1.17.0...v1.18.0) (2026-03-22)
 
 
