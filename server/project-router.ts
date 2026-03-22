@@ -14,6 +14,8 @@ import {
 } from './db'
 import { getProjectSetupSession } from './hub-db'
 import { ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
+import type { JobPriority } from './types'
+import { VALID_PRIORITIES } from './types'
 import { resolveCommand } from './command-resolver'
 import { createHooksRouter, getPhaseStates } from './hooks'
 import { getConfig, fetchIssues } from './config'
@@ -69,13 +71,17 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   // ─── Queue / Spawn routes ────────────────────────────────────────────────────
 
   router.post('/:projectId/spawn', (req: Request, res: Response) => {
-    const { command } = req.body ?? {}
+    const { command, priority } = req.body ?? {}
     if (!command || typeof command !== 'string' || !command.trim()) {
       res.status(400).json({ error: 'command is required' })
       return
     }
+    if (priority !== undefined && !VALID_PRIORITIES.has(priority)) {
+      res.status(400).json({ error: 'priority must be one of: low, normal, high, critical' })
+      return
+    }
     try {
-      const job = ctx(req).queueManager.enqueue(command)
+      const job = ctx(req).queueManager.enqueue(command, (priority as JobPriority) ?? 'normal')
       const position = job.queuePosition ?? 0
       res.status(202).json({ jobId: job.id, position })
     } catch (err) {
@@ -110,6 +116,24 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         res.status(409).json({ error: 'Job is already in terminal state' })
       } else {
         res.status(500).json({ error: 'Internal server error' })
+      }
+    }
+  })
+
+  router.patch('/:projectId/jobs/:id/priority', (req: Request, res: Response) => {
+    const { priority } = req.body ?? {}
+    if (!priority || !VALID_PRIORITIES.has(priority)) {
+      res.status(400).json({ error: 'priority must be one of: low, normal, high, critical' })
+      return
+    }
+    try {
+      ctx(req).queueManager.updatePriority(req.params.id as string, priority as JobPriority)
+      res.json({ ok: true })
+    } catch (err) {
+      if (err instanceof JobNotFoundError) {
+        res.status(404).json({ error: 'Job not found' })
+      } else {
+        res.status(400).json({ error: (err as Error).message })
       }
     }
   })

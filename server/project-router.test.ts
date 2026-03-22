@@ -197,6 +197,55 @@ describe('project-router', () => {
       expect(res.status).toBe(202)
       expect(res.body.jobId).toBeDefined()
     })
+
+    it('accepts priority parameter', async () => {
+      const enqueueMock = vi.fn(() => ({ id: 'job-1', queuePosition: 1, priority: 'high' }))
+      const qm = makeQueueManager({ enqueue: enqueueMock })
+      const ctx = makeContext(db, { queueManager: qm as any })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).post('/api/projects/proj-1/spawn').send({ command: 'sr:implement', priority: 'high' })
+      expect(res.status).toBe(202)
+      expect(enqueueMock).toHaveBeenCalledWith('sr:implement', 'high')
+    })
+
+    it('returns 400 for invalid priority', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).post('/api/projects/proj-1/spawn').send({ command: 'sr:implement', priority: 'ultra' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('priority')
+    })
+  })
+
+  // ─── PATCH /jobs/:id/priority ──────────────────────────────────────────────
+
+  describe('PATCH /jobs/:id/priority', () => {
+    it('returns 400 for invalid priority value', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).patch('/api/projects/proj-1/jobs/job-1/priority').send({ priority: 'ultra' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('priority')
+    })
+
+    it('returns 404 when job does not exist', async () => {
+      const qm = makeQueueManager()
+      ;(qm as any).updatePriority = vi.fn(() => { throw new JobNotFoundError() })
+      const ctx = makeContext(db, { queueManager: qm as any })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).patch('/api/projects/proj-1/jobs/no-such-job/priority').send({ priority: 'high' })
+      expect(res.status).toBe(404)
+    })
+
+    it('returns 200 on successful priority update', async () => {
+      const qm = makeQueueManager()
+      ;(qm as any).updatePriority = vi.fn()
+      const ctx = makeContext(db, { queueManager: qm as any })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).patch('/api/projects/proj-1/jobs/job-1/priority').send({ priority: 'critical' })
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+    })
   })
 
   // ─── DELETE /jobs/:id ──────────────────────────────────────────────────────

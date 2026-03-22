@@ -9,7 +9,7 @@ import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { JobComparisonModal } from './JobComparisonModal'
-import type { JobSummary, JobStatus } from '../types'
+import type { JobSummary, JobStatus, JobPriority } from '../types'
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'running' | 'queued' | 'failed' | 'canceled'
 
@@ -23,6 +23,13 @@ const STATUS_BADGE: Record<JobStatus, { variant: BadgeVariant; label: string; to
 }
 
 const ALL_STATUSES: JobStatus[] = ['running', 'completed', 'failed', 'canceled', 'zombie_terminated', 'queued']
+
+const PRIORITY_STYLES: Record<JobPriority, { className: string; label: string }> = {
+  critical: { className: 'bg-red-500/15 text-red-400 border-red-500/30', label: 'critical' },
+  high: { className: 'bg-orange-500/15 text-orange-400 border-orange-500/30', label: 'high' },
+  normal: { className: '', label: 'normal' },
+  low: { className: 'bg-gray-500/15 text-gray-400 border-gray-500/30', label: 'low' },
+}
 
 function formatCost(cost: number | null | undefined): string | null {
   if (cost == null || cost === 0) return null
@@ -331,6 +338,13 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                 </TooltipTrigger>
                 <TooltipContent>{statusInfo.tooltip}</TooltipContent>
               </Tooltip>
+
+              {/* Priority badge (only for non-normal) */}
+              {job.priority && job.priority !== 'normal' && (
+                <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border ${PRIORITY_STYLES[job.priority].className}`}>
+                  {PRIORITY_STYLES[job.priority].label}
+                </span>
+              )}
 
               {/* Command */}
               <code className="text-xs text-foreground/80 truncate flex-1 min-w-0">

@@ -35,6 +35,17 @@ export interface PhaseMessage {
 
 export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled' | 'zombie_terminated'
 
+export type JobPriority = 'low' | 'normal' | 'high' | 'critical'
+
+export const PRIORITY_WEIGHT: Record<JobPriority, number> = {
+  low: 0,
+  normal: 1,
+  high: 2,
+  critical: 3,
+}
+
+export const VALID_PRIORITIES = new Set<string>(['low', 'normal', 'high', 'critical'])
+
 export interface JobRow {
   id: string
   command: string
@@ -43,6 +54,7 @@ export interface JobRow {
   status: JobStatus
   exit_code: number | null
   queue_position: number | null
+  priority: JobPriority
   tokens_in: number | null
   tokens_out: number | null
   tokens_cache_read: number | null
@@ -205,6 +217,7 @@ export interface Job {
   command: string
   status: JobStatus
   queuePosition: number | null
+  priority: JobPriority
   startedAt: string | null
   finishedAt: string | null
   exitCode: number | null

@@ -478,4 +478,26 @@ describe('job templates', () => {
       .get() as { name: string } | undefined
     expect(result?.name).toBe('job_templates')
   })
+
+  // ─── Priority ────────────────────────────────────────────────────────────
+
+  it('migration 7 adds priority column with default normal', () => {
+    const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='jobs'")
+      .get() as { sql: string }
+    expect(row.sql).toContain('priority')
+  })
+
+  it('createJob stores priority correctly', () => {
+    const id = makeJobId('priority-1')
+    createJob(db, { id, command: '/test', started_at: new Date().toISOString(), priority: 'critical' })
+    const row = getJob(db, id)!
+    expect(row.priority).toBe('critical')
+  })
+
+  it('createJob defaults priority to normal', () => {
+    const id = makeJobId('priority-2')
+    createJob(db, { id, command: '/test', started_at: new Date().toISOString() })
+    const row = getJob(db, id)!
+    expect(row.priority).toBe('normal')
+  })
 })

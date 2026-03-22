@@ -241,11 +241,13 @@ interface CommandGridProps {
   onOpenWizard: (commandSlug: string) => void
 }
 
-async function spawnCommand(command: string): Promise<string> {
+async function spawnCommand(command: string, priority?: string): Promise<string> {
+  const body: Record<string, string> = { command: `/sr:${command}` }
+  if (priority && priority !== 'normal') body.priority = priority
   const res = await fetch(`${getApiBase()}/spawn`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ command: `/sr:${command}` }),
+    body: JSON.stringify(body),
   })
   const data = await res.json() as { jobId?: string; error?: string }
   if (!res.ok) throw new Error(data.error ?? 'Failed to spawn command')

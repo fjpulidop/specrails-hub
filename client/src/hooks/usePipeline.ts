@@ -1,6 +1,6 @@
 import { useState, useCallback, useLayoutEffect, useRef, useEffect } from 'react'
 import { useSharedWebSocket } from './useSharedWebSocket'
-import type { JobSummary, PhaseDefinition } from '../types'
+import type { JobSummary, PhaseDefinition, JobPriority } from '../types'
 import { getApiBase } from '../lib/api'
 
 export type PhaseState = 'idle' | 'running' | 'done' | 'error'
@@ -18,6 +18,7 @@ export interface QueueJob {
   command: string
   status: 'queued' | 'running' | 'completed' | 'failed' | 'canceled'
   queuePosition: number | null
+  priority: JobPriority
   startedAt: string | null
   finishedAt: string | null
   exitCode: number | null

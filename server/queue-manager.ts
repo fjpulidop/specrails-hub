@@ -2,7 +2,8 @@ import { spawn, execSync, ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import { v4 as uuidv4 } from 'uuid'
 import treeKill from 'tree-kill'
-import type { WsMessage, LogMessage, Job, PhaseDefinition } from './types'
+import type { WsMessage, LogMessage, Job, PhaseDefinition, JobPriority } from './types'
+import { PRIORITY_WEIGHT, VALID_PRIORITIES } from './types'
 import { resolveCommand } from './command-resolver'
 import { resetPhases, setActivePhases } from './hooks'
 import { createJob, finishJob, appendEvent } from './db'
@@ -156,7 +157,7 @@ export class QueueManager {
 
   // ─── Public API ─────────────────────────────────────────────────────────────
 
-  enqueue(command: string): Job {
+  enqueue(command: string, priority: JobPriority = 'normal'): Job {
     if (this._provider === 'codex') {
       if (!codexOnPath()) throw new CodexNotFoundError()
     } else {
@@ -168,14 +169,28 @@ export class QueueManager {
       id,
       command,
       status: 'queued',
-      queuePosition: this._queue.length + 1,
+      queuePosition: null,
+      priority,
       startedAt: null,
       finishedAt: null,
       exitCode: null,
     }
 
     this._jobs.set(id, job)
-    this._queue.push(id)
+
+    // Insert at the correct position based on priority (higher priority first, FIFO within same level)
+    const weight = PRIORITY_WEIGHT[priority]
+    let insertIdx = this._queue.length
+    for (let i = 0; i < this._queue.length; i++) {
+      const existing = this._jobs.get(this._queue[i])
+      if (existing && PRIORITY_WEIGHT[existing.priority] < weight) {
+        insertIdx = i
+        break
+      }
+    }
+    this._queue.splice(insertIdx, 0, id)
+
+    this._recomputePositions()
     this._persistJob(job)
     this._broadcastQueueState()
     this._drainQueue()
@@ -248,6 +263,35 @@ export class QueueManager {
       }
     }
 
+    this._broadcastQueueState()
+  }
+
+  updatePriority(jobId: string, priority: JobPriority): void {
+    const job = this._jobs.get(jobId)
+    if (!job) throw new JobNotFoundError()
+    if (job.status !== 'queued') {
+      throw new Error('Can only change priority of queued jobs')
+    }
+
+    job.priority = priority
+
+    // Remove from queue and re-insert at correct position
+    const idx = this._queue.indexOf(jobId)
+    if (idx !== -1) this._queue.splice(idx, 1)
+
+    const weight = PRIORITY_WEIGHT[priority]
+    let insertIdx = this._queue.length
+    for (let i = 0; i < this._queue.length; i++) {
+      const existing = this._jobs.get(this._queue[i])
+      if (existing && PRIORITY_WEIGHT[existing.priority] < weight) {
+        insertIdx = i
+        break
+      }
+    }
+    this._queue.splice(insertIdx, 0, jobId)
+
+    this._recomputePositions()
+    this._persistJob(job)
     this._broadcastQueueState()
   }
 
@@ -356,7 +400,7 @@ export class QueueManager {
     let lastResultEvent: Record<string, unknown> | null = null
 
     if (this._db) {
-      createJob(this._db, { id: jobId, command: job.command, started_at: job.startedAt! })
+      createJob(this._db, { id: jobId, command: job.command, started_at: job.startedAt!, priority: job.priority })
     }
 
     const emitLine = (source: 'stdout' | 'stderr', line: string): void => {
@@ -627,15 +671,15 @@ export class QueueManager {
 
   private _persistJob(job: Job): void {
     if (!this._db) return
-    // For queued jobs, we use the DB to store queue position for startup restore.
-    // We only upsert queue_position — the rest is handled by createJob/finishJob.
+    // For queued jobs, we use the DB to store queue position and priority for startup restore.
+    // We only upsert queue_position + priority — the rest is handled by createJob/finishJob.
     // Since this method is called for all status transitions, we use a flexible upsert
-    // that only touches queue_position (for queued jobs) — other fields are
+    // that only touches queue_position and priority (for queued jobs) — other fields are
     // managed by the existing createJob/finishJob API.
     try {
       this._db.prepare(
-        `UPDATE jobs SET queue_position = ? WHERE id = ?`
-      ).run(job.queuePosition ?? null, job.id)
+        `UPDATE jobs SET queue_position = ?, priority = ? WHERE id = ?`
+      ).run(job.queuePosition ?? null, job.priority, job.id)
     } catch {
       // Job may not exist in DB yet (e.g., queued before createJob is called in _startJob)
       // This is fine — we'll create the row when the job starts.
@@ -662,17 +706,19 @@ export class QueueManager {
         `UPDATE jobs SET status = 'failed', finished_at = CURRENT_TIMESTAMP WHERE status = 'running'`
       ).run()
 
-      // Restore queued jobs in order
+      // Restore queued jobs in order (priority DESC then queue_position ASC)
       const rows = this._db.prepare(
-        `SELECT id, command, queue_position FROM jobs WHERE status = 'queued' ORDER BY queue_position ASC`
-      ).all() as Array<{ id: string; command: string; queue_position: number | null }>
+        `SELECT id, command, queue_position, priority FROM jobs WHERE status = 'queued' ORDER BY queue_position ASC`
+      ).all() as Array<{ id: string; command: string; queue_position: number | null; priority: string | null }>
 
       for (const row of rows) {
+        const priority = (VALID_PRIORITIES.has(row.priority ?? '') ? row.priority : 'normal') as JobPriority
         const job: Job = {
           id: row.id,
           command: row.command,
           status: 'queued',
           queuePosition: row.queue_position,
+          priority,
           startedAt: null,
           finishedAt: null,
           exitCode: null,
@@ -680,6 +726,14 @@ export class QueueManager {
         this._jobs.set(row.id, job)
         this._queue.push(row.id)
       }
+
+      // Re-sort queue by priority (higher first), preserving FIFO within same level
+      this._queue.sort((a, b) => {
+        const jobA = this._jobs.get(a)!
+        const jobB = this._jobs.get(b)!
+        return PRIORITY_WEIGHT[jobB.priority] - PRIORITY_WEIGHT[jobA.priority]
+      })
+      this._recomputePositions()
 
       // Restore pause state
       const pauseRow = this._db.prepare(

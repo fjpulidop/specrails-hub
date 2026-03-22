@@ -617,6 +617,143 @@ describe('QueueManager', () => {
     })
   })
 
+  // ─── priority ordering ──────────────────────────────────────────────────
+
+  describe('priority ordering', () => {
+    it('enqueue with priority inserts job ahead of lower-priority jobs', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4)
+        .mockReturnValueOnce('job-running' as any)
+        .mockReturnValueOnce('job-low' as any)
+        .mockReturnValueOnce('job-critical' as any)
+
+      qm.enqueue('/implement #1')          // runs immediately
+      qm.enqueue('/implement #2', 'low')   // queued at position 1
+      qm.enqueue('/implement #3', 'critical') // should jump ahead of low
+
+      const jobs = qm.getJobs()
+      const low = jobs.find((j) => j.id === 'job-low')
+      const critical = jobs.find((j) => j.id === 'job-critical')
+      expect(critical?.queuePosition).toBe(1)
+      expect(low?.queuePosition).toBe(2)
+    })
+
+    it('enqueue with same priority preserves FIFO order', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4)
+        .mockReturnValueOnce('job-running' as any)
+        .mockReturnValueOnce('job-a' as any)
+        .mockReturnValueOnce('job-b' as any)
+
+      qm.enqueue('/implement #1')
+      qm.enqueue('/implement #2', 'high')
+      qm.enqueue('/implement #3', 'high')
+
+      const jobs = qm.getJobs()
+      const a = jobs.find((j) => j.id === 'job-a')
+      const b = jobs.find((j) => j.id === 'job-b')
+      expect(a?.queuePosition).toBe(1)
+      expect(b?.queuePosition).toBe(2)
+    })
+
+    it('enqueue defaults to normal priority', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      const job = qm.enqueue('/implement #1')
+      expect(job.priority).toBe('normal')
+    })
+
+    it('four-level priority ordering: critical > high > normal > low', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      let id = 0
+      vi.mocked(mockUuidV4).mockImplementation(() => `job-${++id}` as any)
+
+      qm.pause() // prevent drain
+      qm.enqueue('/low', 'low')
+      qm.enqueue('/normal')
+      qm.enqueue('/high', 'high')
+      qm.enqueue('/critical', 'critical')
+
+      const jobs = qm.getJobs()
+      const sorted = jobs
+        .filter((j) => j.status === 'queued')
+        .sort((a, b) => (a.queuePosition ?? 0) - (b.queuePosition ?? 0))
+
+      expect(sorted.map((j) => j.priority)).toEqual(['critical', 'high', 'normal', 'low'])
+    })
+  })
+
+  // ─── updatePriority ────────────────────────────────────────────────────
+
+  describe('updatePriority', () => {
+    it('changes priority of a queued job and reorders queue', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4)
+        .mockReturnValueOnce('job-running' as any)
+        .mockReturnValueOnce('job-a' as any)
+        .mockReturnValueOnce('job-b' as any)
+
+      qm.enqueue('/implement #1')
+      qm.enqueue('/implement #2')       // normal, position 1
+      qm.enqueue('/implement #3', 'high') // high, position 1, pushing job-a to 2
+
+      // Now upgrade job-a to critical
+      qm.updatePriority('job-a', 'critical')
+
+      const jobs = qm.getJobs()
+      const a = jobs.find((j) => j.id === 'job-a')
+      const b = jobs.find((j) => j.id === 'job-b')
+      expect(a?.priority).toBe('critical')
+      expect(a?.queuePosition).toBe(1)
+      expect(b?.queuePosition).toBe(2)
+    })
+
+    it('throws JobNotFoundError for non-existent job', () => {
+      expect(() => qm.updatePriority('no-such-id', 'high')).toThrow(JobNotFoundError)
+    })
+
+    it('throws when trying to update priority of a running job', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('job-1' as any)
+
+      qm.enqueue('/implement #1')
+      expect(() => qm.updatePriority('job-1', 'high')).toThrow('Can only change priority of queued jobs')
+    })
+
+    it('broadcasts queue state after priority update', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4)
+        .mockReturnValueOnce('job-running' as any)
+        .mockReturnValueOnce('job-queued' as any)
+
+      qm.enqueue('/implement #1')
+      qm.enqueue('/implement #2')
+
+      broadcast.mockClear()
+      qm.updatePriority('job-queued', 'critical')
+
+      const queueBroadcasts = broadcast.mock.calls.filter(
+        (args: unknown[]) => (args[0] as WsMessage).type === 'queue'
+      )
+      expect(queueBroadcasts.length).toBeGreaterThanOrEqual(1)
+    })
+  })
+
   // ─── DB-backed persistence ────────────────────────────────────────────────
 
   describe('DB-backed QueueManager', () => {
@@ -693,6 +830,45 @@ describe('QueueManager', () => {
 
       const row = db.prepare(`SELECT status FROM jobs WHERE id = 'orphan-job'`).get() as any
       expect(row?.status).toBe('failed')
+    })
+
+    it('restores priority from DB and sorts queue by priority', () => {
+      const db = initDb(':memory:')
+      // Insert queued jobs with different priorities
+      db.prepare(`INSERT INTO jobs (id, command, started_at, status, queue_position, priority)
+        VALUES ('low-job', '/low', datetime('now'), 'queued', 1, 'low')`).run()
+      db.prepare(`INSERT INTO jobs (id, command, started_at, status, queue_position, priority)
+        VALUES ('critical-job', '/critical', datetime('now'), 'queued', 2, 'critical')`).run()
+
+      const qmWithDb = new QueueManager(broadcast, db)
+      const jobs = qmWithDb.getJobs()
+      const sorted = jobs
+        .filter((j) => j.status === 'queued')
+        .sort((a, b) => (a.queuePosition ?? 0) - (b.queuePosition ?? 0))
+
+      expect(sorted[0].id).toBe('critical-job')
+      expect(sorted[0].priority).toBe('critical')
+      expect(sorted[1].id).toBe('low-job')
+      expect(sorted[1].priority).toBe('low')
+    })
+
+    it('persists priority to DB when enqueuing', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4)
+        .mockReturnValueOnce('running-job' as any)
+        .mockReturnValueOnce('high-job' as any)
+
+      const db = initDb(':memory:')
+      const qmWithDb = new QueueManager(broadcast, db)
+
+      qmWithDb.enqueue('/implement #1')
+      qmWithDb.enqueue('/implement #2', 'high')
+
+      // The running job should be persisted via createJob with priority
+      const runningRow = db.prepare(`SELECT priority FROM jobs WHERE id = 'running-job'`).get() as any
+      expect(runningRow?.priority).toBe('normal')
     })
   })
 })

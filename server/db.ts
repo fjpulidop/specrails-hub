@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import Database from 'better-sqlite3'
-import type { JobRow, EventRow, StatsRow, JobStatus, ChatConversationRow, ChatMessageRow, ActivityItem } from './types'
+import type { JobRow, EventRow, StatsRow, JobStatus, JobPriority, ChatConversationRow, ChatMessageRow, ActivityItem } from './types'
 
 // ─── Proposal types ───────────────────────────────────────────────────────────
 
@@ -24,6 +24,7 @@ export interface NewJob {
   id: string
   command: string
   started_at: string
+  priority?: JobPriority
 }
 
 export interface JobResult {
@@ -187,6 +188,13 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_job_templates_created_at ON job_templates(created_at);
     `)
   },
+
+  // Migration 7: add priority column to jobs
+  (db) => {
+    db.exec(`
+      ALTER TABLE jobs ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal';
+    `)
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {
@@ -242,8 +250,8 @@ export function initDb(dbPath: string): DbInstance {
 
 export function createJob(db: DbInstance, job: NewJob): void {
   db.prepare(
-    'INSERT INTO jobs (id, command, started_at, status) VALUES (?, ?, ?, ?)'
-  ).run(job.id, job.command, job.started_at, 'running')
+    'INSERT INTO jobs (id, command, started_at, status, priority) VALUES (?, ?, ?, ?, ?)'
+  ).run(job.id, job.command, job.started_at, 'running', job.priority ?? 'normal')
 }
 
 export function finishJob(

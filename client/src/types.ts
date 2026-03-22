@@ -1,5 +1,7 @@
 export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled' | 'zombie_terminated'
 
+export type JobPriority = 'low' | 'normal' | 'high' | 'critical'
+
 export interface PhaseDefinition {
   key: string
   label: string
@@ -12,6 +14,7 @@ export interface JobSummary {
   started_at: string
   finished_at?: string | null
   status: JobStatus
+  priority?: JobPriority
   total_cost_usd?: number | null
   duration_ms?: number | null
   model?: string | null
