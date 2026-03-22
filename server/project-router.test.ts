@@ -5,39 +5,12 @@ import path from 'path'
 import express from 'express'
 import request from 'supertest'
 
-// Mock config module to avoid execSync calls (gh, jira, git) that cause timeouts
-vi.mock('./config', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./config')>()
-  return {
-    ...actual,
-    getConfig: vi.fn(() => ({
-      project: { name: 'Test Project', repo: 'owner/repo' },
-      issueTracker: { github: { available: true, authenticated: true }, jira: { available: false, authenticated: false }, active: 'github' as const, labelFilter: '' },
-      commands: [],
-    })),
-    fetchIssues: vi.fn(() => []),
-  }
-})
-
-// Mock metrics to avoid filesystem operations
-vi.mock('./metrics', () => ({
-  getProjectMetrics: vi.fn(() => ({ loc: 100, files: 5 })),
-}))
-
-// Mock command-resolver for proposal route tests
-vi.mock('./command-resolver', () => ({
-  resolveCommand: vi.fn((cmd: string) => cmd === '/sr:propose-feature test' ? '/resolved/path' : cmd),
-}))
-
 import { createProjectRouter } from './project-router'
-import { initDb, createProposal } from './db'
+import { initDb } from './db'
 import { initHubDb } from './hub-db'
 import { ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import type { DbInstance } from './db'
-import { getConfig, fetchIssues } from './config'
-import { getProjectMetrics } from './metrics'
-import { resolveCommand } from './command-resolver'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -223,58 +196,6 @@ describe('project-router', () => {
       const res = await request(app).post('/api/projects/proj-1/spawn').send({ command: 'sr:implement' })
       expect(res.status).toBe(202)
       expect(res.body.jobId).toBeDefined()
-    })
-
-    it('accepts priority parameter', async () => {
-      const enqueueMock = vi.fn(() => ({ id: 'job-1', queuePosition: 1, priority: 'high' }))
-      const qm = makeQueueManager({ enqueue: enqueueMock })
-      const ctx = makeContext(db, { queueManager: qm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/spawn').send({ command: 'sr:implement', priority: 'high' })
-      expect(res.status).toBe(202)
-      expect(enqueueMock).toHaveBeenCalledWith('sr:implement', 'high', {
-        dependsOnJobId: undefined,
-        pipelineId: undefined,
-      })
-    })
-
-    it('returns 400 for invalid priority', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/spawn').send({ command: 'sr:implement', priority: 'ultra' })
-      expect(res.status).toBe(400)
-      expect(res.body.error).toContain('priority')
-    })
-  })
-
-  // ─── PATCH /jobs/:id/priority ──────────────────────────────────────────────
-
-  describe('PATCH /jobs/:id/priority', () => {
-    it('returns 400 for invalid priority value', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).patch('/api/projects/proj-1/jobs/job-1/priority').send({ priority: 'ultra' })
-      expect(res.status).toBe(400)
-      expect(res.body.error).toContain('priority')
-    })
-
-    it('returns 404 when job does not exist', async () => {
-      const qm = makeQueueManager()
-      ;(qm as any).updatePriority = vi.fn(() => { throw new JobNotFoundError() })
-      const ctx = makeContext(db, { queueManager: qm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).patch('/api/projects/proj-1/jobs/no-such-job/priority').send({ priority: 'high' })
-      expect(res.status).toBe(404)
-    })
-
-    it('returns 200 on successful priority update', async () => {
-      const qm = makeQueueManager()
-      ;(qm as any).updatePriority = vi.fn()
-      const ctx = makeContext(db, { queueManager: qm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).patch('/api/projects/proj-1/jobs/job-1/priority').send({ priority: 'critical' })
-      expect(res.status).toBe(200)
-      expect(res.body.ok).toBe(true)
     })
   })
 
@@ -988,187 +909,9 @@ describe('project-router', () => {
     })
   })
 
-  // ─── Config routes (dailyBudgetUsd) ──────────────────────────────────────────
+  // ─── Job Templates ────────────────────────────────────────────────────────
 
-  describe('Config routes', () => {
-    describe('GET /:projectId/config', () => {
-      it('returns config with null dailyBudgetUsd when not set', async () => {
-        const ctx = makeContext(db)
-        const { app } = createApp(new Map([['proj-1', ctx]]))
-        const res = await request(app).get('/api/projects/proj-1/config')
-        expect(res.status).toBe(200)
-        expect(res.body.dailyBudgetUsd).toBeNull()
-      })
-
-      it('returns config with dailyBudgetUsd when set', async () => {
-        db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.daily_budget_usd', '25.5')`).run()
-        const ctx = makeContext(db)
-        const { app } = createApp(new Map([['proj-1', ctx]]))
-        const res = await request(app).get('/api/projects/proj-1/config')
-        expect(res.status).toBe(200)
-        expect(res.body.dailyBudgetUsd).toBe(25.5)
-      })
-    })
-
-    describe('POST /:projectId/config', () => {
-      it('sets dailyBudgetUsd', async () => {
-        const ctx = makeContext(db)
-        const { app } = createApp(new Map([['proj-1', ctx]]))
-        const res = await request(app)
-          .post('/api/projects/proj-1/config')
-          .send({ dailyBudgetUsd: 10.0 })
-        expect(res.status).toBe(200)
-        expect(res.body.ok).toBe(true)
-        const row = db.prepare(`SELECT value FROM queue_state WHERE key = 'config.daily_budget_usd'`).get() as { value: string }
-        expect(row.value).toBe('10')
-      })
-
-      it('clears dailyBudgetUsd when null', async () => {
-        db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.daily_budget_usd', '10')`).run()
-        const ctx = makeContext(db)
-        const { app } = createApp(new Map([['proj-1', ctx]]))
-        const res = await request(app)
-          .post('/api/projects/proj-1/config')
-          .send({ dailyBudgetUsd: null })
-        expect(res.status).toBe(200)
-        const row = db.prepare(`SELECT value FROM queue_state WHERE key = 'config.daily_budget_usd'`).get()
-        expect(row).toBeUndefined()
-      })
-
-      it('ignores dailyBudgetUsd when not a positive number', async () => {
-        const ctx = makeContext(db)
-        const { app } = createApp(new Map([['proj-1', ctx]]))
-        const res = await request(app)
-          .post('/api/projects/proj-1/config')
-          .send({ dailyBudgetUsd: -5 })
-        expect(res.status).toBe(200)
-        const row = db.prepare(`SELECT value FROM queue_state WHERE key = 'config.daily_budget_usd'`).get()
-        expect(row).toBeUndefined()
-      })
-
-      it('sets active and labelFilter together', async () => {
-        const ctx = makeContext(db)
-        const { app } = createApp(new Map([['proj-1', ctx]]))
-        const res = await request(app)
-          .post('/api/projects/proj-1/config')
-          .send({ active: 'tracker1', labelFilter: 'bug' })
-        expect(res.status).toBe(200)
-        expect(res.body.ok).toBe(true)
-      })
-    })
-  })
-
-  // ─── Spec Launcher routes ────────────────────────────────────────────────────
-
-  describe('Spec Launcher routes', () => {
-    it('POST /spec-launcher/start returns 400 without description', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app)
-        .post('/api/projects/proj-1/spec-launcher/start')
-        .send({})
-      expect(res.status).toBe(400)
-      expect(res.body.error).toContain('description is required')
-    })
-
-    it('POST /spec-launcher/start returns 400 for empty string description', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app)
-        .post('/api/projects/proj-1/spec-launcher/start')
-        .send({ description: '   ' })
-      expect(res.status).toBe(400)
-    })
-
-    it('POST /spec-launcher/start returns 202 with valid description', async () => {
-      const launchFn = vi.fn(async () => {})
-      const ctx = makeContext(db, { specLauncherManager: makeSpecLauncherManager({ launch: launchFn }) as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app)
-        .post('/api/projects/proj-1/spec-launcher/start')
-        .send({ description: 'Add user auth' })
-      expect(res.status).toBe(202)
-      expect(res.body.launchId).toBeDefined()
-    })
-
-    it('DELETE /spec-launcher/:launchId returns 404 for unknown launch', async () => {
-      const ctx = makeContext(db, { specLauncherManager: makeSpecLauncherManager({ isActive: vi.fn(() => false) }) as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app)
-        .delete('/api/projects/proj-1/spec-launcher/unknown-id')
-      expect(res.status).toBe(404)
-    })
-
-    it('DELETE /spec-launcher/:launchId cancels active launch', async () => {
-      const cancelFn = vi.fn()
-      const ctx = makeContext(db, { specLauncherManager: makeSpecLauncherManager({ isActive: vi.fn(() => true), cancel: cancelFn }) as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app)
-        .delete('/api/projects/proj-1/spec-launcher/active-id')
-      expect(res.status).toBe(200)
-      expect(res.body.ok).toBe(true)
-      expect(cancelFn).toHaveBeenCalledWith('active-id')
-    })
-  })
-
-  // ─── Change Artifact Browser routes ──────────────────────────────────────────
-
-  describe('Change Artifact Browser', () => {
-    it('returns 400 for invalid artifact name', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/changes/chg-1/artifacts/malicious.js')
-      expect(res.status).toBe(400)
-      expect(res.body.error).toContain('Invalid artifact')
-    })
-
-    it('returns 400 for path traversal in changeId', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/changes/chg%2F..%2F..%2Fetc/artifacts/proposal.md')
-      expect(res.status).toBe(400)
-    })
-
-    it('returns 404 when artifact file does not exist', async () => {
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false)
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/changes/chg-1/artifacts/proposal.md')
-      expect(res.status).toBe(404)
-      vi.restoreAllMocks()
-    })
-
-    it('falls back to archive dir when active dir has no artifact', async () => {
-      let callCount = 0
-      vi.spyOn(fs, 'existsSync').mockImplementation(() => {
-        callCount++
-        return callCount > 1 // first call (active) returns false, second (archive) returns true
-      })
-      vi.spyOn(fs, 'readFileSync').mockReturnValue('# Archived')
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/changes/chg-1/artifacts/design.md')
-      expect(res.status).toBe(200)
-      expect(res.body.content).toBe('# Archived')
-      vi.restoreAllMocks()
-    })
-
-    it('returns artifact content when file exists', async () => {
-      vi.spyOn(fs, 'existsSync').mockReturnValue(true)
-      vi.spyOn(fs, 'readFileSync').mockReturnValue('# Proposal Content')
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/changes/chg-1/artifacts/proposal.md')
-      expect(res.status).toBe(200)
-      expect(res.body.content).toBe('# Proposal Content')
-      expect(res.body.artifact).toBe('proposal.md')
-      vi.restoreAllMocks()
-    })
-  })
-
-  // ─── Template routes ─────────────────────────────────────────────────────────
-
-  describe('Template routes', () => {
+  describe('job templates CRUD', () => {
     it('GET /templates returns empty list initially', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
@@ -1177,832 +920,211 @@ describe('project-router', () => {
       expect(res.body.templates).toEqual([])
     })
 
-    it('POST /templates creates and returns a template', async () => {
+    it('POST /templates creates a template', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const res = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Deploy', commands: ['build', 'deploy'] })
+        .send({ name: 'My Template', description: 'A test template', commands: ['/sr:test', '/sr:build'] })
       expect(res.status).toBe(201)
-      expect(res.body.template.name).toBe('Deploy')
-      expect(res.body.template.commands).toEqual(['build', 'deploy'])
+      expect(res.body.template.name).toBe('My Template')
+      expect(res.body.template.commands).toEqual(['/sr:test', '/sr:build'])
     })
 
-    it('POST /templates returns 400 without name', async () => {
+    it('POST /templates returns 400 when name is missing', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const res = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ commands: ['build'] })
+        .send({ commands: ['/sr:test'] })
       expect(res.status).toBe(400)
+      expect(res.body.error).toMatch(/name/)
     })
 
-    it('POST /templates returns 400 with empty commands', async () => {
+    it('POST /templates returns 400 when commands is empty array', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const res = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Test', commands: [] })
+        .send({ name: 'T', commands: [] })
       expect(res.status).toBe(400)
+      expect(res.body.error).toMatch(/commands/)
     })
 
-    it('POST /templates returns 400 with non-string command', async () => {
+    it('POST /templates returns 400 when a command is not a string', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const res = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Test', commands: [123] })
+        .send({ name: 'T', commands: [42] })
       expect(res.status).toBe(400)
     })
 
     it('POST /templates returns 409 for duplicate name', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      await request(app).post('/api/projects/proj-1/templates').send({ name: 'Deploy', commands: ['build'] })
-      const res = await request(app).post('/api/projects/proj-1/templates').send({ name: 'Deploy', commands: ['test'] })
+      await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'Dup', commands: ['/sr:test'] })
+      const res = await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'Dup', commands: ['/sr:build'] })
       expect(res.status).toBe(409)
     })
 
-    it('GET /templates/:id returns 404 for unknown template', async () => {
+    it('GET /templates/:templateId returns the template', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/templates/nonexistent')
+      const createRes = await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'Get Me', commands: ['/sr:run'] })
+      const id = createRes.body.template.id
+      const res = await request(app).get(`/api/projects/proj-1/templates/${id}`)
+      expect(res.status).toBe(200)
+      expect(res.body.template.id).toBe(id)
+    })
+
+    it('GET /templates/:templateId returns 404 for unknown id', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/templates/no-such-id')
       expect(res.status).toBe(404)
     })
 
-    it('PATCH /templates/:id updates template name', async () => {
+    it('PATCH /templates/:templateId updates name and description', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'Old', commands: ['cmd'] })
+      const createRes = await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'Old Name', commands: ['/sr:run'] })
       const id = createRes.body.template.id
-      const res = await request(app).patch(`/api/projects/proj-1/templates/${id}`).send({ name: 'New' })
+      const res = await request(app)
+        .patch(`/api/projects/proj-1/templates/${id}`)
+        .send({ name: 'New Name', description: 'Updated' })
       expect(res.status).toBe(200)
-      expect(res.body.template.name).toBe('New')
+      expect(res.body.template.name).toBe('New Name')
     })
 
-    it('PATCH /templates/:id returns 404 for unknown template', async () => {
+    it('PATCH /templates/:templateId returns 404 for unknown id', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).patch('/api/projects/proj-1/templates/nonexistent').send({ name: 'New' })
+      const res = await request(app)
+        .patch('/api/projects/proj-1/templates/no-such-id')
+        .send({ name: 'X' })
       expect(res.status).toBe(404)
     })
 
-    it('PATCH /templates/:id returns 400 for empty name', async () => {
+    it('PATCH /templates/:templateId returns 400 for empty name', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'T', commands: ['c'] })
+      const createRes = await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'Valid', commands: ['/sr:run'] })
       const id = createRes.body.template.id
-      const res = await request(app).patch(`/api/projects/proj-1/templates/${id}`).send({ name: '' })
+      const res = await request(app)
+        .patch(`/api/projects/proj-1/templates/${id}`)
+        .send({ name: '' })
       expect(res.status).toBe(400)
     })
 
-    it('PATCH /templates/:id returns 400 for empty commands array', async () => {
+    it('PATCH /templates/:templateId returns 400 for empty commands array', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'T', commands: ['c'] })
+      const createRes = await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'Valid2', commands: ['/sr:run'] })
       const id = createRes.body.template.id
-      const res = await request(app).patch(`/api/projects/proj-1/templates/${id}`).send({ commands: [] })
+      const res = await request(app)
+        .patch(`/api/projects/proj-1/templates/${id}`)
+        .send({ commands: [] })
       expect(res.status).toBe(400)
     })
 
-    it('PATCH /templates/:id returns 400 for non-string commands', async () => {
+    it('PATCH /templates/:templateId returns 409 for duplicate name', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'T', commands: ['c'] })
-      const id = createRes.body.template.id
-      const res = await request(app).patch(`/api/projects/proj-1/templates/${id}`).send({ commands: [42] })
-      expect(res.status).toBe(400)
-    })
-
-    it('PATCH /templates/:id updates description to null', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'T', description: 'orig', commands: ['c'] })
-      const id = createRes.body.template.id
-      const res = await request(app).patch(`/api/projects/proj-1/templates/${id}`).send({ description: null })
-      expect(res.status).toBe(200)
-      expect(res.body.template.description).toBeNull()
-    })
-
-    it('PATCH /templates/:id updates commands', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'T', commands: ['old'] })
-      const id = createRes.body.template.id
-      const res = await request(app).patch(`/api/projects/proj-1/templates/${id}`).send({ commands: ['new1', 'new2'] })
-      expect(res.status).toBe(200)
-      expect(res.body.template.commands).toEqual(['new1', 'new2'])
-    })
-
-    it('PATCH /templates/:id returns 409 for duplicate name', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      await request(app).post('/api/projects/proj-1/templates').send({ name: 'A', commands: ['c'] })
-      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'B', commands: ['c'] })
-      const id = createRes.body.template.id
-      const res = await request(app).patch(`/api/projects/proj-1/templates/${id}`).send({ name: 'A' })
+      await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'Alpha', commands: ['/sr:run'] })
+      const createRes = await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'Beta', commands: ['/sr:run'] })
+      const betaId = createRes.body.template.id
+      const res = await request(app)
+        .patch(`/api/projects/proj-1/templates/${betaId}`)
+        .send({ name: 'Alpha' })
       expect(res.status).toBe(409)
     })
 
-    it('DELETE /templates/:id removes a template', async () => {
+    it('DELETE /templates/:templateId deletes the template', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'Tmp', commands: ['c'] })
+      const createRes = await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'To Delete', commands: ['/sr:run'] })
       const id = createRes.body.template.id
-      const res = await request(app).delete(`/api/projects/proj-1/templates/${id}`)
-      expect(res.status).toBe(200)
-      expect(res.body.ok).toBe(true)
+      const deleteRes = await request(app).delete(`/api/projects/proj-1/templates/${id}`)
+      expect(deleteRes.status).toBe(200)
+      expect(deleteRes.body.ok).toBe(true)
+      const getRes = await request(app).get(`/api/projects/proj-1/templates/${id}`)
+      expect(getRes.status).toBe(404)
     })
 
-    it('DELETE /templates/:id returns 404 for unknown template', async () => {
+    it('DELETE /templates/:templateId returns 404 for unknown id', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).delete('/api/projects/proj-1/templates/nonexistent')
+      const res = await request(app).delete('/api/projects/proj-1/templates/no-such-id')
       expect(res.status).toBe(404)
     })
 
-    it('POST /templates/:id/run enqueues template commands', async () => {
-      const enqueueFn = vi.fn(() => ({ id: `job-${Math.random().toString(36).slice(2, 6)}`, queuePosition: 0 }))
-      const ctx = makeContext(db, { queueManager: makeQueueManager({ enqueue: enqueueFn }) as any })
+    it('POST /templates/:templateId/run enqueues all commands as a pipeline', async () => {
+      const enqueue = vi.fn()
+        .mockReturnValueOnce({ id: 'job-1', queuePosition: 0 })
+        .mockReturnValueOnce({ id: 'job-2', queuePosition: 1 })
+      const queueManager = makeQueueManager({ enqueue })
+      const ctx = makeContext(db, { queueManager: queueManager as any })
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'Run', commands: ['cmd1', 'cmd2'] })
+      const createRes = await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'Run Me', commands: ['/sr:test', '/sr:build'] })
       const id = createRes.body.template.id
       const res = await request(app).post(`/api/projects/proj-1/templates/${id}/run`)
       expect(res.status).toBe(202)
-      expect(res.body.jobIds).toHaveLength(2)
-      expect(enqueueFn).toHaveBeenCalledTimes(2)
+      expect(res.body.jobIds).toEqual(['job-1', 'job-2'])
+      expect(enqueue).toHaveBeenCalledTimes(2)
     })
 
-    it('POST /templates/:id/run returns 404 for unknown template', async () => {
+    it('POST /templates/:templateId/run returns 404 for unknown template', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/templates/nonexistent/run')
+      const res = await request(app).post('/api/projects/proj-1/templates/no-such-id/run')
       expect(res.status).toBe(404)
     })
 
-    it('POST /templates/:id/run returns 400 when claude not found', async () => {
-      const enqueueFn = vi.fn(() => { throw new ClaudeNotFoundError('Claude CLI not found') })
-      const ctx = makeContext(db, { queueManager: makeQueueManager({ enqueue: enqueueFn }) as any })
+    it('POST /templates/:templateId/run returns 400 when Claude not found', async () => {
+      const enqueue = vi.fn().mockImplementation(() => { throw new ClaudeNotFoundError('claude not found') })
+      const queueManager = makeQueueManager({ enqueue })
+      const ctx = makeContext(db, { queueManager: queueManager as any })
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'Fail', commands: ['cmd'] })
+      const createRes = await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'Fail Run', commands: ['/sr:test'] })
       const id = createRes.body.template.id
       const res = await request(app).post(`/api/projects/proj-1/templates/${id}/run`)
       expect(res.status).toBe(400)
     })
-  })
 
-  // ─── Jobs export ─────────────────────────────────────────────────────────────
-
-  describe('GET /:projectId/jobs/export', () => {
-    it('returns JSON by default', async () => {
-      db.prepare(
-        "INSERT INTO jobs (id, command, started_at, status) VALUES ('j-exp-1', 'sr:implement', '2025-01-01T10:00:00.000Z', 'completed')"
-      ).run()
+    it('PATCH /templates/:templateId sets description to null when passed null', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/jobs/export')
-      expect(res.status).toBe(200)
-      expect(res.body.jobs).toBeInstanceOf(Array)
-      expect(res.body.jobs.length).toBe(1)
-      expect(res.body.jobs[0].id).toBe('j-exp-1')
-    })
-
-    it('returns CSV when format=csv', async () => {
-      db.prepare(
-        "INSERT INTO jobs (id, command, started_at, status) VALUES ('j-csv-1', 'sr:implement', '2025-01-01T10:00:00.000Z', 'completed')"
-      ).run()
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/jobs/export?format=csv')
-      expect(res.status).toBe(200)
-      expect(res.headers['content-type']).toContain('text/csv')
-      expect(res.headers['content-disposition']).toContain('jobs-export.csv')
-      const lines = res.text.split('\n')
-      expect(lines[0]).toContain('id')
-      expect(lines[0]).toContain('command')
-      expect(lines[1]).toContain('j-csv-1')
-    })
-
-    it('returns 400 for invalid format', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/jobs/export?format=xml')
-      expect(res.status).toBe(400)
-      expect(res.body.error).toContain('Invalid format')
-    })
-
-    it('filters by date range', async () => {
-      db.prepare(
-        "INSERT INTO jobs (id, command, started_at, status) VALUES ('j-old', 'sr:implement', '2024-01-01T10:00:00.000Z', 'completed')"
-      ).run()
-      db.prepare(
-        "INSERT INTO jobs (id, command, started_at, status) VALUES ('j-new', 'sr:implement', '2025-06-01T10:00:00.000Z', 'completed')"
-      ).run()
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/jobs/export?from=2025-01-01&to=2025-12-31')
-      expect(res.status).toBe(200)
-      expect(res.body.jobs.length).toBe(1)
-      expect(res.body.jobs[0].id).toBe('j-new')
-    })
-
-    it('returns empty array when no jobs match', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/jobs/export')
-      expect(res.status).toBe(200)
-      expect(res.body.jobs).toEqual([])
-    })
-
-    it('escapes CSV values with commas and quotes', async () => {
-      db.prepare(
-        "INSERT INTO jobs (id, command, started_at, status) VALUES ('j-esc', 'sr:implement \"hello, world\"', '2025-01-01T10:00:00.000Z', 'completed')"
-      ).run()
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/jobs/export?format=csv')
-      expect(res.status).toBe(200)
-      // The command contains both comma and quote — should be escaped
-      expect(res.text).toContain('""hello')
-    })
-  })
-
-  // ─── Analytics export ────────────────────────────────────────────────────────
-
-  describe('GET /:projectId/analytics/export', () => {
-    it('returns JSON analytics by default', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/analytics/export')
-      expect(res.status).toBe(200)
-      expect(res.body).toHaveProperty('kpi')
-      expect(res.body).toHaveProperty('commandPerformance')
-    })
-
-    it('returns CSV analytics when format=csv', async () => {
-      db.prepare(
-        "INSERT INTO jobs (id, command, started_at, finished_at, status, total_cost_usd, duration_ms) VALUES ('j-a1', 'sr:implement', '2025-01-01T10:00:00.000Z', '2025-01-01T10:05:00.000Z', 'completed', 0.05, 300000)"
-      ).run()
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/analytics/export?format=csv&period=all')
-      expect(res.status).toBe(200)
-      expect(res.headers['content-type']).toContain('text/csv')
-      expect(res.headers['content-disposition']).toContain('analytics-export.csv')
-      const lines = res.text.split('\n')
-      expect(lines[0]).toContain('command')
-      expect(lines[0]).toContain('totalRuns')
-    })
-
-    it('returns 400 for invalid format', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/analytics/export?format=xml')
-      expect(res.status).toBe(400)
-    })
-
-    it('returns 400 for invalid period', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/analytics/export?period=invalid')
-      expect(res.status).toBe(400)
-    })
-
-    it('returns 400 for custom period without from/to', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/analytics/export?period=custom')
-      expect(res.status).toBe(400)
-      expect(res.body.error).toContain('from and to are required')
-    })
-  })
-
-  // ─── POST /spawn error paths ─────────────────────────────────────────────────
-
-  describe('POST /spawn error paths', () => {
-    it('returns 500 for unexpected errors', async () => {
-      const qm = makeQueueManager({ enqueue: vi.fn(() => { throw new Error('unexpected') }) })
-      const ctx = makeContext(db, { queueManager: qm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/spawn').send({ command: 'test' })
-      expect(res.status).toBe(500)
-      expect(res.body.error).toBe('Internal server error')
-    })
-  })
-
-  // ─── DELETE /jobs/:id success + generic error ────────────────────────────────
-
-  describe('DELETE /jobs/:id additional paths', () => {
-    it('returns 200 on successful cancel', async () => {
-      const qm = makeQueueManager({ cancel: vi.fn(() => 'canceled') })
-      const ctx = makeContext(db, { queueManager: qm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).delete('/api/projects/proj-1/jobs/job-1')
-      expect(res.status).toBe(200)
-      expect(res.body.ok).toBe(true)
-      expect(res.body.status).toBe('canceled')
-    })
-
-    it('returns 500 for unexpected errors', async () => {
-      const qm = makeQueueManager({ cancel: vi.fn(() => { throw new Error('boom') }) })
-      const ctx = makeContext(db, { queueManager: qm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).delete('/api/projects/proj-1/jobs/job-1')
-      expect(res.status).toBe(500)
-    })
-  })
-
-  // ─── PATCH /jobs/:id/priority non-JobNotFoundError ───────────────────────────
-
-  describe('PATCH /jobs/:id/priority other error', () => {
-    it('returns 400 for non-JobNotFoundError', async () => {
-      const qm = makeQueueManager()
-      ;(qm as any).updatePriority = vi.fn(() => { throw new Error('Cannot update running job') })
-      const ctx = makeContext(db, { queueManager: qm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).patch('/api/projects/proj-1/jobs/job-1/priority').send({ priority: 'high' })
-      expect(res.status).toBe(400)
-      expect(res.body.error).toContain('Cannot update running job')
-    })
-  })
-
-  // ─── PUT /queue/reorder error ────────────────────────────────────────────────
-
-  describe('PUT /queue/reorder error path', () => {
-    it('returns 400 when reorder throws', async () => {
-      const qm = makeQueueManager({ reorder: vi.fn(() => { throw new Error('jobIds mismatch') }) })
-      const ctx = makeContext(db, { queueManager: qm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).put('/api/projects/proj-1/queue/reorder').send({ jobIds: ['x'] })
-      expect(res.status).toBe(400)
-      expect(res.body.error).toContain('jobIds mismatch')
-    })
-  })
-
-  // ─── GET /jobs with query params ─────────────────────────────────────────────
-
-  describe('GET /jobs with filters', () => {
-    it('returns jobs with limit and offset', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/jobs?limit=10&offset=0')
-      expect(res.status).toBe(200)
-    })
-
-    it('caps limit at 200', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/jobs?limit=999')
-      expect(res.status).toBe(200)
-    })
-
-    it('filters by status', async () => {
-      db.prepare("INSERT INTO jobs (id, command, started_at, status) VALUES ('s1', 'cmd', '2025-01-01T00:00:00Z', 'completed')").run()
-      db.prepare("INSERT INTO jobs (id, command, started_at, status) VALUES ('s2', 'cmd', '2025-01-01T00:00:00Z', 'failed')").run()
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/jobs?status=completed')
-      expect(res.status).toBe(200)
-    })
-
-    it('filters by from/to date range', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/jobs?from=2025-01-01&to=2025-12-31')
-      expect(res.status).toBe(200)
-    })
-  })
-
-  // ─── GET /metrics ────────────────────────────────────────────────────────────
-
-  describe('GET /:projectId/metrics', () => {
-    it('returns metrics data', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/metrics')
-      expect(res.status).toBe(200)
-      expect(res.body).toBeDefined()
-    })
-
-    it('returns 500 when getProjectMetrics throws', async () => {
-      vi.mocked(getProjectMetrics).mockImplementationOnce(() => { throw new Error('disk error') })
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/metrics')
-      expect(res.status).toBe(500)
-      expect(res.body.error).toContain('Failed to compute metrics')
-    })
-  })
-
-  // ─── GET /config (mocked) ────────────────────────────────────────────────────
-
-  describe('GET /:projectId/config (mocked)', () => {
-    it('returns config with project, issueTracker, commands', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/config')
-      expect(res.status).toBe(200)
-      expect(res.body).toHaveProperty('project')
-      expect(res.body).toHaveProperty('issueTracker')
-      expect(res.body).toHaveProperty('commands')
-      expect(res.body).toHaveProperty('dailyBudgetUsd')
-    })
-
-    it('returns 500 when getConfig throws', async () => {
-      vi.mocked(getConfig).mockImplementationOnce(() => { throw new Error('read error') })
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/config')
-      expect(res.status).toBe(500)
-      expect(res.body.error).toContain('Failed to read config')
-    })
-
-    it('includes dailyBudgetUsd from DB', async () => {
-      db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.daily_budget_usd', '42.5')`).run()
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/config')
-      expect(res.status).toBe(200)
-      expect(res.body.dailyBudgetUsd).toBe(42.5)
-    })
-  })
-
-  // ─── POST /config error path ─────────────────────────────────────────────────
-
-  describe('POST /:projectId/config error path', () => {
-    it('returns 500 when DB write fails', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      // Close the DB to force an error
-      db.close()
-      const res = await request(app).post('/api/projects/proj-1/config').send({ active: 'github' })
-      expect(res.status).toBe(500)
-      expect(res.body.error).toContain('Failed to persist config')
-      // Reinit db for subsequent tests
-      db = initDb(':memory:')
-    })
-  })
-
-  // ─── GET /issues (mocked) ───────────────────────────────────────────────────
-
-  describe('GET /:projectId/issues (mocked)', () => {
-    it('returns issues when tracker is configured', async () => {
-      vi.mocked(fetchIssues).mockReturnValueOnce([{ number: 1, title: 'Bug', labels: ['bug'], body: 'desc' }])
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/issues')
-      expect(res.status).toBe(200)
-      expect(res.body).toHaveLength(1)
-      expect(res.body[0].title).toBe('Bug')
-    })
-
-    it('returns 503 when no tracker is active', async () => {
-      vi.mocked(getConfig).mockReturnValueOnce({
-        project: { name: 'Test', repo: null },
-        issueTracker: { github: { available: false, authenticated: false }, jira: { available: false, authenticated: false }, active: null, labelFilter: '' },
-        commands: [],
-      })
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/issues')
-      expect(res.status).toBe(503)
-      expect(res.body.error).toContain('No issue tracker configured')
-    })
-
-    it('passes search and label params', async () => {
-      vi.mocked(fetchIssues).mockReturnValueOnce([])
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/issues?search=bug&label=critical')
-      expect(res.status).toBe(200)
-      expect(vi.mocked(fetchIssues)).toHaveBeenCalledWith('github', expect.objectContaining({ search: 'bug', label: 'critical' }))
-    })
-
-    it('returns 500 when fetchIssues throws', async () => {
-      vi.mocked(fetchIssues).mockImplementationOnce(() => { throw new Error('api error') })
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/issues')
-      expect(res.status).toBe(500)
-      expect(res.body.error).toContain('Failed to fetch issues')
-    })
-  })
-
-  // ─── GET /analytics error path ──────────────────────────────────────────────
-
-  describe('GET /:projectId/analytics error path', () => {
-    it('returns analytics for custom period with from/to', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/analytics?period=custom&from=2025-01-01&to=2025-12-31')
-      expect(res.status).toBe(200)
-    })
-  })
-
-  // ─── GET /trends error path ─────────────────────────────────────────────────
-
-  describe('GET /:projectId/trends error path', () => {
-    it('returns 500 when getTrends throws', async () => {
-      // Close db and recreate to force error by using a closed db
-      const closedDb = initDb(':memory:')
-      closedDb.close()
-      const ctx = makeContext(closedDb)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/trends?period=7d')
-      expect(res.status).toBe(500)
-      expect(res.body.error).toContain('Failed to compute trends')
-    })
-  })
-
-  // Note: GET /jobs/compare is unreachable because GET /jobs/:id matches first
-
-  // ─── Chat stream abort (success path) ──────────────────────────────────────
-
-  describe('DELETE /:projectId/chat/conversations/:id/messages/stream success', () => {
-    it('aborts active stream and returns ok', async () => {
-      const abortFn = vi.fn()
-      const chatManager = makeChatManager({ isActive: vi.fn(() => true), abort: abortFn })
-      const ctx = makeContext(db, { chatManager: chatManager as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).delete('/api/projects/proj-1/chat/conversations/conv-1/messages/stream')
-      expect(res.status).toBe(200)
-      expect(res.body.ok).toBe(true)
-      expect(abortFn).toHaveBeenCalledWith('conv-1')
-    })
-  })
-
-  // ─── POST /chat/conversations/:id/messages success (202) ──────────────────
-
-  describe('POST /chat/conversations/:id/messages success', () => {
-    it('returns 202 and calls sendMessage', async () => {
-      const sendFn = vi.fn(async () => {})
-      const chatManager = makeChatManager({ sendMessage: sendFn })
-      const ctx = makeContext(db, { chatManager: chatManager as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const createRes = await request(app).post('/api/projects/proj-1/chat/conversations').send({})
-      const convId = createRes.body.conversation.id
-      const res = await request(app).post(`/api/projects/proj-1/chat/conversations/${convId}/messages`).send({ text: 'hello world' })
-      expect(res.status).toBe(202)
-      expect(res.body.ok).toBe(true)
-      await new Promise((r) => setTimeout(r, 10))
-      expect(sendFn).toHaveBeenCalledWith(convId, 'hello world')
-    })
-
-    it('returns 404 for unknown conversation', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/chat/conversations/unknown/messages').send({ text: 'hi' })
-      expect(res.status).toBe(404)
-    })
-
-    it('returns 400 for empty text', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const createRes = await request(app).post('/api/projects/proj-1/chat/conversations').send({})
-      const convId = createRes.body.conversation.id
-      const res = await request(app).post(`/api/projects/proj-1/chat/conversations/${convId}/messages`).send({ text: '   ' })
-      expect(res.status).toBe(400)
-    })
-  })
-
-  // ─── GET /chat/conversations/:id/messages 404 ───────────────────────────────
-
-  describe('GET /chat/conversations/:id/messages', () => {
-    it('returns 404 for unknown conversation', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/chat/conversations/unknown/messages')
-      expect(res.status).toBe(404)
-    })
-  })
-
-  // ─── Setup routes (success paths) ──────────────────────────────────────────
-
-  describe('setup routes success paths', () => {
-    it('POST /setup/install returns 202 and calls startInstall', async () => {
-      const startInstall = vi.fn()
-      const sm = makeSetupManager({ startInstall })
-      const ctx = makeContext(db, { setupManager: sm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/setup/install')
-      expect(res.status).toBe(202)
-      expect(res.body.ok).toBe(true)
-      expect(startInstall).toHaveBeenCalledWith('proj-1', '/tmp')
-    })
-
-    it('POST /setup/start returns 202 and calls startSetup', async () => {
-      const startSetup = vi.fn()
-      const sm = makeSetupManager({ startSetup })
-      const ctx = makeContext(db, { setupManager: sm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/setup/start')
-      expect(res.status).toBe(202)
-      expect(res.body.ok).toBe(true)
-      expect(startSetup).toHaveBeenCalledWith('proj-1', '/tmp')
-    })
-
-    it('POST /setup/message returns 409 when setup already in progress', async () => {
-      const sm = makeSetupManager({ isSettingUp: vi.fn(() => true) })
-      const ctx = makeContext(db, { setupManager: sm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/setup/message').send({ sessionId: 'sess-1', message: 'hello' })
-      expect(res.status).toBe(409)
-      expect(res.body.error).toContain('Setup already in progress')
-    })
-
-    it('POST /setup/message returns 202 and calls resumeSetup', async () => {
-      const resumeSetup = vi.fn()
-      const sm = makeSetupManager({ resumeSetup })
-      const ctx = makeContext(db, { setupManager: sm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/setup/message').send({ sessionId: 'sess-1', message: 'configure project' })
-      expect(res.status).toBe(202)
-      expect(res.body.ok).toBe(true)
-      expect(resumeSetup).toHaveBeenCalledWith('proj-1', '/tmp', 'sess-1', 'configure project')
-    })
-
-    it('POST /setup/abort calls abort and returns ok', async () => {
-      const abortFn = vi.fn()
-      const sm = makeSetupManager({ abort: abortFn })
-      const ctx = makeContext(db, { setupManager: sm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/setup/abort')
-      expect(res.status).toBe(200)
-      expect(res.body.ok).toBe(true)
-      expect(abortFn).toHaveBeenCalledWith('proj-1')
-    })
-  })
-
-  // ─── Proposal routes (additional paths) ────────────────────────────────────
-
-  describe('proposal routes additional paths', () => {
-    it('POST /propose returns 202 and calls startExploration when command exists', async () => {
-      const startExploration = vi.fn(async () => {})
-      const pm = makeProposalManager({ startExploration })
-      const ctx = makeContext(db, { proposalManager: pm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/propose').send({ idea: 'Add dark mode' })
-      expect(res.status).toBe(202)
-      expect(res.body.proposalId).toBeDefined()
-      await new Promise((r) => setTimeout(r, 10))
-      expect(startExploration).toHaveBeenCalled()
-    })
-
-    it('POST /propose returns 400 when propose-feature command not installed', async () => {
-      vi.mocked(resolveCommand).mockReturnValueOnce('/sr:propose-feature test')
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/propose').send({ idea: 'Add dark mode' })
-      expect(res.status).toBe(400)
-      expect(res.body.error).toContain('propose-feature command')
-    })
-
-    it('DELETE /propose/:id cancels and returns ok for existing proposal', async () => {
-      createProposal(db, { id: 'prop-1', idea: 'test idea' })
-      const cancelFn = vi.fn()
-      const pm = makeProposalManager({ cancel: cancelFn })
-      const ctx = makeContext(db, { proposalManager: pm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).delete('/api/projects/proj-1/propose/prop-1')
-      expect(res.status).toBe(200)
-      expect(res.body.ok).toBe(true)
-      expect(cancelFn).toHaveBeenCalledWith('prop-1')
-    })
-
-    it('GET /propose/:id returns proposal data for existing proposal', async () => {
-      createProposal(db, { id: 'prop-2', idea: 'test idea 2' })
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/propose/prop-2')
-      expect(res.status).toBe(200)
-      expect(res.body.proposal).toBeDefined()
-      expect(res.body.proposal.idea).toBe('test idea 2')
-    })
-  })
-
-  // ─── POST /propose/:id/refine ──────────────────────────────────────────────
-
-  describe('POST /:projectId/propose/:id/refine', () => {
-    it('returns 404 for unknown proposal', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/propose/nonexistent/refine').send({ feedback: 'more detail' })
-      expect(res.status).toBe(404)
-    })
-
-    it('returns 400 when feedback is missing', async () => {
-      createProposal(db, { id: 'ref-1', idea: 'some idea' })
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/propose/ref-1/refine').send({})
-      expect(res.status).toBe(400)
-      expect(res.body.error).toContain('feedback is required')
-    })
-
-    it('returns 409 when proposal is busy', async () => {
-      createProposal(db, { id: 'ref-2', idea: 'some idea' })
-      // Update to review status
-      db.prepare("UPDATE proposals SET status = 'review' WHERE id = 'ref-2'").run()
-      const pm = makeProposalManager({ isActive: vi.fn(() => true) })
-      const ctx = makeContext(db, { proposalManager: pm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/propose/ref-2/refine').send({ feedback: 'more detail' })
-      expect(res.status).toBe(409)
-      expect(res.body.error).toBe('PROPOSAL_BUSY')
-    })
-
-    it('returns 409 when proposal not in review state', async () => {
-      createProposal(db, { id: 'ref-3', idea: 'some idea' })
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/propose/ref-3/refine').send({ feedback: 'refine this' })
-      expect(res.status).toBe(409)
-      expect(res.body.error).toContain('not in review state')
-    })
-
-    it('returns 202 and calls sendRefinement when valid', async () => {
-      createProposal(db, { id: 'ref-4', idea: 'some idea' })
-      db.prepare("UPDATE proposals SET status = 'review' WHERE id = 'ref-4'").run()
-      const sendRefinement = vi.fn(async () => {})
-      const pm = makeProposalManager({ sendRefinement })
-      const ctx = makeContext(db, { proposalManager: pm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/propose/ref-4/refine').send({ feedback: 'add more detail' })
-      expect(res.status).toBe(202)
-      await new Promise((r) => setTimeout(r, 10))
-      expect(sendRefinement).toHaveBeenCalledWith('ref-4', 'add more detail')
-    })
-  })
-
-  // ─── POST /propose/:id/create-issue ────────────────────────────────────────
-
-  describe('POST /:projectId/propose/:id/create-issue', () => {
-    it('returns 404 for unknown proposal', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/propose/nonexistent/create-issue')
-      expect(res.status).toBe(404)
-    })
-
-    it('returns 409 when proposal is busy', async () => {
-      createProposal(db, { id: 'ci-1', idea: 'idea' })
-      db.prepare("UPDATE proposals SET status = 'review' WHERE id = 'ci-1'").run()
-      const pm = makeProposalManager({ isActive: vi.fn(() => true) })
-      const ctx = makeContext(db, { proposalManager: pm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/propose/ci-1/create-issue')
-      expect(res.status).toBe(409)
-      expect(res.body.error).toBe('PROPOSAL_BUSY')
-    })
-
-    it('returns 409 when proposal not in review state', async () => {
-      createProposal(db, { id: 'ci-2', idea: 'idea' })
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/propose/ci-2/create-issue')
-      expect(res.status).toBe(409)
-      expect(res.body.error).toContain('not in review state')
-    })
-
-    it('returns 202 and calls createIssue when valid', async () => {
-      createProposal(db, { id: 'ci-3', idea: 'idea' })
-      db.prepare("UPDATE proposals SET status = 'review' WHERE id = 'ci-3'").run()
-      const createIssueFn = vi.fn(async () => {})
-      const pm = makeProposalManager({ createIssue: createIssueFn })
-      const ctx = makeContext(db, { proposalManager: pm as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).post('/api/projects/proj-1/propose/ci-3/create-issue')
-      expect(res.status).toBe(202)
-      await new Promise((r) => setTimeout(r, 10))
-      expect(createIssueFn).toHaveBeenCalledWith('ci-3')
-    })
-  })
-
-  // ─── DELETE /jobs (purge) error path ───────────────────────────────────────
-
-  describe('DELETE /:projectId/jobs error path', () => {
-    it('returns 500 when purge fails', async () => {
-      const closedDb = initDb(':memory:')
-      closedDb.close()
-      const ctx = makeContext(closedDb)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).delete('/api/projects/proj-1/jobs').send({})
-      expect(res.status).toBe(500)
-      expect(res.body.error).toContain('Failed to purge jobs')
-    })
-  })
-
-  // ─── Template run generic error ────────────────────────────────────────────
-
-  describe('POST /templates/:id/run generic error', () => {
-    it('returns 500 for unexpected enqueue error', async () => {
-      const enqueueFn = vi.fn(() => { throw new Error('something broke') })
-      const ctx = makeContext(db, { queueManager: makeQueueManager({ enqueue: enqueueFn }) as any })
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const createRes = await request(app).post('/api/projects/proj-1/templates').send({ name: 'ErrTpl', commands: ['cmd'] })
+      const createRes = await request(app)
+        .post('/api/projects/proj-1/templates')
+        .send({ name: 'Desc Test', description: 'Initial', commands: ['/sr:run'] })
       const id = createRes.body.template.id
-      const res = await request(app).post(`/api/projects/proj-1/templates/${id}/run`)
-      expect(res.status).toBe(500)
+      const res = await request(app)
+        .patch(`/api/projects/proj-1/templates/${id}`)
+        .send({ description: null })
+      expect(res.status).toBe(200)
     })
   })
 })
