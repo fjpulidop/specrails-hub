@@ -1200,3 +1200,15 @@ if (require.main === module) {
     process.exit(1)
   })
 }
+
+// ---------------------------------------------------------------------------
+// Test-only exports — not part of the public API
+// ---------------------------------------------------------------------------
+
+export const _internal = {
+  ansi, dim, red, bold, dimCyan, cliPrefix, cliLog, cliError, cliWarn,
+  httpGet, httpPost, formatJobDuration, formatJobStarted, printVersion, printHelp,
+  handleStatus, handleJobs, handleHub, hubStart, hubStop, hubStatus, hubAdd, hubRemove, hubList, hubServerPath,
+  resolveProjectFromCwd, runViaWebManager, runDirect, isPortInUse, readPid, isProcessRunning, main,
+  isTTY, HUB_PID_FILE, HUB_LOG_FILE, EXIT_PATTERN, DEFAULT_PORT, DETECTION_TIMEOUT_MS,
+}
