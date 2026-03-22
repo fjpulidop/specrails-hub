@@ -23,6 +23,11 @@ const sampleCommands: CommandInfo[] = [
   { id: 'cmd-2', slug: 'review', name: 'Review', description: 'Run review' },
 ]
 
+/** Helper: get all step inputs (input[type=text] inside the dialog) */
+function getStepInputs(): HTMLInputElement[] {
+  return Array.from(document.querySelectorAll<HTMLInputElement>('input[type="text"]'))
+}
+
 describe('PipelineBuilder', () => {
   const onClose = vi.fn()
 
@@ -47,7 +52,7 @@ describe('PipelineBuilder', () => {
 
   it('renders one empty step by default', () => {
     render(<PipelineBuilder open={true} onClose={onClose} commands={[]} />)
-    const inputs = screen.getAllByRole('textbox')
+    const inputs = getStepInputs()
     expect(inputs.length).toBe(1)
     expect(inputs[0]).toHaveValue('')
   })
@@ -61,14 +66,13 @@ describe('PipelineBuilder', () => {
     const user = userEvent.setup()
     render(<PipelineBuilder open={true} onClose={onClose} commands={[]} />)
     await user.click(screen.getByText('Add Step'))
-    const inputs = screen.getAllByRole('textbox')
-    expect(inputs.length).toBe(2)
+    expect(getStepInputs().length).toBe(2)
   })
 
   it('updates command text on input change', async () => {
     const user = userEvent.setup()
     render(<PipelineBuilder open={true} onClose={onClose} commands={sampleCommands} />)
-    const input = screen.getByRole('textbox')
+    const input = getStepInputs()[0]
     await user.type(input, '/sr:implement')
     expect(input).toHaveValue('/sr:implement')
   })
@@ -76,17 +80,16 @@ describe('PipelineBuilder', () => {
   it('removes a step when delete button is clicked', async () => {
     const user = userEvent.setup()
     render(<PipelineBuilder open={true} onClose={onClose} commands={[]} />)
-    // Add a second step so delete is enabled
     await user.click(screen.getByText('Add Step'))
-    expect(screen.getAllByRole('textbox').length).toBe(2)
-    // The delete buttons have the Trash2 icon - find by looking at non-disabled small buttons
+    expect(getStepInputs().length).toBe(2)
+    // Find the enabled delete button (w-7 sized ghost buttons)
     const allButtons = screen.getAllByRole('button')
     const deleteButton = allButtons.find(
       (btn) => !btn.hasAttribute('disabled') && btn.className.includes('w-7')
     )
     if (deleteButton) {
       await user.click(deleteButton)
-      expect(screen.getAllByRole('textbox').length).toBe(1)
+      expect(getStepInputs().length).toBe(1)
     }
   })
 
@@ -106,7 +109,7 @@ describe('PipelineBuilder', () => {
   it('submit button is enabled when a step has a command', async () => {
     const user = userEvent.setup()
     render(<PipelineBuilder open={true} onClose={onClose} commands={[]} />)
-    await user.type(screen.getByRole('textbox'), '/sr:implement')
+    await user.type(getStepInputs()[0], '/sr:implement')
     const submitBtn = screen.getByRole('button', { name: /create pipeline/i })
     expect(submitBtn).not.toBeDisabled()
   })
@@ -114,7 +117,7 @@ describe('PipelineBuilder', () => {
   it('submits pipeline and shows success toast', async () => {
     const user = userEvent.setup()
     render(<PipelineBuilder open={true} onClose={onClose} commands={[]} />)
-    await user.type(screen.getByRole('textbox'), '/sr:implement')
+    await user.type(getStepInputs()[0], '/sr:implement')
     await user.click(screen.getByRole('button', { name: /create pipeline/i }))
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -135,7 +138,7 @@ describe('PipelineBuilder', () => {
     })
     const user = userEvent.setup()
     render(<PipelineBuilder open={true} onClose={onClose} commands={[]} />)
-    await user.type(screen.getByRole('textbox'), '/sr:implement')
+    await user.type(getStepInputs()[0], '/sr:implement')
     await user.click(screen.getByRole('button', { name: /create pipeline/i }))
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Failed to create pipeline', expect.any(Object))
@@ -145,7 +148,7 @@ describe('PipelineBuilder', () => {
   it('shows step count in submit button', async () => {
     const user = userEvent.setup()
     render(<PipelineBuilder open={true} onClose={onClose} commands={[]} />)
-    await user.type(screen.getByRole('textbox'), '/sr:implement')
+    await user.type(getStepInputs()[0], '/sr:implement')
     expect(screen.getByRole('button', { name: /create pipeline \(1 steps?\)/i })).toBeInTheDocument()
   })
 
@@ -158,7 +161,7 @@ describe('PipelineBuilder', () => {
     ;(global.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Network failure'))
     const user = userEvent.setup()
     render(<PipelineBuilder open={true} onClose={onClose} commands={[]} />)
-    await user.type(screen.getByRole('textbox'), '/sr:implement')
+    await user.type(getStepInputs()[0], '/sr:implement')
     await user.click(screen.getByRole('button', { name: /create pipeline/i }))
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
@@ -179,14 +182,14 @@ describe('PipelineBuilder', () => {
     render(<PipelineBuilder open={true} onClose={onClose} commands={[]} />)
     // Add a second step
     await user.click(screen.getByText('Add Step'))
-    const inputs = screen.getAllByRole('textbox')
+    const inputs = getStepInputs()
     await user.type(inputs[0], 'step-one')
     await user.type(inputs[1], 'step-two')
     // Click move up on the second step
     const moveButtons = screen.getAllByRole('button', { name: /move step up/i })
     if (moveButtons.length > 1) {
       await user.click(moveButtons[1])
-      const updatedInputs = screen.getAllByRole('textbox')
+      const updatedInputs = getStepInputs()
       expect(updatedInputs[0]).toHaveValue('step-two')
       expect(updatedInputs[1]).toHaveValue('step-one')
     }
@@ -195,7 +198,6 @@ describe('PipelineBuilder', () => {
   it('disables delete when only one step exists', () => {
     render(<PipelineBuilder open={true} onClose={onClose} commands={[]} />)
     const allButtons = screen.getAllByRole('button')
-    // Find buttons with w-7 class (delete buttons) — should be disabled
     const smallButtons = allButtons.filter((b) => b.className.includes('w-7'))
     expect(smallButtons.length).toBeGreaterThan(0)
     expect(smallButtons[0]).toBeDisabled()
