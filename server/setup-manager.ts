@@ -332,6 +332,26 @@ export class SetupManager {
 
     if (provider) this._projectProviders.set(projectId, provider)
 
+    const resolvedProvider = provider ?? this._projectProviders.get(projectId)
+
+    if (resolvedProvider === 'codex') {
+      // Codex doesn't support --resume.  Build a continuation prompt that
+      // includes the original setup instructions so the new exec run can
+      // pick up where the previous one left off.
+      const setupMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'setup.md')
+      let setupContent = ''
+      try {
+        setupContent = readFileSync(setupMdPath, 'utf-8')
+      } catch { /* will fall back to just the user message */ }
+
+      const prompt = setupContent
+        ? `${setupContent}\n\n---\nIMPORTANT: This is a continuation of a previous setup run. Check which artifacts already exist in the project before regenerating anything. The user responded to your question with:\n\n${userMessage}`
+        : userMessage
+
+      this._spawnSetup(projectId, projectPath, ['-p', prompt], resolvedProvider)
+      return
+    }
+
     const args = [
       '--resume', sessionId,
       '--dangerously-skip-permissions',
@@ -409,6 +429,14 @@ export class SetupManager {
     this._startFilesystemPoll(projectId, projectPath)
 
     let capturedSessionId: string | null = null
+
+    // Codex has no session concept (no stream-json `result` event).  Generate a
+    // synthetic session ID so the wizard can enable its chat input and the
+    // setup/message endpoint accepts follow-up messages.
+    if (isCodex) {
+      capturedSessionId = `codex-${projectId}-${Date.now()}`
+      this._onSessionCaptured?.(projectId, capturedSessionId)
+    }
 
     const stdoutReader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
     const stderrReader = createInterface({ input: child.stderr!, crlfDelay: Infinity })

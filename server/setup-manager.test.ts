@@ -393,6 +393,33 @@ describe('SetupManager', () => {
       )
       expect(detectCLISync).not.toHaveBeenCalled()
     })
+
+    it('generates synthetic sessionId for codex and calls onSessionCaptured', () => {
+      const onSessionCaptured = vi.fn()
+      const smWithCallback = new SetupManager(broadcast, onSessionCaptured)
+      vi.mocked(readFileSync).mockReturnValue('# Setup')
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      smWithCallback.startSetup('p1', '/path/to/project', 'codex')
+
+      expect(onSessionCaptured).toHaveBeenCalledWith('p1', expect.stringMatching(/^codex-p1-\d+$/))
+    })
+
+    it('emits setup_turn_done with synthetic sessionId for codex when setup is incomplete', async () => {
+      vi.mocked(readFileSync).mockReturnValue('# Setup')
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      // No artifacts exist — setup is incomplete
+      vi.mocked(existsSync).mockReturnValue(false)
+
+      sm.startSetup('p1', '/path/to/project', 'codex')
+      await finishProcess(child, 0)
+
+      const turnDone = getBroadcastedByType(broadcast, 'setup_turn_done')
+      expect(turnDone).toHaveLength(1)
+      expect(turnDone[0].sessionId).toMatch(/^codex-p1-\d+$/)
+    })
   })
 
   // ─── resumeSetup ──────────────────────────────────────────────────────────
@@ -421,20 +448,39 @@ describe('SetupManager', () => {
       expect(mockSpawn).toHaveBeenCalledTimes(1)
     })
 
-    it('uses explicit provider parameter for codex resume', () => {
+    it('uses explicit provider parameter for codex resume with continuation prompt', () => {
       vi.mocked(detectCLISync).mockReturnValue('claude')
+      vi.mocked(readFileSync).mockReturnValue('# Setup prompt content')
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
       sm.resumeSetup('p1', '/path', 'sess-abc', 'continue please', 'codex')
 
-      // Resume with Codex passes user message directly (not /setup)
+      // Codex resume builds a continuation prompt from setup.md + user message
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'codex',
+        ['exec', expect.stringContaining('continue please')],
+        expect.any(Object)
+      )
+      // Should include setup.md content (mocked as '# Setup prompt content')
+      const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      expect(spawnArgs[1]).toContain('# Setup prompt content')
+      expect(spawnArgs[1]).toContain('continuation of a previous setup run')
+      expect(detectCLISync).not.toHaveBeenCalled()
+    })
+
+    it('falls back to plain user message when setup.md is missing for codex resume', () => {
+      vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT') })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.resumeSetup('p1', '/path', 'sess-abc', 'continue please', 'codex')
+
       expect(mockSpawn).toHaveBeenCalledWith(
         'codex',
         ['exec', 'continue please'],
         expect.any(Object)
       )
-      expect(detectCLISync).not.toHaveBeenCalled()
     })
   })
 
