@@ -152,19 +152,27 @@ export function getAnalytics(db: DbInstance, opts: AnalyticsOpts): AnalyticsResp
     : opts.period === 'all' ? 'All time'
     : `${opts.from} to ${opts.to}`
 
+  const prevPeriodLabel = opts.period === '7d' ? 'Previous 7 days'
+    : opts.period === '30d' ? 'Previous 30 days'
+    : opts.period === '90d' ? 'Previous 90 days'
+    : opts.period === 'custom' ? `${previous?.from} to ${previous?.to}`
+    : ''
+
   // ── KPI aggregate ──────────────────────────────────────────────────────────
   const kpiRow = db.prepare(`
     SELECT
       COUNT(*) as totalJobs,
       COALESCE(SUM(total_cost_usd), 0) as totalCostUsd,
       AVG(duration_ms) as avgDurationMs,
-      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as successCount
+      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as successCount,
+      COALESCE(SUM(COALESCE(tokens_in, 0) + COALESCE(tokens_out, 0)), 0) as totalTokens
     FROM jobs ${curWhere}
   `).get(...curParams) as {
     totalJobs: number
     totalCostUsd: number
     avgDurationMs: number | null
     successCount: number
+    totalTokens: number
   }
 
   const successRate = kpiRow.totalJobs > 0 ? kpiRow.successCount / kpiRow.totalJobs : 0
@@ -178,7 +186,8 @@ export function getAnalytics(db: DbInstance, opts: AnalyticsOpts): AnalyticsResp
         COUNT(*) as totalJobs,
         COALESCE(SUM(total_cost_usd), 0) as totalCostUsd,
         AVG(duration_ms) as avgDurationMs,
-        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as successCount
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as successCount,
+        COALESCE(SUM(COALESCE(tokens_in, 0) + COALESCE(tokens_out, 0)), 0) as totalTokens
       FROM jobs ${prevWhere}
     `).get(...prevParams) as typeof kpiRow
     prevSuccessRate = prevKpi.totalJobs > 0 ? prevKpi.successCount / prevKpi.totalJobs : 0
@@ -337,6 +346,7 @@ export function getAnalytics(db: DbInstance, opts: AnalyticsOpts): AnalyticsResp
       totalJobs: kpiRow.totalJobs,
       successRate,
       avgDurationMs: kpiRow.avgDurationMs,
+      totalTokens: kpiRow.totalTokens,
       costDelta: prevKpi !== null ? kpiRow.totalCostUsd - prevKpi.totalCostUsd : null,
       jobsDelta: prevKpi !== null ? kpiRow.totalJobs - prevKpi.totalJobs : null,
       successRateDelta: prevKpi !== null ? successRate - prevSuccessRate : null,
@@ -344,6 +354,33 @@ export function getAnalytics(db: DbInstance, opts: AnalyticsOpts): AnalyticsResp
         prevKpi !== null && kpiRow.avgDurationMs !== null && prevKpi.avgDurationMs !== null
           ? kpiRow.avgDurationMs - prevKpi.avgDurationMs
           : null,
+      totalTokensDelta: prevKpi !== null ? kpiRow.totalTokens - prevKpi.totalTokens : null,
+      costDeltaPct: prevKpi !== null && prevKpi.totalCostUsd > 0
+        ? ((kpiRow.totalCostUsd - prevKpi.totalCostUsd) / prevKpi.totalCostUsd) * 100
+        : null,
+      jobsDeltaPct: prevKpi !== null && prevKpi.totalJobs > 0
+        ? ((kpiRow.totalJobs - prevKpi.totalJobs) / prevKpi.totalJobs) * 100
+        : null,
+      successRateDeltaPct: prevKpi !== null && prevSuccessRate > 0
+        ? ((successRate - prevSuccessRate) / prevSuccessRate) * 100
+        : null,
+      avgDurationDeltaPct:
+        prevKpi !== null && kpiRow.avgDurationMs !== null && prevKpi.avgDurationMs !== null && prevKpi.avgDurationMs > 0
+          ? ((kpiRow.avgDurationMs - prevKpi.avgDurationMs) / prevKpi.avgDurationMs) * 100
+          : null,
+      totalTokensDeltaPct: prevKpi !== null && prevKpi.totalTokens > 0
+        ? ((kpiRow.totalTokens - prevKpi.totalTokens) / prevKpi.totalTokens) * 100
+        : null,
+      previousPeriod: prevKpi !== null ? {
+        label: prevPeriodLabel,
+        from: previous!.from,
+        to: previous!.to,
+        totalCostUsd: prevKpi.totalCostUsd,
+        totalJobs: prevKpi.totalJobs,
+        successRate: prevSuccessRate,
+        avgDurationMs: prevKpi.avgDurationMs,
+        totalTokens: prevKpi.totalTokens,
+      } : null,
     },
     costTimeline,
     statusBreakdown,

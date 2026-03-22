@@ -39,10 +39,27 @@ const mockKpi = {
   totalJobs: 42,
   successRate: 0.875,
   avgDurationMs: 90000,
+  totalTokens: 150000,
   costDelta: 0.1,
   jobsDelta: 5,
   successRateDelta: 0.02,
   avgDurationDelta: -5000,
+  totalTokensDelta: 20000,
+  costDeltaPct: 8.8,
+  jobsDeltaPct: 13.5,
+  successRateDeltaPct: 2.3,
+  avgDurationDeltaPct: -5.3,
+  totalTokensDeltaPct: 15.4,
+  previousPeriod: {
+    label: 'Previous 7 days',
+    from: '2026-03-08',
+    to: '2026-03-14',
+    totalCostUsd: 1.1345,
+    totalJobs: 37,
+    successRate: 0.855,
+    avgDurationMs: 95000,
+    totalTokens: 130000,
+  },
 }
 
 const mockCostTimeline = [
@@ -138,9 +155,59 @@ describe('KpiCards', () => {
   })
 
   it('renders null deltas gracefully (no badge)', () => {
-    render(<KpiCards kpi={{ ...mockKpi, costDelta: null, jobsDelta: null, successRateDelta: null, avgDurationDelta: null }} />)
+    render(<KpiCards kpi={{ ...mockKpi, costDelta: null, jobsDelta: null, successRateDelta: null, avgDurationDelta: null, totalTokensDelta: null, costDeltaPct: null, jobsDeltaPct: null, successRateDeltaPct: null, avgDurationDeltaPct: null, totalTokensDeltaPct: null, previousPeriod: null }} />)
     // no crashes, still renders cards
     expect(screen.getByText('Total Cost')).toBeInTheDocument()
+  })
+
+  it('renders Total Tokens card', () => {
+    render(<KpiCards kpi={mockKpi} />)
+    expect(screen.getByText('Total Tokens')).toBeInTheDocument()
+    expect(screen.getByText('150.0K')).toBeInTheDocument()
+  })
+
+  it('renders previous period values when available', () => {
+    render(<KpiCards kpi={mockKpi} />)
+    expect(screen.getByText('prev: $1.1345')).toBeInTheDocument()
+    expect(screen.getByText('prev: 37')).toBeInTheDocument()
+    expect(screen.getByText('prev: 85.5%')).toBeInTheDocument()
+    expect(screen.getByText('prev: 1m 35s')).toBeInTheDocument()
+    expect(screen.getByText('prev: 130.0K')).toBeInTheDocument()
+  })
+
+  it('does not render previous values when previousPeriod is null', () => {
+    render(<KpiCards kpi={{ ...mockKpi, previousPeriod: null }} />)
+    expect(screen.queryByText(/prev:/)).toBeNull()
+  })
+
+  it('shows percentage delta instead of absolute when available', () => {
+    render(<KpiCards kpi={mockKpi} />)
+    expect(screen.getByText('+8.8%')).toBeInTheDocument()
+    expect(screen.getByText('+13.5%')).toBeInTheDocument()
+  })
+
+  it('renders all 5 cards when no previous data', () => {
+    const noPrev = {
+      ...mockKpi,
+      costDelta: null,
+      jobsDelta: null,
+      successRateDelta: null,
+      avgDurationDelta: null,
+      totalTokensDelta: null,
+      costDeltaPct: null,
+      jobsDeltaPct: null,
+      successRateDeltaPct: null,
+      avgDurationDeltaPct: null,
+      totalTokensDeltaPct: null,
+      previousPeriod: null,
+    }
+    render(<KpiCards kpi={noPrev} />)
+    expect(screen.getByText('Total Cost')).toBeInTheDocument()
+    expect(screen.getByText('Total Jobs')).toBeInTheDocument()
+    expect(screen.getByText('Success Rate')).toBeInTheDocument()
+    expect(screen.getByText('Avg Duration')).toBeInTheDocument()
+    expect(screen.getByText('Total Tokens')).toBeInTheDocument()
+    expect(screen.queryByText(/prev:/)).toBeNull()
   })
 })
 
