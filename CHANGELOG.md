@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.20.0](https://github.com/fjpulidop/specrails-hub/compare/v1.19.2...v1.20.0) (2026-03-22)
+
+
+### Features
+
+* rename UI labels — Runbooks→Rails, Commands→Spec, and reorder sections (SPEA-614) ([#129](https://github.com/fjpulidop/specrails-hub/issues/129)) ([d116eda](https://github.com/fjpulidop/specrails-hub/commit/d116edadb8ec0211eacfa805a378f2dc2d91c1b7))
+
+
+### Bug Fixes
+
+* resolve Codex installation failure (SPEA-615) ([#131](https://github.com/fjpulidop/specrails-hub/issues/131)) ([e64b977](https://github.com/fjpulidop/specrails-hub/commit/e64b977381cc9a7341aa78081b2c3b4e7cb93476))
+
 ## [1.19.2](https://github.com/fjpulidop/specrails-hub/compare/v1.19.1...v1.19.2) (2026-03-22)
 
 
