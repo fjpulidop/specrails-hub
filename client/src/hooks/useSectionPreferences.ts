@@ -23,10 +23,15 @@ function loadPrefs(): SectionPrefs {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { order: DEFAULT_ORDER, pinned: new Set() }
     const parsed = JSON.parse(raw) as StoredPrefs
-    const order = Array.isArray(parsed.order) && parsed.order.length === DEFAULT_ORDER.length
+    const validIds = new Set<string>(DEFAULT_ORDER)
+    const order = Array.isArray(parsed.order)
+      && parsed.order.length === DEFAULT_ORDER.length
+      && parsed.order.every((id: string) => validIds.has(id))
       ? parsed.order
       : DEFAULT_ORDER
-    const pinned = new Set<SectionId>(Array.isArray(parsed.pinned) ? parsed.pinned : [])
+    const pinned = new Set<SectionId>(
+      Array.isArray(parsed.pinned) ? parsed.pinned.filter((id: string) => validIds.has(id)) : []
+    )
     return { order, pinned }
   } catch {
     return { order: DEFAULT_ORDER, pinned: new Set() }

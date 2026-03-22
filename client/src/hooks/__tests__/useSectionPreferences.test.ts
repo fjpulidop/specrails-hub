@@ -66,6 +66,19 @@ describe('useSectionPreferences', () => {
       const { result } = renderHook(() => useSectionPreferences())
       expect(result.current.order).toEqual(DEFAULT_ORDER)
     })
+
+    it('falls back to defaults when stored order has stale section IDs', () => {
+      // Simulates pre-SPEA-614 localStorage with old 'runbooks' ID
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        order: ['commands', 'runbooks', 'jobs', 'health'],
+        pinned: ['runbooks'],
+      }))
+
+      const { result } = renderHook(() => useSectionPreferences())
+      expect(result.current.order).toEqual(DEFAULT_ORDER)
+      // Stale pinned ID should be filtered out
+      expect(result.current.isPinned('rails')).toBe(false)
+    })
   })
 
   describe('reorder', () => {
