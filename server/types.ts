@@ -471,6 +471,45 @@ export interface SpecLauncherErrorMessage {
   timestamp: string
 }
 
+// ─── Ticket message types ────────────────────────────────────────────────────
+
+export interface LocalTicket {
+  id: number
+  title: string
+  description: string
+  status: 'todo' | 'in_progress' | 'done' | 'cancelled'
+  priority: 'critical' | 'high' | 'medium' | 'low'
+  labels: string[]
+  assignee: string | null
+  prerequisites: number[]
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  created_by: string
+  source: string
+}
+
+export interface TicketCreatedMessage {
+  type: 'ticket_created'
+  projectId: string
+  ticket: LocalTicket
+  timestamp: string
+}
+
+export interface TicketUpdatedMessage {
+  type: 'ticket_updated'
+  projectId: string
+  ticket: LocalTicket
+  timestamp: string
+}
+
+export interface TicketDeletedMessage {
+  type: 'ticket_deleted'
+  projectId: string
+  ticketId: number
+  timestamp: string
+}
+
 // ─── Cost alert message types ─────────────────────────────────────────────────
 
 export interface CostAlertMessage {
@@ -517,4 +556,5 @@ export type WsMessage =
   | SpecLauncherStreamMessage | SpecLauncherDoneMessage | SpecLauncherErrorMessage
   | CostAlertMessage | DailyBudgetExceededMessage | HubDailyBudgetExceededMessage
   | PipelineStatusMessage
+  | TicketCreatedMessage | TicketUpdatedMessage | TicketDeletedMessage
 

@@ -7,6 +7,7 @@ import { SetupManager } from './setup-manager'
 import { ProposalManager } from './proposal-manager'
 import { SpecLauncherManager } from './spec-launcher-manager'
 import { WebhookManager } from './webhook-manager'
+import { TicketWatcher } from './ticket-watcher'
 import type { WsMessage } from './types'
 import {
   initHubDb,
@@ -35,6 +36,7 @@ export interface ProjectContext {
   setupManager: SetupManager
   proposalManager: ProposalManager
   specLauncherManager: SpecLauncherManager
+  ticketWatcher: TicketWatcher
   broadcast: (msg: WsMessage) => void
 }
 
@@ -78,6 +80,8 @@ export class ProjectRegistry {
   removeProject(id: string): void {
     const ctx = this._contexts.get(id)
     if (ctx) {
+      // Close the ticket file watcher
+      ctx.ticketWatcher.close().catch(() => { /* ignore */ })
       // Close the DB connection
       try { ctx.db.close() } catch { /* ignore */ }
       this._contexts.delete(id)
@@ -180,7 +184,10 @@ export class ProjectRegistry {
       // Non-fatal: project may not have commands yet
     }
 
-    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, specLauncherManager, broadcast: boundBroadcast }
+    const ticketWatcher = new TicketWatcher(project.path, project.id, boundBroadcast)
+    ticketWatcher.start()
+
+    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, specLauncherManager, ticketWatcher, broadcast: boundBroadcast }
     this._contexts.set(project.id, ctx)
     return ctx
   }
