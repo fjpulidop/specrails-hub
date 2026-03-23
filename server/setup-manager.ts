@@ -406,7 +406,7 @@ export class SetupManager {
         }
       }
 
-      resolvedArgs = ['exec', prompt]
+      resolvedArgs = ['exec', '--full-auto', prompt]
     } else {
       // Default to claude (also covers null — warns and tries claude as fallback)
       if (provider === null) {

@@ -329,7 +329,7 @@ describe('SetupManager', () => {
       )
       expect(mockSpawn).toHaveBeenCalledWith(
         'codex',
-        ['exec', '# Full setup instructions'],
+        ['exec', '--full-auto', '# Full setup instructions'],
         expect.objectContaining({ cwd: '/path/to/project' })
       )
     })
@@ -359,7 +359,7 @@ describe('SetupManager', () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'codex',
-        ['exec', '# Setup'],
+        ['exec', '--full-auto', '# Setup'],
         expect.objectContaining({ cwd: '/path/to/project' })
       )
       // detectCLISync should not be called when provider is explicit
@@ -459,13 +459,13 @@ describe('SetupManager', () => {
       // Codex resume builds a continuation prompt from setup.md + user message
       expect(mockSpawn).toHaveBeenCalledWith(
         'codex',
-        ['exec', expect.stringContaining('continue please')],
+        ['exec', '--full-auto', expect.stringContaining('continue please')],
         expect.any(Object)
       )
       // Should include setup.md content (mocked as '# Setup prompt content')
       const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
-      expect(spawnArgs[1]).toContain('# Setup prompt content')
-      expect(spawnArgs[1]).toContain('continuation of a previous setup run')
+      expect(spawnArgs[2]).toContain('# Setup prompt content')
+      expect(spawnArgs[2]).toContain('continuation of a previous setup run')
       expect(detectCLISync).not.toHaveBeenCalled()
     })
 
@@ -478,7 +478,7 @@ describe('SetupManager', () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'codex',
-        ['exec', 'continue please'],
+        ['exec', '--full-auto', 'continue please'],
         expect.any(Object)
       )
     })
