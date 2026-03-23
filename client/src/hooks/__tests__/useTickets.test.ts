@@ -16,6 +16,16 @@ vi.mock('../useSharedWebSocket', () => ({
   }),
 }))
 
+// ─── Mock useHub ───────────────────────────────────────────────────────────────
+
+let mockActiveProjectId: string | null = 'proj-1'
+
+vi.mock('../useHub', () => ({
+  useHub: () => ({
+    get activeProjectId() { return mockActiveProjectId },
+  }),
+}))
+
 // ─── Mock lib/api ──────────────────────────────────────────────────────────────
 
 vi.mock('../../lib/api', () => ({
@@ -54,6 +64,7 @@ describe('useTickets', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     wsHandler = null
+    mockActiveProjectId = 'proj-1'
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({ tickets: [] }),
@@ -64,7 +75,8 @@ describe('useTickets', () => {
 
   describe('initial state', () => {
     it('returns empty tickets when no projectId', () => {
-      const { result } = renderHook(() => useTickets({ activeProjectId: null }))
+      mockActiveProjectId = null
+      const { result } = renderHook(() => useTickets())
       expect(result.current.tickets).toEqual([])
       expect(result.current.loading).toBe(false)
       expect(result.current.error).toBeNull()
@@ -77,7 +89,7 @@ describe('useTickets', () => {
         json: async () => ({ tickets }),
       })
 
-      const { result } = renderHook(() => useTickets({ activeProjectId: 'proj-1' }))
+      const { result } = renderHook(() => useTickets())
 
       await waitFor(() => {
         expect(result.current.tickets).toHaveLength(2)
@@ -96,7 +108,7 @@ describe('useTickets', () => {
         json: async () => ({}),
       })
 
-      const { result } = renderHook(() => useTickets({ activeProjectId: 'proj-1' }))
+      const { result } = renderHook(() => useTickets())
 
       await waitFor(() => {
         expect(result.current.error).toContain('500')
@@ -111,7 +123,7 @@ describe('useTickets', () => {
         json: async () => tickets,
       })
 
-      const { result } = renderHook(() => useTickets({ activeProjectId: 'proj-1' }))
+      const { result } = renderHook(() => useTickets())
 
       await waitFor(() => {
         expect(result.current.tickets).toHaveLength(1)
@@ -123,7 +135,7 @@ describe('useTickets', () => {
 
   describe('ticket_created', () => {
     it('adds a new ticket from WS event', async () => {
-      const { result } = renderHook(() => useTickets({ activeProjectId: 'proj-1' }))
+      const { result } = renderHook(() => useTickets())
       await waitFor(() => expect(result.current.loading).toBe(false))
 
       const newTicket = makeTicket({ id: 5, title: 'New from CLI' })
@@ -141,7 +153,7 @@ describe('useTickets', () => {
     })
 
     it('shows toast and sets glow for new ticket', async () => {
-      const { result } = renderHook(() => useTickets({ activeProjectId: 'proj-1' }))
+      const { result } = renderHook(() => useTickets())
       await waitFor(() => expect(result.current.loading).toBe(false))
 
       const newTicket = makeTicket({ id: 5, title: 'New from CLI' })
@@ -163,7 +175,7 @@ describe('useTickets', () => {
         json: async () => ({ tickets: [makeTicket({ id: 1 })] }),
       })
 
-      const { result } = renderHook(() => useTickets({ activeProjectId: 'proj-1' }))
+      const { result } = renderHook(() => useTickets())
       await waitFor(() => expect(result.current.tickets).toHaveLength(1))
 
       act(() => {
@@ -178,7 +190,7 @@ describe('useTickets', () => {
     })
 
     it('ignores events from other projects', async () => {
-      const { result } = renderHook(() => useTickets({ activeProjectId: 'proj-1' }))
+      const { result } = renderHook(() => useTickets())
       await waitFor(() => expect(result.current.loading).toBe(false))
 
       act(() => {
@@ -202,7 +214,7 @@ describe('useTickets', () => {
         json: async () => ({ tickets: [makeTicket({ id: 1, title: 'Original' })] }),
       })
 
-      const { result } = renderHook(() => useTickets({ activeProjectId: 'proj-1' }))
+      const { result } = renderHook(() => useTickets())
       await waitFor(() => expect(result.current.tickets).toHaveLength(1))
 
       act(() => {
@@ -223,7 +235,7 @@ describe('useTickets', () => {
         json: async () => ({ tickets: [] }),
       })
 
-      const { result } = renderHook(() => useTickets({ activeProjectId: 'proj-1' }))
+      const { result } = renderHook(() => useTickets())
       await waitFor(() => expect(result.current.loading).toBe(false))
 
       // Reset fetch mock to return new data
@@ -256,7 +268,7 @@ describe('useTickets', () => {
         json: async () => ({ tickets: [makeTicket({ id: 1 }), makeTicket({ id: 2, title: 'Two' })] }),
       })
 
-      const { result } = renderHook(() => useTickets({ activeProjectId: 'proj-1' }))
+      const { result } = renderHook(() => useTickets())
       await waitFor(() => expect(result.current.tickets).toHaveLength(2))
 
       act(() => {
@@ -281,17 +293,17 @@ describe('useTickets', () => {
         json: async () => ({ tickets: [makeTicket({ id: 1 })] }),
       })
 
-      const { result, rerender } = renderHook(
-        ({ pid }: { pid: string | null }) => useTickets({ activeProjectId: pid }),
-        { initialProps: { pid: 'proj-1' } },
-      )
+      const { result, rerender } = renderHook(() => useTickets())
       await waitFor(() => expect(result.current.tickets).toHaveLength(1))
 
       ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
         ok: true,
         json: async () => ({ tickets: [] }),
       })
-      rerender({ pid: 'proj-2' })
+
+      // Simulate project switch by changing the mock activeProjectId
+      mockActiveProjectId = 'proj-2'
+      rerender()
 
       await waitFor(() => {
         expect(result.current.tickets).toEqual([])
@@ -308,7 +320,7 @@ describe('useTickets', () => {
         json: async () => ({ tickets: [makeTicket({ id: 1 })] }),
       })
 
-      const { result } = renderHook(() => useTickets({ activeProjectId: 'proj-1' }))
+      const { result } = renderHook(() => useTickets())
       await waitFor(() => expect(result.current.tickets).toHaveLength(1))
 
       // Refetch returns existing + 2 new

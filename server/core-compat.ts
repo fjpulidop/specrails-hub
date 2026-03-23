@@ -33,6 +33,11 @@ interface IntegrationContract {
   specrailsDir?: { claude: string; codex: string }
   checkpoints: string[]
   commands: string[]
+  ticketProvider?: {
+    type: string
+    storagePath: string
+    capabilities: string[]
+  }
 }
 
 export interface CoreCompatResult {

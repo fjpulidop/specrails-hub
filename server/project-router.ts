@@ -919,6 +919,38 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     res.status(202).json({ ok: true, jobIds, templateId: row.id, templateName: row.name })
   })
 
+  // ─── Integration contract ──────────────────────────────────────────────────
+
+  const DEFAULT_TICKET_CAPABILITIES = ['crud', 'labels', 'status', 'priorities', 'dependencies']
+  const DEFAULT_TICKET_STORAGE_PATH = '.claude/local-tickets.json'
+
+  // GET /:projectId/integration-contract — Return the project's integration contract with ticketProvider
+  router.get('/:projectId/integration-contract', (req: Request, res: Response) => {
+    const projectPath = ctx(req).project.path
+    const contractFile = path.join(projectPath, '.claude', 'integration-contract.json')
+    let rawContract: Record<string, unknown> = {}
+    let source: 'contract' | 'default' = 'default'
+
+    if (fs.existsSync(contractFile)) {
+      try {
+        rawContract = JSON.parse(fs.readFileSync(contractFile, 'utf-8'))
+        source = 'contract'
+      } catch {
+        // malformed contract — fall back to defaults
+      }
+    }
+
+    const rawProvider = rawContract.ticketProvider as { type?: string; storagePath?: string; capabilities?: string[] } | undefined
+    const storagePath = rawProvider?.storagePath ?? DEFAULT_TICKET_STORAGE_PATH
+    const ticketProvider = {
+      type: rawProvider?.type ?? 'local',
+      storagePath: path.resolve(projectPath, storagePath),
+      capabilities: rawProvider?.capabilities ?? DEFAULT_TICKET_CAPABILITIES,
+    }
+
+    res.json({ ticketProvider, source })
+  })
+
   // ─── Tickets ──────────────────────────────────────────────────────────────────
 
   /** Resolve the ticket storage file path for a project */

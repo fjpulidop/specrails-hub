@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react
 import { toast } from 'sonner'
 import { getApiBase } from '../lib/api'
 import { useSharedWebSocket } from './useSharedWebSocket'
+import { useHub } from './useHub'
 import type { LocalTicket } from '../types'
 
 // Re-export for backward compat
@@ -17,27 +18,12 @@ interface TicketWsMessage {
   timestamp?: string
 }
 
-interface UseTicketsOpts {
-  activeProjectId: string | null
-}
-
-interface UseTicketsResult {
-  tickets: LocalTicket[]
-  loading: boolean
-  error: string | null
-  /** IDs of recently added tickets — use for glow animation, auto-clears after 3s */
-  newTicketIds: Set<number>
-  refetch: () => void
-  deleteTicket: (ticketId: number) => Promise<boolean>
-  updateTicketStatus: (ticketId: number, status: LocalTicket['status']) => Promise<boolean>
-  updateTicketPriority: (ticketId: number, priority: LocalTicket['priority']) => Promise<boolean>
-}
-
 const GLOW_DURATION_MS = 3000
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-export function useTickets({ activeProjectId }: UseTicketsOpts): UseTicketsResult {
+export function useTickets() {
+  const { activeProjectId } = useHub()
   const [tickets, setTickets] = useState<LocalTicket[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -79,12 +65,9 @@ export function useTickets({ activeProjectId }: UseTicketsOpts): UseTicketsResul
           }
         }
 
-        // Update known IDs
         knownIdsRef.current = new Set(fetched.map((t) => t.id))
-
         setTickets(fetched)
 
-        // Show toast and glow for net-new tickets (only if we had prior state)
         if (newIds.size > 0 && oldIds.size > 0) {
           setNewTicketIds(newIds)
           toast.success(`${newIds.size} new ticket${newIds.size > 1 ? 's' : ''} added from product discovery`)
@@ -149,12 +132,10 @@ export function useTickets({ activeProjectId }: UseTicketsOpts): UseTicketsResul
         if (!msg.ticket) break
         const ticket = msg.ticket
         setTickets((prev) => {
-          // Avoid dupes
           if (prev.some((t) => t.id === ticket.id)) return prev
           return [...prev, ticket]
         })
         knownIdsRef.current.add(ticket.id)
-        // Glow + toast
         setNewTicketIds((prev) => new Set([...prev, ticket.id]))
         toast.success(`New ticket: ${ticket.title}`)
         setTimeout(() => {
@@ -169,7 +150,6 @@ export function useTickets({ activeProjectId }: UseTicketsOpts): UseTicketsResul
 
       case 'ticket_updated': {
         if (!msg.ticket) break
-        // id: 0 is a full-refresh signal from the file watcher
         if (msg.ticket.id === 0) {
           refetch()
           break
@@ -230,5 +210,44 @@ export function useTickets({ activeProjectId }: UseTicketsOpts): UseTicketsResul
     [refetch]
   )
 
-  return { tickets, loading, error, newTicketIds, refetch, deleteTicket, updateTicketStatus, updateTicketPriority }
+  const createTicket = useCallback(
+    async (ticket: { title: string; description?: string; status?: LocalTicket['status']; priority?: LocalTicket['priority']; labels?: string[] }): Promise<boolean> => {
+      const res = await fetch(`${getApiBase()}/tickets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ticket),
+      })
+      if (res.ok) refetch()
+      return res.ok
+    },
+    [refetch]
+  )
+
+  const updateTicket = useCallback(
+    async (ticketId: number, fields: Partial<Pick<LocalTicket, 'title' | 'description' | 'status' | 'priority' | 'labels' | 'prerequisites'>>): Promise<boolean> => {
+      const res = await fetch(`${getApiBase()}/tickets/${ticketId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fields),
+      })
+      if (res.ok) refetch()
+      return res.ok
+    },
+    [refetch]
+  )
+
+  return {
+    tickets,
+    loading,
+    isLoading: loading,
+    error,
+    newTicketIds,
+    refetch,
+    refresh: refetch,
+    deleteTicket,
+    updateTicketStatus,
+    updateTicketPriority,
+    createTicket,
+    updateTicket,
+  }
 }

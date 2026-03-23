@@ -34,8 +34,13 @@ import { useHub } from '../hooks/useHub'
 import { ProjectHealthWidget } from '../components/ProjectHealthWidget'
 import { TemplateLibrary } from '../components/TemplateLibrary'
 import { ExportDropdown } from '../components/ExportDropdown'
+import { Plus } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { TicketsSection } from '../components/TicketsSection'
+import { TicketDetailModal } from '../components/TicketDetailModal'
+import { CreateTicketModal } from '../components/CreateTicketModal'
 import { useTickets } from '../hooks/useTickets'
+import type { LocalTicket } from '../types'
 
 
 const SECTION_TITLES: Record<SectionId, string> = {
@@ -49,8 +54,19 @@ const SECTION_TITLES: Record<SectionId, string> = {
 export default function DashboardPage() {
   const { activeProjectId } = useHub()
   const { recentJobs } = usePipeline(activeProjectId)
-  const { tickets, loading: isLoadingTickets } = useTickets({ activeProjectId })
+  const { tickets, isLoading: isLoadingTickets, deleteTicket, updateTicketStatus, updateTicketPriority, createTicket, updateTicket } = useTickets()
   const [wizardOpen, setWizardOpen] = useState<string | null>(null)
+  const [detailTicket, setDetailTicket] = useState<LocalTicket | null>(null)
+  const [createTicketOpen, setCreateTicketOpen] = useState(false)
+
+  // Collect all labels for autocomplete
+  const allTicketLabels = useMemo(() => {
+    const set = new Set<string>()
+    for (const t of tickets) {
+      for (const l of t.labels) set.add(l)
+    }
+    return Array.from(set).sort()
+  }, [tickets])
 
   // Section preferences (order, pin, expand state)
   const { order, reorder, togglePin, isPinned, toggleExpanded, isExpanded } = useSectionPreferences(activeProjectId ?? undefined)
@@ -210,7 +226,10 @@ export default function DashboardPage() {
           <TicketsSection
             tickets={tickets}
             isLoading={isLoadingTickets}
-            onTicketClick={() => {/* detail modal handled in Phase 3.3 */}}
+            onTicketClick={(ticket) => setDetailTicket(ticket)}
+            onDelete={deleteTicket}
+            onStatusChange={updateTicketStatus}
+            onPriorityChange={updateTicketPriority}
           />
         )
       case 'rails':
@@ -248,6 +267,22 @@ export default function DashboardPage() {
   }
 
   function getSectionTrailing(sectionId: SectionId) {
+    if (sectionId === 'tickets') {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => setCreateTicketOpen(true)}
+              className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Create ticket</TooltipContent>
+        </Tooltip>
+      )
+    }
     if (sectionId === 'jobs') {
       return (
         <ExportDropdown
@@ -293,6 +328,25 @@ export default function DashboardPage() {
         open={wizardOpen === 'batch-implement'}
         onClose={() => setWizardOpen(null)}
       />
+      {/* Ticket detail modal */}
+      {detailTicket && (
+        <TicketDetailModal
+          ticket={detailTicket}
+          allLabels={allTicketLabels}
+          onClose={() => setDetailTicket(null)}
+          onSave={updateTicket}
+          onDelete={(id) => { deleteTicket(id); setDetailTicket(null) }}
+        />
+      )}
+
+      {/* Create ticket modal */}
+      <CreateTicketModal
+        open={createTicketOpen}
+        allLabels={allTicketLabels}
+        onClose={() => setCreateTicketOpen(false)}
+        onCreate={createTicket}
+      />
+
       {/* Proposal detail dialog */}
       <Dialog open={detailProposal !== null} onOpenChange={(o) => !o && setDetailProposal(null)}>
         <DialogContent className="max-w-3xl glass-card">

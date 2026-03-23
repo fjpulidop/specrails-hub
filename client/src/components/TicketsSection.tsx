@@ -2,8 +2,9 @@ import { useState, useCallback } from 'react'
 import { List, LayoutGrid, StickyNote } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { TicketListView } from './TicketListView'
+import { TicketGridView } from './TicketGridView'
 import { TicketPostItView } from './TicketPostItView'
-import type { LocalTicket } from '../types'
+import type { LocalTicket, TicketStatus, TicketPriority } from '../types'
 
 export type TicketViewMode = 'list' | 'grid' | 'postit'
 
@@ -11,6 +12,9 @@ interface TicketsSectionProps {
   tickets: LocalTicket[]
   isLoading: boolean
   onTicketClick: (ticket: LocalTicket) => void
+  onDelete: (ticketId: number) => void
+  onStatusChange: (ticketId: number, status: TicketStatus) => void
+  onPriorityChange: (ticketId: number, priority: TicketPriority) => void
 }
 
 const VIEW_MODES: { mode: TicketViewMode; icon: typeof List; label: string }[] = [
@@ -19,7 +23,14 @@ const VIEW_MODES: { mode: TicketViewMode; icon: typeof List; label: string }[] =
   { mode: 'postit', icon: StickyNote, label: 'Post-it view' },
 ]
 
-export function TicketsSection({ tickets, isLoading, onTicketClick }: TicketsSectionProps) {
+export function TicketsSection({
+  tickets,
+  isLoading,
+  onTicketClick,
+  onDelete,
+  onStatusChange,
+  onPriorityChange,
+}: TicketsSectionProps) {
   const [viewMode, setViewMode] = useState<TicketViewMode>('list')
 
   const handleTicketClick = useCallback(
@@ -59,14 +70,21 @@ export function TicketsSection({ tickets, isLoading, onTicketClick }: TicketsSec
           tickets={tickets}
           isLoading={isLoading}
           onTicketClick={handleTicketClick}
+          onDelete={onDelete}
+          onStatusChange={onStatusChange}
+          onPriorityChange={onPriorityChange}
         />
       )}
 
       {viewMode === 'grid' && (
-        <div className="rounded-lg border border-dashed border-border/40 bg-card/50 p-6 text-center">
-          <LayoutGrid className="w-6 h-6 text-muted-foreground/30 mx-auto mb-2" />
-          <p className="text-xs text-muted-foreground">Kanban view coming soon</p>
-        </div>
+        <TicketGridView
+          tickets={tickets}
+          isLoading={isLoading}
+          onTicketClick={handleTicketClick}
+          onDelete={onDelete}
+          onStatusChange={onStatusChange}
+          onPriorityChange={onPriorityChange}
+        />
       )}
 
       {viewMode === 'postit' && (
@@ -74,6 +92,9 @@ export function TicketsSection({ tickets, isLoading, onTicketClick }: TicketsSec
           tickets={tickets}
           isLoading={isLoading}
           onTicketClick={handleTicketClick}
+          onDelete={onDelete}
+          onStatusChange={onStatusChange}
+          onPriorityChange={onPriorityChange}
         />
       )}
     </div>
