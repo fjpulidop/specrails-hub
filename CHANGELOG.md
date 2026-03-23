@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.21.0](https://github.com/fjpulidop/specrails-hub/compare/v1.20.2...v1.21.0) (2026-03-23)
+
+
+### Features
+
+* add welcome onboarding wizard with 5-step tour (SPEA-642) ([#137](https://github.com/fjpulidop/specrails-hub/issues/137)) ([701379d](https://github.com/fjpulidop/specrails-hub/commit/701379d982af9c7a38bfce31b700d13d0d021cb1))
+
+
+### Bug Fixes
+
+* remove orphaned Create Pipeline button (SPEA-633) ([#136](https://github.com/fjpulidop/specrails-hub/issues/136)) ([77449cd](https://github.com/fjpulidop/specrails-hub/commit/77449cd940046ff35a61d131d0fba8ff52162581))
+
 ## [1.20.2](https://github.com/fjpulidop/specrails-hub/compare/v1.20.1...v1.20.2) (2026-03-22)
 
 
