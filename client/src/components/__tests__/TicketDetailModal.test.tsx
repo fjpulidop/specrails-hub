@@ -1,0 +1,387 @@
+import React from 'react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '../../test-utils'
+import userEvent from '@testing-library/user-event'
+
+vi.mock('react-markdown', () => ({
+  default: ({ children }: { children: string }) => <span>{children}</span>,
+}))
+vi.mock('remark-gfm', () => ({ default: () => {} }))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+
+import { TicketDetailModal } from '../TicketDetailModal'
+import type { LocalTicket } from '../../types'
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function makeTicket(overrides: Partial<LocalTicket> = {}): LocalTicket {
+  return {
+    id: 1, title: 'Test ticket', description: 'A description', status: 'todo', priority: 'medium',
+    labels: ['bug'], assignee: null, prerequisites: [], metadata: {},
+    created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z',
+    created_by: 'user', source: 'manual',
+    ...overrides,
+  }
+}
+
+function makeDefaultProps(overrides: Partial<{
+  ticket: LocalTicket
+  allLabels: string[]
+  onClose: () => void
+  onSave: (id: number, fields: Partial<LocalTicket>) => Promise<boolean>
+  onDelete: (id: number) => void
+}> = {}) {
+  return {
+    ticket: makeTicket(),
+    allLabels: ['bug', 'area:frontend', 'area:backend'],
+    onClose: vi.fn(),
+    onSave: vi.fn(async () => true),
+    onDelete: vi.fn(),
+    ...overrides,
+  }
+}
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+describe('TicketDetailModal', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  describe('rendering', () => {
+    it('renders ticket title', () => {
+      render(<TicketDetailModal {...makeDefaultProps()} />)
+      expect(screen.getByText('Test ticket')).toBeDefined()
+    })
+
+    it('renders ticket description', () => {
+      render(<TicketDetailModal {...makeDefaultProps()} />)
+      expect(screen.getByText('A description')).toBeDefined()
+    })
+
+    it('renders ticket status badge', () => {
+      render(<TicketDetailModal {...makeDefaultProps()} />)
+      // TicketStatusBadge renders "Todo" for todo status
+      expect(screen.getAllByText('Todo').length).toBeGreaterThan(0)
+    })
+
+    it('renders ticket labels', () => {
+      render(<TicketDetailModal {...makeDefaultProps()} />)
+      expect(screen.getByText('bug')).toBeDefined()
+    })
+
+    it('renders ticket ID in header', () => {
+      render(<TicketDetailModal {...makeDefaultProps({ ticket: makeTicket({ id: 42 }) })} />)
+      expect(screen.getByText(/#42/)).toBeDefined()
+    })
+  })
+
+  describe('close behavior', () => {
+    it('calls onClose when the X button is clicked', () => {
+      const onClose = vi.fn()
+      const { container } = render(<TicketDetailModal {...makeDefaultProps({ onClose })} />)
+
+      // Close button has X icon (no aria-label), find via SVG class
+      const closeBtn = container.querySelector('.lucide-x')!.closest('button')!
+      fireEvent.click(closeBtn)
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it('calls onClose when backdrop is clicked', () => {
+      const onClose = vi.fn()
+      const { container } = render(<TicketDetailModal {...makeDefaultProps({ onClose })} />)
+
+      // The backdrop is the absolute inset-0 div behind the panel
+      const backdrop = container.querySelector('.absolute.inset-0')!
+      fireEvent.click(backdrop)
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('edit title', () => {
+    it('shows title input when the title heading is clicked', async () => {
+      render(<TicketDetailModal {...makeDefaultProps()} />)
+
+      // The title "Test ticket" is wrapped in a button — clicking it enables edit mode
+      const titleBtn = screen.getByText('Test ticket').closest('button')!
+      fireEvent.click(titleBtn)
+
+      await waitFor(() => {
+        const input = screen.getByDisplayValue('Test ticket')
+        expect(input.tagName).toBe('INPUT')
+      })
+    })
+  })
+
+  describe('delete behavior', () => {
+    it('shows delete confirmation dialog when Delete button is clicked', async () => {
+      render(<TicketDetailModal {...makeDefaultProps()} />)
+
+      // Footer has a "Delete" button
+      const deleteBtn = screen.getByRole('button', { name: /delete/i })
+      fireEvent.click(deleteBtn)
+
+      await waitFor(() => {
+        // Dialog title: "Delete ticket"
+        expect(screen.getByText('Delete ticket', { selector: '[data-slot="dialog-title"], h2, [role="heading"]' })).toBeDefined()
+      })
+    })
+
+    it('calls onDelete when delete is confirmed', async () => {
+      const onDelete = vi.fn()
+      render(<TicketDetailModal {...makeDefaultProps({ onDelete })} />)
+
+      // Open delete dialog
+      fireEvent.click(screen.getByRole('button', { name: /delete/i }))
+
+      await waitFor(() => {
+        // Two "Delete" buttons now: footer button + dialog confirm button
+        const deleteBtns = screen.getAllByRole('button', { name: /delete/i })
+        // The last one in the DOM is the confirmation button
+        fireEvent.click(deleteBtns[deleteBtns.length - 1])
+      })
+
+      await waitFor(() => {
+        expect(onDelete).toHaveBeenCalledWith(1)
+      })
+    })
+  })
+
+  describe('status select', () => {
+    it('renders a status select with current value', () => {
+      render(<TicketDetailModal {...makeDefaultProps()} />)
+      const select = screen.getByDisplayValue('Todo')
+      expect(select).toBeDefined()
+    })
+
+    it('shows Save button when status is changed', async () => {
+      render(<TicketDetailModal {...makeDefaultProps()} />)
+
+      const select = screen.getByDisplayValue('Todo') as HTMLSelectElement
+      fireEvent.change(select, { target: { value: 'done' } })
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /save/i })).toBeDefined()
+      })
+    })
+  })
+
+  describe('priority select', () => {
+    it('shows Save button when priority is changed', async () => {
+      render(<TicketDetailModal {...makeDefaultProps()} />)
+      const select = screen.getByDisplayValue('Medium') as HTMLSelectElement
+      fireEvent.change(select, { target: { value: 'high' } })
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /save/i })).toBeDefined()
+      })
+    })
+  })
+
+  describe('save flow', () => {
+    it('calls onSave with changed fields and closes on success', async () => {
+      const onSave = vi.fn(async () => true)
+      const onClose = vi.fn()
+      render(<TicketDetailModal {...makeDefaultProps({ onSave, onClose })} />)
+
+      // Change status to make isDirty=true
+      const select = screen.getByDisplayValue('Todo') as HTMLSelectElement
+      fireEvent.change(select, { target: { value: 'in_progress' } })
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /save/i })).toBeDefined()
+      })
+      fireEvent.click(screen.getByRole('button', { name: /save/i }))
+
+      await waitFor(() => {
+        expect(onSave).toHaveBeenCalledWith(1, expect.objectContaining({ status: 'in_progress' }))
+        expect(onClose).toHaveBeenCalled()
+      })
+    })
+
+    it('shows error toast when save fails', async () => {
+      const { toast } = await import('sonner')
+      const onSave = vi.fn(async () => false)
+      render(<TicketDetailModal {...makeDefaultProps({ onSave })} />)
+
+      fireEvent.change(screen.getByDisplayValue('Todo'), { target: { value: 'done' } })
+
+      await waitFor(() => screen.getByRole('button', { name: /save/i }))
+      fireEvent.click(screen.getByRole('button', { name: /save/i }))
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('title editing', () => {
+    it('updates title when typing in the title input', async () => {
+      render(<TicketDetailModal {...makeDefaultProps()} />)
+      const titleBtn = screen.getByText('Test ticket').closest('button')!
+      fireEvent.click(titleBtn)
+
+      await waitFor(() => {
+        const input = screen.getByDisplayValue('Test ticket') as HTMLInputElement
+        fireEvent.change(input, { target: { value: 'Updated title' } })
+        expect(input.value).toBe('Updated title')
+      })
+    })
+
+    it('exits edit mode on Enter key', async () => {
+      render(<TicketDetailModal {...makeDefaultProps()} />)
+      const titleBtn = screen.getByText('Test ticket').closest('button')!
+      fireEvent.click(titleBtn)
+
+      await waitFor(() => {
+        const input = screen.getByDisplayValue('Test ticket') as HTMLInputElement
+        fireEvent.keyDown(input, { key: 'Enter' })
+      })
+
+      await waitFor(() => {
+        expect(screen.queryByDisplayValue('Test ticket')).toBeNull()
+      })
+    })
+
+    it('restores original title on Escape key', async () => {
+      render(<TicketDetailModal {...makeDefaultProps()} />)
+      const titleBtn = screen.getByText('Test ticket').closest('button')!
+      fireEvent.click(titleBtn)
+
+      await waitFor(() => {
+        const input = screen.getByDisplayValue('Test ticket') as HTMLInputElement
+        fireEvent.change(input, { target: { value: 'Changed title' } })
+        fireEvent.keyDown(input, { key: 'Escape' })
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('Test ticket')).toBeDefined()
+      })
+    })
+
+    it('exits title edit on blur', async () => {
+      render(<TicketDetailModal {...makeDefaultProps()} />)
+      const titleBtn = screen.getByText('Test ticket').closest('button')!
+      fireEvent.click(titleBtn)
+
+      await waitFor(() => {
+        const input = screen.getByDisplayValue('Test ticket') as HTMLInputElement
+        fireEvent.blur(input)
+      })
+
+      await waitFor(() => {
+        expect(screen.queryByDisplayValue('Test ticket')).toBeNull()
+      })
+    })
+  })
+
+  describe('description editing', () => {
+    it('enters description edit mode when "Add a description..." is clicked', async () => {
+      render(<TicketDetailModal {...makeDefaultProps({ ticket: makeTicket({ description: '' }) })} />)
+
+      const addDescBtn = screen.getByText('Add a description...')
+      fireEvent.click(addDescBtn)
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Markdown description/i)).toBeDefined()
+      })
+    })
+
+    it('exits description editing when Done editing is clicked', async () => {
+      render(<TicketDetailModal {...makeDefaultProps({ ticket: makeTicket({ description: '' }) })} />)
+
+      fireEvent.click(screen.getByText('Add a description...'))
+      await waitFor(() => screen.getByPlaceholderText(/Markdown description/i))
+
+      const textarea = screen.getByPlaceholderText(/Markdown description/i)
+      fireEvent.change(textarea, { target: { value: 'My new description' } })
+      fireEvent.click(screen.getByText('Done editing'))
+
+      await waitFor(() => {
+        expect(screen.queryByPlaceholderText(/Markdown description/i)).toBeNull()
+      })
+    })
+  })
+
+  describe('label management', () => {
+    it('shows label input when "Add label" is clicked', async () => {
+      render(<TicketDetailModal {...makeDefaultProps({ ticket: makeTicket({ labels: [] }) })} />)
+
+      const addLabelBtn = screen.getByText('Add label')
+      fireEvent.click(addLabelBtn)
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/Add label/i)).toBeDefined()
+      })
+    })
+
+    it('adds label when Enter is pressed in label input', async () => {
+      render(<TicketDetailModal {...makeDefaultProps({ ticket: makeTicket({ labels: [] }) })} />)
+
+      fireEvent.click(screen.getByText('Add label'))
+      await waitFor(() => screen.getByPlaceholderText(/Add label/i))
+
+      const input = screen.getByPlaceholderText(/Add label/i)
+      fireEvent.change(input, { target: { value: 'new-label' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      await waitFor(() => {
+        expect(screen.getByText('new-label')).toBeDefined()
+      })
+    })
+
+    it('hides label input on Escape key', async () => {
+      render(<TicketDetailModal {...makeDefaultProps({ ticket: makeTicket({ labels: [] }) })} />)
+
+      fireEvent.click(screen.getByText('Add label'))
+      await waitFor(() => screen.getByPlaceholderText(/Add label/i))
+
+      const input = screen.getByPlaceholderText(/Add label/i)
+      fireEvent.keyDown(input, { key: 'Escape' })
+
+      await waitFor(() => {
+        expect(screen.queryByPlaceholderText(/Add label/i)).toBeNull()
+      })
+    })
+
+    it('adds label on blur when input has value', async () => {
+      render(<TicketDetailModal {...makeDefaultProps({ ticket: makeTicket({ labels: [] }) })} />)
+
+      fireEvent.click(screen.getByText('Add label'))
+      await waitFor(() => screen.getByPlaceholderText(/Add label/i))
+
+      const input = screen.getByPlaceholderText(/Add label/i)
+      fireEvent.change(input, { target: { value: 'blur-label' } })
+      fireEvent.blur(input)
+
+      await waitFor(() => {
+        expect(screen.getByText('blur-label')).toBeDefined()
+      })
+    })
+
+    it('removes a label when XCircle button is clicked', async () => {
+      render(<TicketDetailModal {...makeDefaultProps()} />)
+
+      // 'bug' label is shown — find the button that removes it (aria-label or by proximity)
+      // The remove button is inside the label span, after the label text
+      const bugLabel = screen.getByText('bug')
+      const labelSpan = bugLabel.closest('span')!
+      const removeBtn = labelSpan.querySelector('button')!
+      fireEvent.click(removeBtn)
+
+      await waitFor(() => {
+        // After removal, the label 'bug' should not appear inside a label chip
+        // (It might appear as a suggestion, but the label chip is gone)
+        const chips = document.querySelectorAll('.bg-accent\\/60')
+        const chipTexts = Array.from(chips).map((c) => c.textContent)
+        expect(chipTexts.some((t) => t?.includes('bug'))).toBe(false)
+      })
+    })
+  })
+
+  describe('ticket with assignee', () => {
+    it('renders assignee field when ticket has assignee', () => {
+      render(<TicketDetailModal {...makeDefaultProps({ ticket: makeTicket({ assignee: 'alice' }) })} />)
+      expect(screen.getByText('alice')).toBeDefined()
+    })
+  })
+})
