@@ -154,7 +154,8 @@ export function CommandPalette({ onOpenSettings, onOpenOverview, onOpenAnalytics
             {projects.map((project) => (
               <Command.Item
                 key={project.id}
-                value={`project ${project.name} ${project.slug}`}
+                value={project.name}
+                keywords={[project.slug]}
                 onSelect={() => handleSelectProject(project.id)}
                 className={cn(navItemClass, project.id === activeProjectId && 'text-dracula-purple')}
               >
@@ -174,7 +175,8 @@ export function CommandPalette({ onOpenSettings, onOpenOverview, onOpenAnalytics
             {commands.map((cmd) => (
               <Command.Item
                 key={cmd.id}
-                value={`command ${cmd.name} ${cmd.slug} ${cmd.description}`}
+                value={cmd.name}
+                keywords={[cmd.slug, cmd.description ?? '']}
                 onSelect={() => handleSelectCommand(cmd.slug)}
                 className={navItemClass}
               >
@@ -196,7 +198,8 @@ export function CommandPalette({ onOpenSettings, onOpenOverview, onOpenAnalytics
             {recentJobs.map((job) => (
               <Command.Item
                 key={job.id}
-                value={`job ${job.command} ${job.status} ${job.id}`}
+                value={`${job.command} ${job.id}`}
+                keywords={[job.status]}
                 onSelect={() => handleSelectJob(job.id)}
                 className={navItemClass}
               >
@@ -218,35 +221,35 @@ export function CommandPalette({ onOpenSettings, onOpenOverview, onOpenAnalytics
 
         {/* Navigation */}
         <Command.Group heading="Navigation">
-          <Command.Item value="navigate dashboard home" onSelect={() => handleNavigate('/')} className={navItemClass}>
+          <Command.Item value="Dashboard" keywords={['home']} onSelect={() => handleNavigate('/')} className={navItemClass}>
             <LayoutDashboard className="w-4 h-4 text-muted-foreground shrink-0" />
             <span>Dashboard</span>
           </Command.Item>
           {onOpenOverview && (
-            <Command.Item value="navigate hub overview projects" onSelect={() => handleHubAction(onOpenOverview)} className={navItemClass}>
+            <Command.Item value="Hub Overview" keywords={['projects']} onSelect={() => handleHubAction(onOpenOverview)} className={navItemClass}>
               <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
               <span>Hub Overview</span>
             </Command.Item>
           )}
           {onOpenAnalytics && (
-            <Command.Item value="navigate hub analytics cross-project" onSelect={() => handleHubAction(onOpenAnalytics)} className={navItemClass}>
+            <Command.Item value="Hub Analytics" keywords={['cross-project']} onSelect={() => handleHubAction(onOpenAnalytics)} className={navItemClass}>
               <PieChart className="w-4 h-4 text-muted-foreground shrink-0" />
               <span>Hub Analytics</span>
             </Command.Item>
           )}
-          <Command.Item value="navigate analytics metrics" onSelect={() => handleNavigate('/analytics')} className={navItemClass}>
+          <Command.Item value="Analytics" keywords={['metrics']} onSelect={() => handleNavigate('/analytics')} className={navItemClass}>
             <BarChart3 className="w-4 h-4 text-muted-foreground shrink-0" />
             <span>Analytics</span>
           </Command.Item>
-          <Command.Item value="navigate activity feed log" onSelect={() => handleNavigate('/activity')} className={navItemClass}>
+          <Command.Item value="Activity Feed" keywords={['log']} onSelect={() => handleNavigate('/activity')} className={navItemClass}>
             <Activity className="w-4 h-4 text-muted-foreground shrink-0" />
             <span>Activity Feed</span>
           </Command.Item>
-          <Command.Item value="navigate settings configuration" onSelect={() => onOpenSettings ? handleHubAction(onOpenSettings) : handleNavigate('/settings')} className={navItemClass}>
+          <Command.Item value="Settings" keywords={['configuration']} onSelect={() => onOpenSettings ? handleHubAction(onOpenSettings) : handleNavigate('/settings')} className={navItemClass}>
             <Settings className="w-4 h-4 text-muted-foreground shrink-0" />
             <span>Settings</span>
           </Command.Item>
-          <Command.Item value="navigate docs documentation" onSelect={() => onOpenDocs ? handleHubAction(onOpenDocs) : handleNavigate('/docs')} className={navItemClass}>
+          <Command.Item value="Docs" keywords={['documentation']} onSelect={() => onOpenDocs ? handleHubAction(onOpenDocs) : handleNavigate('/docs')} className={navItemClass}>
             <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
             <span>Docs</span>
           </Command.Item>
