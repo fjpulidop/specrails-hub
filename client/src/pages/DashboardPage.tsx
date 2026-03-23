@@ -49,7 +49,7 @@ const SECTION_TITLES: Record<SectionId, string> = {
 export default function DashboardPage() {
   const { activeProjectId } = useHub()
   const { recentJobs } = usePipeline(activeProjectId)
-  const { tickets, isLoading: isLoadingTickets } = useTickets()
+  const { tickets, isLoading: isLoadingTickets, deleteTicket, updateTicketStatus, updateTicketPriority } = useTickets()
   const [wizardOpen, setWizardOpen] = useState<string | null>(null)
 
   // Section preferences (order, pin, expand state)
@@ -211,6 +211,9 @@ export default function DashboardPage() {
             tickets={tickets}
             isLoading={isLoadingTickets}
             onTicketClick={() => {/* detail modal handled in Phase 3.3 */}}
+            onDelete={deleteTicket}
+            onStatusChange={updateTicketStatus}
+            onPriorityChange={updateTicketPriority}
           />
         )
       case 'rails':

@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import { Ticket, AlertTriangle, ArrowUp, ChevronUp } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { TicketContextMenu } from './TicketContextMenu'
+import { TicketStatusDot } from './TicketStatusIndicator'
 import type { LocalTicket, TicketStatus, TicketPriority } from '../types'
 
 // ─── Post-it color palettes per status ──────────────────────────────────────
@@ -67,7 +69,6 @@ const PRIORITY_INDICATOR: Record<TicketPriority, { icon: typeof AlertTriangle | 
 // ─── Slight random rotations for paper feel ─────────────────────────────────
 
 function getRotation(id: number): string {
-  // Deterministic subtle rotation based on ticket ID
   const rotations = ['-1.2deg', '0.8deg', '-0.5deg', '1.1deg', '-0.9deg', '0.3deg', '1.5deg', '-0.7deg']
   return rotations[id % rotations.length]
 }
@@ -78,10 +79,19 @@ interface TicketPostItViewProps {
   tickets: LocalTicket[]
   isLoading: boolean
   onTicketClick: (ticket: LocalTicket) => void
+  onDelete: (ticketId: number) => void
+  onStatusChange: (ticketId: number, status: TicketStatus) => void
+  onPriorityChange: (ticketId: number, priority: TicketPriority) => void
 }
 
-export function TicketPostItView({ tickets, isLoading, onTicketClick }: TicketPostItViewProps) {
-  // Sort: in_progress first, then todo, done, cancelled
+export function TicketPostItView({
+  tickets,
+  isLoading,
+  onTicketClick,
+  onDelete,
+  onStatusChange,
+  onPriorityChange,
+}: TicketPostItViewProps) {
   const sorted = useMemo(() => {
     const order: Record<TicketStatus, number> = { in_progress: 0, todo: 1, done: 2, cancelled: 3 }
     return [...tickets].sort((a, b) => order[a.status] - order[b.status])
@@ -115,11 +125,18 @@ export function TicketPostItView({ tickets, isLoading, onTicketClick }: TicketPo
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
       {sorted.map((ticket) => (
-        <PostItCard
+        <TicketContextMenu
           key={ticket.id}
           ticket={ticket}
-          onClick={() => onTicketClick(ticket)}
-        />
+          onDelete={onDelete}
+          onStatusChange={onStatusChange}
+          onPriorityChange={onPriorityChange}
+        >
+          <PostItCard
+            ticket={ticket}
+            onClick={() => onTicketClick(ticket)}
+          />
+        </TicketContextMenu>
       ))}
     </div>
   )
@@ -142,21 +159,16 @@ function PostItCard({ ticket, onClick }: PostItCardProps) {
       type="button"
       onClick={onClick}
       className={cn(
-        // Layout
         'relative w-full text-left rounded-lg p-3 min-h-[100px]',
-        // Paper feel
         'border backdrop-blur-sm',
         palette.bg,
         palette.border,
         palette.shadow,
         palette.hoverShadow,
-        // Transitions
         'transition-all duration-200 ease-out',
         'hover:scale-[1.03] hover:-translate-y-0.5',
         'active:scale-[0.98]',
-        // Focus
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-dracula-purple/50',
-        // Cancelled: dim
         ticket.status === 'cancelled' && 'opacity-60',
       )}
       style={{ transform: `rotate(${rotation})` }}
@@ -169,10 +181,7 @@ function PostItCard({ ticket, onClick }: PostItCardProps) {
     >
       {/* Corner fold effect */}
       <div
-        className={cn(
-          'absolute top-0 right-0 w-5 h-5 rounded-bl-lg',
-          palette.cornerBg,
-        )}
+        className={cn('absolute top-0 right-0 w-5 h-5 rounded-bl-lg', palette.cornerBg)}
         aria-hidden
       />
 
@@ -199,20 +208,7 @@ function PostItCard({ ticket, onClick }: PostItCardProps) {
         <span className={cn('text-[9px] font-mono', palette.metaText)}>
           #{ticket.id}
         </span>
-
-        {/* Status dot */}
-        {ticket.status === 'in_progress' && (
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-60" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-400" />
-          </span>
-        )}
-        {ticket.status === 'done' && (
-          <span className="inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-        )}
-        {ticket.status === 'todo' && (
-          <span className="inline-flex rounded-full h-2 w-2 bg-slate-500/70" />
-        )}
+        <TicketStatusDot status={ticket.status} />
       </div>
     </button>
   )

@@ -1,17 +1,9 @@
 import { useState, useMemo } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { Ticket, Search } from 'lucide-react'
-import { Badge } from './ui/badge'
+import { TicketContextMenu } from './TicketContextMenu'
+import { TicketStatusDot, TicketStatusRow } from './TicketStatusIndicator'
 import type { LocalTicket, TicketStatus, TicketPriority } from '../types'
-
-type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'running' | 'queued' | 'failed' | 'canceled'
-
-const STATUS_CONFIG: Record<TicketStatus, { variant: BadgeVariant; label: string; icon: string }> = {
-  todo: { variant: 'queued', label: 'todo', icon: '○' },
-  in_progress: { variant: 'running', label: 'in progress', icon: '◉' },
-  done: { variant: 'success', label: 'done', icon: '✓' },
-  cancelled: { variant: 'canceled', label: 'cancelled', icon: '✕' },
-}
 
 const PRIORITY_STYLES: Record<TicketPriority, { className: string; label: string }> = {
   critical: { className: 'bg-red-500/15 text-red-400 border-red-500/30', label: 'critical' },
@@ -21,6 +13,13 @@ const PRIORITY_STYLES: Record<TicketPriority, { className: string; label: string
 }
 
 const ALL_STATUSES: TicketStatus[] = ['todo', 'in_progress', 'done', 'cancelled']
+
+const STATUS_LABEL: Record<TicketStatus, string> = {
+  todo: 'todo',
+  in_progress: 'in progress',
+  done: 'done',
+  cancelled: 'cancelled',
+}
 
 type SortField = 'status' | 'priority' | 'updated_at'
 type SortDir = 'asc' | 'desc'
@@ -42,9 +41,19 @@ interface TicketListViewProps {
   tickets: LocalTicket[]
   isLoading: boolean
   onTicketClick: (ticket: LocalTicket) => void
+  onDelete: (ticketId: number) => void
+  onStatusChange: (ticketId: number, status: TicketStatus) => void
+  onPriorityChange: (ticketId: number, priority: TicketPriority) => void
 }
 
-export function TicketListView({ tickets, isLoading, onTicketClick }: TicketListViewProps) {
+export function TicketListView({
+  tickets,
+  isLoading,
+  onTicketClick,
+  onDelete,
+  onStatusChange,
+  onPriorityChange,
+}: TicketListViewProps) {
   const [statusFilter, setStatusFilter] = useState<TicketStatus | null>(null)
   const [labelFilter, setLabelFilter] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -162,7 +171,7 @@ export function TicketListView({ tickets, isLoading, onTicketClick }: TicketList
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                 }`}
               >
-                {STATUS_CONFIG[s].label} ({count})
+                {STATUS_LABEL[s]} ({count})
               </button>
             )
           })}
@@ -196,7 +205,7 @@ export function TicketListView({ tickets, isLoading, onTicketClick }: TicketList
 
       {/* Column headers */}
       <div className="flex items-center gap-3 px-3 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-        <button type="button" onClick={() => toggleSort('status')} className="w-16 text-left hover:text-foreground transition-colors">
+        <button type="button" onClick={() => toggleSort('status')} className="w-20 text-left hover:text-foreground transition-colors">
           Status{sortIndicator('status')}
         </button>
         <span className="flex-1 min-w-0">Title</span>
@@ -212,61 +221,77 @@ export function TicketListView({ tickets, isLoading, onTicketClick }: TicketList
       {/* Ticket rows */}
       <div className="space-y-0.5">
         {filteredAndSorted.slice(0, displayLimit).map((ticket) => {
-          const statusInfo = STATUS_CONFIG[ticket.status]
           const priorityInfo = PRIORITY_STYLES[ticket.priority]
+          const isDone = ticket.status === 'done'
+          const isCancelled = ticket.status === 'cancelled'
 
           return (
-            <div
+            <TicketContextMenu
               key={ticket.id}
-              role="button"
-              tabIndex={0}
-              className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors cursor-pointer hover:bg-accent/50"
-              onClick={() => onTicketClick(ticket)}
-              onKeyDown={(e) => { if (e.key === 'Enter') onTicketClick(ticket) }}
+              ticket={ticket}
+              onDelete={onDelete}
+              onStatusChange={onStatusChange}
+              onPriorityChange={onPriorityChange}
             >
-              {/* Status */}
-              <div className="w-16">
-                <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
-              </div>
+              <TicketStatusRow
+                status={ticket.status}
+                role="button"
+                tabIndex={0}
+                className="flex items-center gap-3 pr-3 py-2 rounded-md transition-colors cursor-pointer hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                onClick={() => onTicketClick(ticket)}
+                onKeyDown={(e) => { if (e.key === 'Enter') onTicketClick(ticket) }}
+              >
+                {/* Status indicator */}
+                <div className="w-20 flex items-center gap-1.5 shrink-0">
+                  <TicketStatusDot status={ticket.status} />
+                  <span className={`text-[10px] ${isCancelled ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
+                    {STATUS_LABEL[ticket.status]}
+                  </span>
+                </div>
 
-              {/* Title */}
-              <div className="flex-1 min-w-0">
-                <span className={`text-xs truncate block ${
-                  ticket.status === 'done' ? 'text-foreground/50' : 'text-foreground/80'
-                }`}>
-                  {ticket.title}
+                {/* Title */}
+                <div className="flex-1 min-w-0">
+                  <span className={`text-xs truncate block ${
+                    isCancelled
+                      ? 'text-foreground/40 line-through decoration-muted-foreground/40'
+                      : isDone
+                        ? 'text-foreground/50'
+                        : 'text-foreground/80'
+                  }`}>
+                    {ticket.title}
+                  </span>
+                </div>
+
+                {/* Priority */}
+                <div className="w-14 text-right shrink-0">
+                  {ticket.priority !== 'medium' && priorityInfo.label && (
+                    <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border ${priorityInfo.className}`}>
+                      {priorityInfo.label}
+                    </span>
+                  )}
+                </div>
+
+                {/* Labels */}
+                <div className="w-24 text-right hidden sm:flex justify-end gap-0.5 overflow-hidden shrink-0">
+                  {ticket.labels.slice(0, 2).map((label) => (
+                    <span
+                      key={label}
+                      className="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium bg-accent/60 text-foreground/70 truncate max-w-[80px]"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                  {ticket.labels.length > 2 && (
+                    <span className="text-[9px] text-muted-foreground">+{ticket.labels.length - 2}</span>
+                  )}
+                </div>
+
+                {/* Updated */}
+                <span className="w-20 text-right text-[10px] text-muted-foreground shrink-0">
+                  {formatRelTime(ticket.updated_at)}
                 </span>
-              </div>
-
-              {/* Priority */}
-              <div className="w-14 text-right">
-                {ticket.priority !== 'medium' && priorityInfo.label && (
-                  <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border ${priorityInfo.className}`}>
-                    {priorityInfo.label}
-                  </span>
-                )}
-              </div>
-
-              {/* Labels */}
-              <div className="w-24 text-right hidden sm:flex justify-end gap-0.5 overflow-hidden">
-                {ticket.labels.slice(0, 2).map((label) => (
-                  <span
-                    key={label}
-                    className="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium bg-accent/60 text-foreground/70 truncate max-w-[80px]"
-                  >
-                    {label}
-                  </span>
-                ))}
-                {ticket.labels.length > 2 && (
-                  <span className="text-[9px] text-muted-foreground">+{ticket.labels.length - 2}</span>
-                )}
-              </div>
-
-              {/* Updated */}
-              <span className="w-20 text-right text-[10px] text-muted-foreground">
-                {formatRelTime(ticket.updated_at)}
-              </span>
-            </div>
+              </TicketStatusRow>
+            </TicketContextMenu>
           )
         })}
       </div>
