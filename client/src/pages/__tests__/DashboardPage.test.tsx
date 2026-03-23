@@ -69,11 +69,6 @@ vi.mock('../../components/BatchImplementWizard', () => ({
     open ? <div data-testid="batch-wizard">BatchImplementWizard</div> : null,
 }))
 
-vi.mock('../../components/PipelineBuilder', () => ({
-  PipelineBuilder: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="pipeline-builder">PipelineBuilder</div> : null,
-}))
-
 
 describe('DashboardPage', () => {
   beforeEach(() => {
@@ -188,8 +183,4 @@ describe('DashboardPage', () => {
     expect(screen.queryByTestId('batch-wizard')).not.toBeInTheDocument()
   })
 
-  it('PipelineBuilder is not shown by default', () => {
-    render(<DashboardPage />)
-    expect(screen.queryByTestId('pipeline-builder')).not.toBeInTheDocument()
-  })
 })

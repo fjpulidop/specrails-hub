@@ -60,11 +60,6 @@ vi.mock('../../components/ProjectHealthWidget', () => ({
   ProjectHealthWidget: () => null,
 }))
 
-vi.mock('../../components/PipelineBuilder', () => ({
-  PipelineBuilder: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="pipeline-builder">PipelineBuilder</div> : null,
-}))
-
 // useProjectCache with proposal returning result_markdown and issue_url
 const mockRefreshJobs = vi.fn()
 

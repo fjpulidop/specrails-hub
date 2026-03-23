@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
-import { GitBranch } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -200,17 +199,6 @@ export default function DashboardPage() {
                 onOpenWizard={(slug) => setWizardOpen(slug)}
               />
             )}
-            <div className="flex justify-end mt-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setWizardOpen('pipeline')}
-                className="text-xs"
-              >
-                <GitBranch className="w-3.5 h-3.5 mr-1.5" />
-                Create Pipeline
-              </Button>
-            </div>
           </>
         )
       case 'rails':

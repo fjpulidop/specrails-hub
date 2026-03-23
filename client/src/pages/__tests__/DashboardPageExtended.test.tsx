@@ -82,11 +82,6 @@ vi.mock('../../components/ProjectHealthWidget', () => ({
   ProjectHealthWidget: () => null,
 }))
 
-vi.mock('../../components/PipelineBuilder', () => ({
-  PipelineBuilder: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="pipeline-builder">PipelineBuilder</div> : null,
-}))
-
 /** Helper: expand a collapsed section by clicking its toggle */
 function expandSection(sectionId: string) {
   fireEvent.click(screen.getByTestId(`toggle-${sectionId}`))
