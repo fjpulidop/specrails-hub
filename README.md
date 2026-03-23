@@ -7,6 +7,7 @@ A local dashboard and CLI for managing all your [specrails-core](https://github.
 - **Multi-project hub** — register multiple specrails projects and switch between them with browser-style tabs
 - **Live pipeline visualization** — see Architect, Developer, Reviewer, and Ship phases update in real-time
 - **Streaming logs** — all `claude` CLI output streamed via WebSocket to the browser
+- **Ticket panel** — visual interface for local tickets with List, Kanban, and Post-it views; real-time sync with CLI agents
 - **Command launcher** — organized into Discovery (propose-spec, auto-propose specs, auto-select specs) and Delivery (implement, batch-implement) sections; other commands available in a collapsible group
 - **Analytics** — cost, duration, token usage, and throughput metrics per project
 - **Conversations** — full-page chat interface with Claude, scoped per project
@@ -85,7 +86,8 @@ A single Express process (port 4200) manages all projects. Each project gets its
 ```
 
 - **Tabs** — one per project, green dot when a job is active
-- **Home** — command grid (Discovery and Delivery sections), recent jobs, pipeline phase indicators
+- **Home** — command grid (Discovery and Delivery sections), ticket panel, recent jobs, pipeline phase indicators
+- **Tickets** — List, Kanban, and Post-it views of local tickets; real-time sync with CLI agents
 - **Analytics** — cost and token metrics
 - **Conversations** — Claude chat sessions scoped to the project
 - **Settings** (gear icon) — global hub configuration, registered projects
@@ -160,6 +162,12 @@ All under `/api/projects/:projectId/`:
 | POST | `/chat/conversations` | Create chat conversation |
 | GET | `/chat/conversations` | List conversations |
 | POST | `/hooks/events` | Pipeline phase notifications |
+| GET | `/tickets` | List tickets (`?status=`, `?label=`, `?q=` filters supported) |
+| GET | `/tickets/:id` | Get ticket by ID |
+| POST | `/tickets` | Create ticket |
+| PATCH | `/tickets/:id` | Update ticket fields |
+| DELETE | `/tickets/:id` | Delete ticket |
+| GET | `/integration-contract` | Read project integration-contract.json |
 
 ## Development
 
@@ -191,14 +199,16 @@ specrails-hub/
 │   ├── hub-db.ts             # hub SQLite (project registry)
 │   ├── project-registry.ts   # per-project context manager
 │   ├── hub-router.ts         # /api/hub/* routes
-│   ├── project-router.ts     # /api/projects/:id/* routes
+│   ├── project-router.ts     # /api/projects/:id/* routes (includes ticket endpoints)
+│   ├── ticket-store.ts       # local-tickets.json read/write with file locking
+│   ├── ticket-watcher.ts     # chokidar watcher → WebSocket broadcast
 │   ├── db.ts                 # per-project SQLite (jobs, events, chat)
 │   ├── queue-manager.ts      # job queue per project
 │   ├── chat-manager.ts       # Claude chat per project
 │   ├── config.ts             # command discovery
 │   ├── hooks.ts              # pipeline event handler
 │   ├── analytics.ts          # metrics aggregation
-│   └── types.ts              # shared TypeScript types
+│   └── types.ts              # shared TypeScript types (includes ticket WS messages)
 ├── client/
 │   └── src/
 │       ├── App.tsx
@@ -209,9 +219,18 @@ specrails-hub/
 │       │   ├── ProjectLayout.tsx    # per-project wrapper
 │       │   ├── ProjectNavbar.tsx    # Home/Analytics/Conversations nav
 │       │   ├── CommandGrid.tsx      # command launcher
+│       │   ├── TicketsSection.tsx   # ticket panel container (view mode toggle)
+│       │   ├── TicketListView.tsx   # sortable table view
+│       │   ├── TicketGridView.tsx   # kanban drag-and-drop view
+│       │   ├── TicketPostItView.tsx # sticky-note grid view
+│       │   ├── TicketDetailModal.tsx # ticket editor modal
+│       │   ├── CreateTicketModal.tsx # new ticket form
+│       │   ├── TicketStatusIndicator.tsx # status dot, badge, border
+│       │   ├── TicketContextMenu.tsx # right-click menu
 │       │   └── ...
 │       ├── hooks/
 │       │   ├── useHub.tsx           # hub state context
+│       │   ├── useTickets.ts        # ticket CRUD + WS subscription + toast/glow
 │       │   ├── useChat.ts          # chat operations
 │       │   ├── usePipeline.ts      # pipeline phases
 │       │   └── useSharedWebSocket.tsx
@@ -240,6 +259,9 @@ The server broadcasts events over a single WebSocket connection. All project-sco
 | `log` | project | Streaming log line |
 | `phase` | project | Pipeline phase transition |
 | `queue_update` | project | Queue state change |
+| `ticket_created` | project | New ticket created (via API or CLI) |
+| `ticket_updated` | project | Ticket updated; if `ticket.id === 0`, signals a full external file change |
+| `ticket_deleted` | project | Ticket deleted |
 | `hub.project_added` | hub | New project registered |
 | `hub.project_removed` | hub | Project unregistered |
 
