@@ -23,6 +23,12 @@ import { getAnalytics, getTrends } from './analytics'
 import type { ChatConversationRow, TrendsPeriod, JobTemplate, JobRow } from './types'
 import { readChanges } from './changes-reader'
 import { getProjectMetrics } from './metrics'
+import {
+  resolveTicketStoragePath, readStore, mutateStore, filterTickets,
+  isValidStatus, isValidPriority,
+  type Ticket,
+} from './ticket-store'
+import type { TicketCreatedMessage, TicketUpdatedMessage, TicketDeletedMessage, LocalTicket } from './types'
 
 // Extend Express Request to carry resolved ProjectContext
 declare module 'express-serve-static-core' {
@@ -911,6 +917,175 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       res.status(500).json({ error: 'Internal server error' }); return
     }
     res.status(202).json({ ok: true, jobIds, templateId: row.id, templateName: row.name })
+  })
+
+  // ─── Tickets ──────────────────────────────────────────────────────────────────
+
+  /** Resolve the ticket storage file path for a project */
+  function ticketPath(req: Request): string {
+    return resolveTicketStoragePath(ctx(req).project.path)
+  }
+
+  // GET /:projectId/tickets — List all tickets with optional filters
+  router.get('/:projectId/tickets', (req: Request, res: Response) => {
+    try {
+      const filePath = ticketPath(req)
+      const store = readStore(filePath)
+      const allTickets = Object.values(store.tickets)
+      const filtered = filterTickets(allTickets, {
+        status: req.query.status as string | undefined,
+        label: req.query.label as string | undefined,
+        q: req.query.q as string | undefined,
+      })
+      // Sort by updated_at descending
+      filtered.sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
+      res.json({ tickets: filtered, revision: store.revision, total: allTickets.length })
+    } catch (err) {
+      console.error('[project-router] ticket list error:', err)
+      res.status(500).json({ error: 'Failed to read tickets' })
+    }
+  })
+
+  // GET /:projectId/tickets/:id — Get single ticket
+  router.get('/:projectId/tickets/:id', (req: Request, res: Response) => {
+    const ticketId = req.params.id as string
+    if (!/^\d+$/.test(ticketId)) {
+      res.status(400).json({ error: 'Invalid ticket ID' }); return
+    }
+    try {
+      const store = readStore(ticketPath(req))
+      const ticket = store.tickets[ticketId]
+      if (!ticket) {
+        res.status(404).json({ error: 'Ticket not found' }); return
+      }
+      res.json({ ticket, revision: store.revision })
+    } catch (err) {
+      console.error('[project-router] ticket get error:', err)
+      res.status(500).json({ error: 'Failed to read ticket' })
+    }
+  })
+
+  // POST /:projectId/tickets — Create new ticket
+  router.post('/:projectId/tickets', (req: Request, res: Response) => {
+    const { title, description, status, priority, labels, assignee, prerequisites, metadata, source } = req.body ?? {}
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      res.status(400).json({ error: 'title is required' }); return
+    }
+    if (status !== undefined && !isValidStatus(status)) {
+      res.status(400).json({ error: 'status must be one of: todo, in_progress, done, cancelled' }); return
+    }
+    if (priority !== undefined && !isValidPriority(priority)) {
+      res.status(400).json({ error: 'priority must be one of: critical, high, medium, low' }); return
+    }
+    try {
+      const filePath = ticketPath(req)
+      const now = new Date().toISOString()
+      let created: Ticket | undefined
+      const store = mutateStore(filePath, (s) => {
+        const id = s.next_id++
+        const ticket: Ticket = {
+          id,
+          title: title.trim(),
+          description: typeof description === 'string' ? description : '',
+          status: status ?? 'todo',
+          priority: priority ?? 'medium',
+          labels: Array.isArray(labels) ? labels.filter((l: unknown) => typeof l === 'string') : [],
+          assignee: typeof assignee === 'string' ? assignee : null,
+          prerequisites: Array.isArray(prerequisites) ? prerequisites.filter((p: unknown) => typeof p === 'number') : [],
+          metadata: typeof metadata === 'object' && metadata !== null ? metadata : {},
+          comments: [],
+          created_at: now,
+          updated_at: now,
+          created_by: 'hub',
+          source: source === 'product-backlog' || source === 'propose-spec' || source === 'manual' ? source : 'hub',
+        }
+        s.tickets[String(id)] = ticket
+        created = ticket
+      })
+      const { broadcast } = ctx(req)
+      const msg: TicketCreatedMessage = { type: 'ticket_created', ticket: created! as unknown as LocalTicket, projectId: ctx(req).project.id, timestamp: new Date().toISOString() }
+      broadcast(msg)
+      res.status(201).json({ ticket: created!, revision: store.revision })
+    } catch (err) {
+      console.error('[project-router] ticket create error:', err)
+      res.status(500).json({ error: 'Failed to create ticket' })
+    }
+  })
+
+  // PATCH /:projectId/tickets/:id — Update ticket fields
+  router.patch('/:projectId/tickets/:id', (req: Request, res: Response) => {
+    const ticketId = req.params.id as string
+    if (!/^\d+$/.test(ticketId)) {
+      res.status(400).json({ error: 'Invalid ticket ID' }); return
+    }
+    const { title, description, status, priority, labels, assignee, prerequisites, metadata } = req.body ?? {}
+    if (status !== undefined && !isValidStatus(status)) {
+      res.status(400).json({ error: 'status must be one of: todo, in_progress, done, cancelled' }); return
+    }
+    if (priority !== undefined && !isValidPriority(priority)) {
+      res.status(400).json({ error: 'priority must be one of: critical, high, medium, low' }); return
+    }
+    if (title !== undefined && (typeof title !== 'string' || !title.trim())) {
+      res.status(400).json({ error: 'title cannot be empty' }); return
+    }
+    try {
+      const filePath = ticketPath(req)
+      let updated: Ticket | undefined
+      const store = mutateStore(filePath, (s) => {
+        const ticket = s.tickets[ticketId]
+        if (!ticket) return
+        if (title !== undefined) ticket.title = title.trim()
+        if (description !== undefined) ticket.description = description
+        if (status !== undefined) ticket.status = status
+        if (priority !== undefined) ticket.priority = priority
+        if (labels !== undefined && Array.isArray(labels)) ticket.labels = labels.filter((l: unknown) => typeof l === 'string')
+        if (assignee !== undefined) ticket.assignee = typeof assignee === 'string' ? assignee : null
+        if (prerequisites !== undefined && Array.isArray(prerequisites)) ticket.prerequisites = prerequisites.filter((p: unknown) => typeof p === 'number')
+        if (metadata !== undefined && typeof metadata === 'object' && metadata !== null) {
+          ticket.metadata = { ...ticket.metadata, ...metadata }
+        }
+        ticket.updated_at = new Date().toISOString()
+        updated = ticket
+      })
+      if (!updated) {
+        res.status(404).json({ error: 'Ticket not found' }); return
+      }
+      const { broadcast } = ctx(req)
+      const msg: TicketUpdatedMessage = { type: 'ticket_updated', ticket: updated as unknown as LocalTicket, projectId: ctx(req).project.id, timestamp: new Date().toISOString() }
+      broadcast(msg)
+      res.json({ ticket: updated, revision: store.revision })
+    } catch (err) {
+      console.error('[project-router] ticket update error:', err)
+      res.status(500).json({ error: 'Failed to update ticket' })
+    }
+  })
+
+  // DELETE /:projectId/tickets/:id — Delete ticket
+  router.delete('/:projectId/tickets/:id', (req: Request, res: Response) => {
+    const ticketId = req.params.id as string
+    if (!/^\d+$/.test(ticketId)) {
+      res.status(400).json({ error: 'Invalid ticket ID' }); return
+    }
+    try {
+      const filePath = ticketPath(req)
+      let found = false
+      const store = mutateStore(filePath, (s) => {
+        if (s.tickets[ticketId]) {
+          delete s.tickets[ticketId]
+          found = true
+        }
+      })
+      if (!found) {
+        res.status(404).json({ error: 'Ticket not found' }); return
+      }
+      const { broadcast } = ctx(req)
+      const msg: TicketDeletedMessage = { type: 'ticket_deleted', ticketId: Number(ticketId), projectId: ctx(req).project.id, timestamp: new Date().toISOString() }
+      broadcast(msg)
+      res.json({ ok: true, revision: store.revision })
+    } catch (err) {
+      console.error('[project-router] ticket delete error:', err)
+      res.status(500).json({ error: 'Failed to delete ticket' })
+    }
   })
 
   return router
