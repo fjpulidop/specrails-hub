@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Settings, Trash2, Zap, Plus, Bell } from 'lucide-react'
+import { Settings, Trash2, Zap, Plus, Bell, GraduationCap } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import {
@@ -45,6 +45,7 @@ interface HubSettings {
 interface SettingsDialogProps {
   open: boolean
   onClose: () => void
+  onOpenOnboarding?: () => void
 }
 
 function ProjectListItem({
@@ -72,7 +73,7 @@ function ProjectListItem({
   )
 }
 
-export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
+export default function SettingsDialog({ open, onClose, onOpenOnboarding }: SettingsDialogProps) {
   const { projects, removeProject } = useHub()
   const [hubSettings, setHubSettings] = useState<HubSettings | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -573,6 +574,35 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                 </div>
               </div>
             </div>
+
+            {/* Onboarding */}
+            {onOpenOnboarding && (
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Onboarding
+                </h3>
+                <div className="rounded-md border border-border p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium">Platform Tour</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Replay the welcome wizard to review key features.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 text-xs shrink-0"
+                      onClick={onOpenOnboarding}
+                      data-testid="replay-onboarding"
+                    >
+                      <GraduationCap className="w-3 h-3 mr-1" />
+                      Replay Tour
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Hub info */}
             <div className="space-y-2">

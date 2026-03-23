@@ -21,6 +21,7 @@ import { ProjectLayout } from './components/ProjectLayout'
 import { ProjectErrorBoundary } from './components/ProjectErrorBoundary'
 import { WelcomeScreen } from './components/WelcomeScreen'
 import { SetupWizard } from './components/SetupWizard'
+import { OnboardingWizard, hasSeenOnboarding } from './components/OnboardingWizard'
 import { TabBar } from './components/TabBar'
 import { AddProjectDialog } from './components/AddProjectDialog'
 import { CommandPalette } from './components/CommandPalette'
@@ -97,6 +98,7 @@ function HubApp() {
   const [overviewOpen, setOverviewOpen] = useState(false)
   const [analyticsOpen, setAnalyticsOpen] = useState(false)
   const [docsOpen, setDocsOpen] = useState(false)
+  const [onboardingOpen, setOnboardingOpen] = useState(() => !hasSeenOnboarding())
 
   // Remember which page each project was on
   useProjectRouteMemory(activeProjectId)
@@ -223,7 +225,7 @@ function HubApp() {
       </div>
 
       <AddProjectDialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} />
-      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} onOpenOnboarding={() => { setSettingsOpen(false); setOnboardingOpen(true) }} />
 
       <Dialog open={overviewOpen} onOpenChange={setOverviewOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
@@ -256,6 +258,7 @@ function HubApp() {
         onOpenDocs={() => setDocsOpen(true)}
       />
       <KeyboardShortcutsCheatsheet open={cheatsheetOpen} onOpenChange={setCheatsheetOpen} />
+      <OnboardingWizard open={onboardingOpen} onClose={() => setOnboardingOpen(false)} />
     </div>
   )
 }
