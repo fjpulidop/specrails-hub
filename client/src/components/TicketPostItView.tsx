@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Ticket, AlertTriangle, ArrowUp, ChevronUp } from 'lucide-react'
+import { Ticket, AlertTriangle, ArrowUp, ChevronUp, Plus } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { TicketContextMenu } from './TicketContextMenu'
 import { TicketStatusDot } from './TicketStatusIndicator'
@@ -78,19 +78,23 @@ function getRotation(id: number): string {
 interface TicketPostItViewProps {
   tickets: LocalTicket[]
   isLoading: boolean
+  error?: string | null
   onTicketClick: (ticket: LocalTicket) => void
   onDelete: (ticketId: number) => void
   onStatusChange: (ticketId: number, status: TicketStatus) => void
   onPriorityChange: (ticketId: number, priority: TicketPriority) => void
+  onCreateClick?: () => void
 }
 
 export function TicketPostItView({
   tickets,
   isLoading,
+  error,
   onTicketClick,
   onDelete,
   onStatusChange,
   onPriorityChange,
+  onCreateClick,
 }: TicketPostItViewProps) {
   const sorted = useMemo(() => {
     const order: Record<TicketStatus, number> = { in_progress: 0, todo: 1, done: 2, cancelled: 3 }
@@ -110,14 +114,36 @@ export function TicketPostItView({
     )
   }
 
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center space-y-1.5">
+        <AlertTriangle className="w-6 h-6 text-red-400 mx-auto" />
+        <p className="text-sm font-medium text-red-400">Failed to load tickets</p>
+        <p className="text-xs text-red-400/70">{error}</p>
+      </div>
+    )
+  }
+
   if (tickets.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border/40 bg-card/50 p-8 text-center space-y-2">
+      <div className="rounded-lg border border-dashed border-border/40 bg-card/50 p-8 text-center space-y-3">
         <Ticket className="w-8 h-8 text-muted-foreground/30 mx-auto" />
-        <p className="text-sm font-medium text-muted-foreground">No tickets yet</p>
-        <p className="text-xs text-muted-foreground/60">
-          Create your first ticket or run a product backlog command to populate tickets
-        </p>
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-muted-foreground">No tickets yet</p>
+          <p className="text-xs text-muted-foreground/60">
+            Create your first ticket or run a product backlog command to populate tickets
+          </p>
+        </div>
+        {onCreateClick && (
+          <button
+            type="button"
+            onClick={onCreateClick}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-accent/60 text-foreground hover:bg-accent transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Create your first ticket
+          </button>
+        )}
       </div>
     )
   }

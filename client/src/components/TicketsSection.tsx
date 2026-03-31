@@ -11,10 +11,12 @@ export type TicketViewMode = 'list' | 'grid' | 'postit'
 interface TicketsSectionProps {
   tickets: LocalTicket[]
   isLoading: boolean
+  error?: string | null
   onTicketClick: (ticket: LocalTicket) => void
   onDelete: (ticketId: number) => void
   onStatusChange: (ticketId: number, status: TicketStatus) => void
   onPriorityChange: (ticketId: number, priority: TicketPriority) => void
+  onCreateClick?: () => void
 }
 
 const VIEW_MODES: { mode: TicketViewMode; icon: typeof List; label: string }[] = [
@@ -26,10 +28,12 @@ const VIEW_MODES: { mode: TicketViewMode; icon: typeof List; label: string }[] =
 export function TicketsSection({
   tickets,
   isLoading,
+  error,
   onTicketClick,
   onDelete,
   onStatusChange,
   onPriorityChange,
+  onCreateClick,
 }: TicketsSectionProps) {
   const [viewMode, setViewMode] = useState<TicketViewMode>('list')
 
@@ -69,10 +73,12 @@ export function TicketsSection({
         <TicketListView
           tickets={tickets}
           isLoading={isLoading}
+          error={error}
           onTicketClick={handleTicketClick}
           onDelete={onDelete}
           onStatusChange={onStatusChange}
           onPriorityChange={onPriorityChange}
+          onCreateClick={onCreateClick}
         />
       )}
 
@@ -80,10 +86,12 @@ export function TicketsSection({
         <TicketGridView
           tickets={tickets}
           isLoading={isLoading}
+          error={error}
           onTicketClick={handleTicketClick}
           onDelete={onDelete}
           onStatusChange={onStatusChange}
           onPriorityChange={onPriorityChange}
+          onCreateClick={onCreateClick}
         />
       )}
 
@@ -91,10 +99,12 @@ export function TicketsSection({
         <TicketPostItView
           tickets={tickets}
           isLoading={isLoading}
+          error={error}
           onTicketClick={handleTicketClick}
           onDelete={onDelete}
           onStatusChange={onStatusChange}
           onPriorityChange={onPriorityChange}
+          onCreateClick={onCreateClick}
         />
       )}
     </div>
