@@ -109,7 +109,7 @@ function createApp(contexts: Map<string, ProjectContext> = new Map()) {
 }
 
 function readDiskStore(tmpDir: string, contractPath?: string): TicketStore {
-  const filePath = contractPath ?? path.join(tmpDir, '.claude', 'local-tickets.json')
+  const filePath = contractPath ?? path.join(tmpDir, '.specrails', 'local-tickets.json')
   return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as TicketStore
 }
 
@@ -356,9 +356,9 @@ describe('E5: External file write triggers TicketWatcher broadcast', () => {
     const broadcast = vi.fn()
 
     // Set up ticket file
-    const claudeDir = path.join(tmpDir, '.claude')
-    fs.mkdirSync(claudeDir, { recursive: true })
-    const filePath = path.join(claudeDir, 'local-tickets.json')
+    const storeDir = path.join(tmpDir, '.specrails')
+    fs.mkdirSync(storeDir, { recursive: true })
+    const filePath = path.join(storeDir, 'local-tickets.json')
     const initialStore = {
       schema_version: '1.0',
       revision: 1,
@@ -398,9 +398,9 @@ describe('E5: External file write triggers TicketWatcher broadcast', () => {
   it('suppresses echo when watcher is notified of hub revision', async () => {
     const broadcast = vi.fn()
 
-    const claudeDir = path.join(tmpDir, '.claude')
-    fs.mkdirSync(claudeDir, { recursive: true })
-    const filePath = path.join(claudeDir, 'local-tickets.json')
+    const storeDir = path.join(tmpDir, '.specrails')
+    fs.mkdirSync(storeDir, { recursive: true })
+    const filePath = path.join(storeDir, 'local-tickets.json')
     const initialStore = {
       schema_version: '1.0', revision: 1, last_updated: new Date().toISOString(),
       next_id: 1, tickets: {},

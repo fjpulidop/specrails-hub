@@ -8,7 +8,7 @@ The **Tickets** section in specrails-hub provides a visual interface for the loc
 
 The Tickets panel requires:
 - specrails-core installed in your project with `provider: local` in `.claude/backlog-config.json`
-- `.claude/local-tickets.json` present (created automatically during `/setup`)
+- `.specrails/local-tickets.json` present (created automatically during `/setup`)
 
 If the file is missing, the panel shows an empty state with a prompt to run `/setup` in Claude Code.
 
@@ -115,7 +115,7 @@ Right-clicking a ticket in any view opens a context menu with:
 
 Changes made by CLI agents (e.g., `/sr:implement` updating a ticket to `in_progress`) appear in the hub automatically — no manual refresh.
 
-Hub watches `.claude/local-tickets.json` using chokidar with a 400 ms debounce. When the file changes:
+Hub watches `.specrails/local-tickets.json` using chokidar with a 400 ms debounce. When the file changes:
 
 1. Hub reads the updated file
 2. Broadcasts a `ticket_updated` WebSocket message to connected clients

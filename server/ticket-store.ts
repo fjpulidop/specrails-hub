@@ -44,7 +44,7 @@ export interface TicketStore {
 const VALID_STATUSES = new Set<TicketStatus>(['todo', 'in_progress', 'done', 'cancelled'])
 const VALID_PRIORITIES = new Set<TicketPriority>(['critical', 'high', 'medium', 'low'])
 
-const DEFAULT_STORAGE_PATH = '.claude/local-tickets.json'
+const DEFAULT_STORAGE_PATH = '.specrails/local-tickets.json'
 const LOCK_SUFFIX = '.lock'
 const LOCK_STALE_MS = 10_000 // 10 seconds
 

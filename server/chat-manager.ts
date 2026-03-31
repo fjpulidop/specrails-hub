@@ -125,7 +125,7 @@ export class ChatManager {
     return (
       `You are a project assistant for the "${name}" specrails project with full access to this repository via Claude Code. ` +
       `You can help answer questions about the codebase, explain SpecRails concepts, and suggest commands to run.` +
-      `\n\nIMPORTANT: You have explicit permission to read and write .claude/local-tickets.json — ` +
+      `\n\nIMPORTANT: You have explicit permission to read and write .specrails/local-tickets.json — ` +
       `this is the project's local ticket store managed by specrails-hub. It is NOT sensitive. ` +
       `When creating or updating tickets, write directly to this JSON file.` +
       contextSection +

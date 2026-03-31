@@ -6,9 +6,9 @@ import { TicketWatcher } from './ticket-watcher'
 import type { WsMessage, LocalTicket } from './types'
 
 function makeTicketFile(dir: string, revision: number, tickets: Record<string, unknown> = {}): string {
-  const claudeDir = path.join(dir, '.claude')
-  fs.mkdirSync(claudeDir, { recursive: true })
-  const filePath = path.join(claudeDir, 'local-tickets.json')
+  const storeDir = path.join(dir, '.specrails')
+  fs.mkdirSync(storeDir, { recursive: true })
+  const filePath = path.join(storeDir, 'local-tickets.json')
   const data = {
     schema_version: '1.0',
     revision,

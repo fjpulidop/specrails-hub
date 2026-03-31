@@ -132,9 +132,9 @@ describe('ticket endpoints', () => {
     })
 
     it('returns tickets from existing file', async () => {
-      const claudeDir = path.join(tmpDir, '.claude')
-      fs.mkdirSync(claudeDir, { recursive: true })
-      fs.writeFileSync(path.join(claudeDir, 'local-tickets.json'), JSON.stringify({
+      const storeDir = path.join(tmpDir, '.specrails')
+      fs.mkdirSync(storeDir, { recursive: true })
+      fs.writeFileSync(path.join(storeDir, 'local-tickets.json'), JSON.stringify({
         schema_version: '1.0',
         revision: 3,
         last_updated: '2026-01-01T00:00:00Z',
@@ -156,9 +156,9 @@ describe('ticket endpoints', () => {
     })
 
     it('filters by status', async () => {
-      const claudeDir = path.join(tmpDir, '.claude')
-      fs.mkdirSync(claudeDir, { recursive: true })
-      fs.writeFileSync(path.join(claudeDir, 'local-tickets.json'), JSON.stringify({
+      const storeDir = path.join(tmpDir, '.specrails')
+      fs.mkdirSync(storeDir, { recursive: true })
+      fs.writeFileSync(path.join(storeDir, 'local-tickets.json'), JSON.stringify({
         schema_version: '1.0', revision: 1, last_updated: '', next_id: 3,
         tickets: {
           '1': { id: 1, title: 'Todo', description: '', status: 'todo', priority: 'medium', labels: [], assignee: null, prerequisites: [], metadata: {}, created_at: '', updated_at: '', created_by: 'user', source: 'manual' },
@@ -176,9 +176,9 @@ describe('ticket endpoints', () => {
     })
 
     it('filters by label', async () => {
-      const claudeDir = path.join(tmpDir, '.claude')
-      fs.mkdirSync(claudeDir, { recursive: true })
-      fs.writeFileSync(path.join(claudeDir, 'local-tickets.json'), JSON.stringify({
+      const storeDir = path.join(tmpDir, '.specrails')
+      fs.mkdirSync(storeDir, { recursive: true })
+      fs.writeFileSync(path.join(storeDir, 'local-tickets.json'), JSON.stringify({
         schema_version: '1.0', revision: 1, last_updated: '', next_id: 3,
         tickets: {
           '1': { id: 1, title: 'Frontend', description: '', status: 'todo', priority: 'medium', labels: ['area:frontend'], assignee: null, prerequisites: [], metadata: {}, created_at: '', updated_at: '', created_by: 'user', source: 'manual' },
@@ -196,9 +196,9 @@ describe('ticket endpoints', () => {
     })
 
     it('filters by search query', async () => {
-      const claudeDir = path.join(tmpDir, '.claude')
-      fs.mkdirSync(claudeDir, { recursive: true })
-      fs.writeFileSync(path.join(claudeDir, 'local-tickets.json'), JSON.stringify({
+      const storeDir = path.join(tmpDir, '.specrails')
+      fs.mkdirSync(storeDir, { recursive: true })
+      fs.writeFileSync(path.join(storeDir, 'local-tickets.json'), JSON.stringify({
         schema_version: '1.0', revision: 1, last_updated: '', next_id: 3,
         tickets: {
           '1': { id: 1, title: 'Fix login bug', description: '', status: 'todo', priority: 'medium', labels: [], assignee: null, prerequisites: [], metadata: {}, created_at: '', updated_at: '', created_by: 'user', source: 'manual' },
@@ -235,9 +235,9 @@ describe('ticket endpoints', () => {
     })
 
     it('returns ticket by id', async () => {
-      const claudeDir = path.join(tmpDir, '.claude')
-      fs.mkdirSync(claudeDir, { recursive: true })
-      fs.writeFileSync(path.join(claudeDir, 'local-tickets.json'), JSON.stringify({
+      const storeDir = path.join(tmpDir, '.specrails')
+      fs.mkdirSync(storeDir, { recursive: true })
+      fs.writeFileSync(path.join(storeDir, 'local-tickets.json'), JSON.stringify({
         schema_version: '1.0', revision: 1, last_updated: '', next_id: 2,
         tickets: {
           '1': { id: 1, title: 'Test', description: 'desc', status: 'todo', priority: 'high', labels: ['bug'], assignee: null, prerequisites: [], metadata: {}, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', created_by: 'user', source: 'manual' },

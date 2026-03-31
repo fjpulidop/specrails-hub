@@ -927,7 +927,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   // ─── Integration contract ──────────────────────────────────────────────────
 
   const DEFAULT_TICKET_CAPABILITIES = ['crud', 'labels', 'status', 'priorities', 'dependencies']
-  const DEFAULT_TICKET_STORAGE_PATH = '.claude/local-tickets.json'
+  const DEFAULT_TICKET_STORAGE_PATH = '.specrails/local-tickets.json'
 
   // GET /:projectId/integration-contract — Return the project's integration contract with ticketProvider
   router.get('/:projectId/integration-contract', (req: Request, res: Response) => {

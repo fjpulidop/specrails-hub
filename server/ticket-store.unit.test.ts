@@ -368,7 +368,7 @@ describe('filterTickets', () => {
 describe('resolveTicketStoragePath', () => {
   it('returns default path when no integration-contract.json exists', () => {
     const result = resolveTicketStoragePath(tmpDir)
-    expect(result).toBe(path.resolve(tmpDir, '.claude/local-tickets.json'))
+    expect(result).toBe(path.resolve(tmpDir, '.specrails/local-tickets.json'))
   })
 
   it('returns default path when contract has no ticketProvider', () => {
@@ -378,7 +378,7 @@ describe('resolveTicketStoragePath', () => {
       schemaVersion: '1.0',
     }))
     const result = resolveTicketStoragePath(tmpDir)
-    expect(result).toBe(path.resolve(tmpDir, '.claude/local-tickets.json'))
+    expect(result).toBe(path.resolve(tmpDir, '.specrails/local-tickets.json'))
   })
 
   it('returns default path when contract has no storagePath', () => {
@@ -388,7 +388,7 @@ describe('resolveTicketStoragePath', () => {
       ticketProvider: { type: 'local' },
     }))
     const result = resolveTicketStoragePath(tmpDir)
-    expect(result).toBe(path.resolve(tmpDir, '.claude/local-tickets.json'))
+    expect(result).toBe(path.resolve(tmpDir, '.specrails/local-tickets.json'))
   })
 
   it('returns custom path from integration-contract.json', () => {
@@ -397,11 +397,11 @@ describe('resolveTicketStoragePath', () => {
     fs.writeFileSync(path.join(claudeDir, 'integration-contract.json'), JSON.stringify({
       ticketProvider: {
         type: 'local',
-        storagePath: '.claude/local-tickets.json',
+        storagePath: '.specrails/local-tickets.json',
       },
     }))
     const result = resolveTicketStoragePath(tmpDir)
-    expect(result).toBe(path.resolve(tmpDir, '.claude/local-tickets.json'))
+    expect(result).toBe(path.resolve(tmpDir, '.specrails/local-tickets.json'))
   })
 
   it('returns custom absolute storagePath unchanged', () => {
@@ -420,7 +420,7 @@ describe('resolveTicketStoragePath', () => {
     fs.mkdirSync(claudeDir, { recursive: true })
     fs.writeFileSync(path.join(claudeDir, 'integration-contract.json'), 'not json')
     const result = resolveTicketStoragePath(tmpDir)
-    expect(result).toBe(path.resolve(tmpDir, '.claude/local-tickets.json'))
+    expect(result).toBe(path.resolve(tmpDir, '.specrails/local-tickets.json'))
   })
 })
 
