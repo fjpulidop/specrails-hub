@@ -76,7 +76,7 @@ function fillDateSeries(
   const result: Array<Record<string, unknown>> = []
   const start = new Date(from)
   const end = new Date(to)
-  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+  for (const d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
     const date = d.toISOString().slice(0, 10)
     const row = byDate.get(date) ?? { date }
     const filled: Record<string, unknown> = { date }
@@ -124,7 +124,7 @@ export function getTrends(db: DbInstance, period: TrendsPeriod): TrendsResponse 
   const points: TrendPoint[] = []
   const start = new Date(from)
   const end = new Date(to)
-  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+  for (const d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
     const date = d.toISOString().slice(0, 10)
     const row = byDate.get(date)
     points.push({
