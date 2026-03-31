@@ -61,7 +61,7 @@ export default function DashboardPage() {
   // Spec tickets: source-filtered + not currently in any rail, in user drag-order
   const specTickets = useMemo(() => {
     const filtered = tickets.filter(
-      (t) => (t.source === 'propose-spec' || t.source === 'product-backlog') && !railTicketIds.has(t.id),
+      (t) => (t.source === 'propose-spec' || t.source === 'product-backlog' || t.source === 'get-backlog-specs') && !railTicketIds.has(t.id),
     )
     if (!specOrderIds) return filtered
     const map = new Map(filtered.map((t) => [t.id, t]))

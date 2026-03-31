@@ -325,6 +325,6 @@ export interface LocalTicket {
   created_at: string
   updated_at: string
   created_by: string
-  source: 'manual' | 'product-backlog' | 'propose-spec'
+  source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs'
 }
 

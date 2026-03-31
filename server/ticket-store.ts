@@ -30,7 +30,7 @@ export interface Ticket {
   created_at: string
   updated_at: string
   created_by: string
-  source: 'manual' | 'product-backlog' | 'propose-spec' | 'hub'
+  source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'hub'
 }
 
 export interface TicketStore {
