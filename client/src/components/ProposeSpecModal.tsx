@@ -17,7 +17,7 @@ export function ProposeSpecModal({ open, onClose }: ProposeSpecModalProps) {
   useEffect(() => {
     if (!open || !chat || startedRef.current) return
     startedRef.current = true
-    chat.startWithMessage('/specrails:propose-spec')
+    chat.startWithMessage('/sr:propose-spec')
   }, [open, chat])
 
   // Reset tracking flag when modal closes

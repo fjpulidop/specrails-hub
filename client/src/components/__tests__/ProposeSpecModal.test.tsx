@@ -74,9 +74,9 @@ describe('ProposeSpecModal', () => {
     expect(screen.getByText('Propose Spec')).toBeInTheDocument()
   })
 
-  it('starts conversation with /specrails:propose-spec when opened', () => {
+  it('starts conversation with /sr:propose-spec when opened', () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
-    expect(mockStartWithMessage).toHaveBeenCalledWith('/specrails:propose-spec')
+    expect(mockStartWithMessage).toHaveBeenCalledWith('/sr:propose-spec')
   })
 
   it('does not start conversation twice if already started', () => {

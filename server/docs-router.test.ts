@@ -50,13 +50,14 @@ describe('docs-router', () => {
       expect(Array.isArray(res.body.categories)).toBe(true)
     })
 
-    it('includes the three known categories in correct order', async () => {
+    it('includes all known categories in correct order', async () => {
       const res = await request(buildApp()).get('/docs')
       const slugs = res.body.categories.map((c: { slug: string }) => c.slug)
       expect(slugs).toContain('general')
       expect(slugs).toContain('product')
+      expect(slugs).toContain('engineering')
       expect(slugs).toContain('operations')
-      expect(slugs).not.toContain('engineering')
+      expect(slugs).toContain('ux')
       expect(slugs[0]).toBe('general')
     })
 
@@ -248,7 +249,7 @@ describe('docs-router', () => {
       expect(res.status).toBe(200)
       // Should still return categories (bundled or empty fallback)
       expect(res.body.categories).toBeDefined()
-      expect(res.body.categories.length).toBe(3)
+      expect(res.body.categories.length).toBe(5)
 
       fs.rmSync(emptyHome, { recursive: true, force: true })
     })

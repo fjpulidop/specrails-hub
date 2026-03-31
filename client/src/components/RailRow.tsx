@@ -42,7 +42,7 @@ export function RailRow({ id, label, tickets, mode, status, onModeChange, onTogg
             </span>
           )}
         </div>
-        <RailControls mode={mode} status={status} onModeChange={onModeChange} onToggle={onToggle} />
+        <RailControls mode={mode} status={status} ticketCount={tickets.length} onModeChange={onModeChange} onToggle={onToggle} />
       </div>
 
       {/* Droppable body */}
@@ -65,7 +65,7 @@ export function RailRow({ id, label, tickets, mode, status, onModeChange, onTogg
         ) : (
           <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
             {tickets.map((ticket) => (
-              <SpecCard key={ticket.id} ticket={ticket} onClick={onTicketClick} />
+              <SpecCard key={ticket.id} ticket={ticket} onClick={onTicketClick} dragDisabled={status === 'running'} />
             ))}
           </SortableContext>
         )}

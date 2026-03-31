@@ -7,11 +7,13 @@ export type RailStatus = 'idle' | 'running'
 interface RailControlsProps {
   mode: RailMode
   status: RailStatus
+  ticketCount: number
   onModeChange: (mode: RailMode) => void
   onToggle: () => void
 }
 
-export function RailControls({ mode, status, onModeChange, onToggle }: RailControlsProps) {
+export function RailControls({ mode, status, ticketCount, onModeChange, onToggle }: RailControlsProps) {
+  const canPlay = ticketCount > 0
   return (
     <div className="flex items-center gap-1.5">
       {/* Mode segmented control */}
@@ -48,10 +50,13 @@ export function RailControls({ mode, status, onModeChange, onToggle }: RailContr
         className={`h-5 w-5 p-0 rounded-full transition-all duration-200 ${
           status === 'running'
             ? 'text-red-400 hover:text-red-300 hover:bg-red-400/10'
-            : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-400/10'
+            : canPlay
+              ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-400/10'
+              : 'text-muted-foreground/30 cursor-not-allowed'
         }`}
         onClick={onToggle}
-        title={status === 'running' ? 'Stop' : 'Play'}
+        disabled={!canPlay && status !== 'running'}
+        title={status === 'running' ? 'Stop' : canPlay ? 'Play' : 'Add specs to this rail first'}
       >
         {status === 'running' ? (
           <Square className="w-2.5 h-2.5 fill-current" />

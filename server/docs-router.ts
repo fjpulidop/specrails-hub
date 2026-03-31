@@ -29,13 +29,15 @@ function resolveDocsDir(): string {
 
 // ─── Category definitions ─────────────────────────────────────────────────────
 
-const CATEGORIES = ['general', 'product', 'operations'] as const
+const CATEGORIES = ['general', 'product', 'engineering', 'operations', 'ux'] as const
 type Category = (typeof CATEGORIES)[number]
 
 const CATEGORY_LABELS: Record<Category, string> = {
   general: 'General',
   product: 'Product',
+  engineering: 'Engineering',
   operations: 'Operations',
+  ux: 'UX',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

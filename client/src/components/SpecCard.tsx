@@ -14,11 +14,13 @@ const PRIORITY_VARIANT: Record<LocalTicket['priority'], 'destructive' | 'default
 interface SpecCardProps {
   ticket: LocalTicket
   onClick: (ticket: LocalTicket) => void
+  dragDisabled?: boolean
 }
 
-export function SpecCard({ ticket, onClick }: SpecCardProps) {
+export function SpecCard({ ticket, onClick, dragDisabled }: SpecCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: ticket.id,
+    disabled: dragDisabled,
   })
 
   const style = {
@@ -37,16 +39,18 @@ export function SpecCard({ ticket, onClick }: SpecCardProps) {
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick(ticket)}
     >
-      <button
-        {...attributes}
-        {...listeners}
-        type="button"
-        className="text-muted-foreground/30 hover:text-muted-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing shrink-0"
-        onClick={(e) => e.stopPropagation()}
-        aria-label="Drag to reorder"
-      >
-        <GripVertical className="w-3.5 h-3.5" />
-      </button>
+      {!dragDisabled && (
+        <button
+          {...attributes}
+          {...listeners}
+          type="button"
+          className="text-muted-foreground/30 hover:text-muted-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing shrink-0"
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Drag to reorder"
+        >
+          <GripVertical className="w-3.5 h-3.5" />
+        </button>
+      )}
       <span className="text-[10px] font-mono text-muted-foreground/50 shrink-0">#{ticket.id}</span>
       <span className="flex-1 text-sm truncate">{ticket.title}</span>
       <Badge variant={PRIORITY_VARIANT[ticket.priority]} className="text-[9px] shrink-0">

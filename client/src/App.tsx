@@ -198,7 +198,7 @@ function HubApp() {
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} onOpenOnboarding={() => { setSettingsOpen(false); setOnboardingOpen(true) }} />
 
       <Dialog open={overviewOpen} onOpenChange={setOverviewOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0 flex flex-col" showCloseButton={false}>
           <div className="flex-1 overflow-auto">
             <Suspense fallback={<div className="flex items-center justify-center h-40"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
               <HubOverviewPage />
