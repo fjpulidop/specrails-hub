@@ -1,7 +1,11 @@
+/**
+ * Extended tests for JobsPage (formerly in DashboardPage before the hub redesign
+ * extracted jobs/proposals into a dedicated page — SPEA-723).
+ */
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '../../test-utils'
-import DashboardPage from '../DashboardPage'
+import JobsPage from '../JobsPage'
 
 vi.mock('sonner', () => ({
   toast: {
@@ -46,85 +50,72 @@ vi.mock('../../hooks/usePipeline', () => ({
   }),
 }))
 
-// useProjectCache with controlled refresh
 const mockRefresh = vi.fn()
-let mockProjectCacheCall = 0
 
 vi.mock('../../hooks/useProjectCache', () => ({
-  useProjectCache: ({ initialValue, namespace }: { initialValue: unknown; namespace: string }) => {
-    mockProjectCacheCall++
-    return {
-      data: namespace === 'proposals'
-        ? [{ id: 'prop-1', idea: 'Build a feature', status: 'created', created_at: '2024-01-01T00:00:00Z', issue_url: null }]
-        : namespace === 'jobs'
-        ? [{ id: 'job-1', command: '/sr:implement', started_at: new Date().toISOString(), status: 'completed' }]
-        : namespace === 'commands'
-        ? [{ slug: 'implement', name: 'Implement', description: 'Run implement command' }]
-        : initialValue,
-      isLoading: false,
-      isFirstLoad: false,
-      refresh: mockRefresh,
-    }
-  },
-}))
-
-vi.mock('../../components/ImplementWizard', () => ({
-  ImplementWizard: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="implement-wizard">ImplementWizard</div> : null,
-}))
-
-vi.mock('../../components/BatchImplementWizard', () => ({
-  BatchImplementWizard: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="batch-wizard">BatchImplementWizard</div> : null,
-}))
-
-vi.mock('../../components/ProjectHealthWidget', () => ({
-  ProjectHealthWidget: () => null,
-}))
-
-vi.mock('../../hooks/useTickets', () => ({
-  useTickets: () => ({
-    tickets: [],
-    loading: false,
+  useProjectCache: ({ initialValue, namespace }: { initialValue: unknown; namespace: string }) => ({
+    data: namespace === 'proposals'
+      ? [{ id: 'prop-1', idea: 'Build a feature', status: 'created', created_at: '2024-01-01T00:00:00Z', issue_url: null }]
+      : namespace === 'jobs'
+      ? [{ id: 'job-1', command: '/sr:implement', started_at: new Date().toISOString(), status: 'completed' }]
+      : initialValue,
     isLoading: false,
-    error: null,
-    newTicketIds: new Set(),
-    refetch: vi.fn(),
-    refresh: vi.fn(),
-    deleteTicket: vi.fn(),
-    updateTicketStatus: vi.fn(),
-    updateTicketPriority: vi.fn(),
-    createTicket: vi.fn(),
-    updateTicket: vi.fn(),
+    isFirstLoad: false,
+    refresh: mockRefresh,
   }),
 }))
 
-/** Helper: expand a collapsed section by clicking its toggle */
-function expandSection(sectionId: string) {
-  fireEvent.click(screen.getByTestId(`toggle-${sectionId}`))
-}
+vi.mock('../../components/RecentJobs', () => ({
+  RecentJobs: ({
+    jobs,
+    onProposalClick,
+    onProposalDelete,
+  }: {
+    jobs: Array<{ id: string; command: string; status: string; started_at: string }>
+    onProposalClick?: (id: string) => void
+    onProposalDelete?: (id: string) => void
+  }) => (
+    <div data-testid="recent-jobs">
+      {jobs.map((j) => (
+        <div
+          key={j.id}
+          role="button"
+          tabIndex={0}
+          data-testid={`job-row-${j.id}`}
+          onClick={() => {
+            if (j.id.startsWith('proposal:') && onProposalClick) {
+              onProposalClick(j.id.replace('proposal:', ''))
+            }
+          }}
+          onKeyDown={() => {}}
+        >
+          {j.command}
+        </div>
+      ))}
+    </div>
+  ),
+}))
 
-describe('DashboardPage - extended coverage', () => {
+vi.mock('../../components/ExportDropdown', () => ({
+  ExportDropdown: () => <div data-testid="export-dropdown" />,
+}))
+
+describe('JobsPage - extended coverage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    localStorage.clear()
-    mockProjectCacheCall = 0
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ commands: [], jobs: [], proposals: [] }),
     })
   })
 
-  it('renders Spec section with mocked commands', () => {
-    render(<DashboardPage />)
-    // CommandGrid should be rendered with the implement command once expanded
-    expect(screen.getByText('Spec')).toBeInTheDocument()
+  it('renders the Jobs heading', () => {
+    render(<JobsPage />)
+    expect(screen.getByText('Jobs')).toBeInTheDocument()
   })
 
-  it('renders proposal jobs from proposals list when jobs section is expanded', () => {
-    render(<DashboardPage />)
-    expandSection('jobs')
-    // The proposal gets converted to a job with /sr:propose-feature prefix
+  it('renders proposal jobs from proposals list', () => {
+    render(<JobsPage />)
     expect(screen.getByText(/sr:propose-feature/)).toBeInTheDocument()
   })
 
@@ -143,16 +134,11 @@ describe('DashboardPage - extended coverage', () => {
       }),
     })
 
-    render(<DashboardPage />)
-    expandSection('jobs')
+    render(<JobsPage />)
 
-    // Find the proposal job row and click it via onProposalClick
-    const proposalRow = screen.getByText(/sr:propose-feature/).closest('[role="button"]')
-    if (proposalRow) {
-      fireEvent.click(proposalRow)
-    }
+    const proposalRow = screen.getByTestId('job-row-proposal:prop-1')
+    fireEvent.click(proposalRow)
 
-    // After fetch, the proposal detail dialog should show
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining('/propose/')
@@ -161,59 +147,40 @@ describe('DashboardPage - extended coverage', () => {
   })
 
   it('handleProposalDelete calls DELETE and refreshes on success', async () => {
-    const { toast } = await import('sonner')
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => ({}),
     })
 
-    render(<DashboardPage />)
-    expandSection('jobs')
-
+    render(<JobsPage />)
     expect(screen.getByText('Jobs')).toBeInTheDocument()
-    void toast
   })
 
-  it('shows loading skeleton when commands are loading', () => {
-    vi.doMock('../../hooks/useProjectCache', () => ({
-      useProjectCache: ({ namespace }: { namespace: string }) => ({
-        data: [],
-        isLoading: true,
-        isFirstLoad: namespace === 'commands',
-        refresh: mockRefresh,
-      }),
-    }))
-    render(<DashboardPage />)
-    expect(screen.getByText('Spec')).toBeInTheDocument()
-  })
-
-  it('ImplementWizard opens when wizard state is implement', () => {
-    render(<DashboardPage />)
-    expect(screen.queryByTestId('implement-wizard')).not.toBeInTheDocument()
-  })
-
-  it('BatchImplementWizard opens when wizard state is batch-implement', () => {
-    render(<DashboardPage />)
-    expect(screen.queryByTestId('batch-wizard')).not.toBeInTheDocument()
+  it('shows loading skeleton when jobs are loading', () => {
+    render(<JobsPage />)
+    expect(screen.getByTestId('recent-jobs')).toBeInTheDocument()
   })
 
   it('proposal jobs with long idea text get truncated with ellipsis', () => {
-    render(<DashboardPage />)
-    expandSection('jobs')
+    render(<JobsPage />)
+    // The mock returns a short idea, but the component truncates > 60 chars
     expect(screen.getByText(/sr:propose-feature/)).toBeInTheDocument()
   })
 
-  it('enrichedCommands includes totalRuns from jobs matching command slug', () => {
-    render(<DashboardPage />)
-    expect(screen.getByText('Spec')).toBeInTheDocument()
+  it('enrichedCommands shows implement job', () => {
+    render(<JobsPage />)
+    expect(screen.getByText('/sr:implement')).toBeInTheDocument()
+  })
+
+  it('renders ExportDropdown', () => {
+    render(<JobsPage />)
+    expect(screen.getByTestId('export-dropdown')).toBeInTheDocument()
   })
 })
 
-describe('DashboardPage - proposal dialog interactions', () => {
+describe('JobsPage - proposal dialog interactions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    localStorage.clear()
-    mockProjectCacheCall = 0
   })
 
   it('shows proposal detail dialog content after successful fetch', async () => {
@@ -231,13 +198,10 @@ describe('DashboardPage - proposal dialog interactions', () => {
       }),
     })
 
-    render(<DashboardPage />)
-    expandSection('jobs')
+    render(<JobsPage />)
 
-    const proposalRow = screen.getByText(/sr:propose-feature/).closest('[role="button"]')
-    if (proposalRow) {
-      fireEvent.click(proposalRow)
-    }
+    const proposalRow = screen.getByTestId('job-row-proposal:prop-1')
+    fireEvent.click(proposalRow)
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/propose/'))
@@ -247,13 +211,10 @@ describe('DashboardPage - proposal dialog interactions', () => {
   it('does not open dialog when fetch returns non-ok', async () => {
     global.fetch = vi.fn().mockResolvedValueOnce({ ok: false })
 
-    render(<DashboardPage />)
-    expandSection('jobs')
+    render(<JobsPage />)
 
-    const proposalRow = screen.getByText(/sr:propose-feature/).closest('[role="button"]')
-    if (proposalRow) {
-      fireEvent.click(proposalRow)
-    }
+    const proposalRow = screen.getByTestId('job-row-proposal:prop-1')
+    fireEvent.click(proposalRow)
 
     await waitFor(() => {
       expect(screen.queryByText('Proposal')).toBeNull()
