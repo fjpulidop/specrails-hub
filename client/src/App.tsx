@@ -11,6 +11,7 @@ import { KeyboardShortcutsCheatsheet } from './components/KeyboardShortcutsCheat
 
 // Lazy-loaded pages — never visible at initial render
 const JobDetailPage = lazy(() => import('./pages/JobDetailPage'))
+const JobsPage = lazy(() => import('./pages/JobsPage'))
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'))
 const ActivityFeedPage = lazy(() => import('./pages/ActivityFeedPage'))
 const HubAnalyticsPage = lazy(() => import('./pages/HubAnalyticsPage'))
@@ -173,6 +174,7 @@ function HubApp() {
                     </ProjectErrorBoundary>
                   }>
                     <Route path="/" element={<DashboardPage />} />
+                    <Route path="/jobs" element={<JobsPage />} />
                     <Route path="/jobs/:id" element={<JobDetailPage />} />
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/activity" element={<ActivityFeedPage />} />
@@ -266,6 +268,7 @@ export default function App() {
             <Route path="/docs/:category/:slug" element={<DocsPage />} />
             <Route element={<RootLayout />}>
               <Route index element={<DashboardPage />} />
+              <Route path="/jobs" element={<JobsPage />} />
               <Route path="/jobs/:id" element={<JobDetailPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/activity" element={<ActivityFeedPage />} />
