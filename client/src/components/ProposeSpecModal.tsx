@@ -17,7 +17,7 @@ export function ProposeSpecModal({ open, onClose }: ProposeSpecModalProps) {
   useEffect(() => {
     if (!open || !chat) return
     setConversationId(null)
-    void chat.startWithMessage('/sr:propose-spec')
+    void chat.startWithMessage('/specrails:propose-spec')
     return () => {
       setConversationId(null)
     }
