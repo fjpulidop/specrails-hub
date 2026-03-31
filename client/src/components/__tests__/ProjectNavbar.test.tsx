@@ -32,9 +32,9 @@ describe('ProjectNavbar', () => {
     expect(screen.getByRole('link', { name: /analytics/i })).toBeInTheDocument()
   })
 
-  it('renders Activity nav link', () => {
+  it('renders Jobs nav link', () => {
     render(<ProjectNavbar project={mockProject} />)
-    expect(screen.getByRole('link', { name: /activity/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /jobs/i })).toBeInTheDocument()
   })
 
   it('renders Settings nav link', () => {

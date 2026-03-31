@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, BarChart3, Settings, Activity } from 'lucide-react'
+import { LayoutDashboard, BarChart3, Settings, Briefcase } from 'lucide-react'
 import { cn } from '../lib/utils'
-import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import type { HubProject } from '../hooks/useHub'
 import { NotificationCenter } from './NotificationCenter'
 
@@ -13,7 +12,8 @@ export function ProjectNavbar({ project }: ProjectNavbarProps) {
   const navItems = [
     { to: '/', end: true, icon: LayoutDashboard, label: 'Home' },
     { to: '/analytics', end: false, icon: BarChart3, label: 'Analytics' },
-    { to: '/activity', end: false, icon: Activity, label: 'Activity' },
+    { to: '/jobs', end: false, icon: Briefcase, label: 'Jobs' },
+    { to: '/settings', end: false, icon: Settings, label: 'Settings' },
   ]
 
   return (
@@ -48,25 +48,6 @@ export function ProjectNavbar({ project }: ProjectNavbarProps) {
       {/* Right actions */}
       <div className="flex items-center gap-1">
         <NotificationCenter activeProjectId={project.id} />
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <NavLink
-              to="/settings"
-              className={({ isActive }) =>
-                cn(
-                  'h-7 w-7 flex items-center justify-center rounded-md transition-colors',
-                  isActive
-                    ? 'text-foreground bg-accent'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                )
-              }
-            >
-              <Settings className="w-3.5 h-3.5" />
-            </NavLink>
-          </TooltipTrigger>
-          <TooltipContent>Project Settings</TooltipContent>
-        </Tooltip>
       </div>
     </nav>
   )

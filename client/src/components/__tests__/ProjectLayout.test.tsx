@@ -53,6 +53,11 @@ vi.mock('../../hooks/useChat', () => ({
   ChatContext: { Provider: ({ children }: { children: React.ReactNode }) => children },
 }))
 
+// Mock feature flags
+vi.mock('../../lib/feature-flags', () => ({
+  FEATURE_CHAT_ENABLED: true,
+}))
+
 // Mock child components
 vi.mock('../StatusBar', () => ({
   StatusBar: ({ connectionStatus }: { connectionStatus: string }) => (
