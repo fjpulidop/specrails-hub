@@ -2,206 +2,126 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '../../test-utils'
 import DashboardPage from '../DashboardPage'
-
-vi.mock('sonner', () => ({
-  toast: {
-    promise: vi.fn(),
-    error: vi.fn(),
-    success: vi.fn(),
-  },
-}))
+import type { LocalTicket } from '../../types'
 
 vi.mock('../../lib/api', () => ({
   getApiBase: () => '/api',
 }))
 
-vi.mock('react-markdown', () => ({
-  default: ({ children }: { children: string }) => <span>{children}</span>,
-}))
-vi.mock('remark-gfm', () => ({ default: () => {} }))
+const mockTickets: LocalTicket[] = [
+  {
+    id: 1,
+    title: 'Spec ticket',
+    description: 'A spec',
+    status: 'todo',
+    priority: 'medium',
+    labels: ['backend'],
+    assignee: null,
+    prerequisites: [],
+    metadata: {},
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    created_by: 'user',
+    source: 'propose-spec',
+  },
+]
 
-// Mock useHub
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({
-    activeProjectId: 'proj-1',
-    projects: [{ id: 'proj-1', name: 'Test Project', path: '/test', slug: 'test', db_path: '/test/.db', added_at: '', last_seen_at: '' }],
-    setActiveProjectId: vi.fn(),
-    isLoading: false,
-    setupProjectIds: new Set(),
-    startSetupWizard: vi.fn(),
-    completeSetupWizard: vi.fn(),
-    addProject: vi.fn(),
-    removeProject: vi.fn(),
-  }),
-}))
-
-// Mock usePipeline
-vi.mock('../../hooks/usePipeline', () => ({
-  usePipeline: () => ({
-    recentJobs: [],
-    phases: {},
-    phaseDefinitions: [],
-    projectName: 'Test Project',
-    logLines: [],
-    connectionStatus: 'connected',
-    queueState: { jobs: [], activeJobId: null, paused: false },
-  }),
-}))
-
-// Mock useProjectCache
-vi.mock('../../hooks/useProjectCache', () => ({
-  useProjectCache: ({ initialValue }: { initialValue: unknown }) => ({
-    data: initialValue,
-    isLoading: false,
-    isFirstLoad: false,
-    refresh: vi.fn(),
-  }),
-}))
-
-// Mock wizard components to avoid complex dependencies
-vi.mock('../../components/ImplementWizard', () => ({
-  ImplementWizard: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="implement-wizard">ImplementWizard</div> : null,
-}))
-
-vi.mock('../../components/BatchImplementWizard', () => ({
-  BatchImplementWizard: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="batch-wizard">BatchImplementWizard</div> : null,
-}))
+const mockUpdateTicket = vi.fn()
+const mockDeleteTicket = vi.fn()
+const mockCreateTicket = vi.fn()
 
 vi.mock('../../hooks/useTickets', () => ({
   useTickets: () => ({
-    tickets: [],
-    loading: false,
+    tickets: mockTickets,
     isLoading: false,
-    error: null,
-    newTicketIds: new Set(),
-    refetch: vi.fn(),
-    refresh: vi.fn(),
-    deleteTicket: vi.fn(),
-    updateTicketStatus: vi.fn(),
-    updateTicketPriority: vi.fn(),
-    createTicket: vi.fn(),
-    updateTicket: vi.fn(),
+    deleteTicket: mockDeleteTicket,
+    updateTicket: mockUpdateTicket,
+    createTicket: mockCreateTicket,
   }),
+}))
+
+// Mock SpecsBoard to expose onTicketClick for testing
+const mockOnTicketClick = vi.fn()
+vi.mock('../../components/SpecsBoard', () => ({
+  SpecsBoard: ({ tickets, isLoading, onTicketClick }: {
+    tickets: LocalTicket[]
+    isLoading: boolean
+    onTicketClick: (t: LocalTicket) => void
+  }) => (
+    <div data-testid="specs-board">
+      <span data-testid="specs-board-ticket-count">{tickets.length}</span>
+      <span data-testid="specs-board-loading">{String(isLoading)}</span>
+      <button
+        data-testid="specs-board-open-ticket"
+        onClick={() => { mockOnTicketClick(tickets[0]); onTicketClick(tickets[0]) }}
+      >
+        open ticket
+      </button>
+    </div>
+  ),
+}))
+
+vi.mock('../../components/TicketDetailModal', () => ({
+  TicketDetailModal: ({ ticket, onClose }: { ticket: LocalTicket; onClose: () => void }) => (
+    <div data-testid="ticket-detail-modal">
+      <span data-testid="ticket-detail-title">{ticket.title}</span>
+      <button onClick={onClose}>close</button>
+    </div>
+  ),
+}))
+
+vi.mock('../../components/CreateTicketModal', () => ({
+  CreateTicketModal: ({ open }: { open: boolean }) => (
+    open ? <div data-testid="create-ticket-modal" /> : null
+  ),
 }))
 
 describe('DashboardPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    localStorage.clear()
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ commands: [], jobs: [], proposals: [] }),
-    })
   })
 
-  // ─── Section headers (always visible, even when collapsed) ─────────────
-
-  it('renders all five section headers', () => {
+  it('renders SpecsBoard and Rails panels', () => {
     render(<DashboardPage />)
-    expect(screen.getByText('Health')).toBeInTheDocument()
-    expect(screen.getByText('Spec')).toBeInTheDocument()
-    expect(screen.getByText('Tickets')).toBeInTheDocument()
+    expect(screen.getByTestId('specs-board')).toBeInTheDocument()
     expect(screen.getByText('Rails')).toBeInTheDocument()
-    expect(screen.getByText('Jobs')).toBeInTheDocument()
   })
 
-  it('renders section containers with test ids', () => {
+  it('passes tickets and loading state to SpecsBoard', () => {
     render(<DashboardPage />)
-    expect(screen.getByTestId('section-health')).toBeInTheDocument()
-    expect(screen.getByTestId('section-commands')).toBeInTheDocument()
-    expect(screen.getByTestId('section-tickets')).toBeInTheDocument()
-    expect(screen.getByTestId('section-rails')).toBeInTheDocument()
-    expect(screen.getByTestId('section-jobs')).toBeInTheDocument()
+    expect(screen.getByTestId('specs-board-ticket-count')).toHaveTextContent('1')
+    expect(screen.getByTestId('specs-board-loading')).toHaveTextContent('false')
   })
 
-  // ─── Default collapsed state ──────────────────────────────────────────
-
-  it('all sections are collapsed by default', () => {
+  it('shows Rails board with rail rows', () => {
     render(<DashboardPage />)
-    expect(screen.queryByTestId('content-health')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('content-commands')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('content-tickets')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('content-rails')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('content-jobs')).not.toBeInTheDocument()
+    expect(screen.getByText('Rail 1')).toBeInTheDocument()
+    expect(screen.getByText('Rail 2')).toBeInTheDocument()
+    expect(screen.getByText('Rail 3')).toBeInTheDocument()
   })
 
-  // ─── Expand/collapse ─────────────────────────────────────────────────
-
-  it('expanding Spec section reveals content', () => {
+  it('TicketDetailModal is not shown initially', () => {
     render(<DashboardPage />)
-    fireEvent.click(screen.getByTestId('toggle-commands'))
-    expect(screen.getByTestId('content-commands')).toBeInTheDocument()
-    // Should show empty state since commands are []
-    expect(screen.getByText(/No commands installed/i)).toBeInTheDocument()
+    expect(screen.queryByTestId('ticket-detail-modal')).not.toBeInTheDocument()
   })
 
-  it('expanding Jobs section reveals content', () => {
+  it('opens TicketDetailModal when SpecsBoard fires onTicketClick', () => {
     render(<DashboardPage />)
-    fireEvent.click(screen.getByTestId('toggle-jobs'))
-    expect(screen.getByTestId('content-jobs')).toBeInTheDocument()
-    expect(screen.getByText(/No jobs yet/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('specs-board-open-ticket'))
+    expect(screen.getByTestId('ticket-detail-modal')).toBeInTheDocument()
+    expect(screen.getByTestId('ticket-detail-title')).toHaveTextContent('Spec ticket')
   })
 
-  it('collapsing an expanded section hides content', () => {
+  it('closes TicketDetailModal on close callback', () => {
     render(<DashboardPage />)
-    // Expand then collapse
-    fireEvent.click(screen.getByTestId('toggle-commands'))
-    expect(screen.getByTestId('content-commands')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByTestId('toggle-commands'))
-    expect(screen.queryByTestId('content-commands')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('specs-board-open-ticket'))
+    expect(screen.getByTestId('ticket-detail-modal')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('close'))
+    expect(screen.queryByTestId('ticket-detail-modal')).not.toBeInTheDocument()
   })
 
-  // ─── Pin buttons ─────────────────────────────────────────────────────
-
-  it('renders pin buttons for each section', () => {
+  it('CreateTicketModal is not shown initially', () => {
     render(<DashboardPage />)
-    expect(screen.getByTestId('pin-health')).toBeInTheDocument()
-    expect(screen.getByTestId('pin-commands')).toBeInTheDocument()
-    expect(screen.getByTestId('pin-tickets')).toBeInTheDocument()
-    expect(screen.getByTestId('pin-rails')).toBeInTheDocument()
-    expect(screen.getByTestId('pin-jobs')).toBeInTheDocument()
+    expect(screen.queryByTestId('create-ticket-modal')).not.toBeInTheDocument()
   })
-
-  // ─── Drag handles ────────────────────────────────────────────────────
-
-  it('renders drag handles for each section', () => {
-    render(<DashboardPage />)
-    expect(screen.getByTestId('drag-handle-health')).toBeInTheDocument()
-    expect(screen.getByTestId('drag-handle-commands')).toBeInTheDocument()
-    expect(screen.getByTestId('drag-handle-tickets')).toBeInTheDocument()
-    expect(screen.getByTestId('drag-handle-rails')).toBeInTheDocument()
-    expect(screen.getByTestId('drag-handle-jobs')).toBeInTheDocument()
-  })
-
-  // ─── Pinned sections start expanded on reload ────────────────────────
-
-  it('pinned sections start expanded', () => {
-    localStorage.setItem('specrails.dashboard.sectionPrefs.proj-1', JSON.stringify({
-      order: ['health', 'rails', 'commands', 'tickets', 'jobs'],
-      pinned: ['commands'],
-    }))
-
-    render(<DashboardPage />)
-    // Commands should be expanded because it's pinned
-    expect(screen.getByTestId('content-commands')).toBeInTheDocument()
-    // Others remain collapsed
-    expect(screen.queryByTestId('content-health')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('content-jobs')).not.toBeInTheDocument()
-  })
-
-  // ─── Wizards ─────────────────────────────────────────────────────────
-
-  it('ImplementWizard is not shown by default', () => {
-    render(<DashboardPage />)
-    expect(screen.queryByTestId('implement-wizard')).not.toBeInTheDocument()
-  })
-
-  it('BatchImplementWizard is not shown by default', () => {
-    render(<DashboardPage />)
-    expect(screen.queryByTestId('batch-wizard')).not.toBeInTheDocument()
-  })
-
 })

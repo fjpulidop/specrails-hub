@@ -29,6 +29,7 @@ import {
   type Ticket,
 } from './ticket-store'
 import type { TicketCreatedMessage, TicketUpdatedMessage, TicketDeletedMessage, LocalTicket } from './types'
+import { createRailsRouter } from './rails-router'
 
 // Extend Express Request to carry resolved ProjectContext
 declare module 'express-serve-static-core' {
@@ -73,6 +74,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     )
     hooksRouter(req, res, next)
   })
+
+  // Mount rails router under each project
+  const railsRouter = createRailsRouter()
+  router.use('/:projectId/rails', railsRouter)
 
   // ─── Queue / Spawn routes ────────────────────────────────────────────────────
 

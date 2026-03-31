@@ -38,6 +38,8 @@ export interface ProjectContext {
   specLauncherManager: SpecLauncherManager
   ticketWatcher: TicketWatcher
   broadcast: (msg: WsMessage) => void
+  /** Maps jobId → rail metadata for active rail-launched jobs */
+  railJobs: Map<string, { railIndex: number; mode: string }>
 }
 
 // ─── ProjectRegistry ──────────────────────────────────────────────────────────
@@ -135,6 +137,7 @@ export class ProjectRegistry {
     }
 
     const webhookManager = this._webhookManager
+    const railJobs = new Map<string, { railIndex: number; mode: string }>()
     const queueManager = new QueueManager(boundBroadcast, db, undefined, project.path, {
       provider: project.provider ?? 'claude',
       getCostAlertThreshold: () => {
@@ -165,6 +168,18 @@ export class ProjectRegistry {
           costUsd: costUsd ?? null,
           durationMs: jobRow?.duration_ms ?? null,
         })
+        // Broadcast rail.job_completed if this job was launched by a rail
+        const railMeta = railJobs.get(jobId)
+        if (railMeta) {
+          railJobs.delete(jobId)
+          boundBroadcast({
+            type: 'rail.job_completed',
+            projectId: project.id,
+            railIndex: railMeta.railIndex,
+            jobId,
+            status,
+          })
+        }
       },
     })
     const chatManager = new ChatManager(boundBroadcast, db, project.path, project.name, project.provider ?? 'claude')
@@ -187,7 +202,7 @@ export class ProjectRegistry {
     const ticketWatcher = new TicketWatcher(project.path, project.id, boundBroadcast)
     ticketWatcher.start()
 
-    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, specLauncherManager, ticketWatcher, broadcast: boundBroadcast }
+    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, specLauncherManager, ticketWatcher, broadcast: boundBroadcast, railJobs }
     this._contexts.set(project.id, ctx)
     return ctx
   }
