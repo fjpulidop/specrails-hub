@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
@@ -11,32 +11,48 @@ interface ProposeSpecModalProps {
 
 export function ProposeSpecModal({ open, onClose }: ProposeSpecModalProps) {
   const chat = useChatContext()
-  const startedRef = useRef(false)
+  const [conversationId, setConversationId] = useState<string | null>(null)
 
-  // Start a new conversation with the propose-spec command when modal opens
+  // Always start a fresh conversation when the modal opens
   useEffect(() => {
-    if (!open || !chat || startedRef.current) return
-    startedRef.current = true
-    chat.startWithMessage('/sr:propose-spec')
-  }, [open, chat])
+    if (!open || !chat) return
+    setConversationId(null)
+    void chat.startWithMessage('/sr:propose-spec')
+    return () => {
+      setConversationId(null)
+    }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset tracking flag when modal closes
+  // Track the conversation created for this session
   useEffect(() => {
-    if (!open) startedRef.current = false
-  }, [open])
+    if (!open || !chat || conversationId) return
+    const convo = chat.conversations[chat.activeTabIndex]
+    if (convo) setConversationId(convo.id)
+  }, [open, chat, chat?.conversations, chat?.activeTabIndex, conversationId])
 
-  const conversation = chat?.conversations[chat.activeTabIndex] ?? null
+  // Get the conversation matching this modal session
+  const conversation = chat?.conversations.find((c) => c.id === conversationId)
+    ?? (open ? chat?.conversations[chat.activeTabIndex] ?? null : null)
+
+  // Prevent closing on overlay/background click — only X button should close
+  const preventInteractOutside = useCallback((e: Event) => {
+    e.preventDefault()
+  }, [])
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl flex flex-col gap-0 p-0 overflow-hidden h-[580px]">
+      <DialogContent
+        className="max-w-2xl flex flex-col gap-0 p-0 overflow-hidden h-[580px]"
+        onInteractOutside={preventInteractOutside}
+        onPointerDownOutside={preventInteractOutside}
+      >
         <DialogHeader className="px-4 py-3 border-b border-border/40 shrink-0">
           <DialogTitle className="text-sm">Propose Spec</DialogTitle>
         </DialogHeader>
 
         {conversation ? (
           <>
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden">
               <MessageList
                 messages={conversation.messages}
                 streamingText={conversation.streamingText}
