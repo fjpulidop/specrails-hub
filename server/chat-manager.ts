@@ -176,7 +176,7 @@ export class ChatManager {
     addMessage(this._db, { conversation_id: conversationId, role: 'user', content: userText })
 
     // Resolve slash commands (e.g. /sr:propose-spec → prompt content)
-    const resolvedText = resolveCommand(userText, this._cwd)
+    const resolvedText = resolveCommand(userText, this._cwd ?? process.cwd())
 
     // Build spawn args based on provider
     let binary: string
