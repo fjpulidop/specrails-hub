@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.22.0](https://github.com/fjpulidop/specrails-hub/compare/v1.21.0...v1.22.0) (2026-03-23)
+
+
+### Features
+
+* **client:** useTickets hook — WS-driven auto-refresh, toast, and glow (SPEA-669) ([fe19a70](https://github.com/fjpulidop/specrails-hub/commit/fe19a702ddcd277a443ea685c3f1fdf17c26c34e))
+* **tickets:** add ticket CRUD REST API endpoints (SPEA-662) ([#142](https://github.com/fjpulidop/specrails-hub/issues/142)) ([f1ac3e2](https://github.com/fjpulidop/specrails-hub/commit/f1ac3e2e13c2753cd5fc362b1b24403095bdd6da))
+* **tickets:** kanban grid view with drag-and-drop (SPEA-665) ([#143](https://github.com/fjpulidop/specrails-hub/issues/143))  ([2baad4f](https://github.com/fjpulidop/specrails-hub/commit/2baad4f0a3057c8191e21a167b98e861b85ea67d))
+* WebSocket ticket events + chokidar file watcher (SPEA-663) ([45d3b75](https://github.com/fjpulidop/specrails-hub/commit/45d3b75d90945fddb65ce4903e4e8734bdc50240))
+
+
+### Bug Fixes
+
+* scope section pin/order prefs per project (SPEA-653) ([#140](https://github.com/fjpulidop/specrails-hub/issues/140)) ([74115d6](https://github.com/fjpulidop/specrails-hub/commit/74115d6a740d4df10ee9117e9e69831058bfb172))
+* use cmdk keywords prop to prevent value strings leaking into palette UI (SPEA-652) ([#139](https://github.com/fjpulidop/specrails-hub/issues/139)) ([29078de](https://github.com/fjpulidop/specrails-hub/commit/29078de3f0d054077cd64f238d69706a588b4d27))
+
 ## [1.21.0](https://github.com/fjpulidop/specrails-hub/compare/v1.20.2...v1.21.0) (2026-03-23)
 
 
