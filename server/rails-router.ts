@@ -77,25 +77,14 @@ export function createRailsRouter(): Router {
     try {
       let jobId: string
 
-      if (mode === 'batch-implement') {
-        const issueArgs = rail.ticketIds.map((id) => `#${id}`).join(' ')
-        const command = `/specrails:batch-implement ${issueArgs} --yes`
-        const job = c.queueManager.enqueue(command, 'normal')
-        jobId = job.id
-        c.railJobs.set(jobId, { railIndex, mode, ticketIds: [...rail.ticketIds] })
-      } else {
-        // implement: queue one job per ticket (chained via dependsOnJobId)
-        let prevJobId: string | undefined
-        for (const ticketId of rail.ticketIds) {
-          const command = `/specrails:implement #${ticketId} --yes`
-          const job = c.queueManager.enqueue(command, 'normal', {
-            dependsOnJobId: prevJobId,
-          })
-          c.railJobs.set(job.id, { railIndex, mode, ticketIds: [ticketId] })
-          prevJobId = job.id
-        }
-        jobId = prevJobId!
-      }
+      // Both modes create a single job with all ticket IDs.
+      // /specrails:implement handles multiple specs in parallel internally.
+      const issueArgs = rail.ticketIds.map((id) => `#${id}`).join(' ')
+      const commandName = mode === 'batch-implement' ? 'batch-implement' : 'implement'
+      const command = `/specrails:${commandName} ${issueArgs} --yes`
+      const job = c.queueManager.enqueue(command, 'normal')
+      jobId = job.id
+      c.railJobs.set(jobId, { railIndex, mode, ticketIds: [...rail.ticketIds] })
 
       const startMsg: RailJobStartedMessage = {
         type: 'rail.job_started',
