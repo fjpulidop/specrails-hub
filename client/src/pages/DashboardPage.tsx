@@ -132,6 +132,24 @@ export default function DashboardPage() {
     return () => { cancelled = true }
   }, [activeProjectId, connectionStatus])
 
+  // ── Auto-remove done tickets from rails ──────────────────────────────────────
+  // When ticket status changes to 'done' (via WS ticket_updated, re-fetch, etc.),
+  // strip those tickets from rails so they appear in Done Specs instead.
+  useEffect(() => {
+    const doneIds = new Set(tickets.filter((t) => t.status === 'done').map((t) => t.id))
+    if (doneIds.size === 0) return
+    setRails((prev) => {
+      const next = prev.map((r) => {
+        const filtered = r.ticketIds.filter((id) => !doneIds.has(id))
+        if (filtered.length === r.ticketIds.length) return r
+        return { ...r, ticketIds: filtered }
+      })
+      if (next.every((r, i) => r === prev[i])) return prev // no change
+      saveRails(activeProjectId, next)
+      return next
+    })
+  }, [tickets, activeProjectId])
+
   // Persist-aware spec order updater
   const updateSpecOrder = useCallback((updater: (prev: number[] | null) => number[] | null) => {
     setSpecOrderIds((prev) => {
