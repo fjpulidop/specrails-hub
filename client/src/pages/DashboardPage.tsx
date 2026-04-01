@@ -78,6 +78,7 @@ function saveRails(projectId: string | null, rails: RailState[]) {
 export default function DashboardPage() {
   const { activeProjectId } = useHub()
   const { tickets, isLoading, updateTicket, deleteTicket, createTicket } = useTickets()
+  const { registerHandler, unregisterHandler, connectionStatus } = useSharedWebSocket()
   const [detailTicket, setDetailTicket] = useState<LocalTicket | null>(null)
   const [createTicketOpen, setCreateTicketOpen] = useState(false)
 
@@ -92,11 +93,14 @@ export default function DashboardPage() {
     setRails(loadRails(activeProjectId) ?? INITIAL_RAILS)
   }, [activeProjectId])
 
-  // ── Reconcile stale 'running' rails on mount / project switch ───────────────
+  // ── Reconcile stale 'running' rails on mount / project switch / WS reconnect ─
   // If the user navigates away while a rail is running, the WS handler is
-  // unregistered and the rail.job_completed event is missed. On re-mount,
-  // check the server for active rail jobs and reset any stale 'running' rails.
+  // unregistered and the rail.job_completed event is missed. Also, after a
+  // server restart the WS reconnects but stale 'running' state persists in
+  // localStorage. On re-mount or reconnect, check the server for active rail
+  // jobs and reset any stale 'running' rails.
   useEffect(() => {
+    if (connectionStatus !== 'connected') return
     const currentRails = loadRails(activeProjectId) ?? INITIAL_RAILS
     const hasRunning = currentRails.some((r) => r.status === 'running')
     if (!hasRunning || !activeProjectId) return
@@ -126,7 +130,7 @@ export default function DashboardPage() {
       .catch(() => {})
 
     return () => { cancelled = true }
-  }, [activeProjectId])
+  }, [activeProjectId, connectionStatus])
 
   // Persist-aware spec order updater
   const updateSpecOrder = useCallback((updater: (prev: number[] | null) => number[] | null) => {
@@ -147,7 +151,6 @@ export default function DashboardPage() {
   }, [activeProjectId])
 
   // ── WebSocket: listen for rail.job_completed to reset rail status ────────────
-  const { registerHandler, unregisterHandler } = useSharedWebSocket()
   const activeProjectIdRef = useRef(activeProjectId)
   useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
 
