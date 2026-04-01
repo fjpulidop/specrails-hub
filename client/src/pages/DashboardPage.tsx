@@ -203,6 +203,10 @@ export default function DashboardPage() {
     toast.info(`${rail.label} removed`)
   }, [rails, updateRails, updateSpecOrder])
 
+  const handleRenameRail = useCallback((railId: string, newLabel: string) => {
+    updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, label: `Rail ${newLabel}` } : r)))
+  }, [updateRails])
+
   // ── WebSocket: listen for rail.job_completed to reset rail status ────────────
   const activeProjectIdRef = useRef(activeProjectId)
   useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
@@ -468,6 +472,7 @@ export default function DashboardPage() {
             onTicketClick={setDetailTicket}
             onAddRail={handleAddRail}
             onDeleteRail={handleDeleteRail}
+            onRenameRail={handleRenameRail}
           />
         </div>
       </div>

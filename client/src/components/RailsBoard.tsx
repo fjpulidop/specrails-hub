@@ -20,9 +20,10 @@ interface RailsBoardProps {
   onTicketClick: (ticket: LocalTicket) => void
   onAddRail: () => void
   onDeleteRail: (railId: string) => void
+  onRenameRail: (railId: string, newLabel: string) => void
 }
 
-export function RailsBoard({ rails, ticketMap, onModeChange, onToggle, onTicketClick, onAddRail, onDeleteRail }: RailsBoardProps) {
+export function RailsBoard({ rails, ticketMap, onModeChange, onToggle, onTicketClick, onAddRail, onDeleteRail, onRenameRail }: RailsBoardProps) {
   const activeRails = rails.filter((r) => r.status === 'running').length
   const [jiggleMode, setJiggleMode] = useState(false)
 
@@ -68,6 +69,7 @@ export function RailsBoard({ rails, ticketMap, onModeChange, onToggle, onTicketC
             onTicketClick={onTicketClick}
             onDelete={() => onDeleteRail(rail.id)}
             onLongPress={() => setJiggleMode(true)}
+            onRename={(newLabel) => onRenameRail(rail.id, newLabel)}
           />
         ))}
 

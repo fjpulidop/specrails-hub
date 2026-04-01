@@ -21,16 +21,20 @@ interface RailRowProps {
   onTicketClick: (ticket: LocalTicket) => void
   onDelete: () => void
   onLongPress: () => void
+  onRename: (newLabel: string) => void
 }
 
 export function RailRow({
   id, label, tickets, mode, status, jiggleMode,
-  onModeChange, onToggle, onTicketClick, onDelete, onLongPress,
+  onModeChange, onToggle, onTicketClick, onDelete, onLongPress, onRename,
 }: RailRowProps) {
   const { isOver, setNodeRef } = useDroppable({ id })
   const [swipeX, setSwipeX] = useState(0)
   const [swiping, setSwiping] = useState(false)
   const [showSwipeDelete, setShowSwipeDelete] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editValue, setEditValue] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFiredRef = useRef(false)
@@ -180,7 +184,48 @@ export function RailRow({
                 status === 'running' ? 'bg-emerald-400 shadow-[0_0_4px_hsl(142_70%_56%/0.8)] animate-pulse' : 'bg-muted-foreground/25'
               }`}
             />
-            <span className="text-xs font-medium text-foreground/80">{label}</span>
+            {editing ? (
+              <form
+                className="flex items-center gap-0.5"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  const trimmed = editValue.trim()
+                  if (trimmed) onRename(trimmed)
+                  setEditing(false)
+                }}
+              >
+                <span className="text-xs font-medium text-foreground/50">Rail -</span>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onBlur={() => {
+                    const trimmed = editValue.trim()
+                    if (trimmed) onRename(trimmed)
+                    setEditing(false)
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Escape') { setEditing(false) } }}
+                  className="w-24 text-xs font-medium bg-transparent border-b border-primary/50 outline-none text-foreground/80 px-0.5"
+                  autoFocus
+                />
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  // Extract suffix after "Rail " prefix for editing
+                  const suffix = label.startsWith('Rail ') ? label.slice(5) : label
+                  setEditValue(suffix)
+                  setEditing(true)
+                  setTimeout(() => inputRef.current?.select(), 0)
+                }}
+                className="text-xs font-medium text-foreground/80 hover:text-foreground hover:underline decoration-dotted underline-offset-2 cursor-text transition-colors"
+              >
+                {label}
+              </button>
+            )}
             {tickets.length > 0 && (
               <span className="text-[9px] text-muted-foreground bg-muted/30 rounded-full px-1.5 py-0.5 leading-none">
                 {tickets.length}
