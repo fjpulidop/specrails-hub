@@ -564,6 +564,7 @@ export interface RailJobCompletedMessage {
   railIndex: number
   jobId: string
   status: string
+  ticketIds: number[]
 }
 
 export type WsMessage =

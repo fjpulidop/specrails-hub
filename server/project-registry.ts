@@ -8,7 +8,8 @@ import { ProposalManager } from './proposal-manager'
 import { SpecLauncherManager } from './spec-launcher-manager'
 import { WebhookManager } from './webhook-manager'
 import { TicketWatcher } from './ticket-watcher'
-import type { WsMessage } from './types'
+import { resolveTicketStoragePath, mutateStore } from './ticket-store'
+import type { WsMessage, TicketUpdatedMessage } from './types'
 import {
   initHubDb,
   getHubDbPath,
@@ -39,7 +40,7 @@ export interface ProjectContext {
   ticketWatcher: TicketWatcher
   broadcast: (msg: WsMessage) => void
   /** Maps jobId → rail metadata for active rail-launched jobs */
-  railJobs: Map<string, { railIndex: number; mode: string }>
+  railJobs: Map<string, { railIndex: number; mode: string; ticketIds: number[] }>
 }
 
 // ─── ProjectRegistry ──────────────────────────────────────────────────────────
@@ -137,7 +138,7 @@ export class ProjectRegistry {
     }
 
     const webhookManager = this._webhookManager
-    const railJobs = new Map<string, { railIndex: number; mode: string }>()
+    const railJobs = new Map<string, { railIndex: number; mode: string; ticketIds: number[] }>()
     const queueManager = new QueueManager(boundBroadcast, db, undefined, project.path, {
       provider: project.provider ?? 'claude',
       getCostAlertThreshold: () => {
@@ -172,12 +173,40 @@ export class ProjectRegistry {
         const railMeta = railJobs.get(jobId)
         if (railMeta) {
           railJobs.delete(jobId)
+          const completedTicketIds = railMeta.ticketIds
+
+          // Mark tickets as done when job completed successfully
+          if (status === 'completed' && completedTicketIds.length > 0) {
+            try {
+              const ticketFile = resolveTicketStoragePath(project.path)
+              mutateStore(ticketFile, (store) => {
+                for (const tid of completedTicketIds) {
+                  const ticket = store.tickets[String(tid)]
+                  if (ticket && ticket.status !== 'done') {
+                    ticket.status = 'done'
+                    ticket.updated_at = new Date().toISOString()
+                    // Broadcast individual ticket updates
+                    boundBroadcast({
+                      type: 'ticket_updated',
+                      ticket: ticket as unknown as import('./types').LocalTicket,
+                      projectId: project.id,
+                      timestamp: ticket.updated_at,
+                    } as TicketUpdatedMessage)
+                  }
+                }
+              })
+            } catch (err) {
+              console.error('[project-registry] failed to mark rail tickets as done:', err)
+            }
+          }
+
           boundBroadcast({
             type: 'rail.job_completed',
             projectId: project.id,
             railIndex: railMeta.railIndex,
             jobId,
             status,
+            ticketIds: completedTicketIds,
           })
         }
       },

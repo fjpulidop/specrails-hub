@@ -116,11 +116,23 @@ export default function DashboardPage() {
   useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
 
   const handleRailWsMessage = useCallback((msg: unknown) => {
-    const m = msg as { type?: string; projectId?: string; railIndex?: number; status?: string }
+    const m = msg as { type?: string; projectId?: string; railIndex?: number; status?: string; ticketIds?: number[] }
     if (m.projectId !== activeProjectIdRef.current) return
     if (m.type === 'rail.job_completed') {
       const railId = `rail-${(m.railIndex ?? 0) + 1}`
-      updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'idle' } : r)))
+      const completedTicketIds = new Set(m.ticketIds ?? [])
+
+      if (m.status === 'completed' && completedTicketIds.size > 0) {
+        // Clear completed tickets from the rail — they'll appear in Done Specs
+        // via ticket_updated WS events that update the ticket list
+        updateRails((prev) => prev.map((r) => {
+          if (r.id !== railId) return r
+          return { ...r, status: 'idle', ticketIds: r.ticketIds.filter((id) => !completedTicketIds.has(id)) }
+        }))
+      } else {
+        updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'idle' } : r)))
+      }
+
       const statusLabel = m.status === 'completed' ? 'completed' : m.status === 'failed' ? 'failed' : m.status ?? 'finished'
       toast.info(`Rail ${(m.railIndex ?? 0) + 1} ${statusLabel}`)
     }

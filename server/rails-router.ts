@@ -82,7 +82,7 @@ export function createRailsRouter(): Router {
         const command = `/specrails:batch-implement ${issueArgs} --yes`
         const job = c.queueManager.enqueue(command, 'normal')
         jobId = job.id
-        c.railJobs.set(jobId, { railIndex, mode })
+        c.railJobs.set(jobId, { railIndex, mode, ticketIds: [...rail.ticketIds] })
       } else {
         // implement: queue one job per ticket (chained via dependsOnJobId)
         let prevJobId: string | undefined
@@ -91,7 +91,7 @@ export function createRailsRouter(): Router {
           const job = c.queueManager.enqueue(command, 'normal', {
             dependsOnJobId: prevJobId,
           })
-          c.railJobs.set(job.id, { railIndex, mode })
+          c.railJobs.set(job.id, { railIndex, mode, ticketIds: [ticketId] })
           prevJobId = job.id
         }
         jobId = prevJobId!
