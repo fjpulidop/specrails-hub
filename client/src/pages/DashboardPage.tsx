@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -20,6 +20,7 @@ import { TicketDetailModal } from '../components/TicketDetailModal'
 import { CreateTicketModal } from '../components/CreateTicketModal'
 import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
+import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import type { LocalTicket } from '../types'
 import type { RailMode, RailStatus } from '../components/RailControls'
 
@@ -108,6 +109,27 @@ export default function DashboardPage() {
       return next
     })
   }, [activeProjectId])
+
+  // ── WebSocket: listen for rail.job_completed to reset rail status ────────────
+  const { registerHandler, unregisterHandler } = useSharedWebSocket()
+  const activeProjectIdRef = useRef(activeProjectId)
+  useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
+
+  const handleRailWsMessage = useCallback((msg: unknown) => {
+    const m = msg as { type?: string; projectId?: string; railIndex?: number; status?: string }
+    if (m.projectId !== activeProjectIdRef.current) return
+    if (m.type === 'rail.job_completed') {
+      const railId = `rail-${(m.railIndex ?? 0) + 1}`
+      updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'idle' } : r)))
+      const statusLabel = m.status === 'completed' ? 'completed' : m.status === 'failed' ? 'failed' : m.status ?? 'finished'
+      toast.info(`Rail ${(m.railIndex ?? 0) + 1} ${statusLabel}`)
+    }
+  }, [updateRails])
+
+  useEffect(() => {
+    registerHandler('dashboard-rails', handleRailWsMessage)
+    return () => unregisterHandler('dashboard-rails')
+  }, [handleRailWsMessage, registerHandler, unregisterHandler])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -272,25 +294,41 @@ export default function DashboardPage() {
     const rail = rails.find((r) => r.id === railId)
     if (!rail) return
 
+    // Rail index: 'rail-1' → 0, 'rail-2' → 1, 'rail-3' → 2
+    const railIndex = parseInt(railId.replace('rail-', ''), 10) - 1
+
     if (rail.status === 'running') {
-      // Stop: just reset UI state (job cancellation is done from the Jobs page)
-      updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'idle' } : r)))
+      // Stop via rails API
+      try {
+        await fetch(`${getApiBase()}/rails/${railIndex}/stop`, { method: 'POST' })
+        updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'idle' } : r)))
+        toast.info(`${rail.label} stopped`)
+      } catch {
+        toast.error('Failed to stop rail')
+      }
       return
     }
 
     if (rail.ticketIds.length === 0) return
 
-    // Build the command: /specrails:implement or /specrails:batch-implement with ticket IDs
-    const ticketArgs = rail.ticketIds.map((id) => `#${id}`).join(' ')
-    const command = rail.mode === 'batch-implement'
-      ? `/specrails:batch-implement ${ticketArgs}`
-      : `/specrails:implement ${ticketArgs}`
-
+    // Sync ticket assignments to server before launching
     try {
-      const res = await fetch(`${getApiBase()}/spawn`, {
+      await fetch(`${getApiBase()}/rails/${railIndex}/tickets`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketIds: rail.ticketIds }),
+      })
+    } catch {
+      toast.error('Failed to sync rail tickets')
+      return
+    }
+
+    // Launch via rails API — server handles job tracking + rail.job_completed events
+    try {
+      const res = await fetch(`${getApiBase()}/rails/${railIndex}/launch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command }),
+        body: JSON.stringify({ mode: rail.mode }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: 'Failed to launch' }))

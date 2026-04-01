@@ -8,6 +8,14 @@ vi.mock('../../lib/api', () => ({
   getApiBase: () => '/api',
 }))
 
+vi.mock('../../hooks/useSharedWebSocket', () => ({
+  useSharedWebSocket: () => ({
+    registerHandler: vi.fn(),
+    unregisterHandler: vi.fn(),
+    connectionStatus: 'connected',
+  }),
+}))
+
 const mockTickets: LocalTicket[] = [
   {
     id: 1,
