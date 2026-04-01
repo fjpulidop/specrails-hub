@@ -304,7 +304,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
           const statusInfo = STATUS_BADGE[job.status] ?? STATUS_BADGE.queued
           const cost = formatCost(job.total_cost_usd)
           const duration = formatWallDuration(job.started_at, job.finished_at)
-          const tokens = formatTokens(job.tokens_out)
+          const tokens = formatTokens(((job.tokens_in ?? 0) + (job.tokens_out ?? 0)) || null)
 
           const isProposal = job.id.startsWith('proposal:')
           const proposalId = isProposal ? job.id.replace('proposal:', '') : null
