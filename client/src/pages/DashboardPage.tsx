@@ -95,11 +95,16 @@ export default function DashboardPage() {
     return ids
   }, [rails])
 
-  // Spec tickets: source-filtered + not currently in any rail, in user drag-order
-  const specTickets = useMemo(() => {
-    const filtered = tickets.filter(
+  // All spec-source tickets not in rails
+  const allSpecTickets = useMemo(() => {
+    return tickets.filter(
       (t) => (t.source === 'propose-spec' || t.source === 'product-backlog' || t.source === 'get-backlog-specs') && !railTicketIds.has(t.id),
     )
+  }, [tickets, railTicketIds])
+
+  // Active specs (not done) in user drag-order
+  const specTickets = useMemo(() => {
+    const filtered = allSpecTickets.filter((t) => t.status !== 'done')
     if (!specOrderIds) return filtered
     const map = new Map(filtered.map((t) => [t.id, t]))
     const result: LocalTicket[] = []
@@ -111,7 +116,12 @@ export default function DashboardPage() {
       if (!specOrderIds.includes(t.id)) result.push(t)
     }
     return result
-  }, [tickets, railTicketIds, specOrderIds])
+  }, [allSpecTickets, specOrderIds])
+
+  // Done specs
+  const doneSpecTickets = useMemo(() => {
+    return allSpecTickets.filter((t) => t.status === 'done')
+  }, [allSpecTickets])
 
   // ── DnD helpers ──────────────────────────────────────────────────────────────
   const findContainer = useCallback(
@@ -269,7 +279,7 @@ export default function DashboardPage() {
       <div className="flex h-full overflow-hidden">
         {/* Left panel: Specs board */}
         <div className="flex-1 min-w-0 border-r border-border/40 flex flex-col overflow-hidden">
-          <SpecsBoard tickets={specTickets} isLoading={isLoading} onTicketClick={setDetailTicket} />
+          <SpecsBoard tickets={specTickets} doneTickets={doneSpecTickets} isLoading={isLoading} onTicketClick={setDetailTicket} />
         </div>
 
         {/* Right panel: Rails board */}

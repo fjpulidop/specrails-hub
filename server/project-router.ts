@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid'
 import type { AnalyticsOpts } from './types'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import {
-  listJobs, getJob, getJobEvents, purgeJobs, getProjectActivity,
+  listJobs, getJob, getJobEvents, purgeJobs, deleteJob, getProjectActivity,
   createConversation, listConversations, getConversation,
   deleteConversation, updateConversation, getMessages,
   getStats, getPipelineJobs,
@@ -145,7 +145,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       if (err instanceof JobNotFoundError) {
         res.status(404).json({ error: 'Job not found' })
       } else if (err instanceof JobAlreadyTerminalError) {
-        res.status(409).json({ error: 'Job is already in terminal state' })
+        // Job already finished — delete it from the DB
+        deleteJob(ctx(req).db, req.params.id as string)
+        res.json({ ok: true, status: 'deleted' })
       } else {
         res.status(500).json({ error: 'Internal server error' })
       }
