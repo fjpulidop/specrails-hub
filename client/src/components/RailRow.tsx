@@ -6,8 +6,8 @@ import { RailControls, type RailMode, type RailStatus } from './RailControls'
 import { SpecCard } from './SpecCard'
 import type { LocalTicket } from '../types'
 
-const LONG_PRESS_MS = 600
-const SWIPE_THRESHOLD = 80
+const LONG_PRESS_MS = 800
+const SWIPE_THRESHOLD = 60
 
 interface RailRowProps {
   id: string
@@ -29,9 +29,11 @@ export function RailRow({
 }: RailRowProps) {
   const { isOver, setNodeRef } = useDroppable({ id })
   const [swipeX, setSwipeX] = useState(0)
+  const [swiping, setSwiping] = useState(false)
   const [showSwipeDelete, setShowSwipeDelete] = useState(false)
-  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressFiredRef = useRef(false)
 
   const isRunning = status === 'running'
   const canDelete = !isRunning
@@ -44,18 +46,24 @@ export function RailRow({
     }
   }, [])
 
+  const startLongPress = useCallback(() => {
+    if (!canDelete) return
+    longPressFiredRef.current = false
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true
+      onLongPress()
+      longPressTimerRef.current = null
+    }, LONG_PRESS_MS)
+  }, [canDelete, onLongPress])
+
+  // ── Touch handlers (swipe + long press) ───────────────────────────────────
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0]
-    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() }
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+    setSwiping(false)
     setShowSwipeDelete(false)
-
-    if (canDelete) {
-      longPressTimerRef.current = setTimeout(() => {
-        onLongPress()
-        longPressTimerRef.current = null
-      }, LONG_PRESS_MS)
-    }
-  }, [canDelete, onLongPress])
+    startLongPress()
+  }, [startLongPress])
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (!touchStartRef.current) return
@@ -63,37 +71,44 @@ export function RailRow({
     const dx = touch.clientX - touchStartRef.current.x
     const dy = touch.clientY - touchStartRef.current.y
 
-    // Cancel long press if finger moves too much
+    // Cancel long press if finger moves
     if (Math.abs(dx) > 10 || Math.abs(dy) > 10) clearLongPress()
 
-    // Only track horizontal swipe (left)
-    if (canDelete && dx < 0 && Math.abs(dx) > Math.abs(dy)) {
-      setSwipeX(Math.max(dx, -120))
+    // Horizontal swipe left
+    if (canDelete && dx < -10 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      setSwiping(true)
+      // Apply rubber-band resistance past threshold
+      const raw = Math.max(dx, -150)
+      setSwipeX(raw)
     }
   }, [canDelete, clearLongPress])
 
   const handleTouchEnd = useCallback(() => {
     clearLongPress()
-    if (swipeX < -SWIPE_THRESHOLD && canDelete) {
-      setShowSwipeDelete(true)
-      setSwipeX(-SWIPE_THRESHOLD)
-    } else {
-      setSwipeX(0)
-      setShowSwipeDelete(false)
+    if (swiping) {
+      if (swipeX < -SWIPE_THRESHOLD && canDelete) {
+        setShowSwipeDelete(true)
+        setSwipeX(-80) // snap to reveal delete button
+      } else {
+        setSwipeX(0)
+        setShowSwipeDelete(false)
+      }
+      setSwiping(false)
     }
     touchStartRef.current = null
-  }, [swipeX, canDelete, clearLongPress])
+  }, [swipeX, swiping, canDelete, clearLongPress])
 
-  // ── Mouse long press (for desktop) ────────────────────────────────────────
-  const handleMouseDown = useCallback(() => {
-    if (!canDelete) return
-    longPressTimerRef.current = setTimeout(() => {
-      onLongPress()
-      longPressTimerRef.current = null
-    }, LONG_PRESS_MS)
-  }, [canDelete, onLongPress])
+  // ── Mouse handlers (long press only — no mouse swipe) ─────────────────────
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Only start long press on the rail header area, not on buttons
+    if ((e.target as HTMLElement).closest('button')) return
+    startLongPress()
+  }, [startLongPress])
 
-  const handleMouseUp = useCallback(() => { clearLongPress() }, [clearLongPress])
+  const handleMouseUp = useCallback(() => {
+    // Only clear the timer — don't exit jiggle mode (it persists after release)
+    clearLongPress()
+  }, [clearLongPress])
 
   const handleDeleteClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
@@ -102,7 +117,7 @@ export function RailRow({
     onDelete()
   }, [onDelete])
 
-  // Dismiss swipe on click elsewhere on the rail
+  // Dismiss swipe on click
   const handleRailClick = useCallback(() => {
     if (showSwipeDelete) {
       setShowSwipeDelete(false)
@@ -137,7 +152,7 @@ export function RailRow({
 
       {/* Main rail content (slides left on swipe) */}
       <div
-        className={`relative z-10 flex flex-col rounded-xl border transition-all duration-200 overflow-hidden ${
+        className={`relative z-10 flex flex-col rounded-xl border overflow-hidden ${
           jiggleMode && canDelete ? 'animate-jiggle' : ''
         } ${
           isOver
@@ -146,7 +161,7 @@ export function RailRow({
         }`}
         style={{
           transform: swipeX < 0 ? `translateX(${swipeX}px)` : undefined,
-          transition: swipeX === 0 ? 'transform 0.2s ease' : 'none',
+          transition: swiping ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1)',
           backdropFilter: 'blur(8px)',
         }}
       >

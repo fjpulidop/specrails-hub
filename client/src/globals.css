@@ -84,12 +84,15 @@
 
 /* Jiggle animation for rail delete mode (iOS-style) */
 @keyframes jiggle {
-  0%, 100% { transform: rotate(-0.5deg); }
-  50%      { transform: rotate(0.5deg); }
+  0%   { transform: rotate(-0.4deg) translateX(-0.5px); }
+  25%  { transform: rotate(0.3deg) translateX(0.5px); }
+  50%  { transform: rotate(-0.3deg) translateX(-0.3px); }
+  75%  { transform: rotate(0.4deg) translateX(0.3px); }
+  100% { transform: rotate(-0.4deg) translateX(-0.5px); }
 }
 
 @utility animate-jiggle {
-  animation: jiggle 0.15s ease-in-out infinite;
+  animation: jiggle 0.4s ease-in-out infinite;
 }
 
 /* Dracula glow effects */
