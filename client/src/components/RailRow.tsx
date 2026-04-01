@@ -194,7 +194,7 @@ export function RailRow({
                   setEditing(false)
                 }}
               >
-                <span className="text-xs font-medium text-foreground/50">Rail -</span>
+                <span className="text-xs font-medium text-foreground/50">Rail </span>
                 <input
                   ref={inputRef}
                   type="text"
