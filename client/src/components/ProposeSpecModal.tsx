@@ -13,11 +13,14 @@ export function ProposeSpecModal({ open, onClose }: ProposeSpecModalProps) {
   const chat = useChatContext()
   const [conversationId, setConversationId] = useState<string | null>(null)
   const conversationIdRef = useRef<string | null>(null)
+  const prevConvoIdsRef = useRef<Set<string>>(new Set())
 
   // Always start a fresh conversation when the modal opens;
   // kill the Claude process when the modal closes.
   useEffect(() => {
     if (!open || !chat) return
+    // Snapshot existing conversation IDs so we can detect the new one
+    prevConvoIdsRef.current = new Set(chat.conversations.map((c) => c.id))
     conversationIdRef.current = null
     setConversationId(null)
     void chat.startWithMessage('/specrails:propose-spec')
@@ -30,19 +33,18 @@ export function ProposeSpecModal({ open, onClose }: ProposeSpecModalProps) {
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Track the conversation created for this session
+  // Track the NEW conversation created for this session (ignore pre-existing ones)
   useEffect(() => {
     if (!open || !chat || conversationId) return
-    const convo = chat.conversations[chat.activeTabIndex]
-    if (convo) {
-      conversationIdRef.current = convo.id
-      setConversationId(convo.id)
+    const newConvo = chat.conversations.find((c) => !prevConvoIdsRef.current.has(c.id))
+    if (newConvo) {
+      conversationIdRef.current = newConvo.id
+      setConversationId(newConvo.id)
     }
-  }, [open, chat, chat?.conversations, chat?.activeTabIndex, conversationId])
+  }, [open, chat, chat?.conversations, conversationId])
 
-  // Get the conversation matching this modal session
-  const conversation = chat?.conversations.find((c) => c.id === conversationId)
-    ?? (open ? chat?.conversations[chat.activeTabIndex] ?? null : null)
+  // Only show the conversation created for this modal session
+  const conversation = chat?.conversations.find((c) => c.id === conversationId) ?? null
 
   // Prevent closing on overlay/background click — only X button should close
   const preventInteractOutside = useCallback((e: Event) => {
