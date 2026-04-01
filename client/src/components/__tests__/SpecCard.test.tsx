@@ -86,27 +86,21 @@ describe('SpecCard', () => {
   it('calls onClick when Enter key is pressed', () => {
     const ticket = makeTicket()
     render(<SpecCard ticket={ticket} onClick={onClickMock} />)
-    const card = screen.getByRole('button', { name: /Drag to reorder/ }).parentElement!
+    const card = screen.getByText('Build the feature').closest('[role="button"]')!
     fireEvent.keyDown(card, { key: 'Enter' })
     expect(onClickMock).toHaveBeenCalledWith(ticket)
   })
 
-  it('renders drag handle button', () => {
+  it('entire card surface is draggable (no separate grip handle)', () => {
     render(<SpecCard ticket={makeTicket()} onClick={onClickMock} />)
-    expect(screen.getByRole('button', { name: /Drag to reorder/i })).toBeInTheDocument()
-  })
-
-  it('drag handle click does not propagate to card click', () => {
-    render(<SpecCard ticket={makeTicket()} onClick={onClickMock} />)
-    const dragHandle = screen.getByRole('button', { name: /Drag to reorder/i })
-    fireEvent.click(dragHandle)
-    expect(onClickMock).not.toHaveBeenCalled()
+    const card = screen.getByText('Build the feature').closest('[role="button"]')!
+    expect(card).toHaveClass('cursor-grab')
   })
 
   it('has correct accessibility role and tabIndex', () => {
     const ticket = makeTicket()
     render(<SpecCard ticket={ticket} onClick={onClickMock} />)
-    const card = screen.getByRole('button', { name: /Drag to reorder/ }).parentElement!
+    const card = screen.getByText('Build the feature').closest('[role="button"]')!
     expect(card).toHaveAttribute('role', 'button')
     expect(card).toHaveAttribute('tabIndex', '0')
   })

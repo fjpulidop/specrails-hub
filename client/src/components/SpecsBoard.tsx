@@ -21,7 +21,7 @@ export function SpecsBoard({ tickets, isLoading, onTicketClick }: SpecsBoardProp
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/40 shrink-0">
+      <div className="flex items-center justify-between px-4 h-12 border-b border-border/40 shrink-0">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Specs</h2>

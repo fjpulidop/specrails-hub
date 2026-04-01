@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -12,11 +12,14 @@ import {
   type UniqueIdentifier,
 } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
+import { toast } from 'sonner'
 import { useTickets } from '../hooks/useTickets'
 import { SpecsBoard } from '../components/SpecsBoard'
 import { RailsBoard, type RailState } from '../components/RailsBoard'
 import { TicketDetailModal } from '../components/TicketDetailModal'
 import { CreateTicketModal } from '../components/CreateTicketModal'
+import { getApiBase } from '../lib/api'
+import { useHub } from '../hooks/useHub'
 import type { LocalTicket } from '../types'
 import type { RailMode } from '../components/RailControls'
 
@@ -28,15 +31,49 @@ const INITIAL_RAILS: RailState[] = [
   { id: 'rail-3', label: 'Rail 3', ticketIds: [], mode: 'implement', status: 'idle' },
 ]
 
+function loadSpecOrder(projectId: string | null): number[] | null {
+  if (!projectId) return null
+  try {
+    const raw = localStorage.getItem(`specrails-hub:spec-order:${projectId}`)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : null
+  } catch { return null }
+}
+
+function saveSpecOrder(projectId: string | null, ids: number[] | null) {
+  if (!projectId) return
+  if (ids) {
+    localStorage.setItem(`specrails-hub:spec-order:${projectId}`, JSON.stringify(ids))
+  } else {
+    localStorage.removeItem(`specrails-hub:spec-order:${projectId}`)
+  }
+}
+
 export default function DashboardPage() {
+  const { activeProjectId } = useHub()
   const { tickets, isLoading, updateTicket, deleteTicket, createTicket } = useTickets()
   const [detailTicket, setDetailTicket] = useState<LocalTicket | null>(null)
   const [createTicketOpen, setCreateTicketOpen] = useState(false)
 
   // ── Drag state ───────────────────────────────────────────────────────────────
   const [activeId, setActiveId] = useState<number | null>(null)
-  const [specOrderIds, setSpecOrderIds] = useState<number[] | null>(null)
+  const [specOrderIds, setSpecOrderIds] = useState<number[] | null>(() => loadSpecOrder(activeProjectId))
   const [rails, setRails] = useState<RailState[]>(INITIAL_RAILS)
+
+  // Reset spec order when active project changes
+  useEffect(() => {
+    setSpecOrderIds(loadSpecOrder(activeProjectId))
+  }, [activeProjectId])
+
+  // Persist-aware spec order updater
+  const updateSpecOrder = useCallback((updater: (prev: number[] | null) => number[] | null) => {
+    setSpecOrderIds((prev) => {
+      const next = updater(prev)
+      saveSpecOrder(activeProjectId, next)
+      return next
+    })
+  }, [activeProjectId])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -127,7 +164,7 @@ export default function DashboardPage() {
         const oldIdx = ids.indexOf(draggedId)
         const newIdx = ids.indexOf(overId as number)
         if (oldIdx !== -1 && newIdx !== -1 && oldIdx !== newIdx) {
-          setSpecOrderIds(arrayMove(ids, oldIdx, newIdx))
+          updateSpecOrder(() => arrayMove(ids, oldIdx, newIdx))
         }
       } else {
         setRails((prev) =>
@@ -146,7 +183,7 @@ export default function DashboardPage() {
       // ── Move between containers ───────────────────────────────────────────
       if (sourceContainer === 'specs') {
         // Specs → Rail
-        setSpecOrderIds((prev) => (prev ?? specTickets.map((t) => t.id)).filter((id) => id !== draggedId))
+        updateSpecOrder((prev) => (prev ?? specTickets.map((t) => t.id)).filter((id) => id !== draggedId))
         setRails((prev) =>
           prev.map((r) => {
             if (r.id !== destContainer) return r
@@ -161,7 +198,7 @@ export default function DashboardPage() {
             return { ...r, ticketIds: r.ticketIds.filter((id) => id !== draggedId) }
           }),
         )
-        setSpecOrderIds((prev) => {
+        updateSpecOrder((prev) => {
           const current = prev ?? specTickets.map((t) => t.id)
           return insertAt(current, draggedId, overId)
         })
@@ -187,10 +224,42 @@ export default function DashboardPage() {
     setRails((prev) => prev.map((r) => (r.id === railId ? { ...r, mode } : r)))
   }
 
-  function handleToggle(railId: string) {
-    setRails((prev) =>
-      prev.map((r) => (r.id === railId ? { ...r, status: r.status === 'running' ? 'idle' : 'running' } : r)),
-    )
+  async function handleToggle(railId: string) {
+    const rail = rails.find((r) => r.id === railId)
+    if (!rail) return
+
+    if (rail.status === 'running') {
+      // Stop: just reset UI state (job cancellation is done from the Jobs page)
+      setRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'idle' } : r)))
+      return
+    }
+
+    if (rail.ticketIds.length === 0) return
+
+    // Build the command: /specrails:implement or /specrails:batch-implement with ticket IDs
+    const ticketArgs = rail.ticketIds.map((id) => `#${id}`).join(' ')
+    const command = rail.mode === 'batch-implement'
+      ? `/specrails:batch-implement ${ticketArgs}`
+      : `/specrails:implement ${ticketArgs}`
+
+    try {
+      const res = await fetch(`${getApiBase()}/spawn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Failed to launch' }))
+        toast.error(data.error || 'Failed to launch rail')
+        return
+      }
+      setRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'running' } : r)))
+      toast.success(`${rail.label} launched`, {
+        description: `${rail.mode} with ${rail.ticketIds.length} spec${rail.ticketIds.length > 1 ? 's' : ''}`,
+      })
+    } catch {
+      toast.error('Network error launching rail')
+    }
   }
 
   const activeTicket = activeId !== null ? ticketMap.get(activeId) : undefined
