@@ -24,8 +24,6 @@ import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import type { LocalTicket } from '../types'
 import type { RailMode, RailStatus } from '../components/RailControls'
 
-const CONTAINER_IDS = new Set<string>(['specs', 'rail-1', 'rail-2', 'rail-3'])
-
 const INITIAL_RAILS: RailState[] = [
   { id: 'rail-1', label: 'Rail 1', ticketIds: [], mode: 'implement', status: 'idle' },
   { id: 'rail-2', label: 'Rail 2', ticketIds: [], mode: 'implement', status: 'idle' },
@@ -168,6 +166,43 @@ export default function DashboardPage() {
     })
   }, [activeProjectId])
 
+  // Dynamic container IDs for DnD (specs + all current rail IDs)
+  const containerIds = useMemo(() => {
+    const ids = new Set<string>(['specs'])
+    for (const r of rails) ids.add(r.id)
+    return ids
+  }, [rails])
+
+  // ── Add / Delete rails ──────────────────────────────────────────────────────
+  const handleAddRail = useCallback(() => {
+    // Find next available rail number
+    const existingNums = rails.map((r) => parseInt(r.id.replace('rail-', ''), 10))
+    const nextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1
+    const newRail: RailState = {
+      id: `rail-${nextNum}`,
+      label: `Rail ${nextNum}`,
+      ticketIds: [],
+      mode: 'implement',
+      status: 'idle',
+    }
+    updateRails((prev) => [...prev, newRail])
+    toast.success(`Rail ${nextNum} added`)
+  }, [rails, updateRails])
+
+  const handleDeleteRail = useCallback((railId: string) => {
+    const rail = rails.find((r) => r.id === railId)
+    if (!rail || rail.status === 'running') return
+    // Return tickets to specs
+    if (rail.ticketIds.length > 0) {
+      updateSpecOrder((prev) => {
+        const current = prev ?? []
+        return [...current, ...rail.ticketIds]
+      })
+    }
+    updateRails((prev) => prev.filter((r) => r.id !== railId))
+    toast.info(`${rail.label} removed`)
+  }, [rails, updateRails, updateSpecOrder])
+
   // ── WebSocket: listen for rail.job_completed to reset rail status ────────────
   const activeProjectIdRef = useRef(activeProjectId)
   useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
@@ -288,7 +323,7 @@ export default function DashboardPage() {
 
     // Destination: if over a known container id, use it; else find the container of the hovered item
     const destContainer =
-      typeof overId === 'string' && CONTAINER_IDS.has(overId)
+      typeof overId === 'string' && containerIds.has(overId)
         ? overId
         : (findContainer(overId as number) ?? sourceContainer)
 
@@ -431,6 +466,8 @@ export default function DashboardPage() {
             onModeChange={handleModeChange}
             onToggle={handleToggle}
             onTicketClick={setDetailTicket}
+            onAddRail={handleAddRail}
+            onDeleteRail={handleDeleteRail}
           />
         </div>
       </div>
