@@ -21,7 +21,7 @@ import { CreateTicketModal } from '../components/CreateTicketModal'
 import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
 import type { LocalTicket } from '../types'
-import type { RailMode } from '../components/RailControls'
+import type { RailMode, RailStatus } from '../components/RailControls'
 
 const CONTAINER_IDS = new Set<string>(['specs', 'rail-1', 'rail-2', 'rail-3'])
 
@@ -50,6 +50,30 @@ function saveSpecOrder(projectId: string | null, ids: number[] | null) {
   }
 }
 
+interface PersistedRail {
+  id: string
+  label: string
+  ticketIds: number[]
+  mode: RailMode
+  status: RailStatus
+}
+
+function loadRails(projectId: string | null): RailState[] | null {
+  if (!projectId) return null
+  try {
+    const raw = localStorage.getItem(`specrails-hub:rails:${projectId}`)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as PersistedRail[]
+    if (!Array.isArray(parsed) || parsed.length === 0) return null
+    return parsed
+  } catch { return null }
+}
+
+function saveRails(projectId: string | null, rails: RailState[]) {
+  if (!projectId) return
+  localStorage.setItem(`specrails-hub:rails:${projectId}`, JSON.stringify(rails))
+}
+
 export default function DashboardPage() {
   const { activeProjectId } = useHub()
   const { tickets, isLoading, updateTicket, deleteTicket, createTicket } = useTickets()
@@ -59,11 +83,12 @@ export default function DashboardPage() {
   // ── Drag state ───────────────────────────────────────────────────────────────
   const [activeId, setActiveId] = useState<number | null>(null)
   const [specOrderIds, setSpecOrderIds] = useState<number[] | null>(() => loadSpecOrder(activeProjectId))
-  const [rails, setRails] = useState<RailState[]>(INITIAL_RAILS)
+  const [rails, setRails] = useState<RailState[]>(() => loadRails(activeProjectId) ?? INITIAL_RAILS)
 
-  // Reset spec order when active project changes
+  // Reset spec order and rails when active project changes
   useEffect(() => {
     setSpecOrderIds(loadSpecOrder(activeProjectId))
+    setRails(loadRails(activeProjectId) ?? INITIAL_RAILS)
   }, [activeProjectId])
 
   // Persist-aware spec order updater
@@ -71,6 +96,15 @@ export default function DashboardPage() {
     setSpecOrderIds((prev) => {
       const next = updater(prev)
       saveSpecOrder(activeProjectId, next)
+      return next
+    })
+  }, [activeProjectId])
+
+  // Persist-aware rails updater
+  const updateRails = useCallback((updater: (prev: RailState[]) => RailState[]) => {
+    setRails((prev) => {
+      const next = updater(prev)
+      saveRails(activeProjectId, next)
       return next
     })
   }, [activeProjectId])
@@ -177,7 +211,7 @@ export default function DashboardPage() {
           updateSpecOrder(() => arrayMove(ids, oldIdx, newIdx))
         }
       } else {
-        setRails((prev) =>
+        updateRails((prev) =>
           prev.map((r) => {
             if (r.id !== destContainer) return r
             const oldIdx = r.ticketIds.indexOf(draggedId)
@@ -194,7 +228,7 @@ export default function DashboardPage() {
       if (sourceContainer === 'specs') {
         // Specs → Rail
         updateSpecOrder((prev) => (prev ?? specTickets.map((t) => t.id)).filter((id) => id !== draggedId))
-        setRails((prev) =>
+        updateRails((prev) =>
           prev.map((r) => {
             if (r.id !== destContainer) return r
             return { ...r, ticketIds: insertAt(r.ticketIds, draggedId, overId) }
@@ -202,7 +236,7 @@ export default function DashboardPage() {
         )
       } else if (destContainer === 'specs') {
         // Rail → Specs
-        setRails((prev) =>
+        updateRails((prev) =>
           prev.map((r) => {
             if (r.id !== sourceContainer) return r
             return { ...r, ticketIds: r.ticketIds.filter((id) => id !== draggedId) }
@@ -214,7 +248,7 @@ export default function DashboardPage() {
         })
       } else {
         // Rail → Rail
-        setRails((prev) =>
+        updateRails((prev) =>
           prev.map((r) => {
             if (r.id === sourceContainer) {
               return { ...r, ticketIds: r.ticketIds.filter((id) => id !== draggedId) }
@@ -231,7 +265,7 @@ export default function DashboardPage() {
 
   // ── Rail controls ─────────────────────────────────────────────────────────────
   function handleModeChange(railId: string, mode: RailMode) {
-    setRails((prev) => prev.map((r) => (r.id === railId ? { ...r, mode } : r)))
+    updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, mode } : r)))
   }
 
   async function handleToggle(railId: string) {
@@ -240,7 +274,7 @@ export default function DashboardPage() {
 
     if (rail.status === 'running') {
       // Stop: just reset UI state (job cancellation is done from the Jobs page)
-      setRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'idle' } : r)))
+      updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'idle' } : r)))
       return
     }
 
@@ -263,7 +297,7 @@ export default function DashboardPage() {
         toast.error(data.error || 'Failed to launch rail')
         return
       }
-      setRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'running' } : r)))
+      updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'running' } : r)))
       toast.success(`${rail.label} launched`, {
         description: `${rail.mode} with ${rail.ticketIds.length} spec${rail.ticketIds.length > 1 ? 's' : ''}`,
       })
