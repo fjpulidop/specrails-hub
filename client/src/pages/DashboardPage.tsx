@@ -92,6 +92,39 @@ export default function DashboardPage() {
     setRails(loadRails(activeProjectId) ?? INITIAL_RAILS)
   }, [activeProjectId])
 
+  // ── Reconcile stale 'running' rails on mount / project switch ───────────────
+  // If the user navigates away while a rail is running, the WS handler is
+  // unregistered and the rail.job_completed event is missed. On re-mount,
+  // check the server for active rail jobs and reset any stale 'running' rails.
+  useEffect(() => {
+    const currentRails = loadRails(activeProjectId) ?? INITIAL_RAILS
+    const hasRunning = currentRails.some((r) => r.status === 'running')
+    if (!hasRunning || !activeProjectId) return
+
+    let cancelled = false
+    fetch(`${getApiBase()}/rails`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { activeJobs?: Record<string, { jobId: string }> } | null) => {
+        if (cancelled || !data) return
+        const activeIndices = new Set(
+          Object.keys(data.activeJobs ?? {}).map(Number)
+        )
+        setRails((prev) => {
+          const next = prev.map((r) => {
+            if (r.status !== 'running') return r
+            const railIndex = parseInt(r.id.replace('rail-', ''), 10) - 1
+            if (activeIndices.has(railIndex)) return r // still running on server
+            return { ...r, status: 'idle' as const }
+          })
+          saveRails(activeProjectId, next)
+          return next
+        })
+      })
+      .catch(() => {})
+
+    return () => { cancelled = true }
+  }, [activeProjectId])
+
   // Persist-aware spec order updater
   const updateSpecOrder = useCallback((updater: (prev: number[] | null) => number[] | null) => {
     setSpecOrderIds((prev) => {

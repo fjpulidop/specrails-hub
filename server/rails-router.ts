@@ -21,12 +21,17 @@ export function createRailsRouter(): Router {
     return req.projectCtx!
   }
 
-  // GET /rails — list all rail assignments
+  // GET /rails — list all rail assignments + active job info
   router.get('/', (_req: Request, res: Response) => {
     const c = ctx(_req)
     try {
       const rails = getRails(c.db)
-      res.json({ rails })
+      // Include which rails have active jobs (so clients can reconcile stale 'running' state)
+      const activeJobs: Record<number, { jobId: string; mode: string }> = {}
+      for (const [jobId, meta] of c.railJobs.entries()) {
+        activeJobs[meta.railIndex] = { jobId, mode: meta.mode }
+      }
+      res.json({ rails, activeJobs })
     } catch (err) {
       console.error('[rails-router] get rails error:', err)
       res.status(500).json({ error: 'Failed to fetch rails' })
