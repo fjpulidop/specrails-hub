@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
@@ -12,13 +12,20 @@ interface ProposeSpecModalProps {
 export function ProposeSpecModal({ open, onClose }: ProposeSpecModalProps) {
   const chat = useChatContext()
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const conversationIdRef = useRef<string | null>(null)
 
-  // Always start a fresh conversation when the modal opens
+  // Always start a fresh conversation when the modal opens;
+  // kill the Claude process when the modal closes.
   useEffect(() => {
     if (!open || !chat) return
+    conversationIdRef.current = null
     setConversationId(null)
     void chat.startWithMessage('/specrails:propose-spec')
     return () => {
+      // Kill any running Claude process for this conversation
+      const id = conversationIdRef.current
+      if (id) chat.abortStream(id)
+      conversationIdRef.current = null
       setConversationId(null)
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -27,7 +34,10 @@ export function ProposeSpecModal({ open, onClose }: ProposeSpecModalProps) {
   useEffect(() => {
     if (!open || !chat || conversationId) return
     const convo = chat.conversations[chat.activeTabIndex]
-    if (convo) setConversationId(convo.id)
+    if (convo) {
+      conversationIdRef.current = convo.id
+      setConversationId(convo.id)
+    }
   }, [open, chat, chat?.conversations, chat?.activeTabIndex, conversationId])
 
   // Get the conversation matching this modal session
