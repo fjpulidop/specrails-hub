@@ -114,7 +114,10 @@ export default function DashboardPage() {
             if (r.status !== 'running') return r
             const railIndex = parseInt(r.id.replace('rail-', ''), 10) - 1
             if (activeIndices.has(railIndex)) return r // still running on server
-            return { ...r, status: 'idle' as const }
+            // Rail was running but server has no active job → job finished while
+            // we were away. Clear tickets so they reappear in Specs/Done based
+            // on their current server-side status (useTickets re-fetches on mount).
+            return { ...r, status: 'idle' as const, ticketIds: [] }
           })
           saveRails(activeProjectId, next)
           return next

@@ -173,33 +173,42 @@ export class ProjectRegistry {
         const railMeta = railJobs.get(jobId)
         if (railMeta) {
           railJobs.delete(jobId)
-          const completedTicketIds = railMeta.ticketIds
+        }
 
-          // Mark tickets as done when job completed successfully
-          if (status === 'completed' && completedTicketIds.length > 0) {
-            try {
-              const ticketFile = resolveTicketStoragePath(project.path)
-              mutateStore(ticketFile, (store) => {
-                for (const tid of completedTicketIds) {
-                  const ticket = store.tickets[String(tid)]
-                  if (ticket && ticket.status !== 'done') {
-                    ticket.status = 'done'
-                    ticket.updated_at = new Date().toISOString()
-                    // Broadcast individual ticket updates
-                    boundBroadcast({
-                      type: 'ticket_updated',
-                      ticket: ticket as unknown as import('./types').LocalTicket,
-                      projectId: project.id,
-                      timestamp: ticket.updated_at,
-                    } as TicketUpdatedMessage)
-                  }
+        // Determine ticket IDs: from rail metadata, or parse from command as fallback
+        // (railJobs Map is in-memory and lost on server restart)
+        let completedTicketIds: number[] = railMeta?.ticketIds ?? []
+        if (completedTicketIds.length === 0 && jobRow?.command) {
+          const matches = jobRow.command.match(/#(\d+)/g)
+          if (matches) completedTicketIds = matches.map((m) => parseInt(m.slice(1), 10))
+        }
+
+        // Mark tickets as done when job completed successfully
+        if (status === 'completed' && completedTicketIds.length > 0) {
+          try {
+            const ticketFile = resolveTicketStoragePath(project.path)
+            mutateStore(ticketFile, (store) => {
+              for (const tid of completedTicketIds) {
+                const ticket = store.tickets[String(tid)]
+                if (ticket && ticket.status !== 'done') {
+                  ticket.status = 'done'
+                  ticket.updated_at = new Date().toISOString()
+                  boundBroadcast({
+                    type: 'ticket_updated',
+                    ticket: ticket as unknown as import('./types').LocalTicket,
+                    projectId: project.id,
+                    timestamp: ticket.updated_at,
+                  } as TicketUpdatedMessage)
                 }
-              })
-            } catch (err) {
-              console.error('[project-registry] failed to mark rail tickets as done:', err)
-            }
+              }
+            })
+          } catch (err) {
+            console.error('[project-registry] failed to mark rail tickets as done:', err)
           }
+        }
 
+        // Broadcast rail.job_completed if we know the rail index
+        if (railMeta) {
           boundBroadcast({
             type: 'rail.job_completed',
             projectId: project.id,
