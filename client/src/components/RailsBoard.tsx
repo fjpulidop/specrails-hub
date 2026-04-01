@@ -70,14 +70,24 @@ export function RailsBoard({ rails, ticketMap, onModeChange, onToggle, onTicketC
   return (
     <div className="flex flex-col h-full" onClick={handleBackgroundClick}>
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 h-12 border-b border-border/40 shrink-0">
-        <Layers className="w-4 h-4 text-muted-foreground" />
-        <h2 className="text-sm font-semibold">Rails</h2>
-        {activeRails > 0 && (
-          <span className="text-[10px] text-emerald-400 bg-emerald-400/10 rounded-full px-1.5 py-0.5 font-medium">
-            {activeRails} running
-          </span>
-        )}
+      <div className="flex items-center justify-between px-4 h-12 border-b border-border/40 shrink-0">
+        <div className="flex items-center gap-2">
+          <Layers className="w-4 h-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold">Rails</h2>
+          {activeRails > 0 && (
+            <span className="text-[10px] text-emerald-400 bg-emerald-400/10 rounded-full px-1.5 py-0.5 font-medium">
+              {activeRails} running
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onAddRail() }}
+          className="flex items-center gap-1 h-7 px-2.5 text-xs font-medium rounded-md border border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add Rail
+        </button>
       </div>
 
       {/* Rail rows */}
@@ -106,16 +116,6 @@ export function RailsBoard({ rails, ticketMap, onModeChange, onToggle, onTicketC
             </SortableRailWrapper>
           ))}
         </SortableContext>
-
-        {/* Add Rail button */}
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onAddRail() }}
-          className="group flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-border/30 hover:border-primary/40 text-muted-foreground/40 hover:text-primary/60 transition-all duration-200 hover:bg-primary/[0.03] active:scale-[0.98]"
-        >
-          <Plus className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" />
-          <span className="text-xs font-medium">Add Rail</span>
-        </button>
       </div>
     </div>
   )

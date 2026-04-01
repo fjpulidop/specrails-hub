@@ -62,15 +62,15 @@ describe('SpecsBoard', () => {
     expect(screen.getByText('Specs')).toBeInTheDocument()
   })
 
-  it('renders Propose Spec button', () => {
+  it('renders Add Spec button', () => {
     render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
-    expect(screen.getByRole('button', { name: /Propose Spec/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Add Spec/i })).toBeInTheDocument()
   })
 
   it('shows empty state when no tickets', () => {
     render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
     expect(screen.getByText('No specs yet')).toBeInTheDocument()
-    expect(screen.getByText(/Click "Propose Spec" to get started/i)).toBeInTheDocument()
+    expect(screen.getByText(/Click "\+ Add Spec" to get started/i)).toBeInTheDocument()
   })
 
   it('shows loading skeletons when isLoading is true', () => {
@@ -104,16 +104,16 @@ describe('SpecsBoard', () => {
     expect(headerDiv.querySelector('.rounded-full')).toBeNull()
   })
 
-  it('opens ProposeSpecModal when Propose Spec is clicked', () => {
+  it('opens ProposeSpecModal when Add Spec is clicked', () => {
     render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
     expect(screen.queryByTestId('propose-spec-modal')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /Propose Spec/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Add Spec/i }))
     expect(screen.getByTestId('propose-spec-modal')).toBeInTheDocument()
   })
 
   it('closes ProposeSpecModal when onClose is called', () => {
     render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
-    fireEvent.click(screen.getByRole('button', { name: /Propose Spec/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Add Spec/i }))
     expect(screen.getByTestId('propose-spec-modal')).toBeInTheDocument()
     fireEvent.click(screen.getByText('close modal'))
     expect(screen.queryByTestId('propose-spec-modal')).not.toBeInTheDocument()

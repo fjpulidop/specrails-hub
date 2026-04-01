@@ -57,7 +57,7 @@ export function SpecsBoard({ tickets, doneTickets = [], isLoading, onTicketClick
         </div>
         <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setProposeOpen(true)}>
           <Plus className="w-3.5 h-3.5" />
-          Propose Spec
+          Add Spec
         </Button>
       </div>
 
@@ -83,7 +83,7 @@ export function SpecsBoard({ tickets, doneTickets = [], isLoading, onTicketClick
             >
               <FileText className="w-8 h-8 mb-3 opacity-20" />
               <p className="text-sm">{isOver ? 'Drop here' : 'No specs yet'}</p>
-              {!isOver && <p className="text-xs mt-1 opacity-60">Click "Propose Spec" to get started</p>}
+              {!isOver && <p className="text-xs mt-1 opacity-60">Click "+ Add Spec" to get started</p>}
             </div>
           ) : (
             <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
