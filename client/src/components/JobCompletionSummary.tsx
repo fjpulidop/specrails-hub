@@ -3,6 +3,19 @@ import { CheckCircle2, XCircle, ChevronDown } from 'lucide-react'
 import { cn } from '../lib/utils'
 import type { JobSummary, EventRow } from '../types'
 
+function formatWallClock(startedAt: string, finishedAt: string): string {
+  const ms = new Date(finishedAt).getTime() - new Date(startedAt).getTime()
+  if (ms < 0) return '—'
+  const secs = Math.round(ms / 1000)
+  if (secs < 60) return `${secs}s`
+  const mins = Math.floor(secs / 60)
+  const s = secs % 60
+  if (mins < 60) return `${mins}m ${s}s`
+  const hrs = Math.floor(mins / 60)
+  const m = mins % 60
+  return `${hrs}h ${m}m`
+}
+
 interface JobCompletionSummaryProps {
   job: JobSummary
   events: EventRow[]
@@ -63,8 +76,8 @@ export function JobCompletionSummary({
 
         {/* Quick stat chips */}
         <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-          {job.duration_ms != null && (
-            <span className="tabular-nums">{(job.duration_ms / 1000).toFixed(1)}s</span>
+          {job.finished_at && (
+            <span className="tabular-nums">{formatWallClock(job.started_at, job.finished_at)}</span>
           )}
           {job.total_cost_usd != null && (
             <span className="tabular-nums text-yellow-400">${job.total_cost_usd.toFixed(4)}</span>
@@ -91,7 +104,7 @@ export function JobCompletionSummary({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3">
             <SummaryMetric
               label="Duration"
-              value={job.duration_ms != null ? `${(job.duration_ms / 1000).toFixed(1)}s` : '—'}
+              value={job.finished_at ? formatWallClock(job.started_at, job.finished_at) : '—'}
             />
             <SummaryMetric
               label="Cost"

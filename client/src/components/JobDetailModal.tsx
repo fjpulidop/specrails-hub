@@ -14,6 +14,19 @@ import { WS_URL } from '../lib/ws-url'
 import type { JobSummary, EventRow, PhaseDefinition } from '../types'
 import type { PhaseMap, PhaseState } from '../hooks/usePipeline'
 
+function formatWallClock(startedAt: string, finishedAt: string): string {
+  const ms = new Date(finishedAt).getTime() - new Date(startedAt).getTime()
+  if (ms < 0) return '—'
+  const secs = Math.round(ms / 1000)
+  if (secs < 60) return `${secs}s`
+  const mins = Math.floor(secs / 60)
+  const s = secs % 60
+  if (mins < 60) return `${mins}m ${s}s`
+  const hrs = Math.floor(mins / 60)
+  const m = mins % 60
+  return `${hrs}h ${m}m`
+}
+
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'running' | 'queued' | 'failed' | 'canceled'
 
 const STATUS_BADGE: Record<string, { variant: BadgeVariant; label: string; tooltip: string }> = {
@@ -169,8 +182,8 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
                 {job.total_cost_usd != null && job.total_cost_usd > 0 && (
                   <span className="text-[10px] text-muted-foreground">${job.total_cost_usd.toFixed(4)}</span>
                 )}
-                {job.duration_ms != null && (
-                  <span className="text-[10px] text-muted-foreground">{(job.duration_ms / 1000).toFixed(1)}s</span>
+                {job.finished_at && (
+                  <span className="text-[10px] text-muted-foreground">{formatWallClock(job.started_at, job.finished_at)}</span>
                 )}
               </>
             )}

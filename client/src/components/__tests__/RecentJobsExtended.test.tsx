@@ -38,7 +38,8 @@ vi.mock('../JobComparisonModal', () => ({
 const baseJob: JobSummary = {
   id: 'job-1',
   command: '/sr:implement',
-  started_at: new Date().toISOString(),
+  started_at: new Date(Date.now() - 90000).toISOString(),
+  finished_at: new Date().toISOString(),
   status: 'completed',
   duration_ms: 90000,       // 1m 30s
   total_cost_usd: 0.0045,   // < 0.01 → $0.0045
@@ -73,13 +74,14 @@ describe('RecentJobs - extended coverage', () => {
   })
 
   describe('formatDuration edge cases', () => {
-    it('shows duration in minutes format when >= 60s', () => {
-      render(<RecentJobs jobs={[{ ...baseJob, duration_ms: 90000 }]} />)
+    it('shows wall-clock duration in minutes format when >= 60s', () => {
+      const now = Date.now()
+      render(<RecentJobs jobs={[{ ...baseJob, started_at: new Date(now - 90000).toISOString(), finished_at: new Date(now).toISOString() }]} />)
       expect(screen.getByText('1m 30s')).toBeInTheDocument()
     })
 
-    it('shows — when duration_ms is null', () => {
-      render(<RecentJobs jobs={[{ ...baseJob, duration_ms: undefined }]} />)
+    it('shows — when finished_at is null', () => {
+      render(<RecentJobs jobs={[{ ...baseJob, finished_at: undefined }]} />)
       const dashes = screen.getAllByText('—')
       expect(dashes.length).toBeGreaterThanOrEqual(1)
     })

@@ -67,6 +67,7 @@ const mockJob: JobSummary = {
   id: 'job-abc123',
   command: '/sr:implement',
   started_at: '2024-01-15T10:00:00Z',
+  finished_at: '2024-01-15T10:00:30Z',
   status: 'completed',
   total_cost_usd: 0.05,
   duration_ms: 30000,
