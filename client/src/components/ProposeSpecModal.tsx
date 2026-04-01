@@ -13,35 +13,30 @@ export function ProposeSpecModal({ open, onClose }: ProposeSpecModalProps) {
   const chat = useChatContext()
   const [conversationId, setConversationId] = useState<string | null>(null)
   const conversationIdRef = useRef<string | null>(null)
-  const prevConvoIdsRef = useRef<Set<string>>(new Set())
 
-  // Always start a fresh conversation when the modal opens;
-  // kill the Claude process when the modal closes.
+  // Start a fresh conversation when the modal opens;
+  // kill the Claude process when it closes.
   useEffect(() => {
     if (!open || !chat) return
-    // Snapshot existing conversation IDs so we can detect the new one
-    prevConvoIdsRef.current = new Set(chat.conversations.map((c) => c.id))
     conversationIdRef.current = null
     setConversationId(null)
-    void chat.startWithMessage('/specrails:propose-spec')
+
+    let cancelled = false
+    ;(async () => {
+      const id = await chat.startWithMessage('/specrails:propose-spec')
+      if (cancelled || !id) return
+      conversationIdRef.current = id
+      setConversationId(id)
+    })()
+
     return () => {
-      // Kill any running Claude process for this conversation
+      cancelled = true
       const id = conversationIdRef.current
       if (id) chat.abortStream(id)
       conversationIdRef.current = null
       setConversationId(null)
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Track the NEW conversation created for this session (ignore pre-existing ones)
-  useEffect(() => {
-    if (!open || !chat || conversationId) return
-    const newConvo = chat.conversations.find((c) => !prevConvoIdsRef.current.has(c.id))
-    if (newConvo) {
-      conversationIdRef.current = newConvo.id
-      setConversationId(newConvo.id)
-    }
-  }, [open, chat, chat?.conversations, conversationId])
 
   // Only show the conversation created for this modal session
   const conversation = chat?.conversations.find((c) => c.id === conversationId) ?? null
