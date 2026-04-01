@@ -212,6 +212,43 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const from = req.query.from as string | undefined
     const to = req.query.to as string | undefined
     const result = listJobs(ctx(req).db, { limit, offset, status, from, to })
+
+    // Merge in-memory queued jobs that haven't been persisted to DB yet
+    const { queueManager } = ctx(req)
+    const dbIds = new Set(result.jobs.map((j) => j.id))
+    const queuedRows = queueManager
+      .getJobs()
+      .filter((j) => j.status === 'queued' && !dbIds.has(j.id))
+      .filter((j) => !status || j.status === status)
+      .map((j) => ({
+        id: j.id,
+        command: j.command,
+        started_at: j.startedAt ?? new Date().toISOString(),
+        finished_at: j.finishedAt,
+        status: j.status,
+        exit_code: j.exitCode,
+        queue_position: j.queuePosition,
+        priority: j.priority,
+        tokens_in: null,
+        tokens_out: null,
+        tokens_cache_read: null,
+        tokens_cache_create: null,
+        total_cost_usd: null,
+        num_turns: null,
+        model: null,
+        duration_ms: null,
+        duration_api_ms: null,
+        session_id: null,
+        depends_on_job_id: j.dependsOnJobId,
+        pipeline_id: j.pipelineId,
+        skip_reason: j.skipReason,
+      } as import('./types').JobRow))
+
+    if (queuedRows.length > 0) {
+      result.jobs = [...queuedRows, ...result.jobs]
+      result.total += queuedRows.length
+    }
+
     res.json(result)
   })
 
