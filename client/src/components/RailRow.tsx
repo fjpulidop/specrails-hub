@@ -110,6 +110,21 @@ export function RailRow({
     clearLongPress()
   }, [clearLongPress])
 
+  // Suppress the click event that follows a successful long press, so it
+  // doesn't bubble up to RailsBoard's background click handler and
+  // immediately exit jiggle mode.
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    if (longPressFiredRef.current) {
+      e.stopPropagation()
+      longPressFiredRef.current = false
+      return
+    }
+    if (showSwipeDelete) {
+      setShowSwipeDelete(false)
+      setSwipeX(0)
+    }
+  }, [showSwipeDelete])
+
   const handleDeleteClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     setShowSwipeDelete(false)
@@ -117,18 +132,10 @@ export function RailRow({
     onDelete()
   }, [onDelete])
 
-  // Dismiss swipe on click
-  const handleRailClick = useCallback(() => {
-    if (showSwipeDelete) {
-      setShowSwipeDelete(false)
-      setSwipeX(0)
-    }
-  }, [showSwipeDelete])
-
   return (
     <div
       className="relative overflow-hidden rounded-xl"
-      onClick={handleRailClick}
+      onClick={handleClick}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
