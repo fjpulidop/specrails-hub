@@ -59,7 +59,7 @@ export function ProposeSpecModal({ open, onClose }: ProposeSpecModalProps) {
         onPointerDownOutside={preventInteractOutside}
       >
         <DialogHeader className="px-4 py-3 border-b border-border/40 shrink-0">
-          <DialogTitle className="text-sm">Propose Spec</DialogTitle>
+          <DialogTitle className="text-sm">Add Spec</DialogTitle>
         </DialogHeader>
 
         {conversation ? (

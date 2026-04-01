@@ -344,8 +344,8 @@ export function useChat(): UseChatReturn {
         commandProposals: [],
       }
       setConversations((prev) => {
-        const next = [...prev, newConvo].slice(0, 3)
-        setActiveTabIndex(Math.min(prev.length, 2))
+        const next = [...prev, newConvo].slice(-3)
+        setActiveTabIndex(next.length - 1)
         return next
       })
       // Send the message after a tick to let state settle

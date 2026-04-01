@@ -66,12 +66,12 @@ describe('ProposeSpecModal', () => {
 
   it('does not render dialog when open=false', () => {
     render(<ProposeSpecModal open={false} onClose={onCloseMock} />)
-    expect(screen.queryByText('Propose Spec')).not.toBeInTheDocument()
+    expect(screen.queryByText('Add Spec')).not.toBeInTheDocument()
   })
 
   it('renders dialog when open=true', () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
-    expect(screen.getByText('Propose Spec')).toBeInTheDocument()
+    expect(screen.getByText('Add Spec')).toBeInTheDocument()
   })
 
   it('starts conversation with /specrails:propose-spec when opened', () => {
