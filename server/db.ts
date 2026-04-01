@@ -406,7 +406,7 @@ export function purgeJobs(
   db: DbInstance,
   opts?: { from?: string; to?: string }
 ): number {
-  const conditions: string[] = ["status IN ('completed', 'failed', 'canceled', 'zombie_terminated')"]
+  const conditions: string[] = ["status IN ('completed', 'failed', 'canceled', 'zombie_terminated', 'skipped')"]
   const params: unknown[] = []
 
   if (opts?.from) {

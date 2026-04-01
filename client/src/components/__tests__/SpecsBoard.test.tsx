@@ -95,10 +95,13 @@ describe('SpecsBoard', () => {
     expect(screen.getByText('3')).toBeInTheDocument()
   })
 
-  it('does not show count badge when no tickets', () => {
+  it('does not show active specs count badge when no tickets', () => {
     render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
-    // No count badge when 0 tickets
-    expect(screen.queryByText('0')).not.toBeInTheDocument()
+    // The Specs header should not show a count badge for 0 active tickets
+    // (the Done section always shows its own "0" badge)
+    const heading = screen.getByText('Specs')
+    const headerDiv = heading.closest('div.flex')!
+    expect(headerDiv.querySelector('.rounded-full')).toBeNull()
   })
 
   it('opens ProposeSpecModal when Propose Spec is clicked', () => {
