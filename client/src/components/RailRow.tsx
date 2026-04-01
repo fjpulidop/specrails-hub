@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { Trash2 } from 'lucide-react'
+import { GripVertical, Trash2 } from 'lucide-react'
 import { RailControls, type RailMode, type RailStatus } from './RailControls'
 import { SpecCard } from './SpecCard'
 import type { LocalTicket } from '../types'
@@ -16,6 +16,8 @@ interface RailRowProps {
   mode: RailMode
   status: RailStatus
   jiggleMode: boolean
+  dragHandleListeners?: Record<string, Function>
+  dragHandleAttributes?: Record<string, any>
   onModeChange: (mode: RailMode) => void
   onToggle: () => void
   onTicketClick: (ticket: LocalTicket) => void
@@ -26,6 +28,7 @@ interface RailRowProps {
 
 export function RailRow({
   id, label, tickets, mode, status, jiggleMode,
+  dragHandleListeners, dragHandleAttributes,
   onModeChange, onToggle, onTicketClick, onDelete, onLongPress, onRename,
 }: RailRowProps) {
   const { isOver, setNodeRef } = useDroppable({ id })
@@ -179,6 +182,14 @@ export function RailRow({
         {/* Row header */}
         <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/30 bg-gradient-to-r from-muted/30 to-transparent shrink-0">
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors -ml-1"
+              {...dragHandleListeners}
+              {...dragHandleAttributes}
+            >
+              <GripVertical className="w-3.5 h-3.5" />
+            </button>
             <div
               className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300 ${
                 status === 'running' ? 'bg-emerald-400 shadow-[0_0_4px_hsl(142_70%_56%/0.8)] animate-pulse' : 'bg-muted-foreground/25'

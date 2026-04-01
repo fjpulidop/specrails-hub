@@ -15,7 +15,7 @@ import { arrayMove } from '@dnd-kit/sortable'
 import { toast } from 'sonner'
 import { useTickets } from '../hooks/useTickets'
 import { SpecsBoard } from '../components/SpecsBoard'
-import { RailsBoard, type RailState } from '../components/RailsBoard'
+import { RailsBoard, type RailState, isRailSortId, extractRailId } from '../components/RailsBoard'
 import { TicketDetailModal } from '../components/TicketDetailModal'
 import { CreateTicketModal } from '../components/CreateTicketModal'
 import { getApiBase } from '../lib/api'
@@ -82,6 +82,7 @@ export default function DashboardPage() {
 
   // ── Drag state ───────────────────────────────────────────────────────────────
   const [activeId, setActiveId] = useState<number | null>(null)
+  const [activeRailDragLabel, setActiveRailDragLabel] = useState<string | null>(null)
   const [specOrderIds, setSpecOrderIds] = useState<number[] | null>(() => loadSpecOrder(activeProjectId))
   const [rails, setRails] = useState<RailState[]>(() => loadRails(activeProjectId) ?? INITIAL_RAILS)
 
@@ -312,12 +313,34 @@ export default function DashboardPage() {
 
   // ── DnD handlers ─────────────────────────────────────────────────────────────
   function handleDragStart({ active }: DragStartEvent) {
+    if (isRailSortId(active.id)) {
+      const railId = extractRailId(active.id as string)
+      const rail = rails.find((r) => r.id === railId)
+      setActiveRailDragLabel(rail?.label ?? railId)
+      return
+    }
     setActiveId(active.id as number)
   }
 
   function handleDragEnd({ active, over }: DragEndEvent) {
     setActiveId(null)
+    setActiveRailDragLabel(null)
     if (!over) return
+
+    // ── Rail reorder ─────────────────────────────────────────────────────────
+    if (isRailSortId(active.id)) {
+      if (!isRailSortId(over.id)) return
+      const fromId = extractRailId(active.id as string)
+      const toId = extractRailId(over.id as string)
+      if (fromId === toId) return
+      updateRails((prev) => {
+        const oldIdx = prev.findIndex((r) => r.id === fromId)
+        const newIdx = prev.findIndex((r) => r.id === toId)
+        if (oldIdx === -1 || newIdx === -1) return prev
+        return arrayMove(prev, oldIdx, newIdx)
+      })
+      return
+    }
 
     const draggedId = active.id as number
     const overId = over.id
@@ -483,6 +506,10 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-primary/40 bg-card/95 shadow-xl shadow-black/20 backdrop-blur-sm rotate-1 scale-[1.03] pointer-events-none">
             <span className="text-[10px] font-mono text-muted-foreground/50 shrink-0">#{activeTicket.id}</span>
             <span className="flex-1 text-sm truncate max-w-[240px]">{activeTicket.title}</span>
+          </div>
+        ) : activeRailDragLabel ? (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-primary/40 bg-card/95 shadow-xl shadow-black/20 backdrop-blur-sm rotate-[0.5deg] scale-[1.02] pointer-events-none">
+            <span className="text-xs font-medium">{activeRailDragLabel}</span>
           </div>
         ) : null}
       </DragOverlay>
