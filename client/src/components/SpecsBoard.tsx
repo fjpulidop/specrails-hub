@@ -10,6 +10,8 @@ import type { LocalTicket } from '../types'
 interface SpecsBoardProps {
   /** Pre-ordered, pre-filtered active tickets (ordering + filtering owned by parent). */
   tickets: LocalTicket[]
+  /** Full unfiltered ticket list (for new-ticket detection in ProposeSpec modal). */
+  allTickets?: LocalTicket[]
   /** Tickets that have been implemented (status=done). */
   doneTickets?: LocalTicket[]
   isLoading: boolean
@@ -17,7 +19,7 @@ interface SpecsBoardProps {
   onTicketCreated?: (ticket: LocalTicket) => void
 }
 
-export function SpecsBoard({ tickets, doneTickets = [], isLoading, onTicketClick, onTicketCreated }: SpecsBoardProps) {
+export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, onTicketClick, onTicketCreated }: SpecsBoardProps) {
   const [proposeOpen, setProposeOpen] = useState(false)
   const { isOver, setNodeRef } = useDroppable({ id: 'specs' })
 
@@ -129,7 +131,7 @@ export function SpecsBoard({ tickets, doneTickets = [], isLoading, onTicketClick
         </div>
       </div>
 
-      <ProposeSpecModal open={proposeOpen} onClose={() => setProposeOpen(false)} onTicketCreated={onTicketCreated} />
+      <ProposeSpecModal open={proposeOpen} onClose={() => setProposeOpen(false)} tickets={allTickets ?? tickets} onTicketCreated={onTicketCreated} />
     </div>
   )
 }

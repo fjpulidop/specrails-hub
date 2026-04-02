@@ -3,24 +3,24 @@ import { Loader2, Sparkles, Send } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
 import { useChatContext } from '../hooks/useChat'
-import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import type { LocalTicket } from '../types'
 
 interface ProposeSpecModalProps {
   open: boolean
   onClose: () => void
+  tickets: LocalTicket[]
   onTicketCreated?: (ticket: LocalTicket) => void
 }
 
 type ModalPhase = 'input' | 'generating' | 'done'
 
-export function ProposeSpecModal({ open, onClose, onTicketCreated }: ProposeSpecModalProps) {
+export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: ProposeSpecModalProps) {
   const chat = useChatContext()
-  const { registerHandler, unregisterHandler } = useSharedWebSocket()
   const [phase, setPhase] = useState<ModalPhase>('input')
   const [inputText, setInputText] = useState('')
   const conversationIdRef = useRef<string | null>(null)
   const createdTicketRef = useRef<LocalTicket | null>(null)
+  const knownTicketIdsRef = useRef<Set<number>>(new Set())
 
   // Reset state when modal opens
   useEffect(() => {
@@ -40,20 +40,16 @@ export function ProposeSpecModal({ open, onClose, onTicketCreated }: ProposeSpec
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Listen for ticket_created events during generation
+  // Detect new tickets during generation by watching the tickets array
   useEffect(() => {
     if (phase !== 'generating') return
-
-    const handler = (msg: unknown) => {
-      const m = msg as { type?: string; ticket?: LocalTicket }
-      if (m.type === 'ticket_created' && m.ticket) {
-        createdTicketRef.current = m.ticket
-        setPhase('done')
-      }
+    // Find any ticket that wasn't in the snapshot taken at generation start
+    const newTicket = tickets.find((t) => !knownTicketIdsRef.current.has(t.id))
+    if (newTicket) {
+      createdTicketRef.current = newTicket
+      setPhase('done')
     }
-    registerHandler('propose-spec-ticket', handler)
-    return () => unregisterHandler('propose-spec-ticket')
-  }, [phase, registerHandler, unregisterHandler])
+  }, [phase, tickets])
 
   // When done, close modal and show the created ticket
   useEffect(() => {
@@ -71,6 +67,8 @@ export function ProposeSpecModal({ open, onClose, onTicketCreated }: ProposeSpec
 
   const handleSubmit = useCallback(async () => {
     if (!inputText.trim() || !chat) return
+    // Snapshot current ticket IDs before starting generation
+    knownTicketIdsRef.current = new Set(tickets.map((t) => t.id))
     setPhase('generating')
 
     const prompt = [
@@ -91,7 +89,7 @@ export function ProposeSpecModal({ open, onClose, onTicketCreated }: ProposeSpec
     if (id) {
       conversationIdRef.current = id
     }
-  }, [inputText, chat])
+  }, [inputText, chat, tickets])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
