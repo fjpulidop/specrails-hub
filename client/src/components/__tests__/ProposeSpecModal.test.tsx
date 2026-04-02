@@ -4,65 +4,38 @@ import { render, screen, fireEvent, waitFor } from '../../test-utils'
 import { ProposeSpecModal } from '../ProposeSpecModal'
 
 const mockStartWithMessage = vi.fn().mockResolvedValue('conv-1')
-const mockSendMessage = vi.fn()
 const mockAbortStream = vi.fn()
-const mockConfirmCommand = vi.fn()
-const mockDismissCommandProposal = vi.fn()
-const mockChangeConversationModel = vi.fn()
-
-// Mutable mock state so individual tests can override conversations
-let mockConversations: unknown[] = [
-  {
-    id: 'conv-1',
-    messages: [{ id: 'msg-1', role: 'assistant', content: 'Hello', timestamp: Date.now() }],
-    streamingText: '',
-    isStreaming: false,
-    model: 'claude-3-5-sonnet',
-  },
-]
 
 vi.mock('../../hooks/useChat', () => ({
   useChatContext: () => ({
-    conversations: mockConversations,
+    conversations: [],
     activeTabIndex: 0,
     startWithMessage: mockStartWithMessage,
-    sendMessage: mockSendMessage,
+    sendMessage: vi.fn(),
     abortStream: mockAbortStream,
-    confirmCommand: mockConfirmCommand,
-    dismissCommandProposal: mockDismissCommandProposal,
-    changeConversationModel: mockChangeConversationModel,
+    confirmCommand: vi.fn(),
+    dismissCommandProposal: vi.fn(),
+    changeConversationModel: vi.fn(),
   }),
 }))
 
-vi.mock('../MessageList', () => ({
-  MessageList: ({ messages }: { messages: unknown[] }) => (
-    <div data-testid="message-list">{messages.length} messages</div>
-  ),
-}))
-
-vi.mock('../ChatInput', () => ({
-  ChatInput: ({ onSend }: { onSend: (msg: string) => void }) => (
-    <div data-testid="chat-input">
-      <button onClick={() => onSend('test message')}>send</button>
-    </div>
-  ),
+const mockRegisterHandler = vi.fn()
+const mockUnregisterHandler = vi.fn()
+vi.mock('../../hooks/useSharedWebSocket', () => ({
+  useSharedWebSocket: () => ({
+    registerHandler: mockRegisterHandler,
+    unregisterHandler: mockUnregisterHandler,
+    connectionStatus: 'connected',
+  }),
 }))
 
 describe('ProposeSpecModal', () => {
   const onCloseMock = vi.fn()
+  const onTicketCreatedMock = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
     mockStartWithMessage.mockResolvedValue('conv-1')
-    mockConversations = [
-      {
-        id: 'conv-1',
-        messages: [{ id: 'msg-1', role: 'assistant', content: 'Hello', timestamp: Date.now() }],
-        streamingText: '',
-        isStreaming: false,
-        model: 'claude-3-5-sonnet',
-      },
-    ]
   })
 
   it('does not render dialog when open=false', () => {
@@ -70,60 +43,78 @@ describe('ProposeSpecModal', () => {
     expect(screen.queryByText('Add Spec')).not.toBeInTheDocument()
   })
 
-  it('renders dialog when open=true', () => {
+  it('renders dialog with textarea when open=true', () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
     expect(screen.getByText('Add Spec')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/describe the feature/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /generate spec/i })).toBeInTheDocument()
   })
 
-  it('starts conversation with /specrails:propose-spec when opened', async () => {
+  it('does not auto-execute command on open', () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
-    await waitFor(() => {
-      expect(mockStartWithMessage).toHaveBeenCalledWith('/specrails:propose-spec')
-    })
+    expect(mockStartWithMessage).not.toHaveBeenCalled()
   })
 
-  it('does not start conversation twice if already started', async () => {
-    const { rerender } = render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
-    rerender(<ProposeSpecModal open={true} onClose={onCloseMock} />)
+  it('disables Generate Spec button when textarea is empty', () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
+    const button = screen.getByRole('button', { name: /generate spec/i })
+    expect(button).toBeDisabled()
+  })
+
+  it('enables Generate Spec button when textarea has content', () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
+    const textarea = screen.getByPlaceholderText(/describe the feature/i)
+    fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
+    const button = screen.getByRole('button', { name: /generate spec/i })
+    expect(button).not.toBeDisabled()
+  })
+
+  it('sends message with /specrails:propose-spec and user text on submit', async () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} onTicketCreated={onTicketCreatedMock} />)
+    const textarea = screen.getByPlaceholderText(/describe the feature/i)
+    fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
+    fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
+
     await waitFor(() => {
       expect(mockStartWithMessage).toHaveBeenCalledTimes(1)
+      const arg = mockStartWithMessage.mock.calls[0][0] as string
+      expect(arg).toContain('/specrails:propose-spec')
+      expect(arg).toContain('Add dark mode')
     })
   })
 
-  it('renders MessageList when conversation exists', async () => {
+  it('shows generating state after submit', async () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
+    const textarea = screen.getByPlaceholderText(/describe the feature/i)
+    fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
+    fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
+
     await waitFor(() => {
-      expect(screen.getByTestId('message-list')).toBeInTheDocument()
+      expect(screen.getByText(/generating your spec/i)).toBeInTheDocument()
     })
   })
 
-  it('renders ChatInput when conversation exists', async () => {
-    render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
-    await waitFor(() => {
-      expect(screen.getByTestId('chat-input')).toBeInTheDocument()
-    })
-  })
-
-  it('resets tracking flag when closed and re-opened', async () => {
+  it('aborts stream on close during generation', async () => {
     const { rerender } = render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
-    await waitFor(() => {
-      expect(mockStartWithMessage).toHaveBeenCalledTimes(1)
-    })
+    const textarea = screen.getByPlaceholderText(/describe the feature/i)
+    fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
+    fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
 
-    // Close and re-open
+    await waitFor(() => expect(mockStartWithMessage).toHaveBeenCalled())
+
+    rerender(<ProposeSpecModal open={false} onClose={onCloseMock} />)
+    expect(mockAbortStream).toHaveBeenCalledWith('conv-1')
+  })
+
+  it('resets state when reopened', async () => {
+    const { rerender } = render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
+    const textarea = screen.getByPlaceholderText(/describe the feature/i)
+    fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
+
     rerender(<ProposeSpecModal open={false} onClose={onCloseMock} />)
     rerender(<ProposeSpecModal open={true} onClose={onCloseMock} />)
-    await waitFor(() => {
-      expect(mockStartWithMessage).toHaveBeenCalledTimes(2)
-    })
-  })
-})
 
-describe('ProposeSpecModal - empty chat context', () => {
-  it('renders "Starting session…" when conversations is empty', () => {
-    mockConversations = [] // No conversations yet
-    const onCloseMock2 = vi.fn()
-    render(<ProposeSpecModal open={true} onClose={onCloseMock2} />)
-    expect(screen.getByText(/Starting session/i)).toBeInTheDocument()
+    const newTextarea = screen.getByPlaceholderText(/describe the feature/i)
+    expect(newTextarea).toHaveValue('')
   })
 })

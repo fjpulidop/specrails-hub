@@ -482,7 +482,7 @@ export default function DashboardPage() {
       <div className="flex h-full overflow-hidden">
         {/* Left panel: Specs board */}
         <div className="flex-1 min-w-0 border-r border-border/40 flex flex-col overflow-hidden">
-          <SpecsBoard tickets={specTickets} doneTickets={doneSpecTickets} isLoading={isLoading} onTicketClick={setDetailTicket} />
+          <SpecsBoard tickets={specTickets} doneTickets={doneSpecTickets} isLoading={isLoading} onTicketClick={setDetailTicket} onTicketCreated={setDetailTicket} />
         </div>
 
         {/* Right panel: Rails board */}

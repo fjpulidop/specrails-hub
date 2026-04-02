@@ -14,9 +14,10 @@ interface SpecsBoardProps {
   doneTickets?: LocalTicket[]
   isLoading: boolean
   onTicketClick: (ticket: LocalTicket) => void
+  onTicketCreated?: (ticket: LocalTicket) => void
 }
 
-export function SpecsBoard({ tickets, doneTickets = [], isLoading, onTicketClick }: SpecsBoardProps) {
+export function SpecsBoard({ tickets, doneTickets = [], isLoading, onTicketClick, onTicketCreated }: SpecsBoardProps) {
   const [proposeOpen, setProposeOpen] = useState(false)
   const { isOver, setNodeRef } = useDroppable({ id: 'specs' })
 
@@ -128,7 +129,7 @@ export function SpecsBoard({ tickets, doneTickets = [], isLoading, onTicketClick
         </div>
       </div>
 
-      <ProposeSpecModal open={proposeOpen} onClose={() => setProposeOpen(false)} />
+      <ProposeSpecModal open={proposeOpen} onClose={() => setProposeOpen(false)} onTicketCreated={onTicketCreated} />
     </div>
   )
 }
