@@ -420,8 +420,17 @@ describe('hubList', () => {
 
 describe('hubStop', () => {
   it('reports not running', async () => {
-    let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => { expect(await _internal.hubStop()).toBe(0) }) })
-    expect(so).toContain('not running')
+    // Temporarily hide the real PID file so the test always sees "not running"
+    const pidFile = _internal.HUB_PID_FILE
+    const bakFile = pidFile + '.test-bak'
+    const hadPidFile = fs.existsSync(pidFile)
+    if (hadPidFile) fs.renameSync(pidFile, bakFile)
+    try {
+      let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => { expect(await _internal.hubStop()).toBe(0) }) })
+      expect(so).toContain('not running')
+    } finally {
+      if (hadPidFile) fs.renameSync(bakFile, pidFile)
+    }
   })
 })
 

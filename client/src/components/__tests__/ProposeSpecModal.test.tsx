@@ -1,9 +1,9 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '../../test-utils'
+import { render, screen, fireEvent, waitFor } from '../../test-utils'
 import { ProposeSpecModal } from '../ProposeSpecModal'
 
-const mockStartWithMessage = vi.fn()
+const mockStartWithMessage = vi.fn().mockResolvedValue('conv-1')
 const mockSendMessage = vi.fn()
 const mockAbortStream = vi.fn()
 const mockConfirmCommand = vi.fn()
@@ -53,6 +53,7 @@ describe('ProposeSpecModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockStartWithMessage.mockResolvedValue('conv-1')
     mockConversations = [
       {
         id: 'conv-1',
@@ -74,35 +75,47 @@ describe('ProposeSpecModal', () => {
     expect(screen.getByText('Add Spec')).toBeInTheDocument()
   })
 
-  it('starts conversation with /specrails:propose-spec when opened', () => {
+  it('starts conversation with /specrails:propose-spec when opened', async () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
-    expect(mockStartWithMessage).toHaveBeenCalledWith('/specrails:propose-spec')
+    await waitFor(() => {
+      expect(mockStartWithMessage).toHaveBeenCalledWith('/specrails:propose-spec')
+    })
   })
 
-  it('does not start conversation twice if already started', () => {
+  it('does not start conversation twice if already started', async () => {
     const { rerender } = render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
     rerender(<ProposeSpecModal open={true} onClose={onCloseMock} />)
-    expect(mockStartWithMessage).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(mockStartWithMessage).toHaveBeenCalledTimes(1)
+    })
   })
 
-  it('renders MessageList when conversation exists', () => {
+  it('renders MessageList when conversation exists', async () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
-    expect(screen.getByTestId('message-list')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByTestId('message-list')).toBeInTheDocument()
+    })
   })
 
-  it('renders ChatInput when conversation exists', () => {
+  it('renders ChatInput when conversation exists', async () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
-    expect(screen.getByTestId('chat-input')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-input')).toBeInTheDocument()
+    })
   })
 
-  it('resets tracking flag when closed and re-opened', () => {
+  it('resets tracking flag when closed and re-opened', async () => {
     const { rerender } = render(<ProposeSpecModal open={true} onClose={onCloseMock} />)
-    expect(mockStartWithMessage).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(mockStartWithMessage).toHaveBeenCalledTimes(1)
+    })
 
     // Close and re-open
     rerender(<ProposeSpecModal open={false} onClose={onCloseMock} />)
     rerender(<ProposeSpecModal open={true} onClose={onCloseMock} />)
-    expect(mockStartWithMessage).toHaveBeenCalledTimes(2)
+    await waitFor(() => {
+      expect(mockStartWithMessage).toHaveBeenCalledTimes(2)
+    })
   })
 })
 
