@@ -12,7 +12,6 @@ declare module 'express-serve-static-core' {
 }
 
 const VALID_MODES = new Set(['implement', 'batch-implement'])
-const VALID_RAIL_INDICES = new Set([0, 1, 2])
 
 export function createRailsRouter(): Router {
   const router = Router({ mergeParams: true })
@@ -41,8 +40,8 @@ export function createRailsRouter(): Router {
   // PUT /rails/:railIndex/tickets — set ticket assignments for a rail
   router.put('/:railIndex/tickets', (req: Request, res: Response) => {
     const railIndex = parseInt(req.params.railIndex as string, 10)
-    if (!VALID_RAIL_INDICES.has(railIndex)) {
-      res.status(400).json({ error: 'Rail index must be 0, 1, or 2' }); return
+    if (isNaN(railIndex) || railIndex < 0) {
+      res.status(400).json({ error: 'Invalid rail index' }); return
     }
 
     const { ticketIds } = req.body ?? {}
@@ -63,8 +62,8 @@ export function createRailsRouter(): Router {
   // POST /rails/:railIndex/launch — launch job(s) for a rail
   router.post('/:railIndex/launch', (req: Request, res: Response) => {
     const railIndex = parseInt(req.params.railIndex as string, 10)
-    if (!VALID_RAIL_INDICES.has(railIndex)) {
-      res.status(400).json({ error: 'Rail index must be 0, 1, or 2' }); return
+    if (isNaN(railIndex) || railIndex < 0) {
+      res.status(400).json({ error: 'Invalid rail index' }); return
     }
 
     const { mode = 'implement' } = req.body ?? {}
@@ -113,8 +112,8 @@ export function createRailsRouter(): Router {
   // POST /rails/:railIndex/stop — kill the running job for a rail
   router.post('/:railIndex/stop', (req: Request, res: Response) => {
     const railIndex = parseInt(req.params.railIndex as string, 10)
-    if (!VALID_RAIL_INDICES.has(railIndex)) {
-      res.status(400).json({ error: 'Rail index must be 0, 1, or 2' }); return
+    if (isNaN(railIndex) || railIndex < 0) {
+      res.status(400).json({ error: 'Invalid rail index' }); return
     }
 
     const c = ctx(req)

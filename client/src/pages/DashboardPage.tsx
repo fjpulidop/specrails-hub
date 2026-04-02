@@ -113,10 +113,9 @@ export default function DashboardPage() {
           Object.keys(data.activeJobs ?? {}).map(Number)
         )
         setRails((prev) => {
-          const next = prev.map((r) => {
+          const next = prev.map((r, idx) => {
             if (r.status !== 'running') return r
-            const railIndex = parseInt(r.id.replace('rail-', ''), 10) - 1
-            if (activeIndices.has(railIndex)) return r // still running on server
+            if (activeIndices.has(idx)) return r // still running on server
             // Rail was running but server has no active job → job finished while
             // we were away. Clear tickets so they reappear in Specs/Done based
             // on their current server-side status (useTickets re-fetches on mount).
@@ -216,22 +215,20 @@ export default function DashboardPage() {
     const m = msg as { type?: string; projectId?: string; railIndex?: number; status?: string; ticketIds?: number[] }
     if (m.projectId !== activeProjectIdRef.current) return
     if (m.type === 'rail.job_completed') {
-      const railId = `rail-${(m.railIndex ?? 0) + 1}`
+      const targetIndex = m.railIndex ?? 0
       const completedTicketIds = new Set(m.ticketIds ?? [])
 
       if (m.status === 'completed' && completedTicketIds.size > 0) {
-        // Clear completed tickets from the rail — they'll appear in Done Specs
-        // via ticket_updated WS events that update the ticket list
-        updateRails((prev) => prev.map((r) => {
-          if (r.id !== railId) return r
+        updateRails((prev) => prev.map((r, idx) => {
+          if (idx !== targetIndex) return r
           return { ...r, status: 'idle', ticketIds: r.ticketIds.filter((id) => !completedTicketIds.has(id)) }
         }))
       } else {
-        updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'idle' } : r)))
+        updateRails((prev) => prev.map((r, idx) => (idx === targetIndex ? { ...r, status: 'idle' } : r)))
       }
 
       const statusLabel = m.status === 'completed' ? 'completed' : m.status === 'failed' ? 'failed' : m.status ?? 'finished'
-      toast.info(`Rail ${(m.railIndex ?? 0) + 1} ${statusLabel}`)
+      toast.info(`Rail ${targetIndex + 1} ${statusLabel}`)
     }
   }, [updateRails])
 
@@ -422,11 +419,9 @@ export default function DashboardPage() {
   }
 
   async function handleToggle(railId: string) {
-    const rail = rails.find((r) => r.id === railId)
-    if (!rail) return
-
-    // Rail index: 'rail-1' → 0, 'rail-2' → 1, 'rail-3' → 2
-    const railIndex = parseInt(railId.replace('rail-', ''), 10) - 1
+    const railIndex = rails.findIndex((r) => r.id === railId)
+    if (railIndex === -1) return
+    const rail = rails[railIndex]
 
     if (rail.status === 'running') {
       // Stop via rails API
