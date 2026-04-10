@@ -239,7 +239,7 @@ export class SetupManager {
       return
     }
 
-    const child = spawn('npx', ['specrails-core', 'init', '--yes', '--root-dir', projectPath], {
+    const child = spawn('npx', ['specrails-core@latest', 'init', '--yes', '--root-dir', projectPath], {
       cwd: projectPath,
       env: process.env,
       shell: false,

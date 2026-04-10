@@ -123,7 +123,7 @@ describe('SetupManager', () => {
   // ─── startInstall ──────────────────────────────────────────────────────────
 
   describe('startInstall', () => {
-    it('spawns npx specrails-core init --yes --root-dir <projectPath>', () => {
+    it('spawns npx specrails-core@latest init --yes --root-dir <projectPath>', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
@@ -131,7 +131,7 @@ describe('SetupManager', () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'npx',
-        ['specrails-core', 'init', '--yes', '--root-dir', '/path/to/project'],
+        ['specrails-core@latest', 'init', '--yes', '--root-dir', '/path/to/project'],
         expect.objectContaining({ cwd: '/path/to/project' })
       )
     })
