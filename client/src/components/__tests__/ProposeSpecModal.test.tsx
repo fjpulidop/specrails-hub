@@ -51,7 +51,7 @@ describe('ProposeSpecModal', () => {
   it('renders dialog with textarea when open=true', () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
     expect(screen.getByText('Add Spec')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText(/describe the feature/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/add a dark mode toggle/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /generate spec/i })).toBeInTheDocument()
   })
 
@@ -68,7 +68,7 @@ describe('ProposeSpecModal', () => {
 
   it('enables Generate Spec button when textarea has content', () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
-    const textarea = screen.getByPlaceholderText(/describe the feature/i)
+    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
     const button = screen.getByRole('button', { name: /generate spec/i })
     expect(button).not.toBeDisabled()
@@ -76,7 +76,7 @@ describe('ProposeSpecModal', () => {
 
   it('sends message with /specrails:propose-spec and user text on submit', async () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} onTicketCreated={onTicketCreatedMock} />)
-    const textarea = screen.getByPlaceholderText(/describe the feature/i)
+    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
     fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
 
@@ -90,7 +90,7 @@ describe('ProposeSpecModal', () => {
 
   it('shows generating state after submit', async () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
-    const textarea = screen.getByPlaceholderText(/describe the feature/i)
+    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
     fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
 
@@ -105,7 +105,7 @@ describe('ProposeSpecModal', () => {
       <ProposeSpecModal open={true} onClose={onCloseMock} tickets={existingTickets} onTicketCreated={onTicketCreatedMock} />,
     )
     // Submit
-    const textarea = screen.getByPlaceholderText(/describe the feature/i)
+    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
     fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
 
@@ -124,7 +124,7 @@ describe('ProposeSpecModal', () => {
 
   it('aborts stream on close during generation', async () => {
     const { rerender } = render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
-    const textarea = screen.getByPlaceholderText(/describe the feature/i)
+    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
     fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
 
@@ -136,13 +136,13 @@ describe('ProposeSpecModal', () => {
 
   it('resets state when reopened', async () => {
     const { rerender } = render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
-    const textarea = screen.getByPlaceholderText(/describe the feature/i)
+    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
 
     rerender(<ProposeSpecModal open={false} onClose={onCloseMock} tickets={emptyTickets} />)
     rerender(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
 
-    const newTextarea = screen.getByPlaceholderText(/describe the feature/i)
+    const newTextarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     expect(newTextarea).toHaveValue('')
   })
 })
