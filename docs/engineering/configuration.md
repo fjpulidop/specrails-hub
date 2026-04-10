@@ -48,7 +48,7 @@ All CLI flags can be combined with any command.
 ```bash
 specrails-hub start                  # Start the hub server (daemonized)
 specrails-hub stop                   # Stop the hub server
-specrails-hub hub status             # Show hub status and all registered projects
+specrails-hub status                 # Show hub status and all registered projects
 specrails-hub add <path>             # Register a project by absolute path
 specrails-hub remove <project-id>    # Unregister a project by ID
 specrails-hub list                   # List all registered projects

@@ -631,7 +631,7 @@ if (fs.existsSync(clientDist)) {
 server.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`[error] Port ${port} is already in use. Is another manager instance running?`)
-    console.error(`[error] Try stopping it first: specrails-hub hub stop`)
+    console.error(`[error] Try stopping it first: specrails-hub stop`)
     process.exit(1)
   }
   throw err

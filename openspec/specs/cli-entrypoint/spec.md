@@ -16,7 +16,7 @@ The npm package SHALL expose a binary named `specrails-hub` (not `srm`). All use
 - **THEN** the output references `specrails-hub` (not `srm`) in usage examples
 
 ### Requirement: CLI locates the compiled server binary correctly
-The CLI SHALL resolve the Express server path relative to its own compiled location so that `specrails-hub hub start` can spawn the server process when installed via npm.
+The CLI SHALL resolve the Express server path relative to its own compiled location so that `specrails-hub start` can spawn the server process when installed via npm.
 
 #### Scenario: CLI finds server in npm-installed package
 - **WHEN** the CLI is run from an npm global install (CLI at `cli/dist/specrails-hub.js`)
