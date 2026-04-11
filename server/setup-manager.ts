@@ -1,6 +1,6 @@
 import { spawn, ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
-import { existsSync, readdirSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, readdirSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs'
 import { join } from 'path'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
@@ -40,6 +40,77 @@ function serializeInstallConfigYaml(config: Record<string, unknown>): string {
     const rendered = valueToYaml(v, 1)
     return rendered.startsWith('\n') ? `${k}:${rendered}` : `${k}: ${rendered}`
   }).join('\n')
+}
+
+// ─── Install config reader ───────────────────────────────────────────────────
+
+interface InstallConfigParsed {
+  tier: 'quick' | 'full'
+  selectedAgents: string[]
+}
+
+function readInstallConfig(projectPath: string): InstallConfigParsed | null {
+  const configPath = join(projectPath, '.specrails', 'install-config.yaml')
+  try {
+    const text = readFileSync(configPath, 'utf-8')
+    const tierMatch = text.match(/^tier:\s*(\w+)/m)
+    const tier = (tierMatch?.[1] === 'quick' ? 'quick' : 'full') as 'quick' | 'full'
+    const selectedMatch = text.match(/selected:\s*\[([^\]]*)\]/)
+    const selectedAgents = selectedMatch
+      ? selectedMatch[1].split(',').map((s) => s.trim()).filter(Boolean)
+      : []
+    return { tier, selectedAgents }
+  } catch {
+    return null
+  }
+}
+
+// ─── Template deployment (post-install) ──────────────────────────────────────
+
+function deployTemplates(projectPath: string, selectedAgents: string[]): { agents: number; commands: number; personas: number } {
+  const templatesDir = join(projectPath, '.specrails', 'setup-templates')
+  const targetDir = join(projectPath, SPECRAILS_DIR)
+  let agents = 0, commands = 0, personas = 0
+
+  // Deploy selected agent templates
+  const agentTemplatesDir = join(templatesDir, 'agents')
+  const agentTargetDir = join(targetDir, 'agents')
+  if (existsSync(agentTemplatesDir)) {
+    mkdirSync(agentTargetDir, { recursive: true })
+    for (const file of readdirSync(agentTemplatesDir) as string[]) {
+      if (!file.endsWith('.md')) continue
+      const agentId = file.replace(/\.md$/, '')
+      if (selectedAgents.length > 0 && !selectedAgents.includes(agentId)) continue
+      copyFileSync(join(agentTemplatesDir, file), join(agentTargetDir, file))
+      agents++
+    }
+  }
+
+  // Deploy persona templates
+  const personaTemplatesDir = join(templatesDir, 'personas')
+  const personaTargetDir = join(agentTargetDir, 'personas')
+  if (existsSync(personaTemplatesDir)) {
+    mkdirSync(personaTargetDir, { recursive: true })
+    for (const file of readdirSync(personaTemplatesDir) as string[]) {
+      if (!file.endsWith('.md')) continue
+      copyFileSync(join(personaTemplatesDir, file), join(personaTargetDir, file))
+      personas++
+    }
+  }
+
+  // Deploy command templates
+  const cmdTemplatesDir = join(templatesDir, 'commands', 'specrails')
+  const cmdTargetDir = join(targetDir, 'commands', 'specrails')
+  if (existsSync(cmdTemplatesDir)) {
+    mkdirSync(cmdTargetDir, { recursive: true })
+    for (const file of readdirSync(cmdTemplatesDir) as string[]) {
+      if (!file.endsWith('.md')) continue
+      copyFileSync(join(cmdTemplatesDir, file), join(cmdTargetDir, file))
+      commands++
+    }
+  }
+
+  return { agents, commands, personas }
 }
 
 // ─── Checkpoint definitions ───────────────────────────────────────────────────
@@ -358,9 +429,13 @@ export class SetupManager {
     child.on('close', (code) => {
       this._installProcesses.delete(projectId)
       if (code === 0) {
-        // Complete remaining quick checkpoints
         this._advanceCheckpoint(projectId, 'base_install')
         this._completeCheckpoint(projectId, 'base_install')
+        // Deploy agent/command templates that specrails-core scaffolded but didn't activate
+        try {
+          const config = readInstallConfig(projectPath)
+          deployTemplates(projectPath, config?.selectedAgents ?? [])
+        } catch { /* non-fatal */ }
         this._advanceCheckpoint(projectId, 'quick_complete')
         this._completeCheckpoint(projectId, 'quick_complete')
         const summary = computeSummary(projectPath)
@@ -389,11 +464,12 @@ export class SetupManager {
       return
     }
 
-    this._projectTiers.set(projectId, 'full')
-    this._initCheckpoints(projectId)
-
     const configPath = join(projectPath, '.specrails', 'install-config.yaml')
     const hasConfig = existsSync(configPath)
+    const parsedConfig = hasConfig ? readInstallConfig(projectPath) : null
+    const tier = parsedConfig?.tier ?? 'full'
+    this._projectTiers.set(projectId, tier)
+    this._initCheckpoints(projectId)
 
     const args = hasConfig
       ? ['specrails-core@latest', 'init', '--from-config', configPath]
@@ -438,6 +514,12 @@ export class SetupManager {
       if (code === 0) {
         this._advanceCheckpoint(projectId, 'base_install')
         this._completeCheckpoint(projectId, 'base_install')
+        // Deploy agent/command templates that specrails-core scaffolded but didn't activate
+        if (tier !== 'full') {
+          try {
+            deployTemplates(projectPath, parsedConfig?.selectedAgents ?? [])
+          } catch { /* non-fatal */ }
+        }
         const summary = computeSummary(projectPath)
         this._broadcast({
           type: 'setup_install_done',
