@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.0](https://github.com/fjpulidop/specrails-hub/compare/v1.22.0...v1.23.0) (2026-04-11)
+
+
+### Features
+
+* redesign hub with Arc sidebar, Specs/Rails boards (SPEA-723) ([#165](https://github.com/fjpulidop/specrails-hub/issues/165)) ([ea25a92](https://github.com/fjpulidop/specrails-hub/commit/ea25a92f31c0486236da181f47b772a42893c233))
+
 ## [1.22.0](https://github.com/fjpulidop/specrails-hub/compare/v1.21.0...v1.22.0) (2026-03-23)
 
 
