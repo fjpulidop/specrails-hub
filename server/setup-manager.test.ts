@@ -146,15 +146,30 @@ describe('SetupManager', () => {
   // ─── startInstall ──────────────────────────────────────────────────────────
 
   describe('startInstall', () => {
-    it('spawns npx specrails-core@latest init --yes --root-dir <projectPath>', () => {
+    it('spawns npx specrails-core@latest init --yes --root-dir when no config exists', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockReturnValue(false)
 
       sm.startInstall('p1', '/path/to/project')
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'npx',
         ['specrails-core@latest', 'init', '--yes', '--root-dir', '/path/to/project'],
+        expect.objectContaining({ cwd: '/path/to/project' })
+      )
+    })
+
+    it('spawns npx specrails-core@latest init --from-config when config exists', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockReturnValue(true)
+
+      sm.startInstall('p1', '/path/to/project')
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'npx',
+        ['specrails-core@latest', 'init', '--from-config', '/path/to/project/.specrails/install-config.yaml'],
         expect.objectContaining({ cwd: '/path/to/project' })
       )
     })
@@ -199,12 +214,10 @@ describe('SetupManager', () => {
       expect(errors[0].error).toContain('code 1')
     })
 
-    it('always passes --root-dir so install works outside a git repo', () => {
-      // Regression test: without --root-dir, install.sh would fail with exit code 1
-      // when the project path is not inside a git repo (REPO_ROOT empty → bash `read`
-      // fails on closed stdin → set -e exits with code 1).
+    it('passes --root-dir when no config exists (fallback for non-git repos)', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockReturnValue(false)
 
       sm.startInstall('p1', '/non-git/project')
 

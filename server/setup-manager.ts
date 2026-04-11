@@ -390,8 +390,16 @@ export class SetupManager {
     }
 
     this._projectTiers.set(projectId, 'full')
+    this._initCheckpoints(projectId)
 
-    const child = spawn('npx', ['specrails-core@latest', 'init', '--yes', '--root-dir', projectPath], {
+    const configPath = join(projectPath, '.specrails', 'install-config.yaml')
+    const hasConfig = existsSync(configPath)
+
+    const args = hasConfig
+      ? ['specrails-core@latest', 'init', '--from-config', configPath]
+      : ['specrails-core@latest', 'init', '--yes', '--root-dir', projectPath]
+
+    const child = spawn('npx', args, {
       cwd: projectPath,
       env: process.env,
       shell: false,
@@ -414,6 +422,10 @@ export class SetupManager {
     stdoutReader.on('line', (line) => {
       appendLog(line)
       this._broadcast({ type: 'setup_log', projectId, line, stream: 'stdout' })
+      const hits = detectCheckpointFromText(line)
+      for (const hit of hits) {
+        this._advanceCheckpoint(projectId, hit.key, hit.detail)
+      }
     })
 
     stderrReader.on('line', (line) => {
@@ -424,6 +436,8 @@ export class SetupManager {
     child.on('close', (code) => {
       this._installProcesses.delete(projectId)
       if (code === 0) {
+        this._advanceCheckpoint(projectId, 'base_install')
+        this._completeCheckpoint(projectId, 'base_install')
         const summary = computeSummary(projectPath)
         this._broadcast({
           type: 'setup_install_done',
@@ -431,7 +445,6 @@ export class SetupManager {
           timestamp: new Date().toISOString(),
           summary,
         })
-        // Validate that hub constants are in sync with the installed core contract
         validateCoreContract().catch(() => { /* non-fatal */ })
       } else {
         this._broadcast({
