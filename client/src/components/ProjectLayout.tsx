@@ -9,6 +9,7 @@ import { usePipeline } from '../hooks/usePipeline'
 import { useChat, ChatContext } from '../hooks/useChat'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import type { HubProject } from '../hooks/useHub'
+import { FEATURE_CHAT_ENABLED } from '../lib/feature-flags'
 
 interface ProjectLayoutProps {
   project: HubProject
@@ -70,7 +71,7 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
           <main className="flex-1 overflow-auto">
             <Outlet />
           </main>
-          <ChatPanel chat={chat} project={project} />
+          {FEATURE_CHAT_ENABLED && <ChatPanel chat={chat} project={project} />}
         </div>
         <StatusBar connectionStatus={connectionStatus} />
       </div>

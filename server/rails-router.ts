@@ -1,0 +1,154 @@
+import { Router, Request, Response } from 'express'
+import type { ProjectContext } from './project-registry'
+import { getRails, getRail, setRailTickets } from './rails-store'
+import { ClaudeNotFoundError } from './queue-manager'
+import type { RailJobStartedMessage, RailJobStoppedMessage } from './types'
+
+// Extend Express Request to carry resolved ProjectContext (declared in project-router)
+declare module 'express-serve-static-core' {
+  interface Request {
+    projectCtx?: ProjectContext
+  }
+}
+
+const VALID_MODES = new Set(['implement', 'batch-implement'])
+
+export function createRailsRouter(): Router {
+  const router = Router({ mergeParams: true })
+
+  function ctx(req: Request): ProjectContext {
+    return req.projectCtx!
+  }
+
+  // GET /rails — list all rail assignments + active job info
+  router.get('/', (_req: Request, res: Response) => {
+    const c = ctx(_req)
+    try {
+      const rails = getRails(c.db)
+      // Include which rails have active jobs (so clients can reconcile stale 'running' state)
+      const activeJobs: Record<number, { jobId: string; mode: string }> = {}
+      for (const [jobId, meta] of c.railJobs.entries()) {
+        activeJobs[meta.railIndex] = { jobId, mode: meta.mode }
+      }
+      res.json({ rails, activeJobs })
+    } catch (err) {
+      console.error('[rails-router] get rails error:', err)
+      res.status(500).json({ error: 'Failed to fetch rails' })
+    }
+  })
+
+  // PUT /rails/:railIndex/tickets — set ticket assignments for a rail
+  router.put('/:railIndex/tickets', (req: Request, res: Response) => {
+    const railIndex = parseInt(req.params.railIndex as string, 10)
+    if (isNaN(railIndex) || railIndex < 0) {
+      res.status(400).json({ error: 'Invalid rail index' }); return
+    }
+
+    const { ticketIds } = req.body ?? {}
+    if (!Array.isArray(ticketIds) || ticketIds.some((id: unknown) => typeof id !== 'number')) {
+      res.status(400).json({ error: 'ticketIds must be an array of numbers' }); return
+    }
+
+    const c = ctx(req)
+    try {
+      const rail = setRailTickets(c.db, railIndex, ticketIds as number[])
+      res.json({ rail })
+    } catch (err) {
+      console.error('[rails-router] set rail tickets error:', err)
+      res.status(500).json({ error: 'Failed to update rail tickets' })
+    }
+  })
+
+  // POST /rails/:railIndex/launch — launch job(s) for a rail
+  router.post('/:railIndex/launch', (req: Request, res: Response) => {
+    const railIndex = parseInt(req.params.railIndex as string, 10)
+    if (isNaN(railIndex) || railIndex < 0) {
+      res.status(400).json({ error: 'Invalid rail index' }); return
+    }
+
+    const { mode = 'implement' } = req.body ?? {}
+    if (!VALID_MODES.has(mode as string)) {
+      res.status(400).json({ error: 'mode must be "implement" or "batch-implement"' }); return
+    }
+
+    const c = ctx(req)
+    const rail = getRail(c.db, railIndex)
+
+    if (rail.ticketIds.length === 0) {
+      res.status(400).json({ error: 'Rail has no tickets assigned' }); return
+    }
+
+    try {
+      let jobId: string
+
+      // Both modes create a single job with all ticket IDs.
+      // /specrails:implement handles multiple specs in parallel internally.
+      const issueArgs = rail.ticketIds.map((id) => `#${id}`).join(' ')
+      const commandName = mode === 'batch-implement' ? 'batch-implement' : 'implement'
+      const command = `/specrails:${commandName} ${issueArgs} --yes`
+      const job = c.queueManager.enqueue(command, 'normal')
+      jobId = job.id
+      c.railJobs.set(jobId, { railIndex, mode, ticketIds: [...rail.ticketIds] })
+
+      const startMsg: RailJobStartedMessage = {
+        type: 'rail.job_started',
+        projectId: c.project.id,
+        railIndex,
+        jobId,
+        mode,
+      }
+      c.broadcast(startMsg)
+
+      res.status(202).json({ jobId, railIndex, mode })
+    } catch (err) {
+      if (err instanceof ClaudeNotFoundError) {
+        res.status(503).json({ error: 'Claude CLI not found' }); return
+      }
+      console.error('[rails-router] launch error:', err)
+      res.status(500).json({ error: 'Failed to launch rail job' })
+    }
+  })
+
+  // POST /rails/:railIndex/stop — kill the running job for a rail
+  router.post('/:railIndex/stop', (req: Request, res: Response) => {
+    const railIndex = parseInt(req.params.railIndex as string, 10)
+    if (isNaN(railIndex) || railIndex < 0) {
+      res.status(400).json({ error: 'Invalid rail index' }); return
+    }
+
+    const c = ctx(req)
+
+    // Find the active rail job for this rail index
+    let targetJobId: string | undefined
+    for (const [jobId, meta] of c.railJobs.entries()) {
+      if (meta.railIndex === railIndex) {
+        targetJobId = jobId
+        break
+      }
+    }
+
+    if (!targetJobId) {
+      res.status(404).json({ error: 'No active rail job found for this rail' }); return
+    }
+
+    try {
+      c.queueManager.cancel(targetJobId)
+      c.railJobs.delete(targetJobId)
+
+      const stopMsg: RailJobStoppedMessage = {
+        type: 'rail.job_stopped',
+        projectId: c.project.id,
+        railIndex,
+        jobId: targetJobId,
+      }
+      c.broadcast(stopMsg)
+
+      res.json({ ok: true, jobId: targetJobId })
+    } catch (err) {
+      console.error('[rails-router] stop error:', err)
+      res.status(500).json({ error: 'Failed to stop rail job' })
+    }
+  })
+
+  return router
+}

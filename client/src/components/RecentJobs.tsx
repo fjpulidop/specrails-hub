@@ -38,13 +38,19 @@ function formatCost(cost: number | null | undefined): string | null {
   return `$${cost.toFixed(3)}`
 }
 
-function formatDuration(ms: number | null | undefined): string | null {
-  if (ms == null) return null
+/** Wall-clock duration from started_at / finished_at timestamps */
+function formatWallDuration(startedAt: string, finishedAt: string | null | undefined): string | null {
+  if (!finishedAt) return null
+  const ms = new Date(finishedAt).getTime() - new Date(startedAt).getTime()
+  if (ms < 0) return null
   const secs = Math.round(ms / 1000)
   if (secs < 60) return `${secs}s`
   const mins = Math.floor(secs / 60)
   const s = secs % 60
-  return `${mins}m ${s}s`
+  if (mins < 60) return `${mins}m ${s}s`
+  const hrs = Math.floor(mins / 60)
+  const m = mins % 60
+  return `${hrs}h ${m}m`
 }
 
 function formatTokens(n: number | null | undefined): string | null {
@@ -297,8 +303,8 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
         {filteredJobs.slice(0, displayLimit).map((job) => {
           const statusInfo = STATUS_BADGE[job.status] ?? STATUS_BADGE.queued
           const cost = formatCost(job.total_cost_usd)
-          const duration = formatDuration(job.duration_ms)
-          const tokens = formatTokens(job.tokens_out)
+          const duration = formatWallDuration(job.started_at, job.finished_at)
+          const tokens = formatTokens(((job.tokens_in ?? 0) + (job.tokens_out ?? 0)) || null)
 
           const isProposal = job.id.startsWith('proposal:')
           const proposalId = isProposal ? job.id.replace('proposal:', '') : null

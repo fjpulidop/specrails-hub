@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid'
 import type { AnalyticsOpts } from './types'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import {
-  listJobs, getJob, getJobEvents, purgeJobs, getProjectActivity,
+  listJobs, getJob, getJobEvents, purgeJobs, deleteJob, getProjectActivity,
   createConversation, listConversations, getConversation,
   deleteConversation, updateConversation, getMessages,
   getStats, getPipelineJobs,
@@ -29,6 +29,7 @@ import {
   type Ticket,
 } from './ticket-store'
 import type { TicketCreatedMessage, TicketUpdatedMessage, TicketDeletedMessage, LocalTicket } from './types'
+import { createRailsRouter } from './rails-router'
 
 // Extend Express Request to carry resolved ProjectContext
 declare module 'express-serve-static-core' {
@@ -73,6 +74,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     )
     hooksRouter(req, res, next)
   })
+
+  // Mount rails router under each project
+  const railsRouter = createRailsRouter()
+  router.use('/:projectId/rails', railsRouter)
 
   // ─── Queue / Spawn routes ────────────────────────────────────────────────────
 
@@ -140,7 +145,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       if (err instanceof JobNotFoundError) {
         res.status(404).json({ error: 'Job not found' })
       } else if (err instanceof JobAlreadyTerminalError) {
-        res.status(409).json({ error: 'Job is already in terminal state' })
+        // Job already finished — delete it from the DB
+        deleteJob(ctx(req).db, req.params.id as string)
+        res.json({ ok: true, status: 'deleted' })
       } else {
         res.status(500).json({ error: 'Internal server error' })
       }
@@ -205,6 +212,43 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const from = req.query.from as string | undefined
     const to = req.query.to as string | undefined
     const result = listJobs(ctx(req).db, { limit, offset, status, from, to })
+
+    // Merge in-memory queued jobs that haven't been persisted to DB yet
+    const { queueManager } = ctx(req)
+    const dbIds = new Set(result.jobs.map((j) => j.id))
+    const queuedRows = queueManager
+      .getJobs()
+      .filter((j) => j.status === 'queued' && !dbIds.has(j.id))
+      .filter((j) => !status || j.status === status)
+      .map((j) => ({
+        id: j.id,
+        command: j.command,
+        started_at: j.startedAt ?? new Date().toISOString(),
+        finished_at: j.finishedAt,
+        status: j.status,
+        exit_code: j.exitCode,
+        queue_position: j.queuePosition,
+        priority: j.priority,
+        tokens_in: null,
+        tokens_out: null,
+        tokens_cache_read: null,
+        tokens_cache_create: null,
+        total_cost_usd: null,
+        num_turns: null,
+        model: null,
+        duration_ms: null,
+        duration_api_ms: null,
+        session_id: null,
+        depends_on_job_id: j.dependsOnJobId,
+        pipeline_id: j.pipelineId,
+        skip_reason: j.skipReason,
+      } as import('./types').JobRow))
+
+    if (queuedRows.length > 0) {
+      result.jobs = [...queuedRows, ...result.jobs]
+      result.total += queuedRows.length
+    }
+
     res.json(result)
   })
 
@@ -922,7 +966,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   // ─── Integration contract ──────────────────────────────────────────────────
 
   const DEFAULT_TICKET_CAPABILITIES = ['crud', 'labels', 'status', 'priorities', 'dependencies']
-  const DEFAULT_TICKET_STORAGE_PATH = '.claude/local-tickets.json'
+  const DEFAULT_TICKET_STORAGE_PATH = '.specrails/local-tickets.json'
 
   // GET /:projectId/integration-contract — Return the project's integration contract with ticketProvider
   router.get('/:projectId/integration-contract', (req: Request, res: Response) => {

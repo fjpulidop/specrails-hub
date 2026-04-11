@@ -208,6 +208,20 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_jobs_pipeline_id ON jobs(pipeline_id);
     `)
   },
+
+  // Migration 9: rails table for Rails board job integration
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS rails (
+        rail_index  INTEGER NOT NULL,
+        ticket_id   INTEGER NOT NULL,
+        position    INTEGER NOT NULL,
+        mode        TEXT    NOT NULL DEFAULT 'implement',
+        PRIMARY KEY (rail_index, ticket_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_rails_rail_index ON rails(rail_index);
+    `)
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {
@@ -392,7 +406,7 @@ export function purgeJobs(
   db: DbInstance,
   opts?: { from?: string; to?: string }
 ): number {
-  const conditions: string[] = ["status IN ('completed', 'failed', 'canceled', 'zombie_terminated')"]
+  const conditions: string[] = ["status IN ('completed', 'failed', 'canceled', 'zombie_terminated', 'skipped')"]
   const params: unknown[] = []
 
   if (opts?.from) {

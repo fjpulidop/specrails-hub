@@ -82,6 +82,19 @@
   -webkit-backdrop-filter: blur(12px);
 }
 
+/* Jiggle animation for rail delete mode (iOS-style) */
+@keyframes jiggle {
+  0%   { transform: rotate(-0.4deg) translateX(-0.5px); }
+  25%  { transform: rotate(0.3deg) translateX(0.5px); }
+  50%  { transform: rotate(-0.3deg) translateX(-0.3px); }
+  75%  { transform: rotate(0.4deg) translateX(0.3px); }
+  100% { transform: rotate(-0.4deg) translateX(-0.5px); }
+}
+
+@utility animate-jiggle {
+  animation: jiggle 0.4s ease-in-out infinite;
+}
+
 /* Dracula glow effects */
 @utility glow-purple  { box-shadow: 0 0 20px hsl(265 89% 78% / 0.2); }
 @utility glow-pink    { box-shadow: 0 0 20px hsl(326 100% 74% / 0.2); }

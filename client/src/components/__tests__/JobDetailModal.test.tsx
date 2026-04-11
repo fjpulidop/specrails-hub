@@ -45,6 +45,7 @@ const mockJob = {
   id: 'job-abc123',
   command: '/sr:implement --spec SPEA-001',
   started_at: '2024-03-21T10:00:00Z',
+  finished_at: '2024-03-21T10:01:02Z',
   status: 'completed' as const,
   duration_ms: 62000,
   total_cost_usd: 0.0234,
@@ -57,6 +58,7 @@ const mockRunningJob = {
   ...mockJob,
   id: 'job-running',
   status: 'running' as const,
+  finished_at: null as string | null,
   duration_ms: null,
   total_cost_usd: null,
 }
@@ -103,11 +105,11 @@ describe('JobDetailModal', () => {
     })
   })
 
-  it('renders duration when duration_ms is set', async () => {
+  it('renders wall-clock duration when finished_at is set', async () => {
     render(<JobDetailModal jobId="job-abc123" onClose={onClose} />)
     await waitFor(() => {
-      // 62000ms → 62.0s
-      expect(screen.getByText('62.0s')).toBeInTheDocument()
+      // Wall-clock: 10:00:00 → 10:01:02 = 62s → "1m 2s"
+      expect(screen.getByText('1m 2s')).toBeInTheDocument()
     })
   })
 
@@ -392,11 +394,11 @@ describe('JobDetailModal', () => {
     expect(screen.queryByText(/^\$/)).not.toBeInTheDocument()
   })
 
-  it('does not show duration when duration_ms is null', async () => {
+  it('does not show duration when finished_at is null', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        job: { ...mockJob, duration_ms: null },
+        job: { ...mockJob, finished_at: null },
         events: [],
         phaseDefinitions: [],
       }),

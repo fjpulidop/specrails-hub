@@ -198,7 +198,8 @@ export function LogViewer({ events, isLoading }: LogViewerProps) {
     : totalLines
 
   const scrollToBottom = useCallback(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = containerRef.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [])
 
   useEffect(() => {

@@ -8,7 +8,8 @@ import { ProposalManager } from './proposal-manager'
 import { SpecLauncherManager } from './spec-launcher-manager'
 import { WebhookManager } from './webhook-manager'
 import { TicketWatcher } from './ticket-watcher'
-import type { WsMessage } from './types'
+import { resolveTicketStoragePath, mutateStore } from './ticket-store'
+import type { WsMessage, TicketUpdatedMessage } from './types'
 import {
   initHubDb,
   getHubDbPath,
@@ -38,6 +39,8 @@ export interface ProjectContext {
   specLauncherManager: SpecLauncherManager
   ticketWatcher: TicketWatcher
   broadcast: (msg: WsMessage) => void
+  /** Maps jobId → rail metadata for active rail-launched jobs */
+  railJobs: Map<string, { railIndex: number; mode: string; ticketIds: number[] }>
 }
 
 // ─── ProjectRegistry ──────────────────────────────────────────────────────────
@@ -135,6 +138,7 @@ export class ProjectRegistry {
     }
 
     const webhookManager = this._webhookManager
+    const railJobs = new Map<string, { railIndex: number; mode: string; ticketIds: number[] }>()
     const queueManager = new QueueManager(boundBroadcast, db, undefined, project.path, {
       provider: project.provider ?? 'claude',
       getCostAlertThreshold: () => {
@@ -165,6 +169,55 @@ export class ProjectRegistry {
           costUsd: costUsd ?? null,
           durationMs: jobRow?.duration_ms ?? null,
         })
+        // Broadcast rail.job_completed if this job was launched by a rail
+        const railMeta = railJobs.get(jobId)
+        if (railMeta) {
+          railJobs.delete(jobId)
+        }
+
+        // Determine ticket IDs: from rail metadata, or parse from command as fallback
+        // (railJobs Map is in-memory and lost on server restart)
+        let completedTicketIds: number[] = railMeta?.ticketIds ?? []
+        if (completedTicketIds.length === 0 && jobRow?.command) {
+          const matches = jobRow.command.match(/#(\d+)/g)
+          if (matches) completedTicketIds = matches.map((m) => parseInt(m.slice(1), 10))
+        }
+
+        // Mark tickets as done when job completed successfully
+        if (status === 'completed' && completedTicketIds.length > 0) {
+          try {
+            const ticketFile = resolveTicketStoragePath(project.path)
+            mutateStore(ticketFile, (store) => {
+              for (const tid of completedTicketIds) {
+                const ticket = store.tickets[String(tid)]
+                if (ticket && ticket.status !== 'done') {
+                  ticket.status = 'done'
+                  ticket.updated_at = new Date().toISOString()
+                  boundBroadcast({
+                    type: 'ticket_updated',
+                    ticket: ticket as unknown as import('./types').LocalTicket,
+                    projectId: project.id,
+                    timestamp: ticket.updated_at,
+                  } as TicketUpdatedMessage)
+                }
+              }
+            })
+          } catch (err) {
+            console.error('[project-registry] failed to mark rail tickets as done:', err)
+          }
+        }
+
+        // Broadcast rail.job_completed if we know the rail index
+        if (railMeta) {
+          boundBroadcast({
+            type: 'rail.job_completed',
+            projectId: project.id,
+            railIndex: railMeta.railIndex,
+            jobId,
+            status,
+            ticketIds: completedTicketIds,
+          })
+        }
       },
     })
     const chatManager = new ChatManager(boundBroadcast, db, project.path, project.name, project.provider ?? 'claude')
@@ -187,7 +240,7 @@ export class ProjectRegistry {
     const ticketWatcher = new TicketWatcher(project.path, project.id, boundBroadcast)
     ticketWatcher.start()
 
-    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, specLauncherManager, ticketWatcher, broadcast: boundBroadcast }
+    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, specLauncherManager, ticketWatcher, broadcast: boundBroadcast, railJobs }
     this._contexts.set(project.id, ctx)
     return ctx
   }

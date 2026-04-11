@@ -1,5 +1,5 @@
-import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import React, { act } from 'react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '../../test-utils'
 import { TicketListView } from '../TicketListView'
 import type { LocalTicket, TicketStatus, TicketPriority } from '../../types'
@@ -163,6 +163,9 @@ describe('TicketListView', () => {
   })
 
   describe('search', () => {
+    beforeEach(() => { vi.useFakeTimers() })
+    afterEach(() => { vi.useRealTimers() })
+
     it('filters tickets by search query', () => {
       const tickets = [
         makeTicket({ id: 1, title: 'Fix login bug' }),
@@ -172,6 +175,7 @@ describe('TicketListView', () => {
 
       const searchInput = screen.getByPlaceholderText('Search...')
       fireEvent.change(searchInput, { target: { value: 'login' } })
+      act(() => { vi.advanceTimersByTime(300) })
 
       expect(screen.getByText('Fix login bug')).toBeDefined()
       expect(screen.queryByText('Add dashboard')).toBeNull()
@@ -185,6 +189,7 @@ describe('TicketListView', () => {
       render(<TicketListView {...makeDefaultProps({ tickets })} />)
       const searchInput = screen.getByPlaceholderText('Search...')
       fireEvent.change(searchInput, { target: { value: 'auth' } })
+      act(() => { vi.advanceTimersByTime(300) })
       expect(screen.getByText('Ticket A')).toBeDefined()
       expect(screen.queryByText('Ticket B')).toBeNull()
     })

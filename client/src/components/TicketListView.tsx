@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { Ticket, Search } from 'lucide-react'
+import { Ticket, Search, AlertTriangle, Plus } from 'lucide-react'
 import { TicketContextMenu } from './TicketContextMenu'
 import { TicketStatusDot, TicketStatusRow } from './TicketStatusIndicator'
 import type { LocalTicket, TicketStatus, TicketPriority } from '../types'
@@ -40,26 +40,40 @@ const PAGE_SIZE = 20
 interface TicketListViewProps {
   tickets: LocalTicket[]
   isLoading: boolean
+  error?: string | null
   onTicketClick: (ticket: LocalTicket) => void
   onDelete: (ticketId: number) => void
   onStatusChange: (ticketId: number, status: TicketStatus) => void
   onPriorityChange: (ticketId: number, priority: TicketPriority) => void
+  onCreateClick?: () => void
 }
 
 export function TicketListView({
   tickets,
   isLoading,
+  error,
   onTicketClick,
   onDelete,
   onStatusChange,
   onPriorityChange,
+  onCreateClick,
 }: TicketListViewProps) {
   const [statusFilter, setStatusFilter] = useState<TicketStatus | null>(null)
   const [labelFilter, setLabelFilter] = useState<string | null>(null)
+  // Separate input value (immediate) from filter value (debounced 300ms)
+  const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortField, setSortField] = useState<SortField>('status')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE)
+
+  const rowsRef = useRef<HTMLDivElement>(null)
+
+  // Debounce search input
+  useEffect(() => {
+    const t = setTimeout(() => setSearchQuery(searchInput), 300)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
   const allLabels = useMemo(() => {
     const set = new Set<string>()
@@ -119,6 +133,28 @@ export function TicketListView({
     return sortDir === 'asc' ? ' ↑' : ' ↓'
   }
 
+  function handleListKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    const rows = Array.from(
+      rowsRef.current?.querySelectorAll('[data-ticket-row]') ?? []
+    ) as HTMLElement[]
+    if (rows.length === 0) return
+    const idx = rows.findIndex((el) => el === document.activeElement)
+    e.preventDefault()
+    if (e.key === 'ArrowDown') {
+      rows[Math.min(idx + 1, rows.length - 1)]?.focus()
+    } else {
+      rows[Math.max(idx - 1, 0)]?.focus()
+    }
+  }
+
+  function clearFilters() {
+    setStatusFilter(null)
+    setLabelFilter(null)
+    setSearchInput('')
+    setSearchQuery('')
+  }
+
   if (isLoading) {
     return (
       <div className="rounded-lg border border-border/40 bg-card/50 p-4 space-y-1">
@@ -129,14 +165,36 @@ export function TicketListView({
     )
   }
 
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center space-y-1.5">
+        <AlertTriangle className="w-6 h-6 text-red-400 mx-auto" />
+        <p className="text-sm font-medium text-red-400">Failed to load tickets</p>
+        <p className="text-xs text-red-400/70">{error}</p>
+      </div>
+    )
+  }
+
   if (tickets.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border/40 bg-card/50 p-8 text-center space-y-2">
+      <div className="rounded-lg border border-dashed border-border/40 bg-card/50 p-8 text-center space-y-3">
         <Ticket className="w-8 h-8 text-muted-foreground/30 mx-auto" />
-        <p className="text-sm font-medium text-muted-foreground">No tickets yet</p>
-        <p className="text-xs text-muted-foreground/60">
-          Create your first ticket or run a product backlog command to populate tickets
-        </p>
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-muted-foreground">No tickets yet</p>
+          <p className="text-xs text-muted-foreground/60">
+            Create your first ticket or run a product backlog command to populate tickets
+          </p>
+        </div>
+        {onCreateClick && (
+          <button
+            type="button"
+            onClick={onCreateClick}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-accent/60 text-foreground hover:bg-accent transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Create your first ticket
+          </button>
+        )}
       </div>
     )
   }
@@ -194,8 +252,8 @@ export function TicketListView({
             <Search className="absolute left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
             <input
               type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search..."
               className="h-6 w-32 rounded border border-border bg-input pl-5 pr-1.5 text-[10px] text-foreground placeholder:text-muted-foreground"
             />
@@ -218,95 +276,116 @@ export function TicketListView({
         </button>
       </div>
 
-      {/* Ticket rows */}
-      <div className="space-y-0.5">
-        {filteredAndSorted.slice(0, displayLimit).map((ticket) => {
-          const priorityInfo = PRIORITY_STYLES[ticket.priority]
-          const isDone = ticket.status === 'done'
-          const isCancelled = ticket.status === 'cancelled'
-
-          return (
-            <TicketContextMenu
-              key={ticket.id}
-              ticket={ticket}
-              onDelete={onDelete}
-              onStatusChange={onStatusChange}
-              onPriorityChange={onPriorityChange}
-            >
-              <TicketStatusRow
-                status={ticket.status}
-                role="button"
-                tabIndex={0}
-                className="flex items-center gap-3 pr-3 py-2 rounded-md transition-colors cursor-pointer hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                onClick={() => onTicketClick(ticket)}
-                onKeyDown={(e) => { if (e.key === 'Enter') onTicketClick(ticket) }}
-              >
-                {/* Status indicator */}
-                <div className="w-20 flex items-center gap-1.5 shrink-0">
-                  <TicketStatusDot status={ticket.status} />
-                  <span className={`text-[10px] ${isCancelled ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
-                    {STATUS_LABEL[ticket.status]}
-                  </span>
-                </div>
-
-                {/* Title */}
-                <div className="flex-1 min-w-0">
-                  <span className={`text-xs truncate block ${
-                    isCancelled
-                      ? 'text-foreground/40 line-through decoration-muted-foreground/40'
-                      : isDone
-                        ? 'text-foreground/50'
-                        : 'text-foreground/80'
-                  }`}>
-                    {ticket.title}
-                  </span>
-                </div>
-
-                {/* Priority */}
-                <div className="w-14 text-right shrink-0">
-                  {ticket.priority !== 'medium' && priorityInfo.label && (
-                    <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border ${priorityInfo.className}`}>
-                      {priorityInfo.label}
-                    </span>
-                  )}
-                </div>
-
-                {/* Labels */}
-                <div className="w-24 text-right hidden sm:flex justify-end gap-0.5 overflow-hidden shrink-0">
-                  {ticket.labels.slice(0, 2).map((label) => (
-                    <span
-                      key={label}
-                      className="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium bg-accent/60 text-foreground/70 truncate max-w-[80px]"
-                    >
-                      {label}
-                    </span>
-                  ))}
-                  {ticket.labels.length > 2 && (
-                    <span className="text-[9px] text-muted-foreground">+{ticket.labels.length - 2}</span>
-                  )}
-                </div>
-
-                {/* Updated */}
-                <span className="w-20 text-right text-[10px] text-muted-foreground shrink-0">
-                  {formatRelTime(ticket.updated_at)}
-                </span>
-              </TicketStatusRow>
-            </TicketContextMenu>
-          )
-        })}
-      </div>
-
-      {/* Load more */}
-      {filteredAndSorted.length > displayLimit && (
-        <div className="pt-1 text-center">
+      {/* Filtered empty state */}
+      {filteredAndSorted.length === 0 ? (
+        <div className="py-6 text-center space-y-1.5">
+          <p className="text-xs text-muted-foreground">No tickets match your filters</p>
           <button
             type="button"
-            onClick={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
-            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded hover:bg-accent/50"
+            onClick={clearFilters}
+            className="text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors underline underline-offset-2"
           >
-            Load more ({filteredAndSorted.length - displayLimit} remaining)
+            Clear filters
           </button>
         </div>
+      ) : (
+        <>
+          {/* Ticket rows */}
+          <div
+            ref={rowsRef}
+            className="space-y-0.5"
+            onKeyDown={handleListKeyDown}
+          >
+            {filteredAndSorted.slice(0, displayLimit).map((ticket) => {
+              const priorityInfo = PRIORITY_STYLES[ticket.priority]
+              const isDone = ticket.status === 'done'
+              const isCancelled = ticket.status === 'cancelled'
+
+              return (
+                <TicketContextMenu
+                  key={ticket.id}
+                  ticket={ticket}
+                  onDelete={onDelete}
+                  onStatusChange={onStatusChange}
+                  onPriorityChange={onPriorityChange}
+                >
+                  <TicketStatusRow
+                    status={ticket.status}
+                    role="button"
+                    tabIndex={0}
+                    data-ticket-row=""
+                    className="flex items-center gap-3 pr-3 py-2 rounded-md transition-colors cursor-pointer hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    onClick={() => onTicketClick(ticket)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') onTicketClick(ticket) }}
+                  >
+                    {/* Status indicator */}
+                    <div className="w-20 flex items-center gap-1.5 shrink-0">
+                      <TicketStatusDot status={ticket.status} />
+                      <span className={`text-[10px] ${isCancelled ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
+                        {STATUS_LABEL[ticket.status]}
+                      </span>
+                    </div>
+
+                    {/* Title */}
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-xs truncate block ${
+                        isCancelled
+                          ? 'text-foreground/40 line-through decoration-muted-foreground/40'
+                          : isDone
+                            ? 'text-foreground/50'
+                            : 'text-foreground/80'
+                      }`}>
+                        {ticket.title}
+                      </span>
+                    </div>
+
+                    {/* Priority */}
+                    <div className="w-14 text-right shrink-0">
+                      {ticket.priority !== 'medium' && priorityInfo.label && (
+                        <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border ${priorityInfo.className}`}>
+                          {priorityInfo.label}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Labels */}
+                    <div className="w-24 text-right hidden sm:flex justify-end gap-0.5 overflow-hidden shrink-0">
+                      {ticket.labels.slice(0, 2).map((label) => (
+                        <span
+                          key={label}
+                          className="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium bg-accent/60 text-foreground/70 truncate max-w-[80px]"
+                        >
+                          {label}
+                        </span>
+                      ))}
+                      {ticket.labels.length > 2 && (
+                        <span className="text-[9px] text-muted-foreground">+{ticket.labels.length - 2}</span>
+                      )}
+                    </div>
+
+                    {/* Updated */}
+                    <span className="w-20 text-right text-[10px] text-muted-foreground shrink-0">
+                      {formatRelTime(ticket.updated_at)}
+                    </span>
+                  </TicketStatusRow>
+                </TicketContextMenu>
+              )
+            })}
+          </div>
+
+          {/* Load more */}
+          {filteredAndSorted.length > displayLimit && (
+            <div className="pt-1 text-center">
+              <button
+                type="button"
+                onClick={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
+                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded hover:bg-accent/50"
+              >
+                Load more ({filteredAndSorted.length - displayLimit} remaining)
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

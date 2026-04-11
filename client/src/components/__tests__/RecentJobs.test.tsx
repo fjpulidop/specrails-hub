@@ -31,7 +31,8 @@ const mockJobs: JobSummary[] = [
   {
     id: 'job-1',
     command: '/sr:implement',
-    started_at: new Date().toISOString(),
+    started_at: new Date(Date.now() - 30000).toISOString(),
+    finished_at: new Date().toISOString(),
     status: 'completed',
     duration_ms: 30000,
     total_cost_usd: 0.05,

@@ -3,7 +3,7 @@ import fs from 'fs'
 import { FSWatcher } from 'chokidar'
 import type { WsMessage, LocalTicket } from './types'
 
-const TICKET_FILE = '.claude/local-tickets.json'
+const TICKET_FILE = '.specrails/local-tickets.json'
 const DEBOUNCE_MS = 400
 
 interface TicketFileData {
@@ -15,7 +15,7 @@ interface TicketFileData {
 }
 
 /**
- * Watches `.claude/local-tickets.json` for external changes and broadcasts
+ * Watches `.specrails/local-tickets.json` for external changes and broadcasts
  * ticket_updated via WebSocket. One instance per project context.
  */
 export class TicketWatcher {

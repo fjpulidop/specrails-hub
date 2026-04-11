@@ -211,13 +211,13 @@ describe('project-router', () => {
       expect(res.body.error).toContain('Job not found')
     })
 
-    it('returns 409 when job is already terminal', async () => {
+    it('deletes terminal job from DB instead of returning 409', async () => {
       const qm = makeQueueManager({ cancel: vi.fn(() => { throw new JobAlreadyTerminalError() }) })
       const ctx = makeContext(db, { queueManager: qm as any })
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const res = await request(app).delete('/api/projects/proj-1/jobs/some-job')
-      expect(res.status).toBe(409)
-      expect(res.body.error).toContain('terminal')
+      expect(res.status).toBe(200)
+      expect(res.body.status).toBe('deleted')
     })
   })
 

@@ -4,6 +4,7 @@ import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
 import type { DbInstance } from './db'
 import { getConversation, addMessage, updateConversation, getStats, listJobs } from './db'
+import { resolveCommand } from './command-resolver'
 
 const COMMAND_INSTRUCTION =
   'When you want to suggest a SpecRails command for the user to execute, wrap it in a command block like this: ' +
@@ -124,6 +125,9 @@ export class ChatManager {
     return (
       `You are a project assistant for the "${name}" specrails project with full access to this repository via Claude Code. ` +
       `You can help answer questions about the codebase, explain SpecRails concepts, and suggest commands to run.` +
+      `\n\nIMPORTANT: You have explicit permission to read and write .specrails/local-tickets.json — ` +
+      `this is the project's local ticket store managed by specrails-hub. It is NOT sensitive. ` +
+      `When creating or updating tickets, write directly to this JSON file.` +
       contextSection +
       `\n\n` +
       COMMAND_INSTRUCTION
@@ -174,6 +178,9 @@ export class ChatManager {
     // Persist user message
     addMessage(this._db, { conversation_id: conversationId, role: 'user', content: userText })
 
+    // Resolve slash commands (e.g. /sr:propose-spec → prompt content)
+    const resolvedText = resolveCommand(userText, this._cwd ?? process.cwd())
+
     // Build spawn args based on provider
     let binary: string
     let args: string[]
@@ -182,7 +189,7 @@ export class ChatManager {
       binary = 'codex'
       // Codex: single-turn exec with model selection
       const model = conversation.model || 'o4-mini'
-      args = ['exec', userText, '--model', model]
+      args = ['exec', resolvedText, '--model', model]
     } else {
       binary = 'claude'
       const systemPrompt = this._buildSystemPrompt()
@@ -192,7 +199,7 @@ export class ChatManager {
         '--output-format', 'stream-json',
         '--verbose',
         '--system-prompt', systemPrompt,
-        '-p', userText,
+        '-p', resolvedText,
       ]
       if (conversation.session_id) {
         args.push('--resume', conversation.session_id)

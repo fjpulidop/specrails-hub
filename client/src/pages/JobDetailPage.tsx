@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { getApiBase } from '../lib/api'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
-import { ChevronRight, Home, MessageSquare, RotateCcw } from 'lucide-react'
+import { ChevronRight, Home, RotateCcw } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
@@ -14,7 +14,6 @@ import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import type { JobSummary, EventRow, PhaseDefinition } from '../types'
 import type { PhaseMap, PhaseState } from '../hooks/usePipeline'
 import { useHub } from '../hooks/useHub'
-import { useChatContext } from '../hooks/useChat'
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'running' | 'queued' | 'failed' | 'canceled'
 
@@ -26,43 +25,10 @@ const STATUS_BADGE: Record<string, { variant: BadgeVariant; label: string; toolt
   queued: { variant: 'queued', label: 'queued', tooltip: 'Job is waiting in the queue' },
 }
 
-function buildExplainPrompt(job: JobSummary, events: EventRow[]): string {
-  const status = job.status
-  const dur = job.duration_ms != null ? `${(job.duration_ms / 1000).toFixed(1)}s` : 'unknown'
-  const cost = job.total_cost_usd != null ? `$${job.total_cost_usd.toFixed(4)}` : 'unknown'
-  const model = job.model ?? 'unknown'
-  const tokens = job.tokens_in != null ? `${job.tokens_in} in / ${job.tokens_out ?? 0} out` : null
-
-  // Extract log lines from events (last 150 lines)
-  const logLines: string[] = []
-  for (const ev of events) {
-    if (ev.event_type === 'log') {
-      try {
-        const p = JSON.parse(ev.payload) as { line?: string }
-        if (p.line) logLines.push(p.line)
-      } catch { /* skip malformed */ }
-    }
-  }
-  const excerpt = logLines.slice(-150).join('\n')
-
-  return (
-    `Please explain this SpecRails job:\n\n` +
-    `**Command:** \`${job.command}\`\n` +
-    `**Status:** ${status}\n` +
-    `**Duration:** ${dur}\n` +
-    `**Cost:** ${cost}\n` +
-    `**Model:** ${model}\n` +
-    (tokens ? `**Tokens:** ${tokens}\n` : '') +
-    (excerpt ? `\n**Log output (last 150 lines):**\n\`\`\`\n${excerpt}\n\`\`\`\n` : '') +
-    `\nWhat happened in this job? Were there any errors or notable events? What did Claude accomplish?`
-  )
-}
-
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { activeProjectId } = useHub()
   const navigate = useNavigate()
-  const chat = useChatContext()
   const [job, setJob] = useState<JobSummary | null>(null)
   const [events, setEvents] = useState<EventRow[]>([])
   const [phaseDefinitions, setPhaseDefinitions] = useState<PhaseDefinition[]>([])
@@ -168,21 +134,20 @@ export default function JobDetailPage() {
     try {
       const res = await fetch(`${getApiBase()}/jobs/${id}`, { method: 'DELETE' })
       if (res.ok) {
-        toast.success('Cancel signal sent', { description: 'Job will stop at the next safe point' })
+        const data = await res.json() as { status?: string }
+        if (data.status === 'deleted') {
+          toast.success('Job deleted')
+          navigate('/jobs')
+        } else {
+          toast.success('Cancel signal sent', { description: 'Job will stop at the next safe point' })
+        }
       } else {
         const data = await res.json() as { error?: string }
-        toast.error('Failed to cancel', { description: data.error })
+        toast.error('Failed', { description: data.error })
       }
     } catch {
       toast.error('Network error')
     }
-  }
-
-  async function handleExplainJob() {
-    if (!job || !chat) return
-    const prompt = buildExplainPrompt(job, events)
-    if (!chat.isPanelOpen) chat.togglePanel()
-    await chat.startWithMessage(prompt)
   }
 
   async function handleRerun() {
@@ -269,24 +234,6 @@ export default function JobDetailPage() {
 
           {/* Actions */}
           <div className="flex items-center gap-2 shrink-0">
-            {isFinished && chat && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleExplainJob}
-                    className="h-7"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
-                    Explain this job
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Ask Claude to explain what happened in this job
-                </TooltipContent>
-              </Tooltip>
-            )}
             {isFinished && (
               <Tooltip>
                 <TooltipTrigger asChild>

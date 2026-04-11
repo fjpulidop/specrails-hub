@@ -543,6 +543,30 @@ export interface PipelineStatusMessage {
   projectId?: string
 }
 
+export interface RailJobStartedMessage {
+  type: 'rail.job_started'
+  projectId: string
+  railIndex: number
+  jobId: string
+  mode: string
+}
+
+export interface RailJobStoppedMessage {
+  type: 'rail.job_stopped'
+  projectId: string
+  railIndex: number
+  jobId: string
+}
+
+export interface RailJobCompletedMessage {
+  type: 'rail.job_completed'
+  projectId: string
+  railIndex: number
+  jobId: string
+  status: string
+  ticketIds: number[]
+}
+
 export type WsMessage =
   | LogMessage | PhaseMessage | InitMessage | QueueMessage | EventMessage
   | ChatStreamMessage | ChatDoneMessage | ChatErrorMessage
@@ -557,4 +581,5 @@ export type WsMessage =
   | CostAlertMessage | DailyBudgetExceededMessage | HubDailyBudgetExceededMessage
   | PipelineStatusMessage
   | TicketCreatedMessage | TicketUpdatedMessage | TicketDeletedMessage
+  | RailJobStartedMessage | RailJobStoppedMessage | RailJobCompletedMessage
 

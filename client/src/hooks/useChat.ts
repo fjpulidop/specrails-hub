@@ -26,7 +26,7 @@ export interface UseChatReturn {
   createConversation: (model?: string) => Promise<void>
   deleteConversation: (id: string) => Promise<void>
   sendMessage: (conversationId: string, text: string) => Promise<void>
-  startWithMessage: (text: string) => Promise<void>
+  startWithMessage: (text: string) => Promise<string | null>
   abortStream: (conversationId: string) => Promise<void>
   confirmCommand: (command: string) => Promise<void>
   dismissCommandProposal: (conversationId: string, command: string) => void
@@ -325,14 +325,14 @@ export function useChat(): UseChatReturn {
   }, [])
 
   // Create a conversation and immediately send the first message
-  const startWithMessage = useCallback(async (text: string) => {
+  const startWithMessage = useCallback(async (text: string): Promise<string | null> => {
     try {
       const res = await fetch(`${getApiBase()}/chat/conversations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: 'claude-sonnet-4-6' }),
       })
-      if (!res.ok) return
+      if (!res.ok) return null
       const data = await res.json() as { conversation: ChatConversationSummary }
       const newConvo: ChatConversation = {
         id: data.conversation.id,
@@ -344,15 +344,15 @@ export function useChat(): UseChatReturn {
         commandProposals: [],
       }
       setConversations((prev) => {
-        const next = [...prev, newConvo].slice(0, 3)
-        setActiveTabIndex(Math.min(prev.length, 2))
+        const next = [...prev, newConvo].slice(-3)
+        setActiveTabIndex(next.length - 1)
         return next
       })
-      // Send the message after a tick to let state settle
-      await new Promise((r) => setTimeout(r, 0))
-      await sendMessage(data.conversation.id, text)
+      // Fire-and-forget the message send so the caller gets the ID immediately
+      void sendMessage(data.conversation.id, text)
+      return data.conversation.id
     } catch {
-      // ignore
+      return null
     }
   }, [sendMessage])
 

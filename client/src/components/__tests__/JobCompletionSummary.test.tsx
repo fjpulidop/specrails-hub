@@ -8,8 +8,9 @@ const completedJob: JobSummary = {
   id: 'job-1',
   command: '/sr:implement --spec SPEA-001',
   started_at: '2024-03-21T10:00:00Z',
+  finished_at: '2024-03-21T10:01:02Z',  // 62s wall-clock
   status: 'completed',
-  duration_ms: 62000,      // 62s
+  duration_ms: 62000,
   total_cost_usd: 0.0234,
   tokens_in: 5000,
   tokens_out: 3000,
@@ -20,6 +21,7 @@ const failedJob: JobSummary = {
   id: 'job-2',
   command: '/sr:health-check',
   started_at: '2024-03-21T11:00:00Z',
+  finished_at: null,
   status: 'failed',
   duration_ms: null,
   total_cost_usd: null,
@@ -76,8 +78,8 @@ describe('JobCompletionSummary', () => {
 
   it('renders duration chip in header for completed job', () => {
     render(<JobCompletionSummary job={completedJob} events={[]} />)
-    // 62000ms → 62.0s — appears in both header chip AND metric card
-    const durationTexts = screen.getAllByText('62.0s')
+    // Wall-clock: 10:00:00 → 10:01:02 = 62s → "1m 2s" — appears in both header chip AND metric card
+    const durationTexts = screen.getAllByText('1m 2s')
     expect(durationTexts.length).toBeGreaterThanOrEqual(1)
   })
 
@@ -88,7 +90,7 @@ describe('JobCompletionSummary', () => {
     expect(costTexts.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('does not render duration chip when duration_ms is null', () => {
+  it('does not render duration chip when finished_at is null', () => {
     render(<JobCompletionSummary job={failedJob} events={[]} />)
     expect(screen.queryByText(/\ds$/)).not.toBeInTheDocument()
   })
@@ -127,8 +129,8 @@ describe('JobCompletionSummary', () => {
 
   it('renders metric values in expanded state', () => {
     render(<JobCompletionSummary job={completedJob} events={[]} />)
-    // Duration in metric card (formatted as "62.0s")
-    const durationValues = screen.getAllByText('62.0s')
+    // Wall-clock duration in metric card: 10:00:00 → 10:01:02 = "1m 2s"
+    const durationValues = screen.getAllByText('1m 2s')
     expect(durationValues.length).toBeGreaterThanOrEqual(1)
   })
 

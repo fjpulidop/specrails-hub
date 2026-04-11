@@ -1,7 +1,11 @@
+/**
+ * Extended dialog tests for JobsPage (formerly in DashboardPage before the hub redesign
+ * extracted jobs/proposals into a dedicated page — SPEA-723).
+ */
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '../../test-utils'
-import DashboardPage from '../DashboardPage'
+import JobsPage from '../JobsPage'
 
 vi.mock('sonner', () => ({
   toast: {
@@ -46,38 +50,6 @@ vi.mock('../../hooks/usePipeline', () => ({
   }),
 }))
 
-vi.mock('../../components/ImplementWizard', () => ({
-  ImplementWizard: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="implement-wizard">ImplementWizard</div> : null,
-}))
-
-vi.mock('../../components/BatchImplementWizard', () => ({
-  BatchImplementWizard: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="batch-wizard">BatchImplementWizard</div> : null,
-}))
-
-vi.mock('../../components/ProjectHealthWidget', () => ({
-  ProjectHealthWidget: () => null,
-}))
-
-vi.mock('../../hooks/useTickets', () => ({
-  useTickets: () => ({
-    tickets: [],
-    loading: false,
-    isLoading: false,
-    error: null,
-    newTicketIds: new Set(),
-    refetch: vi.fn(),
-    refresh: vi.fn(),
-    deleteTicket: vi.fn(),
-    updateTicketStatus: vi.fn(),
-    updateTicketPriority: vi.fn(),
-    createTicket: vi.fn(),
-    updateTicket: vi.fn(),
-  }),
-}))
-
-// useProjectCache with proposal returning result_markdown and issue_url
 const mockRefreshJobs = vi.fn()
 
 vi.mock('../../hooks/useProjectCache', () => ({
@@ -86,13 +58,47 @@ vi.mock('../../hooks/useProjectCache', () => ({
       ? [{ id: 'prop-1', idea: 'Build amazing feature', status: 'created', created_at: '2024-01-01T00:00:00Z', issue_url: null }]
       : namespace === 'jobs'
       ? []
-      : namespace === 'commands'
-      ? []
       : [],
     isLoading: false,
     isFirstLoad: false,
     refresh: mockRefreshJobs,
   }),
+}))
+
+vi.mock('../../components/ExportDropdown', () => ({
+  ExportDropdown: () => <div data-testid="export-dropdown" />,
+}))
+
+vi.mock('../../components/RecentJobs', () => ({
+  RecentJobs: ({
+    jobs,
+    onProposalClick,
+    onProposalDelete,
+  }: {
+    jobs: Array<{ id: string; command: string; status: string; started_at: string }>
+    onProposalClick?: (id: string) => void
+    onProposalDelete?: (id: string) => void
+  }) => (
+    <div data-testid="recent-jobs">
+      {jobs.map((j) => (
+        <div
+          key={j.id}
+          role="button"
+          tabIndex={0}
+          data-testid={`job-row-${j.id}`}
+          onClick={() => {
+            if (j.id.startsWith('proposal:') && onProposalClick) {
+              onProposalClick(j.id.replace('proposal:', ''))
+            }
+          }}
+          onKeyDown={() => {}}
+        >
+          {j.command}
+        </div>
+      ))}
+      {onProposalDelete && <button data-testid="delete-prop-1" onClick={() => onProposalDelete('prop-1')}>Delete prop</button>}
+    </div>
+  ),
 }))
 
 function setupWithProposal(proposalOverrides: Record<string, unknown> = {}) {
@@ -112,28 +118,22 @@ function setupWithProposal(proposalOverrides: Record<string, unknown> = {}) {
   })
 }
 
-/** Expand the Jobs section and then click the proposal row */
 async function openProposalDialog() {
-  // Jobs section is collapsed by default — expand it first
-  fireEvent.click(screen.getByTestId('toggle-jobs'))
-  const proposalRow = screen.getByText(/sr:propose-feature/).closest('[role="button"]')
-  if (proposalRow) {
-    fireEvent.click(proposalRow)
-  }
+  const proposalRow = screen.getByTestId('job-row-proposal:prop-1')
+  fireEvent.click(proposalRow)
   await waitFor(() => {
     expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/propose/'))
   })
 }
 
-describe('DashboardPage - proposal dialog content', () => {
+describe('JobsPage - proposal dialog content', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    localStorage.clear()
     setupWithProposal()
   })
 
   it('opens proposal dialog after clicking proposal row', async () => {
-    render(<DashboardPage />)
+    render(<JobsPage />)
     await openProposalDialog()
 
     await waitFor(() => {
@@ -142,7 +142,7 @@ describe('DashboardPage - proposal dialog content', () => {
   })
 
   it('renders proposal idea text in dialog', async () => {
-    render(<DashboardPage />)
+    render(<JobsPage />)
     await openProposalDialog()
 
     await waitFor(() => {
@@ -152,18 +152,17 @@ describe('DashboardPage - proposal dialog content', () => {
 
   it('renders result_markdown when present', async () => {
     setupWithProposal({ result_markdown: 'Proposal Result Content' })
-    render(<DashboardPage />)
+    render(<JobsPage />)
     await openProposalDialog()
 
     await waitFor(() => {
-      // react-markdown renders it as a span (our mock)
       expect(screen.getByText('Proposal Result Content')).toBeInTheDocument()
     })
   })
 
   it('shows "No proposal content yet." when result_markdown is null', async () => {
     setupWithProposal({ result_markdown: null })
-    render(<DashboardPage />)
+    render(<JobsPage />)
     await openProposalDialog()
 
     await waitFor(() => {
@@ -176,7 +175,7 @@ describe('DashboardPage - proposal dialog content', () => {
       issue_url: 'https://github.com/owner/repo/issues/42',
       result_markdown: null,
     })
-    render(<DashboardPage />)
+    render(<JobsPage />)
     await openProposalDialog()
 
     await waitFor(() => {
@@ -186,28 +185,24 @@ describe('DashboardPage - proposal dialog content', () => {
 
   it('does not render GitHub Issue section when issue_url is null', async () => {
     setupWithProposal({ issue_url: null, result_markdown: null })
-    render(<DashboardPage />)
+    render(<JobsPage />)
     await openProposalDialog()
 
     await waitFor(() => {
       expect(screen.getByText('No proposal content yet.')).toBeInTheDocument()
     })
-
     expect(screen.queryByText('GitHub Issue:')).not.toBeInTheDocument()
   })
 
   it('closes dialog when Close button is clicked', async () => {
-    render(<DashboardPage />)
+    render(<JobsPage />)
     await openProposalDialog()
 
     await waitFor(() => {
       expect(screen.getByText('Proposal')).toBeInTheDocument()
     })
 
-    // There may be multiple close buttons (DialogContent X and Close button in footer)
-    // Click the one in the footer (text = "Close")
     const closeButtons = screen.getAllByRole('button', { name: /close/i })
-    // Click the last Close button (footer one)
     fireEvent.click(closeButtons[closeButtons.length - 1])
 
     await waitFor(() => {
@@ -218,7 +213,6 @@ describe('DashboardPage - proposal dialog content', () => {
   it('calls DELETE and refreshes when Delete button in dialog is clicked', async () => {
     const { toast } = await import('sonner')
 
-    // First fetch for proposal detail, second for delete
     global.fetch = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
@@ -233,16 +227,16 @@ describe('DashboardPage - proposal dialog content', () => {
           },
         }),
       })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // DELETE
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
 
-    render(<DashboardPage />)
+    render(<JobsPage />)
     await openProposalDialog()
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /delete/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -255,7 +249,7 @@ describe('DashboardPage - proposal dialog content', () => {
 
   it('shows status badge in proposal dialog', async () => {
     setupWithProposal({ status: 'created', result_markdown: null })
-    render(<DashboardPage />)
+    render(<JobsPage />)
     await openProposalDialog()
 
     await waitFor(() => {
@@ -265,7 +259,7 @@ describe('DashboardPage - proposal dialog content', () => {
 
   it('shows cancelled status badge in proposal dialog', async () => {
     setupWithProposal({ status: 'cancelled', result_markdown: null })
-    render(<DashboardPage />)
+    render(<JobsPage />)
     await openProposalDialog()
 
     await waitFor(() => {
@@ -273,17 +267,14 @@ describe('DashboardPage - proposal dialog content', () => {
     })
   })
 
-  it('Spec section heading always renders regardless of loading state', () => {
-    render(<DashboardPage />)
-    // Spec heading is always present
-    expect(screen.getByText('Spec')).toBeInTheDocument()
+  it('Jobs heading always renders', () => {
+    render(<JobsPage />)
+    expect(screen.getByText('Jobs')).toBeInTheDocument()
   })
 
   it('proposal idea shorter than 60 chars is not truncated in command', () => {
-    // The mock proposal has idea 'Build amazing feature' (22 chars) — no truncation
-    render(<DashboardPage />)
-    fireEvent.click(screen.getByTestId('toggle-jobs'))
-    const row = screen.getByText(/sr:propose-feature/)
+    render(<JobsPage />)
+    const row = screen.getByTestId('job-row-proposal:prop-1')
     expect(row.textContent).toContain('Build amazing feature')
     expect(row.textContent).not.toContain('...')
   })

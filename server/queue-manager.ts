@@ -403,7 +403,13 @@ export class QueueManager {
         commandToRun = `Previous step output:\n\n${truncated}\n\n---\n\nNow execute the following:\n${commandToRun}`
       }
     }
-    const resolvedCmd = this._resolveCommand(commandToRun)
+    let resolvedCmd = this._resolveCommand(commandToRun)
+
+    // Headless mode: when --yes is in the command, append auto-proceed instructions
+    // so Claude doesn't wait for user confirmation (stdin is ignored in spawned processes)
+    if (job.command.includes('--yes')) {
+      resolvedCmd += '\n\nIMPORTANT: This command is running in headless/unattended mode (--yes flag). Do NOT wait for user confirmation at any step. Auto-proceed with "yes" for all confirmation prompts. Skip any "Wait for user confirmation" instructions.'
+    }
 
     let binary: string
     let args: string[]

@@ -11,6 +11,7 @@ import { KeyboardShortcutsCheatsheet } from './components/KeyboardShortcutsCheat
 
 // Lazy-loaded pages — never visible at initial render
 const JobDetailPage = lazy(() => import('./pages/JobDetailPage'))
+const JobsPage = lazy(() => import('./pages/JobsPage'))
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'))
 const ActivityFeedPage = lazy(() => import('./pages/ActivityFeedPage'))
 const HubAnalyticsPage = lazy(() => import('./pages/HubAnalyticsPage'))
@@ -22,7 +23,7 @@ import { ProjectErrorBoundary } from './components/ProjectErrorBoundary'
 import { WelcomeScreen } from './components/WelcomeScreen'
 import { SetupWizard } from './components/SetupWizard'
 import { OnboardingWizard, hasSeenOnboarding } from './components/OnboardingWizard'
-import { TabBar } from './components/TabBar'
+import { ArcSidebar } from './components/ArcSidebar'
 import { AddProjectDialog } from './components/AddProjectDialog'
 import { CommandPalette } from './components/CommandPalette'
 import { SharedWebSocketProvider } from './hooks/useSharedWebSocket'
@@ -119,8 +120,8 @@ function HubApp() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-screen bg-background">
-        <div className="h-11 border-b border-border bg-card/50 animate-pulse" />
+      <div className="flex h-screen bg-background">
+        <div className="w-11 border-r border-border bg-card/50 animate-pulse flex-shrink-0" />
         <div className="flex-1 flex items-center justify-center">
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
@@ -129,106 +130,75 @@ function HubApp() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background font-sans">
-      {/* Hub top bar */}
-      <div className="flex items-center justify-between px-4 h-10 border-b border-border bg-card/50 backdrop-blur-sm flex-shrink-0">
-        <span className="font-mono text-sm font-bold">
-          <span className="text-dracula-purple">spec</span>
-          <span className="text-dracula-pink">rails</span>
-          <span className="text-muted-foreground text-xs font-normal ml-1">/ hub</span>
-        </span>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setOverviewOpen(true)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Overview
-          </button>
-          <button
-            type="button"
-            onClick={() => setAnalyticsOpen(true)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Analytics
-          </button>
-          <button
-            type="button"
-            onClick={() => setDocsOpen(true)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Docs
-          </button>
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Settings
-          </button>
-        </div>
-      </div>
+    <div className="flex h-screen overflow-hidden bg-background font-sans">
+      {/* Arc-style collapsible sidebar */}
+      <ArcSidebar
+        onAddProject={() => setAddDialogOpen(true)}
+        onOpenOverview={() => setOverviewOpen(true)}
+        onOpenAnalytics={() => setAnalyticsOpen(true)}
+        onOpenDocs={() => setDocsOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
 
-      {/* Project tabs */}
-      {projects.length > 0 && (
-        <TabBar onAddProject={() => setAddDialogOpen(true)} />
-      )}
-
-      {/* Project switching progress bar */}
-      {isSwitchingProject && (
-        <div
-          className="h-0.5 w-full bg-dracula-purple/70 animate-pulse shrink-0"
-          data-testid="project-switching-bar"
-        />
-      )}
-
-      {/* Main content */}
-      <div className="flex-1 overflow-hidden">
-        {isInSetup && activeProject ? (
-          <SetupWizard
-            key={activeProject.id}
-            project={activeProject}
-            onComplete={() => completeSetupWizard(activeProject.id)}
-            onSkip={() => completeSetupWizard(activeProject.id)}
+      {/* Main area */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Project switching progress bar */}
+        {isSwitchingProject && (
+          <div
+            className="h-0.5 w-full bg-dracula-purple/70 animate-pulse shrink-0"
+            data-testid="project-switching-bar"
           />
-        ) : (
-          <Suspense fallback={<div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
-            <Routes>
-              <Route path="/docs" element={<DocsPage />} />
-              <Route path="/docs/:category/:slug" element={<DocsPage />} />
-              {/* Project routes */}
-              {projects.length === 0 ? (
-                <Route path="*" element={<WelcomeScreen onAddProject={() => setAddDialogOpen(true)} />} />
-              ) : activeProject ? (
-                <Route element={
-                  <ProjectErrorBoundary key={activeProject.id} projectName={activeProject.name}>
-                    <ProjectLayout project={activeProject} />
-                  </ProjectErrorBoundary>
-                }>
-                  <Route path="/" element={<DashboardPage />} />
-                  <Route path="/jobs/:id" element={<JobDetailPage />} />
-                  <Route path="/analytics" element={<AnalyticsPage />} />
-                  <Route path="/activity" element={<ActivityFeedPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Route>
-              ) : (
-                <Route path="*" element={
-                  <div className="flex items-center justify-center h-full">
-                    <p className="text-sm text-muted-foreground">Select a project</p>
-                  </div>
-                } />
-              )}
-            </Routes>
-          </Suspense>
         )}
+
+        {/* Content */}
+        <div className="flex-1 overflow-hidden">
+          {isInSetup && activeProject ? (
+            <SetupWizard
+              key={activeProject.id}
+              project={activeProject}
+              onComplete={() => completeSetupWizard(activeProject.id)}
+              onSkip={() => completeSetupWizard(activeProject.id)}
+            />
+          ) : (
+            <Suspense fallback={<div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
+              <Routes>
+                <Route path="/docs" element={<DocsPage />} />
+                <Route path="/docs/:category/:slug" element={<DocsPage />} />
+                {/* Project routes */}
+                {projects.length === 0 ? (
+                  <Route path="*" element={<WelcomeScreen onAddProject={() => setAddDialogOpen(true)} />} />
+                ) : activeProject ? (
+                  <Route element={
+                    <ProjectErrorBoundary key={activeProject.id} projectName={activeProject.name}>
+                      <ProjectLayout project={activeProject} />
+                    </ProjectErrorBoundary>
+                  }>
+                    <Route path="/" element={<DashboardPage />} />
+                    <Route path="/jobs" element={<JobsPage />} />
+                    <Route path="/jobs/:id" element={<JobDetailPage />} />
+                    <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/activity" element={<ActivityFeedPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Route>
+                ) : (
+                  <Route path="*" element={
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-sm text-muted-foreground">Select a project</p>
+                    </div>
+                  } />
+                )}
+              </Routes>
+            </Suspense>
+          )}
+        </div>
       </div>
 
       <AddProjectDialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} onOpenOnboarding={() => { setSettingsOpen(false); setOnboardingOpen(true) }} />
 
       <Dialog open={overviewOpen} onOpenChange={setOverviewOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0 flex flex-col" showCloseButton={false}>
           <div className="flex-1 overflow-auto">
             <Suspense fallback={<div className="flex items-center justify-center h-40"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
               <HubOverviewPage />
@@ -298,6 +268,7 @@ export default function App() {
             <Route path="/docs/:category/:slug" element={<DocsPage />} />
             <Route element={<RootLayout />}>
               <Route index element={<DashboardPage />} />
+              <Route path="/jobs" element={<JobsPage />} />
               <Route path="/jobs/:id" element={<JobDetailPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/activity" element={<ActivityFeedPage />} />
