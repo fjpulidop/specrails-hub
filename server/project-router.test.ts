@@ -41,22 +41,33 @@ function makeQueueManager(overrides: Partial<{
 function makeSetupManager(overrides: Partial<{
   isInstalling: (id: string) => boolean
   isSettingUp: (id: string) => boolean
+  isEnriching: (id: string) => boolean
   startInstall: () => void
   startSetup: () => void
+  startEnrich: () => void
   resumeSetup: () => void
+  resumeEnrich: () => void
   abort: () => void
   getCheckpointStatus: () => any[]
   getInstallLog: () => string[]
+  getInstallTier: () => string | undefined
+  getSummary: () => { agents: number; personas: number; commands: number }
 }> = {}) {
+  const isEnriching = overrides.isEnriching ?? overrides.isSettingUp ?? vi.fn(() => false)
   return {
     isInstalling: overrides.isInstalling ?? vi.fn(() => false),
-    isSettingUp: overrides.isSettingUp ?? vi.fn(() => false),
+    isEnriching,
+    isSettingUp: overrides.isSettingUp ?? isEnriching,
     startInstall: overrides.startInstall ?? vi.fn(),
-    startSetup: overrides.startSetup ?? vi.fn(),
-    resumeSetup: overrides.resumeSetup ?? vi.fn(),
+    startEnrich: overrides.startEnrich ?? overrides.startSetup ?? vi.fn(),
+    startSetup: overrides.startSetup ?? overrides.startEnrich ?? vi.fn(),
+    resumeEnrich: overrides.resumeEnrich ?? overrides.resumeSetup ?? vi.fn(),
+    resumeSetup: overrides.resumeSetup ?? overrides.resumeEnrich ?? vi.fn(),
     abort: overrides.abort ?? vi.fn(),
     getCheckpointStatus: overrides.getCheckpointStatus ?? vi.fn(() => []),
     getInstallLog: overrides.getInstallLog ?? vi.fn(() => []),
+    getInstallTier: overrides.getInstallTier ?? vi.fn(() => undefined),
+    getSummary: overrides.getSummary ?? vi.fn(() => ({ agents: 0, personas: 0, commands: 0 })),
   }
 }
 
@@ -406,6 +417,20 @@ describe('project-router', () => {
       const res = await request(app).get('/api/projects/proj-1/setup/checkpoints')
       expect(res.status).toBe(200)
       expect(Array.isArray(res.body.checkpoints)).toBe(true)
+    })
+
+    it('GET /setup/checkpoints includes summary with agent/persona/command counts', async () => {
+      // Regression: was missing from the response; SetupWizard.tsx used hardcoded zeros.
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/setup/checkpoints')
+      expect(res.status).toBe(200)
+      expect(res.body).toHaveProperty('summary')
+      expect(res.body.summary).toMatchObject({
+        agents: expect.any(Number),
+        personas: expect.any(Number),
+        commands: expect.any(Number),
+      })
     })
   })
 

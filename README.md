@@ -100,7 +100,7 @@ A single Express process (port 4200) manages all projects. Each project gets its
 |---------|-------------|
 | `specrails-hub start [--port N]` | Start the hub server (default port 4200) |
 | `specrails-hub stop` | Stop the hub server |
-| `specrails-hub hub status` | Show hub state and registered projects |
+| `specrails-hub status` | Show hub state and registered projects |
 | `specrails-hub list` | List all registered projects |
 | `specrails-hub add <path>` | Register a project |
 | `specrails-hub remove <id>` | Unregister a project |

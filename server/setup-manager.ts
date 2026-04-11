@@ -1,6 +1,6 @@
 import { spawn, ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
-import { existsSync, readdirSync, mkdirSync, readFileSync } from 'fs'
+import { existsSync, readdirSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
@@ -20,6 +20,7 @@ export interface CheckpointDefinition {
   name: string
 }
 
+// Full install: 7-phase enrichment flow (claude /specrails:enrich)
 export const CHECKPOINTS: CheckpointDefinition[] = [
   { key: 'base_install', name: 'Base installation' },
   { key: 'repo_analysis', name: 'Repository analysis' },
@@ -29,6 +30,15 @@ export const CHECKPOINTS: CheckpointDefinition[] = [
   { key: 'command_config', name: 'Command configuration' },
   { key: 'final_verification', name: 'Final verification' },
 ]
+
+// Quick install: 3-phase non-interactive flow (npx init --from-config)
+export const QUICK_CHECKPOINTS: CheckpointDefinition[] = [
+  { key: 'config_written', name: 'Config written' },
+  { key: 'base_install', name: 'Base installation' },
+  { key: 'quick_complete', name: 'Quick install complete' },
+]
+
+export type InstallTier = 'quick' | 'full'
 
 // ─── Checkpoint filesystem checks ─────────────────────────────────────────────
 
@@ -42,8 +52,10 @@ export interface CheckpointStatus {
 
 function checkFilesystem(projectPath: string): Partial<Record<string, boolean>> {
   const dir = SPECRAILS_DIR
-  const hasBaseInstall = existsSync(join(projectPath, '.specrails-version'))
-  const hasSetupTemplates = existsSync(join(projectPath, dir, 'setup-templates'))
+  const hasBaseInstall = existsSync(join(projectPath, '.specrails', 'specrails-version')) ||
+    existsSync(join(projectPath, '.specrails-version'))
+  const hasSetupTemplates = existsSync(join(projectPath, '.specrails', 'setup-templates')) ||
+    existsSync(join(projectPath, dir, 'setup-templates'))
   const hasRules = existsSync(join(projectPath, dir, 'rules')) &&
     hasFiles(join(projectPath, dir, 'rules'), /\.md$/)
   const hasPersonas = existsSync(join(projectPath, dir, 'agents', 'personas')) &&
@@ -85,7 +97,7 @@ function detectCheckpointFromText(
 ): { key: string; detail?: string }[] {
   const hits: { key: string; detail?: string }[] = []
 
-  // Match phase headers from Claude's /setup output
+  // Match phase headers from Claude's /specrails:enrich output (and legacy /setup)
   if (/phase\s*1|codebase\s*analysis|repository\s*analysis/i.test(text)) {
     hits.push({ key: 'repo_analysis', detail: 'Analyzing codebase...' })
   }
@@ -102,8 +114,16 @@ function detectCheckpointFromText(
     hits.push({ key: 'command_config', detail: 'Configuring commands...' })
   }
 
+  // TUI output patterns from specrails-core init --from-config
+  if (/✓\s*config\s*loaded|reading.*install-config|from-config/i.test(text)) {
+    hits.push({ key: 'config_written' })
+  }
+  if (/✓\s*installed|installation\s*complete|init\s*complete/i.test(text)) {
+    hits.push({ key: 'quick_complete' })
+  }
+
   // File path detection in tool_use events
-  if (text.includes('.specrails-version')) hits.push({ key: 'base_install' })
+  if (text.includes('.specrails-version') || text.includes('specrails/specrails-version')) hits.push({ key: 'base_install' })
   if (text.includes('/agents/personas/') && text.includes('.md')) {
     hits.push({ key: 'product_discovery', detail: 'Writing personas...' })
   }
@@ -116,7 +136,7 @@ function detectCheckpointFromText(
   if (text.includes('/rules/') && text.includes('.md')) {
     hits.push({ key: 'stack_conventions', detail: 'Writing conventions...' })
   }
-  if (text.includes('.specrails-manifest.json')) {
+  if (text.includes('.specrails-manifest.json') || text.includes('specrails/specrails-manifest.json')) {
     hits.push({ key: 'final_verification' })
   }
 
@@ -213,6 +233,8 @@ export class SetupManager {
   private _installLogBuffer: Map<string, string[]>
   // Track each project's chosen AI provider for binary selection
   private _projectProviders: Map<string, CLIProvider>
+  // Track each project's install tier (quick vs full)
+  private _projectTiers: Map<string, InstallTier>
 
   constructor(
     broadcast: (msg: WsMessage) => void,
@@ -229,9 +251,106 @@ export class SetupManager {
     this._pollTimers = new Map()
     this._installLogBuffer = new Map()
     this._projectProviders = new Map()
+    this._projectTiers = new Map()
   }
 
-  // ─── Install: npx specrails-core ─────────────────────────────────────────────
+  // ─── Quick Install: Hub writes install-config.yaml + npx init --from-config ──
+
+  startQuickInstall(projectId: string, projectPath: string, installConfig: Record<string, unknown>): void {
+    if (this._installProcesses.has(projectId)) {
+      console.warn(`[SetupManager] install already running for ${projectId}`)
+      return
+    }
+
+    this._projectTiers.set(projectId, 'quick')
+    this._initCheckpoints(projectId)
+
+    // Write install-config.yaml to .specrails/ for specrails-core to consume
+    const configDir = join(projectPath, '.specrails')
+    const configPath = join(configDir, 'install-config.yaml')
+
+    try {
+      mkdirSync(configDir, { recursive: true })
+      // Serialize config to minimal YAML (key: value pairs, no dependencies needed)
+      const yaml = Object.entries(installConfig)
+        .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+        .join('\n')
+      writeFileSync(configPath, yaml, 'utf-8')
+    } catch (err) {
+      console.warn(`[SetupManager] Failed to write install-config.yaml: ${err}`)
+      this._broadcast({
+        type: 'setup_error',
+        projectId,
+        error: `Failed to write install-config.yaml: ${err}`,
+      })
+      return
+    }
+
+    // Advance to config_written checkpoint
+    this._advanceCheckpoint(projectId, 'config_written')
+    this._completeCheckpoint(projectId, 'config_written')
+
+    const child = spawn('npx', ['specrails-core@latest', 'init', '--from-config', configPath], {
+      cwd: projectPath,
+      env: process.env,
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+
+    this._installProcesses.set(projectId, child)
+    this._installLogBuffer.set(projectId, [])
+
+    const stdoutReader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
+    const stderrReader = createInterface({ input: child.stderr!, crlfDelay: Infinity })
+
+    const appendLog = (line: string) => {
+      const buf = this._installLogBuffer.get(projectId) ?? []
+      buf.push(line)
+      if (buf.length > INSTALL_LOG_BUFFER_MAX) buf.splice(0, buf.length - INSTALL_LOG_BUFFER_MAX)
+      this._installLogBuffer.set(projectId, buf)
+    }
+
+    stdoutReader.on('line', (line) => {
+      appendLog(line)
+      this._broadcast({ type: 'setup_log', projectId, line, stream: 'stdout' })
+      const hits = detectCheckpointFromText(line)
+      for (const hit of hits) {
+        this._advanceCheckpoint(projectId, hit.key, hit.detail)
+      }
+    })
+
+    stderrReader.on('line', (line) => {
+      appendLog(line)
+      this._broadcast({ type: 'setup_log', projectId, line, stream: 'stderr' })
+    })
+
+    child.on('close', (code) => {
+      this._installProcesses.delete(projectId)
+      if (code === 0) {
+        // Complete remaining quick checkpoints
+        this._advanceCheckpoint(projectId, 'base_install')
+        this._completeCheckpoint(projectId, 'base_install')
+        this._advanceCheckpoint(projectId, 'quick_complete')
+        this._completeCheckpoint(projectId, 'quick_complete')
+        const summary = computeSummary(projectPath)
+        this._broadcast({
+          type: 'setup_install_done',
+          projectId,
+          timestamp: new Date().toISOString(),
+          summary,
+        })
+        validateCoreContract().catch(() => { /* non-fatal */ })
+      } else {
+        this._broadcast({
+          type: 'setup_error',
+          projectId,
+          error: `npx specrails-core init --from-config exited with code ${code ?? 'unknown'}`,
+        })
+      }
+    })
+  }
+
+  // ─── Full Install: TUI installer (npx specrails-core) ────────────────────────
 
   startInstall(projectId: string, projectPath: string): void {
     if (this._installProcesses.has(projectId)) {
@@ -239,7 +358,9 @@ export class SetupManager {
       return
     }
 
-    const child = spawn('npx', ['specrails-core', 'init', '--yes', '--root-dir', projectPath], {
+    this._projectTiers.set(projectId, 'full')
+
+    const child = spawn('npx', ['specrails-core@latest', 'init', '--yes', '--root-dir', projectPath], {
       cwd: projectPath,
       env: process.env,
       shell: false,
@@ -272,10 +393,12 @@ export class SetupManager {
     child.on('close', (code) => {
       this._installProcesses.delete(projectId)
       if (code === 0) {
+        const summary = computeSummary(projectPath)
         this._broadcast({
           type: 'setup_install_done',
           projectId,
           timestamp: new Date().toISOString(),
+          summary,
         })
         // Validate that hub constants are in sync with the installed core contract
         validateCoreContract().catch(() => { /* non-fatal */ })
@@ -289,33 +412,38 @@ export class SetupManager {
     })
   }
 
-  // ─── Setup: claude -p "/setup" ───────────────────────────────────────────────
+  // ─── Enrich: claude -p "/specrails:enrich --from-config" ────────────────────
 
-  startSetup(projectId: string, projectPath: string, provider?: 'claude' | 'codex'): void {
+  startEnrich(projectId: string, projectPath: string, provider?: 'claude' | 'codex'): void {
     if (this._setupProcesses.has(projectId)) {
-      console.warn(`[SetupManager] setup already running for ${projectId}`)
+      console.warn(`[SetupManager] enrich already running for ${projectId}`)
       return
     }
 
     if (provider) this._projectProviders.set(projectId, provider)
+    this._projectTiers.set(projectId, 'full')
 
     this._initCheckpoints(projectId)
 
-    // Pre-create the directory structure that /setup will write to.
+    // Pre-create the directory structure that /specrails:enrich will write to.
     // Claude Code's Write tool does not create parent directories automatically —
     // if a target directory doesn't exist the write fails and Claude reports a
     // misleading "write permissions aren't enabled" error.  Creating the dirs
-    // here ensures setup runs transparently without any user intervention.
+    // here ensures enrich runs transparently without any user intervention.
     try {
       mkdirSync(join(projectPath, SPECRAILS_DIR, 'agents', 'personas'), { recursive: true })
       mkdirSync(join(projectPath, SPECRAILS_DIR, 'commands', 'sr'), { recursive: true })
       mkdirSync(join(projectPath, SPECRAILS_DIR, 'rules'), { recursive: true })
     } catch (err) {
-      console.warn(`[SetupManager] Failed to pre-create setup directories: ${err}`)
+      console.warn(`[SetupManager] Failed to pre-create enrich directories: ${err}`)
     }
 
+    const configPath = join(projectPath, '.specrails', 'install-config.yaml')
+    const hasConfig = existsSync(configPath)
+    const enrichCmd = hasConfig ? '/specrails:enrich --from-config' : '/specrails:enrich'
+
     const args = [
-      '-p', '/setup',
+      '-p', enrichCmd,
       '--dangerously-skip-permissions',
       '--output-format', 'stream-json',
       '--verbose',
@@ -324,9 +452,14 @@ export class SetupManager {
     this._spawnSetup(projectId, projectPath, args, provider)
   }
 
-  resumeSetup(projectId: string, projectPath: string, sessionId: string, userMessage: string, provider?: 'claude' | 'codex'): void {
+  /** @deprecated Use startEnrich() instead */
+  startSetup(projectId: string, projectPath: string, provider?: 'claude' | 'codex'): void {
+    return this.startEnrich(projectId, projectPath, provider)
+  }
+
+  resumeEnrich(projectId: string, projectPath: string, sessionId: string, userMessage: string, provider?: 'claude' | 'codex'): void {
     if (this._setupProcesses.has(projectId)) {
-      console.warn(`[SetupManager] setup already running for ${projectId}`)
+      console.warn(`[SetupManager] enrich already running for ${projectId}`)
       return
     }
 
@@ -336,16 +469,22 @@ export class SetupManager {
 
     if (resolvedProvider === 'codex') {
       // Codex doesn't support --resume.  Build a continuation prompt that
-      // includes the original setup instructions so the new exec run can
+      // includes the original enrich instructions so the new exec run can
       // pick up where the previous one left off.
-      const setupMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'setup.md')
-      let setupContent = ''
+      const enrichMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'sr', 'enrich.md')
+      // Fallback to legacy setup.md if enrich.md not yet installed
+      const legacyMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'setup.md')
+      let enrichContent = ''
       try {
-        setupContent = readFileSync(setupMdPath, 'utf-8')
-      } catch { /* will fall back to just the user message */ }
+        enrichContent = readFileSync(enrichMdPath, 'utf-8')
+      } catch {
+        try {
+          enrichContent = readFileSync(legacyMdPath, 'utf-8')
+        } catch { /* will fall back to just the user message */ }
+      }
 
-      const prompt = setupContent
-        ? `${setupContent}\n\n---\nIMPORTANT: This is a continuation of a previous setup run. Check which artifacts already exist in the project before regenerating anything. The user responded to your question with:\n\n${userMessage}`
+      const prompt = enrichContent
+        ? `${enrichContent}\n\n---\nIMPORTANT: This is a continuation of a previous enrich run. Check which artifacts already exist in the project before regenerating anything. The user responded to your question with:\n\n${userMessage}`
         : userMessage
 
       this._spawnSetup(projectId, projectPath, ['-p', prompt], resolvedProvider)
@@ -361,6 +500,11 @@ export class SetupManager {
     ]
 
     this._spawnSetup(projectId, projectPath, args, provider)
+  }
+
+  /** @deprecated Use resumeEnrich() instead */
+  resumeSetup(projectId: string, projectPath: string, sessionId: string, userMessage: string, provider?: 'claude' | 'codex'): void {
+    return this.resumeEnrich(projectId, projectPath, sessionId, userMessage, provider)
   }
 
   // Active filesystem poll timers per project
@@ -390,19 +534,25 @@ export class SetupManager {
     let binary: string
     let resolvedArgs: string[]
     if (isCodex) {
-      // Codex doesn't share Claude Code's custom-command system — "/setup" is
-      // just literal text.  Read the setup command file installed by specrails-core
+      // Codex doesn't share Claude Code's custom-command system — "/specrails:enrich" is
+      // just literal text.  Read the enrich command file installed by specrails-core
       // and pass its full content as the prompt so Codex gets the real instructions.
       binary = 'codex'
       const promptIdx = args.indexOf('-p')
-      let prompt = promptIdx >= 0 ? args[promptIdx + 1] : '/setup'
+      let prompt = promptIdx >= 0 ? args[promptIdx + 1] : '/specrails:enrich'
 
-      if (prompt === '/setup') {
-        const setupMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'setup.md')
+      if (prompt === '/specrails:enrich' || prompt === '/specrails:enrich --from-config') {
+        const enrichMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'sr', 'enrich.md')
+        // Fallback to legacy setup.md if enrich.md not yet installed
+        const legacyMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'setup.md')
         try {
-          prompt = readFileSync(setupMdPath, 'utf-8')
+          prompt = readFileSync(enrichMdPath, 'utf-8')
         } catch {
-          console.warn(`[SetupManager] Could not read ${setupMdPath} — falling back to literal /setup prompt`)
+          try {
+            prompt = readFileSync(legacyMdPath, 'utf-8')
+          } catch {
+            console.warn(`[SetupManager] Could not read enrich.md or setup.md — falling back to literal prompt`)
+          }
         }
       }
 
@@ -533,7 +683,7 @@ export class SetupManager {
         this._broadcast({
           type: 'setup_error',
           projectId,
-          error: `${binary} setup exited with code ${code ?? 'unknown'}`,
+          error: `${binary} enrich exited with code ${code ?? 'unknown'}`,
         })
       }
     })
@@ -578,9 +728,11 @@ export class SetupManager {
   }
 
   private _initCheckpoints(projectId: string): void {
+    const tier = this._projectTiers.get(projectId) ?? 'full'
+    const defs = tier === 'quick' ? QUICK_CHECKPOINTS : CHECKPOINTS
     const statuses = new Map<string, CheckpointStatus>()
     const starts = new Map<string, number>()
-    for (const def of CHECKPOINTS) {
+    for (const def of defs) {
       statuses.set(def.key, { key: def.key, name: def.name, status: 'pending' })
     }
     this._checkpoints.set(projectId, statuses)
@@ -597,7 +749,9 @@ export class SetupManager {
     const starts = this._checkpointStart.get(projectId)!
 
     // When a later checkpoint starts, auto-complete all earlier ones
-    const checkpointKeys = CHECKPOINTS.map((c) => c.key)
+    const tier = this._projectTiers.get(projectId) ?? 'full'
+    const checkpointDefs = tier === 'quick' ? QUICK_CHECKPOINTS : CHECKPOINTS
+    const checkpointKeys = checkpointDefs.map((c) => c.key)
     const targetIdx = checkpointKeys.indexOf(key)
     for (let i = 0; i < targetIdx; i++) {
       const prevKey = checkpointKeys[i]
@@ -660,13 +814,15 @@ export class SetupManager {
     // Sync from filesystem before returning
     this._syncFilesystemCheckpoints(projectId, projectPath)
 
+    const tier = this._projectTiers.get(projectId) ?? 'full'
+    const defs = tier === 'quick' ? QUICK_CHECKPOINTS : CHECKPOINTS
     const statuses = this._checkpoints.get(projectId)
     if (!statuses) {
-      // Return all-pending if setup hasn't started
-      return CHECKPOINTS.map((def) => ({ key: def.key, name: def.name, status: 'pending' as const }))
+      // Return all-pending if install hasn't started
+      return defs.map((def) => ({ key: def.key, name: def.name, status: 'pending' as const }))
     }
 
-    return CHECKPOINTS.map((def) => statuses.get(def.key) ?? { key: def.key, name: def.name, status: 'pending' as const })
+    return defs.map((def) => statuses.get(def.key) ?? { key: def.key, name: def.name, status: 'pending' as const })
   }
 
   getInstallLog(projectId: string): string[] {
@@ -678,6 +834,7 @@ export class SetupManager {
   abort(projectId: string): void {
     this._stopFilesystemPoll(projectId)
     this._projectProviders.delete(projectId)
+    this._projectTiers.delete(projectId)
     this._onSetupDone?.(projectId)
 
     const installChild = this._installProcesses.get(projectId)
@@ -697,7 +854,20 @@ export class SetupManager {
     return this._installProcesses.has(projectId)
   }
 
-  isSettingUp(projectId: string): boolean {
+  isEnriching(projectId: string): boolean {
     return this._setupProcesses.has(projectId)
+  }
+
+  /** @deprecated Use isEnriching() instead */
+  isSettingUp(projectId: string): boolean {
+    return this.isEnriching(projectId)
+  }
+
+  getInstallTier(projectId: string): InstallTier | undefined {
+    return this._projectTiers.get(projectId)
+  }
+
+  getSummary(projectPath: string): SetupSummary {
+    return computeSummary(projectPath)
   }
 }

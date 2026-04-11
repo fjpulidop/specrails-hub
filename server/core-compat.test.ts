@@ -33,6 +33,7 @@ const COMPATIBLE_CONTRACT = {
     'refactor-recommender',
     'health-check',
     'compat-check',
+    'enrich',
   ],
 }
 

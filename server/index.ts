@@ -547,7 +547,7 @@ if (isHubMode) {
     const testCmd = `/sr:propose-feature test`
     const resolved = resolveCommand(testCmd, process.cwd())
     if (resolved === testCmd) {
-      res.status(400).json({ error: 'This project does not have the /sr:propose-feature command installed. Run "npx specrails-core" to update.' }); return
+      res.status(400).json({ error: 'This project does not have the /sr:propose-feature command installed. Run "npx specrails-core@latest" to update.' }); return
     }
     const id = uuidv4()
     createProposal(db, { id, idea: idea.trim() })
@@ -631,7 +631,7 @@ if (fs.existsSync(clientDist)) {
 server.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`[error] Port ${port} is already in use. Is another manager instance running?`)
-    console.error(`[error] Try stopping it first: specrails-hub hub stop`)
+    console.error(`[error] Try stopping it first: specrails-hub stop`)
     process.exit(1)
   }
   throw err

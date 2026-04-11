@@ -20,10 +20,8 @@ interface AddProjectDialogProps {
 }
 
 type Provider = 'claude' | 'codex'
-type DialogStep = 'provider' | 'input'
 
 export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
-  const [step, setStep] = useState<DialogStep>('provider')
   const [selectedProvider, setSelectedProvider] = useState<Provider>('claude')
   const [projectPath, setProjectPath] = useState('')
   const [projectName, setProjectName] = useState('')
@@ -38,7 +36,6 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
       .then((r) => r.json())
       .then((data) => {
         setAvailableProviders(data)
-        // Auto-select the first available provider
         if (!data.claude && data.codex) setSelectedProvider('codex')
         else setSelectedProvider('claude')
       })
@@ -89,7 +86,6 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
   }
 
   function resetAndClose() {
-    setStep('provider')
     setProjectPath('')
     setProjectName('')
     onClose()
@@ -99,90 +95,7 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
     if (!isOpen) resetAndClose()
   }
 
-  if (step === 'provider') {
-    const noProviderAvailable = !availableProviders.claude && !availableProviders.codex
-    return (
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Choose AI Provider</DialogTitle>
-            <DialogDescription>
-              Select which AI provider to use for this project. This cannot be changed later.
-            </DialogDescription>
-          </DialogHeader>
-
-          {noProviderAvailable && (
-            <p className="text-xs text-destructive bg-destructive/10 rounded-md p-2">
-              No AI CLI detected. Install Claude Code or Codex CLI first.
-            </p>
-          )}
-
-          <div className="grid grid-cols-2 gap-3 py-2">
-            {/* Claude Card */}
-            <button
-              disabled={!availableProviders.claude}
-              onClick={() => setSelectedProvider('claude')}
-              className={cn(
-                'flex flex-col items-center gap-2 rounded-lg border p-4 text-left transition-colors',
-                'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                selectedProvider === 'claude' && availableProviders.claude
-                  ? 'border-dracula-purple bg-dracula-purple/10'
-                  : 'border-border/30 hover:border-border/60',
-                !availableProviders.claude && 'opacity-40 cursor-not-allowed'
-              )}
-            >
-              <span className="text-xl">🤖</span>
-              <div className="space-y-0.5 text-center">
-                <p className="text-xs font-semibold">Claude Code</p>
-                <p className="text-[10px] text-muted-foreground">
-                  {availableProviders.claude ? 'Available' : 'Not installed'}
-                </p>
-              </div>
-            </button>
-
-            {/* Codex Card */}
-            <button
-              disabled={!availableProviders.codex}
-              onClick={() => setSelectedProvider('codex')}
-              className={cn(
-                'flex flex-col items-center gap-2 rounded-lg border p-4 text-left transition-colors',
-                'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                selectedProvider === 'codex' && availableProviders.codex
-                  ? 'border-dracula-orange bg-dracula-orange/10'
-                  : 'border-border/30 hover:border-border/60',
-                !availableProviders.codex && 'opacity-40 cursor-not-allowed'
-              )}
-            >
-              <span className="text-xl">⚡</span>
-              <div className="space-y-0.5 text-center">
-                <p className="text-xs font-semibold">Codex CLI</p>
-                <p className="text-[10px] text-muted-foreground">
-                  {availableProviders.codex ? 'Available' : 'Not installed'}
-                </p>
-              </div>
-            </button>
-          </div>
-
-          <p className="text-[10px] text-muted-foreground/70">
-            ⚠️ Provider selection cannot be changed after the project is created.
-          </p>
-
-          <DialogFooter>
-            <Button variant="outline" size="sm" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              disabled={noProviderAvailable}
-              onClick={() => setStep('input')}
-            >
-              Continue
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    )
-  }
+  const noProviderAvailable = !availableProviders.claude && !availableProviders.codex
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -191,19 +104,17 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
           <DialogTitle className="flex items-center gap-2">
             <FolderOpen className="w-4 h-4" />
             Add Project
-            <span className={cn(
-              'ml-auto text-[10px] rounded px-1.5 py-0.5 font-medium',
-              selectedProvider === 'codex'
-                ? 'bg-dracula-orange/20 text-dracula-orange'
-                : 'bg-dracula-purple/20 text-dracula-purple'
-            )}>
-              {selectedProvider === 'codex' ? '⚡ Codex' : '🤖 Claude'}
-            </span>
           </DialogTitle>
           <DialogDescription>
             Register a project directory to manage it from the hub.
           </DialogDescription>
         </DialogHeader>
+
+        {noProviderAvailable && (
+          <p className="text-xs text-destructive bg-destructive/10 rounded-md p-2">
+            No AI CLI detected. Install Claude Code or Codex CLI first.
+          </p>
+        )}
 
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
@@ -236,13 +147,64 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
               Defaults to the directory name
             </p>
           </div>
+
+          {/* Provider selector — less prominent, inline */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">AI provider</label>
+            <div className="flex gap-2">
+              <button
+                disabled={!availableProviders.claude}
+                onClick={() => setSelectedProvider('claude')}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-left transition-colors text-xs',
+                  'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                  selectedProvider === 'claude' && availableProviders.claude
+                    ? 'border-dracula-purple/60 bg-dracula-purple/10 text-foreground'
+                    : 'border-border/30 text-muted-foreground hover:border-border/60',
+                  !availableProviders.claude && 'opacity-40 cursor-not-allowed'
+                )}
+              >
+                <span>🤖</span>
+                <span className="font-medium">Claude</span>
+                {!availableProviders.claude && (
+                  <span className="text-[9px] text-muted-foreground/60">not found</span>
+                )}
+              </button>
+
+              <button
+                disabled={!availableProviders.codex}
+                onClick={() => setSelectedProvider('codex')}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-left transition-colors text-xs',
+                  'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                  selectedProvider === 'codex' && availableProviders.codex
+                    ? 'border-dracula-orange/60 bg-dracula-orange/10 text-foreground'
+                    : 'border-border/30 text-muted-foreground hover:border-border/60',
+                  !availableProviders.codex && 'opacity-40 cursor-not-allowed'
+                )}
+              >
+                <span>⚡</span>
+                <span className="font-medium">Codex</span>
+                {!availableProviders.codex && (
+                  <span className="text-[9px] text-muted-foreground/60">not found</span>
+                )}
+              </button>
+            </div>
+            <p className="text-[9px] text-muted-foreground/70">
+              Cannot be changed after the project is created.
+            </p>
+          </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => setStep('provider')} disabled={isAdding}>
-            Back
+          <Button variant="outline" size="sm" onClick={onClose} disabled={isAdding}>
+            Cancel
           </Button>
-          <Button size="sm" onClick={handleAdd} disabled={isAdding || !projectPath.trim()}>
+          <Button
+            size="sm"
+            onClick={handleAdd}
+            disabled={isAdding || !projectPath.trim() || noProviderAvailable}
+          >
             {isAdding ? 'Adding...' : 'Add Project'}
           </Button>
         </DialogFooter>

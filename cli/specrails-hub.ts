@@ -40,6 +40,7 @@ export const KNOWN_VERBS = new Set([
   'refactor-recommender',
   'health-check',
   'compat-check',
+  'enrich',
 ])
 
 const EXIT_PATTERN = /\[process exited with code (\d+)/
@@ -131,7 +132,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   //   specrails-hub stop   →  specrails-hub hub stop
   //   specrails-hub add    →  specrails-hub hub add
   //   etc.
-  const HUB_SUBCOMMANDS = new Set(['start', 'stop', 'add', 'remove', 'list'])
+  const HUB_SUBCOMMANDS = new Set(['start', 'stop', 'status', 'add', 'remove', 'list'])
   if (HUB_SUBCOMMANDS.has(args[0])) {
     return { mode: 'hub', subArgs: args, port }
   }
@@ -182,7 +183,7 @@ ${bold('Project Required:')}
   directory. Register your project once before running any commands:
 
     ${dim('# Register your project (run once per project):')}
-    specrails-hub hub add .
+    specrails-hub add .
 
     ${dim('# Then run commands from that directory:')}
     specrails-hub implement #42
@@ -397,7 +398,7 @@ async function runViaWebManager(command: string, baseUrl: string): Promise<numbe
       if (!project) {
         cliError(
           'hub is running but no project registered for the current directory.\n' +
-          `  Run: specrails-hub hub add ${process.cwd()}`
+          `  Run: specrails-hub add ${process.cwd()}`
         )
         return 1
       }
@@ -1098,7 +1099,7 @@ ${bold('specrails-hub')} — hub management
 ${bold('Usage:')}
   specrails-hub start                  Start the hub server
   specrails-hub stop                   Stop the hub server
-  specrails-hub hub status             Show hub status and registered projects
+  specrails-hub status                 Show hub status and registered projects
   specrails-hub add <path>             Register a project by path
   specrails-hub remove <id>            Unregister a project by ID
   specrails-hub list                   List all registered projects
@@ -1118,7 +1119,7 @@ ${bold('Usage:')}
   if (sub === 'add') {
     const projectPath = subArgs[1]
     if (!projectPath) {
-      cliError('usage: specrails-hub hub add <path>')
+      cliError('usage: specrails-hub add <path>')
       return 1
     }
     return hubAdd(projectPath, port)
@@ -1126,7 +1127,7 @@ ${bold('Usage:')}
   if (sub === 'remove') {
     const projectId = subArgs[1]
     if (!projectId) {
-      cliError('usage: specrails-hub hub remove <id>')
+      cliError('usage: specrails-hub remove <id>')
       return 1
     }
     return hubRemove(projectId, port)

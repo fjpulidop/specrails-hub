@@ -39,6 +39,6 @@ describe('WelcomeScreen', () => {
 
   it('shows terminal command hint', () => {
     render(<WelcomeScreen onAddProject={vi.fn()} />)
-    expect(screen.getByText(/specrails-hub hub add/i)).toBeInTheDocument()
+    expect(screen.getByText(/specrails-hub add/i)).toBeInTheDocument()
   })
 })

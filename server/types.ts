@@ -371,6 +371,7 @@ export interface SetupInstallDoneMessage {
   type: 'setup_install_done'
   projectId: string
   timestamp: string
+  summary?: { agents: number; personas: number; commands: number }
 }
 
 export interface SetupCompleteMessage {

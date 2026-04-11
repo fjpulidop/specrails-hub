@@ -635,7 +635,29 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     res.json({ ok: true })
   })
 
-  // ─── Setup routes ─────────────────────────────────────────────────────────────
+  // ─── Install-config route ─────────────────────────────────────────────────────
+
+  router.post('/:projectId/install-config', (req: Request, res: Response) => {
+    const { project } = ctx(req)
+    const config = req.body ?? {}
+    if (typeof config !== 'object' || Array.isArray(config)) {
+      res.status(400).json({ error: 'Request body must be a config object' }); return
+    }
+    const configDir = path.join(project.path, '.specrails')
+    const configPath = path.join(configDir, 'install-config.yaml')
+    try {
+      fs.mkdirSync(configDir, { recursive: true })
+      const yaml = Object.entries(config)
+        .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+        .join('\n')
+      fs.writeFileSync(configPath, yaml, 'utf-8')
+      res.json({ ok: true, path: configPath })
+    } catch (err) {
+      res.status(500).json({ error: `Failed to write install-config.yaml: ${err}` })
+    }
+  })
+
+  // ─── Enrich routes (v3) + Setup aliases (v1/v2 backward compat) ──────────────
 
   router.post('/:projectId/setup/install', (req: Request, res: Response) => {
     const { project, setupManager } = ctx(req)
@@ -646,15 +668,52 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     setupManager.startInstall(project.id, project.path)
   })
 
+  router.post('/:projectId/setup/quick-install', (req: Request, res: Response) => {
+    const { project, setupManager } = ctx(req)
+    if (setupManager.isInstalling(project.id)) {
+      res.status(409).json({ error: 'Install already in progress' }); return
+    }
+    const installConfig = req.body ?? {}
+    res.status(202).json({ ok: true })
+    setupManager.startQuickInstall(project.id, project.path, installConfig)
+  })
+
+  router.post('/:projectId/enrich/start', (req: Request, res: Response) => {
+    const { project, setupManager } = ctx(req)
+    if (setupManager.isEnriching(project.id)) {
+      res.status(409).json({ error: 'Enrich already in progress' }); return
+    }
+    res.status(202).json({ ok: true })
+    setupManager.startEnrich(project.id, project.path, project.provider)
+  })
+
+  // Legacy alias: /setup/start → /enrich/start
   router.post('/:projectId/setup/start', (req: Request, res: Response) => {
     const { project, setupManager } = ctx(req)
-    if (setupManager.isSettingUp(project.id)) {
+    if (setupManager.isEnriching(project.id)) {
       res.status(409).json({ error: 'Setup already in progress' }); return
     }
     res.status(202).json({ ok: true })
-    setupManager.startSetup(project.id, project.path, project.provider)
+    setupManager.startEnrich(project.id, project.path, project.provider)
   })
 
+  router.post('/:projectId/enrich/message', (req: Request, res: Response) => {
+    const { project, setupManager } = ctx(req)
+    const { sessionId, message } = req.body ?? {}
+    if (!sessionId || typeof sessionId !== 'string') {
+      res.status(400).json({ error: 'sessionId is required' }); return
+    }
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      res.status(400).json({ error: 'message is required' }); return
+    }
+    if (setupManager.isEnriching(project.id)) {
+      res.status(409).json({ error: 'Enrich already in progress' }); return
+    }
+    res.status(202).json({ ok: true })
+    setupManager.resumeEnrich(project.id, project.path, sessionId, message.trim(), project.provider)
+  })
+
+  // Legacy alias: /setup/message → /enrich/message
   router.post('/:projectId/setup/message', (req: Request, res: Response) => {
     const { project, setupManager } = ctx(req)
     const { sessionId, message } = req.body ?? {}
@@ -664,11 +723,11 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     if (!message || typeof message !== 'string' || !message.trim()) {
       res.status(400).json({ error: 'message is required' }); return
     }
-    if (setupManager.isSettingUp(project.id)) {
+    if (setupManager.isEnriching(project.id)) {
       res.status(409).json({ error: 'Setup already in progress' }); return
     }
     res.status(202).json({ ok: true })
-    setupManager.resumeSetup(project.id, project.path, sessionId, message.trim(), project.provider)
+    setupManager.resumeEnrich(project.id, project.path, sessionId, message.trim(), project.provider)
   })
 
   router.get('/:projectId/setup/checkpoints', (req: Request, res: Response) => {
@@ -678,9 +737,12 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     res.json({
       checkpoints,
       isInstalling: setupManager.isInstalling(project.id),
-      isSettingUp: setupManager.isSettingUp(project.id),
+      isSettingUp: setupManager.isEnriching(project.id),
+      isEnriching: setupManager.isEnriching(project.id),
+      tier: setupManager.getInstallTier(project.id) ?? null,
       savedSessionId: savedSessionId ?? null,
       logLines: setupManager.getInstallLog(project.id),
+      summary: setupManager.getSummary(project.path),
     })
   })
 
@@ -708,7 +770,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const testCmd = `/sr:propose-feature test`
     const resolved = resolveCommand(testCmd, ctx(req).project.path)
     if (resolved === testCmd) {
-      res.status(400).json({ error: 'This project does not have the /sr:propose-feature command installed. Run "npx specrails-core" to update.' }); return
+      res.status(400).json({ error: 'This project does not have the /sr:propose-feature command installed. Run "npx specrails-core@latest" to update.' }); return
     }
     const id = uuidv4()
     createProposal(ctx(req).db, { id, idea: idea.trim() })

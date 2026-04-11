@@ -44,12 +44,6 @@ function mockFetchSequence(projectResponse?: { ok: boolean; json: () => Promise<
     .mockResolvedValueOnce(projectResponse)
 }
 
-/** Advance from provider step to path input step */
-async function advanceToInputStep(user: ReturnType<typeof userEvent.setup>) {
-  const continueBtn = screen.getByRole('button', { name: /Continue/i })
-  await user.click(continueBtn)
-}
-
 describe('AddProjectDialog', () => {
   beforeEach(() => {
     mockStartSetupWizard.mockClear()
@@ -58,29 +52,25 @@ describe('AddProjectDialog', () => {
     mockFetchSequence()
   })
 
-  it('renders dialog when open=true — shows provider step first', () => {
+  it('renders dialog when open=true — shows path input directly', () => {
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
     expect(screen.getByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /Choose AI Provider/i })).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('/Users/me/my-project')).toBeInTheDocument()
   })
 
   it('does not render dialog when open=false', () => {
     render(<AddProjectDialog open={false} onClose={vi.fn()} />)
-    expect(screen.queryByText('Choose AI Provider')).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('/Users/me/my-project')).not.toBeInTheDocument()
   })
 
-  it('shows path and name inputs after advancing past provider step', async () => {
-    const user = userEvent.setup()
+  it('shows path and name inputs immediately on open', async () => {
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
-    await advanceToInputStep(user)
     expect(screen.getByPlaceholderText('/Users/me/my-project')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('My Project')).toBeInTheDocument()
   })
 
   it('submit button is disabled when path is empty', async () => {
-    const user = userEvent.setup()
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
-    await advanceToInputStep(user)
     const addBtn = screen.getByRole('button', { name: /Add Project/i })
     expect(addBtn).toBeDisabled()
   })
@@ -88,7 +78,6 @@ describe('AddProjectDialog', () => {
   it('submit button is enabled when path is filled', async () => {
     const user = userEvent.setup()
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
-    await advanceToInputStep(user)
     const pathInput = screen.getByPlaceholderText('/Users/me/my-project')
     await user.type(pathInput, '/some/path')
     const addBtn = screen.getByRole('button', { name: /Add Project/i })
@@ -107,7 +96,6 @@ describe('AddProjectDialog', () => {
     })
 
     render(<AddProjectDialog open={true} onClose={onClose} />)
-    await advanceToInputStep(user)
     const pathInput = screen.getByPlaceholderText('/Users/me/my-project')
     await user.type(pathInput, '/some/path')
     const addBtn = screen.getByRole('button', { name: /Add Project/i })
@@ -127,7 +115,6 @@ describe('AddProjectDialog', () => {
     })
 
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
-    await advanceToInputStep(user)
     const pathInput = screen.getByPlaceholderText('/Users/me/my-project')
     await user.type(pathInput, '/bad/path')
     const addBtn = screen.getByRole('button', { name: /Add Project/i })
@@ -149,7 +136,6 @@ describe('AddProjectDialog', () => {
     })
 
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
-    await advanceToInputStep(user)
     const pathInput = screen.getByPlaceholderText('/Users/me/my-project')
     await user.type(pathInput, '/some/path')
     const addBtn = screen.getByRole('button', { name: /Add Project/i })
@@ -170,20 +156,14 @@ describe('AddProjectDialog', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('back button returns to provider step from input step', async () => {
-    const user = userEvent.setup()
+  it('shows Claude and Codex provider buttons', async () => {
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
-    await advanceToInputStep(user)
-    expect(screen.getByPlaceholderText('/Users/me/my-project')).toBeInTheDocument()
-    const backBtn = screen.getByRole('button', { name: /Back/i })
-    await user.click(backBtn)
-    expect(screen.getByRole('heading', { name: /Choose AI Provider/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Claude/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Codex/i })).toBeInTheDocument()
   })
 
-  it('provider badge shows in input step title', async () => {
-    const user = userEvent.setup()
+  it('shows Add Project dialog title', async () => {
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
-    await advanceToInputStep(user)
-    expect(screen.getByText(/Claude/i, { selector: 'span' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Add Project/i })).toBeInTheDocument()
   })
 })
