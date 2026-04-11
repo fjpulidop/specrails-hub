@@ -55,10 +55,19 @@ function readInstallConfig(projectPath: string): InstallConfigParsed | null {
     const text = readFileSync(configPath, 'utf-8')
     const tierMatch = text.match(/^tier:\s*(\w+)/m)
     const tier = (tierMatch?.[1] === 'quick' ? 'quick' : 'full') as 'quick' | 'full'
-    const selectedMatch = text.match(/selected:\s*\[([^\]]*)\]/)
-    const selectedAgents = selectedMatch
-      ? selectedMatch[1].split(',').map((s) => s.trim()).filter(Boolean)
-      : []
+
+    let selectedAgents: string[] = []
+    // Inline format: selected: [a, b, c]
+    const inlineMatch = text.match(/selected:\s*\[([^\]]*)\]/)
+    if (inlineMatch) {
+      selectedAgents = inlineMatch[1].split(',').map((s) => s.trim()).filter(Boolean)
+    } else {
+      // Multi-line format: selected:\n    - a\n    - b
+      const multilineMatch = text.match(/selected:\s*\n((?:\s+-\s+\S+\n?)+)/)
+      if (multilineMatch) {
+        selectedAgents = multilineMatch[1].match(/- (\S+)/g)?.map((m) => m.replace('- ', '')) ?? []
+      }
+    }
     return { tier, selectedAgents }
   } catch {
     return null

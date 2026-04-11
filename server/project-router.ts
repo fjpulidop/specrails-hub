@@ -666,7 +666,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
   // ─── Install-config route ─────────────────────────────────────────────────────
 
-  router.post('/:projectId/install-config', (req: Request, res: Response) => {
+  router.post('/:projectId/setup/install-config', (req: Request, res: Response) => {
     const { project } = ctx(req)
     const config = req.body ?? {}
     if (typeof config !== 'object' || Array.isArray(config)) {
