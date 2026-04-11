@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.0](https://github.com/fjpulidop/specrails-hub/compare/v1.23.0...v1.24.0) (2026-04-11)
+
+
+### Features
+
+* tiered install, SetupWizard rewrite + agent selector (SPEA-741, SPEA-745, SPEA-746) ([#170](https://github.com/fjpulidop/specrails-hub/issues/170)) ([ffcddff](https://github.com/fjpulidop/specrails-hub/commit/ffcddfff9e73a3b83c91563056e9e7b5e804572f))
+
 ## [1.23.0](https://github.com/fjpulidop/specrails-hub/compare/v1.22.0...v1.23.0) (2026-04-11)
 
 
