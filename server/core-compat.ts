@@ -13,10 +13,12 @@ const HUB_KNOWN_COMMANDS = new Set([
   'refactor-recommender',
   'health-check',
   'compat-check',
+  'enrich',
 ])
 
 // v1.0: cli.initArgs / cli.updateArgs (flat)
 // v2.0: cli.claude / cli.codex (per-provider objects) + specrailsDir
+// v3.0: cli.tui (TUI-based installer) + tiers (quick/full) + configSchema
 interface IntegrationContract {
   schemaVersion: string
   coreVersion: string
@@ -29,8 +31,17 @@ interface IntegrationContract {
     // v2.0 fields
     claude?: { binary: string; initArgs: string[] }
     codex?: { binary: string; initArgs: string[] }
+    // v3.0 fields — TUI-based installer replaces non-interactive init
+    tui?: { binary: string; initArgs: string[] }
   }
   specrailsDir?: { claude: string; codex: string }
+  // v3.0: installation tiers supported by this core version
+  tiers?: ('quick' | 'full')[]
+  // v3.0: install-config.yaml schema location for Hub-driven quick install
+  configSchema?: {
+    path: string
+    schema?: string
+  }
   checkpoints: string[]
   commands: string[]
   ticketProvider?: {

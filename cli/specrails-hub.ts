@@ -40,6 +40,7 @@ export const KNOWN_VERBS = new Set([
   'refactor-recommender',
   'health-check',
   'compat-check',
+  'enrich',
 ])
 
 const EXIT_PATTERN = /\[process exited with code (\d+)/

@@ -18,7 +18,8 @@ vi.mock('fs', async () => {
     existsSync: vi.fn().mockReturnValue(false),
     readdirSync: vi.fn().mockReturnValue([]),
     mkdirSync: vi.fn(),
-    readFileSync: vi.fn().mockReturnValue('# Setup prompt content'),
+    readFileSync: vi.fn().mockReturnValue('# Enrich prompt content'),
+    writeFileSync: vi.fn(),
   }
 })
 
@@ -30,9 +31,9 @@ vi.mock('./core-compat', () => ({
 
 import { spawn as mockSpawn } from 'child_process'
 import treeKill from 'tree-kill'
-import { existsSync, readdirSync, mkdirSync, readFileSync } from 'fs'
+import { existsSync, readdirSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { detectCLISync } from './core-compat'
-import { SetupManager, CHECKPOINTS } from './setup-manager'
+import { SetupManager, CHECKPOINTS, QUICK_CHECKPOINTS } from './setup-manager'
 
 function createMockChildProcess() {
   const child = new EventEmitter() as any
@@ -97,12 +98,26 @@ describe('SetupManager', () => {
     })
   })
 
+  describe('QUICK_CHECKPOINTS', () => {
+    it('has 3 checkpoint definitions', () => {
+      expect(QUICK_CHECKPOINTS).toHaveLength(3)
+    })
+
+    it('contains config_written, base_install, quick_complete keys', () => {
+      const keys = QUICK_CHECKPOINTS.map((c) => c.key)
+      expect(keys).toContain('config_written')
+      expect(keys).toContain('base_install')
+      expect(keys).toContain('quick_complete')
+    })
+  })
+
   // ─── State queries ─────────────────────────────────────────────────────────
 
-  describe('isInstalling / isSettingUp', () => {
+  describe('isInstalling / isSettingUp / isEnriching', () => {
     it('returns false when no processes running', () => {
       expect(sm.isInstalling('p1')).toBe(false)
       expect(sm.isSettingUp('p1')).toBe(false)
+      expect(sm.isEnriching('p1')).toBe(false)
     })
 
     it('returns true after starting install', () => {
@@ -112,7 +127,15 @@ describe('SetupManager', () => {
       expect(sm.isInstalling('p1')).toBe(true)
     })
 
-    it('returns true after starting setup', () => {
+    it('returns true after startEnrich', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      sm.startEnrich('p1', '/path/to/project')
+      expect(sm.isEnriching('p1')).toBe(true)
+      expect(sm.isSettingUp('p1')).toBe(true) // backward compat alias
+    })
+
+    it('returns true after startSetup (deprecated alias)', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
       sm.startSetup('p1', '/path/to/project')
@@ -503,6 +526,55 @@ describe('SetupManager', () => {
     })
   })
 
+  // ─── checkFilesystem new paths ─────────────────────────────────────────────
+
+  describe('checkFilesystem new .specrails/ paths', () => {
+    it('detects base_install from .specrails/specrails-version (new path)', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      vi.mocked(existsSync).mockImplementation((p: any) => {
+        const s = String(p)
+        return s.includes('.specrails/specrails-version')
+      })
+
+      sm.startSetup('p1', '/path/to/project')
+      const statuses = sm.getCheckpointStatus('p1', '/path/to/project')
+      const baseInstall = statuses.find((s) => s.key === 'base_install')
+      expect(baseInstall?.status).toBe('done')
+    })
+
+    it('detects base_install from legacy .specrails-version (backward compat)', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      vi.mocked(existsSync).mockImplementation((p: any) => {
+        const s = String(p)
+        return s.endsWith('.specrails-version') && !s.includes('.specrails/specrails-version')
+      })
+
+      sm.startSetup('p1', '/path/to/project')
+      const statuses = sm.getCheckpointStatus('p1', '/path/to/project')
+      const baseInstall = statuses.find((s) => s.key === 'base_install')
+      expect(baseInstall?.status).toBe('done')
+    })
+
+    it('detects repo_analysis from .specrails/setup-templates (new path)', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      vi.mocked(existsSync).mockImplementation((p: any) => {
+        const s = String(p)
+        return s.includes('.specrails/specrails-version') || s.includes('.specrails/setup-templates')
+      })
+
+      sm.startSetup('p1', '/path/to/project')
+      const statuses = sm.getCheckpointStatus('p1', '/path/to/project')
+      const repoAnalysis = statuses.find((s) => s.key === 'repo_analysis')
+      expect(repoAnalysis?.status).toBe('done')
+    })
+  })
+
   // ─── Checkpoint detection from stream ──────────────────────────────────────
 
   describe('checkpoint detection from stream events', () => {
@@ -544,6 +616,44 @@ describe('SetupManager', () => {
       const checkpointMsgs = getBroadcastedByType(broadcast, 'setup_checkpoint')
       const agentGen = checkpointMsgs.find((m) => m.checkpoint === 'agent_generation')
       expect(agentGen).toBeDefined()
+    })
+
+    it('detects base_install from new specrails/specrails-version path in tool_use', async () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startSetup('p1', '/path/to/project')
+
+      const event = JSON.stringify({
+        type: 'tool_use',
+        input: { file_path: '.specrails/specrails-version' },
+      })
+      pushLine(child, event)
+
+      await new Promise((r) => setImmediate(r))
+
+      const checkpointMsgs = getBroadcastedByType(broadcast, 'setup_checkpoint')
+      const baseInstall = checkpointMsgs.find((m) => m.checkpoint === 'base_install')
+      expect(baseInstall).toBeDefined()
+    })
+
+    it('detects final_verification from new specrails/specrails-manifest.json path in tool_use', async () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startSetup('p1', '/path/to/project')
+
+      const event = JSON.stringify({
+        type: 'tool_use',
+        input: { file_path: '.specrails/specrails-manifest.json' },
+      })
+      pushLine(child, event)
+
+      await new Promise((r) => setImmediate(r))
+
+      const checkpointMsgs = getBroadcastedByType(broadcast, 'setup_checkpoint')
+      const finalVerification = checkpointMsgs.find((m) => m.checkpoint === 'final_verification')
+      expect(finalVerification).toBeDefined()
     })
   })
 

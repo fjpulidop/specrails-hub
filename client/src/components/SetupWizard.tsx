@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect, memo } from 'react'
-import { Check, ArrowRight, Package, Bot, Terminal, Users, RotateCcw, ChevronLeft } from 'lucide-react'
+import { Check, ArrowRight, Package, Bot, ChevronLeft, Settings2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Button } from './ui/button'
 import { CheckpointTracker, type CheckpointState } from './CheckpointTracker'
 import { SetupChat, type SetupChatMessage } from './SetupChat'
+import { AgentSelector, ALL_AGENTS } from './AgentSelector'
+import { ModelSelector, type ModelPreset, type ModelOverrides } from './ModelSelector'
+import { TierSelector, type InstallTier } from './TierSelector'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import { cn } from '../lib/utils'
 import type { HubProject } from '../hooks/useHub'
@@ -12,11 +15,11 @@ import type { HubProject } from '../hooks/useHub'
 // ─── Wizard step types ────────────────────────────────────────────────────────
 
 type WizardStep =
-  | { step: 'proposal' }
-  | { step: 'installing' }
-  | { step: 'setup'; sessionId?: string }
+  | { step: 'agent-selection' }
+  | { step: 'installing'; tier: InstallTier }
+  | { step: 'enriching'; sessionId?: string }
   | { step: 'complete'; summary: SetupSummary }
-  | { step: 'error'; message: string; retryStep: 'installing' | 'setup' }
+  | { step: 'error'; message: string; retryStep: 'installing' | 'enriching' }
 
 interface SetupSummary {
   agents: number
@@ -24,9 +27,33 @@ interface SetupSummary {
   commands: number
 }
 
+// ─── Install config ───────────────────────────────────────────────────────────
+
+interface InstallConfig {
+  tier: InstallTier
+  selectedAgents: string[]
+  modelPreset: ModelPreset
+  modelOverrides: ModelOverrides
+}
+
+function buildDefaultConfig(): InstallConfig {
+  return {
+    tier: 'full',
+    selectedAgents: ALL_AGENTS.map((a) => a.id),
+    modelPreset: 'balanced',
+    modelOverrides: {},
+  }
+}
+
 // ─── Initial checkpoint states ────────────────────────────────────────────────
 
-const INITIAL_CHECKPOINTS: CheckpointState[] = [
+const QUICK_CHECKPOINTS: CheckpointState[] = [
+  { key: 'base_install', name: 'Base installation', status: 'pending' },
+  { key: 'agent_selection', name: 'Agent selection', status: 'pending' },
+  { key: 'agent_generation', name: 'Agent generation', status: 'pending' },
+]
+
+const FULL_CHECKPOINTS: CheckpointState[] = [
   { key: 'base_install', name: 'Base installation', status: 'pending' },
   { key: 'repo_analysis', name: 'Repository analysis', status: 'pending' },
   { key: 'stack_conventions', name: 'Stack & conventions', status: 'pending' },
@@ -45,68 +72,12 @@ interface WizardSnapshot {
   chatMessages: SetupChatMessage[]
   sessionId: string | null
   isStreaming: boolean
+  installConfig: InstallConfig
 }
 
 const wizardCache = new Map<string, WizardSnapshot>()
 
-// ─── Phase 2: Proposal ────────────────────────────────────────────────────────
-
-function ProposalStep({
-  project,
-  onInstall,
-  onSkip,
-}: {
-  project: HubProject
-  onInstall: () => void
-  onSkip: () => void
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto px-6 gap-6">
-      <div className="w-14 h-14 rounded-2xl bg-dracula-purple/20 flex items-center justify-center">
-        <Package className="w-7 h-7 text-dracula-purple" />
-      </div>
-
-      <div className="text-center space-y-2">
-        <h2 className="text-base font-semibold">Install specrails in {project.name}?</h2>
-        <p className="text-sm text-muted-foreground">
-          This project doesn&apos;t have specrails installed yet. Install it to unlock
-          AI-powered development workflows.
-        </p>
-      </div>
-
-      <div className="w-full rounded-lg border border-border/50 bg-muted/20 p-4 space-y-3">
-        <p className="text-xs font-medium text-foreground">What will be installed:</p>
-        <ul className="space-y-2">
-          {[
-            { icon: Bot, text: 'Specialized AI agents (architect, developer, reviewer)' },
-            { icon: Terminal, text: 'Workflow commands (/sr:implement, /sr:product-backlog...)' },
-            { icon: Users, text: 'User personas and per-layer conventions' },
-            { icon: Package, text: 'Agent memory and configuration scaffolding' },
-          ].map(({ text }) => (
-            <li key={text} className="flex items-center gap-2.5 text-xs text-muted-foreground">
-              <div className="w-4 h-4 rounded bg-dracula-green/20 flex items-center justify-center flex-shrink-0">
-                <Check className="w-2.5 h-2.5 text-dracula-green" />
-              </div>
-              {text}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="flex gap-3 w-full">
-        <Button variant="outline" size="sm" className="flex-1" onClick={onSkip}>
-          Skip for now
-        </Button>
-        <Button size="sm" className="flex-1 gap-2" onClick={onInstall}>
-          <Package className="w-3.5 h-3.5" />
-          Install specrails
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Shared log renderer — always renders as markdown ─────────────────────────
+// ─── Shared log renderer ──────────────────────────────────────────────────────
 
 const PROSE_CLASSES = `prose prose-invert prose-xs max-w-none
   prose-p:my-1 prose-p:leading-relaxed
@@ -122,9 +93,7 @@ const PROSE_CLASSES = `prose prose-invert prose-xs max-w-none
   text-foreground/80`
 
 const SetupLogLines = memo(function SetupLogLines({ lines }: { lines: string[] }) {
-  // Join all lines into a single markdown document
   const content = lines.join('\n')
-
   return (
     <div className={PROSE_CLASSES}>
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
@@ -132,13 +101,135 @@ const SetupLogLines = memo(function SetupLogLines({ lines }: { lines: string[] }
   )
 })
 
-// ─── Phase 3: Installing ──────────────────────────────────────────────────────
+// ─── Step 1: Agent Selection ──────────────────────────────────────────────────
+
+type AgentSelectionTab = 'agents' | 'models'
+
+function AgentSelectionStep({
+  config,
+  onChange,
+  onInstall,
+  onSkip,
+  provider,
+}: {
+  config: InstallConfig
+  onChange: (config: InstallConfig) => void
+  onInstall: () => void
+  onSkip: () => void
+  provider: 'claude' | 'codex'
+}) {
+  const [activeTab, setActiveTab] = useState<AgentSelectionTab>('agents')
+  const selectedAgents = ALL_AGENTS.filter((a) => config.selectedAgents.includes(a.id))
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Header */}
+      <div className="flex-shrink-0 px-6 pt-6 pb-4 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-dracula-purple/20 flex items-center justify-center flex-shrink-0">
+            <Bot className="w-5 h-5 text-dracula-purple" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold">Configure your agents</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Choose which agents to install and how to run them.
+            </p>
+          </div>
+        </div>
+
+        {/* Tier selector */}
+        <TierSelector
+          tier={config.tier}
+          onChange={(tier) => onChange({ ...config, tier })}
+        />
+
+        {/* Tabs */}
+        <div className="flex border-b border-border/30">
+          {(['agents', 'models'] as AgentSelectionTab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors',
+                activeTab === tab
+                  ? 'border-dracula-purple text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {tab === 'agents' ? (
+                <>
+                  <Bot className="w-3 h-3" />
+                  Agents
+                </>
+              ) : (
+                <>
+                  <Settings2 className="w-3 h-3" />
+                  Models
+                </>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tab content */}
+      <div className="flex-1 overflow-auto px-6 pb-4">
+        {activeTab === 'agents' ? (
+          <AgentSelector
+            selected={config.selectedAgents}
+            onChange={(selectedAgents) => onChange({ ...config, selectedAgents })}
+          />
+        ) : (
+          <ModelSelector
+            agents={selectedAgents}
+            provider={provider}
+            preset={config.modelPreset}
+            overrides={config.modelOverrides}
+            onPresetChange={(modelPreset) => onChange({ ...config, modelPreset })}
+            onOverrideChange={(agentId, model) => {
+              const next = { ...config.modelOverrides }
+              if (model) {
+                next[agentId] = model
+              } else {
+                delete next[agentId]
+              }
+              onChange({ ...config, modelOverrides: next })
+            }}
+          />
+        )}
+      </div>
+
+      {/* Footer actions */}
+      <div className="flex-shrink-0 border-t border-border/30 px-6 py-4 flex items-center justify-between gap-3">
+        <button
+          onClick={onSkip}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Skip for now
+        </button>
+        <Button
+          size="sm"
+          className="gap-2"
+          onClick={onInstall}
+          disabled={config.selectedAgents.length === 0}
+        >
+          <Package className="w-3.5 h-3.5" />
+          {config.tier === 'quick' ? 'Quick Install' : 'Install & Enrich'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Step 2: Installing ───────────────────────────────────────────────────────
 
 function InstallingStep({
   logLines,
+  tier,
   onBack,
 }: {
   logLines: string[]
+  tier: InstallTier
   onBack: () => void
 }) {
   return (
@@ -150,7 +241,11 @@ function InstallingStep({
           </div>
           <div>
             <h2 className="text-sm font-semibold">Installing specrails...</h2>
-            <p className="text-xs text-muted-foreground">Running npx specrails-core in your project</p>
+            <p className="text-xs text-muted-foreground">
+              {tier === 'quick'
+                ? 'Installing agents from templates'
+                : 'Running npx specrails-core in your project'}
+            </p>
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={onBack} className="h-7 gap-1.5 text-xs">
@@ -170,7 +265,65 @@ function InstallingStep({
   )
 }
 
-// ─── Phase 5: Complete ────────────────────────────────────────────────────────
+// ─── Step 3 (full only): Enriching ───────────────────────────────────────────
+
+function EnrichStep({
+  checkpoints,
+  logLines,
+  chatMessages,
+  isStreaming,
+  streamingText,
+  sessionId,
+  projectId,
+  onBack,
+  onSendMessage,
+}: {
+  checkpoints: CheckpointState[]
+  logLines: string[]
+  chatMessages: SetupChatMessage[]
+  isStreaming: boolean
+  streamingText: string
+  sessionId: string | null
+  projectId: string
+  onBack: () => void
+  onSendMessage: (text: string) => void
+}) {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex-shrink-0 px-3 py-1.5 border-b border-border/20">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 text-xs"
+          onClick={onBack}
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+          Back
+        </Button>
+      </div>
+      <div className="flex flex-1 overflow-hidden">
+        <div className="w-72 flex-shrink-0 border-r border-border/30 overflow-hidden">
+          <CheckpointTracker
+            checkpoints={checkpoints}
+            logLines={logLines}
+          />
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <SetupChat
+            projectId={projectId}
+            messages={chatMessages}
+            isStreaming={isStreaming}
+            streamingText={streamingText}
+            sessionId={sessionId}
+            onSendMessage={onSendMessage}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Step 4: Complete ─────────────────────────────────────────────────────────
 
 function CompleteStep({
   projectName,
@@ -239,6 +392,8 @@ function CompleteStep({
 
 // ─── Error step ───────────────────────────────────────────────────────────────
 
+import { RotateCcw } from 'lucide-react'
+
 function ErrorStep({
   message,
   onRetry,
@@ -268,6 +423,63 @@ function ErrorStep({
   )
 }
 
+// ─── Step indicator ───────────────────────────────────────────────────────────
+
+function StepIndicator({ wizardStep, tier }: { wizardStep: WizardStep; tier: InstallTier }) {
+  const quickSteps = [
+    { id: 'agent-selection', label: 'Configure' },
+    { id: 'installing', label: 'Install' },
+    { id: 'complete', label: 'Done' },
+  ]
+  const fullSteps = [
+    { id: 'agent-selection', label: 'Configure' },
+    { id: 'installing', label: 'Install' },
+    { id: 'enriching', label: 'Enrich' },
+    { id: 'complete', label: 'Done' },
+  ]
+
+  const steps = tier === 'quick' ? quickSteps : fullSteps
+  const stepOrder = steps.map((s) => s.id)
+
+  const currentStepId = wizardStep.step === 'error' ? wizardStep.retryStep : wizardStep.step
+  const currentIndex = stepOrder.indexOf(currentStepId)
+
+  return (
+    <div className="flex items-center gap-2">
+      {steps.map((s, i) => {
+        const isDone = i < currentIndex
+        const isCurrent = i === currentIndex
+        return (
+          <div key={s.id} className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <div
+                className={cn(
+                  'w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold',
+                  isDone && 'bg-dracula-green text-background',
+                  isCurrent && 'bg-dracula-purple text-background',
+                  !isDone && !isCurrent && 'bg-muted/50 text-muted-foreground'
+                )}
+              >
+                {isDone ? <Check className="w-2.5 h-2.5" /> : i + 1}
+              </div>
+              <span className={cn(
+                'text-[10px] font-medium',
+                isCurrent && 'text-foreground',
+                !isCurrent && 'text-muted-foreground'
+              )}>
+                {s.label}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className={cn('w-6 h-px', isDone ? 'bg-dracula-green/50' : 'bg-border/50')} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── SetupWizard ──────────────────────────────────────────────────────────────
 
 interface SetupWizardProps {
@@ -277,42 +489,42 @@ interface SetupWizardProps {
 }
 
 export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnSkip }: SetupWizardProps) {
-  // Wrap callbacks to clear cache when wizard finishes
   const onComplete = useCallback(() => { wizardCache.delete(project.id); rawOnComplete() }, [project.id, rawOnComplete])
   const onSkip = useCallback(() => { wizardCache.delete(project.id); rawOnSkip() }, [project.id, rawOnSkip])
 
-  // Restore from cache if returning to a project mid-setup
   const cached = wizardCache.get(project.id)
 
-  const [wizardStep, setWizardStep] = useState<WizardStep>(cached?.wizardStep ?? { step: 'proposal' })
-  const [checkpoints, setCheckpoints] = useState<CheckpointState[]>(cached?.checkpoints ?? INITIAL_CHECKPOINTS)
+  const [wizardStep, setWizardStep] = useState<WizardStep>(cached?.wizardStep ?? { step: 'agent-selection' })
+  const [installConfig, setInstallConfig] = useState<InstallConfig>(cached?.installConfig ?? buildDefaultConfig())
+  const [checkpoints, setCheckpoints] = useState<CheckpointState[]>(cached?.checkpoints ?? FULL_CHECKPOINTS)
   const [logLines, setLogLines] = useState<string[]>(cached?.logLines ?? [])
   const [chatMessages, setChatMessages] = useState<SetupChatMessage[]>(cached?.chatMessages ?? [])
   const [streamingText, setStreamingText] = useState('')
   const [isStreaming, setIsStreaming] = useState(cached?.isStreaming ?? false)
   const [sessionId, setSessionId] = useState<string | null>(cached?.sessionId ?? null)
-  // Track whether we need to auto-start the setup phase after install completes
-  const pendingSetupStart = useRef(false)
-  // Safety timeout: reset isStreaming if no new chunks arrive for 30s
+
+  const pendingEnrichStart = useRef(false)
   const streamingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Save state to cache on every update so it survives unmount
+  // Persist refs for cache-on-unmount
   const wizardStepRef = useRef(wizardStep)
   const checkpointsRef = useRef(checkpoints)
   const logLinesRef = useRef(logLines)
   const chatMessagesRef = useRef(chatMessages)
   const sessionIdRef = useRef(sessionId)
   const isStreamingRef = useRef(isStreaming)
+  const installConfigRef = useRef(installConfig)
+
   wizardStepRef.current = wizardStep
   checkpointsRef.current = checkpoints
   logLinesRef.current = logLines
   chatMessagesRef.current = chatMessages
   sessionIdRef.current = sessionId
   isStreamingRef.current = isStreaming
+  installConfigRef.current = installConfig
 
   useEffect(() => {
     return () => {
-      // Save to cache on unmount (tab switch)
       wizardCache.set(project.id, {
         wizardStep: wizardStepRef.current,
         checkpoints: checkpointsRef.current,
@@ -320,75 +532,72 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
         chatMessages: chatMessagesRef.current,
         sessionId: sessionIdRef.current,
         isStreaming: isStreamingRef.current,
+        installConfig: installConfigRef.current,
       })
     }
   }, [project.id])
 
-  // On remount after tab switch: check if the install/setup finished while we were away
+  // On remount after tab switch: check if the install/enrich finished while we were away
   useEffect(() => {
-    if (wizardStep.step !== 'installing' && wizardStep.step !== 'setup') return
+    if (wizardStep.step !== 'installing' && wizardStep.step !== 'enriching') return
 
     async function syncState() {
       try {
         const res = await fetch(`/api/projects/${project.id}/setup/checkpoints`)
         if (!res.ok) return
-        const data = await res.json() as { checkpoints: CheckpointState[]; isInstalling: boolean; isSettingUp: boolean; savedSessionId: string | null; logLines?: string[] }
+        const data = await res.json() as {
+          checkpoints: CheckpointState[]
+          isInstalling: boolean
+          isSettingUp: boolean
+          savedSessionId: string | null
+          logLines?: string[]
+        }
 
-        // Restore session ID from server if not in memory (e.g. server restart)
         if (data.savedSessionId && !sessionIdRef.current) {
           setSessionId(data.savedSessionId)
         }
 
-        // Merge checkpoints from server — never regress a checkpoint that
-        // the client cache already marked as 'done' (guards against server
-        // restart returning all-pending while the wizard was mid-setup)
         if (data.checkpoints) {
           setCheckpoints((prev) =>
             prev.map((cp) => {
               const serverCp = data.checkpoints!.find((s: CheckpointState) => s.key === cp.key)
               if (!serverCp) return cp
-              // Never regress from done → pending/running
               if (cp.status === 'done' && serverCp.status !== 'done') return cp
               return { ...cp, ...serverCp }
             })
           )
         }
 
-        // Restore install log lines — use server buffer if it has more lines than
-        // the client cache (server accumulates all lines; client may have missed
-        // lines received while the tab was inactive)
         if (data.logLines && data.logLines.length > 0) {
           setLogLines((prev) => data.logLines!.length > prev.length ? data.logLines! : prev)
         }
 
-        // If server says setup isn't actively running, clear stale streaming state
         if (!data.isSettingUp && !data.isInstalling) {
           setIsStreaming(false)
         }
 
-        // If we were on 'installing' but install finished, advance to setup
+        // Install done → advance to enrich (full) or complete (quick)
         if (wizardStep.step === 'installing' && !data.isInstalling) {
           const hasBaseInstall = data.checkpoints?.some(
             (cp: CheckpointState) => cp.key === 'base_install' && cp.status === 'done'
           )
           if (hasBaseInstall) {
-            setWizardStep({ step: 'setup' })
-            pendingSetupStart.current = true
+            if (installConfigRef.current.tier === 'full') {
+              setWizardStep({ step: 'enriching' })
+              pendingEnrichStart.current = true
+            } else {
+              setWizardStep({ step: 'complete', summary: { agents: 0, personas: 0, commands: 0 } })
+            }
           }
         }
 
-        // If setup finished and all artifacts exist, complete
+        // Enrich finished
         const finalDone = data.checkpoints?.find(
           (cp: CheckpointState) => cp.key === 'final_verification'
         )
         if (finalDone?.status === 'done' && !data.isSettingUp) {
-          // Fetch summary
-          const summaryRes = await fetch(`/api/projects/${project.id}/setup/checkpoints`)
-          if (summaryRes.ok) {
-            // Just mark complete — the summary will be recalculated
-            setCheckpoints((prev) => prev.map((cp) => ({ ...cp, status: 'done' as const })))
-            setWizardStep({ step: 'complete', summary: { agents: 0, personas: 0, commands: 0 } })
-          }
+          setCheckpoints((prev) => prev.map((cp) => ({ ...cp, status: 'done' as const })))
+          setWizardStep({ step: 'complete', summary: { agents: 0, personas: 0, commands: 0 } })
         }
       } catch {
         // non-fatal
@@ -400,7 +609,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
 
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
 
-  // ─── WebSocket message handler ──────────────────────────────────────────────
+  // ─── WebSocket handler ──────────────────────────────────────────────────────
 
   const handleWsMessage = useCallback((raw: unknown) => {
     const msg = raw as Record<string, unknown>
@@ -409,15 +618,18 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
 
     switch (msg.type) {
       case 'setup_log': {
-        const line = msg.line as string
-        setLogLines((prev) => [...prev, line])
+        setLogLines((prev) => [...prev, msg.line as string])
         break
       }
 
       case 'setup_install_done': {
-        // Base install done — signal to auto-start setup phase
-        pendingSetupStart.current = true
-        setWizardStep({ step: 'setup' })
+        if (installConfigRef.current.tier === 'full') {
+          pendingEnrichStart.current = true
+          setWizardStep({ step: 'enriching' })
+        } else {
+          // Quick install done → complete
+          setWizardStep({ step: 'complete', summary: { agents: 0, personas: 0, commands: 0 } })
+        }
         break
       }
 
@@ -447,15 +659,10 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
       }
 
       case 'setup_turn_done': {
-        // Claude finished one turn but setup isn't complete yet.
-        // Save session ID and flush streaming text — wait for user input.
         const turnSid = msg.sessionId as string | undefined
         if (turnSid) setSessionId(turnSid)
-
         setStreamingText((prev) => {
-          if (prev) {
-            setChatMessages((msgs) => [...msgs, { role: 'assistant', text: prev }])
-          }
+          if (prev) setChatMessages((msgs) => [...msgs, { role: 'assistant', text: prev }])
           return ''
         })
         setIsStreaming(false)
@@ -465,37 +672,27 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
       case 'setup_complete': {
         const sid = msg.sessionId as string | undefined
         if (sid) setSessionId(sid)
-
-        // Flush any streaming text into messages
         setStreamingText((prev) => {
-          if (prev) {
-            setChatMessages((msgs) => [...msgs, { role: 'assistant', text: prev }])
-          }
+          if (prev) setChatMessages((msgs) => [...msgs, { role: 'assistant', text: prev }])
           return ''
         })
         setIsStreaming(false)
-
-        // Mark all checkpoints done
         setCheckpoints((prev) => prev.map((cp) => ({ ...cp, status: 'done' as const })))
-
-        const summary = msg.summary as SetupSummary
-        setWizardStep({ step: 'complete', summary })
+        setWizardStep({ step: 'complete', summary: msg.summary as SetupSummary })
         break
       }
 
       case 'setup_error': {
         const error = msg.error as string
-        // Flush streaming text
         setStreamingText((prev) => {
-          if (prev) {
-            setChatMessages((msgs) => [...msgs, { role: 'assistant', text: prev }])
-          }
+          if (prev) setChatMessages((msgs) => [...msgs, { role: 'assistant', text: prev }])
           return ''
         })
         setIsStreaming(false)
-
-        const currentStep = wizardStep.step === 'installing' ? 'installing' : 'setup'
-        setWizardStep({ step: 'error', message: error, retryStep: currentStep })
+        const step = wizardStep.step
+        const retryStep: 'installing' | 'enriching' =
+          step === 'installing' ? 'installing' : 'enriching'
+        setWizardStep({ step: 'error', message: error, retryStep })
         break
       }
     }
@@ -506,26 +703,69 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
     return () => unregisterHandler(`setup-${project.id}`)
   }, [handleWsMessage, registerHandler, unregisterHandler, project.id])
 
-  // When streaming text completes (setup_complete or gap between turns), commit to messages
-  // We detect turn end via setup_complete. Between user sends, streaming builds up.
+  // Safety streaming timeout
+  useEffect(() => {
+    if (!isStreaming) {
+      if (streamingTimeoutRef.current) {
+        clearTimeout(streamingTimeoutRef.current)
+        streamingTimeoutRef.current = null
+      }
+      return
+    }
+    if (streamingTimeoutRef.current) clearTimeout(streamingTimeoutRef.current)
+    streamingTimeoutRef.current = setTimeout(() => { setIsStreaming(false) }, 30_000)
+    return () => { if (streamingTimeoutRef.current) clearTimeout(streamingTimeoutRef.current) }
+  }, [isStreaming, streamingText])
+
+  useEffect(() => {
+    if (!isStreaming && streamingText) {
+      setChatMessages((prev) => [...prev, { role: 'assistant', text: streamingText }])
+      setStreamingText('')
+    }
+  }, [isStreaming, streamingText])
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 
-  function startInstall() {
-    setWizardStep({ step: 'installing' })
+  async function handleInstall() {
+    const cfg = installConfigRef.current
+
+    // Reset checkpoints based on tier
+    setCheckpoints(cfg.tier === 'quick' ? QUICK_CHECKPOINTS : FULL_CHECKPOINTS)
     setLogLines([])
+    setWizardStep({ step: 'installing', tier: cfg.tier })
+
+    // Write install config to server, then start install
+    try {
+      await fetch(`/api/projects/${project.id}/setup/install-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tier: cfg.tier,
+          agents: {
+            selected: cfg.selectedAgents,
+            excluded: ALL_AGENTS.map((a) => a.id).filter((id) => !cfg.selectedAgents.includes(id)),
+          },
+          models: {
+            preset: cfg.modelPreset,
+            overrides: cfg.modelOverrides,
+          },
+        }),
+      })
+    } catch (err) {
+      console.error('[SetupWizard] install-config write error:', err)
+    }
+
     fetch(`/api/projects/${project.id}/setup/install`, { method: 'POST' }).catch((err) => {
       console.error('[SetupWizard] install start error:', err)
     })
   }
 
-  function startSetup() {
-    setCheckpoints(INITIAL_CHECKPOINTS)
+  function startEnrich() {
     setChatMessages([])
     setStreamingText('')
     setIsStreaming(false)
     fetch(`/api/projects/${project.id}/setup/start`, { method: 'POST' }).catch((err) => {
-      console.error('[SetupWizard] setup start error:', err)
+      console.error('[SetupWizard] enrich start error:', err)
     })
   }
 
@@ -546,52 +786,26 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
   function handleRetry() {
     if (wizardStep.step !== 'error') return
     const retryStep = wizardStep.retryStep
-    setWizardStep({ step: retryStep === 'installing' ? 'installing' : 'setup' })
     if (retryStep === 'installing') {
-      startInstall()
+      handleInstall()
     } else {
-      startSetup()
+      setWizardStep({ step: 'enriching' })
+      startEnrich()
     }
   }
 
-  // Auto-start setup phase when install completes
+  // Auto-start enrich phase when install completes (full tier)
   useEffect(() => {
-    if (wizardStep.step === 'setup' && pendingSetupStart.current) {
-      pendingSetupStart.current = false
-      startSetup()
+    if (wizardStep.step === 'enriching' && pendingEnrichStart.current) {
+      pendingEnrichStart.current = false
+      startEnrich()
     }
-  // startSetup is a stable function defined below; eslint-disable-next-line is intentional
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wizardStep.step])
 
-  // Safety timeout: if streaming for 30s with no new chunks, reset isStreaming
-  // so the chat input becomes usable again (guards against WS drops / stalled streams)
-  useEffect(() => {
-    if (!isStreaming) {
-      if (streamingTimeoutRef.current) {
-        clearTimeout(streamingTimeoutRef.current)
-        streamingTimeoutRef.current = null
-      }
-      return
-    }
-    // Reset the timer whenever streaming text changes
-    if (streamingTimeoutRef.current) clearTimeout(streamingTimeoutRef.current)
-    streamingTimeoutRef.current = setTimeout(() => {
-      setIsStreaming(false)
-    }, 30_000)
-    return () => {
-      if (streamingTimeoutRef.current) clearTimeout(streamingTimeoutRef.current)
-    }
-  }, [isStreaming, streamingText])
-
-  // Commit streaming text to messages when streaming ends mid-turn.
-  // setup_complete handles the final flush directly; this handles unexpected stream end.
-  useEffect(() => {
-    if (!isStreaming && streamingText) {
-      setChatMessages((prev) => [...prev, { role: 'assistant', text: streamingText }])
-      setStreamingText('')
-    }
-  }, [isStreaming, streamingText])
+  // Determine current tier for step indicator (use config tier, fallback to 'full')
+  const currentTier: InstallTier =
+    wizardStep.step === 'installing' ? wizardStep.tier : installConfig.tier
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -599,105 +813,41 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
     <div className="flex flex-col h-full overflow-hidden bg-background">
       {/* Wizard step indicator */}
       <div className="flex-shrink-0 border-b border-border/30 px-4 py-2">
-        <div className="flex items-center gap-2">
-          {[
-            { id: 'proposal', label: 'Proposal' },
-            { id: 'installing', label: 'Install' },
-            { id: 'setup', label: 'Configure' },
-            { id: 'complete', label: 'Complete' },
-          ].map((s, i, arr) => {
-            const stepOrder = ['proposal', 'installing', 'setup', 'complete']
-            const currentIndex = stepOrder.indexOf(wizardStep.step === 'error'
-              ? wizardStep.retryStep
-              : wizardStep.step
-            )
-            const thisIndex = stepOrder.indexOf(s.id)
-            const isDone = thisIndex < currentIndex
-            const isCurrent = thisIndex === currentIndex
-
-            return (
-              <div key={s.id} className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className={cn(
-                      'w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold',
-                      isDone && 'bg-dracula-green text-background',
-                      isCurrent && 'bg-dracula-purple text-background',
-                      !isDone && !isCurrent && 'bg-muted/50 text-muted-foreground'
-                    )}
-                  >
-                    {isDone ? <Check className="w-2.5 h-2.5" /> : i + 1}
-                  </div>
-                  <span
-                    className={cn(
-                      'text-[10px] font-medium',
-                      isCurrent && 'text-foreground',
-                      !isCurrent && 'text-muted-foreground'
-                    )}
-                  >
-                    {s.label}
-                  </span>
-                </div>
-                {i < arr.length - 1 && (
-                  <div className={cn('w-6 h-px', isDone ? 'bg-dracula-green/50' : 'bg-border/50')} />
-                )}
-              </div>
-            )
-          })}
-        </div>
+        <StepIndicator wizardStep={wizardStep} tier={currentTier} />
       </div>
 
       {/* Step content */}
       <div className="flex-1 overflow-hidden">
-        {wizardStep.step === 'proposal' && (
-          <ProposalStep
-            project={project}
-            onInstall={startInstall}
+        {wizardStep.step === 'agent-selection' && (
+          <AgentSelectionStep
+            config={installConfig}
+            onChange={setInstallConfig}
+            onInstall={handleInstall}
             onSkip={onSkip}
+            provider={(project as { provider?: 'claude' | 'codex' }).provider ?? 'claude'}
           />
         )}
 
         {wizardStep.step === 'installing' && (
           <InstallingStep
             logLines={logLines}
-            onBack={() => setWizardStep({ step: 'proposal' })}
+            tier={wizardStep.tier}
+            onBack={() => setWizardStep({ step: 'agent-selection' })}
           />
         )}
 
-        {wizardStep.step === 'setup' && (
-          <div className="flex flex-col h-full">
-            {/* Back navigation */}
-            <div className="flex-shrink-0 px-3 py-1.5 border-b border-border/20">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 text-xs"
-                onClick={() => setWizardStep({ step: 'installing' })}
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                Back
-              </Button>
-            </div>
-            {/* Left: checkpoint tracker + Right: setup chat */}
-            <div className="flex flex-1 overflow-hidden">
-              <div className="w-72 flex-shrink-0 border-r border-border/30 overflow-hidden">
-                <CheckpointTracker
-                  checkpoints={checkpoints}
-                  logLines={logLines}
-                />
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <SetupChat
-                  projectId={project.id}
-                  messages={chatMessages}
-                  isStreaming={isStreaming}
-                  streamingText={streamingText}
-                  sessionId={sessionId}
-                  onSendMessage={handleSendMessage}
-                />
-              </div>
-            </div>
-          </div>
+        {wizardStep.step === 'enriching' && (
+          <EnrichStep
+            checkpoints={checkpoints}
+            logLines={logLines}
+            chatMessages={chatMessages}
+            isStreaming={isStreaming}
+            streamingText={streamingText}
+            sessionId={sessionId}
+            projectId={project.id}
+            onBack={() => setWizardStep({ step: 'installing', tier: installConfig.tier })}
+            onSendMessage={handleSendMessage}
+          />
         )}
 
         {wizardStep.step === 'complete' && (

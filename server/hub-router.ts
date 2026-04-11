@@ -63,9 +63,13 @@ export function createHubRouter(
     res.json({ projects, setupProjectIds })
   })
 
-  // GET /api/hub/available-providers — which AI CLIs are installed
+  // GET /api/hub/available-providers — which AI CLIs are installed, plus supported install tiers
   router.get('/available-providers', (_req, res) => {
-    res.json(detectAvailableCLIs())
+    const providers = detectAvailableCLIs()
+    // tiers: quick install is always available (Hub-driven config); full requires an AI CLI
+    const tiers: ('quick' | 'full')[] = ['quick']
+    if (providers.claude || providers.codex) tiers.push('full')
+    res.json({ ...providers, tiers })
   })
 
   // POST /api/hub/projects — register a new project by path
