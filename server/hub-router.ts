@@ -33,8 +33,17 @@ function deriveProjectName(projectPath: string): string {
   return path.basename(projectPath)
 }
 
+function hasCommandFiles(dir: string): boolean {
+  try {
+    return fs.readdirSync(dir).some((f) => f.endsWith('.md'))
+  } catch {
+    return false
+  }
+}
+
 function hasSpecrails(projectPath: string): boolean {
-  return fs.existsSync(path.join(projectPath, '.claude', 'commands', 'sr'))
+  return hasCommandFiles(path.join(projectPath, '.claude', 'commands', 'sr'))
+    || hasCommandFiles(path.join(projectPath, '.claude', 'commands', 'specrails'))
 }
 
 export function createHubRouter(
