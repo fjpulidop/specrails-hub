@@ -941,4 +941,197 @@ describe('SetupManager', () => {
       expect(chatMsgs[0].role).toBe('assistant')
     })
   })
+
+  // ─── getSummary / computeSummary ────────────────────────────────────────────
+  // Regression tests for: "Hub shows 0 Agents, 0 Personas, 0 Specs after install"
+  // Root cause: three places in SetupWizard.tsx hardcoded { agents:0, personas:0, commands:0 }
+  // Fix: computeSummary() now called in setup_install_done broadcasts; getSummary() is public.
+
+  describe('getSummary', () => {
+    it('returns zeros when no .claude/ directory exists', () => {
+      vi.mocked(existsSync).mockReturnValue(false)
+      vi.mocked(readdirSync).mockReturnValue([])
+
+      const result = sm.getSummary('/path/to/project')
+      expect(result).toEqual({ agents: 0, personas: 0, commands: 0 })
+    })
+
+    it('counts sr-*.md files as agents', () => {
+      vi.mocked(existsSync).mockImplementation((p: any) =>
+        String(p).includes('.claude/agents')
+      )
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        if (String(p).endsWith('.claude/agents')) {
+          return ['sr-architect.md', 'sr-developer.md', 'sr-reviewer.md', 'not-an-agent.md'] as any
+        }
+        return []
+      })
+
+      const result = sm.getSummary('/path/to/project')
+      expect(result.agents).toBe(3)
+      expect(result.personas).toBe(0)
+      expect(result.commands).toBe(0)
+    })
+
+    it('counts .md files in agents/personas/ as personas', () => {
+      vi.mocked(existsSync).mockImplementation((p: any) => {
+        const s = String(p)
+        return s.includes('.claude/agents')
+      })
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        const s = String(p)
+        if (s.endsWith('.claude/agents')) return ['sr-architect.md'] as any
+        if (s.includes('agents/personas')) return ['the-builder.md', 'the-maintainer.md'] as any
+        return []
+      })
+
+      const result = sm.getSummary('/path/to/project')
+      expect(result.personas).toBe(2)
+    })
+
+    it('counts .md files in commands/sr/ as commands', () => {
+      vi.mocked(existsSync).mockImplementation((p: any) => {
+        const s = String(p)
+        return s.includes('commands/sr')
+      })
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        if (String(p).includes('commands/sr')) {
+          return ['implement.md', 'batch-implement.md', 'get-backlog-specs.md'] as any
+        }
+        return []
+      })
+
+      const result = sm.getSummary('/path/to/project')
+      expect(result.commands).toBe(3)
+    })
+
+    it('does not count non-.md files in commands/sr/', () => {
+      vi.mocked(existsSync).mockImplementation((p: any) =>
+        String(p).includes('commands/sr')
+      )
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        if (String(p).includes('commands/sr')) {
+          return ['implement.md', 'README.txt', '.DS_Store'] as any
+        }
+        return []
+      })
+
+      const result = sm.getSummary('/path/to/project')
+      expect(result.commands).toBe(1)
+    })
+
+    it('returns zeros and does not throw when readdirSync throws', () => {
+      vi.mocked(existsSync).mockReturnValue(true)
+      vi.mocked(readdirSync).mockImplementation(() => {
+        throw new Error('EACCES: permission denied')
+      })
+
+      expect(() => sm.getSummary('/path/to/project')).not.toThrow()
+      const result = sm.getSummary('/path/to/project')
+      expect(result).toEqual({ agents: 0, personas: 0, commands: 0 })
+    })
+
+    it('counts all three categories together', () => {
+      vi.mocked(existsSync).mockReturnValue(true)
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        const s = String(p)
+        if (s.endsWith('.claude/agents')) return ['sr-architect.md', 'sr-developer.md'] as any
+        if (s.includes('agents/personas')) return ['the-builder.md'] as any
+        if (s.includes('commands/sr')) return ['implement.md', 'batch-implement.md'] as any
+        return []
+      })
+
+      const result = sm.getSummary('/path/to/project')
+      expect(result).toEqual({ agents: 2, personas: 1, commands: 2 })
+    })
+  })
+
+  // ─── setup_install_done includes summary ────────────────────────────────────
+
+  describe('setup_install_done includes summary (regression: was hardcoded zeros)', () => {
+    it('startInstall broadcasts setup_install_done with summary field', async () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      // Simulate 3 agents installed
+      vi.mocked(existsSync).mockImplementation((p: any) =>
+        String(p).includes('.claude/agents')
+      )
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        if (String(p).endsWith('.claude/agents'))
+          return ['sr-architect.md', 'sr-developer.md', 'sr-reviewer.md'] as any
+        return []
+      })
+
+      sm.startInstall('p1', '/path/to/project')
+      await finishProcess(child, 0)
+
+      const done = getBroadcastedByType(broadcast, 'setup_install_done')
+      expect(done).toHaveLength(1)
+      expect(done[0]).toHaveProperty('summary')
+      expect(done[0].summary).toMatchObject({
+        agents: expect.any(Number),
+        personas: expect.any(Number),
+        commands: expect.any(Number),
+      })
+      // Crucially: agents should be non-zero (not the old hardcoded 0)
+      expect(done[0].summary.agents).toBe(3)
+    })
+
+    it('startEnrich broadcasts setup_complete with summary field (enrich done)', async () => {
+      // startEnrich emits 'setup_complete' (not 'setup_install_done') when Claude finishes.
+      // setup_complete is gated on hasAgents && hasCommands being true.
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockReturnValue(true)
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        const s = String(p)
+        if (s.endsWith('.claude/agents')) return ['sr-architect.md', 'sr-developer.md'] as any
+        if (s.includes('agents/personas')) return ['the-builder.md'] as any
+        if (s.includes('commands/sr')) return ['implement.md'] as any
+        return []
+      })
+
+      sm.startEnrich('p1', '/path/to/project')
+      await finishProcess(child, 0)
+
+      const complete = getBroadcastedByType(broadcast, 'setup_complete')
+      expect(complete).toHaveLength(1)
+      expect(complete[0]).toHaveProperty('summary')
+      expect(complete[0].summary).toMatchObject({ agents: 2, personas: 1, commands: 1 })
+    })
+
+    it('startQuickInstall broadcasts setup_install_done with summary field', async () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockImplementation((p: any) =>
+        String(p).includes('.claude/agents')
+      )
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        if (String(p).endsWith('.claude/agents'))
+          return ['sr-architect.md', 'sr-developer.md'] as any
+        return []
+      })
+
+      sm.startQuickInstall('p1', '/path/to/project', {})
+      await finishProcess(child, 0)
+
+      const done = getBroadcastedByType(broadcast, 'setup_install_done')
+      expect(done).toHaveLength(1)
+      expect(done[0]).toHaveProperty('summary')
+      expect(done[0].summary.agents).toBe(2)
+    })
+
+    it('summary falls back to zeros when agents dir does not exist', async () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockReturnValue(false)
+      vi.mocked(readdirSync).mockReturnValue([])
+
+      sm.startInstall('p1', '/path/to/project')
+      await finishProcess(child, 0)
+
+      const done = getBroadcastedByType(broadcast, 'setup_install_done')
+      expect(done[0].summary).toEqual({ agents: 0, personas: 0, commands: 0 })
+    })
+  })
 })
