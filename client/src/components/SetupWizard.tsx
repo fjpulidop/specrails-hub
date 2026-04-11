@@ -551,6 +551,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
           isSettingUp: boolean
           savedSessionId: string | null
           logLines?: string[]
+          summary?: SetupSummary
         }
 
         if (data.savedSessionId && !sessionIdRef.current) {
@@ -586,7 +587,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
               setWizardStep({ step: 'enriching' })
               pendingEnrichStart.current = true
             } else {
-              setWizardStep({ step: 'complete', summary: { agents: 0, personas: 0, commands: 0 } })
+              setWizardStep({ step: 'complete', summary: data.summary ?? { agents: 0, personas: 0, commands: 0 } })
             }
           }
         }
@@ -597,7 +598,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
         )
         if (finalDone?.status === 'done' && !data.isSettingUp) {
           setCheckpoints((prev) => prev.map((cp) => ({ ...cp, status: 'done' as const })))
-          setWizardStep({ step: 'complete', summary: { agents: 0, personas: 0, commands: 0 } })
+          setWizardStep({ step: 'complete', summary: data.summary ?? { agents: 0, personas: 0, commands: 0 } })
         }
       } catch {
         // non-fatal
@@ -628,7 +629,8 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
           setWizardStep({ step: 'enriching' })
         } else {
           // Quick install done → complete
-          setWizardStep({ step: 'complete', summary: { agents: 0, personas: 0, commands: 0 } })
+          const summary = (msg.summary as SetupSummary | undefined) ?? { agents: 0, personas: 0, commands: 0 }
+          setWizardStep({ step: 'complete', summary })
         }
         break
       }

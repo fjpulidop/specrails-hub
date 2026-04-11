@@ -332,10 +332,12 @@ export class SetupManager {
         this._completeCheckpoint(projectId, 'base_install')
         this._advanceCheckpoint(projectId, 'quick_complete')
         this._completeCheckpoint(projectId, 'quick_complete')
+        const summary = computeSummary(projectPath)
         this._broadcast({
           type: 'setup_install_done',
           projectId,
           timestamp: new Date().toISOString(),
+          summary,
         })
         validateCoreContract().catch(() => { /* non-fatal */ })
       } else {
@@ -391,10 +393,12 @@ export class SetupManager {
     child.on('close', (code) => {
       this._installProcesses.delete(projectId)
       if (code === 0) {
+        const summary = computeSummary(projectPath)
         this._broadcast({
           type: 'setup_install_done',
           projectId,
           timestamp: new Date().toISOString(),
+          summary,
         })
         // Validate that hub constants are in sync with the installed core contract
         validateCoreContract().catch(() => { /* non-fatal */ })
@@ -861,5 +865,9 @@ export class SetupManager {
 
   getInstallTier(projectId: string): InstallTier | undefined {
     return this._projectTiers.get(projectId)
+  }
+
+  getSummary(projectPath: string): SetupSummary {
+    return computeSummary(projectPath)
   }
 }

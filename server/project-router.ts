@@ -742,6 +742,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       tier: setupManager.getInstallTier(project.id) ?? null,
       savedSessionId: savedSessionId ?? null,
       logLines: setupManager.getInstallLog(project.id),
+      summary: setupManager.getSummary(project.path),
     })
   })
 
