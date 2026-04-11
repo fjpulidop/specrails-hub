@@ -13,6 +13,35 @@ import { findCoreContract, detectCLISync, CLIProvider } from './core-compat'
  */
 const SPECRAILS_DIR = '.claude'
 
+// ─── YAML helpers ─────────────────────────────────────────────────────────────
+
+function valueToYaml(value: unknown, indent: number): string {
+  const pad = '  '.repeat(indent)
+  if (value === null || value === undefined) return 'null'
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value)
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '[]'
+    return '\n' + value.map((item) => `${pad}- ${valueToYaml(item, indent + 1)}`).join('\n')
+  }
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+    if (entries.length === 0) return '{}'
+    return '\n' + entries.map(([k, v]) => {
+      const rendered = valueToYaml(v, indent + 1)
+      return rendered.startsWith('\n') ? `${pad}${k}:${rendered}` : `${pad}${k}: ${rendered}`
+    }).join('\n')
+  }
+  return String(value)
+}
+
+function serializeInstallConfigYaml(config: Record<string, unknown>): string {
+  return Object.entries(config).map(([k, v]) => {
+    const rendered = valueToYaml(v, 1)
+    return rendered.startsWith('\n') ? `${k}:${rendered}` : `${k}: ${rendered}`
+  }).join('\n')
+}
+
 // ─── Checkpoint definitions ───────────────────────────────────────────────────
 
 export interface CheckpointDefinition {
@@ -62,8 +91,10 @@ function checkFilesystem(projectPath: string): Partial<Record<string, boolean>> 
     hasFiles(join(projectPath, dir, 'agents', 'personas'), /\.md$/)
   const hasAgents = existsSync(join(projectPath, dir, 'agents')) &&
     hasFiles(join(projectPath, dir, 'agents'), /^sr-.*\.md$/)
-  const hasCommands = existsSync(join(projectPath, dir, 'commands', 'sr')) &&
-    hasFiles(join(projectPath, dir, 'commands', 'sr'), /\.md$/)
+  const hasCommands = (
+    (existsSync(join(projectPath, dir, 'commands', 'sr')) && hasFiles(join(projectPath, dir, 'commands', 'sr'), /\.md$/)) ||
+    (existsSync(join(projectPath, dir, 'commands', 'specrails')) && hasFiles(join(projectPath, dir, 'commands', 'specrails'), /\.md$/))
+  )
   const hasCLAUDE = existsSync(join(projectPath, 'CLAUDE.md'))
 
   return {
@@ -110,7 +141,7 @@ function detectCheckpointFromText(
   if (/generating\s*all\s*files|writing.*agent|sr-architect|sr-developer|sr-reviewer/i.test(text)) {
     hits.push({ key: 'agent_generation', detail: 'Generating agents...' })
   }
-  if (/command\s*selection|installing.*commands|\.claude\/commands\/sr/i.test(text)) {
+  if (/command\s*selection|installing.*commands|\.claude\/commands\/(sr|specrails)/i.test(text)) {
     hits.push({ key: 'command_config', detail: 'Configuring commands...' })
   }
 
@@ -130,7 +161,7 @@ function detectCheckpointFromText(
   if (/\/agents\/sr-[^/]+\.md/.test(text)) {
     hits.push({ key: 'agent_generation', detail: 'Writing agents...' })
   }
-  if (text.includes('/commands/sr/') && text.includes('.md')) {
+  if ((text.includes('/commands/sr/') || text.includes('/commands/specrails/')) && text.includes('.md')) {
     hits.push({ key: 'command_config', detail: 'Writing commands...' })
   }
   if (text.includes('/rules/') && text.includes('.md')) {
@@ -167,9 +198,13 @@ function computeSummary(projectPath: string): SetupSummary {
         personas = (readdirSync(personasDir) as string[]).filter((f) => f.endsWith('.md')).length
       }
     }
-    const commandsDir = join(projectPath, dir, 'commands', 'sr')
-    if (existsSync(commandsDir)) {
-      commands = (readdirSync(commandsDir) as string[]).filter((f) => f.endsWith('.md')).length
+    const commandsDirSr = join(projectPath, dir, 'commands', 'sr')
+    const commandsDirSpecrails = join(projectPath, dir, 'commands', 'specrails')
+    if (existsSync(commandsDirSr)) {
+      commands += (readdirSync(commandsDirSr) as string[]).filter((f) => f.endsWith('.md')).length
+    }
+    if (existsSync(commandsDirSpecrails)) {
+      commands += (readdirSync(commandsDirSpecrails) as string[]).filter((f) => f.endsWith('.md')).length
     }
   } catch {
     // non-fatal
@@ -271,11 +306,7 @@ export class SetupManager {
 
     try {
       mkdirSync(configDir, { recursive: true })
-      // Serialize config to minimal YAML (key: value pairs, no dependencies needed)
-      const yaml = Object.entries(installConfig)
-        .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
-        .join('\n')
-      writeFileSync(configPath, yaml, 'utf-8')
+      writeFileSync(configPath, serializeInstallConfigYaml(installConfig), 'utf-8')
     } catch (err) {
       console.warn(`[SetupManager] Failed to write install-config.yaml: ${err}`)
       this._broadcast({
@@ -433,6 +464,7 @@ export class SetupManager {
     try {
       mkdirSync(join(projectPath, SPECRAILS_DIR, 'agents', 'personas'), { recursive: true })
       mkdirSync(join(projectPath, SPECRAILS_DIR, 'commands', 'sr'), { recursive: true })
+      mkdirSync(join(projectPath, SPECRAILS_DIR, 'commands', 'specrails'), { recursive: true })
       mkdirSync(join(projectPath, SPECRAILS_DIR, 'rules'), { recursive: true })
     } catch (err) {
       console.warn(`[SetupManager] Failed to pre-create enrich directories: ${err}`)
@@ -472,6 +504,7 @@ export class SetupManager {
       // includes the original enrich instructions so the new exec run can
       // pick up where the previous one left off.
       const enrichMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'sr', 'enrich.md')
+      const enrichMdPathSpecrails = join(projectPath, SPECRAILS_DIR, 'commands', 'specrails', 'enrich.md')
       // Fallback to legacy setup.md if enrich.md not yet installed
       const legacyMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'setup.md')
       let enrichContent = ''
@@ -479,8 +512,12 @@ export class SetupManager {
         enrichContent = readFileSync(enrichMdPath, 'utf-8')
       } catch {
         try {
-          enrichContent = readFileSync(legacyMdPath, 'utf-8')
-        } catch { /* will fall back to just the user message */ }
+          enrichContent = readFileSync(enrichMdPathSpecrails, 'utf-8')
+        } catch {
+          try {
+            enrichContent = readFileSync(legacyMdPath, 'utf-8')
+          } catch { /* will fall back to just the user message */ }
+        }
       }
 
       const prompt = enrichContent
@@ -542,16 +579,21 @@ export class SetupManager {
       let prompt = promptIdx >= 0 ? args[promptIdx + 1] : '/specrails:enrich'
 
       if (prompt === '/specrails:enrich' || prompt === '/specrails:enrich --from-config') {
-        const enrichMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'sr', 'enrich.md')
+        const enrichMdPathSr = join(projectPath, SPECRAILS_DIR, 'commands', 'sr', 'enrich.md')
+        const enrichMdPathSpecrails = join(projectPath, SPECRAILS_DIR, 'commands', 'specrails', 'enrich.md')
         // Fallback to legacy setup.md if enrich.md not yet installed
         const legacyMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'setup.md')
         try {
-          prompt = readFileSync(enrichMdPath, 'utf-8')
+          prompt = readFileSync(enrichMdPathSr, 'utf-8')
         } catch {
           try {
-            prompt = readFileSync(legacyMdPath, 'utf-8')
+            prompt = readFileSync(enrichMdPathSpecrails, 'utf-8')
           } catch {
-            console.warn(`[SetupManager] Could not read enrich.md or setup.md — falling back to literal prompt`)
+            try {
+              prompt = readFileSync(legacyMdPath, 'utf-8')
+            } catch {
+              console.warn(`[SetupManager] Could not read enrich.md or setup.md — falling back to literal prompt`)
+            }
           }
         }
       }
@@ -656,8 +698,10 @@ export class SetupManager {
         // Check if setup is truly complete — real artifacts must exist
         const hasAgents = existsSync(join(projectPath, SPECRAILS_DIR, 'agents')) &&
           hasFiles(join(projectPath, SPECRAILS_DIR, 'agents'), /^sr-.*\.md$/)
-        const hasCommands = existsSync(join(projectPath, SPECRAILS_DIR, 'commands', 'sr')) &&
-          hasFiles(join(projectPath, SPECRAILS_DIR, 'commands', 'sr'), /\.md$/)
+        const hasCommands = (
+          (existsSync(join(projectPath, SPECRAILS_DIR, 'commands', 'sr')) && hasFiles(join(projectPath, SPECRAILS_DIR, 'commands', 'sr'), /\.md$/)) ||
+          (existsSync(join(projectPath, SPECRAILS_DIR, 'commands', 'specrails')) && hasFiles(join(projectPath, SPECRAILS_DIR, 'commands', 'specrails'), /\.md$/))
+        )
         const isComplete = hasAgents && hasCommands
 
         if (isComplete) {

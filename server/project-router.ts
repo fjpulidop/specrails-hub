@@ -31,6 +31,35 @@ import {
 import type { TicketCreatedMessage, TicketUpdatedMessage, TicketDeletedMessage, LocalTicket } from './types'
 import { createRailsRouter } from './rails-router'
 
+// ─── YAML helpers ─────────────────────────────────────────────────────────────
+
+function valueToYaml(value: unknown, indent: number): string {
+  const pad = '  '.repeat(indent)
+  if (value === null || value === undefined) return `${pad}null`
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value)
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '[]'
+    return '\n' + value.map((item) => `${pad}- ${valueToYaml(item, indent + 1)}`).join('\n')
+  }
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+    if (entries.length === 0) return '{}'
+    return '\n' + entries.map(([k, v]) => {
+      const rendered = valueToYaml(v, indent + 1)
+      return rendered.startsWith('\n') ? `${pad}${k}:${rendered}` : `${pad}${k}: ${rendered}`
+    }).join('\n')
+  }
+  return String(value)
+}
+
+function serializeInstallConfigYaml(config: Record<string, unknown>): string {
+  return Object.entries(config).map(([k, v]) => {
+    const rendered = valueToYaml(v, 1)
+    return rendered.startsWith('\n') ? `${k}:${rendered}` : `${k}: ${rendered}`
+  }).join('\n')
+}
+
 // Extend Express Request to carry resolved ProjectContext
 declare module 'express-serve-static-core' {
   interface Request {
@@ -647,9 +676,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const configPath = path.join(configDir, 'install-config.yaml')
     try {
       fs.mkdirSync(configDir, { recursive: true })
-      const yaml = Object.entries(config)
-        .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
-        .join('\n')
+      const yaml = serializeInstallConfigYaml(config as Record<string, unknown>)
       fs.writeFileSync(configPath, yaml, 'utf-8')
       res.json({ ok: true, path: configPath })
     } catch (err) {

@@ -440,6 +440,7 @@ describe('SetupManager', () => {
       const mkdirCalls = vi.mocked(mkdirSync).mock.calls.map(([p]) => String(p))
       expect(mkdirCalls.some((p) => p.includes('.claude/agents/personas'))).toBe(true)
       expect(mkdirCalls.some((p) => p.includes('.claude/commands/sr'))).toBe(true)
+      expect(mkdirCalls.some((p) => p.includes('.claude/commands/specrails'))).toBe(true)
       expect(mkdirCalls.some((p) => p.includes('.claude/rules'))).toBe(true)
     })
 
@@ -1020,6 +1021,34 @@ describe('SetupManager', () => {
       expect(result.commands).toBe(1)
     })
 
+    it('counts .md files in commands/specrails/ as commands (new install path)', () => {
+      vi.mocked(existsSync).mockImplementation((p: any) =>
+        String(p).includes('commands/specrails')
+      )
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        if (String(p).includes('commands/specrails')) {
+          return ['implement.md', 'batch-implement.md', 'propose-spec.md'] as any
+        }
+        return []
+      })
+
+      const result = sm.getSummary('/path/to/project')
+      expect(result.commands).toBe(3)
+    })
+
+    it('counts commands from both commands/sr/ and commands/specrails/ together', () => {
+      vi.mocked(existsSync).mockReturnValue(true)
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        const s = String(p)
+        if (s.includes('commands/sr') && !s.includes('specrails')) return ['implement.md'] as any
+        if (s.includes('commands/specrails')) return ['propose-spec.md', 'why.md'] as any
+        return []
+      })
+
+      const result = sm.getSummary('/path/to/project')
+      expect(result.commands).toBe(3)
+    })
+
     it('returns zeros and does not throw when readdirSync throws', () => {
       vi.mocked(existsSync).mockReturnValue(true)
       vi.mocked(readdirSync).mockImplementation(() => {
@@ -1098,6 +1127,34 @@ describe('SetupManager', () => {
       expect(complete).toHaveLength(1)
       expect(complete[0]).toHaveProperty('summary')
       expect(complete[0].summary).toMatchObject({ agents: 2, personas: 1, commands: 1 })
+    })
+
+    it('startEnrich broadcasts setup_complete when commands are in commands/specrails/ (regression: wizard was stuck)', async () => {
+      // Regression test for SPEA-751: specrails-core installs commands in commands/specrails/
+      // but the completion check was only looking at commands/sr/ → setup_turn_done was sent
+      // instead of setup_complete → wizard stayed stuck on the enriching step.
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockImplementation((p: any) => {
+        const s = String(p)
+        return s.includes('.claude/agents') || s.includes('commands/specrails')
+      })
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        const s = String(p)
+        if (s.endsWith('.claude/agents')) return ['sr-architect.md', 'sr-developer.md'] as any
+        if (s.includes('commands/specrails')) return ['implement.md', 'propose-spec.md'] as any
+        return []
+      })
+
+      sm.startEnrich('p1', '/path/to/project')
+      await finishProcess(child, 0)
+
+      const complete = getBroadcastedByType(broadcast, 'setup_complete')
+      expect(complete).toHaveLength(1)
+      expect(complete[0].summary).toMatchObject({ agents: 2, personas: 0, commands: 2 })
+      // Should NOT have emitted setup_turn_done (which would leave wizard stuck)
+      const turnDone = getBroadcastedByType(broadcast, 'setup_turn_done')
+      expect(turnDone).toHaveLength(0)
     })
 
     it('startQuickInstall broadcasts setup_install_done with summary field', async () => {
