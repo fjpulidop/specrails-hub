@@ -41,22 +41,31 @@ function makeQueueManager(overrides: Partial<{
 function makeSetupManager(overrides: Partial<{
   isInstalling: (id: string) => boolean
   isSettingUp: (id: string) => boolean
+  isEnriching: (id: string) => boolean
   startInstall: () => void
   startSetup: () => void
+  startEnrich: () => void
   resumeSetup: () => void
+  resumeEnrich: () => void
   abort: () => void
   getCheckpointStatus: () => any[]
   getInstallLog: () => string[]
+  getInstallTier: () => string | undefined
 }> = {}) {
+  const isEnriching = overrides.isEnriching ?? overrides.isSettingUp ?? vi.fn(() => false)
   return {
     isInstalling: overrides.isInstalling ?? vi.fn(() => false),
-    isSettingUp: overrides.isSettingUp ?? vi.fn(() => false),
+    isEnriching,
+    isSettingUp: overrides.isSettingUp ?? isEnriching,
     startInstall: overrides.startInstall ?? vi.fn(),
-    startSetup: overrides.startSetup ?? vi.fn(),
-    resumeSetup: overrides.resumeSetup ?? vi.fn(),
+    startEnrich: overrides.startEnrich ?? overrides.startSetup ?? vi.fn(),
+    startSetup: overrides.startSetup ?? overrides.startEnrich ?? vi.fn(),
+    resumeEnrich: overrides.resumeEnrich ?? overrides.resumeSetup ?? vi.fn(),
+    resumeSetup: overrides.resumeSetup ?? overrides.resumeEnrich ?? vi.fn(),
     abort: overrides.abort ?? vi.fn(),
     getCheckpointStatus: overrides.getCheckpointStatus ?? vi.fn(() => []),
     getInstallLog: overrides.getInstallLog ?? vi.fn(() => []),
+    getInstallTier: overrides.getInstallTier ?? vi.fn(() => undefined),
   }
 }
 

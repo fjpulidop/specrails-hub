@@ -235,10 +235,49 @@ describe('SetupManager', () => {
     })
   })
 
-  // ─── startSetup ────────────────────────────────────────────────────────────
+  // ─── startEnrich ───────────────────────────────────────────────────────────
 
-  describe('startSetup', () => {
-    it('spawns claude with correct args', () => {
+  describe('startEnrich', () => {
+    it('spawns claude with /specrails:enrich args', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startEnrich('p1', '/path/to/project')
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'claude',
+        expect.arrayContaining(['-p', '/specrails:enrich', '--dangerously-skip-permissions']),
+        expect.objectContaining({ cwd: '/path/to/project' })
+      )
+    })
+
+    it('uses /specrails:enrich --from-config when install-config.yaml exists', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockImplementation((p: any) =>
+        String(p).includes('.specrails/install-config.yaml')
+      )
+
+      sm.startEnrich('p1', '/path/to/project')
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'claude',
+        expect.arrayContaining(['-p', '/specrails:enrich --from-config']),
+        expect.objectContaining({ cwd: '/path/to/project' })
+      )
+    })
+
+    it('does not start enrich twice', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startEnrich('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
+
+      expect(mockSpawn).toHaveBeenCalledTimes(1)
+    })
+
+    it('deprecated startSetup alias delegates to startEnrich', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
@@ -246,28 +285,17 @@ describe('SetupManager', () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'claude',
-        expect.arrayContaining(['-p', '/setup', '--dangerously-skip-permissions']),
-        expect.objectContaining({ cwd: '/path/to/project' })
+        expect.arrayContaining(['-p', '/specrails:enrich', '--dangerously-skip-permissions']),
+        expect.any(Object)
       )
     })
 
-    it('does not start setup twice', () => {
+    it('broadcasts setup_turn_done when claude exits 0 but artifacts incomplete', async () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
-
-      sm.startSetup('p1', '/path/to/project')
-      sm.startSetup('p1', '/path/to/project')
-
-      expect(mockSpawn).toHaveBeenCalledTimes(1)
-    })
-
-    it('broadcasts setup_turn_done when claude exits 0 but setup incomplete', async () => {
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
-      // No agents/commands exist → setup not complete
       vi.mocked(existsSync).mockReturnValue(false)
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
       pushLine(child, JSON.stringify({ type: 'result', session_id: 'sess-123' }))
       await finishProcess(child, 0)
 
@@ -280,7 +308,6 @@ describe('SetupManager', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      // Mock: agents and commands exist
       vi.mocked(existsSync).mockImplementation((p: any) => {
         const s = String(p)
         return s.includes('.claude/agents') || s.includes('.claude/commands/sr')
@@ -292,7 +319,7 @@ describe('SetupManager', () => {
         return [] as any
       })
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
       pushLine(child, JSON.stringify({ type: 'result', session_id: 'sess-456' }))
       await finishProcess(child, 0)
 
@@ -305,7 +332,6 @@ describe('SetupManager', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      // Mock: agents and commands exist under .claude/ (specrails always uses .claude)
       vi.mocked(existsSync).mockImplementation((p: any) => {
         const s = String(p)
         return s.includes('.claude/agents') || s.includes('.claude/commands/sr')
@@ -317,9 +343,8 @@ describe('SetupManager', () => {
         return [] as any
       })
 
-      sm.startSetup('p1', '/path/to/project', 'codex')
-      // Codex outputs plain text, not JSON — push a plain text line
-      pushLine(child, 'Setup complete')
+      sm.startEnrich('p1', '/path/to/project', 'codex')
+      pushLine(child, 'Enrich complete')
       await finishProcess(child, 0)
 
       const complete = getBroadcastedByType(broadcast, 'setup_complete')
@@ -331,28 +356,47 @@ describe('SetupManager', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
       await finishProcess(child, 1)
 
       const errors = getBroadcastedByType(broadcast, 'setup_error')
       expect(errors).toHaveLength(1)
     })
 
-    it('spawns codex with setup.md content when codex is the detected CLI', () => {
+    it('spawns codex with enrich.md content when codex is the detected CLI', () => {
       vi.mocked(detectCLISync).mockReturnValue('codex')
-      vi.mocked(readFileSync).mockReturnValue('# Full setup instructions')
+      vi.mocked(readFileSync).mockReturnValue('# Full enrich instructions')
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
 
       expect(readFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('.claude/commands/setup.md'),
+        expect.stringContaining('.claude/commands/sr/enrich.md'),
         'utf-8'
       )
       expect(mockSpawn).toHaveBeenCalledWith(
         'codex',
-        ['exec', '--full-auto', '# Full setup instructions'],
+        ['exec', '--full-auto', '# Full enrich instructions'],
+        expect.objectContaining({ cwd: '/path/to/project' })
+      )
+    })
+
+    it('falls back to setup.md for codex when enrich.md missing', () => {
+      vi.mocked(detectCLISync).mockReturnValue('codex')
+      vi.mocked(readFileSync).mockImplementation((p: any) => {
+        const s = String(p)
+        if (s.includes('enrich.md')) throw new Error('ENOENT')
+        return '# Legacy setup content'
+      })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startEnrich('p1', '/path/to/project')
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'codex',
+        ['exec', '--full-auto', '# Legacy setup content'],
         expect.objectContaining({ cwd: '/path/to/project' })
       )
     })
@@ -362,30 +406,28 @@ describe('SetupManager', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'claude',
-        expect.arrayContaining(['-p', '/setup']),
+        expect.arrayContaining(['-p', '/specrails:enrich']),
         expect.any(Object)
       )
     })
 
     it('uses explicit provider parameter over detectCLISync', () => {
-      // detectCLISync returns claude (the default mock) but we pass 'codex' explicitly
       vi.mocked(detectCLISync).mockReturnValue('claude')
-      vi.mocked(readFileSync).mockReturnValue('# Setup')
+      vi.mocked(readFileSync).mockReturnValue('# Enrich')
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.startSetup('p1', '/path/to/project', 'codex')
+      sm.startEnrich('p1', '/path/to/project', 'codex')
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'codex',
-        ['exec', '--full-auto', '# Setup'],
+        ['exec', '--full-auto', '# Enrich'],
         expect.objectContaining({ cwd: '/path/to/project' })
       )
-      // detectCLISync should not be called when provider is explicit
       expect(detectCLISync).not.toHaveBeenCalled()
     })
 
@@ -393,10 +435,9 @@ describe('SetupManager', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.startSetup('p1', '/path/to/project', 'codex')
+      sm.startEnrich('p1', '/path/to/project', 'codex')
 
       const mkdirCalls = vi.mocked(mkdirSync).mock.calls.map(([p]) => String(p))
-      // specrails-core always installs to .claude/ — both providers use .claude
       expect(mkdirCalls.some((p) => p.includes('.claude/agents/personas'))).toBe(true)
       expect(mkdirCalls.some((p) => p.includes('.claude/commands/sr'))).toBe(true)
       expect(mkdirCalls.some((p) => p.includes('.claude/rules'))).toBe(true)
@@ -407,11 +448,11 @@ describe('SetupManager', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.startSetup('p1', '/path/to/project', 'claude')
+      sm.startEnrich('p1', '/path/to/project', 'claude')
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'claude',
-        expect.arrayContaining(['-p', '/setup']),
+        expect.arrayContaining(['-p', '/specrails:enrich']),
         expect.objectContaining({ cwd: '/path/to/project' })
       )
       expect(detectCLISync).not.toHaveBeenCalled()
@@ -420,35 +461,174 @@ describe('SetupManager', () => {
     it('generates synthetic sessionId for codex and calls onSessionCaptured', () => {
       const onSessionCaptured = vi.fn()
       const smWithCallback = new SetupManager(broadcast, onSessionCaptured)
-      vi.mocked(readFileSync).mockReturnValue('# Setup')
+      vi.mocked(readFileSync).mockReturnValue('# Enrich')
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      smWithCallback.startSetup('p1', '/path/to/project', 'codex')
+      smWithCallback.startEnrich('p1', '/path/to/project', 'codex')
 
       expect(onSessionCaptured).toHaveBeenCalledWith('p1', expect.stringMatching(/^codex-p1-\d+$/))
     })
 
-    it('emits setup_turn_done with synthetic sessionId for codex when setup is incomplete', async () => {
-      vi.mocked(readFileSync).mockReturnValue('# Setup')
+    it('emits setup_turn_done with synthetic sessionId for codex when incomplete', async () => {
+      vi.mocked(readFileSync).mockReturnValue('# Enrich')
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
-      // No artifacts exist — setup is incomplete
       vi.mocked(existsSync).mockReturnValue(false)
 
-      sm.startSetup('p1', '/path/to/project', 'codex')
+      sm.startEnrich('p1', '/path/to/project', 'codex')
       await finishProcess(child, 0)
 
       const turnDone = getBroadcastedByType(broadcast, 'setup_turn_done')
       expect(turnDone).toHaveLength(1)
       expect(turnDone[0].sessionId).toMatch(/^codex-p1-\d+$/)
     })
+
+    it('getInstallTier returns full after startEnrich', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startEnrich('p1', '/path/to/project')
+      expect(sm.getInstallTier('p1')).toBe('full')
+    })
   })
 
-  // ─── resumeSetup ──────────────────────────────────────────────────────────
+  // ─── startQuickInstall ──────────────────────────────────────────────────────
 
-  describe('resumeSetup', () => {
+  describe('startQuickInstall', () => {
+    it('writes install-config.yaml before spawning', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startQuickInstall('p1', '/path/to/project', { provider: 'claude', tier: 'quick' })
+
+      expect(vi.mocked(mkdirSync)).toHaveBeenCalledWith(
+        expect.stringContaining('.specrails'),
+        { recursive: true }
+      )
+      expect(vi.mocked(writeFileSync)).toHaveBeenCalledWith(
+        expect.stringContaining('install-config.yaml'),
+        expect.any(String),
+        'utf-8'
+      )
+    })
+
+    it('spawns npx specrails-core@latest init --from-config <configPath>', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startQuickInstall('p1', '/path/to/project', { provider: 'claude' })
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'npx',
+        expect.arrayContaining(['specrails-core@latest', 'init', '--from-config']),
+        expect.objectContaining({ cwd: '/path/to/project' })
+      )
+    })
+
+    it('broadcasts config_written checkpoint immediately', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startQuickInstall('p1', '/path/to/project', {})
+
+      const checkpoints = getBroadcastedByType(broadcast, 'setup_checkpoint')
+      expect(checkpoints.some((c) => c.checkpoint === 'config_written' && c.status === 'done')).toBe(true)
+    })
+
+    it('broadcasts setup_install_done on exit 0', async () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startQuickInstall('p1', '/path/to/project', {})
+      await finishProcess(child, 0)
+
+      const done = getBroadcastedByType(broadcast, 'setup_install_done')
+      expect(done).toHaveLength(1)
+    })
+
+    it('completes quick_complete checkpoint on exit 0', async () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startQuickInstall('p1', '/path/to/project', {})
+      await finishProcess(child, 0)
+
+      const checkpoints = getBroadcastedByType(broadcast, 'setup_checkpoint')
+      expect(checkpoints.some((c) => c.checkpoint === 'quick_complete' && c.status === 'done')).toBe(true)
+    })
+
+    it('broadcasts setup_error on non-zero exit', async () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startQuickInstall('p1', '/path/to/project', {})
+      await finishProcess(child, 1)
+
+      const errors = getBroadcastedByType(broadcast, 'setup_error')
+      expect(errors).toHaveLength(1)
+      expect(errors[0].error).toContain('--from-config')
+    })
+
+    it('getCheckpointStatus returns 3 checkpoints for quick tier', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startQuickInstall('p1', '/path/to/project', {})
+      const statuses = sm.getCheckpointStatus('p1', '/path/to/project')
+      expect(statuses).toHaveLength(3)
+    })
+
+    it('getInstallTier returns quick after startQuickInstall', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startQuickInstall('p1', '/path/to/project', {})
+      expect(sm.getInstallTier('p1')).toBe('quick')
+    })
+
+    it('broadcasts setup_error when writeFileSync throws', () => {
+      vi.mocked(writeFileSync).mockImplementation(() => { throw new Error('Permission denied') })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startQuickInstall('p1', '/path/to/project', {})
+
+      const errors = getBroadcastedByType(broadcast, 'setup_error')
+      expect(errors).toHaveLength(1)
+      expect(errors[0].error).toContain('install-config.yaml')
+      // spawn should not be called since config write failed
+      expect(mockSpawn).not.toHaveBeenCalled()
+    })
+
+    it('does not start install twice for same project', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startQuickInstall('p1', '/path/to/project', {})
+      sm.startQuickInstall('p1', '/path/to/project', {})
+
+      expect(mockSpawn).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // ─── resumeEnrich ──────────────────────────────────────────────────────────
+
+  describe('resumeEnrich', () => {
     it('spawns claude with --resume and message', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.resumeEnrich('p1', '/path', 'sess-abc', 'continue please')
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'claude',
+        expect.arrayContaining(['--resume', 'sess-abc', '-p', 'continue please']),
+        expect.any(Object)
+      )
+    })
+
+    it('deprecated resumeSetup alias delegates to resumeEnrich', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
@@ -465,39 +645,51 @@ describe('SetupManager', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.resumeSetup('p1', '/path', 'sess-1', 'msg1')
-      sm.resumeSetup('p1', '/path', 'sess-2', 'msg2')
+      sm.resumeEnrich('p1', '/path', 'sess-1', 'msg1')
+      sm.resumeEnrich('p1', '/path', 'sess-2', 'msg2')
 
       expect(mockSpawn).toHaveBeenCalledTimes(1)
     })
 
-    it('uses explicit provider parameter for codex resume with continuation prompt', () => {
+    it('uses enrich.md content for codex resume continuation prompt', () => {
       vi.mocked(detectCLISync).mockReturnValue('claude')
-      vi.mocked(readFileSync).mockReturnValue('# Setup prompt content')
+      vi.mocked(readFileSync).mockReturnValue('# Enrich prompt content')
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.resumeSetup('p1', '/path', 'sess-abc', 'continue please', 'codex')
+      sm.resumeEnrich('p1', '/path', 'sess-abc', 'continue please', 'codex')
 
-      // Codex resume builds a continuation prompt from setup.md + user message
       expect(mockSpawn).toHaveBeenCalledWith(
         'codex',
         ['exec', '--full-auto', expect.stringContaining('continue please')],
         expect.any(Object)
       )
-      // Should include setup.md content (mocked as '# Setup prompt content')
       const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
-      expect(spawnArgs[2]).toContain('# Setup prompt content')
-      expect(spawnArgs[2]).toContain('continuation of a previous setup run')
+      expect(spawnArgs[2]).toContain('# Enrich prompt content')
+      expect(spawnArgs[2]).toContain('continuation of a previous enrich run')
       expect(detectCLISync).not.toHaveBeenCalled()
     })
 
-    it('falls back to plain user message when setup.md is missing for codex resume', () => {
+    it('falls back to setup.md when enrich.md is missing for codex resume', () => {
+      vi.mocked(readFileSync).mockImplementation((p: any) => {
+        if (String(p).includes('enrich.md')) throw new Error('ENOENT')
+        return '# Legacy setup content'
+      })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.resumeEnrich('p1', '/path', 'sess-abc', 'continue please', 'codex')
+
+      const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      expect(spawnArgs[2]).toContain('# Legacy setup content')
+    })
+
+    it('falls back to plain user message when both enrich.md and setup.md are missing', () => {
       vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT') })
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.resumeSetup('p1', '/path', 'sess-abc', 'continue please', 'codex')
+      sm.resumeEnrich('p1', '/path', 'sess-abc', 'continue please', 'codex')
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'codex',
@@ -510,19 +702,28 @@ describe('SetupManager', () => {
   // ─── getCheckpointStatus ───────────────────────────────────────────────────
 
   describe('getCheckpointStatus', () => {
-    it('returns all-pending when setup has not started', () => {
+    it('returns all-pending (7) when no install has started', () => {
       const statuses = sm.getCheckpointStatus('p1', '/path/to/project')
       expect(statuses).toHaveLength(7)
       expect(statuses.every((s) => s.status === 'pending')).toBe(true)
     })
 
-    it('returns initialized checkpoints after startSetup', () => {
+    it('returns 7 checkpoints after startEnrich (full tier)', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
       const statuses = sm.getCheckpointStatus('p1', '/path/to/project')
       expect(statuses).toHaveLength(7)
+    })
+
+    it('returns 3 checkpoints after startQuickInstall (quick tier)', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startQuickInstall('p1', '/path/to/project', {})
+      const statuses = sm.getCheckpointStatus('p1', '/path/to/project')
+      expect(statuses).toHaveLength(3)
     })
   })
 
@@ -538,7 +739,7 @@ describe('SetupManager', () => {
         return s.includes('.specrails/specrails-version')
       })
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
       const statuses = sm.getCheckpointStatus('p1', '/path/to/project')
       const baseInstall = statuses.find((s) => s.key === 'base_install')
       expect(baseInstall?.status).toBe('done')
@@ -553,7 +754,7 @@ describe('SetupManager', () => {
         return s.endsWith('.specrails-version') && !s.includes('.specrails/specrails-version')
       })
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
       const statuses = sm.getCheckpointStatus('p1', '/path/to/project')
       const baseInstall = statuses.find((s) => s.key === 'base_install')
       expect(baseInstall?.status).toBe('done')
@@ -568,7 +769,7 @@ describe('SetupManager', () => {
         return s.includes('.specrails/specrails-version') || s.includes('.specrails/setup-templates')
       })
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
       const statuses = sm.getCheckpointStatus('p1', '/path/to/project')
       const repoAnalysis = statuses.find((s) => s.key === 'repo_analysis')
       expect(repoAnalysis?.status).toBe('done')
@@ -582,7 +783,7 @@ describe('SetupManager', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
 
       const event = JSON.stringify({
         type: 'assistant',
@@ -590,7 +791,6 @@ describe('SetupManager', () => {
       })
       pushLine(child, event)
 
-      // Allow readline to process
       await new Promise((r) => setImmediate(r))
 
       const checkpointMsgs = getBroadcastedByType(broadcast, 'setup_checkpoint')
@@ -603,7 +803,7 @@ describe('SetupManager', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
 
       const event = JSON.stringify({
         type: 'tool_use',
@@ -622,7 +822,7 @@ describe('SetupManager', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
 
       const event = JSON.stringify({
         type: 'tool_use',
@@ -641,7 +841,7 @@ describe('SetupManager', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
 
       const event = JSON.stringify({
         type: 'tool_use',
@@ -671,15 +871,25 @@ describe('SetupManager', () => {
       expect(sm.isInstalling('p1')).toBe(false)
     })
 
-    it('kills setup process and clears state', () => {
+    it('kills enrich process and clears state', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
       sm.abort('p1')
 
       expect(treeKill).toHaveBeenCalledWith(child.pid, 'SIGTERM')
-      expect(sm.isSettingUp('p1')).toBe(false)
+      expect(sm.isEnriching('p1')).toBe(false)
+    })
+
+    it('clears install tier on abort', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startEnrich('p1', '/path/to/project')
+      expect(sm.getInstallTier('p1')).toBe('full')
+      sm.abort('p1')
+      expect(sm.getInstallTier('p1')).toBeUndefined()
     })
 
     it('does nothing if no processes running', () => {
@@ -711,15 +921,15 @@ describe('SetupManager', () => {
   // ─── Setup chat broadcast ──────────────────────────────────────────────────
 
   describe('setup chat broadcast', () => {
-    it('broadcasts setup_chat for assistant text', async () => {
+    it('broadcasts setup_chat for assistant text during enrich', async () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.startSetup('p1', '/path/to/project')
+      sm.startEnrich('p1', '/path/to/project')
 
       const event = JSON.stringify({
         type: 'assistant',
-        message: { content: [{ type: 'text', text: 'Hello from setup!' }] },
+        message: { content: [{ type: 'text', text: 'Hello from enrich!' }] },
       })
       pushLine(child, event)
 
@@ -727,7 +937,7 @@ describe('SetupManager', () => {
 
       const chatMsgs = getBroadcastedByType(broadcast, 'setup_chat')
       expect(chatMsgs.length).toBeGreaterThan(0)
-      expect(chatMsgs[0].text).toBe('Hello from setup!')
+      expect(chatMsgs[0].text).toBe('Hello from enrich!')
       expect(chatMsgs[0].role).toBe('assistant')
     })
   })
