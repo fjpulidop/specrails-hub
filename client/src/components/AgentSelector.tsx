@@ -1,7 +1,7 @@
-import { Check } from 'lucide-react'
+import { Check, Lock } from 'lucide-react'
 import { cn } from '../lib/utils'
 
-// ─── Agent definitions ────────────────────────────────────────────────────────
+// ─── Agent definitions (mirrors specrails-core tui-installer.mjs) ────────────
 
 export interface AgentDef {
   id: string
@@ -11,43 +11,58 @@ export interface AgentDef {
 }
 
 export const ALL_AGENTS: AgentDef[] = [
-  // Core Implementation
-  { id: 'sr-architect', name: 'Architect', description: 'Architecture design & change specs', category: 'Core' },
-  { id: 'sr-developer', name: 'Developer', description: 'Full-stack implementation', category: 'Core' },
-  { id: 'sr-frontend-developer', name: 'Frontend Dev', description: 'React/TypeScript implementation', category: 'Core' },
-  { id: 'sr-backend-developer', name: 'Backend Dev', description: 'Backend specialization', category: 'Core' },
-  // Quality
-  { id: 'sr-reviewer', name: 'Reviewer', description: 'General code review', category: 'Quality' },
-  { id: 'sr-frontend-reviewer', name: 'Frontend Reviewer', description: 'Frontend review & accessibility', category: 'Quality' },
-  { id: 'sr-backend-reviewer', name: 'Backend Reviewer', description: 'N+1 queries, DB indexes, connection pools', category: 'Quality' },
-  { id: 'sr-security-reviewer', name: 'Security Reviewer', description: 'Security analysis & vulnerability scanning', category: 'Quality' },
-  { id: 'sr-performance-reviewer', name: 'Perf Reviewer', description: 'Performance analysis & optimization', category: 'Quality' },
-  // Testing
-  { id: 'sr-test-writer', name: 'Test Writer', description: 'Comprehensive test generation', category: 'Testing' },
+  // Architecture
+  { id: 'sr-architect', name: 'Architect', description: 'Architecture design, change specs, implementation planning', category: 'Architecture' },
+  // Development
+  { id: 'sr-developer', name: 'Developer', description: 'Full-stack implementation across all layers', category: 'Development' },
+  { id: 'sr-frontend-developer', name: 'Frontend Dev', description: 'Frontend implementation (React, Vue, Angular, etc.)', category: 'Development' },
+  { id: 'sr-backend-developer', name: 'Backend Dev', description: 'Backend specialization (APIs, databases, services)', category: 'Development' },
+  // Review
+  { id: 'sr-reviewer', name: 'Reviewer', description: 'General code review — the final quality gate', category: 'Review' },
+  { id: 'sr-frontend-reviewer', name: 'Frontend Reviewer', description: 'Frontend review (UI, accessibility, performance)', category: 'Review' },
+  { id: 'sr-backend-reviewer', name: 'Backend Reviewer', description: 'Backend review (APIs, security, scalability)', category: 'Review' },
+  { id: 'sr-security-reviewer', name: 'Security Reviewer', description: 'Security analysis — OWASP, vulnerabilities, hardening', category: 'Review' },
+  { id: 'sr-performance-reviewer', name: 'Perf Reviewer', description: 'Performance analysis — profiling, bottlenecks, optimization', category: 'Review' },
   // Product
-  { id: 'sr-product-manager', name: 'Product Manager', description: 'Product discovery & personas', category: 'Product' },
-  { id: 'sr-product-analyst', name: 'Product Analyst', description: 'Backlog analysis & prioritization', category: 'Product' },
-  // Operations
-  { id: 'sr-doc-sync', name: 'Doc Sync', description: 'Documentation synchronization', category: 'Ops' },
-  { id: 'sr-merge-resolver', name: 'Merge Resolver', description: 'Merge conflict resolution', category: 'Ops' },
+  { id: 'sr-product-manager', name: 'Product Manager', description: 'Product discovery, VPC personas, backlog management', category: 'Product' },
+  { id: 'sr-product-analyst', name: 'Product Analyst', description: 'Backlog analysis, spec gap analysis, reporting', category: 'Product' },
+  // Utilities
+  { id: 'sr-test-writer', name: 'Test Writer', description: 'Comprehensive test generation (unit, integration, E2E)', category: 'Utilities' },
+  { id: 'sr-doc-sync', name: 'Doc Sync', description: 'Documentation sync — keeps docs aligned with code', category: 'Utilities' },
+  { id: 'sr-merge-resolver', name: 'Merge Resolver', description: 'Merge conflict resolution with context awareness', category: 'Utilities' },
 ]
 
-export const AGENT_CATEGORIES = ['Core', 'Quality', 'Testing', 'Product', 'Ops'] as const
+// Core agents cannot be deselected — the implementation pipeline depends on them
+export const CORE_AGENTS = new Set([
+  'sr-architect',
+  'sr-developer',
+  'sr-reviewer',
+  'sr-merge-resolver',
+])
+
+// Default selection: core agents + test-writer + product-manager
+export const DEFAULT_SELECTED = new Set([
+  ...CORE_AGENTS,
+  'sr-test-writer',
+  'sr-product-manager',
+])
+
+export const AGENT_CATEGORIES = ['Architecture', 'Development', 'Review', 'Product', 'Utilities'] as const
 
 const CATEGORY_LABELS: Record<string, string> = {
-  Core: 'Core Implementation',
-  Quality: 'Quality & Review',
-  Testing: 'Testing',
+  Architecture: 'Architecture',
+  Development: 'Development',
+  Review: 'Review',
   Product: 'Product',
-  Ops: 'Operations',
+  Utilities: 'Utilities',
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Core: 'text-dracula-purple',
-  Quality: 'text-dracula-green',
-  Testing: 'text-dracula-cyan',
+  Architecture: 'text-dracula-green',
+  Development: 'text-dracula-purple',
+  Review: 'text-dracula-cyan',
   Product: 'text-dracula-pink',
-  Ops: 'text-dracula-orange',
+  Utilities: 'text-dracula-orange',
 }
 
 // ─── AgentSelector ────────────────────────────────────────────────────────────
@@ -61,6 +76,7 @@ export function AgentSelector({ selected, onChange }: AgentSelectorProps) {
   const selectedSet = new Set(selected)
 
   function toggle(agentId: string) {
+    if (CORE_AGENTS.has(agentId)) return // core agents cannot be toggled
     const next = new Set(selectedSet)
     if (next.has(agentId)) {
       next.delete(agentId)
@@ -72,12 +88,14 @@ export function AgentSelector({ selected, onChange }: AgentSelectorProps) {
 
   function toggleCategory(category: string) {
     const categoryAgents = ALL_AGENTS.filter((a) => a.category === category).map((a) => a.id)
-    const allSelected = categoryAgents.every((id) => selectedSet.has(id))
+    const toggleable = categoryAgents.filter((id) => !CORE_AGENTS.has(id))
+    if (toggleable.length === 0) return // all agents in this category are core
+    const allSelected = toggleable.every((id) => selectedSet.has(id))
     const next = new Set(selectedSet)
     if (allSelected) {
-      categoryAgents.forEach((id) => next.delete(id))
+      toggleable.forEach((id) => next.delete(id))
     } else {
-      categoryAgents.forEach((id) => next.add(id))
+      toggleable.forEach((id) => next.add(id))
     }
     onChange(Array.from(next))
   }
@@ -87,7 +105,7 @@ export function AgentSelector({ selected, onChange }: AgentSelectorProps) {
   }
 
   function selectNone() {
-    onChange([])
+    onChange([...CORE_AGENTS]) // core agents always stay selected
   }
 
   return (
@@ -146,14 +164,18 @@ export function AgentSelector({ selected, onChange }: AgentSelectorProps) {
               {/* Agent rows */}
               <div className="space-y-1 pl-1">
                 {agents.map((agent) => {
-                  const isSelected = selectedSet.has(agent.id)
+                  const isCore = CORE_AGENTS.has(agent.id)
+                  const isSelected = isCore || selectedSet.has(agent.id)
                   return (
                     <button
                       key={agent.id}
                       onClick={() => toggle(agent.id)}
+                      disabled={isCore}
                       className={cn(
                         'flex items-start gap-2.5 w-full text-left rounded-md px-2 py-1.5 transition-colors',
-                        isSelected
+                        isCore
+                          ? 'bg-dracula-purple/10 cursor-default'
+                          : isSelected
                           ? 'bg-dracula-purple/10 hover:bg-dracula-purple/15'
                           : 'hover:bg-muted/30'
                       )}
@@ -174,6 +196,12 @@ export function AgentSelector({ selected, onChange }: AgentSelectorProps) {
                           <span className="text-[9px] text-muted-foreground/60 font-mono truncate">
                             {agent.id}
                           </span>
+                          {isCore && (
+                            <span className="flex items-center gap-0.5 text-[9px] text-dracula-orange/80">
+                              <Lock className="w-2.5 h-2.5" />
+                              core
+                            </span>
+                          )}
                         </div>
                         <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
                           {agent.description}

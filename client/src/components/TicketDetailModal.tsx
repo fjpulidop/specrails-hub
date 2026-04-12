@@ -1,22 +1,16 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { formatDistanceToNow } from 'date-fns'
-import { X, Pencil, Trash2, Save, Plus, XCircle } from 'lucide-react'
+import { X, Pencil, Trash2, Save, Plus, XCircle, Sparkles, Loader2, Undo2, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
-import { TicketStatusBadge } from './TicketStatusIndicator'
-import type { LocalTicket, TicketStatus, TicketPriority } from '../types'
+import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
+import { getApiBase } from '../lib/api'
+import type { LocalTicket, TicketPriority } from '../types'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
-
-const STATUS_OPTIONS: { value: TicketStatus; label: string }[] = [
-  { value: 'todo', label: 'Todo' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'done', label: 'Done' },
-  { value: 'cancelled', label: 'Cancelled' },
-]
 
 const PRIORITY_OPTIONS: { value: TicketPriority; label: string; className: string }[] = [
   { value: 'critical', label: 'Critical', className: 'text-red-400' },
@@ -54,9 +48,8 @@ export function TicketDetailModal({
   // Editable state
   const [title, setTitle] = useState(ticket.title)
   const [description, setDescription] = useState(ticket.description)
-  const [status, setStatus] = useState<TicketStatus>(ticket.status)
   const [priority, setPriority] = useState<TicketPriority>(ticket.priority)
-  const [labels, setLabels] = useState<string[]>([...ticket.labels])
+  const [labels, setLabels] = useState<string[]>([...(ticket.labels ?? [])])
 
   // Edit mode toggles
   const [editingTitle, setEditingTitle] = useState(false)
@@ -68,6 +61,15 @@ export function TicketDetailModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  // AI Edit state
+  const [aiEditOpen, setAiEditOpen] = useState(false)
+  const [aiInstructions, setAiInstructions] = useState('')
+  const [aiEditing, setAiEditing] = useState(false)
+  const [aiRequestId, setAiRequestId] = useState<string | null>(null)
+  const [descriptionSnapshot, setDescriptionSnapshot] = useState<string | null>(null)
+  const aiInstructionsRef = useRef<HTMLTextAreaElement>(null)
+  const { registerHandler, unregisterHandler } = useSharedWebSocket()
+
   const titleInputRef = useRef<HTMLInputElement>(null)
   const descTextareaRef = useRef<HTMLTextAreaElement>(null)
   const labelInputRef = useRef<HTMLInputElement>(null)
@@ -77,11 +79,10 @@ export function TicketDetailModal({
     return (
       title !== ticket.title ||
       description !== ticket.description ||
-      status !== ticket.status ||
       priority !== ticket.priority ||
       JSON.stringify(labels) !== JSON.stringify(ticket.labels)
     )
-  }, [title, description, status, priority, labels, ticket])
+  }, [title, description, priority, labels, ticket])
 
   // Focus on edit start
   useEffect(() => {
@@ -105,13 +106,13 @@ export function TicketDetailModal({
   // Close on Escape (unless editing)
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !editingTitle && !editingDescription && !showDeleteConfirm) {
+      if (e.key === 'Escape' && !editingTitle && !editingDescription && !showDeleteConfirm && !aiEditing && !aiEditOpen) {
         onClose()
       }
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [onClose, editingTitle, editingDescription, showDeleteConfirm])
+  }, [onClose, editingTitle, editingDescription, showDeleteConfirm, aiEditing, aiEditOpen])
 
   // Label autocomplete suggestions
   const labelSuggestions = useMemo(() => {
@@ -134,11 +135,96 @@ export function TicketDetailModal({
     setLabels((prev) => prev.filter((l) => l !== label))
   }, [])
 
+  // ─── AI Edit WS handler ───────────────────────────────────────────────────
+
+  const aiRequestIdRef = useRef(aiRequestId)
+  useEffect(() => { aiRequestIdRef.current = aiRequestId }, [aiRequestId])
+
+  const handleAiWs = useCallback((raw: unknown) => {
+    const msg = raw as Record<string, unknown>
+    if (!msg || typeof msg.type !== 'string') return
+    const reqId = msg.requestId as string | undefined
+    if (!reqId || reqId !== aiRequestIdRef.current) return
+
+    if (msg.type === 'ticket_ai_edit_stream') {
+      const delta = msg.delta as string
+      setDescription((prev) => prev + delta)
+    } else if (msg.type === 'ticket_ai_edit_done') {
+      const fullText = msg.fullText as string
+      setDescription(fullText)
+      setAiEditing(false)
+      setAiRequestId(null)
+      setAiEditOpen(false)
+      setAiInstructions('')
+      setEditingDescription(false)
+      toast.success('AI edit complete')
+    } else if (msg.type === 'ticket_ai_edit_error') {
+      setAiEditing(false)
+      setAiRequestId(null)
+      // Restore snapshot on error
+      if (descriptionSnapshot !== null) {
+        setDescription(descriptionSnapshot)
+        setDescriptionSnapshot(null)
+      }
+      toast.error(`AI edit failed: ${msg.error}`)
+    }
+  }, [descriptionSnapshot])
+
+  useLayoutEffect(() => {
+    registerHandler('ticket_ai_edit', handleAiWs)
+    return () => unregisterHandler('ticket_ai_edit')
+  }, [handleAiWs, registerHandler, unregisterHandler])
+
+  const handleAiEditSubmit = useCallback(async () => {
+    if (!aiInstructions.trim() || aiEditing) return
+    // Capture current description before clearing
+    const currentDesc = description
+    setDescriptionSnapshot(currentDesc)
+    setAiEditing(true)
+    // Clear description to stream fresh result
+    setDescription('')
+    setEditingDescription(false)
+
+    try {
+      const res = await fetch(`${getApiBase()}/tickets/${ticket.id}/ai-edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instructions: aiInstructions.trim(),
+          description: currentDesc,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Request failed' }))
+        throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+      }
+      const data = await res.json() as { requestId: string }
+      setAiRequestId(data.requestId)
+    } catch (err) {
+      setAiEditing(false)
+      setDescription(currentDesc)
+      setDescriptionSnapshot(null)
+      toast.error(`AI edit failed: ${(err as Error).message}`)
+    }
+  }, [aiInstructions, aiEditing, description, ticket.id])
+
+  const handleAiRevert = useCallback(() => {
+    if (descriptionSnapshot !== null) {
+      setDescription(descriptionSnapshot)
+      setDescriptionSnapshot(null)
+      toast.success('Reverted to original description')
+    }
+  }, [descriptionSnapshot])
+
+  // Focus instructions input when AI panel opens
+  useEffect(() => {
+    if (aiEditOpen) aiInstructionsRef.current?.focus()
+  }, [aiEditOpen])
+
   const handleSave = useCallback(async () => {
-    const changes: Partial<Pick<LocalTicket, 'title' | 'description' | 'status' | 'priority' | 'labels'>> = {}
+    const changes: Partial<Pick<LocalTicket, 'title' | 'description' | 'priority' | 'labels'>> = {}
     if (title !== ticket.title) changes.title = title
     if (description !== ticket.description) changes.description = description
-    if (status !== ticket.status) changes.status = status
     if (priority !== ticket.priority) changes.priority = priority
     if (JSON.stringify(labels) !== JSON.stringify(ticket.labels)) changes.labels = labels
 
@@ -157,7 +243,7 @@ export function TicketDetailModal({
     } else {
       toast.error('Failed to update ticket')
     }
-  }, [title, description, status, priority, labels, ticket, onSave, onClose])
+  }, [title, description, priority, labels, ticket, onSave, onClose])
 
   const handleDelete = useCallback(() => {
     onDelete(ticket.id)
@@ -170,11 +256,11 @@ export function TicketDetailModal({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={aiEditing ? undefined : onClose}
       />
 
       {/* Panel */}
-      <div className="relative w-full max-w-2xl m-4 rounded-xl glass-card border border-border/30 flex flex-col animate-in fade-in zoom-in-95 duration-200 max-h-[90vh]">
+      <div className="relative w-full max-w-5xl m-4 rounded-xl glass-card border border-border/30 flex flex-col animate-in fade-in zoom-in-95 duration-200 h-[90vh]">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border/30">
           <div className="flex-1 min-w-0">
@@ -202,7 +288,6 @@ export function TicketDetailModal({
             )}
             <div className="flex items-center gap-2 mt-1.5">
               <span className="text-[10px] text-muted-foreground font-mono">#{ticket.id}</span>
-              <TicketStatusBadge status={status} />
             </div>
           </div>
 
@@ -215,15 +300,23 @@ export function TicketDetailModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="flex flex-col sm:flex-row">
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="flex flex-col sm:flex-row h-full">
             {/* Main content */}
-            <div className="flex-1 min-w-0 px-5 py-4 space-y-4">
+            <div className="flex-1 min-w-0 px-5 py-4 space-y-4 flex flex-col">
               {/* Description */}
-              <div>
+              <div className="flex-1 flex flex-col">
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Description</span>
-                  {!editingDescription && (
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    Description
+                    {aiEditing && (
+                      <span className="inline-flex items-center gap-1 text-primary/70 font-normal normal-case">
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                        AI is editing...
+                      </span>
+                    )}
+                  </span>
+                  {!editingDescription && !aiEditing && (
                     <button
                       type="button"
                       onClick={() => setEditingDescription(true)}
@@ -236,13 +329,12 @@ export function TicketDetailModal({
                 </div>
 
                 {editingDescription ? (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 flex-1 flex flex-col">
                     <textarea
                       ref={descTextareaRef}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      rows={8}
-                      className="w-full rounded-lg border border-border bg-input px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground resize-y min-h-[120px]"
+                      className="w-full flex-1 rounded-lg border border-border bg-input px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground resize-none min-h-[300px]"
                       placeholder="Markdown description..."
                     />
                     <div className="flex items-center gap-1.5">
@@ -257,14 +349,21 @@ export function TicketDetailModal({
                       <span className="text-[9px] text-muted-foreground">Supports markdown</span>
                     </div>
                   </div>
-                ) : description ? (
+                ) : (description || aiEditing) ? (
                   <div
-                    className="rounded-lg bg-muted/20 px-3 py-2 cursor-pointer hover:bg-muted/30 transition-colors"
-                    onClick={() => setEditingDescription(true)}
+                    className="flex-1 rounded-lg bg-muted/20 px-3 py-2 overflow-y-auto transition-colors"
+                    {...(!aiEditing ? { onClick: () => setEditingDescription(true), role: 'button', style: { cursor: 'pointer' } } : {})}
                   >
-                    <div className="prose prose-invert prose-xs max-w-none prose-p:my-1 prose-headings:mt-2 prose-headings:mb-1 prose-headings:text-sm prose-headings:font-semibold prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-code:text-cyan-300 prose-code:text-[10px] prose-code:bg-muted/40 prose-code:px-1 prose-code:py-0.5 prose-code:rounded text-foreground/80 text-xs">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{description}</ReactMarkdown>
-                    </div>
+                    {description ? (
+                      <div className="prose prose-invert prose-xs max-w-none prose-p:my-1 prose-headings:mt-2 prose-headings:mb-1 prose-headings:text-sm prose-headings:font-semibold prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-code:text-cyan-300 prose-code:text-[10px] prose-code:bg-muted/40 prose-code:px-1 prose-code:py-0.5 prose-code:rounded text-foreground/80 text-xs">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{description}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 py-4 justify-center text-muted-foreground/50">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-xs">Waiting for AI response...</span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <button
@@ -278,7 +377,7 @@ export function TicketDetailModal({
               </div>
 
               {/* Prerequisites */}
-              {ticket.prerequisites.length > 0 && (
+              {ticket.prerequisites && ticket.prerequisites.length > 0 && (
                 <div>
                   <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1.5">
                     Prerequisites
@@ -299,22 +398,6 @@ export function TicketDetailModal({
 
             {/* Sidebar */}
             <div className="sm:w-48 sm:border-l border-t sm:border-t-0 border-border/30 px-4 py-4 space-y-4 bg-muted/5">
-              {/* Status selector */}
-              <div>
-                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1.5">
-                  Status
-                </span>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as TicketStatus)}
-                  className="w-full h-7 rounded border border-border bg-input px-2 text-xs text-foreground"
-                >
-                  {STATUS_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-
               {/* Priority selector */}
               <div>
                 <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1.5">
@@ -407,8 +490,94 @@ export function TicketDetailModal({
                 )}
               </div>
 
+              {/* AI Edit */}
+              <div>
+                {!aiEditOpen ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full h-7 text-[10px] gap-1.5"
+                    onClick={() => setAiEditOpen(true)}
+                    disabled={aiEditing}
+                  >
+                    {aiEditing ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        AI is editing...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3 h-3" />
+                        AI Edit
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      AI Edit
+                    </span>
+                    <textarea
+                      ref={aiInstructionsRef}
+                      value={aiInstructions}
+                      onChange={(e) => setAiInstructions(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                          e.preventDefault()
+                          handleAiEditSubmit()
+                        }
+                        if (e.key === 'Escape') {
+                          setAiEditOpen(false)
+                          setAiInstructions('')
+                        }
+                      }}
+                      placeholder="Describe the changes you want..."
+                      className="w-full rounded-lg border border-border bg-input px-2.5 py-2 text-[11px] text-foreground placeholder:text-muted-foreground/50 resize-none min-h-[80px]"
+                      disabled={aiEditing}
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        size="sm"
+                        className="h-6 text-[10px] gap-1 flex-1"
+                        onClick={handleAiEditSubmit}
+                        disabled={!aiInstructions.trim() || aiEditing}
+                      >
+                        {aiEditing ? (
+                          <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                        ) : (
+                          <Send className="w-2.5 h-2.5" />
+                        )}
+                        {aiEditing ? 'Editing...' : 'Apply'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-[10px]"
+                        onClick={() => { setAiEditOpen(false); setAiInstructions('') }}
+                        disabled={aiEditing}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {descriptionSnapshot !== null && !aiEditing && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full h-6 text-[10px] gap-1 mt-1.5 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+                    onClick={handleAiRevert}
+                  >
+                    <Undo2 className="w-2.5 h-2.5" />
+                    Revert to original
+                  </Button>
+                )}
+              </div>
+
               {/* Metadata */}
-              {ticket.metadata.effort_level && (
+              {ticket.metadata?.effort_level && (
                 <div>
                   <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-0.5">
                     Effort

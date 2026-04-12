@@ -6,6 +6,7 @@ import { StatusBar } from '../StatusBar'
 vi.mock('../../lib/api', () => ({
   getApiBase: () => '/api',
 }))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 describe('StatusBar', () => {
   beforeEach(() => {
@@ -75,6 +76,19 @@ describe('StatusBar', () => {
     // Wait a tick so the fetch can resolve
     await new Promise((r) => setTimeout(r, 50))
     expect(screen.queryByText(/total:/i)).not.toBeInTheDocument()
+  })
+
+  it('shows "Connection restored" toast on reconnect', async () => {
+    const { toast } = await import('sonner')
+    global.fetch = vi.fn().mockResolvedValue({ ok: false })
+    const { rerender } = render(<StatusBar connectionStatus="connected" />)
+    // Simulate disconnect then reconnect
+    rerender(<StatusBar connectionStatus="disconnected" />)
+    rerender(<StatusBar connectionStatus="connected" />)
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Connection restored')
+    })
   })
 
   it('does not show cost when totalCostUsd is 0', async () => {

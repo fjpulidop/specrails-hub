@@ -20,6 +20,7 @@ vi.mock('fs', async () => {
     mkdirSync: vi.fn(),
     readFileSync: vi.fn().mockReturnValue('# Enrich prompt content'),
     writeFileSync: vi.fn(),
+    copyFileSync: vi.fn(),
   }
 })
 
@@ -31,7 +32,7 @@ vi.mock('./core-compat', () => ({
 
 import { spawn as mockSpawn } from 'child_process'
 import treeKill from 'tree-kill'
-import { existsSync, readdirSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, readdirSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs'
 import { detectCLISync } from './core-compat'
 import { SetupManager, CHECKPOINTS, QUICK_CHECKPOINTS } from './setup-manager'
 
@@ -146,15 +147,30 @@ describe('SetupManager', () => {
   // ─── startInstall ──────────────────────────────────────────────────────────
 
   describe('startInstall', () => {
-    it('spawns npx specrails-core@latest init --yes --root-dir <projectPath>', () => {
+    it('spawns npx specrails-core@latest init --yes --root-dir when no config exists', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockReturnValue(false)
 
       sm.startInstall('p1', '/path/to/project')
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'npx',
         ['specrails-core@latest', 'init', '--yes', '--root-dir', '/path/to/project'],
+        expect.objectContaining({ cwd: '/path/to/project' })
+      )
+    })
+
+    it('spawns npx specrails-core@latest init --from-config when config exists', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockReturnValue(true)
+
+      sm.startInstall('p1', '/path/to/project')
+
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'npx',
+        ['specrails-core@latest', 'init', '--yes', '--from-config', '/path/to/project/.specrails/install-config.yaml'],
         expect.objectContaining({ cwd: '/path/to/project' })
       )
     })
@@ -199,12 +215,10 @@ describe('SetupManager', () => {
       expect(errors[0].error).toContain('code 1')
     })
 
-    it('always passes --root-dir so install works outside a git repo', () => {
-      // Regression test: without --root-dir, install.sh would fail with exit code 1
-      // when the project path is not inside a git repo (REPO_ROOT empty → bash `read`
-      // fails on closed stdin → set -e exits with code 1).
+    it('passes --root-dir when no config exists (fallback for non-git repos)', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockReturnValue(false)
 
       sm.startInstall('p1', '/non-git/project')
 
@@ -440,6 +454,7 @@ describe('SetupManager', () => {
       const mkdirCalls = vi.mocked(mkdirSync).mock.calls.map(([p]) => String(p))
       expect(mkdirCalls.some((p) => p.includes('.claude/agents/personas'))).toBe(true)
       expect(mkdirCalls.some((p) => p.includes('.claude/commands/sr'))).toBe(true)
+      expect(mkdirCalls.some((p) => p.includes('.claude/commands/specrails'))).toBe(true)
       expect(mkdirCalls.some((p) => p.includes('.claude/rules'))).toBe(true)
     })
 
@@ -1020,6 +1035,34 @@ describe('SetupManager', () => {
       expect(result.commands).toBe(1)
     })
 
+    it('counts .md files in commands/specrails/ as commands (new install path)', () => {
+      vi.mocked(existsSync).mockImplementation((p: any) =>
+        String(p).includes('commands/specrails')
+      )
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        if (String(p).includes('commands/specrails')) {
+          return ['implement.md', 'batch-implement.md', 'propose-spec.md'] as any
+        }
+        return []
+      })
+
+      const result = sm.getSummary('/path/to/project')
+      expect(result.commands).toBe(3)
+    })
+
+    it('counts commands from both commands/sr/ and commands/specrails/ together', () => {
+      vi.mocked(existsSync).mockReturnValue(true)
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        const s = String(p)
+        if (s.includes('commands/sr') && !s.includes('specrails')) return ['implement.md'] as any
+        if (s.includes('commands/specrails')) return ['propose-spec.md', 'why.md'] as any
+        return []
+      })
+
+      const result = sm.getSummary('/path/to/project')
+      expect(result.commands).toBe(3)
+    })
+
     it('returns zeros and does not throw when readdirSync throws', () => {
       vi.mocked(existsSync).mockReturnValue(true)
       vi.mocked(readdirSync).mockImplementation(() => {
@@ -1100,6 +1143,34 @@ describe('SetupManager', () => {
       expect(complete[0].summary).toMatchObject({ agents: 2, personas: 1, commands: 1 })
     })
 
+    it('startEnrich broadcasts setup_complete when commands are in commands/specrails/ (regression: wizard was stuck)', async () => {
+      // Regression test for SPEA-751: specrails-core installs commands in commands/specrails/
+      // but the completion check was only looking at commands/sr/ → setup_turn_done was sent
+      // instead of setup_complete → wizard stayed stuck on the enriching step.
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockImplementation((p: any) => {
+        const s = String(p)
+        return s.includes('.claude/agents') || s.includes('commands/specrails')
+      })
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        const s = String(p)
+        if (s.endsWith('.claude/agents')) return ['sr-architect.md', 'sr-developer.md'] as any
+        if (s.includes('commands/specrails')) return ['implement.md', 'propose-spec.md'] as any
+        return []
+      })
+
+      sm.startEnrich('p1', '/path/to/project')
+      await finishProcess(child, 0)
+
+      const complete = getBroadcastedByType(broadcast, 'setup_complete')
+      expect(complete).toHaveLength(1)
+      expect(complete[0].summary).toMatchObject({ agents: 2, personas: 0, commands: 2 })
+      // Should NOT have emitted setup_turn_done (which would leave wizard stuck)
+      const turnDone = getBroadcastedByType(broadcast, 'setup_turn_done')
+      expect(turnDone).toHaveLength(0)
+    })
+
     it('startQuickInstall broadcasts setup_install_done with summary field', async () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
@@ -1132,6 +1203,117 @@ describe('SetupManager', () => {
 
       const done = getBroadcastedByType(broadcast, 'setup_install_done')
       expect(done[0].summary).toEqual({ agents: 0, personas: 0, commands: 0 })
+    })
+  })
+
+  // ─── Template deployment (post-install) ──────────────────────────────────────
+
+  describe('template deployment after install', () => {
+    const quickConfig = [
+      'version: 1',
+      'tier: quick',
+      'agents:',
+      '  selected: [sr-architect, sr-developer]',
+    ].join('\n')
+
+    it('startQuickInstall deploys agent templates to .claude/agents/', async () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes('install-config.yaml')) return true
+        if (s.includes('setup-templates/agents')) return true
+        if (s.includes('setup-templates/personas')) return false
+        if (s.includes('setup-templates/commands/specrails')) return true
+        return false
+      })
+      vi.mocked(readFileSync).mockReturnValue(quickConfig)
+      vi.mocked(readdirSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes('setup-templates/agents')) return ['sr-architect.md', 'sr-developer.md', 'sr-reviewer.md'] as any
+        if (s.includes('setup-templates/commands/specrails')) return ['implement.md', 'doctor.md'] as any
+        return []
+      })
+
+      sm.startQuickInstall('p1', '/path/to/project', { tier: 'quick', agents: { selected: ['sr-architect', 'sr-developer'] } })
+      await finishProcess(child, 0)
+
+      const copyCalls = vi.mocked(copyFileSync).mock.calls
+      const agentCopies = copyCalls.filter(([, dest]) => String(dest).includes('.claude/agents/'))
+      expect(agentCopies).toHaveLength(2)
+      expect(agentCopies.some(([, d]) => String(d).includes('sr-architect.md'))).toBe(true)
+      expect(agentCopies.some(([, d]) => String(d).includes('sr-developer.md'))).toBe(true)
+      // sr-reviewer.md should NOT be copied (not in selected)
+      expect(agentCopies.some(([, d]) => String(d).includes('sr-reviewer.md'))).toBe(false)
+    })
+
+    it('startQuickInstall deploys command templates to .claude/commands/specrails/', async () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes('install-config.yaml')) return true
+        if (s.includes('setup-templates/agents')) return false
+        if (s.includes('setup-templates/personas')) return false
+        if (s.includes('setup-templates/commands/specrails')) return true
+        return false
+      })
+      vi.mocked(readFileSync).mockReturnValue(quickConfig)
+      vi.mocked(readdirSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes('setup-templates/commands/specrails')) return ['implement.md', 'batch-implement.md'] as any
+        return []
+      })
+
+      sm.startQuickInstall('p1', '/path/to/project', { tier: 'quick' })
+      await finishProcess(child, 0)
+
+      const copyCalls = vi.mocked(copyFileSync).mock.calls
+      const cmdCopies = copyCalls.filter(([, dest]) => String(dest).includes('commands/specrails/'))
+      expect(cmdCopies).toHaveLength(2)
+    })
+
+    it('startInstall reads tier from config and deploys templates for quick tier', async () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes('install-config.yaml')) return true
+        if (s.includes('setup-templates/agents')) return true
+        if (s.includes('setup-templates/personas')) return false
+        if (s.includes('setup-templates/commands/specrails')) return false
+        return false
+      })
+      vi.mocked(readFileSync).mockReturnValue(quickConfig)
+      vi.mocked(readdirSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes('setup-templates/agents')) return ['sr-architect.md', 'sr-developer.md'] as any
+        return []
+      })
+
+      sm.startInstall('p1', '/path/to/project')
+      await finishProcess(child, 0)
+
+      const copyCalls = vi.mocked(copyFileSync).mock.calls
+      expect(copyCalls.length).toBeGreaterThan(0)
+    })
+
+    it('startInstall does NOT deploy templates for full tier (enrich handles it)', async () => {
+      const fullConfig = 'version: 1\ntier: full\nagents:\n  selected: [sr-architect]'
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes('install-config.yaml')) return true
+        return false
+      })
+      vi.mocked(readFileSync).mockReturnValue(fullConfig)
+
+      sm.startInstall('p1', '/path/to/project')
+      await finishProcess(child, 0)
+
+      const copyCalls = vi.mocked(copyFileSync).mock.calls
+      expect(copyCalls).toHaveLength(0)
     })
   })
 })

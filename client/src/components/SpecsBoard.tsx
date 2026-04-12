@@ -22,6 +22,7 @@ interface SpecsBoardProps {
 export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, onTicketClick, onTicketCreated }: SpecsBoardProps) {
   const [proposeOpen, setProposeOpen] = useState(false)
   const { isOver, setNodeRef } = useDroppable({ id: 'specs' })
+  const { isOver: isDoneOver, setNodeRef: setDoneNodeRef } = useDroppable({ id: 'done-specs' })
 
   // ── Resizable split divider ──────────────────────────────────────────────────
   const [splitRatio, setSplitRatio] = useState(0.65) // top panel gets 65%
@@ -107,8 +108,8 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
           <div className="w-8 h-0.5 rounded-full bg-border/60 group-hover:bg-primary/30 transition-colors" />
         </div>
 
-        {/* Done specs section — always visible */}
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        {/* Done specs section — droppable zone */}
+        <div ref={setDoneNodeRef} className={`flex-1 min-h-0 flex flex-col overflow-hidden transition-colors duration-150 ${isDoneOver ? 'bg-emerald-500/[0.04]' : ''}`}>
           <div className="flex items-center gap-2 px-4 py-1.5 border-t border-border/30 shrink-0">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400/70" />
             <span className="text-[11px] font-medium text-muted-foreground">Done</span>
@@ -120,12 +121,14 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
             {doneTickets.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
                 <CheckCircle2 className="w-6 h-6 mb-2 opacity-15" />
-                <p className="text-xs opacity-60">No completed specs yet</p>
+                <p className="text-xs opacity-60">{isDoneOver ? 'Drop to mark as done' : 'No completed specs yet'}</p>
               </div>
             ) : (
-              doneTickets.map((ticket) => (
-                <SpecCard key={ticket.id} ticket={ticket} onClick={onTicketClick} dragDisabled />
-              ))
+              <SortableContext items={doneTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                {doneTickets.map((ticket) => (
+                  <SpecCard key={ticket.id} ticket={ticket} onClick={onTicketClick} />
+                ))}
+              </SortableContext>
             )}
           </div>
         </div>

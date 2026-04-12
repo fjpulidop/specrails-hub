@@ -2029,7 +2029,7 @@ describe('project-router', () => {
         .send({ text: 'hello world' })
       expect(res.status).toBe(202)
       await new Promise((r) => setTimeout(r, 10))
-      expect(sendMessage).toHaveBeenCalledWith(convId, 'hello world')
+      expect(sendMessage).toHaveBeenCalledWith(convId, 'hello world', { lightweight: false, maxTurns: undefined })
     })
   })
 })

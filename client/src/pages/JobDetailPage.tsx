@@ -75,6 +75,23 @@ export default function JobDetailPage() {
   const activeProjectRef = useRef(activeProjectId)
   activeProjectRef.current = activeProjectId
 
+  // ── Batched event accumulation (flush via rAF → max ~60 updates/sec) ────
+  const pendingEventsRef = useRef<EventRow[]>([])
+  const rafIdRef = useRef<number | null>(null)
+
+  const flushEvents = useCallback(() => {
+    rafIdRef.current = null
+    const batch = pendingEventsRef.current
+    if (batch.length === 0) return
+    pendingEventsRef.current = []
+    setEvents((prev) => {
+      const next = [...prev, ...batch]
+      return next.length > 10000 ? next.slice(next.length - 8000) : next
+    })
+  }, [])
+
+  useEffect(() => () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current) }, [])
+
   const handleMessage = useCallback((data: unknown) => {
     const msg = data as { type: string; projectId?: string } & Record<string, unknown>
 
@@ -92,9 +109,6 @@ export default function JobDetailPage() {
       }
       setPhases(initPhases)
     } else if (msg.type === 'log' && msg.processId === id) {
-      // Live log lines — the server also emits 'event' messages for the same
-      // content but those are redundant during streaming (they're useful for
-      // the initial DB load where 'log' messages aren't stored separately).
       const syntheticEvent: EventRow = {
         id: Date.now(),
         job_id: id ?? '',
@@ -104,24 +118,20 @@ export default function JobDetailPage() {
         payload: JSON.stringify({ line: msg.line }),
         timestamp: msg.timestamp as string,
       }
-      setEvents((prev) => {
-        const next = [...prev, syntheticEvent]
-        // Cap at 10,000 entries — keep the last 8,000 to avoid unbounded growth
-        return next.length > 10000 ? next.slice(next.length - 8000) : next
-      })
+      pendingEventsRef.current.push(syntheticEvent)
+      if (!rafIdRef.current) rafIdRef.current = requestAnimationFrame(flushEvents)
     } else if (msg.type === 'phase') {
       const phaseName = msg.phase as string
       const phaseState = msg.state as PhaseState
       setPhases((prev) => ({ ...prev, [phaseName]: phaseState }))
     } else if (msg.type === 'queue') {
-      // Refresh job status from queue state
       const jobs = msg.jobs as Array<{ id: string; status: string }> | undefined
       const matchingJob = jobs?.find((j) => j.id === id)
       if (matchingJob) {
         setJob((prev) => prev ? { ...prev, status: matchingJob.status as JobSummary['status'] } : prev)
       }
     }
-  }, [id])
+  }, [id, flushEvents])
 
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
   useEffect(() => {

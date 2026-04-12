@@ -61,20 +61,37 @@ function useHubMode(): boolean {
   return isHub
 }
 
-// ─── Per-project route memory ─────────────────────────────────────────────────
+// ─── Per-project route memory (persisted to localStorage) ─────────────────────
+
+const ROUTE_MEMORY_KEY = 'specrails-hub:routeMemory'
+
+function readRouteMemory(): Map<string, string> {
+  try {
+    const raw = localStorage.getItem(ROUTE_MEMORY_KEY)
+    if (!raw) return new Map()
+    return new Map(Object.entries(JSON.parse(raw)))
+  } catch { return new Map() }
+}
+
+function writeRouteMemory(map: Map<string, string>): void {
+  try {
+    localStorage.setItem(ROUTE_MEMORY_KEY, JSON.stringify(Object.fromEntries(map)))
+  } catch { /* ignore */ }
+}
 
 function useProjectRouteMemory(activeProjectId: string | null) {
   const location = useLocation()
   const navigate = useNavigate()
 
-  // Map of projectId → last visited path
-  const routeMemory = useRef<Map<string, string>>(new Map())
+  // Map of projectId → last visited path (seeded from localStorage)
+  const routeMemory = useRef<Map<string, string>>(readRouteMemory())
   const prevProjectId = useRef<string | null>(null)
 
   useEffect(() => {
     // Save the current route for the outgoing project
     if (prevProjectId.current && prevProjectId.current !== activeProjectId) {
       routeMemory.current.set(prevProjectId.current, location.pathname)
+      writeRouteMemory(routeMemory.current)
     }
 
     // Restore route for the incoming project
@@ -88,6 +105,14 @@ function useProjectRouteMemory(activeProjectId: string | null) {
 
     prevProjectId.current = activeProjectId
   }, [activeProjectId, location.pathname, navigate])
+
+  // Also persist the current route continuously for the active project (survives refresh)
+  useEffect(() => {
+    if (activeProjectId && location.pathname !== '/') {
+      routeMemory.current.set(activeProjectId, location.pathname)
+      writeRouteMemory(routeMemory.current)
+    }
+  }, [activeProjectId, location.pathname])
 }
 
 // ─── Hub app shell ────────────────────────────────────────────────────────────

@@ -1,8 +1,11 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { Loader2, Sparkles, Send } from 'lucide-react'
+import { useEffect, useState, useCallback, useRef, useLayoutEffect } from 'react'
+import { Loader2, Sparkles, Send, Search } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
 import { useChatContext } from '../hooks/useChat'
+import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
+import { useHub } from '../hooks/useHub'
+import { getApiBase } from '../lib/api'
 import type { LocalTicket } from '../types'
 
 interface ProposeSpecModalProps {
@@ -16,80 +19,193 @@ type ModalPhase = 'input' | 'generating' | 'done'
 
 export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: ProposeSpecModalProps) {
   const chat = useChatContext()
+  const { registerHandler, unregisterHandler } = useSharedWebSocket()
+  const { activeProjectId } = useHub()
   const [phase, setPhase] = useState<ModalPhase>('input')
   const [inputText, setInputText] = useState('')
+  const [exploreCodebase, setExploreCodebase] = useState(true)
   const conversationIdRef = useRef<string | null>(null)
   const createdTicketRef = useRef<LocalTicket | null>(null)
   const knownTicketIdsRef = useRef<Set<number>>(new Set())
+  const fastRequestIdRef = useRef<string | null>(null)
+  const activeProjectIdRef = useRef(activeProjectId)
+  useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
 
-  // Reset state when modal opens
+  // Reset state when modal opens/closes
   useEffect(() => {
     if (open) {
       setPhase('input')
       setInputText('')
       conversationIdRef.current = null
       createdTicketRef.current = null
-    }
-    return () => {
-      // Kill any running Claude process when the modal closes
+      fastRequestIdRef.current = null
+    } else {
+      // Modal closed — kill detection loops and any running Claude process
       if (conversationIdRef.current && chat) {
         chat.abortStream(conversationIdRef.current)
       }
+      setPhase('input')
       conversationIdRef.current = null
       createdTicketRef.current = null
+      fastRequestIdRef.current = null
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Detect new tickets during generation by watching the tickets array
+  // ── Shared helper: fetch tickets from API and check for new ones ──────────
+  const checkForNewTickets = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await fetch(`${getApiBase()}/tickets`)
+      if (!res.ok) return false
+      const data = (await res.json()) as { tickets: LocalTicket[] } | LocalTicket[]
+      const list: LocalTicket[] = Array.isArray(data) ? data : data.tickets ?? []
+      const newTicket = list.find((t) => !knownTicketIdsRef.current.has(t.id))
+      if (newTicket) {
+        createdTicketRef.current = newTicket
+        setPhase('done')
+        return true
+      }
+    } catch { /* ignore */ }
+    return false
+  }, [])
+
+  // ── Explore mode: direct WS listener for ticket events ────────────────────
+  const handleTicketWs = useCallback((raw: unknown) => {
+    const msg = raw as Record<string, unknown>
+    if (!msg || typeof msg.type !== 'string') return
+    if (msg.projectId && msg.projectId !== activeProjectIdRef.current) return
+    if (msg.type === 'ticket_created' || msg.type === 'ticket_updated') {
+      // A ticket was created/updated — check if it's our new one
+      checkForNewTickets()
+    }
+  }, [checkForNewTickets])
+
+  useLayoutEffect(() => {
+    registerHandler('propose_tickets', handleTicketWs)
+    return () => unregisterHandler('propose_tickets')
+  }, [handleTicketWs, registerHandler, unregisterHandler])
+
+  // ── Explore mode: detect from tickets prop (fast path, no network) ────────
   useEffect(() => {
-    if (phase !== 'generating') return
-    // Find any ticket that wasn't in the snapshot taken at generation start
+    if (phase !== 'generating' || !exploreCodebase) return
     const newTicket = tickets.find((t) => !knownTicketIdsRef.current.has(t.id))
     if (newTicket) {
       createdTicketRef.current = newTicket
       setPhase('done')
     }
-  }, [phase, tickets])
+  }, [phase, tickets, exploreCodebase])
 
-  // When done, close modal and show the created ticket
+  // ── Explore mode: polling fallback — immediate first check + 1.5s interval
   useEffect(() => {
-    if (phase !== 'done') return
+    if (phase !== 'generating' || !exploreCodebase) return
+    // Immediate first check (ticket may already be on disk)
+    checkForNewTickets()
+    const interval = setInterval(() => { checkForNewTickets() }, 1500)
+    return () => clearInterval(interval)
+  }, [phase, exploreCodebase, checkForNewTickets])
+
+  // ── Explore mode: listen for chat_done to immediately check ───────────────
+  const handleChatDone = useCallback((raw: unknown) => {
+    const msg = raw as Record<string, unknown>
+    if (!msg || msg.type !== 'chat_done') return
+    if (msg.conversationId !== conversationIdRef.current) return
+    checkForNewTickets()
+  }, [checkForNewTickets])
+
+  useLayoutEffect(() => {
+    registerHandler('propose_chat_done', handleChatDone)
+    return () => unregisterHandler('propose_chat_done')
+  }, [handleChatDone, registerHandler, unregisterHandler])
+
+  // WS handler for fast mode (spec_gen_done / spec_gen_error)
+  const handleSpecGenWs = useCallback((raw: unknown) => {
+    const msg = raw as Record<string, unknown>
+    if (!msg || typeof msg.type !== 'string') return
+    const reqId = msg.requestId as string | undefined
+    if (!reqId || reqId !== fastRequestIdRef.current) return
+
+    if (msg.type === 'spec_gen_done') {
+      createdTicketRef.current = msg.ticket as LocalTicket
+      setPhase('done')
+    } else if (msg.type === 'spec_gen_error') {
+      setPhase('input')
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    registerHandler('spec_gen', handleSpecGenWs)
+    return () => unregisterHandler('spec_gen')
+  }, [handleSpecGenWs, registerHandler, unregisterHandler])
+
+  // Stable refs for callbacks — avoids re-running the done effect on every parent render
+  const onCloseRef = useRef(onClose)
+  const onTicketCreatedRef = useRef(onTicketCreated)
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
+  useEffect(() => { onTicketCreatedRef.current = onTicketCreated }, [onTicketCreated])
+
+  // When done, kill any still-running Claude process, close modal, show ticket
+  useEffect(() => {
+    if (phase !== 'done' || !open) return
+    // Abort the ChatManager session — ticket is created, no need to keep going
+    if (conversationIdRef.current && chat) {
+      chat.abortStream(conversationIdRef.current)
+      conversationIdRef.current = null
+    }
     const ticket = createdTicketRef.current
-    // Small delay for a polished feel
     const timer = setTimeout(() => {
-      onClose()
-      if (ticket && onTicketCreated) {
-        onTicketCreated(ticket)
+      onCloseRef.current()
+      if (ticket && onTicketCreatedRef.current) {
+        onTicketCreatedRef.current(ticket)
       }
     }, 400)
     return () => clearTimeout(timer)
-  }, [phase, onClose, onTicketCreated])
+  }, [phase, open, chat])
 
   const handleSubmit = useCallback(async () => {
-    if (!inputText.trim() || !chat) return
-    // Snapshot current ticket IDs before starting generation
+    if (!inputText.trim()) return
     knownTicketIdsRef.current = new Set(tickets.map((t) => t.id))
     setPhase('generating')
 
-    const prompt = [
-      '/specrails:propose-spec',
-      '',
-      'Here is the spec idea from the user:',
-      '',
-      inputText.trim(),
-      '',
-      'IMPORTANT INSTRUCTIONS:',
-      '- Generate the spec based on the above description.',
-      '- Create the local ticket automatically when done.',
-      '- Do NOT ask any questions — accept all defaults and proceed directly.',
-      '- Complete the entire flow without user interaction.',
-    ].join('\n')
+    if (exploreCodebase) {
+      // Full mode: use ChatManager with propose-spec skill
+      if (!chat) return
+      const prompt = [
+        '/specrails:propose-spec',
+        '',
+        'Here is the spec idea from the user:',
+        '',
+        inputText.trim(),
+        '',
+        'IMPORTANT INSTRUCTIONS:',
+        '- Generate the spec based on the above description.',
+        '- Create the local ticket automatically when done.',
+        '- Do NOT ask any questions — accept all defaults and proceed directly.',
+        '- Complete the entire flow without user interaction.',
+        '- Be FAST: skip broad codebase exploration. Only read 1-2 files if strictly necessary to understand the relevant area. Prefer writing the spec from your knowledge of the project.',
+      ].join('\n')
 
-    const id = await chat.startWithMessage(prompt)
-    if (id) {
-      conversationIdRef.current = id
+      const id = await chat.startWithMessage(prompt, { lightweight: true, maxTurns: 8 })
+      if (id) {
+        conversationIdRef.current = id
+      }
+    } else {
+      // Fast mode: dedicated endpoint, no codebase exploration
+      try {
+        const res = await fetch(`${getApiBase()}/tickets/generate-spec`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idea: inputText.trim() }),
+        })
+        if (!res.ok) {
+          setPhase('input')
+          return
+        }
+        const data = await res.json() as { requestId: string }
+        fastRequestIdRef.current = data.requestId
+      } catch {
+        setPhase('input')
+      }
     }
-  }, [inputText, chat, tickets])
+  }, [inputText, chat, tickets, exploreCodebase])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -98,7 +214,6 @@ export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: Pr
     }
   }, [handleSubmit])
 
-  // Prevent closing on overlay click during generation
   const preventInteractOutside = useCallback((e: Event) => {
     if (phase === 'generating') e.preventDefault()
   }, [phase])
@@ -131,9 +246,21 @@ export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: Pr
               autoFocus
             />
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-muted-foreground/50">
-                {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+Enter to submit
-              </span>
+              <label className="flex items-center gap-2 cursor-pointer select-none group">
+                <input
+                  type="checkbox"
+                  checked={exploreCodebase}
+                  onChange={(e) => setExploreCodebase(e.target.checked)}
+                  className="rounded border-border/60 bg-background text-primary focus:ring-primary/30 w-3.5 h-3.5 cursor-pointer"
+                />
+                <span className="text-[11px] text-muted-foreground group-hover:text-foreground transition-colors flex items-center gap-1">
+                  <Search className="w-3 h-3" />
+                  Explore codebase
+                </span>
+                <span className="text-[10px] text-muted-foreground/40">
+                  {exploreCodebase ? '~1 min' : '~15s'}
+                </span>
+              </label>
               <Button
                 size="sm"
                 onClick={handleSubmit}
@@ -156,7 +283,9 @@ export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: Pr
             <div className="text-center space-y-1.5">
               <p className="text-sm font-medium">Generating your spec...</p>
               <p className="text-xs text-muted-foreground/70">
-                This may take a moment. The spec will appear automatically when ready.
+                {exploreCodebase
+                  ? 'Exploring the codebase and generating the spec. This may take a moment.'
+                  : 'Generating spec from your description. This should be quick.'}
               </p>
             </div>
           </div>

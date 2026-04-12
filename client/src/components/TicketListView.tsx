@@ -350,7 +350,7 @@ export function TicketListView({
 
                     {/* Labels */}
                     <div className="w-24 text-right hidden sm:flex justify-end gap-0.5 overflow-hidden shrink-0">
-                      {ticket.labels.slice(0, 2).map((label) => (
+                      {(ticket.labels ?? []).slice(0, 2).map((label) => (
                         <span
                           key={label}
                           className="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium bg-accent/60 text-foreground/70 truncate max-w-[80px]"
@@ -358,8 +358,8 @@ export function TicketListView({
                           {label}
                         </span>
                       ))}
-                      {ticket.labels.length > 2 && (
-                        <span className="text-[9px] text-muted-foreground">+{ticket.labels.length - 2}</span>
+                      {(ticket.labels?.length ?? 0) > 2 && (
+                        <span className="text-[9px] text-muted-foreground">+{ticket.labels!.length - 2}</span>
                       )}
                     </div>
 

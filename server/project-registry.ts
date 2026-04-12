@@ -161,7 +161,7 @@ export class ProjectRegistry {
         const jobRow = db.prepare('SELECT command, duration_ms FROM jobs WHERE id = ?').get(jobId) as
           | { command: string; duration_ms: number | null }
           | undefined
-        const event = status === 'completed' ? 'job.completed' : 'job.failed'
+        const event = status === 'completed' ? 'job.completed' : status === 'canceled' ? 'job.canceled' : 'job.failed'
         webhookManager.deliver(project.id, event, {
           jobId,
           command: jobRow?.command ?? '',
@@ -204,6 +204,30 @@ export class ProjectRegistry {
             })
           } catch (err) {
             console.error('[project-registry] failed to mark rail tickets as done:', err)
+          }
+        }
+
+        // Revert tickets to todo when job was canceled
+        if (status === 'canceled' && completedTicketIds.length > 0) {
+          try {
+            const ticketFile = resolveTicketStoragePath(project.path)
+            mutateStore(ticketFile, (store) => {
+              for (const tid of completedTicketIds) {
+                const ticket = store.tickets[String(tid)]
+                if (ticket && ticket.status === 'in_progress') {
+                  ticket.status = 'todo'
+                  ticket.updated_at = new Date().toISOString()
+                  boundBroadcast({
+                    type: 'ticket_updated',
+                    ticket: ticket as unknown as import('./types').LocalTicket,
+                    projectId: project.id,
+                    timestamp: ticket.updated_at,
+                  } as TicketUpdatedMessage)
+                }
+              }
+            })
+          } catch (err) {
+            console.error('[project-registry] failed to revert canceled rail tickets:', err)
           }
         }
 

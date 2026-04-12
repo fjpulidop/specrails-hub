@@ -17,6 +17,13 @@ export interface ChatConversation {
   commandProposals: string[]
 }
 
+export interface ChatSendOptions {
+  /** Use lightweight mode: minimal system prompt, limited turns, no auto-titling */
+  lightweight?: boolean
+  /** Limit Claude's agentic tool-use turns */
+  maxTurns?: number
+}
+
 export interface UseChatReturn {
   conversations: ChatConversation[]
   activeTabIndex: number
@@ -25,8 +32,8 @@ export interface UseChatReturn {
   togglePanel: () => void
   createConversation: (model?: string) => Promise<void>
   deleteConversation: (id: string) => Promise<void>
-  sendMessage: (conversationId: string, text: string) => Promise<void>
-  startWithMessage: (text: string) => Promise<string | null>
+  sendMessage: (conversationId: string, text: string, options?: ChatSendOptions) => Promise<void>
+  startWithMessage: (text: string, options?: ChatSendOptions) => Promise<string | null>
   abortStream: (conversationId: string) => Promise<void>
   confirmCommand: (command: string) => Promise<void>
   dismissCommandProposal: (conversationId: string, command: string) => void
@@ -248,7 +255,7 @@ export function useChat(): UseChatReturn {
     setActiveTabIndex((prev) => Math.max(0, prev - 1))
   }, [])
 
-  const sendMessage = useCallback(async (conversationId: string, text: string) => {
+  const sendMessage = useCallback(async (conversationId: string, text: string, options?: ChatSendOptions) => {
     // Optimistically add user message to local state
     const optimisticMsg: ChatMessage = {
       id: Date.now(),
@@ -266,10 +273,13 @@ export function useChat(): UseChatReturn {
     )
 
     try {
+      const body: Record<string, unknown> = { text }
+      if (options?.lightweight) body.lightweight = true
+      if (options?.maxTurns != null) body.maxTurns = options.maxTurns
       await fetch(`${getApiBase()}/chat/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(body),
       })
     } catch {
       setConversations((prev) =>
@@ -325,7 +335,7 @@ export function useChat(): UseChatReturn {
   }, [])
 
   // Create a conversation and immediately send the first message
-  const startWithMessage = useCallback(async (text: string): Promise<string | null> => {
+  const startWithMessage = useCallback(async (text: string, options?: ChatSendOptions): Promise<string | null> => {
     try {
       const res = await fetch(`${getApiBase()}/chat/conversations`, {
         method: 'POST',
@@ -349,7 +359,7 @@ export function useChat(): UseChatReturn {
         return next
       })
       // Fire-and-forget the message send so the caller gets the ID immediately
-      void sendMessage(data.conversation.id, text)
+      void sendMessage(data.conversation.id, text, options)
       return data.conversation.id
     } catch {
       return null

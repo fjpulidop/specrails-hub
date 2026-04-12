@@ -12,6 +12,8 @@ vi.mock('react-markdown', () => ({
 vi.mock('remark-gfm', () => ({ default: () => {} }))
 vi.mock('rehype-highlight', () => ({ default: () => {} }))
 
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+
 // Mock the markdown-detect module so all lines are treated as plain by default
 let mockHasMarkdownSyntax = vi.fn(() => false)
 vi.mock('../../lib/markdown-detect', () => ({
@@ -242,6 +244,23 @@ describe('LogViewer', () => {
       render(<LogViewer events={events} />)
       // Mocked ReactMarkdown renders children as-is
       expect(screen.getByText('# Heading with **bold**')).toBeInTheDocument()
+    })
+  })
+
+  describe('copy button', () => {
+    it('copies log text to clipboard when copy button is clicked', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined)
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText },
+        writable: true,
+        configurable: true,
+      })
+      const events = [makeLogEvent('line one', 1), makeLogEvent('line two', 2)]
+      const { container } = render(<LogViewer events={events} />)
+      // The copy button contains the Copy icon (lucide-copy)
+      const copyBtn = container.querySelector('.lucide-copy')!.closest('button')!
+      fireEvent.click(copyBtn)
+      expect(writeText).toHaveBeenCalled()
     })
   })
 

@@ -511,6 +511,57 @@ export interface TicketDeletedMessage {
   timestamp: string
 }
 
+export interface TicketAiEditStreamMessage {
+  type: 'ticket_ai_edit_stream'
+  projectId: string
+  ticketId: number
+  requestId: string
+  delta: string
+  timestamp: string
+}
+
+export interface TicketAiEditDoneMessage {
+  type: 'ticket_ai_edit_done'
+  projectId: string
+  ticketId: number
+  requestId: string
+  fullText: string
+  timestamp: string
+}
+
+export interface TicketAiEditErrorMessage {
+  type: 'ticket_ai_edit_error'
+  projectId: string
+  ticketId: number
+  requestId: string
+  error: string
+  timestamp: string
+}
+
+export interface SpecGenStreamMessage {
+  type: 'spec_gen_stream'
+  projectId: string
+  requestId: string
+  delta: string
+  timestamp: string
+}
+
+export interface SpecGenDoneMessage {
+  type: 'spec_gen_done'
+  projectId: string
+  requestId: string
+  ticket: LocalTicket
+  timestamp: string
+}
+
+export interface SpecGenErrorMessage {
+  type: 'spec_gen_error'
+  projectId: string
+  requestId: string
+  error: string
+  timestamp: string
+}
+
 // ─── Cost alert message types ─────────────────────────────────────────────────
 
 export interface CostAlertMessage {
@@ -582,5 +633,7 @@ export type WsMessage =
   | CostAlertMessage | DailyBudgetExceededMessage | HubDailyBudgetExceededMessage
   | PipelineStatusMessage
   | TicketCreatedMessage | TicketUpdatedMessage | TicketDeletedMessage
+  | TicketAiEditStreamMessage | TicketAiEditDoneMessage | TicketAiEditErrorMessage
+  | SpecGenStreamMessage | SpecGenDoneMessage | SpecGenErrorMessage
   | RailJobStartedMessage | RailJobStoppedMessage | RailJobCompletedMessage
 

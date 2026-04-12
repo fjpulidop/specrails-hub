@@ -33,8 +33,17 @@ function deriveProjectName(projectPath: string): string {
   return path.basename(projectPath)
 }
 
+function hasCommandFiles(dir: string): boolean {
+  try {
+    return fs.readdirSync(dir).some((f) => f.endsWith('.md'))
+  } catch {
+    return false
+  }
+}
+
 function hasSpecrails(projectPath: string): boolean {
-  return fs.existsSync(path.join(projectPath, '.claude', 'commands', 'sr'))
+  return hasCommandFiles(path.join(projectPath, '.claude', 'commands', 'sr'))
+    || hasCommandFiles(path.join(projectPath, '.claude', 'commands', 'specrails'))
 }
 
 export function createHubRouter(
@@ -469,10 +478,10 @@ export function createHubRouter(
       return
     }
 
-    const validEvents: WebhookEvent[] = ['job.completed', 'job.failed', 'daily_budget_exceeded', 'hub_daily_budget_exceeded']
+    const validEvents: WebhookEvent[] = ['job.completed', 'job.failed', 'job.canceled', 'daily_budget_exceeded', 'hub_daily_budget_exceeded']
     const parsedEvents: WebhookEvent[] = Array.isArray(events)
       ? (events as string[]).filter((e): e is WebhookEvent => validEvents.includes(e as WebhookEvent))
-      : ['job.completed', 'job.failed']
+      : ['job.completed', 'job.failed', 'job.canceled']
 
     if (parsedEvents.length === 0) {
       res.status(400).json({ error: 'at least one valid event is required' })
@@ -506,7 +515,7 @@ export function createHubRouter(
     }
 
     const { url, secret, events, enabled } = req.body ?? {}
-    const validEvents: WebhookEvent[] = ['job.completed', 'job.failed', 'daily_budget_exceeded', 'hub_daily_budget_exceeded']
+    const validEvents: WebhookEvent[] = ['job.completed', 'job.failed', 'job.canceled', 'daily_budget_exceeded', 'hub_daily_budget_exceeded']
     const parsedEvents: WebhookEvent[] | undefined = Array.isArray(events)
       ? (events as string[]).filter((e): e is WebhookEvent => validEvents.includes(e as WebhookEvent))
       : undefined

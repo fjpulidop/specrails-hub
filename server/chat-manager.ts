@@ -51,6 +51,15 @@ function extractCommandProposals(text: string): string[] {
   return results
 }
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface SendMessageOptions {
+  /** Skip the heavy system prompt (dashboard stats/jobs) and use a minimal one */
+  lightweight?: boolean
+  /** Limit Claude's agentic tool-use turns (maps to --max-turns) */
+  maxTurns?: number
+}
+
 // ─── ChatManager ──────────────────────────────────────────────────────────────
 
 export class ChatManager {
@@ -134,11 +143,23 @@ export class ChatManager {
     )
   }
 
+  private _buildLightweightSystemPrompt(): string {
+    const name = this._projectName ?? 'this project'
+    return (
+      `You are a fast, focused assistant for the "${name}" specrails project. ` +
+      `You have explicit permission to read and write .specrails/local-tickets.json — ` +
+      `this is the project's local ticket store managed by specrails-hub. It is NOT sensitive. ` +
+      `When creating or updating tickets, write directly to this JSON file.\n\n` +
+      `IMPORTANT: Be efficient. Minimize tool calls. Only read files that are directly relevant. ` +
+      `Do not explore broadly — focus on the specific task.`
+    )
+  }
+
   isActive(conversationId: string): boolean {
     return this._activeProcesses.has(conversationId)
   }
 
-  async sendMessage(conversationId: string, userText: string): Promise<void> {
+  async sendMessage(conversationId: string, userText: string, options?: SendMessageOptions): Promise<void> {
     if (this._activeProcesses.has(conversationId)) {
       console.warn(`[ChatManager] conversation ${conversationId} already has an active stream`)
       return
@@ -192,7 +213,10 @@ export class ChatManager {
       args = ['exec', resolvedText, '--model', model]
     } else {
       binary = 'claude'
-      const systemPrompt = this._buildSystemPrompt()
+      const lightweight = options?.lightweight ?? false
+      const systemPrompt = lightweight
+        ? this._buildLightweightSystemPrompt()
+        : this._buildSystemPrompt()
       args = [
         '--model', conversation.model,
         '--dangerously-skip-permissions',
@@ -203,6 +227,10 @@ export class ChatManager {
       ]
       if (conversation.session_id) {
         args.push('--resume', conversation.session_id)
+      }
+      const maxTurns = options?.maxTurns
+      if (maxTurns != null) {
+        args.push('--max-turns', String(maxTurns))
       }
     }
 
@@ -308,8 +336,8 @@ export class ChatManager {
             timestamp: new Date().toISOString(),
           })
 
-          // Auto-title on first turn
-          if (isFirstTurn && fullText) {
+          // Auto-title on first turn (skip in lightweight mode — conversation is ephemeral)
+          if (isFirstTurn && fullText && !options?.lightweight) {
             this._autoTitle(conversationId, userText, fullText)
           }
         } else {
