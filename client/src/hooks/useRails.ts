@@ -134,10 +134,15 @@ export function useRails() {
           const next = new Map(prev)
           const existing = next.get(msg.railIndex)
           if (existing && existing.jobId === msg.jobId) {
-            next.set(msg.railIndex, {
-              ...existing,
-              status: msg.status === 'completed' ? 'completed' : 'failed',
-            })
+            if (msg.status === 'canceled') {
+              // Canceled — remove from active rails entirely (same as stopped)
+              next.delete(msg.railIndex)
+            } else {
+              next.set(msg.railIndex, {
+                ...existing,
+                status: msg.status === 'completed' ? 'completed' : 'failed',
+              })
+            }
           }
           return next
         })
