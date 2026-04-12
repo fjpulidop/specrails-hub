@@ -156,4 +156,69 @@ describe('ProposeSpecModal', () => {
     const newTextarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     expect(newTextarea).toHaveValue('')
   })
+
+  it('submits via Cmd+Enter keyboard shortcut', async () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
+    fireEvent.change(textarea, { target: { value: 'Keyboard test' } })
+    fireEvent.keyDown(textarea, { key: 'Enter', metaKey: true })
+
+    await waitFor(() => {
+      expect(mockStartWithMessage).toHaveBeenCalledTimes(1)
+      expect((mockStartWithMessage.mock.calls[0][0] as string)).toContain('Keyboard test')
+    })
+  })
+
+  it('uses fast mode when explore codebase is unchecked', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ requestId: 'req-1' }),
+    })
+
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    // Uncheck explore codebase
+    const checkbox = screen.getByRole('checkbox')
+    fireEvent.click(checkbox)
+    // Fill and submit
+    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
+    fireEvent.change(textarea, { target: { value: 'Fast spec' } })
+    fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/tickets/generate-spec'),
+        expect.objectContaining({ method: 'POST' }),
+      )
+    })
+    // Should NOT use ChatManager in fast mode
+    expect(mockStartWithMessage).not.toHaveBeenCalled()
+  })
+
+  it('resets phase to input when closed during generation', async () => {
+    const { rerender } = render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
+    fireEvent.change(textarea, { target: { value: 'Test' } })
+    fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
+
+    await waitFor(() => expect(screen.getByText(/generating your spec/i)).toBeInTheDocument())
+
+    // Close modal
+    rerender(<ProposeSpecModal open={false} onClose={onCloseMock} tickets={emptyTickets} />)
+    // Reopen — should show input phase, not generating
+    rerender(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+
+    expect(screen.getByPlaceholderText(/add a dark mode toggle/i)).toBeInTheDocument()
+    expect(screen.queryByText(/generating your spec/i)).not.toBeInTheDocument()
+  })
+
+  it('prevents interaction outside during generation', async () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
+    fireEvent.change(textarea, { target: { value: 'Test' } })
+    fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
+
+    await waitFor(() => expect(screen.getByText(/generating your spec/i)).toBeInTheDocument())
+    // The preventInteractOutside callback should exist — modal should still be generating
+    expect(screen.getByText(/generating your spec/i)).toBeInTheDocument()
+  })
 })
