@@ -4,7 +4,7 @@ import { FSWatcher } from 'chokidar'
 import type { WsMessage, LocalTicket } from './types'
 
 const TICKET_FILE = '.specrails/local-tickets.json'
-const DEBOUNCE_MS = 400
+const DEBOUNCE_MS = 150
 
 interface TicketFileData {
   schema_version: string
@@ -54,8 +54,8 @@ export class TicketWatcher {
       ignoreInitial: true,
       // awaitWriteFinish helps with rapid writes from CLI agents
       awaitWriteFinish: {
-        stabilityThreshold: 200,
-        pollInterval: 100,
+        stabilityThreshold: 80,
+        pollInterval: 50,
       },
     })
 

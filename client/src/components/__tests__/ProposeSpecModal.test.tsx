@@ -7,6 +7,17 @@ import type { LocalTicket } from '../../types'
 const mockStartWithMessage = vi.fn().mockResolvedValue('conv-1')
 const mockAbortStream = vi.fn()
 
+vi.mock('../../hooks/useHub', () => ({
+  useHub: () => ({ activeProjectId: 'proj-1' }),
+}))
+
+vi.mock('../../hooks/useSharedWebSocket', () => ({
+  useSharedWebSocket: () => ({
+    registerHandler: vi.fn(),
+    unregisterHandler: vi.fn(),
+  }),
+}))
+
 vi.mock('../../hooks/useChat', () => ({
   useChatContext: () => ({
     conversations: [],
