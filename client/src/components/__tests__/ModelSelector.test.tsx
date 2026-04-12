@@ -14,28 +14,32 @@ describe('getDefaultModel', () => {
     expect(getDefaultModel('sr-developer', 'balanced', 'claude')).toBe('claude-sonnet-4-6')
   })
 
-  it('returns opus for architect in balanced preset (claude)', () => {
-    expect(getDefaultModel('sr-architect', 'balanced', 'claude')).toBe('claude-opus-4-6')
+  it('returns sonnet for architect in balanced preset (claude)', () => {
+    expect(getDefaultModel('sr-architect', 'balanced', 'claude')).toBe('claude-sonnet-4-6')
   })
 
-  it('returns opus for product-manager in balanced preset (claude)', () => {
-    expect(getDefaultModel('sr-product-manager', 'balanced', 'claude')).toBe('claude-opus-4-6')
+  it('returns sonnet for product-manager in balanced preset (claude)', () => {
+    expect(getDefaultModel('sr-product-manager', 'balanced', 'claude')).toBe('claude-sonnet-4-6')
   })
 
   it('returns haiku for budget preset (claude)', () => {
     expect(getDefaultModel('sr-developer', 'budget', 'claude')).toBe('claude-haiku-4-5-20251001')
   })
 
-  it('returns opus for max preset (claude)', () => {
-    expect(getDefaultModel('sr-developer', 'max', 'claude')).toBe('claude-opus-4-6')
+  it('returns sonnet for non-special agents in max preset (claude)', () => {
+    expect(getDefaultModel('sr-developer', 'max', 'claude')).toBe('claude-sonnet-4-6')
+  })
+
+  it('returns opus for architect in max preset (claude)', () => {
+    expect(getDefaultModel('sr-architect', 'max', 'claude')).toBe('claude-opus-4-6')
   })
 
   it('returns codex-mini-latest for budget preset (codex)', () => {
     expect(getDefaultModel('sr-developer', 'budget', 'codex')).toBe('codex-mini-latest')
   })
 
-  it('returns o3 for architect in balanced preset (codex)', () => {
-    expect(getDefaultModel('sr-architect', 'balanced', 'codex')).toBe('o3')
+  it('returns codex-mini-latest for architect in balanced preset (codex)', () => {
+    expect(getDefaultModel('sr-architect', 'balanced', 'codex')).toBe('codex-mini-latest')
   })
 })
 

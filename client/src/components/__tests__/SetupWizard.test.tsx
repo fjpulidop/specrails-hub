@@ -77,12 +77,12 @@ describe('SetupWizard', () => {
       expect(screen.getByText(/configure your agents/i)).toBeInTheDocument()
     })
 
-    it('shows wizard step indicator labels', () => {
+    it('shows wizard step indicator labels (quick mode default — no Enrich)', () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
       expect(screen.getByText('Configure')).toBeInTheDocument()
       expect(screen.getByText('Install')).toBeInTheDocument()
-      expect(screen.getByText('Enrich')).toBeInTheDocument()
+      expect(screen.queryByText('Enrich')).not.toBeInTheDocument()
       expect(screen.getByText('Done')).toBeInTheDocument()
     })
 
@@ -107,11 +107,11 @@ describe('SetupWizard', () => {
       expect(screen.getByText('Full Setup')).toBeInTheDocument()
     })
 
-    it('renders Install & Enrich button in agent-selection step', () => {
+    it('renders Quick Install button in agent-selection step (default tier is quick)', () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
-      // Default tier is 'full', so the button reads "Install & Enrich"
-      expect(screen.getByText('Install & Enrich')).toBeInTheDocument()
+      // Default tier is 'quick', so the button reads "Quick Install"
+      expect(screen.getByText('Quick Install')).toBeInTheDocument()
     })
   })
 
@@ -119,7 +119,7 @@ describe('SetupWizard', () => {
     it('transitions to installing step when Install button is clicked', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
-      fireEvent.click(screen.getByText('Install & Enrich'))
+      fireEvent.click(screen.getByText('Quick Install'))
       await waitFor(() => {
         expect(screen.getByText(/installing specrails/i)).toBeInTheDocument()
       })
@@ -128,7 +128,7 @@ describe('SetupWizard', () => {
     it('calls POST /setup/install when Install is clicked', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
-      fireEvent.click(screen.getByText('Install & Enrich'))
+      fireEvent.click(screen.getByText('Quick Install'))
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(
           `/api/projects/${project.id}/setup/install`,
@@ -140,7 +140,7 @@ describe('SetupWizard', () => {
     it('shows "Waiting for output..." when no log lines yet', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
-      fireEvent.click(screen.getByText('Install & Enrich'))
+      fireEvent.click(screen.getByText('Quick Install'))
       await waitFor(() => {
         expect(screen.getByText(/waiting for output/i)).toBeInTheDocument()
       })
@@ -174,7 +174,7 @@ describe('SetupWizard', () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
       // Move to installing step
-      fireEvent.click(screen.getByText('Install & Enrich'))
+      fireEvent.click(screen.getByText('Quick Install'))
       await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
 
       const handler = getWsHandler()
@@ -190,7 +190,7 @@ describe('SetupWizard', () => {
     it('ignores messages from different projectId', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
-      fireEvent.click(screen.getByText('Install & Enrich'))
+      fireEvent.click(screen.getByText('Quick Install'))
       await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
 
       const handler = getWsHandler()
@@ -201,9 +201,11 @@ describe('SetupWizard', () => {
       expect(screen.queryByText('Should not appear')).toBeNull()
     })
 
-    it('transitions to setup step on setup_install_done', async () => {
+    it('transitions to enriching step on setup_install_done (full tier)', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      // Switch to full tier so install_done transitions to enriching
+      fireEvent.click(screen.getByText('Full Setup'))
       fireEvent.click(screen.getByText('Install & Enrich'))
       await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
 
@@ -217,9 +219,11 @@ describe('SetupWizard', () => {
       })
     })
 
-    it('marks complete on setup_complete message', async () => {
+    it('marks complete on setup_complete message (full tier)', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      // Switch to full tier
+      fireEvent.click(screen.getByText('Full Setup'))
       fireEvent.click(screen.getByText('Install & Enrich'))
       await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
 
@@ -243,7 +247,7 @@ describe('SetupWizard', () => {
     it('shows error step on setup_error message', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
-      fireEvent.click(screen.getByText('Install & Enrich'))
+      fireEvent.click(screen.getByText('Quick Install'))
       await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
 
       const handler = getWsHandler()
@@ -257,9 +261,11 @@ describe('SetupWizard', () => {
       })
     })
 
-    it('updates checkpoint status on setup_checkpoint message', async () => {
+    it('updates checkpoint status on setup_checkpoint message (full tier)', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      // Switch to full tier so install_done transitions to enriching
+      fireEvent.click(screen.getByText('Full Setup'))
       fireEvent.click(screen.getByText('Install & Enrich'))
       await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
 
@@ -283,7 +289,7 @@ describe('SetupWizard', () => {
     async function renderErrorStep() {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
-      fireEvent.click(screen.getByText('Install & Enrich'))
+      fireEvent.click(screen.getByText('Quick Install'))
       await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
       const handler = mockRegisterHandler.mock.calls[0][1] as (msg: unknown) => void
       act(() => {
@@ -324,7 +330,7 @@ describe('SetupWizard', () => {
     it('installing step shows a Back button', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
-      fireEvent.click(screen.getByText('Install & Enrich'))
+      fireEvent.click(screen.getByText('Quick Install'))
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /^back$/i })).toBeInTheDocument()
       })
@@ -333,7 +339,7 @@ describe('SetupWizard', () => {
     it('Back button in installing step returns to agent-selection', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
-      fireEvent.click(screen.getByText('Install & Enrich'))
+      fireEvent.click(screen.getByText('Quick Install'))
       await waitFor(() => expect(screen.getByRole('button', { name: /^back$/i })).toBeInTheDocument())
       fireEvent.click(screen.getByRole('button', { name: /^back$/i }))
       await waitFor(() => {
@@ -341,9 +347,10 @@ describe('SetupWizard', () => {
       })
     })
 
-    it('enriching step shows a Back button', async () => {
+    it('enriching step shows a Back button (full tier)', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      fireEvent.click(screen.getByText('Full Setup'))
       fireEvent.click(screen.getByText('Install & Enrich'))
       await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
       const handler = mockRegisterHandler.mock.calls[0][1] as (msg: unknown) => void
@@ -354,9 +361,10 @@ describe('SetupWizard', () => {
       expect(screen.getByRole('button', { name: /^back$/i })).toBeInTheDocument()
     })
 
-    it('Back button in enriching step returns to installing', async () => {
+    it('Back button in enriching step returns to installing (full tier)', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      fireEvent.click(screen.getByText('Full Setup'))
       fireEvent.click(screen.getByText('Install & Enrich'))
       await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
       const handler = mockRegisterHandler.mock.calls[0][1] as (msg: unknown) => void
@@ -370,9 +378,10 @@ describe('SetupWizard', () => {
       })
     })
 
-    it('user input in setup chat is preserved when navigating back and forward', async () => {
+    it('user input in setup chat is preserved when navigating back and forward (full tier)', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      fireEvent.click(screen.getByText('Full Setup'))
       fireEvent.click(screen.getByText('Install & Enrich'))
       await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
       const handler = mockRegisterHandler.mock.calls[0][1] as (msg: unknown) => void
@@ -394,6 +403,8 @@ describe('SetupWizard', () => {
     async function renderCompleteStep(summary = { agents: 4, personas: 3, commands: 8 }) {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      // Switch to full tier so install_done transitions to enriching, then complete
+      fireEvent.click(screen.getByText('Full Setup'))
       fireEvent.click(screen.getByText('Install & Enrich'))
       await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
       const handler = mockRegisterHandler.mock.calls[0][1] as (msg: unknown) => void
@@ -431,6 +442,8 @@ describe('SetupWizard', () => {
       const onComplete = vi.fn()
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={onComplete} onSkip={vi.fn()} />)
+      // Switch to full tier so install_done transitions to enriching, then complete
+      fireEvent.click(screen.getByText('Full Setup'))
       fireEvent.click(screen.getByText('Install & Enrich'))
       await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
       const handler = mockRegisterHandler.mock.calls[0][1] as (msg: unknown) => void
