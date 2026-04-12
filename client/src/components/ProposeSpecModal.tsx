@@ -31,7 +31,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: Pr
   const activeProjectIdRef = useRef(activeProjectId)
   useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
 
-  // Reset state when modal opens
+  // Reset state when modal opens/closes
   useEffect(() => {
     if (open) {
       setPhase('input')
@@ -39,12 +39,12 @@ export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: Pr
       conversationIdRef.current = null
       createdTicketRef.current = null
       fastRequestIdRef.current = null
-    }
-    return () => {
-      // Kill any running Claude process when the modal closes
+    } else {
+      // Modal closed — kill detection loops and any running Claude process
       if (conversationIdRef.current && chat) {
         chat.abortStream(conversationIdRef.current)
       }
+      setPhase('input')
       conversationIdRef.current = null
       createdTicketRef.current = null
       fastRequestIdRef.current = null
@@ -136,9 +136,15 @@ export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: Pr
     return () => unregisterHandler('spec_gen')
   }, [handleSpecGenWs, registerHandler, unregisterHandler])
 
+  // Stable refs for callbacks — avoids re-running the done effect on every parent render
+  const onCloseRef = useRef(onClose)
+  const onTicketCreatedRef = useRef(onTicketCreated)
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
+  useEffect(() => { onTicketCreatedRef.current = onTicketCreated }, [onTicketCreated])
+
   // When done, kill any still-running Claude process, close modal, show ticket
   useEffect(() => {
-    if (phase !== 'done') return
+    if (phase !== 'done' || !open) return
     // Abort the ChatManager session — ticket is created, no need to keep going
     if (conversationIdRef.current && chat) {
       chat.abortStream(conversationIdRef.current)
@@ -146,13 +152,13 @@ export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: Pr
     }
     const ticket = createdTicketRef.current
     const timer = setTimeout(() => {
-      onClose()
-      if (ticket && onTicketCreated) {
-        onTicketCreated(ticket)
+      onCloseRef.current()
+      if (ticket && onTicketCreatedRef.current) {
+        onTicketCreatedRef.current(ticket)
       }
     }, 400)
     return () => clearTimeout(timer)
-  }, [phase, onClose, onTicketCreated, chat])
+  }, [phase, open, chat])
 
   const handleSubmit = useCallback(async () => {
     if (!inputText.trim()) return

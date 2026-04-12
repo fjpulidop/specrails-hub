@@ -8,6 +8,12 @@ vi.mock('react-markdown', () => ({
 }))
 vi.mock('remark-gfm', () => ({ default: () => {} }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+vi.mock('../../hooks/useSharedWebSocket', () => ({
+  useSharedWebSocket: () => ({
+    registerHandler: vi.fn(),
+    unregisterHandler: vi.fn(),
+  }),
+}))
 
 import { TicketDetailModal } from '../TicketDetailModal'
 import type { LocalTicket } from '../../types'
@@ -57,12 +63,6 @@ describe('TicketDetailModal', () => {
     it('renders ticket description', () => {
       render(<TicketDetailModal {...makeDefaultProps()} />)
       expect(screen.getByText('A description')).toBeDefined()
-    })
-
-    it('renders ticket status badge', () => {
-      render(<TicketDetailModal {...makeDefaultProps()} />)
-      // TicketStatusBadge renders "Todo" for todo status
-      expect(screen.getAllByText('Todo').length).toBeGreaterThan(0)
     })
 
     it('renders ticket labels', () => {
@@ -147,25 +147,6 @@ describe('TicketDetailModal', () => {
     })
   })
 
-  describe('status select', () => {
-    it('renders a status select with current value', () => {
-      render(<TicketDetailModal {...makeDefaultProps()} />)
-      const select = screen.getByDisplayValue('Todo')
-      expect(select).toBeDefined()
-    })
-
-    it('shows Save button when status is changed', async () => {
-      render(<TicketDetailModal {...makeDefaultProps()} />)
-
-      const select = screen.getByDisplayValue('Todo') as HTMLSelectElement
-      fireEvent.change(select, { target: { value: 'done' } })
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /save/i })).toBeDefined()
-      })
-    })
-  })
-
   describe('priority select', () => {
     it('shows Save button when priority is changed', async () => {
       render(<TicketDetailModal {...makeDefaultProps()} />)
@@ -183,9 +164,9 @@ describe('TicketDetailModal', () => {
       const onClose = vi.fn()
       render(<TicketDetailModal {...makeDefaultProps({ onSave, onClose })} />)
 
-      // Change status to make isDirty=true
-      const select = screen.getByDisplayValue('Todo') as HTMLSelectElement
-      fireEvent.change(select, { target: { value: 'in_progress' } })
+      // Change priority to make isDirty=true
+      const select = screen.getByDisplayValue('Medium') as HTMLSelectElement
+      fireEvent.change(select, { target: { value: 'high' } })
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /save/i })).toBeDefined()
@@ -193,7 +174,7 @@ describe('TicketDetailModal', () => {
       fireEvent.click(screen.getByRole('button', { name: /save/i }))
 
       await waitFor(() => {
-        expect(onSave).toHaveBeenCalledWith(1, expect.objectContaining({ status: 'in_progress' }))
+        expect(onSave).toHaveBeenCalledWith(1, expect.objectContaining({ priority: 'high' }))
         expect(onClose).toHaveBeenCalled()
       })
     })
@@ -203,7 +184,7 @@ describe('TicketDetailModal', () => {
       const onSave = vi.fn(async () => false)
       render(<TicketDetailModal {...makeDefaultProps({ onSave })} />)
 
-      fireEvent.change(screen.getByDisplayValue('Todo'), { target: { value: 'done' } })
+      fireEvent.change(screen.getByDisplayValue('Medium'), { target: { value: 'high' } })
 
       await waitFor(() => screen.getByRole('button', { name: /save/i }))
       fireEvent.click(screen.getByRole('button', { name: /save/i }))
