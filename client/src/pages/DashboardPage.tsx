@@ -168,7 +168,7 @@ export default function DashboardPage() {
 
   // Dynamic container IDs for DnD (specs + all current rail IDs)
   const containerIds = useMemo(() => {
-    const ids = new Set<string>(['specs'])
+    const ids = new Set<string>(['specs', 'done-specs'])
     for (const r of rails) ids.add(r.id)
     return ids
   }, [rails])
@@ -289,12 +289,13 @@ export default function DashboardPage() {
   const findContainer = useCallback(
     (ticketId: number): string | null => {
       if (specTickets.some((t) => t.id === ticketId)) return 'specs'
+      if (doneSpecTickets.some((t) => t.id === ticketId)) return 'done-specs'
       for (const rail of rails) {
         if (rail.ticketIds.includes(ticketId)) return rail.id
       }
       return null
     },
-    [specTickets, rails],
+    [specTickets, doneSpecTickets, rails],
   )
 
   /** Insert itemId before beforeId in arr; if beforeId not found, append. */
@@ -375,8 +376,22 @@ export default function DashboardPage() {
       }
     } else {
       // ── Move between containers ───────────────────────────────────────────
-      if (sourceContainer === 'specs') {
-        // Specs → Rail
+
+      // Specs → Done (mark ticket as done)
+      if (sourceContainer === 'specs' && destContainer === 'done-specs') {
+        updateSpecOrder((prev) => (prev ?? specTickets.map((t) => t.id)).filter((id) => id !== draggedId))
+        updateTicket(draggedId, { status: 'done' })
+      }
+      // Done → Specs (revert ticket to todo)
+      else if (sourceContainer === 'done-specs' && destContainer === 'specs') {
+        updateTicket(draggedId, { status: 'todo' })
+        updateSpecOrder((prev) => {
+          const current = prev ?? specTickets.map((t) => t.id)
+          return insertAt(current, draggedId, overId)
+        })
+      }
+      // Specs → Rail
+      else if (sourceContainer === 'specs') {
         updateSpecOrder((prev) => (prev ?? specTickets.map((t) => t.id)).filter((id) => id !== draggedId))
         updateRails((prev) =>
           prev.map((r) => {
@@ -384,8 +399,9 @@ export default function DashboardPage() {
             return { ...r, ticketIds: insertAt(r.ticketIds, draggedId, overId) }
           }),
         )
-      } else if (destContainer === 'specs') {
-        // Rail → Specs
+      }
+      // Rail → Specs
+      else if (destContainer === 'specs') {
         updateRails((prev) =>
           prev.map((r) => {
             if (r.id !== sourceContainer) return r
@@ -396,8 +412,29 @@ export default function DashboardPage() {
           const current = prev ?? specTickets.map((t) => t.id)
           return insertAt(current, draggedId, overId)
         })
-      } else {
-        // Rail → Rail
+      }
+      // Done → Rail (revert to todo then add to rail)
+      else if (sourceContainer === 'done-specs') {
+        updateTicket(draggedId, { status: 'todo' })
+        updateRails((prev) =>
+          prev.map((r) => {
+            if (r.id !== destContainer) return r
+            return { ...r, ticketIds: insertAt(r.ticketIds, draggedId, overId) }
+          }),
+        )
+      }
+      // Rail → Done (mark as done, remove from rail)
+      else if (destContainer === 'done-specs') {
+        updateRails((prev) =>
+          prev.map((r) => {
+            if (r.id !== sourceContainer) return r
+            return { ...r, ticketIds: r.ticketIds.filter((id) => id !== draggedId) }
+          }),
+        )
+        updateTicket(draggedId, { status: 'done' })
+      }
+      // Rail → Rail
+      else {
         updateRails((prev) =>
           prev.map((r) => {
             if (r.id === sourceContainer) {
