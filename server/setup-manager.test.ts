@@ -170,7 +170,7 @@ describe('SetupManager', () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'npx',
-        ['specrails-core@latest', 'init', '--from-config', '/path/to/project/.specrails/install-config.yaml'],
+        ['specrails-core@latest', 'init', '--yes', '--from-config', '/path/to/project/.specrails/install-config.yaml'],
         expect.objectContaining({ cwd: '/path/to/project' })
       )
     })
