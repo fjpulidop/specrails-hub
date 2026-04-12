@@ -76,4 +76,20 @@ describe('TicketPostItView', () => {
     render(<TicketPostItView {...makeDefaultProps({ tickets: [ticket] })} />)
     expect(screen.getByText('#42')).toBeDefined()
   })
+
+  it('resets rotation on mouse enter and restores on mouse leave', () => {
+    const ticket = makeTicket({ id: 1, title: 'Hover ticket', status: 'todo' })
+    render(<TicketPostItView {...makeDefaultProps({ tickets: [ticket] })} />)
+    const card = screen.getByText('Hover ticket').closest('button')!
+    fireEvent.mouseEnter(card)
+    expect(card.style.transform).toContain('rotate(0deg)')
+    fireEvent.mouseLeave(card)
+    expect(card.style.transform).toContain('rotate(')
+  })
+
+  it('shows error state when error prop is provided', () => {
+    render(<TicketPostItView {...makeDefaultProps()} error="Network error" />)
+    expect(screen.getByText('Failed to load tickets')).toBeDefined()
+    expect(screen.getByText('Network error')).toBeDefined()
+  })
 })
