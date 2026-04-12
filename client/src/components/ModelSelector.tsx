@@ -30,15 +30,15 @@ export const CODEX_MODELS = [
   { value: 'o3', label: 'o3' },
 ]
 
-// Preset → default model per provider
+// Preset → default model per provider (matches specrails-core MODEL_PRESETS)
 export const PRESET_DEFAULTS: Record<ModelPreset, { claude: string; codex: string }> = {
   balanced: { claude: 'claude-sonnet-4-6', codex: 'codex-mini-latest' },
   budget: { claude: 'claude-haiku-4-5-20251001', codex: 'codex-mini-latest' },
-  max: { claude: 'claude-opus-4-6', codex: 'o3' },
+  max: { claude: 'claude-sonnet-4-6', codex: 'codex-mini-latest' },
 }
 
-// Agents that default to a more powerful model in the "balanced" preset
-const BALANCED_OVERRIDES: Record<string, { claude: string; codex: string }> = {
+// "max" preset: Opus for architect + PM, Sonnet for rest (matches specrails-core)
+const MAX_OVERRIDES: Record<string, { claude: string; codex: string }> = {
   'sr-architect': { claude: 'claude-opus-4-6', codex: 'o3' },
   'sr-product-manager': { claude: 'claude-opus-4-6', codex: 'o3' },
 }
@@ -48,8 +48,8 @@ export function getDefaultModel(
   preset: ModelPreset,
   provider: 'claude' | 'codex'
 ): string {
-  if (preset === 'balanced' && BALANCED_OVERRIDES[agentId]) {
-    return BALANCED_OVERRIDES[agentId][provider]
+  if (preset === 'max' && MAX_OVERRIDES[agentId]) {
+    return MAX_OVERRIDES[agentId][provider]
   }
   return PRESET_DEFAULTS[preset][provider]
 }
@@ -66,9 +66,9 @@ interface ModelSelectorProps {
 }
 
 const PRESET_LABELS: Record<ModelPreset, { label: string; description: string }> = {
-  balanced: { label: 'Balanced', description: 'Opus for architecture, Sonnet for the rest' },
-  budget: { label: 'Budget', description: 'Haiku/Mini for all agents — fast & cheap' },
-  max: { label: 'Max', description: 'Opus/o3 for every agent — best quality' },
+  balanced: { label: 'Balanced', description: 'Sonnet for all agents (recommended)' },
+  budget: { label: 'Budget', description: 'Haiku for all agents — 3x cheaper, faster' },
+  max: { label: 'Max', description: 'Opus for architect + PM, Sonnet for rest' },
 }
 
 export function ModelSelector({

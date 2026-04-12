@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm'
 import { Button } from './ui/button'
 import { CheckpointTracker, type CheckpointState } from './CheckpointTracker'
 import { SetupChat, type SetupChatMessage } from './SetupChat'
-import { AgentSelector, ALL_AGENTS } from './AgentSelector'
+import { AgentSelector, ALL_AGENTS, CORE_AGENTS, DEFAULT_SELECTED } from './AgentSelector'
 import { ModelSelector, type ModelPreset, type ModelOverrides } from './ModelSelector'
 import { TierSelector, type InstallTier } from './TierSelector'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
@@ -36,10 +36,28 @@ interface InstallConfig {
   modelOverrides: ModelOverrides
 }
 
+// Map full model IDs to short names used by specrails-core
+function toShortModelName(modelId: string): string {
+  if (modelId.includes('opus')) return 'opus'
+  if (modelId.includes('haiku')) return 'haiku'
+  if (modelId.includes('sonnet')) return 'sonnet'
+  return modelId // codex models pass through as-is
+}
+
+// Map preset to default short model name
+function presetToDefaultModel(preset: ModelPreset): string {
+  const defaults: Record<ModelPreset, string> = {
+    balanced: 'sonnet',
+    budget: 'haiku',
+    max: 'sonnet',
+  }
+  return defaults[preset]
+}
+
 function buildDefaultConfig(): InstallConfig {
   return {
-    tier: 'full',
-    selectedAgents: ALL_AGENTS.map((a) => a.id),
+    tier: 'quick',
+    selectedAgents: [...DEFAULT_SELECTED],
     modelPreset: 'balanced',
     modelOverrides: {},
   }
@@ -496,7 +514,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
 
   const [wizardStep, setWizardStep] = useState<WizardStep>(cached?.wizardStep ?? { step: 'agent-selection' })
   const [installConfig, setInstallConfig] = useState<InstallConfig>(cached?.installConfig ?? buildDefaultConfig())
-  const [checkpoints, setCheckpoints] = useState<CheckpointState[]>(cached?.checkpoints ?? FULL_CHECKPOINTS)
+  const [checkpoints, setCheckpoints] = useState<CheckpointState[]>(cached?.checkpoints ?? QUICK_CHECKPOINTS)
   const [logLines, setLogLines] = useState<string[]>(cached?.logLines ?? [])
   const [chatMessages, setChatMessages] = useState<SetupChatMessage[]>(cached?.chatMessages ?? [])
   const [streamingText, setStreamingText] = useState('')
@@ -730,27 +748,42 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
 
   async function handleInstall() {
     const cfg = installConfigRef.current
+    const provider = (project as { provider?: 'claude' | 'codex' }).provider ?? 'claude'
+
+    // Ensure core agents are always included
+    const selectedWithCore = [...new Set([...CORE_AGENTS, ...cfg.selectedAgents])]
+    const excluded = ALL_AGENTS.map((a) => a.id).filter((id) => !selectedWithCore.includes(id))
+
+    // Convert model overrides from full IDs to short names (sonnet/haiku/opus)
+    const shortOverrides: Record<string, string> = {}
+    for (const [agentId, modelId] of Object.entries(cfg.modelOverrides)) {
+      if (modelId) shortOverrides[agentId] = toShortModelName(modelId)
+    }
 
     // Reset checkpoints based on tier
     setCheckpoints(cfg.tier === 'quick' ? QUICK_CHECKPOINTS : FULL_CHECKPOINTS)
     setLogLines([])
     setWizardStep({ step: 'installing', tier: cfg.tier })
 
-    // Write install config to server, then start install
+    // Write install config matching specrails-core's install-config.yaml schema
     try {
       await fetch(`/api/projects/${project.id}/setup/install-config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          version: 1,
+          provider,
           tier: cfg.tier,
           agents: {
-            selected: cfg.selectedAgents,
-            excluded: ALL_AGENTS.map((a) => a.id).filter((id) => !cfg.selectedAgents.includes(id)),
+            selected: selectedWithCore,
+            excluded,
           },
           models: {
             preset: cfg.modelPreset,
-            overrides: cfg.modelOverrides,
+            defaults: { model: presetToDefaultModel(cfg.modelPreset) },
+            overrides: shortOverrides,
           },
+          agent_teams: false,
         }),
       })
     } catch (err) {

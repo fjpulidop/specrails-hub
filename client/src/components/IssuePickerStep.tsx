@@ -139,9 +139,9 @@ export function IssuePickerStep({ multiSelect = false, selectedIssues, onSelecti
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium truncate">{issue.title}</p>
-                  {issue.labels.length > 0 && (
+                  {(issue.labels?.length ?? 0) > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {issue.labels.slice(0, 3).map((label) => (
+                      {issue.labels!.slice(0, 3).map((label) => (
                         <Badge key={label} variant="secondary" className="text-[9px] px-1 py-0">
                           {label}
                         </Badge>

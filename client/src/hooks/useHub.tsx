@@ -40,15 +40,29 @@ interface HubContextValue {
 
 const HubContext = createContext<HubContextValue | null>(null)
 
+const ACTIVE_PROJECT_KEY = 'specrails-hub:activeProjectId'
+
+function readSavedProjectId(): string | null {
+  try { return localStorage.getItem(ACTIVE_PROJECT_KEY) } catch { return null }
+}
+
+function writeSavedProjectId(id: string | null): void {
+  try {
+    if (id) localStorage.setItem(ACTIVE_PROJECT_KEY, id)
+    else localStorage.removeItem(ACTIVE_PROJECT_KEY)
+  } catch { /* ignore */ }
+}
+
 export function HubProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<HubProject[]>([])
-  const [activeProjectId, setActiveProjectIdRaw] = useState<string | null>(null)
+  const [activeProjectId, setActiveProjectIdRaw] = useState<string | null>(readSavedProjectId)
   const [isLoading, setIsLoading] = useState(true)
   const [isSwitchingProject, setIsSwitchingProject] = useState(false)
   const [setupProjectIds, setSetupProjectIds] = useState<Set<string>>(new Set())
   const switchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function setActiveProjectId(id: string | null): void {
+    writeSavedProjectId(id)
     setApiContext(true, id)
     setActiveProjectIdRaw((prev) => {
       if (prev !== null && prev !== id) {
@@ -74,10 +88,13 @@ export function HubProvider({ children }: { children: ReactNode }) {
         if (data.setupProjectIds && data.setupProjectIds.length > 0) {
           setSetupProjectIds(new Set(data.setupProjectIds))
         }
-        // Default to first project if none selected
+        // Restore active project: prefer saved ID if it still exists, else first project
         if (data.projects.length > 0) {
           setActiveProjectIdRaw((prev) => {
-            const next = prev ?? data.projects[0].id
+            const saved = prev // Already initialized from localStorage
+            const validSaved = saved && data.projects.find((p) => p.id === saved) ? saved : null
+            const next = validSaved ?? data.projects[0].id
+            writeSavedProjectId(next)
             setApiContext(true, next)
             return next
           })
@@ -101,6 +118,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
       setProjects(incoming)
       setActiveProjectIdRaw((prev) => {
         const next = (prev && incoming.find((p) => p.id === prev)) ? prev : (incoming.length > 0 ? incoming[0].id : null)
+        writeSavedProjectId(next)
         setApiContext(true, next)
         return next
       })
@@ -120,6 +138,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
       setProjects((prev) => prev.filter((p) => p.id !== projectId))
       setActiveProjectIdRaw((prev) => {
         if (prev !== projectId) return prev
+        writeSavedProjectId(null)
         setApiContext(true, null)
         return null
       })
