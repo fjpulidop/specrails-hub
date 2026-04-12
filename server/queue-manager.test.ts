@@ -1041,7 +1041,7 @@ describe('QueueManager', () => {
       expect(onJobFinished).toHaveBeenCalledWith('fail-cb-job', 'failed', undefined)
     })
 
-    it('does not call onJobFinished for canceled jobs', async () => {
+    it('calls onJobFinished for canceled jobs with canceled status', async () => {
       vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
@@ -1053,9 +1053,9 @@ describe('QueueManager', () => {
 
       qmWithCallback.cancel('cancel-cb-job')
       child.emit('close', 1)
-      await new Promise((r) => setTimeout(r, 50))
+      await new Promise((r) => setTimeout(r, 100))
 
-      expect(onJobFinished).not.toHaveBeenCalled()
+      expect(onJobFinished).toHaveBeenCalledWith('cancel-cb-job', 'canceled', undefined)
     })
 
     it('passes cost from DB when available', async () => {
@@ -1160,7 +1160,8 @@ describe('QueueManager', () => {
 
       const systemEvent = JSON.stringify({ type: 'system' })
       child.stdout!.push(systemEvent + '\n')
-      await new Promise((r) => setTimeout(r, 50))
+      // Wait > 80ms for the batched broadcast flush
+      await new Promise((r) => setTimeout(r, 100))
 
       // Event is broadcast but no log line emitted
       const eventBroadcasts = broadcast.mock.calls.filter(

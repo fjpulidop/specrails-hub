@@ -458,6 +458,29 @@ export class QueueManager {
       })
     }
 
+    // ── Batched broadcast for high-frequency messages (log + event) ──────
+    // Collects messages and flushes every ~80ms instead of one WS send per line.
+    const pendingBroadcast: WsMessage[] = []
+    let flushTimer: ReturnType<typeof setTimeout> | null = null
+    const FLUSH_INTERVAL_MS = 80
+
+    const batchedBroadcast = (msg: WsMessage): void => {
+      pendingBroadcast.push(msg)
+      if (!flushTimer) {
+        flushTimer = setTimeout(() => {
+          flushTimer = null
+          const batch = pendingBroadcast.splice(0)
+          for (const m of batch) this._broadcast(m)
+        }, FLUSH_INTERVAL_MS)
+      }
+    }
+
+    const flushPending = (): void => {
+      if (flushTimer) { clearTimeout(flushTimer); flushTimer = null }
+      const batch = pendingBroadcast.splice(0)
+      for (const m of batch) this._broadcast(m)
+    }
+
     const emitLine = (source: 'stdout' | 'stderr', line: string): void => {
       const msg: LogMessage = {
         type: 'log',
@@ -470,7 +493,7 @@ export class QueueManager {
       if (this._logBuffer.length > LOG_BUFFER_MAX) {
         this._logBuffer.splice(0, LOG_BUFFER_DROP)
       }
-      this._broadcast(msg)
+      batchedBroadcast(msg)
     }
 
     const stdoutReader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
@@ -489,7 +512,7 @@ export class QueueManager {
             payload: line,
           })
         }
-        this._broadcast({
+        batchedBroadcast({
           type: 'event',
           jobId,
           event_type: eventType,
@@ -536,6 +559,7 @@ export class QueueManager {
     })
 
     child.on('close', (code) => {
+      flushPending() // flush any remaining batched messages before job exit
       this._onJobExit(jobId, code, lastResultEvent, emitLine)
     })
 
@@ -669,8 +693,8 @@ export class QueueManager {
       emitLine('stdout', `[process exited with code ${code ?? 'unknown'}]`)
     }
 
-    // Notify webhook handler (if any) about job completion/failure
-    if (this._onJobFinished && (finalStatus === 'completed' || finalStatus === 'failed')) {
+    // Notify webhook handler (if any) about job completion/failure/cancellation
+    if (this._onJobFinished && (finalStatus === 'completed' || finalStatus === 'failed' || finalStatus === 'canceled')) {
       const costUsd = this._db
         ? (this._db.prepare('SELECT total_cost_usd FROM jobs WHERE id = ?').get(jobId) as { total_cost_usd: number | null } | undefined)?.total_cost_usd ?? undefined
         : undefined

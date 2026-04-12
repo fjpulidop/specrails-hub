@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { getApiBase } from '../lib/api'
 import { toast } from 'sonner'
@@ -82,13 +82,29 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
     loadJob()
   }, [jobId])
 
+  // ── Batched event accumulation (flush via rAF → max ~60 updates/sec) ────
+  const pendingEventsRef = useRef<EventRow[]>([])
+  const rafIdRef = useRef<number | null>(null)
+
+  const flushEvents = useCallback(() => {
+    rafIdRef.current = null
+    const batch = pendingEventsRef.current
+    if (batch.length === 0) return
+    pendingEventsRef.current = []
+    setEvents((prev) => {
+      const next = [...prev, ...batch]
+      return next.length > 10000 ? next.slice(next.length - 8000) : next
+    })
+  }, [])
+
+  // Cleanup rAF on unmount
+  useEffect(() => () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current) }, [])
+
   // Subscribe to live WebSocket updates
   const handleMessage = useCallback((data: unknown) => {
     const msg = data as { type: string } & Record<string, unknown>
 
     if (msg.type === 'event' && msg.jobId === jobId) {
-      // Use structured events only — ignore 'log' messages to avoid duplicates
-      // (the server broadcasts both 'event' and 'log' for each stdout JSON line)
       const eventRow: EventRow = {
         id: Date.now(),
         job_id: jobId,
@@ -98,9 +114,9 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
         payload: msg.payload as string,
         timestamp: msg.timestamp as string,
       }
-      setEvents((prev) => [...prev, eventRow])
+      pendingEventsRef.current.push(eventRow)
+      if (!rafIdRef.current) rafIdRef.current = requestAnimationFrame(flushEvents)
     } else if (msg.type === 'log' && msg.processId === jobId && msg.source === 'stderr') {
-      // Only handle stderr log messages (stdout is covered by 'event' type above)
       const syntheticEvent: EventRow = {
         id: Date.now(),
         job_id: jobId,
@@ -110,7 +126,8 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
         payload: JSON.stringify({ line: msg.line }),
         timestamp: msg.timestamp as string,
       }
-      setEvents((prev) => [...prev, syntheticEvent])
+      pendingEventsRef.current.push(syntheticEvent)
+      if (!rafIdRef.current) rafIdRef.current = requestAnimationFrame(flushEvents)
     } else if (msg.type === 'phase') {
       const phaseName = msg.phase as string
       const phaseState = msg.state as PhaseState
@@ -122,7 +139,7 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
         setJob((prev) => prev ? { ...prev, status: matchingJob.status as JobSummary['status'] } : prev)
       }
     }
-  }, [jobId, job])
+  }, [jobId, job, flushEvents])
 
   useWebSocket(WS_URL, handleMessage)
 

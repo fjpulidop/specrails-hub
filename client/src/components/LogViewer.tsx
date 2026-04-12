@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, memo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -173,29 +173,32 @@ export function LogViewer({ events, isLoading }: LogViewerProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Parse → merge markdown → detect diffs
-  const rawLines = events
-    .map((ev, idx) => parseEvent(ev, idx))
-    .filter((l): l is FormattedLine => l !== null)
+  // Parse → merge markdown → detect diffs (memoized — only recomputes when events change)
+  const { processedLines, groups, totalLines } = useMemo(() => {
+    const rawLines = events
+      .map((ev, idx) => parseEvent(ev, idx))
+      .filter((l): l is FormattedLine => l !== null)
 
-  const merged: FormattedLine[] = []
-  for (const line of rawLines) {
-    const prev = merged.length > 0 ? merged[merged.length - 1] : null
-    if (line.type === 'assistant' && prev?.type === 'assistant') {
-      prev.content += '\n' + line.content
-    } else {
-      merged.push({ ...line })
+    const merged: FormattedLine[] = []
+    for (const line of rawLines) {
+      const prev = merged.length > 0 ? merged[merged.length - 1] : null
+      if (line.type === 'assistant' && prev?.type === 'assistant') {
+        prev.content += '\n' + line.content
+      } else {
+        merged.push({ ...line })
+      }
     }
-  }
 
-  const processedLines = applyDiffDetection(merged)
-  const groups = groupByPhase(processedLines)
-  const totalLines = processedLines.length
+    const processed = applyDiffDetection(merged)
+    return { processedLines: processed, groups: groupByPhase(processed), totalLines: processed.length }
+  }, [events])
 
-  // Filter count: lines matching filter across all groups
-  const filteredCount = filter
-    ? processedLines.filter((l) => l.content.toLowerCase().includes(filter.toLowerCase())).length
-    : totalLines
+  // Filter count (memoized — only recomputes when filter or lines change)
+  const filteredCount = useMemo(() => {
+    if (!filter) return totalLines
+    const lowerFilter = filter.toLowerCase()
+    return processedLines.filter((l) => l.content.toLowerCase().includes(lowerFilter)).length
+  }, [filter, processedLines, totalLines])
 
   const scrollToBottom = useCallback(() => {
     const el = containerRef.current
