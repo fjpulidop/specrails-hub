@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.1](https://github.com/fjpulidop/specrails-hub/compare/v1.25.0...v1.25.1) (2026-04-12)
+
+
+### Bug Fixes
+
+* correct YAML serialization and command dir for full install (SPEA-751) ([#173](https://github.com/fjpulidop/specrails-hub/issues/173)) ([7866ef5](https://github.com/fjpulidop/specrails-hub/commit/7866ef59a696b5d6f233155d5234ce3bc20a95de))
+
 ## [1.25.0](https://github.com/fjpulidop/specrails-hub/compare/v1.24.0...v1.25.0) (2026-04-11)
 
 
