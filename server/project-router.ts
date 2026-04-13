@@ -1187,6 +1187,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       binary = 'claude'
       args = [
         '--dangerously-skip-permissions',
+        '--tools', 'default',
         '--output-format', 'stream-json',
         '--verbose',
         '--max-turns', '1',
@@ -1450,6 +1451,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       binary = 'claude'
       args = [
         '--dangerously-skip-permissions',
+        '--tools', 'default',
         '--output-format', 'stream-json',
         '--verbose',
         '--max-turns', '4',

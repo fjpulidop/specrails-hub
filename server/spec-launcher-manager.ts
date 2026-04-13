@@ -33,6 +33,7 @@ export class SpecLauncherManager {
 
     const args = [
       '--dangerously-skip-permissions',
+      '--tools', 'default',
       '--output-format', 'stream-json',
       '--verbose',
       '-p', prompt,

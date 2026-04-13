@@ -50,6 +50,7 @@ export class ProposalManager {
 
     const args = [
       '--dangerously-skip-permissions',
+      '--tools', 'default',
       '--output-format', 'stream-json',
       '--verbose',
       '-p', prompt,
@@ -90,6 +91,7 @@ export class ProposalManager {
 
     const args = [
       '--dangerously-skip-permissions',
+      '--tools', 'default',
       '--output-format', 'stream-json',
       '--verbose',
       '--resume', proposal.session_id,
@@ -135,6 +137,7 @@ export class ProposalManager {
 
     const args = [
       '--dangerously-skip-permissions',
+      '--tools', 'default',
       '--output-format', 'stream-json',
       '--verbose',
       '--resume', proposal.session_id,

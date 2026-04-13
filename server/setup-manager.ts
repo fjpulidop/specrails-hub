@@ -620,6 +620,7 @@ export class SetupManager {
     const args = [
       '-p', enrichCmd,
       '--dangerously-skip-permissions',
+      '--tools', 'default',
       '--output-format', 'stream-json',
       '--verbose',
     ]
@@ -674,6 +675,7 @@ export class SetupManager {
     const args = [
       '--resume', sessionId,
       '--dangerously-skip-permissions',
+      '--tools', 'default',
       '--output-format', 'stream-json',
       '--verbose',
       '-p', userMessage,
