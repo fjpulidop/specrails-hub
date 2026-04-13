@@ -75,7 +75,7 @@ function saveRails(projectId: string | null, rails: RailState[]) {
 
 export default function DashboardPage() {
   const { activeProjectId } = useHub()
-  const { tickets, isLoading, updateTicket, deleteTicket, createTicket } = useTickets()
+  const { tickets, isLoading, updateTicket, deleteTicket, createTicket, refetch } = useTickets()
   const { registerHandler, unregisterHandler, connectionStatus } = useSharedWebSocket()
   const [detailTicket, setDetailTicket] = useState<LocalTicket | null>(null)
   const [createTicketOpen, setCreateTicketOpen] = useState(false)
@@ -514,7 +514,7 @@ export default function DashboardPage() {
       <div className="flex h-full overflow-hidden">
         {/* Left panel: Specs board */}
         <div className="flex-1 min-w-0 border-r border-border/40 flex flex-col overflow-hidden">
-          <SpecsBoard tickets={specTickets} allTickets={tickets} doneTickets={doneSpecTickets} isLoading={isLoading} onTicketClick={setDetailTicket} onTicketCreated={setDetailTicket} />
+          <SpecsBoard tickets={specTickets} allTickets={tickets} doneTickets={doneSpecTickets} isLoading={isLoading} onTicketClick={setDetailTicket} onTicketCreated={(ticket) => { setDetailTicket(ticket); refetch() }} />
         </div>
 
         {/* Right panel: Rails board */}

@@ -415,6 +415,14 @@ export class QueueManager {
       systemAppend += '\n\nIMPORTANT: This command is running in headless/unattended mode (--yes flag). Do NOT wait for user confirmation at any step. Auto-proceed with "yes" for all confirmation prompts. Skip any "Wait for user confirmation" instructions.'
     }
 
+    // Local ticket store: implement/batch-implement jobs must read specs from
+    // .specrails/local-tickets.json — never from external trackers like Jira/Linear.
+    if (/\/(specrails|sr):(implement|batch-implement)\b/.test(commandToRun)) {
+      systemAppend += '\n\nIMPORTANT: The ticket/spec data for this project is stored locally in .specrails/local-tickets.json. ' +
+        'You MUST read specs from this file. Do NOT attempt to fetch tickets from Jira, Linear, GitHub Issues, or any other external tracker. ' +
+        'The #<id> references in the command correspond to ticket IDs inside .specrails/local-tickets.json.'
+    }
+
     let binary: string
     let args: string[]
     if (this._provider === 'codex') {

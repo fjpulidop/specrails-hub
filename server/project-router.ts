@@ -1154,7 +1154,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       res.status(400).json({ error: 'idea is required' }); return
     }
 
-    const { project, broadcast } = ctx(req)
+    const { project, broadcast, ticketWatcher } = ctx(req)
     const provider = project.provider ?? 'claude'
     const requestId = uuidv4()
     const projectId = project.id
@@ -1256,7 +1256,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         try {
           const now = new Date().toISOString()
           let created: import('./ticket-store').Ticket | undefined
-          mutateStore(filePath, (s) => {
+          const store = mutateStore(filePath, (s) => {
             const id = s.next_id++
             const ticket: import('./ticket-store').Ticket = {
               id,
@@ -1277,6 +1277,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
             s.tickets[String(id)] = ticket
             created = ticket
           })
+          ticketWatcher.notifyHubWrite(store.revision)
 
           const ticketMsg: TicketCreatedMessage = {
             type: 'ticket_created', ticket: created! as unknown as LocalTicket,
@@ -1345,7 +1346,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         s.tickets[String(id)] = ticket
         created = ticket
       })
-      const { broadcast } = ctx(req)
+      const { broadcast, ticketWatcher } = ctx(req)
+      ticketWatcher.notifyHubWrite(store.revision)
       const msg: TicketCreatedMessage = { type: 'ticket_created', ticket: created! as unknown as LocalTicket, projectId: ctx(req).project.id, timestamp: new Date().toISOString() }
       broadcast(msg)
       res.status(201).json({ ticket: created!, revision: store.revision })
@@ -1393,7 +1395,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       if (!updated) {
         res.status(404).json({ error: 'Ticket not found' }); return
       }
-      const { broadcast } = ctx(req)
+      const { broadcast, ticketWatcher } = ctx(req)
+      ticketWatcher.notifyHubWrite(store.revision)
       const msg: TicketUpdatedMessage = { type: 'ticket_updated', ticket: updated as unknown as LocalTicket, projectId: ctx(req).project.id, timestamp: new Date().toISOString() }
       broadcast(msg)
       res.json({ ticket: updated, revision: store.revision })
@@ -1553,7 +1556,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       if (!found) {
         res.status(404).json({ error: 'Ticket not found' }); return
       }
-      const { broadcast } = ctx(req)
+      const { broadcast, ticketWatcher } = ctx(req)
+      ticketWatcher.notifyHubWrite(store.revision)
       const msg: TicketDeletedMessage = { type: 'ticket_deleted', ticketId: Number(ticketId), projectId: ctx(req).project.id, timestamp: new Date().toISOString() }
       broadcast(msg)
       res.json({ ok: true, revision: store.revision })
