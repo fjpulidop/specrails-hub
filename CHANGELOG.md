@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.3](https://github.com/fjpulidop/specrails-hub/compare/v1.25.2...v1.25.3) (2026-04-13)
+
+
+### Bug Fixes
+
+* pass raw slash commands to Claude CLI instead of pre-resolving ([#177](https://github.com/fjpulidop/specrails-hub/issues/177)) ([3ed5730](https://github.com/fjpulidop/specrails-hub/commit/3ed573090cfe9689a41403c5c24b3e6861a73643))
+
 ## [1.25.2](https://github.com/fjpulidop/specrails-hub/compare/v1.25.1...v1.25.2) (2026-04-13)
 
 
