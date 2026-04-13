@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.2](https://github.com/fjpulidop/specrails-hub/compare/v1.25.1...v1.25.2) (2026-04-13)
+
+
+### Bug Fixes
+
+* add --tools default to all Claude CLI -p spawns ([#175](https://github.com/fjpulidop/specrails-hub/issues/175)) ([5d2e8d3](https://github.com/fjpulidop/specrails-hub/commit/5d2e8d3a2e1055db06e36a27f08825da27ec35f3))
+
 ## [1.25.1](https://github.com/fjpulidop/specrails-hub/compare/v1.25.0...v1.25.1) (2026-04-12)
 
 
