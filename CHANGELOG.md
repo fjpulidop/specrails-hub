@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.4](https://github.com/fjpulidop/specrails-hub/compare/v1.25.3...v1.25.4) (2026-04-13)
+
+
+### Bug Fixes
+
+* spec list refresh + local-tickets instruction for rails ([#179](https://github.com/fjpulidop/specrails-hub/issues/179)) ([0a30e26](https://github.com/fjpulidop/specrails-hub/commit/0a30e26a6b8c7a52c62743ccf7e98780736e4cd8))
+
 ## [1.25.3](https://github.com/fjpulidop/specrails-hub/compare/v1.25.2...v1.25.3) (2026-04-13)
 
 
