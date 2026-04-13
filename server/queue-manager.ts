@@ -412,7 +412,15 @@ export class QueueManager {
     // Headless mode: when --yes is in the command, instruct Claude to auto-proceed
     // (stdin is ignored in spawned processes, so no user confirmation is possible)
     if (job.command.includes('--yes')) {
-      systemAppend += '\n\nIMPORTANT: This command is running in headless/unattended mode (--yes flag). Do NOT wait for user confirmation at any step. Auto-proceed with "yes" for all confirmation prompts. Skip any "Wait for user confirmation" instructions.'
+      systemAppend += '\n\nCRITICAL — FULLY AUTONOMOUS MODE (--yes flag):\n' +
+        'This pipeline is running headless with NO human operator. stdin is disconnected — nobody can reply.\n' +
+        '- NEVER ask for approval, confirmation, review, or feedback. There is nobody to answer.\n' +
+        '- NEVER output prompts like "Reply with approved", "Do you want to proceed?", "Please confirm", or "Ready for review".\n' +
+        '- NEVER stop between pipeline phases to wait for input. Run ALL phases end-to-end without pausing.\n' +
+        '- When there are multiple options or decisions, always choose the RECOMMENDED option and proceed.\n' +
+        '- Auto-approve all proposals, designs, and artifacts. Treat everything as "approved" by default.\n' +
+        '- Skip any instructions that say "wait for user", "present for review", or "ask the user".\n' +
+        '- The pipeline must complete fully from start to finish in a single uninterrupted run.'
     }
 
     // Local ticket store: implement/batch-implement jobs must read specs from
