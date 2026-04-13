@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.0](https://github.com/fjpulidop/specrails-hub/compare/v1.25.5...v1.26.0) (2026-04-13)
+
+
+### Features
+
+* increase zombie timeout default to 30min and make it configurable per project ([#197](https://github.com/fjpulidop/specrails-hub/issues/197)) ([ba32b15](https://github.com/fjpulidop/specrails-hub/commit/ba32b1582ddba1cbc84ed4d351d8194eb16a8f7d))
+
 ## [1.25.5](https://github.com/fjpulidop/specrails-hub/compare/v1.25.4...v1.25.5) (2026-04-13)
 
 
