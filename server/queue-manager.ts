@@ -391,7 +391,12 @@ export class QueueManager {
       resetPhases(this._broadcast)
     }
 
-    let commandToRun = job.command.trim()
+    const commandToRun = job.command.trim()
+
+    // Build supplementary context (output chaining + headless mode) that goes
+    // into --append-system-prompt, keeping the user prompt clean.
+    let systemAppend = ''
+
     // Output chaining: inject previous step's output as context for dependent jobs
     if (job.dependsOnJobId) {
       const parentJob = this._jobs.get(job.dependsOnJobId)
@@ -400,22 +405,23 @@ export class QueueManager {
         const truncated = prevOutput.length > 10000
           ? prevOutput.slice(0, 10000) + '\n\n[output truncated]'
           : prevOutput
-        commandToRun = `Previous step output:\n\n${truncated}\n\n---\n\nNow execute the following:\n${commandToRun}`
+        systemAppend += `Previous step output:\n\n${truncated}\n\n---\n\nNow execute the following command.\n\n`
       }
     }
-    let resolvedCmd = this._resolveCommand(commandToRun)
 
-    // Headless mode: when --yes is in the command, append auto-proceed instructions
-    // so Claude doesn't wait for user confirmation (stdin is ignored in spawned processes)
+    // Headless mode: when --yes is in the command, instruct Claude to auto-proceed
+    // (stdin is ignored in spawned processes, so no user confirmation is possible)
     if (job.command.includes('--yes')) {
-      resolvedCmd += '\n\nIMPORTANT: This command is running in headless/unattended mode (--yes flag). Do NOT wait for user confirmation at any step. Auto-proceed with "yes" for all confirmation prompts. Skip any "Wait for user confirmation" instructions.'
+      systemAppend += '\n\nIMPORTANT: This command is running in headless/unattended mode (--yes flag). Do NOT wait for user confirmation at any step. Auto-proceed with "yes" for all confirmation prompts. Skip any "Wait for user confirmation" instructions.'
     }
 
     let binary: string
     let args: string[]
     if (this._provider === 'codex') {
       binary = 'codex'
-      args = ['exec', resolvedCmd]
+      // Codex doesn't support slash commands — resolve the prompt
+      const resolved = this._resolveCommand(commandToRun)
+      args = ['exec', resolved]
     } else {
       binary = 'claude'
       args = [
@@ -423,9 +429,15 @@ export class QueueManager {
         '--tools', 'default',
         '--output-format', 'stream-json',
         '--verbose',
-        '-p',
-        resolvedCmd,
       ]
+      if (systemAppend) {
+        args.push('--append-system-prompt', systemAppend)
+      }
+      // Pass the raw command to Claude CLI so it resolves skills natively.
+      // This ensures skills get proper execution priority over CLAUDE.md
+      // instructions — pre-resolving to plain text caused the project's
+      // CLAUDE.md to override the pipeline prompt.
+      args.push('-p', commandToRun)
     }
 
     const child = spawn(binary, args, {
