@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.5](https://github.com/fjpulidop/specrails-hub/compare/v1.25.4...v1.25.5) (2026-04-13)
+
+
+### Bug Fixes
+
+* strengthen headless mode prompt to prevent pipeline pauses ([#181](https://github.com/fjpulidop/specrails-hub/issues/181)) ([56f8916](https://github.com/fjpulidop/specrails-hub/commit/56f8916e220c640bd072bebbd9d87b0a7897dd99))
+
 ## [1.25.4](https://github.com/fjpulidop/specrails-hub/compare/v1.25.3...v1.25.4) (2026-04-13)
 
 
