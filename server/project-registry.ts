@@ -137,9 +137,20 @@ export class ProjectRegistry {
       }
     }
 
+    // Per-project zombie timeout (stored in queue_state)
+    let projectZombieTimeout: number | undefined
+    try {
+      const row = db.prepare(`SELECT value FROM queue_state WHERE key = 'config.zombie_timeout_ms'`).get() as { value: string } | undefined
+      if (row) {
+        const parsed = parseInt(row.value, 10)
+        if (!isNaN(parsed) && parsed > 0) projectZombieTimeout = parsed
+      }
+    } catch { /* queue_state table may not exist yet */ }
+
     const webhookManager = this._webhookManager
     const railJobs = new Map<string, { railIndex: number; mode: string; ticketIds: number[] }>()
     const queueManager = new QueueManager(boundBroadcast, db, undefined, project.path, {
+      zombieTimeoutMs: projectZombieTimeout,
       provider: project.provider ?? 'claude',
       getCostAlertThreshold: () => {
         const val = getHubSetting(this._hubDb, 'cost_alert_threshold_usd')
