@@ -76,6 +76,7 @@ function makeContext(db: DbInstance, projectPath: string): ProjectContext {
     setupManager: makeSetupManager() as any,
     proposalManager: makeProposalManager() as any,
     specLauncherManager: makeSpecLauncherManager() as any,
+    ticketWatcher: { notifyHubWrite: vi.fn(), start: vi.fn(), close: vi.fn() } as any,
     broadcast: vi.fn(),
   } as any
 }

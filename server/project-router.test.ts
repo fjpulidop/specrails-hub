@@ -120,6 +120,7 @@ function makeContext(db: DbInstance, overrides: Partial<ProjectContext> = {}): P
     setupManager: makeSetupManager() as any,
     proposalManager: makeProposalManager() as any,
     specLauncherManager: makeSpecLauncherManager() as any,
+    ticketWatcher: { notifyHubWrite: vi.fn(), start: vi.fn(), close: vi.fn() } as any,
     broadcast: vi.fn(),
     ...overrides,
   }
