@@ -6,6 +6,8 @@ client/dist/
 data/
 
 # specrails installer (one-time setup tool, not part of the project)
-specrails/
+# Leading slash limits match to root level — without it, the pattern also
+# matches .claude/commands/specrails/ which must be tracked.
+/specrails/
 .claude/worktrees/
 coverage/

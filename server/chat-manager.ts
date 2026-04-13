@@ -220,6 +220,7 @@ export class ChatManager {
       args = [
         '--model', conversation.model,
         '--dangerously-skip-permissions',
+        '--tools', 'default',
         '--output-format', 'stream-json',
         '--verbose',
         '--system-prompt', systemPrompt,

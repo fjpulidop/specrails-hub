@@ -16,7 +16,8 @@
     "cli/dist",
     "server/dist",
     "client/dist",
-    "docs"
+    "docs",
+    ".claude/commands/specrails"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",

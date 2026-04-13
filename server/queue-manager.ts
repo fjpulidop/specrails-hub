@@ -420,6 +420,7 @@ export class QueueManager {
       binary = 'claude'
       args = [
         '--dangerously-skip-permissions',
+        '--tools', 'default',
         '--output-format', 'stream-json',
         '--verbose',
         '-p',
