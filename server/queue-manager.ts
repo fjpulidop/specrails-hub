@@ -12,7 +12,7 @@ import type { CommandInfo } from './config'
 
 const LOG_BUFFER_MAX = 5000
 const LOG_BUFFER_DROP = 1000
-const DEFAULT_ZOMBIE_TIMEOUT_MS = 300_000 // 5 minutes
+export const DEFAULT_ZOMBIE_TIMEOUT_MS = 1_800_000 // 30 minutes
 
 // ─── Error classes ────────────────────────────────────────────────────────────
 
@@ -161,6 +161,14 @@ export class QueueManager {
 
   setCommands(commands: CommandInfo[]): void {
     this._commands = commands
+  }
+
+  setZombieTimeout(ms: number): void {
+    this._zombieTimeoutMs = ms
+    // If a job is currently running, reset the timer with the new value
+    if (this._activeJobId) {
+      this._resetZombieTimer()
+    }
   }
 
   // ─── Public API ─────────────────────────────────────────────────────────────

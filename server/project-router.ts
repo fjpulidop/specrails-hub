@@ -13,7 +13,7 @@ import {
   createTemplate, listTemplates, getTemplate, updateTemplate, deleteTemplate,
 } from './db'
 import { getProjectSetupSession } from './hub-db'
-import { ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
+import { ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError, DEFAULT_ZOMBIE_TIMEOUT_MS } from './queue-manager'
 import type { JobPriority } from './types'
 import { VALID_PRIORITIES } from './types'
 import { resolveCommand } from './command-resolver'
@@ -504,7 +504,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       const config = getConfig(project.path, db, project.name)
       const dailyBudgetRaw = (db.prepare(`SELECT value FROM queue_state WHERE key = 'config.daily_budget_usd'`).get() as { value: string } | undefined)?.value
       const dailyBudgetUsd = dailyBudgetRaw != null ? parseFloat(dailyBudgetRaw) : null
-      res.json({ ...config, dailyBudgetUsd })
+      const zombieTimeoutRaw = (db.prepare(`SELECT value FROM queue_state WHERE key = 'config.zombie_timeout_ms'`).get() as { value: string } | undefined)?.value
+      const zombieTimeoutMs = zombieTimeoutRaw != null ? parseInt(zombieTimeoutRaw, 10) : null
+      res.json({ ...config, dailyBudgetUsd, zombieTimeoutMs })
     } catch (err) {
       console.error('[project-router] config error:', err)
       res.status(500).json({ error: 'Failed to read config' })
@@ -512,8 +514,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   router.post('/:projectId/config', (req: Request, res: Response) => {
-    const { active, labelFilter, dailyBudgetUsd } = req.body ?? {}
-    const { db } = ctx(req)
+    const { active, labelFilter, dailyBudgetUsd, zombieTimeoutMs } = req.body ?? {}
+    const { db, queueManager } = ctx(req)
     try {
       if (active !== undefined) {
         db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.active_tracker', ?)`).run(active ?? '')
@@ -527,6 +529,14 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         } else if (typeof dailyBudgetUsd === 'number' && dailyBudgetUsd > 0) {
           db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.daily_budget_usd', ?)`).run(String(dailyBudgetUsd))
         }
+      }
+      if (zombieTimeoutMs !== undefined) {
+        if (zombieTimeoutMs === null) {
+          db.prepare(`DELETE FROM queue_state WHERE key = 'config.zombie_timeout_ms'`).run()
+        } else if (typeof zombieTimeoutMs === 'number' && zombieTimeoutMs > 0) {
+          db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.zombie_timeout_ms', ?)`).run(String(zombieTimeoutMs))
+        }
+        queueManager.setZombieTimeout(typeof zombieTimeoutMs === 'number' && zombieTimeoutMs > 0 ? zombieTimeoutMs : DEFAULT_ZOMBIE_TIMEOUT_MS)
       }
       res.json({ ok: true })
     } catch (err) {
