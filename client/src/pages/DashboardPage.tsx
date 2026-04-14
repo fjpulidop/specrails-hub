@@ -223,12 +223,18 @@ export default function DashboardPage() {
           if (idx !== targetIndex) return r
           return { ...r, status: 'idle', ticketIds: r.ticketIds.filter((id) => !completedTicketIds.has(id)) }
         }))
+      } else if (m.status === 'failed') {
+        updateRails((prev) => prev.map((r, idx) => (idx === targetIndex ? { ...r, status: 'failed' } : r)))
       } else {
         updateRails((prev) => prev.map((r, idx) => (idx === targetIndex ? { ...r, status: 'idle' } : r)))
       }
 
       const statusLabel = m.status === 'completed' ? 'completed' : m.status === 'failed' ? 'failed' : m.status ?? 'finished'
-      toast.info(`Rail ${targetIndex + 1} ${statusLabel}`)
+      if (m.status === 'failed') {
+        toast.error(`Rail ${targetIndex + 1} failed`)
+      } else {
+        toast.info(`Rail ${targetIndex + 1} ${statusLabel}`)
+      }
     }
   }, [updateRails])
 

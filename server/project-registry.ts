@@ -218,8 +218,8 @@ export class ProjectRegistry {
           }
         }
 
-        // Revert tickets to todo when job was canceled
-        if (status === 'canceled' && completedTicketIds.length > 0) {
+        // Revert tickets to todo when job was canceled or failed
+        if ((status === 'canceled' || status === 'failed') && completedTicketIds.length > 0) {
           try {
             const ticketFile = resolveTicketStoragePath(project.path)
             mutateStore(ticketFile, (store) => {
@@ -238,7 +238,7 @@ export class ProjectRegistry {
               }
             })
           } catch (err) {
-            console.error('[project-registry] failed to revert canceled rail tickets:', err)
+            console.error('[project-registry] failed to revert rail tickets:', err)
           }
         }
 

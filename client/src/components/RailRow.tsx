@@ -192,7 +192,7 @@ export function RailRow({
             </button>
             <div
               className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300 ${
-                status === 'running' ? 'bg-emerald-400 shadow-[0_0_4px_hsl(142_70%_56%/0.8)] animate-pulse' : 'bg-muted-foreground/25'
+                status === 'running' ? 'bg-emerald-400 shadow-[0_0_4px_hsl(142_70%_56%/0.8)] animate-pulse' : status === 'failed' ? 'bg-amber-400 shadow-[0_0_4px_hsl(38_92%_50%/0.6)]' : 'bg-muted-foreground/25'
               }`}
             />
             {editing ? (

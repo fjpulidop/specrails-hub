@@ -1,8 +1,8 @@
-import { Play, Square } from 'lucide-react'
+import { Play, Square, AlertTriangle } from 'lucide-react'
 import { Button } from './ui/button'
 
 export type RailMode = 'implement' | 'batch-implement'
-export type RailStatus = 'idle' | 'running'
+export type RailStatus = 'idle' | 'running' | 'failed'
 
 interface RailControlsProps {
   mode: RailMode
@@ -43,23 +43,31 @@ export function RailControls({ mode, status, ticketCount, onModeChange, onToggle
         </button>
       </div>
 
-      {/* Play / Stop toggle */}
+      {/* Play / Stop / Failed toggle */}
       <Button
         size="sm"
         variant="ghost"
         className={`h-5 w-5 p-0 rounded-full transition-all duration-200 ${
           status === 'running'
             ? 'text-red-400 hover:text-red-300 hover:bg-red-400/10'
-            : canPlay
-              ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-400/10'
-              : 'text-muted-foreground/30 cursor-not-allowed'
+            : status === 'failed'
+              ? 'text-amber-400 hover:text-emerald-300 hover:bg-emerald-400/10'
+              : canPlay
+                ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-400/10'
+                : 'text-muted-foreground/30 cursor-not-allowed'
         }`}
         onClick={onToggle}
         disabled={!canPlay && status !== 'running'}
-        title={status === 'running' ? 'Stop' : canPlay ? 'Play' : 'Add specs to this rail first'}
+        title={
+          status === 'running' ? 'Stop' :
+          status === 'failed' ? 'Job failed — click to retry' :
+          canPlay ? 'Play' : 'Add specs to this rail first'
+        }
       >
         {status === 'running' ? (
           <Square className="w-2.5 h-2.5 fill-current" />
+        ) : status === 'failed' ? (
+          <AlertTriangle className="w-2.5 h-2.5" />
         ) : (
           <Play className="w-2.5 h-2.5 fill-current" />
         )}
