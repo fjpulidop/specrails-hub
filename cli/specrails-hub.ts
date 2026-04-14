@@ -276,10 +276,16 @@ function loadHubToken(): string | null {
 function httpGet(url: string): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const token = loadHubToken()
-    const options: http.RequestOptions = new URL(url)
+    const parsed = new URL(url)
     const headers: http.OutgoingHttpHeaders = {}
     if (token) headers['Authorization'] = `Bearer ${token}`
-    const req = http.get({ ...options, headers }, (res) => {
+    const options: http.RequestOptions = {
+      hostname: parsed.hostname,
+      port: parsed.port,
+      path: parsed.pathname + parsed.search,
+      headers,
+    }
+    const req = http.get(options, (res) => {
       let body = ''
       res.on('data', (chunk) => { body += chunk })
       res.on('end', () => resolve({ status: res.statusCode ?? 0, body }))
