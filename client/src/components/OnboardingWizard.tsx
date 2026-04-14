@@ -2,16 +2,13 @@ import { useState, useCallback } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import {
   Search,
-  LayoutDashboard,
-  MessageSquare,
   FolderOpen,
   ArrowRight,
   ArrowLeft,
   Sparkles,
   Command,
-  GripVertical,
-  Pin,
-  ChevronDown,
+  Bot,
+  Wrench,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { Button } from './ui/button'
@@ -84,23 +81,22 @@ const STEPS: StepConfig[] = [
     content: (
       <div className="space-y-4">
         <p className="text-xs text-muted-foreground leading-relaxed">
-          specrails-hub lets you manage multiple AI development projects from a single interface.
-          Orchestrate pipelines, stream logs in real-time, and let AI handle the heavy lifting &mdash;
-          from architecture to shipping.
+          specrails-hub turns ideas into shipped code. Write a spec, drop it in a Rail, hit Play &mdash;
+          AI handles architecture, implementation, review, and the PR.
         </p>
         <div className="rounded-lg border border-border/30 bg-card/20 p-3 space-y-2">
-          <p className="text-[10px] font-semibold text-dracula-purple uppercase tracking-wider">The pipeline</p>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-dracula-cyan">Architect</span>
+          <p className="text-[10px] font-semibold text-dracula-purple uppercase tracking-wider">The workflow</p>
+          <div className="flex items-center gap-2 text-xs flex-wrap">
+            <span className="text-dracula-cyan">Add Spec</span>
             <ArrowRight className="w-3 h-3 text-muted-foreground" />
-            <span className="text-dracula-green">Developer</span>
+            <span className="text-dracula-green">Drop in Rail</span>
             <ArrowRight className="w-3 h-3 text-muted-foreground" />
-            <span className="text-dracula-orange">Reviewer</span>
+            <span className="text-dracula-orange">Hit Play</span>
             <ArrowRight className="w-3 h-3 text-muted-foreground" />
             <span className="text-dracula-pink">Ship</span>
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Each spec flows through these phases automatically, with full visibility at every step.
+            Each spec flows through Architect → Developer → Reviewer automatically, with live log streaming at every step.
           </p>
         </div>
         <p className="text-[10px] text-muted-foreground italic">
@@ -110,11 +106,75 @@ const STEPS: StepConfig[] = [
     ),
   },
 
-  // Step 2: Command Palette
+  // Step 2: Agents
   {
-    icon: <Search className="w-6 h-6" />,
+    icon: <Bot className="w-6 h-6" />,
     accent: 'text-dracula-cyan',
     glowClass: 'glow-cyan',
+    title: 'Specialized Agents',
+    subtitle: 'The pipeline runs itself — you stay in control',
+    content: (
+      <div className="space-y-4">
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Every spec runs through a pipeline of AI agents, each with a focused role. The default pipeline includes four core agents that are always present.
+        </p>
+        <div className="rounded-lg border border-border/30 bg-card/20 p-3 space-y-1.5">
+          <p className="text-[10px] font-semibold text-dracula-cyan uppercase tracking-wider mb-2">Core agents (always installed)</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
+            <div><span className="text-dracula-cyan font-medium">Architect</span><span className="text-muted-foreground"> — designs the solution</span></div>
+            <div><span className="text-dracula-green font-medium">Developer</span><span className="text-muted-foreground"> — writes the code</span></div>
+            <div><span className="text-dracula-orange font-medium">Reviewer</span><span className="text-muted-foreground"> — runs CI, fixes failures</span></div>
+            <div><span className="text-dracula-pink font-medium">Merge Resolver</span><span className="text-muted-foreground"> — handles conflicts</span></div>
+          </div>
+        </div>
+        <FeatureRow
+          icon={<Wrench className="w-3.5 h-3.5" />}
+          label="Fully customizable"
+          description="Agent prompts are plain Markdown files in your project. Add domain knowledge, change behavior, or swap models — no special tools needed."
+        />
+        <div className="rounded-lg border border-border/30 bg-card/20 p-2.5">
+          <p className="text-[10px] text-muted-foreground">
+            <span className="text-dracula-cyan font-medium">Optional agents:</span> Test Writer, Doc Sync, Security Reviewer, Frontend/Backend Reviewers — installed during setup.
+          </p>
+        </div>
+      </div>
+    ),
+  },
+
+  // Step 3: Multi-project
+  {
+    icon: <FolderOpen className="w-6 h-6" />,
+    accent: 'text-dracula-green',
+    glowClass: 'glow-green',
+    title: 'Multi-Project Hub',
+    subtitle: 'All your projects, one place',
+    content: (
+      <div className="space-y-4">
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          specrails-hub manages multiple projects simultaneously. Each project gets its own database
+          and job queue — completely isolated.
+        </p>
+        <div className="space-y-3">
+          <FeatureRow
+            icon={<FolderOpen className="w-3.5 h-3.5" />}
+            label="Sidebar navigation"
+            description="Projects live in the left sidebar. Click to switch between them, or pin the sidebar open for quick access."
+          />
+          <FeatureRow
+            icon={<Sparkles className="w-3.5 h-3.5" />}
+            label="Guided setup wizard"
+            description="Adding a new project? The wizard walks you through installing specrails-core step by step."
+          />
+        </div>
+      </div>
+    ),
+  },
+
+  // Step 4: Command Palette
+  {
+    icon: <Search className="w-6 h-6" />,
+    accent: 'text-dracula-orange',
+    glowClass: 'glow-orange',
     title: 'Command Palette',
     subtitle: 'Your fastest way to navigate',
     content: (
@@ -131,128 +191,17 @@ const STEPS: StepConfig[] = [
           <FeatureRow
             icon={<Command className="w-3.5 h-3.5" />}
             label="Run spec commands"
-            description="Launch propose, implement, batch-implement, and more directly from the palette."
+            description="Launch propose-spec, implement, batch-implement, health-check, and more — straight from the palette."
           />
           <FeatureRow
             icon={<Search className="w-3.5 h-3.5" />}
             label="Find anything"
-            description="Search across jobs, navigation routes, and project names with fuzzy matching."
-          />
-        </div>
-        <div className="rounded-lg border border-border/30 bg-card/20 p-2.5">
-          <p className="text-[10px] text-muted-foreground">
-            <span className="text-dracula-cyan font-medium">Pro tip:</span> Press <Kbd>?</Kbd> to see all keyboard shortcuts at a glance.
-          </p>
-        </div>
-      </div>
-    ),
-  },
-
-  // Step 3: Dashboard
-  {
-    icon: <LayoutDashboard className="w-6 h-6" />,
-    accent: 'text-dracula-green',
-    glowClass: 'glow-green',
-    title: 'Your Dashboard',
-    subtitle: 'Organize your workspace your way',
-    content: (
-      <div className="space-y-4">
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          The dashboard is divided into collapsible sections that you can customize to match your workflow.
-        </p>
-        <div className="space-y-3">
-          <FeatureRow
-            icon={<GripVertical className="w-3.5 h-3.5" />}
-            label="Drag to reorder"
-            description="Grab the handle on any section header and drag it to rearrange your layout."
-          />
-          <FeatureRow
-            icon={<ChevronDown className="w-3.5 h-3.5" />}
-            label="Collapse & expand"
-            description="Click the chevron to collapse sections you don't need right now."
-          />
-          <FeatureRow
-            icon={<Pin className="w-3.5 h-3.5" />}
-            label="Pin favorites"
-            description="Pin sections to keep them expanded by default. Your layout persists across sessions."
-          />
-        </div>
-        <div className="rounded-lg border border-border/30 bg-card/20 p-2.5">
-          <p className="text-[10px] text-muted-foreground">
-            <span className="text-dracula-green font-medium">Sections include:</span> Health overview, Spec commands, Rails features, and recent Jobs.
-          </p>
-        </div>
-      </div>
-    ),
-  },
-
-  // Step 4: Chat
-  {
-    icon: <MessageSquare className="w-6 h-6" />,
-    accent: 'text-dracula-pink',
-    glowClass: 'glow-pink',
-    title: 'AI Chat',
-    subtitle: 'Your development copilot, always available',
-    content: (
-      <div className="space-y-4">
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          The chat panel lives in the sidebar of every project. Use it to brainstorm, ask questions about your codebase,
-          or let the AI propose specs for you.
-        </p>
-        <div className="space-y-3">
-          <FeatureRow
-            icon={<MessageSquare className="w-3.5 h-3.5" />}
-            label="Per-project conversations"
-            description="Each project has its own chat history. Switch projects and your conversation stays."
-          />
-          <FeatureRow
-            icon={<Sparkles className="w-3.5 h-3.5" />}
-            label="AI-generated proposals"
-            description="The AI can propose spec changes directly from chat. Review and launch them with one click."
-          />
-          <FeatureRow
-            icon={<ArrowRight className="w-3.5 h-3.5" />}
-            label="Resizable sidebar"
-            description="Drag the edge of the chat panel to resize it, or expand it to full screen for deep work."
-          />
-        </div>
-      </div>
-    ),
-  },
-
-  // Step 5: Multi-project
-  {
-    icon: <FolderOpen className="w-6 h-6" />,
-    accent: 'text-dracula-orange',
-    glowClass: 'glow-orange',
-    title: 'Multi-Project Hub',
-    subtitle: 'All your projects, one place',
-    content: (
-      <div className="space-y-4">
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          specrails-hub manages multiple projects simultaneously. Each project gets its own database,
-          job queue, and chat — completely isolated.
-        </p>
-        <div className="space-y-3">
-          <FeatureRow
-            icon={<FolderOpen className="w-3.5 h-3.5" />}
-            label="Tab-based navigation"
-            description="Open projects appear as tabs in the top bar. Click to switch, double-click to close."
-          />
-          <FeatureRow
-            icon={<Sparkles className="w-3.5 h-3.5" />}
-            label="Guided setup wizard"
-            description="Adding a new project? The wizard walks you through installing specrails-core step by step."
-          />
-          <FeatureRow
-            icon={<LayoutDashboard className="w-3.5 h-3.5" />}
-            label="Hub overview & analytics"
-            description="See aggregate metrics across all your projects from the top bar navigation."
+            description="Search recent jobs, navigate to any page, or switch projects — all with fuzzy matching."
           />
         </div>
         <div className="rounded-lg border border-dracula-orange/30 bg-dracula-orange/5 p-2.5">
           <p className="text-[10px] text-foreground">
-            You&apos;re all set! Start by adding a project or exploring the dashboard.
+            <span className="text-dracula-orange font-medium">Pro tip:</span> Press <Kbd>?</Kbd> to see all keyboard shortcuts. You&apos;re all set — start shipping.
           </p>
         </div>
       </div>
@@ -285,13 +234,15 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
 
   const handleNext = useCallback(() => {
     if (isLast) {
-      dismissOnboarding()
+      if (dontShowAgain) {
+        dismissOnboarding()
+      }
       setStep(0)
       onClose()
     } else {
       setStep((s) => s + 1)
     }
-  }, [isLast, onClose])
+  }, [isLast, dontShowAgain, onClose])
 
   const handleBack = useCallback(() => {
     setStep((s) => Math.max(0, s - 1))
@@ -305,7 +256,7 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
         />
         <DialogPrimitive.Content
-          className="fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] border border-border/30 bg-popover shadow-2xl backdrop-blur-xl sm:rounded-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
+          className="fixed left-[50%] top-[50%] z-50 w-full max-w-xl translate-x-[-50%] translate-y-[-50%] border border-border/30 bg-popover shadow-2xl backdrop-blur-xl sm:rounded-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
           data-testid="onboarding-wizard"
           aria-describedby="onboarding-description"
         >
@@ -314,9 +265,9 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
             'bg-dracula-purple': step === 0,
             'bg-dracula-cyan': step === 1,
             'bg-dracula-green': step === 2,
-            'bg-dracula-pink': step === 3,
-            'bg-dracula-orange': step === 4,
+            'bg-dracula-orange': step === 3,
           })} />
+          {/* colors: 0=purple, 1=cyan(agents), 2=green(hub), 3=orange(cmd palette) */}
 
           <div className="p-6 space-y-5">
             {/* Header */}
@@ -337,7 +288,7 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
             </div>
 
             {/* Content */}
-            <div className="min-h-[200px]">
+            <div className="min-h-[260px]">
               {current.content}
             </div>
 
@@ -417,8 +368,7 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
                     'bg-dracula-purple hover:bg-dracula-purple/90 text-primary-foreground': step === 0,
                     'bg-dracula-cyan hover:bg-dracula-cyan/90 text-primary-foreground': step === 1,
                     'bg-dracula-green hover:bg-dracula-green/90 text-primary-foreground': step === 2,
-                    'bg-dracula-pink hover:bg-dracula-pink/90 text-primary-foreground': step === 3,
-                    'bg-dracula-orange hover:bg-dracula-orange/90 text-primary-foreground': step === 4,
+                    'bg-dracula-orange hover:bg-dracula-orange/90 text-primary-foreground': step === 3,
                   })}
                   data-testid="onboarding-next"
                 >

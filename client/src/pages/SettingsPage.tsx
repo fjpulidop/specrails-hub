@@ -169,7 +169,7 @@ export default function SettingsPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
       <div>
-        <h1 className="text-base font-semibold">Settings</h1>
+        <h1 className="text-base font-semibold">Project Settings</h1>
         {config && (
           <p className="text-xs text-muted-foreground mt-1">
             {config.project.name}

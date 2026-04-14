@@ -12,26 +12,28 @@ import {
   Activity,
   Settings,
   FileText,
-  Globe,
   PieChart,
+  PanelLeft,
+  PanelRight,
 } from 'lucide-react'
 import { useHub } from '../hooks/useHub'
 import { getApiBase } from '../lib/api'
 import type { CommandInfo, JobSummary } from '../types'
 import { cn } from '../lib/utils'
+import { useSidebarPin } from '../context/SidebarPinContext'
 
 interface CommandPaletteProps {
   onOpenSettings?: () => void
-  onOpenOverview?: () => void
   onOpenAnalytics?: () => void
   onOpenDocs?: () => void
 }
 
-export function CommandPalette({ onOpenSettings, onOpenOverview, onOpenAnalytics, onOpenDocs }: CommandPaletteProps) {
+export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: CommandPaletteProps) {
   const [open, setOpen] = useState(false)
   const [commands, setCommands] = useState<CommandInfo[]>([])
   const [recentJobs, setRecentJobs] = useState<JobSummary[]>([])
   const { projects, activeProjectId, setActiveProjectId } = useHub()
+  const { leftPinned, setLeftPinned, rightPinned, setRightPinned } = useSidebarPin()
   const navigate = useNavigate()
   const fetchedRef = useRef(false)
 
@@ -225,33 +227,45 @@ export function CommandPalette({ onOpenSettings, onOpenOverview, onOpenAnalytics
             <LayoutDashboard className="w-4 h-4 text-muted-foreground shrink-0" />
             <span>Dashboard</span>
           </Command.Item>
-          {onOpenOverview && (
-            <Command.Item value="Hub Overview" keywords={['projects']} onSelect={() => handleHubAction(onOpenOverview)} className={navItemClass}>
-              <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span>Hub Overview</span>
-            </Command.Item>
-          )}
           {onOpenAnalytics && (
-            <Command.Item value="Hub Analytics" keywords={['cross-project']} onSelect={() => handleHubAction(onOpenAnalytics)} className={navItemClass}>
+            <Command.Item value="Hub Analytics" keywords={['cross-project', 'hub']} onSelect={() => handleHubAction(onOpenAnalytics)} className={navItemClass}>
               <PieChart className="w-4 h-4 text-muted-foreground shrink-0" />
               <span>Hub Analytics</span>
             </Command.Item>
           )}
-          <Command.Item value="Analytics" keywords={['metrics']} onSelect={() => handleNavigate('/analytics')} className={navItemClass}>
+          <Command.Item value="Project Analytics" keywords={['metrics']} onSelect={() => handleNavigate('/analytics')} className={navItemClass}>
             <BarChart3 className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Analytics</span>
+            <span>Project Analytics</span>
           </Command.Item>
           <Command.Item value="Activity Feed" keywords={['log']} onSelect={() => handleNavigate('/activity')} className={navItemClass}>
             <Activity className="w-4 h-4 text-muted-foreground shrink-0" />
             <span>Activity Feed</span>
           </Command.Item>
-          <Command.Item value="Settings" keywords={['configuration']} onSelect={() => onOpenSettings ? handleHubAction(onOpenSettings) : handleNavigate('/settings')} className={navItemClass}>
+          <Command.Item value="Hub Settings" keywords={['configuration']} onSelect={() => onOpenSettings ? handleHubAction(onOpenSettings) : handleNavigate('/settings')} className={navItemClass}>
             <Settings className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Settings</span>
+            <span>Hub Settings</span>
           </Command.Item>
           <Command.Item value="Docs" keywords={['documentation']} onSelect={() => onOpenDocs ? handleHubAction(onOpenDocs) : handleNavigate('/docs')} className={navItemClass}>
             <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
             <span>Docs</span>
+          </Command.Item>
+          <Command.Item
+            value={leftPinned ? 'Unpin left sidebar' : 'Pin left sidebar'}
+            keywords={['sidebar', 'panel', 'left']}
+            onSelect={() => { setLeftPinned((p) => !p); setOpen(false) }}
+            className={navItemClass}
+          >
+            <PanelLeft className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span>{leftPinned ? 'Unpin left sidebar' : 'Pin left sidebar'}</span>
+          </Command.Item>
+          <Command.Item
+            value={rightPinned ? 'Unpin right sidebar' : 'Pin right sidebar'}
+            keywords={['sidebar', 'panel', 'right', 'nav']}
+            onSelect={() => { setRightPinned((p) => !p); setOpen(false) }}
+            className={navItemClass}
+          >
+            <PanelRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span>{rightPinned ? 'Unpin right sidebar' : 'Pin right sidebar'}</span>
           </Command.Item>
         </Command.Group>
       </Command.List>

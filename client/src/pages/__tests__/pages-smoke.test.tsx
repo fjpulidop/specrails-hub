@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, waitFor, fireEvent } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { render } from '../../test-utils'
 
 // Ensure IntersectionObserver is always available (vi.restoreAllMocks can wipe setup mocks)
@@ -58,103 +58,6 @@ vi.mock('react-markdown', () => ({
 vi.mock('remark-gfm', () => ({ default: () => {} }))
 vi.mock('rehype-highlight', () => ({ default: () => {} }))
 vi.mock('highlight.js/styles/atom-one-dark.css', () => ({}))
-
-// ─── HubOverviewPage ──────────────────────────────────────────────────────────
-
-describe('HubOverviewPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        aggregated: {
-          totalCount: 1,
-          healthyCount: 1,
-          warningCount: 0,
-          criticalCount: 0,
-          jobsToday: 3,
-          activeJobs: 0,
-        },
-        projects: [],
-        recentJobs: [],
-      }),
-    })
-  })
-
-  it('renders Hub Overview heading', async () => {
-    const HubOverviewPage = (await import('../HubOverviewPage')).default
-    render(<HubOverviewPage />)
-    expect(screen.getByText('Hub Overview')).toBeInTheDocument()
-  })
-
-  it('renders search input', async () => {
-    const HubOverviewPage = (await import('../HubOverviewPage')).default
-    render(<HubOverviewPage />)
-    expect(screen.getByPlaceholderText(/search across all projects/i)).toBeInTheDocument()
-  })
-
-  it('renders aggregated stats after loading', async () => {
-    const HubOverviewPage = (await import('../HubOverviewPage')).default
-    render(<HubOverviewPage />)
-
-    await waitFor(() => {
-      expect(screen.queryByText('Projects')).toBeInTheDocument()
-    })
-  })
-
-  it('renders "No projects registered yet" when projects array is empty', async () => {
-    const HubOverviewPage = (await import('../HubOverviewPage')).default
-    render(<HubOverviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('No projects registered yet.')).toBeInTheDocument()
-    })
-  })
-
-  it('renders Recent Activity section after loading', async () => {
-    const HubOverviewPage = (await import('../HubOverviewPage')).default
-    render(<HubOverviewPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Recent Activity')).toBeInTheDocument()
-    })
-  })
-
-  it('renders search results on query (debounced)', async () => {
-    const overviewData = {
-      aggregated: { totalCount: 1, healthyCount: 1, warningCount: 0, criticalCount: 0, jobsToday: 3, activeJobs: 0 },
-      projects: [],
-      recentJobs: [],
-    }
-    const healthData = { projects: [], aggregated: { totalCount: 0, greenCount: 0, yellowCount: 0, redCount: 0 } }
-    const searchData = { query: 'test', groups: [], total: 0 }
-    ;(global.fetch as ReturnType<typeof vi.fn>).mockImplementation(async (url: string) => {
-      if (typeof url === 'string' && url.includes('/api/hub/health')) {
-        return { ok: true, json: async () => healthData }
-      }
-      if (typeof url === 'string' && url.includes('/api/hub/search')) {
-        return { ok: true, json: async () => searchData }
-      }
-      return { ok: true, json: async () => overviewData }
-    })
-
-    const HubOverviewPage = (await import('../HubOverviewPage')).default
-    render(<HubOverviewPage />)
-
-    await waitFor(() => { expect(screen.getByText('Hub Overview')).toBeInTheDocument() })
-
-    const searchInput = screen.getByPlaceholderText(/search across all projects/i)
-    fireEvent.change(searchInput, { target: { value: 'test query' } })
-
-    // Debounced at 350ms — results load asynchronously
-    await waitFor(() => {
-      // The search query fetch should eventually fire
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/hub/search')
-      )
-    }, { timeout: 2000 })
-  })
-})
 
 // ─── ActivityFeedPage ─────────────────────────────────────────────────────────
 

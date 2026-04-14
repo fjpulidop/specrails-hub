@@ -9,7 +9,7 @@ import type { WebhookEvent } from './hub-db'
 import { WebhookManager } from './webhook-manager'
 import { createSpecrailsTechClient } from './specrails-tech-client'
 import { checkCoreCompat, getCLIStatus, detectAvailableCLIs } from './core-compat'
-import { getHubAnalytics, getHubTodayStats, getHubRecentJobs, searchHubContent, getHubOverview, getHubHealth } from './hub-analytics'
+import { getHubAnalytics, getHubTodayStats, getHubRecentJobs } from './hub-analytics'
 import type { AnalyticsOpts, AnalyticsPeriod } from './types'
 
 function slugify(name: string): string {
@@ -178,63 +178,6 @@ export function createHubRouter(
     const limit = Math.min(Math.max(parseInt((req.query.limit as string) ?? '10', 10) || 10, 1), 50)
     const jobs = getHubRecentJobs(registry, limit)
     res.json({ jobs })
-  })
-
-  // GET /api/hub/overview — per-project overview with health scores and aggregated stats
-  router.get('/overview', (_req, res) => {
-    const result = getHubOverview(registry)
-    res.json(result)
-  })
-
-  // GET /api/hub/health — per-project health with traffic light indicators
-  router.get('/health', (_req, res) => {
-    const result = getHubHealth(registry)
-    res.json(result)
-  })
-
-  // GET /api/hub/export — export hub overview as JSON or CSV
-  router.get('/export', (req, res) => {
-    const format = (req.query.format as string) || 'json'
-    if (format !== 'json' && format !== 'csv') {
-      res.status(400).json({ error: 'Invalid format. Must be json or csv' })
-      return
-    }
-    const toCsv = (headers: string[], rows: Record<string, unknown>[]): string => {
-      const escape = (v: unknown) => {
-        const s = v == null ? '' : String(v)
-        return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
-      }
-      const lines = [headers.join(',')]
-      for (const row of rows) {
-        lines.push(headers.map(h => escape(row[h])).join(','))
-      }
-      return lines.join('\n')
-    }
-    const overview = getHubOverview(registry)
-    if (format === 'csv') {
-      const headers = ['projectName', 'healthScore', 'activeJobs', 'jobsToday', 'lastRunAt', 'lastRunStatus', 'coveragePct']
-      const csv = toCsv(headers, overview.projects as unknown as Record<string, unknown>[])
-      res.setHeader('Content-Type', 'text/csv')
-      res.setHeader('Content-Disposition', 'attachment; filename="hub-export.csv"')
-      res.send(csv)
-    } else {
-      res.json(overview)
-    }
-  })
-
-  // GET /api/hub/search?q= — search across all project jobs, proposals, chat messages
-  router.get('/search', (req, res) => {
-    const query = ((req.query.q as string) ?? '').trim()
-    if (!query) {
-      res.json({ query: '', groups: [], total: 0 })
-      return
-    }
-    if (query.length < 2) {
-      res.status(400).json({ error: 'Query must be at least 2 characters' })
-      return
-    }
-    const result = searchHubContent(registry, query)
-    res.json(result)
   })
 
   // GET /api/hub/resolve?path=<cwd> — resolve a project from a filesystem path

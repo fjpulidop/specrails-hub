@@ -1,112 +1,107 @@
-# Getting Started with specrails-hub
+# Getting Started
 
-specrails-hub is a local dashboard and CLI for managing multiple [specrails-core](https://github.com/fjpulidop/specrails-core) projects from a single interface.
-
----
-
-## Quick Start
-
-### 1. Install
-
-```bash
-npm install -g specrails-hub
-```
-
-### 2. Start the hub
-
-```bash
-specrails-hub start
-```
-
-### 3. Register a project
-
-```bash
-specrails-hub add /path/to/your/project
-```
-
-### 4. Open the dashboard
-
-```bash
-open http://localhost:4200
-```
-
-On first launch with no projects, you'll see a welcome screen with an **Add your first project** button.
+specrails-hub is a local dashboard for managing multiple [specrails-core](https://github.com/fjpulidop/specrails-core) projects from one place. It runs an Express server that spawns Claude CLI agents, streams their output in real-time, and tracks jobs, analytics, and specs per project.
 
 ---
 
 ## Prerequisites
 
-- **Node.js** 18+
-- **npm** 9+
-- **claude** CLI on your PATH ([Claude Code](https://claude.ai/claude-code))
-- At least one project with specrails-core installed (`npx specrails-core`)
+- Node.js 18+
+- [specrails-core](https://github.com/fjpulidop/specrails-core) installed in at least one project
+- Claude CLI available in your PATH
 
 ---
 
-## Dashboard overview
+## Installation
 
+```bash
+npm install -g specrails-hub
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  specrails hub   [my-app ●] [api-srv] [+]              ⚙   │
-│  Home   Analytics   Activity                                │
-│─────────────────────────────────────────────────────────────│
-│  DISCOVERY                  DELIVERY                        │
-│  [Propose Spec]             [Implement →]                   │
-│  [Auto-propose Specs]       [Batch Implement →]             │
-│  [Auto-select Specs]                                        │
-│                                                             │
-│  Recent Jobs                                                │
-│  /sr:implement #42   2m 4s   ✓   $0.08   12,400 tok        │
-└─────────────────────────────────────────────────────────────┘
-```
-
-- **Tabs** — one per project, green dot when a job is active
-- **Home** — CommandGrid (DISCOVERY + DELIVERY sections), recent jobs, pipeline status
-- **Analytics** — cost, token, and duration metrics
-- **Activity** — chronological event log
-- **Settings** (gear icon) — global hub configuration and registered projects
 
 ---
 
-## CLI reference (quick)
+## Starting the hub
 
-| Command | Description |
-|---------|-------------|
-| `specrails-hub start` | Start the hub server |
-| `specrails-hub stop` | Stop the hub server |
-| `specrails-hub list` | List all registered projects |
-| `specrails-hub add <path>` | Register a project |
-| `specrails-hub remove <id>` | Unregister a project |
-| `specrails-hub implement "#42"` | Run an implement job (auto-detects project from CWD) |
-| `specrails-hub --jobs` | Show recent job history |
+```bash
+specrails-hub start
+```
+
+Starts the Express server on port **4200** and opens the dashboard at `http://127.0.0.1:4200`.
 
 ---
 
-## Documentation index
+## Adding your first project
 
-| Document | What it covers |
-|----------|---------------|
-| [Features](../product/features.md) | Dashboard feature reference (CommandGrid, jobs, analytics, chat) |
-| [Workflows](../product/workflows.md) | Step-by-step task guides |
-| [OpenSpec Workflow](../product/openspec-workflow.md) | `opsx:*` CLI commands for structured change management |
-| [Architecture](../engineering/architecture.md) | System architecture, data layout, WebSocket protocol |
-| [API Reference](../engineering/api-reference.md) | REST API endpoint reference |
-| [Engineering Standards](../engineering/engineering-standards.md) | Coding conventions, testing, RFC format |
-| [Operations Runbook](../operations/runbook.md) | Deployment and incident response |
-| [Platform Overview](platform-overview.md) | High-level product overview |
+**From the dashboard:**
+
+1. Click **+** (add project) in the sidebar.
+2. Enter the absolute path to your project (e.g. `/Users/you/repos/my-app`).
+3. Click **Add**.
+
+If specrails-core is not yet installed, a setup wizard launches automatically to install and configure it.
+
+**From the CLI:**
+
+```bash
+specrails-hub add /path/to/your/project
+```
 
 ---
 
-## Adding documentation
-
-Markdown files in `docs/` are served by the embedded docs portal at `http://localhost:4200/docs`. Add files to the appropriate category directory:
+## Dashboard layout
 
 ```
-docs/
-  engineering/   # RFCs, architecture, technical standards
-  product/       # Roadmaps, PRDs, feature specs
-  operations/    # Runbooks, on-call procedures
-  general/       # Onboarding, platform overview
+┌──────────┬─────────────────────────────────────────────────────┐
+│          │  ProjectNavbar: Home · Jobs · Analytics · Settings  │
+│ Sidebar  │                                                     │
+│          │  Page content (Dashboard / Jobs / Analytics / ...)  │
+│ Projects │                                                     │
+│ ──────── │                                                     │
+│ Docs     │                                                     │
+│ Analytics│                                                     │
+│ Settings │                                                     │
+└──────────┴─────────────────────────────────────────────────────┘
 ```
 
-Each file becomes a URL like `/docs/engineering/my-rfc`.
+- **Sidebar** — hover to expand, pin icon to lock open. Lists all registered projects plus Docs, Hub Analytics, and Hub Settings at the bottom.
+- **ProjectNavbar** — top bar for the active project: Home, Jobs, Project Analytics, Project Settings.
+- **Home** — Specs panel (local tickets) and Rails (execution lanes).
+- **Jobs** — all jobs for the active project with real-time log streaming.
+
+---
+
+## Running your first job
+
+1. Select a project in the sidebar.
+2. On the Home page, click **+ Add Spec** to create a spec.
+3. Drag the spec into a Rail and click **Play** to start the pipeline.
+
+Or from the CLI:
+
+```bash
+cd ~/repos/my-app
+specrails-hub implement "#42"
+```
+
+Monitor the job in **Jobs** — logs stream in real-time.
+
+---
+
+## CLI quick reference
+
+```bash
+specrails-hub start                              # Start the hub server
+specrails-hub add <path>                         # Register a project
+specrails-hub list                               # List registered projects
+specrails-hub remove <project-id>               # Unregister a project
+specrails-hub implement "#42"                    # Queue an implement job (cwd project)
+specrails-hub --project my-app implement "#42"  # Target a specific project by name
+```
+
+---
+
+## Next steps
+
+- [Platform Overview](platform-overview.md) — how the hub works
+- [Features](../product/features.md) — full feature reference
+- [Workflows](../product/workflows.md) — step-by-step guides

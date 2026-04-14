@@ -28,7 +28,6 @@ vi.mock('../../hooks/useHub', () => ({
 
 const defaultProps = {
   onAddProject: vi.fn(),
-  onOpenOverview: vi.fn(),
   onOpenAnalytics: vi.fn(),
   onOpenDocs: vi.fn(),
   onOpenSettings: vi.fn(),
@@ -59,11 +58,10 @@ describe('ArcSidebar', () => {
     expect(screen.getByRole('button', { name: /Unpin sidebar/i })).toBeInTheDocument()
   })
 
-  it('renders the specrails branding when expanded (pinned)', () => {
+  it('renders the Hub label when expanded (pinned)', () => {
     render(<ArcSidebar {...defaultProps} />)
     fireEvent.click(screen.getByRole('button', { name: /Pin sidebar open/i }))
-    expect(screen.getByText('spec')).toBeInTheDocument()
-    expect(screen.getByText('rails')).toBeInTheDocument()
+    expect(screen.getByText('Hub')).toBeInTheDocument()
   })
 
   it('renders Add project button', () => {
@@ -95,30 +93,22 @@ describe('ArcSidebar', () => {
   it('renders hub nav items when expanded', () => {
     render(<ArcSidebar {...defaultProps} />)
     fireEvent.click(screen.getByRole('button', { name: /Pin sidebar open/i }))
-    expect(screen.getByRole('button', { name: /Overview/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Analytics/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Docs/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Settings/i })).toBeInTheDocument()
-  })
-
-  it('calls onOpenOverview when Overview is clicked', () => {
-    render(<ArcSidebar {...defaultProps} />)
-    fireEvent.click(screen.getByRole('button', { name: /Pin sidebar open/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Overview/i }))
-    expect(defaultProps.onOpenOverview).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: /^Analytics$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Settings$/i })).toBeInTheDocument()
   })
 
   it('calls onOpenAnalytics when Analytics is clicked', () => {
     render(<ArcSidebar {...defaultProps} />)
     fireEvent.click(screen.getByRole('button', { name: /Pin sidebar open/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Analytics/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Analytics$/i }))
     expect(defaultProps.onOpenAnalytics).toHaveBeenCalledOnce()
   })
 
   it('calls onOpenSettings when Settings is clicked', () => {
     render(<ArcSidebar {...defaultProps} />)
     fireEvent.click(screen.getByRole('button', { name: /Pin sidebar open/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Settings$/i }))
     expect(defaultProps.onOpenSettings).toHaveBeenCalledOnce()
   })
 
