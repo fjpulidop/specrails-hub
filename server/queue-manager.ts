@@ -438,15 +438,6 @@ export class QueueManager {
         'You MUST read specs from this file. Do NOT attempt to fetch tickets from Jira, Linear, GitHub Issues, or any other external tracker. ' +
         'The #<id> references in the command correspond to ticket IDs inside .specrails/local-tickets.json.'
 
-      // Multi-phase completion guard: ensure Claude runs merge/review phases
-      systemAppend += '\n\nCRITICAL — PIPELINE COMPLETION REQUIREMENT:\n' +
-        'This is a multi-phase implementation pipeline. You MUST complete ALL phases before exiting:\n' +
-        '  Phase 3a (Architect) → Phase 3b (Developer) → Phase 3c (Test writer) → Phase 3d (Doc sync) → Phase 4a (Merge worktrees) → Phase 4b (Reviewer)\n' +
-        '- NEVER exit after Phase 3b (Developer). The merge phase (4a) is MANDATORY even if a sub-agent takes a long time.\n' +
-        '- After all developer agents finish, you MUST merge their worktrees into the main branch in MERGE_ORDER.\n' +
-        '- If a developer agent fails or returns an error, still proceed with merging any successful agents and run the reviewer.\n' +
-        '- Before exiting, verify with `git log --oneline -5` that the feature branches were merged.\n' +
-        '- The job is NOT complete until all worktrees are merged and cleaned up. Do NOT exit early.'
     }
 
     let binary: string
