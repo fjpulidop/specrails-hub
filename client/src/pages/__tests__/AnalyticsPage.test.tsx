@@ -109,7 +109,7 @@ describe('AnalyticsPage', () => {
   it('renders Analytics heading', () => {
     global.fetch = vi.fn().mockImplementation(() => new Promise(() => {}))
     render(<AnalyticsPage />)
-    expect(screen.getByText('Analytics')).toBeInTheDocument()
+    expect(screen.getByText('Project Analytics')).toBeInTheDocument()
   })
 
   it('fetches analytics data on mount', async () => {

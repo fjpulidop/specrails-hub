@@ -70,7 +70,7 @@ describe('SettingsPage', () => {
     })
     render(<SettingsPage />)
     await waitFor(() => {
-      expect(screen.getByText('Settings')).toBeInTheDocument()
+      expect(screen.getByText('Project Settings')).toBeInTheDocument()
     })
   })
 

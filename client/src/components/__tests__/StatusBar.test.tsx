@@ -7,6 +7,7 @@ vi.mock('../../lib/api', () => ({
   getApiBase: () => '/api',
 }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+vi.mock('../NotificationCenter', () => ({ NotificationCenter: () => null }))
 
 describe('StatusBar', () => {
   beforeEach(() => {

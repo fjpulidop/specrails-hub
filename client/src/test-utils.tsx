@@ -2,14 +2,17 @@ import React, { type ReactNode } from 'react'
 import { render, type RenderOptions } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { TooltipProvider } from './components/ui/tooltip'
+import { SidebarPinProvider } from './context/SidebarPinContext'
 
-// Default wrapper with MemoryRouter + TooltipProvider
+// Default wrapper with MemoryRouter + TooltipProvider + SidebarPinProvider
 function AllProviders({ children }: { children: ReactNode }) {
   return (
     <MemoryRouter>
-      <TooltipProvider>
-        {children}
-      </TooltipProvider>
+      <SidebarPinProvider>
+        <TooltipProvider>
+          {children}
+        </TooltipProvider>
+      </SidebarPinProvider>
     </MemoryRouter>
   )
 }
@@ -21,9 +24,11 @@ function customRender(
   const { route, ...renderOptions } = options ?? {}
   const Wrapper = ({ children }: { children: ReactNode }) => (
     <MemoryRouter initialEntries={route ? [route] : ['/']}>
-      <TooltipProvider>
-        {children}
-      </TooltipProvider>
+      <SidebarPinProvider>
+        <TooltipProvider>
+          {children}
+        </TooltipProvider>
+      </SidebarPinProvider>
     </MemoryRouter>
   )
   return render(ui, { wrapper: Wrapper, ...renderOptions })

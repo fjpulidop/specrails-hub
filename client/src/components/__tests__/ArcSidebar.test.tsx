@@ -40,27 +40,26 @@ describe('ArcSidebar', () => {
 
   it('renders in collapsed state by default', () => {
     render(<ArcSidebar {...defaultProps} />)
-    // Width class for collapsed state
-    const sidebar = screen.getByRole('button', { name: /Pin sidebar|Unpin sidebar/i }).closest('div')!.parentElement
+    const sidebar = screen.getByRole('button', { name: /Pin left sidebar|Unpin left sidebar/i }).closest('div')!.parentElement
     expect(sidebar).toBeTruthy()
   })
 
   it('renders the pin/unpin toggle button', () => {
     render(<ArcSidebar {...defaultProps} />)
-    const toggleBtn = screen.getByRole('button', { name: /Pin sidebar open/i })
+    const toggleBtn = screen.getByRole('button', { name: /Pin left sidebar/i })
     expect(toggleBtn).toBeInTheDocument()
   })
 
   it('toggles to pinned state on click', () => {
     render(<ArcSidebar {...defaultProps} />)
-    const pinBtn = screen.getByRole('button', { name: /Pin sidebar open/i })
+    const pinBtn = screen.getByRole('button', { name: /Pin left sidebar/i })
     fireEvent.click(pinBtn)
-    expect(screen.getByRole('button', { name: /Unpin sidebar/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Unpin left sidebar/i })).toBeInTheDocument()
   })
 
   it('renders the Hub label when expanded (pinned)', () => {
     render(<ArcSidebar {...defaultProps} />)
-    fireEvent.click(screen.getByRole('button', { name: /Pin sidebar open/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
     expect(screen.getByText('Hub')).toBeInTheDocument()
   })
 
@@ -78,21 +77,21 @@ describe('ArcSidebar', () => {
   it('renders project list buttons', () => {
     render(<ArcSidebar {...defaultProps} />)
     // Pin to expand and see project names
-    fireEvent.click(screen.getByRole('button', { name: /Pin sidebar open/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
     expect(screen.getByText('Project Alpha')).toBeInTheDocument()
     expect(screen.getByText('Project Beta')).toBeInTheDocument()
   })
 
   it('calls setActiveProjectId when a project is clicked', () => {
     render(<ArcSidebar {...defaultProps} />)
-    fireEvent.click(screen.getByRole('button', { name: /Pin sidebar open/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
     fireEvent.click(screen.getByText('Project Beta'))
     expect(mockSetActiveProjectId).toHaveBeenCalledWith('proj-2')
   })
 
   it('renders hub nav items when expanded', () => {
     render(<ArcSidebar {...defaultProps} />)
-    fireEvent.click(screen.getByRole('button', { name: /Pin sidebar open/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
     expect(screen.getByRole('button', { name: /Docs/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Analytics$/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Settings$/i })).toBeInTheDocument()
@@ -100,21 +99,21 @@ describe('ArcSidebar', () => {
 
   it('calls onOpenAnalytics when Analytics is clicked', () => {
     render(<ArcSidebar {...defaultProps} />)
-    fireEvent.click(screen.getByRole('button', { name: /Pin sidebar open/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
     fireEvent.click(screen.getByRole('button', { name: /^Analytics$/i }))
     expect(defaultProps.onOpenAnalytics).toHaveBeenCalledOnce()
   })
 
   it('calls onOpenSettings when Settings is clicked', () => {
     render(<ArcSidebar {...defaultProps} />)
-    fireEvent.click(screen.getByRole('button', { name: /Pin sidebar open/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
     fireEvent.click(screen.getByRole('button', { name: /^Settings$/i }))
     expect(defaultProps.onOpenSettings).toHaveBeenCalledOnce()
   })
 
   it('shows confirm prompt then removes project on second click', async () => {
     render(<ArcSidebar {...defaultProps} />)
-    fireEvent.click(screen.getByRole('button', { name: /Pin sidebar open/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
 
     // Click remove button for Project Beta (not active)
     const removeBtn = screen.getByRole('button', { name: /Remove Project Beta/i })

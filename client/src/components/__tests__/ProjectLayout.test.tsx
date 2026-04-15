@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import { render } from '../../test-utils'
 import { ProjectLayout } from '../ProjectLayout'
-import type { HubProject } from '../../hooks/useHub'
+import type { HubProject } from '../../hooks/useHub' // used by mockProject
 
 // Mock Toaster from sonner
 vi.mock('sonner', () => ({
@@ -69,11 +69,6 @@ vi.mock('../ChatPanel', () => ({
   ChatPanel: () => <div data-testid="chat-panel" />,
 }))
 
-vi.mock('../ProjectNavbar', () => ({
-  ProjectNavbar: ({ project }: { project: HubProject }) => (
-    <nav data-testid="project-navbar">{project.name}</nav>
-  ),
-}))
 
 const mockProject: HubProject = {
   id: 'proj-1',
@@ -86,12 +81,6 @@ const mockProject: HubProject = {
 }
 
 describe('ProjectLayout', () => {
-  it('renders ProjectNavbar with the project prop', () => {
-    render(<ProjectLayout project={mockProject} />)
-    expect(screen.getByTestId('project-navbar')).toBeInTheDocument()
-    expect(screen.getByTestId('project-navbar')).toHaveTextContent('My Project')
-  })
-
   it('renders StatusBar', () => {
     render(<ProjectLayout project={mockProject} />)
     expect(screen.getByTestId('status-bar')).toBeInTheDocument()
