@@ -14,6 +14,10 @@ export const SHORTCUTS: Shortcut[] = [
   // General
   { keys: '?', description: 'Show keyboard shortcuts', category: 'general' },
   { keys: 'Esc', description: 'Close modal / sidebar', category: 'general' },
+  { keys: '⌘B', description: 'Toggle right sidebar', category: 'general' },
+  { keys: '⌥⌘B', description: 'Toggle left sidebar', category: 'general' },
+  { keys: '⌘1–4', description: 'Navigate to project page (Home/Jobs/Analytics/Settings)', category: 'general' },
+  { keys: '⌥⌘1–9', description: 'Switch to project by position', category: 'general' },
 
   // Navigation
   { keys: 'G D', description: 'Go to Dashboard', category: 'navigation' },
@@ -42,11 +46,22 @@ interface UseKeyboardShortcutsOptions {
   onOpenCheatsheet: () => void
   /** Optional contextual callbacks */
   onListNavigate?: (direction: 'up' | 'down') => void
+  /** Sidebar toggles */
+  onToggleLeftSidebar?: () => void
+  onToggleRightSidebar?: () => void
+  /** Switch to project by 1-based index */
+  onSwitchProject?: (index: number) => void
+  /** Navigate to project page by 1-based index (Home, Jobs, Analytics, Settings…) */
+  onSwitchProjectPage?: (index: number) => void
 }
 
 export function useKeyboardShortcuts({
   onOpenCheatsheet,
   onListNavigate,
+  onToggleLeftSidebar,
+  onToggleRightSidebar,
+  onSwitchProject,
+  onSwitchProjectPage,
 }: UseKeyboardShortcutsOptions) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -58,6 +73,14 @@ export function useKeyboardShortcuts({
   onOpenCheatsheetRef.current = onOpenCheatsheet
   const onListNavigateRef = useRef(onListNavigate)
   onListNavigateRef.current = onListNavigate
+  const onToggleLeftSidebarRef = useRef(onToggleLeftSidebar)
+  onToggleLeftSidebarRef.current = onToggleLeftSidebar
+  const onToggleRightSidebarRef = useRef(onToggleRightSidebar)
+  onToggleRightSidebarRef.current = onToggleRightSidebar
+  const onSwitchProjectRef = useRef(onSwitchProject)
+  onSwitchProjectRef.current = onSwitchProject
+  const onSwitchProjectPageRef = useRef(onSwitchProjectPage)
+  onSwitchProjectPageRef.current = onSwitchProjectPage
   const locationRef = useRef(location)
   locationRef.current = location
 
@@ -66,7 +89,41 @@ export function useKeyboardShortcuts({
       // Never intercept when typing in inputs
       if (isEditableTarget(e)) return
 
-      // Don't intercept modifier combos (except Esc)
+      // ⌘B → toggle right sidebar  (e.code avoids Option layer chars like '∫')
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.code === 'KeyB') {
+        e.preventDefault()
+        onToggleRightSidebarRef.current?.()
+        return
+      }
+
+      // ⌥⌘B → toggle left sidebar
+      if ((e.metaKey || e.ctrlKey) && e.altKey && e.code === 'KeyB') {
+        e.preventDefault()
+        onToggleLeftSidebarRef.current?.()
+        return
+      }
+
+      // ⌘1–⌘9 → navigate to project page by index
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
+        const match = e.code.match(/^Digit([1-9])$/)
+        if (match) {
+          e.preventDefault()
+          onSwitchProjectPageRef.current?.(parseInt(match[1], 10))
+          return
+        }
+      }
+
+      // ⌥⌘1–⌥⌘9 → switch to project by index
+      if ((e.metaKey || e.ctrlKey) && e.altKey && !e.shiftKey) {
+        const match = e.code.match(/^Digit([1-9])$/)
+        if (match) {
+          e.preventDefault()
+          onSwitchProjectRef.current?.(parseInt(match[1], 10))
+          return
+        }
+      }
+
+      // Don't intercept other modifier combos
       if (e.metaKey || e.ctrlKey || e.altKey) return
 
       const key = e.key

@@ -59,18 +59,18 @@ describe('SpecsBoard', () => {
 
   it('renders the Specs heading', () => {
     render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
-    expect(screen.getByText('Specs')).toBeInTheDocument()
+    expect(screen.getByText('Spec')).toBeInTheDocument()
   })
 
   it('renders Add Spec button', () => {
     render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
-    expect(screen.getByRole('button', { name: /Add Spec/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Add$/i })).toBeInTheDocument()
   })
 
   it('shows empty state when no tickets', () => {
     render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
     expect(screen.getByText('No specs yet')).toBeInTheDocument()
-    expect(screen.getByText(/Click "\+ Add Spec" to get started/i)).toBeInTheDocument()
+    expect(screen.getByText(/Click "\+ Add" to get started/i)).toBeInTheDocument()
   })
 
   it('shows loading skeletons when isLoading is true', () => {
@@ -98,8 +98,7 @@ describe('SpecsBoard', () => {
   it('does not show active specs count badge when no tickets', () => {
     render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
     // The Specs header should not show a count badge for 0 active tickets
-    // (the Done section always shows its own "0" badge)
-    const heading = screen.getByText('Specs')
+    const heading = screen.getByText('Spec')
     const headerDiv = heading.closest('div.flex')!
     expect(headerDiv.querySelector('.rounded-full')).toBeNull()
   })
@@ -107,13 +106,13 @@ describe('SpecsBoard', () => {
   it('opens ProposeSpecModal when Add Spec is clicked', () => {
     render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
     expect(screen.queryByTestId('propose-spec-modal')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /Add Spec/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Add$/i }))
     expect(screen.getByTestId('propose-spec-modal')).toBeInTheDocument()
   })
 
   it('closes ProposeSpecModal when onClose is called', () => {
     render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
-    fireEvent.click(screen.getByRole('button', { name: /Add Spec/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Add$/i }))
     expect(screen.getByTestId('propose-spec-modal')).toBeInTheDocument()
     fireEvent.click(screen.getByText('close modal'))
     expect(screen.queryByTestId('propose-spec-modal')).not.toBeInTheDocument()

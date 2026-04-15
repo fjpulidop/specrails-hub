@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { Menu, Pin, FolderOpen, Plus, LayoutDashboard, BarChart2, BookOpen, Settings, X } from 'lucide-react'
+import { PanelLeft, FolderOpen, Plus, BarChart2, BookOpen, Settings, X } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useHub } from '../hooks/useHub'
 import type { HubProject } from '../hooks/useHub'
+import { useSidebarPin } from '../context/SidebarPinContext'
 
 interface ArcSidebarProps {
   onAddProject: () => void
-  onOpenOverview: () => void
   onOpenAnalytics: () => void
   onOpenDocs: () => void
   onOpenSettings: () => void
@@ -93,20 +93,18 @@ function ProjectItem({
 
 export function ArcSidebar({
   onAddProject,
-  onOpenOverview,
   onOpenAnalytics,
   onOpenDocs,
   onOpenSettings,
 }: ArcSidebarProps) {
   const { projects, activeProjectId, setActiveProjectId, removeProject } = useHub()
-  const [pinned, setPinned] = useState(false)
+  const { leftPinned: pinned, setLeftPinned: setPinned } = useSidebarPin()
   const [hovered, setHovered] = useState(false)
   const expanded = pinned || hovered
 
   const navItems = [
-    { label: 'Overview', icon: LayoutDashboard, action: onOpenOverview },
-    { label: 'Analytics', icon: BarChart2, action: onOpenAnalytics },
     { label: 'Docs', icon: BookOpen, action: onOpenDocs },
+    { label: 'Analytics', icon: BarChart2, action: onOpenAnalytics },
     { label: 'Settings', icon: Settings, action: onOpenSettings },
   ]
 
@@ -131,24 +129,28 @@ export function ArcSidebar({
       {/* Header */}
       <div
         className={cn(
-          'flex items-center h-10 border-b border-border flex-shrink-0',
+          'flex items-center h-12 border-b border-border flex-shrink-0',
           expanded ? 'px-3 justify-between' : 'justify-center'
         )}
       >
         {expanded && (
-          <span className="font-mono text-sm font-bold whitespace-nowrap overflow-hidden">
-            <span className="text-dracula-purple">spec</span>
-            <span className="text-dracula-pink">rails</span>
+          <span className="font-mono text-sm font-bold whitespace-nowrap overflow-hidden text-dracula-purple">
+            Hub
           </span>
         )}
         <button
           type="button"
           onClick={() => setPinned((p) => !p)}
-          className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex-shrink-0"
-          aria-label={pinned ? 'Unpin sidebar' : 'Pin sidebar open'}
-          title={pinned ? 'Unpin sidebar' : 'Pin sidebar open'}
+          className={cn(
+            'flex items-center justify-center w-7 h-7 rounded-md transition-colors flex-shrink-0',
+            pinned
+              ? 'text-foreground bg-muted'
+              : 'text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50'
+          )}
+          aria-label={pinned ? 'Unpin left sidebar' : 'Pin left sidebar'}
+          title={pinned ? 'Unpin left sidebar (⌥⌘B)' : 'Pin left sidebar (⌥⌘B)'}
         >
-          {pinned ? <Pin className="w-4 h-4 fill-current" /> : <Menu className="w-4 h-4" />}
+          <PanelLeft className="w-4 h-4" />
         </button>
       </div>
 

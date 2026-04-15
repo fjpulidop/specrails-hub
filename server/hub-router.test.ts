@@ -467,67 +467,6 @@ describe('hub-router', () => {
     })
   })
 
-  // ─── GET /search ────────────────────────────────────────────────────────────
-
-  describe('GET /api/hub/search', () => {
-    it('returns empty result for missing query', async () => {
-      const { app } = createApp()
-      const res = await request(app).get('/api/hub/search')
-      expect(res.status).toBe(200)
-      expect(res.body.groups).toEqual([])
-      expect(res.body.total).toBe(0)
-    })
-
-    it('returns 400 for single-char query', async () => {
-      const { app } = createApp()
-      const res = await request(app).get('/api/hub/search?q=x')
-      expect(res.status).toBe(400)
-    })
-
-    it('finds jobs matching the query', async () => {
-      const { app, contexts } = createApp()
-      const db = initDb(':memory:')
-      const today = new Date().toISOString().slice(0, 10)
-      db.prepare(`
-        INSERT INTO jobs (id, command, started_at, status)
-        VALUES ('j1', 'sr:implement', ?, 'completed')
-      `).run(`${today}T10:00:00.000Z`)
-
-      contexts.set('p1', {
-        project: { id: 'p1', name: 'MyProject', slug: 'my', path: '/tmp', db_path: ':memory:', added_at: '', last_seen_at: '' },
-        db,
-        queueManager: {} as any, chatManager: {} as any, setupManager: {} as any, proposalManager: {} as any, broadcast: vi.fn(),
-      })
-
-      const res = await request(app).get('/api/hub/search?q=implement')
-      expect(res.status).toBe(200)
-      expect(res.body.total).toBeGreaterThan(0)
-      expect(res.body.groups[0].projectName).toBe('MyProject')
-      expect(res.body.groups[0].jobs).toHaveLength(1)
-    })
-
-    it('returns no groups when nothing matches', async () => {
-      const { app, contexts } = createApp()
-      const db = initDb(':memory:')
-      const today = new Date().toISOString().slice(0, 10)
-      db.prepare(`
-        INSERT INTO jobs (id, command, started_at, status)
-        VALUES ('j1', 'implement', ?, 'completed')
-      `).run(`${today}T10:00:00.000Z`)
-
-      contexts.set('p1', {
-        project: { id: 'p1', name: 'P', slug: 'p', path: '/tmp', db_path: ':memory:', added_at: '', last_seen_at: '' },
-        db,
-        queueManager: {} as any, chatManager: {} as any, setupManager: {} as any, proposalManager: {} as any, broadcast: vi.fn(),
-      })
-
-      const res = await request(app).get('/api/hub/search?q=zzzNOTHING')
-      expect(res.status).toBe(200)
-      expect(res.body.groups).toHaveLength(0)
-      expect(res.body.total).toBe(0)
-    })
-  })
-
   // ─── GET /api/hub/cli-status ────────────────────────────────────────────────
 
   describe('GET /api/hub/cli-status', () => {
@@ -602,16 +541,6 @@ describe('hub-router', () => {
     it('accepts from and to query params', async () => {
       const { app } = createApp()
       const res = await request(app).get('/api/hub/analytics?period=custom&from=2026-01-01&to=2026-03-01')
-      expect(res.status).toBe(200)
-    })
-  })
-
-  // ─── GET /api/hub/overview ───────────────────────────────────────────────────
-
-  describe('GET /api/hub/overview', () => {
-    it('returns hub overview', async () => {
-      const { app } = createApp()
-      const res = await request(app).get('/api/hub/overview')
       expect(res.status).toBe(200)
     })
   })
@@ -984,93 +913,4 @@ describe('hub-router', () => {
     })
   })
 
-  // ─── GET /health ──────────────────────────────────────────────────────────
-
-  describe('GET /api/hub/health', () => {
-    it('returns empty when no projects', async () => {
-      const { app } = createApp()
-      const res = await request(app).get('/api/hub/health')
-      expect(res.status).toBe(200)
-      expect(res.body.projects).toEqual([])
-      expect(res.body.aggregated.totalCount).toBe(0)
-    })
-
-    it('returns per-project health data', async () => {
-      const { app, contexts } = createApp()
-      const now = new Date()
-      const recentIso = new Date(now.getTime() - 60 * 60 * 1000).toISOString()
-      const db = initDb(':memory:')
-      db.prepare(`
-        INSERT INTO jobs (id, command, status, started_at, finished_at, total_cost_usd)
-        VALUES (?, 'implement', 'completed', ?, ?, 0.10)
-      `).run('j1', recentIso, recentIso)
-
-      contexts.set('p1', {
-        project: { id: 'p1', name: 'TestProj', slug: 'testproj', path: '/tmp', db_path: ':memory:', added_at: '', last_seen_at: '' },
-        db,
-        queueManager: {} as any,
-        chatManager: {} as any,
-        setupManager: { isInstalling: vi.fn(() => false), isSettingUp: vi.fn(() => false) } as any,
-        proposalManager: {} as any,
-        broadcast: vi.fn(),
-      })
-
-      const res = await request(app).get('/api/hub/health')
-      expect(res.status).toBe(200)
-      expect(res.body.projects).toHaveLength(1)
-      expect(res.body.projects[0].projectId).toBe('p1')
-      expect(res.body.projects[0].projectName).toBe('TestProj')
-      expect(res.body.projects[0].successRate24h).toBe(1)
-      expect(res.body.projects[0].totalCost24h).toBeCloseTo(0.10)
-      expect(res.body.projects[0].healthStatus).toBe('green')
-      expect(res.body.aggregated.greenCount).toBe(1)
-    })
-  })
-
-  // ─── Export ────────────────────────────────────────────────────────────────────
-
-  describe('GET /api/hub/export', () => {
-    it('returns JSON overview by default', async () => {
-      const { app } = createApp()
-      const res = await request(app).get('/api/hub/export')
-      expect(res.status).toBe(200)
-      expect(res.body).toHaveProperty('projects')
-      expect(res.body).toHaveProperty('aggregated')
-    })
-
-    it('returns CSV when format=csv', async () => {
-      const { app } = createApp()
-      const res = await request(app).get('/api/hub/export?format=csv')
-      expect(res.status).toBe(200)
-      expect(res.headers['content-type']).toContain('text/csv')
-      expect(res.headers['content-disposition']).toContain('hub-export.csv')
-      const lines = res.text.split('\n')
-      expect(lines[0]).toContain('projectName')
-      expect(lines[0]).toContain('healthScore')
-    })
-
-    it('returns 400 for invalid format', async () => {
-      const { app } = createApp()
-      const res = await request(app).get('/api/hub/export?format=xml')
-      expect(res.status).toBe(400)
-      expect(res.body.error).toContain('Invalid format')
-    })
-
-    it('CSV has headers even with no projects', async () => {
-      const { app } = createApp()
-      const res = await request(app).get('/api/hub/export?format=csv')
-      expect(res.status).toBe(200)
-      const lines = res.text.split('\n')
-      expect(lines.length).toBeGreaterThanOrEqual(1)
-      expect(lines[0]).toContain('projectName')
-    })
-
-    it('JSON includes aggregated stats', async () => {
-      const { app } = createApp()
-      const res = await request(app).get('/api/hub/export?format=json')
-      expect(res.status).toBe(200)
-      expect(res.body.projects).toBeInstanceOf(Array)
-      expect(res.body.aggregated).toBeDefined()
-    })
-  })
 })

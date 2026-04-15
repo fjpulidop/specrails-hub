@@ -2,7 +2,6 @@ import { Outlet } from 'react-router-dom'
 import { Toaster, toast } from 'sonner'
 import { useEffect, useRef, useState } from 'react'
 import { TooltipProvider } from './ui/tooltip'
-import { ProjectNavbar } from './ProjectNavbar'
 import { StatusBar } from './StatusBar'
 import { ChatPanel } from './ChatPanel'
 import { usePipeline } from '../hooks/usePipeline'
@@ -52,7 +51,6 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
     <TooltipProvider delayDuration={400}>
       <ChatContext.Provider value={chat}>
       <div className="flex flex-col h-full overflow-hidden">
-        <ProjectNavbar project={project} />
         {budgetExceeded && (
           <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-destructive/20 text-xs">
             <span className="text-destructive font-medium">
@@ -73,7 +71,7 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
           </main>
           {FEATURE_CHAT_ENABLED && <ChatPanel chat={chat} project={project} />}
         </div>
-        <StatusBar connectionStatus={connectionStatus} />
+        <StatusBar connectionStatus={connectionStatus} activeProjectId={project.id} />
       </div>
       </ChatContext.Provider>
       <Toaster

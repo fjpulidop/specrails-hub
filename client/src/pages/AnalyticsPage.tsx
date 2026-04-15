@@ -145,7 +145,7 @@ export default function AnalyticsPage() {
     <div className="flex flex-col gap-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-base font-semibold">Analytics</h1>
+          <h1 className="text-base font-semibold">Project Analytics</h1>
           {data && (
             <p className="text-xs text-muted-foreground">{data.period.label}</p>
           )}

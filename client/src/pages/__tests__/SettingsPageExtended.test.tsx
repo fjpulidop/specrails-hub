@@ -235,7 +235,7 @@ describe('SettingsPage - extended coverage', () => {
     render(<SettingsPageFresh />)
 
     await waitFor(() => {
-      expect(screen.getByText('Settings')).toBeInTheDocument()
+      expect(screen.getByText('Project Settings')).toBeInTheDocument()
     })
   })
 
@@ -245,7 +245,7 @@ describe('SettingsPage - extended coverage', () => {
 
     await waitFor(() => {
       // After failed fetch, isLoading becomes false but config stays null
-      expect(screen.getByText('Settings')).toBeInTheDocument()
+      expect(screen.getByText('Project Settings')).toBeInTheDocument()
     })
   })
 

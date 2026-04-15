@@ -35,8 +35,9 @@ export const KNOWN_VERBS = new Set([
   'implement',
   'batch-implement',
   'why',
-  'product-backlog',
-  'update-product-driven-backlog',
+  'get-backlog-specs',
+  'auto-propose-backlog-specs',
+  'propose-spec',
   'refactor-recommender',
   'health-check',
   'compat-check',
@@ -87,21 +88,26 @@ export type ParsedArgs =
   | { mode: 'status'; port: number }
   | { mode: 'jobs'; port: number }
   | { mode: 'hub'; subArgs: string[]; port: number }
-  | { mode: 'command'; resolved: string; port: number }
-  | { mode: 'raw'; resolved: string; port: number }
+  | { mode: 'command'; resolved: string; port: number; projectOverride?: string }
+  | { mode: 'raw'; resolved: string; port: number; projectOverride?: string }
 
 export function parseArgs(argv: string[]): ParsedArgs {
   // argv is process.argv.slice(2)
   let port = DEFAULT_PORT
+  let projectOverride: string | undefined
   const args = [...argv]
 
-  // Extract --port <n> from any position
+  // Extract --port <n> and --project <name|path> from any position
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--port' && i + 1 < args.length) {
       const parsed = parseInt(args[i + 1], 10)
       if (!isNaN(parsed)) {
         port = parsed
       }
+      args.splice(i, 2)
+      i--
+    } else if (args[i] === '--project' && i + 1 < args.length) {
+      projectOverride = args[i + 1]
       args.splice(i, 2)
       i--
     }
@@ -142,18 +148,18 @@ export function parseArgs(argv: string[]): ParsedArgs {
   // Slash-prefixed command: pass through unchanged
   if (first.startsWith('/')) {
     const resolved = args.join(' ')
-    return { mode: 'raw', resolved, port }
+    return { mode: 'raw', resolved, port, projectOverride }
   }
 
   // Known verb: inject /sr: prefix
   if (KNOWN_VERBS.has(first)) {
     const resolved = `/sr:${args.join(' ')}`
-    return { mode: 'command', resolved, port }
+    return { mode: 'command', resolved, port, projectOverride }
   }
 
   // Unknown first token: treat as raw prompt
   const resolved = args.join(' ')
-  return { mode: 'raw', resolved, port }
+  return { mode: 'raw', resolved, port, projectOverride }
 }
 
 export function getVersion(): string {
@@ -192,16 +198,17 @@ ${bold('Usage:')}
   specrails-hub implement #42                Run a known specrails verb (prepends /sr:)
   specrails-hub batch-implement #40 #41      Batch implementation across issues
   specrails-hub why                          Explain recent changes
-  specrails-hub product-backlog              View prioritized product backlog
-  specrails-hub update-product-driven-backlog  Generate new feature ideas
+  specrails-hub get-backlog-specs            View prioritized spec backlog
+  specrails-hub auto-propose-backlog-specs   Generate new spec ideas
+  specrails-hub propose-spec                 Explore an idea and produce a spec
   specrails-hub refactor-recommender        Find refactoring opportunities
   specrails-hub health-check                Run codebase health check
   specrails-hub compat-check                Check for breaking API changes
   specrails-hub "any raw prompt"             Pass a raw prompt directly to claude
   specrails-hub --status                     Print manager status and exit
   specrails-hub --jobs                       Print recent job history and exit
-  specrails-hub start|stop|add|remove|list  Manage the hub (shorthand, no 'hub' prefix)
-  specrails-hub hub <subcommand>             Same, with explicit 'hub' prefix
+  specrails-hub start|stop|add|remove|list  Manage the hub
+  specrails-hub --project <name|path>        Override project (default: current directory)
   specrails-hub --port <n>                   Override default port (${DEFAULT_PORT})
   specrails-hub --version, -v               Print version and exit
   specrails-hub --help, -h                  Show this help text
@@ -256,9 +263,29 @@ export function detectWebManager(port: number): Promise<DetectionResult> {
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
+function loadHubToken(): string | null {
+  try {
+    const tokenPath = path.join(os.homedir(), '.specrails', 'hub.token')
+    const t = fs.readFileSync(tokenPath, 'utf-8').trim()
+    return t.length >= 32 ? t : null
+  } catch {
+    return null
+  }
+}
+
 function httpGet(url: string): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
-    const req = http.get(url, (res) => {
+    const token = loadHubToken()
+    const parsed = new URL(url)
+    const headers: http.OutgoingHttpHeaders = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    const options: http.RequestOptions = {
+      hostname: parsed.hostname,
+      port: parsed.port,
+      path: parsed.pathname + parsed.search,
+      headers,
+    }
+    const req = http.get(options, (res) => {
       let body = ''
       res.on('data', (chunk) => { body += chunk })
       res.on('end', () => resolve({ status: res.statusCode ?? 0, body }))
@@ -271,15 +298,18 @@ function httpPost(url: string, payload: unknown): Promise<{ status: number; body
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(payload)
     const urlObj = new URL(url)
+    const token = loadHubToken()
+    const headers: http.OutgoingHttpHeaders = {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(data),
+    }
+    if (token) headers['Authorization'] = `Bearer ${token}`
     const options: http.RequestOptions = {
       hostname: urlObj.hostname,
       port: urlObj.port,
       path: urlObj.pathname,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(data),
-      },
+      headers,
     }
     const req = http.request(options, (res) => {
       let body = ''
@@ -371,8 +401,32 @@ interface HubProject {
   path: string
 }
 
-async function resolveProjectFromCwd(baseUrl: string): Promise<HubProject | null> {
+async function resolveProjectFromCwd(baseUrl: string, projectOverride?: string): Promise<HubProject | null> {
   try {
+    // --project flag: resolve by path (absolute/relative) or by name
+    if (projectOverride) {
+      const isPathLike = projectOverride.startsWith('/') || projectOverride.startsWith('.')
+      if (isPathLike) {
+        const res = await httpGet(`${baseUrl}/api/hub/resolve?path=${encodeURIComponent(projectOverride)}`)
+        if (res.status === 200) {
+          const data = JSON.parse(res.body) as { project?: HubProject }
+          return data.project ?? null
+        }
+      } else {
+        // Resolve by name: fetch all projects and match
+        const res = await httpGet(`${baseUrl}/api/hub/projects`)
+        if (res.status === 200) {
+          const data = JSON.parse(res.body) as { projects?: HubProject[] }
+          const match = (data.projects ?? []).find(
+            (p) => p.name.toLowerCase() === projectOverride.toLowerCase()
+          )
+          return match ?? null
+        }
+      }
+      return null
+    }
+
+    // Default: resolve from CWD
     const cwd = process.cwd()
     const res = await httpGet(`${baseUrl}/api/hub/resolve?path=${encodeURIComponent(cwd)}`)
     if (res.status === 200) {
@@ -385,7 +439,7 @@ async function resolveProjectFromCwd(baseUrl: string): Promise<HubProject | null
   return null
 }
 
-async function runViaWebManager(command: string, baseUrl: string): Promise<number> {
+async function runViaWebManager(command: string, baseUrl: string, projectOverride?: string): Promise<number> {
   // Detect hub mode: check if /api/hub/state is reachable
   let spawnUrl = `${baseUrl}/api/spawn`
   let jobApiBase = `${baseUrl}/api`
@@ -393,13 +447,13 @@ async function runViaWebManager(command: string, baseUrl: string): Promise<numbe
   try {
     const hubCheck = await httpGet(`${baseUrl}/api/hub/state`)
     if (hubCheck.status === 200) {
-      // Hub mode: resolve project from CWD
-      const project = await resolveProjectFromCwd(baseUrl)
+      // Hub mode: resolve project from CWD or --project override
+      const project = await resolveProjectFromCwd(baseUrl, projectOverride)
       if (!project) {
-        cliError(
-          'hub is running but no project registered for the current directory.\n' +
-          `  Run: specrails-hub add ${process.cwd()}`
-        )
+        const hint = projectOverride
+          ? `no project found matching: ${projectOverride}`
+          : `no project registered for the current directory.\n  Run: specrails-hub add ${process.cwd()}`
+        cliError(`hub is running but ${hint}`)
         return 1
       }
       spawnUrl = `${baseUrl}/api/projects/${project.id}/spawn`
@@ -1183,9 +1237,11 @@ async function main(): Promise<void> {
 
   let exitCode: number
 
+  const projectOverride = (parsed.mode === 'command' || parsed.mode === 'raw') ? parsed.projectOverride : undefined
+
   if (detection.running) {
     cliLog(`routing via manager at ${detection.baseUrl}`)
-    exitCode = await runViaWebManager(command, detection.baseUrl)
+    exitCode = await runViaWebManager(command, detection.baseUrl, projectOverride)
   } else {
     cliLog('manager not running — invoking claude directly')
     exitCode = await runDirect(command)

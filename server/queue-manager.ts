@@ -437,6 +437,7 @@ export class QueueManager {
       systemAppend += '\n\nIMPORTANT: The ticket/spec data for this project is stored locally in .specrails/local-tickets.json. ' +
         'You MUST read specs from this file. Do NOT attempt to fetch tickets from Jira, Linear, GitHub Issues, or any other external tracker. ' +
         'The #<id> references in the command correspond to ticket IDs inside .specrails/local-tickets.json.'
+
     }
 
     let binary: string

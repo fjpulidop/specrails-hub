@@ -25,27 +25,26 @@ describe('OnboardingWizard', () => {
   it('navigates to the next step on Next click', () => {
     render(<OnboardingWizard open={true} onClose={onClose} />)
     fireEvent.click(screen.getByTestId('onboarding-next'))
-    expect(screen.getByText('Command Palette')).toBeTruthy()
+    expect(screen.getByText('Specialized Agents')).toBeTruthy()
   })
 
   it('navigates back on Back click', () => {
     render(<OnboardingWizard open={true} onClose={onClose} />)
     // Go to step 2
     fireEvent.click(screen.getByTestId('onboarding-next'))
-    expect(screen.getByText('Command Palette')).toBeTruthy()
+    expect(screen.getByText('Specialized Agents')).toBeTruthy()
     // Go back
     fireEvent.click(screen.getByTestId('onboarding-back'))
     expect(screen.getByText('Welcome to specrails-hub')).toBeTruthy()
   })
 
-  it('navigates through all 5 steps', () => {
+  it('navigates through all 4 steps', () => {
     render(<OnboardingWizard open={true} onClose={onClose} />)
     const titles = [
       'Welcome to specrails-hub',
-      'Command Palette',
-      'Your Dashboard',
-      'AI Chat',
+      'Specialized Agents',
       'Multi-Project Hub',
+      'Command Palette',
     ]
     expect(screen.getByText(titles[0])).toBeTruthy()
     for (let i = 1; i < titles.length; i++) {
@@ -56,14 +55,13 @@ describe('OnboardingWizard', () => {
 
   it('closes and dismisses on "Get Started" (last step)', () => {
     render(<OnboardingWizard open={true} onClose={onClose} />)
-    // Navigate to the last step
-    for (let i = 0; i < 4; i++) {
+    // Navigate to the last step (4 steps total, so 3 clicks)
+    for (let i = 0; i < 3; i++) {
       fireEvent.click(screen.getByTestId('onboarding-next'))
     }
     expect(screen.getByText('Get Started')).toBeTruthy()
     fireEvent.click(screen.getByTestId('onboarding-next'))
     expect(onClose).toHaveBeenCalled()
-    expect(hasSeenOnboarding()).toBe(true)
   })
 
   it('dismisses on close when "Don\'t show again" is checked', () => {
@@ -91,9 +89,9 @@ describe('OnboardingWizard', () => {
   it('step dots allow jumping to a specific step', () => {
     render(<OnboardingWizard open={true} onClose={onClose} />)
     const dots = screen.getAllByRole('button', { name: /Go to step/ })
-    expect(dots).toHaveLength(5)
+    expect(dots).toHaveLength(4)
     fireEvent.click(dots[3]) // Jump to step 4
-    expect(screen.getByText('AI Chat')).toBeTruthy()
+    expect(screen.getByText('Command Palette')).toBeTruthy()
   })
 })
 

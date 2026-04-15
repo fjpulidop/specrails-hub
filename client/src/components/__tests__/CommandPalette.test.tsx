@@ -170,9 +170,9 @@ describe('CommandPalette', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Dashboard')).toBeInTheDocument()
-      expect(screen.getByText('Analytics')).toBeInTheDocument()
+      expect(screen.getByText('Project Analytics')).toBeInTheDocument()
       expect(screen.getByText('Activity Feed')).toBeInTheDocument()
-      expect(screen.getByText('Settings')).toBeInTheDocument()
+      expect(screen.getByText('Hub Settings')).toBeInTheDocument()
       expect(screen.getByText('Docs')).toBeInTheDocument()
     })
   })
@@ -301,27 +301,13 @@ describe('CommandPalette', () => {
 
     await user.keyboard('{Meta>}k{/Meta}')
     await waitFor(() => {
-      expect(screen.getByText('Settings')).toBeInTheDocument()
+      expect(screen.getByText('Hub Settings')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByText('Settings'))
+    await user.click(screen.getByText('Hub Settings'))
 
     expect(onOpenSettings).toHaveBeenCalled()
     expect(mockNavigate).not.toHaveBeenCalledWith('/settings')
-  })
-
-  it('shows Hub Overview when onOpenOverview provided', async () => {
-    const onOpenOverview = vi.fn()
-    const user = userEvent.setup()
-    render(<CommandPalette onOpenOverview={onOpenOverview} />)
-
-    await user.keyboard('{Meta>}k{/Meta}')
-    await waitFor(() => {
-      expect(screen.getByText('Hub Overview')).toBeInTheDocument()
-    })
-
-    await user.click(screen.getByText('Hub Overview'))
-    expect(onOpenOverview).toHaveBeenCalled()
   })
 
   it('shows Hub Analytics when onOpenAnalytics provided', async () => {
@@ -413,10 +399,10 @@ describe('CommandPalette', () => {
 
     await user.keyboard('{Meta>}k{/Meta}')
     await waitFor(() => {
-      expect(screen.getByText('Settings')).toBeInTheDocument()
+      expect(screen.getByText('Hub Settings')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByText('Settings'))
+    await user.click(screen.getByText('Hub Settings'))
     expect(mockNavigate).toHaveBeenCalledWith('/settings')
   })
 

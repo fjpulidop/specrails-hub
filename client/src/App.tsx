@@ -15,7 +15,6 @@ const JobsPage = lazy(() => import('./pages/JobsPage'))
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'))
 const ActivityFeedPage = lazy(() => import('./pages/ActivityFeedPage'))
 const HubAnalyticsPage = lazy(() => import('./pages/HubAnalyticsPage'))
-const HubOverviewPage = lazy(() => import('./pages/HubOverviewPage'))
 const DocsPage = lazy(() => import('./pages/DocsPage'))
 const DocsDialog = lazy(() => import('./components/DocsDialog'))
 import { ProjectLayout } from './components/ProjectLayout'
@@ -24,7 +23,9 @@ import { WelcomeScreen } from './components/WelcomeScreen'
 import { SetupWizard } from './components/SetupWizard'
 import { OnboardingWizard, hasSeenOnboarding } from './components/OnboardingWizard'
 import { ArcSidebar } from './components/ArcSidebar'
+import { ProjectRightSidebar } from './components/ProjectRightSidebar'
 import { AddProjectDialog } from './components/AddProjectDialog'
+import { SidebarPinProvider, useSidebarPin } from './context/SidebarPinContext'
 import { CommandPalette } from './components/CommandPalette'
 import { SharedWebSocketProvider } from './hooks/useSharedWebSocket'
 import { HubProvider, useHub } from './hooks/useHub'
@@ -119,9 +120,10 @@ function useProjectRouteMemory(activeProjectId: string | null) {
 
 function HubApp() {
   const { projects, activeProjectId, isLoading, isSwitchingProject, setupProjectIds, completeSetupWizard, setActiveProjectId } = useHub()
+  const { setLeftPinned, setRightPinned } = useSidebarPin()
+  const navigate = useNavigate()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [overviewOpen, setOverviewOpen] = useState(false)
   const [analyticsOpen, setAnalyticsOpen] = useState(false)
   const [docsOpen, setDocsOpen] = useState(false)
   const [onboardingOpen, setOnboardingOpen] = useState(() => !hasSeenOnboarding())
@@ -131,7 +133,20 @@ function HubApp() {
 
   // Keyboard shortcuts
   const { cheatsheetOpen, setCheatsheetOpen, openCheatsheet } = useCheatsheetState()
-  useKeyboardShortcuts({ onOpenCheatsheet: openCheatsheet })
+  const PROJECT_PAGES = ['/', '/jobs', '/analytics', '/settings']
+  useKeyboardShortcuts({
+    onOpenCheatsheet: openCheatsheet,
+    onToggleLeftSidebar: () => setLeftPinned((p) => !p),
+    onToggleRightSidebar: () => setRightPinned((p) => !p),
+    onSwitchProject: (index) => {
+      const project = projects[index - 1]
+      if (project) setActiveProjectId(project.id)
+    },
+    onSwitchProjectPage: (index) => {
+      const route = PROJECT_PAGES[index - 1]
+      if (route) navigate(route)
+    },
+  })
 
   // OS notifications for job completions/failures
   const projectsById = useMemo(
@@ -159,13 +174,12 @@ function HubApp() {
       {/* Arc-style collapsible sidebar */}
       <ArcSidebar
         onAddProject={() => setAddDialogOpen(true)}
-        onOpenOverview={() => setOverviewOpen(true)}
         onOpenAnalytics={() => setAnalyticsOpen(true)}
         onOpenDocs={() => setDocsOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      {/* Main area */}
+      {/* Main area — navbar + content */}
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Project switching progress bar */}
         {isSwitchingProject && (
@@ -219,18 +233,11 @@ function HubApp() {
         </div>
       </div>
 
+      {/* Right sidebar — full height, only when a project is active and not in setup */}
+      {activeProject && !isInSetup && <ProjectRightSidebar />}
+
       <AddProjectDialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} onOpenOnboarding={() => { setSettingsOpen(false); setOnboardingOpen(true) }} />
-
-      <Dialog open={overviewOpen} onOpenChange={setOverviewOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0 flex flex-col" showCloseButton={false}>
-          <div className="flex-1 overflow-auto">
-            <Suspense fallback={<div className="flex items-center justify-center h-40"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
-              <HubOverviewPage />
-            </Suspense>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
@@ -248,7 +255,6 @@ function HubApp() {
 
       <CommandPalette
         onOpenSettings={() => setSettingsOpen(true)}
-        onOpenOverview={() => setOverviewOpen(true)}
         onOpenAnalytics={() => setAnalyticsOpen(true)}
         onOpenDocs={() => setDocsOpen(true)}
       />
@@ -282,7 +288,9 @@ export default function App() {
     <SharedWebSocketProvider url={WS_URL}>
       {isHub ? (
         <HubProvider>
-          <HubApp />
+          <SidebarPinProvider>
+            <HubApp />
+          </SidebarPinProvider>
         </HubProvider>
       ) : (
         <Suspense fallback={<div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">Loading...</p></div>}>

@@ -1,56 +1,19 @@
 # Platform Overview
 
-This document explains the mental model behind specrails-hub: what it is, how the pieces fit together, and what happens when you run a command.
+specrails-hub is a local multi-project dashboard that manages specrails-core installations. This document covers the mental model, architecture, and key concepts.
 
 ---
 
-## The specrails ecosystem
+## How it works
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     specrails-hub                        │
-│                                                         │
-│   Dashboard (browser)  ←→  Express + WebSocket server  │
-│   CLI (specrails-hub)  ──→  /api/spawn                  │
-│                              │                          │
-│              ┌───────────────┼───────────────┐          │
-│              │               │               │          │
-│         Project A       Project B       Project C       │
-│         (context)       (context)       (context)       │
-│              │               │               │          │
-└──────────────┼───────────────┼───────────────┼──────────┘
-               │               │               │
-        specrails-core   specrails-core   specrails-core
-        (Claude CLI)     (Claude CLI)     (Claude CLI)
+Browser (4201)  ←→  Express + WebSocket (4200)  ←→  Claude CLI processes
+                         │
+                    SQLite databases
+                    (~/.specrails/)
 ```
 
-**specrails-core** is the AI pipeline engine installed per-project. It defines the pipeline phases and runs Claude.
-
-**specrails-hub** is the local server that manages multiple specrails-core projects from one place. It provides the dashboard UI, job queues, analytics, and the CLI bridge.
-
----
-
-## Hub mode vs. Legacy mode
-
-### Hub mode (default)
-
-One Express server manages multiple projects. Each project gets its own isolated context:
-- Its own SQLite database at `~/.specrails/projects/<slug>/jobs.sqlite`
-- Its own job queue (`QueueManager`)
-- Its own chat history (`ChatManager`)
-- Its own setup state (`SetupManager`)
-
-The CLI auto-detects which project to use based on the current working directory.
-
-### Legacy mode
-
-For single-project setups (older installations). Activated with the `--legacy` flag:
-
-```bash
-specrails-hub start --legacy
-```
-
-In legacy mode, there is no project registry — the server manages one project directly.
+One hub server manages many projects. Each project gets its own SQLite database, job queue, and isolated process context. The browser talks exclusively to the hub via REST and WebSocket.
 
 ---
 
@@ -58,76 +21,85 @@ In legacy mode, there is no project registry — the server manages one project 
 
 ### Projects
 
-A project is a directory on your machine that contains a specrails-core installation. You register it with specrails-hub by its absolute path. The hub assigns it an ID and a slug (derived from the directory name).
+A project is a directory that has specrails-core installed. The hub tracks projects in `~/.specrails/hub.sqlite`. Each project stores its jobs in `~/.specrails/projects/<slug>/jobs.sqlite`.
+
+Register a project with `specrails-hub add <path>` or via the dashboard sidebar.
+
+### Specs
+
+Specs are local tickets — descriptions of work to be done. They live in `.specrails/local-tickets.json` inside your project. Create them with **+ Add Spec** on the Home page. The hub watches this file and syncs changes in real-time.
+
+### Rails
+
+Rails are execution lanes on the Home page. Drag specs into a Rail and click **Play** to launch the pipeline for that spec. The pipeline runs: **Architect → Developer → Reviewer → Ship** via Claude CLI agents.
 
 ### Jobs
 
-A job is a single Claude CLI invocation. Each time you run a command (e.g., `implement`, `batch-implement`), the hub creates a job record, spawns Claude, and streams the output.
+Every pipeline run is a job. Jobs have a status (queued → running → completed/failed), real-time log streaming, and cost tracking. Browse all jobs for the active project in the **Jobs** page.
 
-Job records include: command, start time, duration, exit code, token usage, and cost.
+### Agents
 
-### Pipeline phases
+The pipeline uses specialized Claude Code agents. The four required agents are:
 
-specrails-core organizes work into four sequential phases:
+| Agent | Role |
+|-------|------|
+| `sr-architect` | Plans the implementation |
+| `sr-developer` | Writes the code |
+| `sr-reviewer` | Reviews the output |
+| `sr-merge-resolver` | Resolves conflicts |
 
-| Phase | Agent | What happens |
-|-------|-------|--------------|
-| Architect | `sr-architect` | Designs the solution, creates artifacts |
-| Developer | `sr-developer` | Implements the code |
-| Reviewer | `sr-reviewer` | Reviews and fixes issues |
-| Ship | `sr-shipper` | Deploys or finalizes the change |
-
-The dashboard visualizes which phase is active and streams its logs in real-time.
-
-### Changes (OpenSpec)
-
-A Change is the structured unit of work in the OpenSpec workflow. It groups together a set of artifacts (specs, tasks, implementation notes) that describe a feature or fix from start to finish. See [OpenSpec Workflow](../product/openspec-workflow.md) for the full lifecycle.
+Optional agents (Test Writer, Doc Sync, Security Reviewer, etc.) can be added in the project configuration.
 
 ---
 
-## Real-time logs via WebSocket
+## Hub vs. project scope
 
-A single WebSocket connection from the browser receives all events:
+| Scope | What it covers |
+|-------|---------------|
+| **Hub** | All projects — Hub Analytics, Hub Settings |
+| **Project** | One active project — Jobs, Project Analytics, Project Settings |
 
-- **Log lines** — raw stdout/stderr from Claude processes, tagged with `projectId` and `processId`
-- **Phase events** — `phase` messages indicating which pipeline phase is active
-- **Hub events** — `hub.project_added`, `hub.project_removed` for the project list
-
-The dashboard filters messages by the currently selected project. Switching projects does not reconnect — it just changes the filter.
+The sidebar handles hub-level navigation. The ProjectNavbar (top bar) handles project-level navigation for the active project.
 
 ---
 
 ## Data layout
 
-Everything specrails-hub stores lives under `~/.specrails/`:
-
 ```
 ~/.specrails/
-  hub.sqlite                        # Project registry (names, paths, IDs)
-  manager.pid                       # PID of the running server process
-  hub.log                           # Server stdout/stderr log
+  hub.sqlite                       # project registry
+  manager.pid                      # server PID
+  hub.token                        # auth token (Bearer)
   projects/
-    <project-slug>/
-      jobs.sqlite                   # Job history for this project
+    <slug>/
+      jobs.sqlite                  # per-project jobs DB
 ```
 
-Project source code is never copied or modified by the hub. The hub only reads the project path and runs CLI commands inside it.
+Inside each project directory:
+
+```
+.specrails/
+  local-tickets.json               # specs
+  changes/                         # OpenSpec change artifacts
+  backlog-config.json              # issue tracker config
+```
 
 ---
 
-## Ports
+## WebSocket protocol
 
-| Port | Service |
-|------|---------|
-| 4200 | Express server — API (`/api/*`) and WebSocket |
-| 4201 | Vite dev server (development only) — proxies to 4200 |
+All real-time updates come through a single WebSocket connection. Every project-scoped message includes `projectId`. The client filters by the active project. Hub-level messages (`hub.project_added`, `hub.project_removed`) have no `projectId` and reach all handlers.
 
-In production, only port 4200 is used.
+---
+
+## Authentication
+
+The hub generates a Bearer token stored at `~/.specrails/hub.token`. All `/api/*` requests require this token. The CLI reads it automatically — no manual setup needed.
 
 ---
 
 ## Further reading
 
-- [Getting Started](getting-started.md) — installation and first run
-- [Workflows](../product/workflows.md) — common step-by-step workflows
-- [Configuration](../engineering/configuration.md) — all settings and CLI flags
+- [Features](../product/features.md) — full feature reference
+- [Workflows](../product/workflows.md) — step-by-step guides
+- [Architecture](../engineering/architecture.md) — technical deep-dive

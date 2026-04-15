@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { FileText, Plus, CheckCircle2 } from 'lucide-react'
@@ -21,6 +21,18 @@ interface SpecsBoardProps {
 
 export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, onTicketClick, onTicketCreated }: SpecsBoardProps) {
   const [proposeOpen, setProposeOpen] = useState(false)
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.key !== 'Enter') return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+      e.preventDefault()
+      setProposeOpen(true)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
   const { isOver, setNodeRef } = useDroppable({ id: 'specs' })
   const { isOver: isDoneOver, setNodeRef: setDoneNodeRef } = useDroppable({ id: 'done-specs' })
 
@@ -52,7 +64,7 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
       <div className="flex items-center justify-between px-4 h-12 border-b border-border/40 shrink-0">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Specs</h2>
+          <h2 className="text-sm font-semibold text-dracula-purple">Spec</h2>
           {tickets.length > 0 && (
             <span className="text-[10px] text-muted-foreground bg-muted/30 rounded-full px-1.5 py-0.5">
               {tickets.length}
@@ -61,7 +73,7 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
         </div>
         <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setProposeOpen(true)}>
           <Plus className="w-3.5 h-3.5" />
-          Add Spec
+          Add
         </Button>
       </div>
 
@@ -87,7 +99,7 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
             >
               <FileText className="w-8 h-8 mb-3 opacity-20" />
               <p className="text-sm">{isOver ? 'Drop here' : 'No specs yet'}</p>
-              {!isOver && <p className="text-xs mt-1 opacity-60">Click "+ Add Spec" to get started</p>}
+              {!isOver && <p className="text-xs mt-1 opacity-60">Click "+ Add" to get started</p>}
             </div>
           ) : (
             <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>

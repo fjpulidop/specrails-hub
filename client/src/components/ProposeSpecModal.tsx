@@ -100,15 +100,40 @@ export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: Pr
     // Immediate first check (ticket may already be on disk)
     checkForNewTickets()
     const interval = setInterval(() => { checkForNewTickets() }, 1500)
-    return () => clearInterval(interval)
+    // Hard timeout — if nothing after 90s, give up
+    const timeout = setTimeout(() => setPhase('input'), 90_000)
+    return () => { clearInterval(interval); clearTimeout(timeout) }
   }, [phase, exploreCodebase, checkForNewTickets])
 
-  // ── Explore mode: listen for chat_done to immediately check ───────────────
+  // ── Explore mode: listen for chat_done / chat_error ─────────────────────
   const handleChatDone = useCallback((raw: unknown) => {
     const msg = raw as Record<string, unknown>
-    if (!msg || msg.type !== 'chat_done') return
+    if (!msg || typeof msg.type !== 'string') return
     if (msg.conversationId !== conversationIdRef.current) return
-    checkForNewTickets()
+
+    if (msg.type === 'chat_error') {
+      setPhase('input')
+      return
+    }
+
+    if (msg.type !== 'chat_done') return
+    // Conversation ended — retry a few times to allow file watcher + WS propagation,
+    // then give up only if still nothing after ~5s
+    let attempts = 0
+    const MAX_ATTEMPTS = 5
+    const RETRY_DELAY = 1000
+    function retry() {
+      checkForNewTickets().then((found) => {
+        if (found) return
+        attempts++
+        if (attempts < MAX_ATTEMPTS) {
+          setTimeout(retry, RETRY_DELAY)
+        } else {
+          setPhase('input')
+        }
+      })
+    }
+    retry()
   }, [checkForNewTickets])
 
   useLayoutEffect(() => {
@@ -162,12 +187,12 @@ export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: Pr
 
   const handleSubmit = useCallback(async () => {
     if (!inputText.trim()) return
+    if (exploreCodebase && !chat) return
     knownTicketIdsRef.current = new Set(tickets.map((t) => t.id))
     setPhase('generating')
 
-    if (exploreCodebase) {
+    if (exploreCodebase && chat) {
       // Full mode: use ChatManager with propose-spec skill
-      if (!chat) return
       const prompt = [
         '/specrails:propose-spec',
         '',
@@ -186,6 +211,8 @@ export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: Pr
       const id = await chat.startWithMessage(prompt, { lightweight: true, maxTurns: 8 })
       if (id) {
         conversationIdRef.current = id
+      } else {
+        setPhase('input')
       }
     } else {
       // Fast mode: dedicated endpoint, no codebase exploration
@@ -221,7 +248,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: Pr
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
-        className="max-w-lg flex flex-col gap-0 p-0 overflow-hidden"
+        className="max-w-4xl flex flex-col gap-0 p-0 overflow-hidden"
         onInteractOutside={preventInteractOutside}
         onPointerDownOutside={preventInteractOutside}
       >

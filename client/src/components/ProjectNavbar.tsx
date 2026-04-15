@@ -1,54 +1,65 @@
-import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, BarChart3, Settings, Briefcase } from 'lucide-react'
+import { PanelLeft, PanelRight } from 'lucide-react'
 import { cn } from '../lib/utils'
-import type { HubProject } from '../hooks/useHub'
-import { NotificationCenter } from './NotificationCenter'
+import { useSidebarPin } from '../context/SidebarPinContext'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 
-interface ProjectNavbarProps {
-  project: HubProject
+function SidebarButton({
+  pinned,
+  onToggle,
+  label,
+  icon: Icon,
+}: {
+  pinned: boolean
+  onToggle: () => void
+  label: string
+  icon: React.ElementType
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onToggle}
+          className={cn(
+            'h-6 w-6 flex items-center justify-center rounded transition-colors',
+            pinned
+              ? 'text-foreground bg-muted'
+              : 'text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50'
+          )}
+          aria-label={label}
+        >
+          <Icon className="w-4 h-4" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="flex items-center gap-2">
+        <span>{label}</span>
+        <kbd className="rounded border border-border bg-muted px-1 py-0.5 text-[10px] font-mono text-muted-foreground leading-none">
+          ⌘K
+        </kbd>
+      </TooltipContent>
+    </Tooltip>
+  )
 }
 
-export function ProjectNavbar({ project }: ProjectNavbarProps) {
-  const navItems = [
-    { to: '/', end: true, icon: LayoutDashboard, label: 'Home' },
-    { to: '/analytics', end: false, icon: BarChart3, label: 'Analytics' },
-    { to: '/jobs', end: false, icon: Briefcase, label: 'Jobs' },
-    { to: '/settings', end: false, icon: Settings, label: 'Settings' },
-  ]
+export function ProjectNavbar() {
+  const { leftPinned, setLeftPinned, rightPinned, setRightPinned } = useSidebarPin()
 
   return (
-    <nav className="flex items-center justify-between h-9 px-3 border-b border-border bg-background/50">
-      {/* Project name */}
-      <span className="text-xs text-muted-foreground truncate max-w-[160px]">
-        {project.path}
-      </span>
-
-      {/* Center nav */}
-      <div className="flex items-center gap-0.5">
-        {navItems.map(({ to, end, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              cn(
-                'h-7 px-2 flex items-center gap-1.5 rounded-md text-xs transition-colors',
-                isActive
-                  ? 'text-foreground bg-accent'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-              )
-            }
-          >
-            <Icon className="w-3.5 h-3.5" />
-            <span>{label}</span>
-          </NavLink>
-        ))}
-      </div>
-
-      {/* Right actions */}
-      <div className="flex items-center gap-1">
-        <NotificationCenter activeProjectId={project.id} />
-      </div>
-    </nav>
+    <TooltipProvider delayDuration={500}>
+      <nav className="flex items-center justify-between h-8 px-2 border-b border-border bg-background/50 flex-shrink-0">
+        <SidebarButton
+          pinned={leftPinned}
+          onToggle={() => setLeftPinned((p) => !p)}
+          label={leftPinned ? 'Unpin left sidebar' : 'Pin left sidebar'}
+          icon={PanelLeft}
+        />
+        <SidebarButton
+          pinned={rightPinned}
+          onToggle={() => setRightPinned((p) => !p)}
+          label={rightPinned ? 'Unpin right sidebar' : 'Pin right sidebar'}
+          icon={PanelRight}
+        />
+      </nav>
+    </TooltipProvider>
   )
 }
