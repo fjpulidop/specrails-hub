@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.27.0](https://github.com/fjpulidop/specrails-hub/compare/v1.26.0...v1.27.0) (2026-04-15)
+
+
+### Features
+
+* Specs/Rails UI redesign with Arc-style sidebars ([#199](https://github.com/fjpulidop/specrails-hub/issues/199)) ([69b492d](https://github.com/fjpulidop/specrails-hub/commit/69b492db29d3b56645ca66f31eafb988b03d3ce3))
+
 ## [1.26.0](https://github.com/fjpulidop/specrails-hub/compare/v1.25.5...v1.26.0) (2026-04-13)
 
 
