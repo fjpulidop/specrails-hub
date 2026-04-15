@@ -57,7 +57,6 @@ describe('docs-router', () => {
       expect(slugs).toContain('product')
       expect(slugs).toContain('engineering')
       expect(slugs).toContain('operations')
-      expect(slugs).toContain('ux')
       expect(slugs[0]).toBe('general')
     })
 
@@ -249,7 +248,7 @@ describe('docs-router', () => {
       expect(res.status).toBe(200)
       // Should still return categories (bundled or empty fallback)
       expect(res.body.categories).toBeDefined()
-      expect(res.body.categories.length).toBe(5)
+      expect(res.body.categories.length).toBe(4)
 
       fs.rmSync(emptyHome, { recursive: true, force: true })
     })
