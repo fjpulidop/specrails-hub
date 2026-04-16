@@ -82,3 +82,33 @@ specrails-hub start > ~/.specrails/hub.log 2>&1 &
 npm update -g specrails-hub
 specrails-hub stop && specrails-hub start
 ```
+
+## Desktop App
+
+### Development
+
+```bash
+npm run tauri dev
+```
+
+### Production build
+
+```bash
+npm run tauri build
+```
+
+### Regenerate icons
+
+```bash
+node scripts/generate-icons.mjs
+```
+
+Regenerates all icon sizes from the source SVG. Run after any icon design change.
+
+### Build server sidecar
+
+```bash
+node scripts/build-sidecar.mjs
+```
+
+Compiles the Express server to a standalone binary for bundling inside the Tauri app. Run before `npm run tauri build` if server code has changed.

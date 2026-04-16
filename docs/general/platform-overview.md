@@ -7,13 +7,15 @@ specrails-hub is a local multi-project dashboard that manages specrails-core ins
 ## How it works
 
 ```
-Browser (4201)  ←→  Express + WebSocket (4200)  ←→  Claude CLI processes
-                         │
-                    SQLite databases
-                    (~/.specrails/)
+Browser (4201)        ←→  Express + WebSocket (4200)  ←→  Claude CLI processes
+Desktop App (Tauri)   ←→        │
+                            SQLite databases
+                            (~/.specrails/)
 ```
 
-One hub server manages many projects. Each project gets its own SQLite database, job queue, and isolated process context. The browser talks exclusively to the hub via REST and WebSocket.
+One hub server manages many projects. Each project gets its own SQLite database, job queue, and isolated process context. The browser and the Tauri desktop app both talk exclusively to the hub via REST and WebSocket.
+
+The Tauri desktop app bundles the server as a sidecar binary — on macOS, Windows, and Linux it can start the server automatically without a separate terminal session.
 
 ---
 
