@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.1](https://github.com/fjpulidop/specrails-hub/compare/v1.28.0...v1.28.1) (2026-04-16)
+
+
+### Bug Fixes
+
+* refresh job metrics on completion while viewing job detail ([#204](https://github.com/fjpulidop/specrails-hub/issues/204)) ([e9718ac](https://github.com/fjpulidop/specrails-hub/commit/e9718acbbe9753ef096824bf84214b2db2eca420))
+
 ## [1.28.0](https://github.com/fjpulidop/specrails-hub/compare/v1.27.0...v1.28.0) (2026-04-16)
 
 
