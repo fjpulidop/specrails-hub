@@ -7,20 +7,29 @@
  * automatically attaches `X-Hub-Token` to every request targeting localhost.
  */
 
+import { API_ORIGIN } from './origin'
+
 let _token: string | null = null
 
-/** Fetches the server token and caches it in memory. */
+/** Fetches the server token, retrying until the server is reachable (Tauri sidecar startup). */
 export async function initAuth(): Promise<void> {
-  try {
-    const res = await fetch('/api/hub/token')
-    if (res.ok) {
-      const data = await res.json() as { token: string }
-      _token = data.token ?? null
+  const ATTEMPTS = 20
+  const DELAY_MS = 300
+
+  for (let i = 0; i < ATTEMPTS; i++) {
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/hub/token`)
+      if (res.ok) {
+        const data = await res.json() as { token: string }
+        _token = data.token ?? null
+        return
+      }
+    } catch {
+      // Server not ready yet — retry
     }
-  } catch {
-    // Non-fatal — if auth isn't available the app will receive 401s and
-    // the user can reload once the server is ready.
+    await new Promise(r => setTimeout(r, DELAY_MS))
   }
+  // Non-fatal — app will handle 401s gracefully
 }
 
 /** Returns the cached hub token, or null if not yet initialized. */
@@ -29,24 +38,32 @@ export function getHubToken(): string | null {
 }
 
 /**
- * Patches `window.fetch` so that all requests to relative paths or localhost
- * automatically include `X-Hub-Token`.
+ * Patches `window.fetch` so that:
+ * 1. In Tauri: relative /api/* paths are rewritten to http://localhost:4200/api/*
+ * 2. All requests to relative paths or localhost get X-Hub-Token header attached.
  *
  * Call this once after `initAuth()` succeeds.
  */
 export function installFetchInterceptor(): void {
   const origFetch = window.fetch.bind(window)
+  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
   window.fetch = function (
     input: RequestInfo | URL,
     init: RequestInit = {}
   ): Promise<Response> {
-    const url =
+    let url =
       typeof input === 'string'
         ? input
         : input instanceof URL
           ? input.href
           : (input as Request).url
+
+    // In Tauri, rewrite relative API paths to the absolute Express origin.
+    if (isTauri && url.startsWith('/')) {
+      url = `http://localhost:4200${url}`
+      input = url
+    }
 
     const isLocal =
       url.startsWith('/') ||

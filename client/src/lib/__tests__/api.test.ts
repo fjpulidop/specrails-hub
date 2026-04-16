@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { setApiContext, getApiBase } from '../api'
+import { setApiContext, setHubMode, getApiBase } from '../api'
 
 describe('api', () => {
   // Reset to legacy defaults before each test
@@ -48,6 +48,20 @@ describe('api', () => {
 
     it('ignores projectId when isHub is false even if provided', () => {
       setApiContext(false, 'proj-ignored')
+      expect(getApiBase()).toBe('/api')
+    })
+  })
+
+  describe('setHubMode', () => {
+    it('sets hub mode without clearing active project', () => {
+      setApiContext(true, 'proj-123')
+      setHubMode(true)
+      expect(getApiBase()).toBe('/api/projects/proj-123')
+    })
+
+    it('disables hub mode without clearing project ID', () => {
+      setApiContext(true, 'proj-123')
+      setHubMode(false)
       expect(getApiBase()).toBe('/api')
     })
   })

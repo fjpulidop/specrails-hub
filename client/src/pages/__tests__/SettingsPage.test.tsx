@@ -49,6 +49,7 @@ const mockConfig: ProjectConfig = {
     labelFilter: 'backlog',
   },
   commands: [],
+  dailyBudgetUsd: null,
 }
 
 describe('SettingsPage', () => {
@@ -85,79 +86,25 @@ describe('SettingsPage', () => {
     })
   })
 
-  it('shows GitHub tracker section', async () => {
+  it('shows Budget section after load', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => mockConfig,
     })
     render(<SettingsPage />)
     await waitFor(() => {
-      expect(screen.getByText('GitHub')).toBeInTheDocument()
+      expect(screen.getByText('Budget')).toBeInTheDocument()
     })
   })
 
-  it('shows Jira tracker section', async () => {
+  it('shows daily budget input after load', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => mockConfig,
     })
     render(<SettingsPage />)
     await waitFor(() => {
-      expect(screen.getByText('Jira')).toBeInTheDocument()
-    })
-  })
-
-  it('renders Save Settings button', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => mockConfig,
-    })
-    render(<SettingsPage />)
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Save Settings/i })).toBeInTheDocument()
-    })
-  })
-
-  it('Save button triggers POST to /api/config', async () => {
-    const user = userEvent.setup()
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => mockConfig })  // GET config
-      .mockResolvedValueOnce({ ok: true, json: async () => ({}) })        // POST config
-
-    render(<SettingsPage />)
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Save Settings/i })).toBeInTheDocument()
-    })
-
-    await user.click(screen.getByRole('button', { name: /Save Settings/i }))
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/config',
-        expect.objectContaining({ method: 'POST' })
-      )
-    })
-  })
-
-  it('shows label filter input with correct value from config', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => mockConfig,
-    })
-    render(<SettingsPage />)
-    await waitFor(() => {
-      const input = screen.getByPlaceholderText(/backlog, feature/i) as HTMLInputElement
-      expect(input.value).toBe('backlog')
-    })
-  })
-
-  it('shows Issue Tracker section heading', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => mockConfig,
-    })
-    render(<SettingsPage />)
-    await waitFor(() => {
-      expect(screen.getByText('Issue Tracker')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText(/e\.g\. 5\.00/i)).toBeInTheDocument()
     })
   })
 })

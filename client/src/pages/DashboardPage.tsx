@@ -21,6 +21,7 @@ import { CreateTicketModal } from '../components/CreateTicketModal'
 import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
+import { useSpecGenTracker } from '../hooks/useSpecGenTracker'
 import type { LocalTicket } from '../types'
 import type { RailMode, RailStatus } from '../components/RailControls'
 
@@ -77,8 +78,17 @@ export default function DashboardPage() {
   const { activeProjectId } = useHub()
   const { tickets, isLoading, updateTicket, deleteTicket, createTicket, refetch } = useTickets()
   const { registerHandler, unregisterHandler, connectionStatus } = useSharedWebSocket()
+  const { specToOpen, clearSpecToOpen } = useSpecGenTracker()
   const [detailTicket, setDetailTicket] = useState<LocalTicket | null>(null)
   const [createTicketOpen, setCreateTicketOpen] = useState(false)
+
+  // Open a spec when the tracker signals "Ver" was clicked for this project
+  useEffect(() => {
+    if (!specToOpen || specToOpen.projectId !== activeProjectId) return
+    setDetailTicket(specToOpen.ticket)
+    refetch()
+    clearSpecToOpen()
+  }, [specToOpen, activeProjectId, refetch, clearSpecToOpen])
 
   // ── Drag state ───────────────────────────────────────────────────────────────
   const [activeId, setActiveId] = useState<number | null>(null)

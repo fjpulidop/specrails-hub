@@ -253,12 +253,19 @@ describe('useHub - error paths', () => {
     })
 
     const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
-    await waitFor(() => expect(result.current.activeProjectId).toBe('existing'))
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     await waitFor(() => MockWebSocket.instances.length > 0)
     const ws = MockWebSocket.instances[0]
     await act(async () => { ws.onopen?.() })
 
+    // Set active project via WS (REST load no longer auto-selects)
+    act(() => {
+      ws.simulateMessage({ type: 'hub.projects', projects: [makeProject({ id: 'existing' })] })
+    })
+    await waitFor(() => expect(result.current.activeProjectId).toBe('existing'))
+
+    // Send updated list — active project should stay 'existing'
     act(() => {
       ws.simulateMessage({
         type: 'hub.projects',
@@ -291,6 +298,19 @@ describe('useHub - error paths', () => {
       })
       const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
       await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+      await waitFor(() => MockWebSocket.instances.length > 0)
+      const ws = MockWebSocket.instances[0]
+      await act(async () => { ws.onopen?.() })
+
+      // Set active project to p1 via WS (REST no longer auto-selects)
+      act(() => {
+        ws.simulateMessage({
+          type: 'hub.projects',
+          projects: [makeProject({ id: 'p1' }), makeProject({ id: 'p2' })],
+        })
+      })
+      await waitFor(() => expect(result.current.activeProjectId).toBe('p1'))
 
       act(() => { result.current.setActiveProjectId('p2') })
       expect(result.current.isSwitchingProject).toBe(true)

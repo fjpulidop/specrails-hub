@@ -8,7 +8,19 @@ const mockStartWithMessage = vi.fn().mockResolvedValue('conv-1')
 const mockAbortStream = vi.fn()
 
 vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({ activeProjectId: 'proj-1' }),
+  useHub: () => ({ activeProjectId: 'proj-1', projects: [{ id: 'proj-1', name: 'Test Project' }] }),
+}))
+
+const mockRegisterExploreSpec = vi.fn()
+const mockRegisterFastSpec = vi.fn()
+
+vi.mock('../../hooks/useSpecGenTracker', () => ({
+  useSpecGenTracker: () => ({
+    registerFastSpec: mockRegisterFastSpec,
+    registerExploreSpec: mockRegisterExploreSpec,
+    specToOpen: null,
+    clearSpecToOpen: vi.fn(),
+  }),
 }))
 
 vi.mock('../../hooks/useSharedWebSocket', () => ({
@@ -52,6 +64,8 @@ describe('ProposeSpecModal', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockStartWithMessage.mockResolvedValue('conv-1')
+    mockRegisterExploreSpec.mockReset()
+    mockRegisterFastSpec.mockReset()
   })
 
   it('does not render dialog when open=false', () => {
@@ -99,50 +113,15 @@ describe('ProposeSpecModal', () => {
     })
   })
 
-  it('shows generating state after submit', async () => {
+  it('registers explore spec with tracker after submit', async () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
     const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
     fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
 
     await waitFor(() => {
-      expect(screen.getByText(/generating your spec/i)).toBeInTheDocument()
+      expect(mockRegisterExploreSpec).toHaveBeenCalledWith('conv-1', expect.objectContaining({ projectId: 'proj-1' }))
     })
-  })
-
-  it('detects new ticket and transitions to done', async () => {
-    const existingTickets = [makeTicket({ id: 1 })]
-    const { rerender } = render(
-      <ProposeSpecModal open={true} onClose={onCloseMock} tickets={existingTickets} onTicketCreated={onTicketCreatedMock} />,
-    )
-    // Submit
-    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
-    fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
-    fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
-
-    await waitFor(() => expect(screen.getByText(/generating your spec/i)).toBeInTheDocument())
-
-    // Simulate a new ticket appearing
-    const newTicket = makeTicket({ id: 2, title: 'New Spec' })
-    rerender(
-      <ProposeSpecModal open={true} onClose={onCloseMock} tickets={[...existingTickets, newTicket]} onTicketCreated={onTicketCreatedMock} />,
-    )
-
-    await waitFor(() => {
-      expect(screen.getByText(/spec created/i)).toBeInTheDocument()
-    })
-  })
-
-  it('aborts stream on close during generation', async () => {
-    const { rerender } = render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
-    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
-    fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
-    fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
-
-    await waitFor(() => expect(mockStartWithMessage).toHaveBeenCalled())
-
-    rerender(<ProposeSpecModal open={false} onClose={onCloseMock} tickets={emptyTickets} />)
-    expect(mockAbortStream).toHaveBeenCalledWith('conv-1')
   })
 
   it('resets state when reopened', async () => {
@@ -194,31 +173,21 @@ describe('ProposeSpecModal', () => {
     expect(mockStartWithMessage).not.toHaveBeenCalled()
   })
 
-  it('resets phase to input when closed during generation', async () => {
-    const { rerender } = render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
-    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
-    fireEvent.change(textarea, { target: { value: 'Test' } })
-    fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
+  it('registers fast spec with tracker when explore codebase is unchecked', async () => {
+    ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ requestId: 'req-fast' }),
+    })
 
-    await waitFor(() => expect(screen.getByText(/generating your spec/i)).toBeInTheDocument())
-
-    // Close modal
-    rerender(<ProposeSpecModal open={false} onClose={onCloseMock} tickets={emptyTickets} />)
-    // Reopen — should show input phase, not generating
-    rerender(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
-
-    expect(screen.getByPlaceholderText(/add a dark mode toggle/i)).toBeInTheDocument()
-    expect(screen.queryByText(/generating your spec/i)).not.toBeInTheDocument()
-  })
-
-  it('prevents interaction outside during generation', async () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    const checkbox = screen.getByRole('checkbox')
+    fireEvent.click(checkbox)
     const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
-    fireEvent.change(textarea, { target: { value: 'Test' } })
+    fireEvent.change(textarea, { target: { value: 'Fast spec' } })
     fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
 
-    await waitFor(() => expect(screen.getByText(/generating your spec/i)).toBeInTheDocument())
-    // The preventInteractOutside callback should exist — modal should still be generating
-    expect(screen.getByText(/generating your spec/i)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(mockRegisterFastSpec).toHaveBeenCalledWith('req-fast', expect.objectContaining({ projectId: 'proj-1' }))
+    })
   })
 })

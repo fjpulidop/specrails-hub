@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
+import { _registerRouteForcer } from './lib/route-memory'
 import { RootLayout } from './components/RootLayout'
 import DashboardPage from './pages/DashboardPage'
 import SettingsPage from './pages/SettingsPage'
@@ -8,6 +9,7 @@ import SettingsDialog from './pages/GlobalSettingsPage'
 import { Dialog, DialogContent } from './components/ui/dialog'
 import { useKeyboardShortcuts, useCheatsheetState } from './hooks/useKeyboardShortcuts'
 import { KeyboardShortcutsCheatsheet } from './components/KeyboardShortcutsCheatsheet'
+import { TitleBar } from './components/TitleBar'
 
 // Lazy-loaded pages — never visible at initial render
 const JobDetailPage = lazy(() => import('./pages/JobDetailPage'))
@@ -29,21 +31,28 @@ import { SidebarPinProvider, useSidebarPin } from './context/SidebarPinContext'
 import { CommandPalette } from './components/CommandPalette'
 import { SharedWebSocketProvider } from './hooks/useSharedWebSocket'
 import { HubProvider, useHub } from './hooks/useHub'
+import { SpecGenTrackerProvider } from './hooks/useSpecGenTracker'
 import { useOsNotifications } from './hooks/useOsNotifications'
 import { WS_URL } from './lib/ws-url'
+import { API_ORIGIN } from './lib/origin'
 
 // ─── Hub mode detection ───────────────────────────────────────────────────────
 
+const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+
 function useHubMode(): boolean {
-  const [isHub, setIsHub] = useState(false)
+  // In Tauri the server ALWAYS runs in hub mode — skip the network round-trip.
+  const [isHub, setIsHub] = useState(IS_TAURI)
 
   useEffect(() => {
+    if (IS_TAURI) return  // already set to true
+
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 5000)
 
     async function detect() {
       try {
-        const res = await fetch('/api/hub/state', { signal: controller.signal })
+        const res = await fetch(`${API_ORIGIN}/api/hub/state`, { signal: controller.signal })
         setIsHub(res.ok)
       } catch {
         setIsHub(false)
@@ -87,6 +96,14 @@ function useProjectRouteMemory(activeProjectId: string | null) {
   // Map of projectId → last visited path (seeded from localStorage)
   const routeMemory = useRef<Map<string, string>>(readRouteMemory())
   const prevProjectId = useRef<string | null>(null)
+
+  // Allow external code (e.g. SpecGenTracker "Ver" button) to force a route
+  // for a project before the switch happens, so route memory restores it.
+  useEffect(() => {
+    _registerRouteForcer((projectId, route) => {
+      routeMemory.current.set(projectId, route)
+    })
+  }, [])
 
   useEffect(() => {
     // Save the current route for the outgoing project
@@ -160,7 +177,7 @@ function HubApp() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen bg-background">
+      <div className="flex h-full bg-background">
         <div className="w-11 border-r border-border bg-card/50 animate-pulse flex-shrink-0" />
         <div className="flex-1 flex items-center justify-center">
           <p className="text-sm text-muted-foreground">Loading...</p>
@@ -170,7 +187,7 @@ function HubApp() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background font-sans">
+    <div className="flex h-full overflow-hidden bg-background font-sans">
       {/* Arc-style collapsible sidebar */}
       <ArcSidebar
         onAddProject={() => setAddDialogOpen(true)}
@@ -221,11 +238,7 @@ function HubApp() {
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>
                 ) : (
-                  <Route path="*" element={
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-sm text-muted-foreground">Select a project</p>
-                    </div>
-                  } />
+                  <Route path="*" element={<WelcomeScreen onAddProject={() => setAddDialogOpen(true)} />} />
                 )}
               </Routes>
             </Suspense>
@@ -285,34 +298,88 @@ export default function App() {
   const isHub = useHubMode()
 
   return (
-    <SharedWebSocketProvider url={WS_URL}>
-      {isHub ? (
-        <HubProvider>
-          <SidebarPinProvider>
-            <HubApp />
-          </SidebarPinProvider>
-        </HubProvider>
-      ) : (
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
-          <LegacyOsNotifications />
-          <LegacyKeyboardShortcuts />
-          <Routes>
-            <Route path="/docs" element={<DocsPage />} />
-            <Route path="/docs/:category/:slug" element={<DocsPage />} />
-            <Route element={<RootLayout />}>
-              <Route index element={<DashboardPage />} />
-              <Route path="/jobs" element={<JobsPage />} />
-              <Route path="/jobs/:id" element={<JobDetailPage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/activity" element={<ActivityFeedPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-          <CommandPalette />
-        </Suspense>
-      )}
-      <Toaster position="bottom-right" richColors />
-    </SharedWebSocketProvider>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Main app content — fills remaining height below titlebar */}
+      <div
+        style={{
+          flex: 1,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <SharedWebSocketProvider url={WS_URL}>
+          {isHub ? (
+            <HubProvider>
+              {/* Custom frameless titlebar inside HubProvider so it can read active project */}
+              <TitleBar />
+              <SpecGenTrackerProvider>
+                <SidebarPinProvider>
+                  <HubApp />
+                </SidebarPinProvider>
+              </SpecGenTrackerProvider>
+            </HubProvider>
+          ) : (
+            /* Legacy mode: TitleBar uses LEGACY_FALLBACK from useHub (no project name) */
+            <>
+              <TitleBar />
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
+                <LegacyOsNotifications />
+                <LegacyKeyboardShortcuts />
+                <Routes>
+                  <Route path="/docs" element={<DocsPage />} />
+                  <Route path="/docs/:category/:slug" element={<DocsPage />} />
+                  <Route element={<RootLayout />}>
+                    <Route index element={<DashboardPage />} />
+                    <Route path="/jobs" element={<JobsPage />} />
+                    <Route path="/jobs/:id" element={<JobDetailPage />} />
+                    <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/activity" element={<ActivityFeedPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Route>
+                </Routes>
+                <CommandPalette />
+              </Suspense>
+            </>
+          )}
+          <Toaster
+            position="bottom-right"
+            theme="dark"
+            gap={8}
+            closeButton
+            richColors
+            style={{
+              '--normal-bg':           'hsl(232 14% 26%)',
+              '--normal-bg-hover':     'hsl(232 14% 31%)',
+              '--normal-border':       'hsl(265 89% 78% / 0.18)',
+              '--normal-border-hover': 'hsl(265 89% 78% / 0.28)',
+              '--normal-text':         'hsl(60 30% 96%)',
+              '--success-bg':          'hsl(135 50% 16%)',
+              '--success-border':      'hsl(135 94% 65% / 0.3)',
+              '--success-text':        'hsl(135 94% 82%)',
+              '--error-bg':            'hsl(0 40% 20%)',
+              '--error-border':        'hsl(0 100% 67% / 0.3)',
+              '--error-text':          'hsl(0 100% 85%)',
+              '--warning-bg':          'hsl(31 40% 20%)',
+              '--warning-border':      'hsl(31 100% 71% / 0.3)',
+              '--warning-text':        'hsl(31 100% 82%)',
+              '--info-bg':             'hsl(191 35% 18%)',
+              '--info-border':         'hsl(191 97% 77% / 0.3)',
+              '--info-text':           'hsl(191 97% 85%)',
+              '--border-radius':       '0.75rem',
+              'fontFamily':            "'DM Mono', 'JetBrains Mono', ui-monospace, monospace",
+            } as React.CSSProperties}
+          />
+        </SharedWebSocketProvider>
+      </div>
+    </div>
   )
 }

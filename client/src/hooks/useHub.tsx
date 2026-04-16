@@ -2,15 +2,17 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useCallback,
   useLayoutEffect,
   type ReactNode,
 } from 'react'
+import { API_ORIGIN } from '../lib/origin'
 import { toast } from 'sonner'
 import { useSharedWebSocket } from './useSharedWebSocket'
-import { setApiContext } from '../lib/api'
+import { setApiContext, setHubMode } from '../lib/api'
 
 export interface HubProject {
   id: string
@@ -42,10 +44,6 @@ const HubContext = createContext<HubContextValue | null>(null)
 
 const ACTIVE_PROJECT_KEY = 'specrails-hub:activeProjectId'
 
-function readSavedProjectId(): string | null {
-  try { return localStorage.getItem(ACTIVE_PROJECT_KEY) } catch { return null }
-}
-
 function writeSavedProjectId(id: string | null): void {
   try {
     if (id) localStorage.setItem(ACTIVE_PROJECT_KEY, id)
@@ -55,13 +53,13 @@ function writeSavedProjectId(id: string | null): void {
 
 export function HubProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<HubProject[]>([])
-  const [activeProjectId, setActiveProjectIdRaw] = useState<string | null>(readSavedProjectId)
+  const [activeProjectId, setActiveProjectIdRaw] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSwitchingProject, setIsSwitchingProject] = useState(false)
   const [setupProjectIds, setSetupProjectIds] = useState<Set<string>>(new Set())
   const switchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function setActiveProjectId(id: string | null): void {
+  const setActiveProjectId = useCallback((id: string | null): void => {
     writeSavedProjectId(id)
     setApiContext(true, id)
     setActiveProjectIdRaw((prev) => {
@@ -73,14 +71,14 @@ export function HubProvider({ children }: { children: ReactNode }) {
       }
       return id
     })
-  }
+  }, [])
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
 
   // Load projects from REST on mount
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch('/api/hub/projects')
+        const res = await fetch(`${API_ORIGIN}/api/hub/projects`)
         if (!res.ok) return
         const data = await res.json() as { projects: HubProject[]; setupProjectIds?: string[] }
         setProjects(data.projects)
@@ -88,17 +86,10 @@ export function HubProvider({ children }: { children: ReactNode }) {
         if (data.setupProjectIds && data.setupProjectIds.length > 0) {
           setSetupProjectIds(new Set(data.setupProjectIds))
         }
-        // Restore active project: prefer saved ID if it still exists, else first project
-        if (data.projects.length > 0) {
-          setActiveProjectIdRaw((prev) => {
-            const saved = prev // Already initialized from localStorage
-            const validSaved = saved && data.projects.find((p) => p.id === saved) ? saved : null
-            const next = validSaved ?? data.projects[0].id
-            writeSavedProjectId(next)
-            setApiContext(true, next)
-            return next
-          })
-        }
+        // Mark hub mode without overwriting any project already set by the WS
+        // handler (hub.projects fires concurrently and may have already called
+        // setApiContext(true, projectId) — resetting it here would break API calls).
+        setHubMode(true)
       } catch {
         // Hub may not be running in hub mode — treat as empty
       } finally {
@@ -176,7 +167,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
 
   const removeProject = useCallback(async (id: string): Promise<void> => {
     try {
-      const res = await fetch(`/api/hub/projects/${id}`, { method: 'DELETE' })
+      const res = await fetch(`${API_ORIGIN}/api/hub/projects/${id}`, { method: 'DELETE' })
       if (!res.ok) {
         const err = await res.json() as { error?: string }
         throw new Error(err.error ?? `HTTP ${res.status}`)
@@ -199,19 +190,21 @@ export function HubProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const contextValue = useMemo(() => ({
+    projects,
+    activeProjectId,
+    setActiveProjectId,
+    addProject,
+    removeProject,
+    isLoading,
+    isSwitchingProject,
+    setupProjectIds,
+    startSetupWizard,
+    completeSetupWizard,
+  }), [projects, activeProjectId, setActiveProjectId, addProject, removeProject, isLoading, isSwitchingProject, setupProjectIds, startSetupWizard, completeSetupWizard])
+
   return (
-    <HubContext.Provider value={{
-      projects,
-      activeProjectId,
-      setActiveProjectId,
-      addProject,
-      removeProject,
-      isLoading,
-      isSwitchingProject,
-      setupProjectIds,
-      startSetupWizard,
-      completeSetupWizard,
-    }}>
+    <HubContext.Provider value={contextValue}>
       {children}
     </HubContext.Provider>
   )

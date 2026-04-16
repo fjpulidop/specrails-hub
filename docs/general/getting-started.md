@@ -48,6 +48,21 @@ specrails-hub add /path/to/your/project
 
 ---
 
+## Desktop App
+
+The Tauri desktop app is an alternative to opening the browser dashboard. It wraps the same React client as a native macOS/Windows/Linux app and bundles the server as a sidecar so no separate `specrails-hub start` is needed.
+
+```bash
+npm run tauri dev      # Run in development mode
+npm run tauri build    # Build production app
+```
+
+**macOS** — native traffic lights with a custom drag region and centered search pill replace the standard titlebar.
+
+**Windows / Linux** — custom frameless titlebar with SR icon, app name, and window controls.
+
+---
+
 ## Dashboard layout
 
 ```

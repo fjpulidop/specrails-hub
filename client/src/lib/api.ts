@@ -8,6 +8,8 @@
  * resource paths (e.g., `${base}/jobs`).
  */
 
+import { API_ORIGIN } from './origin'
+
 // Module-level store for active project ID — set by HubProvider/App
 let _activeProjectId: string | null = null
 let _isHubMode = false
@@ -17,9 +19,16 @@ export function setApiContext(isHub: boolean, projectId: string | null): void {
   _activeProjectId = projectId
 }
 
+/** Sets hub mode without touching the active project ID.
+ * Use in the REST load to avoid racing with the WS handler that may have
+ * already set _activeProjectId via setApiContext(true, projectId). */
+export function setHubMode(isHub: boolean): void {
+  _isHubMode = isHub
+}
+
 export function getApiBase(): string {
   if (_isHubMode && _activeProjectId) {
-    return `/api/projects/${_activeProjectId}`
+    return `${API_ORIGIN}/api/projects/${_activeProjectId}`
   }
-  return '/api'
+  return `${API_ORIGIN}/api`
 }

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SpecRails Hub",
+  "version": "0.1.0",
+  "identifier": "sh.specrails.hub",
+  "build": {
+    "frontendDist": "../client/dist",
+    "devUrl": "http://localhost:4201"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "SpecRails Hub",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 900,
+        "minHeight": 600,
+        "decorations": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": ["binaries/specrails-server"],
+    "resources": {
+      "binaries/better_sqlite3.node": "better_sqlite3.node"
+    }
+  }
+}

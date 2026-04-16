@@ -242,6 +242,12 @@ export class ChatManager {
       cwd: this._cwd,
     })
 
+    // Drain stderr so the pipe buffer never fills up (child process would block otherwise)
+    child.stderr?.resume()
+    child.stderr?.on('data', (chunk: Buffer) => {
+      console.error(`[chat-manager] claude stderr (${conversationId}):`, chunk.toString().trim())
+    })
+
     this._activeProcesses.set(conversationId, child)
     this._buffers.set(conversationId, '')
     this._emittedProposals.set(conversationId, new Set())
@@ -304,6 +310,7 @@ export class ChatManager {
 
     return new Promise<void>((resolve) => {
       child.on('close', (code) => {
+        console.log(`[chat-manager] claude exited code=${code} conv=${conversationId}`)
         const fullText = this._buffers.get(conversationId) ?? ''
         const wasAborting = this._abortingConversations.has(conversationId)
 

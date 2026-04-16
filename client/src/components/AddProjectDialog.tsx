@@ -3,6 +3,8 @@ import { toast } from 'sonner'
 import { FolderOpen } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
+
+const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 import {
   Dialog,
   DialogContent,
@@ -121,13 +123,41 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
             <label className="text-xs font-medium">
               Project path <span className="text-destructive">*</span>
             </label>
-            <Input
-              placeholder="/Users/me/my-project"
-              value={projectPath}
-              onChange={(e) => setProjectPath(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) handleAdd() }}
-              autoFocus
-            />
+            <div className="flex gap-2">
+              <Input
+                placeholder="/Users/me/my-project"
+                value={projectPath}
+                onChange={(e) => setProjectPath(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) handleAdd() }}
+                autoFocus
+                className="flex-1"
+              />
+              {IS_TAURI && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  title="Browse for folder"
+                  onClick={async () => {
+                    try {
+                      const { open } = await import('@tauri-apps/plugin-dialog')
+                      const selected = await open({ directory: true, multiple: false, title: 'Select project folder' })
+                      if (typeof selected === 'string' && selected) {
+                        setProjectPath(selected)
+                        if (!projectName) {
+                          setProjectName(selected.split('/').filter(Boolean).pop() ?? '')
+                        }
+                      }
+                    } catch {
+                      // Tauri dialog not available — user can still type path
+                    }
+                  }}
+                >
+                  <FolderOpen className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
             <p className="text-[10px] text-muted-foreground">
               Absolute path to the project root
             </p>

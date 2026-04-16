@@ -22,6 +22,9 @@ export default defineConfig({
         'src/test-setup.ts',
         'src/test-utils.tsx',
         'src/types.ts',
+        // Tauri-only component: returns null in non-Tauri (test) environments.
+        // Internal sub-components are structurally unreachable in jsdom tests.
+        'src/components/TitleBar.tsx',
       ],
       thresholds: {
         lines: 80,

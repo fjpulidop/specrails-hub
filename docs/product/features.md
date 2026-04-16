@@ -15,6 +15,32 @@ The collapsible sidebar on the left manages hub-level navigation.
 
 ---
 
+## Desktop App
+
+The Tauri native app is an alternative to the browser dashboard. It wraps the same React UI as a native macOS/Windows/Linux application and bundles the server as a sidecar.
+
+- **macOS** — native traffic lights with a custom drag region and centered search pill replace the standard titlebar.
+- **Windows / Linux** — custom frameless titlebar with SR icon, app name, and window controls.
+
+```bash
+npm run tauri dev      # Development mode
+npm run tauri build    # Production build
+```
+
+---
+
+## Demo Mode
+
+Run the UI with fixture data — no live server required. Useful for demos and screenshots.
+
+```bash
+npm run demo
+```
+
+Fixture data covers jobs, tickets, analytics, activity, and config. Served via the standalone Vite demo entry (`client/demo.html`, `vite.demo.config.ts`).
+
+---
+
 ## Home (per project)
 
 The landing page for the active project. Contains two sections:
@@ -27,6 +53,7 @@ Local tickets for the project. Backed by `.specrails/local-tickets.json`.
 - List, Grid (Kanban), and Post-it view modes.
 - Real-time sync — changes from CLI agents appear instantly via WebSocket.
 - Click any spec to edit. Drag cards in Grid view to change status.
+- **Spec generation state** persists across page refreshes and project switches via localStorage — in-progress generation is not lost on navigation.
 
 See [Ticket Panel](tickets.md) for the full reference.
 
@@ -76,7 +103,6 @@ Export data via the export dropdown (CSV/JSON).
 
 Configuration for the active project.
 
-- **Issue tracker** — select GitHub or Jira as the source for the Implement wizard. Shows authentication status. Label filter to narrow issue lists.
 - **Budget** — daily spend cap (USD). Queue auto-pauses when hit. Per-job cost alert threshold.
 
 ---

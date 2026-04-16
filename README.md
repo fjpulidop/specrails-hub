@@ -1,6 +1,6 @@
 # specrails hub
 
-A local dashboard and CLI for managing all your [specrails-core](https://github.com/fjpulidop/specrails-core) projects from a single interface. Visualizes the AI pipeline phases (Architect, Developer, Reviewer, Ship), streams logs in real-time, and lets you launch commands from the browser or terminal.
+A local dashboard and CLI for managing all your [specrails-core](https://github.com/fjpulidop/specrails-core) projects from a single interface. Visualizes the AI pipeline phases (Architect, Developer, Reviewer, Ship), streams logs in real-time, and lets you launch commands from the browser, terminal, or native desktop app.
 
 ## Features
 
@@ -11,6 +11,9 @@ A local dashboard and CLI for managing all your [specrails-core](https://github.
 - **Command launcher** — organized into Discovery (propose-spec, auto-propose specs, auto-select specs) and Delivery (implement, batch-implement) sections; other commands available in a collapsible group
 - **Analytics** — cost, duration, token usage, and throughput metrics per project
 - **Conversations** — full-page chat interface with Claude, scoped per project
+- **Native desktop app (macOS/Windows/Linux via Tauri)** — installable app that bundles the server; macOS uses native traffic lights with a custom titlebar, Windows/Linux use a custom frameless titlebar
+- **Demo mode for offline previews** — run the UI with fixture data, no server required
+- **Persistent spec generation state across refreshes** — in-progress spec generation survives page reloads and project switches
 - **`specrails-hub` CLI** — terminal bridge that auto-routes commands to the correct project
 
 ## Prerequisites
@@ -39,6 +42,15 @@ open http://localhost:4200
 ```
 
 On first launch with no projects, you'll see a welcome screen with an "Add your first project" button.
+
+## Desktop App
+
+```bash
+npm run tauri dev      # Run desktop app in development mode
+npm run tauri build    # Build production desktop app
+```
+
+macOS: native traffic lights with a custom drag region and centered search pill. Windows/Linux: custom frameless titlebar with SR icon, app name, and window controls.
 
 ## Architecture
 
@@ -70,6 +82,16 @@ A single Express process (port 4200) manages all projects. Each project gets its
 │  /api/hub/*              → hub-level operations     │
 │  /api/projects/:id/*     → project-scoped actions   │
 └─────────────────────────────────────────────────────┘
+```
+
+### Three-layer monorepo
+
+```
+specrails-hub/
+├── server/       → Express + WebSocket + SQLite (TypeScript, CommonJS)
+├── client/       → React + Vite + Tailwind v4 (TypeScript, ESM)
+├── cli/          → specrails-hub CLI bridge (TypeScript, CommonJS)
+└── src-tauri/    → Tauri desktop shell (Rust + bundled server sidecar)
 ```
 
 ## UI Overview
@@ -219,6 +241,9 @@ specrails-hub/
 │       │   ├── ProjectLayout.tsx    # per-project wrapper
 │       │   ├── ProjectNavbar.tsx    # Home/Analytics/Conversations nav
 │       │   ├── CommandGrid.tsx      # command launcher
+│       │   ├── TitleBar.tsx         # custom titlebar (Windows/Linux frameless)
+│       │   ├── ArcSidebar.tsx       # collapsible Arc-style sidebar
+│       │   ├── ProjectRightSidebar.tsx # project-level right panel
 │       │   ├── TicketsSection.tsx   # ticket panel container (view mode toggle)
 │       │   ├── TicketListView.tsx   # sortable table view
 │       │   ├── TicketGridView.tsx   # kanban drag-and-drop view
@@ -230,6 +255,7 @@ specrails-hub/
 │       │   └── ...
 │       ├── hooks/
 │       │   ├── useHub.tsx           # hub state context
+│       │   ├── useSpecGenTracker.tsx # spec generation state (persists via localStorage)
 │       │   ├── useTickets.ts        # ticket CRUD + WS subscription + toast/glow
 │       │   ├── useChat.ts          # chat operations
 │       │   ├── usePipeline.ts      # pipeline phases
@@ -241,7 +267,13 @@ specrails-hub/
 │       │   ├── GlobalSettingsPage.tsx
 │       │   └── JobDetailPage.tsx
 │       └── lib/
-│           └── api.ts              # dynamic API base routing
+│           ├── api.ts              # dynamic API base routing
+│           ├── pending-specs.ts    # spec generation state persistence
+│           └── route-memory.ts     # per-project route save/restore
+├── src-tauri/                      # Tauri desktop shell
+├── scripts/
+│   ├── build-sidecar.mjs           # build bundled server binary for Tauri
+│   └── generate-icons.mjs          # regenerate all icon sizes from SVG
 ├── cli/
 │   └── specrails-hub.ts            # CLI bridge
 ├── package.json

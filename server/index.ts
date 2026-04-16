@@ -1,3 +1,44 @@
+// When running as a pkg binary, redirect better_sqlite3.node to the real filesystem.
+// pkg's own bootstrap patches Module._resolveFilename and throws ENOENT for assets not
+// in the virtual snapshot. We re-patch _resolveFilename (runs before pkg's version) AND
+// patch process.dlopen as belt-and-suspenders.
+// Avoid fs.existsSync — it's patched by pkg to check virtual paths. Instead detect the
+// macOS .app bundle layout by inspecting process.execPath.
+if ((process as NodeJS.Process & { pkg?: unknown }).pkg !== undefined) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const _p = require('path') as typeof import('path')
+  const _execDir = _p.dirname(process.execPath)
+  // In a macOS .app bundle the sidecar lives in Contents/MacOS/ and Tauri resources
+  // land in Contents/Resources/. Detect by path string — avoids patched fs calls.
+  const _inAppBundle = process.execPath.includes('.app/Contents/MacOS/')
+  const _sqliteReal = _inAppBundle
+    ? _p.resolve(_execDir, '..', 'Resources', 'better_sqlite3.node')
+    : _p.resolve(_execDir, 'better_sqlite3.node')   // standalone binary (dev/test)
+
+  // Re-patch Module._resolveFilename so OUR handler runs before pkg's snapshot check.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const _Module = require('module') as { _resolveFilename: (...a: unknown[]) => unknown }
+  const _origResolve = _Module._resolveFilename.bind(_Module)
+  _Module._resolveFilename = function (...args: unknown[]) {
+    if (typeof args[0] === 'string' && args[0].includes('better_sqlite3')) {
+      return _sqliteReal
+    }
+    return _origResolve(...args)
+  }
+
+  // Also patch process.dlopen in case any code path bypasses _resolveFilename.
+  type DlopenFn = (module: object, filename: string, flags?: number) => void
+  const _origDlopen = (process.dlopen as DlopenFn).bind(process)
+  ;(process as NodeJS.Process & { dlopen: DlopenFn }).dlopen = function (
+    module: object, filename: string, flags?: number
+  ) {
+    if (filename.includes('better_sqlite3')) {
+      return _origDlopen(module, _sqliteReal, flags ?? 1)
+    }
+    return _origDlopen(module, filename, flags ?? 1)
+  }
+}
+
 import http from 'http'
 import path from 'path'
 import fs from 'fs'
@@ -35,6 +76,27 @@ const PKG_VERSION: string = (() => {
     return '0.0.0'
   }
 })()
+
+// ─── Desktop app watchdog ─────────────────────────────────────────────────────
+
+// When running as a Tauri sidecar, the parent Tauri process passes its PID via
+// --parent-pid=<pid>. We poll every 3 seconds and exit if the parent is gone,
+// preventing orphaned server processes after an app crash.
+const parentPidArg = process.argv.find((a) => a.startsWith('--parent-pid='))
+if (parentPidArg) {
+  const parentPid = parseInt(parentPidArg.split('=')[1], 10)
+  if (!isNaN(parentPid)) {
+    setInterval(() => {
+      try {
+        // signal 0 = existence check only, does not actually send a signal
+        process.kill(parentPid, 0)
+      } catch {
+        // Parent process is gone — terminate cleanly
+        process.exit(0)
+      }
+    }, 3000)
+  }
+}
 
 // ─── Mode detection ───────────────────────────────────────────────────────────
 
@@ -97,7 +159,8 @@ const app = express()
 
 // ─── CORS — allow only localhost origins (CRIT-02) ────────────────────────────
 
-const ALLOWED_ORIGIN_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
+// tauri://localhost is the origin used by Tauri's WebView in the desktop app
+const ALLOWED_ORIGIN_PATTERN = /^(https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?|tauri:\/\/localhost)$/
 
 function corsMiddleware(req: Request, res: Response, next: NextFunction): void {
   const origin = req.headers['origin']

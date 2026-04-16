@@ -119,7 +119,7 @@ export function ArcSidebar({
   return (
     <div
       className={cn(
-        'relative flex flex-col h-full border-r border-border bg-card/50 backdrop-blur-sm flex-shrink-0',
+        'relative flex flex-col h-full border-r border-border bg-background flex-shrink-0',
         'transition-all duration-200 ease-in-out overflow-hidden',
         expanded ? 'w-52' : 'w-11'
       )}

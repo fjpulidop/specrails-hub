@@ -86,7 +86,7 @@ describe('useHub', () => {
     expect(result.current.projects[0].name).toBe('Project One')
   })
 
-  it('defaults to first project', async () => {
+  it('does not auto-select project on REST load (welcome screen behavior)', async () => {
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ projects: [makeProject({ id: 'first', name: 'First' })] }),
@@ -95,7 +95,8 @@ describe('useHub', () => {
     const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
 
     await waitFor(() => expect(result.current.isLoading).toBe(false))
-    expect(result.current.activeProjectId).toBe('first')
+    expect(result.current.projects).toHaveLength(1)
+    expect(result.current.activeProjectId).toBeNull()
   })
 
   it('addProject: POSTs and returns project', async () => {
@@ -193,7 +194,11 @@ describe('useHub', () => {
     })
 
     const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
-    await waitFor(() => expect(result.current.activeProjectId).toBe('to-remove'))
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    // Manually activate the project (REST no longer auto-selects)
+    act(() => { result.current.setActiveProjectId('to-remove') })
+    expect(result.current.activeProjectId).toBe('to-remove')
 
     await waitFor(() => MockWebSocket.instances.length > 0)
     const ws = MockWebSocket.instances[0]
