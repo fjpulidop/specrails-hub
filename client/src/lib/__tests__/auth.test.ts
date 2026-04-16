@@ -22,22 +22,30 @@ describe('auth', () => {
     })
 
     it('does not crash and leaves token null when fetch fails', async () => {
-      ;(global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('network error'))
+      vi.useFakeTimers()
+      ;(global.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('network error'))
 
       const { initAuth, getHubToken } = await import('../auth')
-      await expect(initAuth()).resolves.toBeUndefined()
+      const p = initAuth()
+      await vi.runAllTimersAsync()
+      await p
       expect(getHubToken()).toBeNull()
+      vi.useRealTimers()
     })
 
     it('does not cache token when response is not ok', async () => {
-      ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      vi.useFakeTimers()
+      ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
         ok: false,
         json: async () => ({}),
       })
 
       const { initAuth, getHubToken } = await import('../auth')
-      await initAuth()
+      const p = initAuth()
+      await vi.runAllTimersAsync()
+      await p
       expect(getHubToken()).toBeNull()
+      vi.useRealTimers()
     })
 
     it('handles missing token field gracefully (token=undefined)', async () => {
