@@ -19,6 +19,7 @@ export interface RailState {
   ticketIds: number[]
   mode: RailMode
   status: RailStatus
+  activeJobId?: string
 }
 
 interface RailsBoardProps {
@@ -102,6 +103,7 @@ export function RailsBoard({ rails, ticketMap, onModeChange, onToggle, onTicketC
                   tickets={rail.ticketIds.map((id) => ticketMap.get(id)).filter((t): t is LocalTicket => t !== undefined)}
                   mode={rail.mode}
                   status={rail.status}
+                  activeJobId={rail.activeJobId}
                   jiggleMode={jiggleMode}
                   dragHandleListeners={listeners}
                   dragHandleAttributes={attributes}

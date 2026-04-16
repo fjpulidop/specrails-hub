@@ -119,17 +119,21 @@ export default function DashboardPage() {
       .then((res) => res.ok ? res.json() : null)
       .then((data: { activeJobs?: Record<string, { jobId: string }> } | null) => {
         if (cancelled || !data) return
-        const activeIndices = new Set(
-          Object.keys(data.activeJobs ?? {}).map(Number)
-        )
+        const activeJobs = data.activeJobs ?? {}
+        const activeIndices = new Set(Object.keys(activeJobs).map(Number))
         setRails((prev) => {
           const next = prev.map((r, idx) => {
             if (r.status !== 'running') return r
-            if (activeIndices.has(idx)) return r // still running on server
+            if (activeIndices.has(idx)) {
+              // Still running — restore jobId if somehow lost
+              const serverJobId = activeJobs[String(idx)]?.jobId
+              if (serverJobId && !r.activeJobId) return { ...r, activeJobId: serverJobId }
+              return r
+            }
             // Rail was running but server has no active job → job finished while
             // we were away. Clear tickets so they reappear in Specs/Done based
             // on their current server-side status (useTickets re-fetches on mount).
-            return { ...r, status: 'idle' as const, ticketIds: [] }
+            return { ...r, status: 'idle' as const, activeJobId: undefined, ticketIds: [] }
           })
           saveRails(activeProjectId, next)
           return next
@@ -231,12 +235,12 @@ export default function DashboardPage() {
       if (m.status === 'completed' && completedTicketIds.size > 0) {
         updateRails((prev) => prev.map((r, idx) => {
           if (idx !== targetIndex) return r
-          return { ...r, status: 'idle', ticketIds: r.ticketIds.filter((id) => !completedTicketIds.has(id)) }
+          return { ...r, status: 'idle', activeJobId: undefined, ticketIds: r.ticketIds.filter((id) => !completedTicketIds.has(id)) }
         }))
       } else if (m.status === 'failed') {
-        updateRails((prev) => prev.map((r, idx) => (idx === targetIndex ? { ...r, status: 'failed' } : r)))
+        updateRails((prev) => prev.map((r, idx) => (idx === targetIndex ? { ...r, status: 'failed', activeJobId: undefined } : r)))
       } else {
-        updateRails((prev) => prev.map((r, idx) => (idx === targetIndex ? { ...r, status: 'idle' } : r)))
+        updateRails((prev) => prev.map((r, idx) => (idx === targetIndex ? { ...r, status: 'idle', activeJobId: undefined } : r)))
       }
 
       const statusLabel = m.status === 'completed' ? 'completed' : m.status === 'failed' ? 'failed' : m.status ?? 'finished'
@@ -480,7 +484,7 @@ export default function DashboardPage() {
       // Stop via rails API
       try {
         await fetch(`${getApiBase()}/rails/${railIndex}/stop`, { method: 'POST' })
-        updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'idle' } : r)))
+        updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'idle', activeJobId: undefined } : r)))
         toast.info(`${rail.label} stopped`)
       } catch {
         toast.error('Failed to stop rail')
@@ -514,7 +518,8 @@ export default function DashboardPage() {
         toast.error(data.error || 'Failed to launch rail')
         return
       }
-      updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'running' } : r)))
+      const { jobId } = await res.json() as { jobId: string }
+      updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'running', activeJobId: jobId } : r)))
       toast.success(`${rail.label} launched`, {
         description: `${rail.mode} with ${rail.ticketIds.length} spec${rail.ticketIds.length > 1 ? 's' : ''}`,
       })
