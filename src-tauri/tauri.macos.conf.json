@@ -1,0 +1,11 @@
+{
+  "app": {
+    "windows": [
+      {
+        "titleBarStyle": "Overlay",
+        "decorations": true,
+        "title": ""
+      }
+    ]
+  }
+}

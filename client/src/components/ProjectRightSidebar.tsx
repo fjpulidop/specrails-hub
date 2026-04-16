@@ -19,7 +19,7 @@ export function ProjectRightSidebar() {
   return (
     <div
       className={cn(
-        'relative flex flex-col h-full border-l border-border bg-card/50 backdrop-blur-sm flex-shrink-0',
+        'relative flex flex-col h-full border-l border-border bg-background flex-shrink-0',
         'transition-all duration-200 ease-in-out overflow-hidden',
         expanded ? 'w-44' : 'w-11'
       )}

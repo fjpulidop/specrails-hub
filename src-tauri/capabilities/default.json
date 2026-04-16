@@ -1,0 +1,29 @@
+{
+  "$schema": "https://schemas.tauri.app/config/v2/capability.json",
+  "identifier": "default",
+  "description": "Default capabilities for SpecRails Hub",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-unmaximize",
+    "core:window:allow-start-dragging",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "specrails-server",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
+    "shell:allow-execute",
+    "dialog:allow-message",
+    "dialog:allow-confirm",
+    "dialog:allow-open"
+  ]
+}
