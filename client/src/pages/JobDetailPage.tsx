@@ -128,7 +128,14 @@ export default function JobDetailPage() {
       const jobs = msg.jobs as Array<{ id: string; status: string }> | undefined
       const matchingJob = jobs?.find((j) => j.id === id)
       if (matchingJob) {
-        setJob((prev) => prev ? { ...prev, status: matchingJob.status as JobSummary['status'] } : prev)
+        const newStatus = matchingJob.status as JobSummary['status']
+        setJob((prev) => prev ? { ...prev, status: newStatus } : prev)
+        if (newStatus === 'completed' || newStatus === 'failed' || newStatus === 'canceled') {
+          fetch(`${getApiBase()}/jobs/${id}`)
+            .then((r) => r.json())
+            .then((data: { job: JobSummary }) => setJob(data.job))
+            .catch(() => {})
+        }
       }
     }
   }, [id, flushEvents])

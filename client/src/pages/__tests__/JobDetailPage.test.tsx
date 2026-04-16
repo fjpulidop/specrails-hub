@@ -218,6 +218,28 @@ describe('JobDetailPage', () => {
     })
   })
 
+  it('re-fetches job when queue message transitions job to completed', async () => {
+    const runningJob = { ...mockJob, status: 'running' as const, duration_ms: null, total_cost_usd: null }
+    const completedJob = { ...mockJob, status: 'completed' as const, duration_ms: 30000, total_cost_usd: 0.05 }
+
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ job: runningJob, events: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ job: completedJob, events: mockEvents }) })
+
+    render(<JobDetailPage />)
+    await waitFor(() => {
+      expect(mockRegisterHandler).toHaveBeenCalled()
+    })
+
+    const handler = mockRegisterHandler.mock.calls[0][1]
+    handler({ type: 'queue', projectId: 'proj-1', jobs: [{ id: 'job-abc123', status: 'completed' }] })
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(2)
+      expect(global.fetch).toHaveBeenLastCalledWith('/api/jobs/job-abc123')
+    })
+  })
+
   it('renders log viewer section', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
