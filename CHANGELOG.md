@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.0](https://github.com/fjpulidop/specrails-hub/compare/v1.27.0...v1.28.0) (2026-04-16)
+
+
+### Features
+
+* Tauri desktop app, demo mode, and pending-specs tracking ([#201](https://github.com/fjpulidop/specrails-hub/issues/201)) ([a0810be](https://github.com/fjpulidop/specrails-hub/commit/a0810bee57da65bc25daab15e32f1de6d73850a1))
+
 ## [1.27.0](https://github.com/fjpulidop/specrails-hub/compare/v1.26.0...v1.27.0) (2026-04-15)
 
 
