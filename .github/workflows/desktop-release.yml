@@ -3,6 +3,7 @@ name: Desktop Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:  # allows manual trigger from GitHub UI or: gh workflow run desktop-release.yml
 
 jobs:
   build-macos:

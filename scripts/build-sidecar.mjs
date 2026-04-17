@@ -184,15 +184,24 @@ async function main() {
   fs.copyFileSync(sqliteAddon, addonDest)
   console.log(`  ${sqliteAddon} → ${addonDest}`)
 
-  // Step 4: Codesign sidecar binary (macOS only, requires APPLE_SIGNING_IDENTITY)
-  // Apple notarization rejects app bundles that contain unsigned binaries.
-  // The sidecar must be signed with a Developer ID cert + hardened runtime
-  // before tauri build attempts to notarize the whole .app.
+  // Step 4: Codesign sidecar + .node addon (macOS only, requires APPLE_SIGNING_IDENTITY)
+  // Apple notarization rejects bundles with unsigned binaries or binaries missing
+  // hardened runtime + secure timestamp. We sign both artifacts here so Tauri can
+  // either keep our signatures or re-sign them with the same identity.
+  // The entitlements allow JIT (V8) + unsigned memory + library validation bypass
+  // which are required for pkg-compiled Node.js binaries and native .node addons.
   const signingIdentity = process.env.APPLE_SIGNING_IDENTITY
   if (process.platform === 'darwin' && signingIdentity) {
-    console.log('\n[4/4] Codesigning sidecar binary for notarization...')
-    run(`codesign --force --sign "${signingIdentity}" --options runtime --timestamp "${outputPath}"`)
+    const entitlementsPath = path.join(ROOT, 'src-tauri', 'entitlements.plist')
+    console.log('\n[4/4] Codesigning sidecar and native addon for notarization...')
+
+    // Sign the sidecar binary with hardened runtime + entitlements
+    run(`codesign --force --sign "${signingIdentity}" --options runtime --entitlements "${entitlementsPath}" --timestamp "${outputPath}"`)
     console.log(`  Signed: ${outputPath}`)
+
+    // Sign the .node addon (native Mach-O shared lib) — must be signed for notarization
+    run(`codesign --force --sign "${signingIdentity}" --timestamp "${addonDest}"`)
+    console.log(`  Signed: ${addonDest}`)
   } else if (process.platform === 'darwin') {
     console.log('\n[4/4] Skipping codesign (APPLE_SIGNING_IDENTITY not set — local build)')
   }

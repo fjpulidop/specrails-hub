@@ -36,6 +36,9 @@
     "externalBin": ["binaries/specrails-server"],
     "resources": {
       "binaries/better_sqlite3.node": "better_sqlite3.node"
+    },
+    "macOS": {
+      "entitlements": "./entitlements.plist"
     }
   }
 }
