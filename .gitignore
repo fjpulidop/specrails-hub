@@ -11,3 +11,7 @@ data/
 /specrails/
 .claude/worktrees/
 coverage/
+
+# Sidecar binaries — built during desktop release, not tracked
+src-tauri/binaries/specrails-server-*
+src-tauri/binaries/better_sqlite3.node

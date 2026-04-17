@@ -71,7 +71,7 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
           </main>
           {FEATURE_CHAT_ENABLED && <ChatPanel chat={chat} project={project} />}
         </div>
-        <StatusBar connectionStatus={connectionStatus} activeProjectId={project.id} />
+        <StatusBar connectionStatus={connectionStatus} />
       </div>
       </ChatContext.Provider>
       <Toaster
