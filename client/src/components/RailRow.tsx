@@ -15,6 +15,7 @@ interface RailRowProps {
   tickets: LocalTicket[]
   mode: RailMode
   status: RailStatus
+  activeJobId?: string
   jiggleMode: boolean
   dragHandleListeners?: Record<string, Function>
   dragHandleAttributes?: Record<string, any>
@@ -27,7 +28,7 @@ interface RailRowProps {
 }
 
 export function RailRow({
-  id, label, tickets, mode, status, jiggleMode,
+  id, label, tickets, mode, status, activeJobId, jiggleMode,
   dragHandleListeners, dragHandleAttributes,
   onModeChange, onToggle, onTicketClick, onDelete, onLongPress, onRename,
 }: RailRowProps) {
@@ -244,7 +245,7 @@ export function RailRow({
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            <RailControls mode={mode} status={status} ticketCount={tickets.length} onModeChange={onModeChange} onToggle={onToggle} />
+            <RailControls mode={mode} status={status} activeJobId={activeJobId} ticketCount={tickets.length} onModeChange={onModeChange} onToggle={onToggle} />
             {/* Jiggle-mode delete button */}
             {jiggleMode && canDelete && (
               <button

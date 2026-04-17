@@ -358,7 +358,7 @@ describe('QueueManager', () => {
       vi.advanceTimersByTime(5100)
 
       expect(vi.mocked(treeKill)).toHaveBeenCalledWith(12345, 'SIGTERM')
-      expect(vi.mocked(treeKill)).toHaveBeenCalledWith(12345, 'SIGKILL')
+      expect(vi.mocked(treeKill)).toHaveBeenCalledWith(12345, 'SIGKILL', expect.any(Function))
 
       vi.useRealTimers()
     })
@@ -757,9 +757,12 @@ describe('QueueManager', () => {
   // ─── DB-backed persistence ────────────────────────────────────────────────
 
   describe('DB-backed QueueManager', () => {
-    it('restores queued jobs from DB on construction', () => {
+    it('restores queued jobs from DB on construction and auto-starts them', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
       const db = initDb(':memory:')
-      // Insert a queued job directly into the DB
       db.prepare(`INSERT INTO jobs (id, command, started_at, status, queue_position)
         VALUES ('restored-job', '/implement #1', datetime('now'), 'queued', 1)`).run()
 
@@ -767,7 +770,8 @@ describe('QueueManager', () => {
       const jobs = qmWithDb.getJobs()
       const restored = jobs.find((j) => j.id === 'restored-job')
       expect(restored).toBeDefined()
-      expect(restored?.status).toBe('queued')
+      // Job auto-starts after restore — should be running now
+      expect(restored?.status).toBe('running')
     })
 
     it('restores paused state from DB on construction', () => {
@@ -832,9 +836,12 @@ describe('QueueManager', () => {
       expect(row?.status).toBe('failed')
     })
 
-    it('restores priority from DB and sorts queue by priority', () => {
+    it('restores priority from DB and starts highest-priority job first', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
       const db = initDb(':memory:')
-      // Insert queued jobs with different priorities
       db.prepare(`INSERT INTO jobs (id, command, started_at, status, queue_position, priority)
         VALUES ('low-job', '/low', datetime('now'), 'queued', 1, 'low')`).run()
       db.prepare(`INSERT INTO jobs (id, command, started_at, status, queue_position, priority)
@@ -842,14 +849,13 @@ describe('QueueManager', () => {
 
       const qmWithDb = new QueueManager(broadcast, db)
       const jobs = qmWithDb.getJobs()
-      const sorted = jobs
-        .filter((j) => j.status === 'queued')
-        .sort((a, b) => (a.queuePosition ?? 0) - (b.queuePosition ?? 0))
 
-      expect(sorted[0].id).toBe('critical-job')
-      expect(sorted[0].priority).toBe('critical')
-      expect(sorted[1].id).toBe('low-job')
-      expect(sorted[1].priority).toBe('low')
+      // critical-job has highest priority — it should be running now
+      const criticalJob = jobs.find((j) => j.id === 'critical-job')
+      const lowJob = jobs.find((j) => j.id === 'low-job')
+      expect(criticalJob?.status).toBe('running')
+      expect(lowJob?.status).toBe('queued')
+      expect(lowJob?.priority).toBe('low')
     })
 
     it('persists priority to DB when enqueuing', () => {

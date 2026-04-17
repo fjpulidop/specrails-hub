@@ -810,7 +810,32 @@ export class QueueManager {
 
     const pid = this._activeProcess.pid
     this._killTimer = setTimeout(() => {
-      treeKill(pid, 'SIGKILL')
+      treeKill(pid, 'SIGKILL', (err) => {
+        if (err) {
+          // SIGKILL failed — force cleanup so queue is not permanently blocked
+          console.error(`[kill] SIGKILL failed for pid ${pid}: ${err.message}`)
+          if (this._activeJobId === jobId) {
+            const job = this._jobs.get(jobId)
+            if (job && job.status === 'running') {
+              job.status = 'failed'
+              job.finishedAt = new Date().toISOString()
+              if (this._db) {
+                try {
+                  this._db.prepare(
+                    `UPDATE jobs SET status = 'failed', finished_at = CURRENT_TIMESTAMP WHERE id = ?`
+                  ).run(jobId)
+                } catch { /* ignore */ }
+              }
+            }
+            this._activeProcess = null
+            this._activeJobId = null
+            this._cancelingJobs.delete(jobId)
+            this._zombieJobs.delete(jobId)
+            this._broadcastQueueState()
+            this._drainQueue()
+          }
+        }
+      })
       this._killTimer = null
     }, 5000)
   }
@@ -903,6 +928,9 @@ export class QueueManager {
     } catch {
       // DB may not have queue_state table yet — ignore
     }
+
+    // Kick off any restored queued jobs that are ready to run
+    this._drainQueue()
   }
 
   private _isDependencyMet(job: Job): boolean {
