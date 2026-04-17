@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.0](https://github.com/fjpulidop/specrails-hub/compare/v1.28.1...v1.29.0) (2026-04-17)
+
+
+### Features
+
+* add View Log button to rail controls when running ([#206](https://github.com/fjpulidop/specrails-hub/issues/206)) ([569e2e9](https://github.com/fjpulidop/specrails-hub/commit/569e2e9f3813c2a012e6b526b0c5f2ba8165dd25))
+
 ## [1.28.1](https://github.com/fjpulidop/specrails-hub/compare/v1.28.0...v1.28.1) (2026-04-16)
 
 
