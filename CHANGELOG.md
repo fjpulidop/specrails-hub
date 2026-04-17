@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.33.0](https://github.com/fjpulidop/specrails-hub/compare/v1.32.0...v1.33.0) (2026-04-17)
+
+
+### Features
+
+* truthful post-install setup summary ([#217](https://github.com/fjpulidop/specrails-hub/issues/217)) ([a68423a](https://github.com/fjpulidop/specrails-hub/commit/a68423af16a9857fe474558ce7dc4ffb00ae8235))
+
 ## [1.32.0](https://github.com/fjpulidop/specrails-hub/compare/v1.31.1...v1.32.0) (2026-04-17)
 
 
