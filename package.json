@@ -36,7 +36,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:client": "cd client && npx vitest run",
-    "test:all": "vitest run && cd client && npx vitest run"
+    "test:all": "vitest run && cd client && npx vitest run",
+    "ci": "npm run typecheck && npm test && npm run test:coverage && cd client && npm run test:coverage"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
