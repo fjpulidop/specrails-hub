@@ -9,11 +9,12 @@ README.md at project root contains these sections in order:
 - Prerequisites
 - Installation
 - Quick Start
-- Architecture
+- Desktop App (added 2026-04-16)
+- Architecture (includes Three-layer monorepo subsection with src-tauri/ row)
 - UI Overview
-- CLI: `srm` (with sub-tables)
+- CLI: `specrails-hub` (with sub-tables)
 - API (with Hub routes and Project-scoped routes tables)
-- Development
+- Development (includes project structure tree)
 - WebSocket (message type table)
 - Security
 - License
@@ -25,3 +26,19 @@ README.md at project root contains these sections in order:
 No CHANGELOG.md exists at the project root — skip changelog updates unless it is created.
 
 API docs are inline in README.md, not in a separate docs/ directory.
+
+docs/ directory structure:
+- docs/general/getting-started.md
+- docs/general/platform-overview.md
+- docs/engineering/architecture.md
+- docs/engineering/configuration.md
+- docs/engineering/api-reference.md
+- docs/engineering/rfcs/ (do not modify)
+- docs/engineering/spikes/ (do not modify)
+- docs/product/features.md
+- docs/product/tickets.md
+- docs/product/workflows.md
+- docs/product/openspec-workflow.md (do not modify)
+- docs/operations/runbook.md
+
+Project Settings in features.md has only Budget subsection — Issue Tracker, Queue, and Display were removed in the 2026-04-16 redesign.

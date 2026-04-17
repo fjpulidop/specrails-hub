@@ -23,8 +23,20 @@ type WizardStep =
 
 interface SetupSummary {
   agents: number
+  specrailsCommands: number
+  opsxCommands: number
   personas: number
-  commands: number
+  legacySrRemoved: number
+  tier: 'quick' | 'full'
+}
+
+const EMPTY_SUMMARY: SetupSummary = {
+  agents: 0,
+  specrailsCommands: 0,
+  opsxCommands: 0,
+  personas: 0,
+  legacySrRemoved: 0,
+  tier: 'quick',
 }
 
 // ─── Install config ───────────────────────────────────────────────────────────
@@ -352,6 +364,9 @@ function CompleteStep({
   summary: SetupSummary
   onGoToProject: () => void
 }) {
+  const showPersonas = summary.tier === 'full' && summary.personas > 0
+  const tileCount = showPersonas ? 4 : 3
+
   return (
     <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto px-6 gap-8">
       <div className="w-16 h-16 rounded-2xl bg-dracula-green/20 flex items-center justify-center">
@@ -364,26 +379,40 @@ function CompleteStep({
         </h2>
         <p className="text-sm text-muted-foreground max-w-sm">
           <strong className="text-foreground">{projectName}</strong> is now configured with
-          AI-powered development workflows. Your specialized agents, personas, and commands
-          are ready to use.
+          AI-powered development workflows.{' '}
+          {summary.tier === 'full' && summary.personas > 0
+            ? 'Your specialized agents, personas, and commands are ready to use.'
+            : 'Your specialized agents and commands are ready to use.'}
         </p>
       </div>
 
       <div className="w-full rounded-lg border border-border/50 bg-muted/20 p-4">
-        <div className="grid grid-cols-3 gap-4 text-center">
+        <div className={cn('grid gap-4 text-center', tileCount === 4 ? 'grid-cols-4' : 'grid-cols-3')}>
           <div>
             <div className="text-2xl font-bold text-dracula-purple">{summary.agents}</div>
             <div className="text-[10px] text-muted-foreground">Agents</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-dracula-pink">{summary.personas}</div>
-            <div className="text-[10px] text-muted-foreground">Personas</div>
+            <div className="text-2xl font-bold text-dracula-green">{summary.specrailsCommands}</div>
+            <div className="text-[10px] text-muted-foreground">/specrails:*</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-dracula-green">{summary.commands}</div>
-            <div className="text-[10px] text-muted-foreground">Spec</div>
+            <div className="text-2xl font-bold text-dracula-cyan">{summary.opsxCommands}</div>
+            <div className="text-[10px] text-muted-foreground">/opsx:*</div>
           </div>
+          {showPersonas && (
+            <div>
+              <div className="text-2xl font-bold text-dracula-pink">{summary.personas}</div>
+              <div className="text-[10px] text-muted-foreground">Personas</div>
+            </div>
+          )}
         </div>
+
+        {summary.legacySrRemoved > 0 && (
+          <p className="mt-3 text-xs text-muted-foreground text-center">
+            Removed {summary.legacySrRemoved} legacy <code className="text-xs">/sr:*</code> command{summary.legacySrRemoved === 1 ? '' : 's'}
+          </p>
+        )}
       </div>
 
       <div className="text-center space-y-1">
@@ -605,7 +634,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
               setWizardStep({ step: 'enriching' })
               pendingEnrichStart.current = true
             } else {
-              setWizardStep({ step: 'complete', summary: data.summary ?? { agents: 0, personas: 0, commands: 0 } })
+              setWizardStep({ step: 'complete', summary: data.summary ?? { ...EMPTY_SUMMARY } })
             }
           }
         }
@@ -616,7 +645,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
         )
         if (finalDone?.status === 'done' && !data.isSettingUp) {
           setCheckpoints((prev) => prev.map((cp) => ({ ...cp, status: 'done' as const })))
-          setWizardStep({ step: 'complete', summary: data.summary ?? { agents: 0, personas: 0, commands: 0 } })
+          setWizardStep({ step: 'complete', summary: data.summary ?? { ...EMPTY_SUMMARY } })
         }
       } catch {
         // non-fatal
@@ -647,7 +676,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
           setWizardStep({ step: 'enriching' })
         } else {
           // Quick install done → complete
-          const summary = (msg.summary as SetupSummary | undefined) ?? { agents: 0, personas: 0, commands: 0 }
+          const summary = (msg.summary as SetupSummary | undefined) ?? { ...EMPTY_SUMMARY }
           setWizardStep({ step: 'complete', summary })
         }
         break

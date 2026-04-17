@@ -1,3 +1,3 @@
 # Memory Index
 
-No memories recorded yet. Memories will be added here as agents work on specrails-hub.
+- [types_ts_inline_shapes.md](types_ts_inline_shapes.md) — server/types.ts has inline WS message payload shapes that must be updated when SetupSummary changes

@@ -235,7 +235,7 @@ describe('SetupWizard', () => {
         handler({
           type: 'setup_complete',
           projectId: project.id,
-          summary: { agents: 3, personas: 2, commands: 5 },
+          summary: { agents: 3, specrailsCommands: 5, opsxCommands: 2, personas: 2, legacySrRemoved: 0, tier: 'full' },
         })
       })
 
@@ -400,7 +400,25 @@ describe('SetupWizard', () => {
   })
 
   describe('Complete step', () => {
-    async function renderCompleteStep(summary = { agents: 4, personas: 3, commands: 8 }) {
+    type SummaryOverride = {
+      agents?: number
+      specrailsCommands?: number
+      opsxCommands?: number
+      personas?: number
+      legacySrRemoved?: number
+      tier?: 'quick' | 'full'
+    }
+
+    async function renderCompleteStep(summaryOverride: SummaryOverride = {}) {
+      const summary = {
+        agents: 4,
+        specrailsCommands: 8,
+        opsxCommands: 3,
+        personas: 3,
+        legacySrRemoved: 0,
+        tier: 'full' as const,
+        ...summaryOverride,
+      }
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
       // Switch to full tier so install_done transitions to enriching, then complete
@@ -419,18 +437,20 @@ describe('SetupWizard', () => {
     }
 
     it('shows summary stats', async () => {
-      await renderCompleteStep({ agents: 7, personas: 6, commands: 12 })
+      await renderCompleteStep({ agents: 7, specrailsCommands: 12, opsxCommands: 5, personas: 6, tier: 'full' })
       // Use unique numbers that won't clash with step indicators (1-4)
       expect(screen.getByText('7')).toBeInTheDocument()
-      expect(screen.getByText('6')).toBeInTheDocument()
       expect(screen.getByText('12')).toBeInTheDocument()
+      expect(screen.getByText('5')).toBeInTheDocument()
+      expect(screen.getByText('6')).toBeInTheDocument()
     })
 
-    it('shows Agents, Personas, Spec labels', async () => {
+    it('shows Agents, /specrails:*, /opsx:* labels and never Spec', async () => {
       await renderCompleteStep()
       expect(screen.getByText('Agents')).toBeInTheDocument()
-      expect(screen.getByText('Personas')).toBeInTheDocument()
-      expect(screen.getByText('Spec')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:*')).toBeInTheDocument()
+      expect(screen.getByText('/opsx:*')).toBeInTheDocument()
+      expect(screen.queryByText('Spec')).not.toBeInTheDocument()
     })
 
     it('renders Continue to project button', async () => {
@@ -451,7 +471,11 @@ describe('SetupWizard', () => {
         handler({ type: 'setup_install_done', projectId: project.id })
       })
       act(() => {
-        handler({ type: 'setup_complete', projectId: project.id, summary: { agents: 1, personas: 1, commands: 1 } })
+        handler({
+          type: 'setup_complete',
+          projectId: project.id,
+          summary: { agents: 1, specrailsCommands: 5, opsxCommands: 2, personas: 0, legacySrRemoved: 0, tier: 'quick' },
+        })
       })
       await waitFor(() => expect(screen.getByRole('button', { name: /continue to project/i })).toBeInTheDocument())
       fireEvent.click(screen.getByRole('button', { name: /continue to project/i }))
@@ -467,6 +491,45 @@ describe('SetupWizard', () => {
       await renderCompleteStep()
       const docsLink = document.querySelector('a[href="https://specrails.dev/docs"]')
       expect(docsLink).toBeTruthy()
+    })
+
+    it('quick tier renders three tiles and no Personas tile', async () => {
+      await renderCompleteStep({ tier: 'quick', personas: 0 })
+      expect(screen.getByText('Agents')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:*')).toBeInTheDocument()
+      expect(screen.getByText('/opsx:*')).toBeInTheDocument()
+      expect(screen.queryByText('Personas')).not.toBeInTheDocument()
+    })
+
+    it('full tier with personas > 0 renders four tiles including Personas', async () => {
+      await renderCompleteStep({ tier: 'full', personas: 3 })
+      expect(screen.getByText('Agents')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:*')).toBeInTheDocument()
+      expect(screen.getByText('/opsx:*')).toBeInTheDocument()
+      expect(screen.getByText('Personas')).toBeInTheDocument()
+    })
+
+    it('full tier with zero personas renders three tiles and no Personas tile', async () => {
+      await renderCompleteStep({ tier: 'full', personas: 0 })
+      expect(screen.queryByText('Personas')).not.toBeInTheDocument()
+      expect(screen.getByText('Agents')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:*')).toBeInTheDocument()
+      expect(screen.getByText('/opsx:*')).toBeInTheDocument()
+    })
+
+    it('renders legacy cleanup notice when legacySrRemoved > 0', async () => {
+      await renderCompleteStep({ legacySrRemoved: 2 })
+      expect(screen.getByText(/removed 2 legacy/i)).toBeInTheDocument()
+    })
+
+    it('does not render legacy cleanup notice when legacySrRemoved === 0', async () => {
+      await renderCompleteStep({ legacySrRemoved: 0 })
+      expect(screen.queryByText(/legacy.*sr/i)).not.toBeInTheDocument()
+    })
+
+    it('never renders a tile labelled Spec', async () => {
+      await renderCompleteStep({ tier: 'full', personas: 3 })
+      expect(screen.queryByText('Spec')).not.toBeInTheDocument()
     })
   })
 })
