@@ -88,6 +88,7 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
         {/* Active specs — droppable zone */}
         <div
           ref={setNodeRef}
+          data-tour="specs-list"
           style={{ flex: `0 0 ${splitRatio * 100}%` }}
           className={`overflow-y-auto px-4 py-3 space-y-1.5 transition-colors duration-150 ${isOver ? 'bg-primary/[0.04]' : ''}`}
         >

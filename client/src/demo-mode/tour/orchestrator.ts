@@ -10,6 +10,9 @@ import { findTourElement, type TourSelectorKey } from './selectors'
 import { TOUR_TIMELINE, type Beat } from './timeline'
 import { TOUR_LOG_LINES, TOUR_LOG_LINE_INTERVAL_MS } from '../fixtures/tour-log'
 
+/** Stable sonner toast id — one per page, so loops replace instead of stack. */
+const TOUR_TOAST_ID = 'tour-spec-generation'
+
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 // Wait through a single beat, honouring pause.
@@ -114,11 +117,12 @@ async function runAction(name: string, durationMs: number) {
 
     case 'showToast':
       // Use the real sonner toast system so it looks identical to a real user
-      // action. Dynamic import because 'sonner' is ambient but we want
-      // tree-shaking safety in prod builds.
+      // action. Stable id so each loop iteration REPLACES the previous toast
+      // instead of stacking.
       try {
         const sonner = await import('sonner')
         sonner.toast.loading('specrails-hub · Add JWT auth with refresh…', {
+          id: TOUR_TOAST_ID,
           description: 'Generating spec...',
           duration: 2800,
         })
@@ -165,6 +169,15 @@ async function runAction(name: string, durationMs: number) {
 
     case 'resetAll':
       tourStore.softReset()
+      // Dismiss the previous loop's toast so it doesn't bleed into the next
+      // loop's toast (which uses the same stable id, but dismiss is cheap
+      // insurance against any lingering state).
+      try {
+        const sonner = await import('sonner')
+        sonner.toast.dismiss(TOUR_TOAST_ID)
+      } catch {
+        // no-op
+      }
       await wait(durationMs)
       return
   }
