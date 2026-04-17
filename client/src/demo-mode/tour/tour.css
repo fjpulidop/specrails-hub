@@ -1,0 +1,189 @@
+/**
+ * Tour-specific CSS keyframes. Loaded only from demo-entry.tsx so the
+ * production client bundle does not include them.
+ *
+ * openspec: hub-demo-scripted-tour
+ */
+
+@keyframes tour-click-ring {
+  from {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+@keyframes tour-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tour-slide-left {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes tour-caret {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes tour-pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 16px hsl(142 70% 56% / 0.25);
+  }
+  50% {
+    box-shadow: 0 0 28px hsl(142 70% 56% / 0.55);
+  }
+}
+
+@keyframes tour-pulse-dot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.7;
+  }
+}
+
+/*
+ * Hide the ChatPanel right-hand sidebar in the demo build. The panel is
+ * rendered as the next sibling of <main>, carrying the border-l +
+ * backdrop-blur classes from ChatPanel.tsx.
+ */
+main + div[class*="border-l"][class*="backdrop-blur"],
+main ~ div[class*="border-l"][class*="backdrop-blur"],
+[data-chat-panel] {
+  display: none !important;
+}
+
+/*
+ * Hide the top Navbar (logo · Home/Analytics · Claude Code badge · Docs ·
+ * Settings). Matches the `h-11` + `border-b` classes from Navbar.tsx.
+ */
+nav[class*="h-11"][class*="border-b"] {
+  display: none !important;
+}
+
+/*
+ * Hide the bottom StatusBar (connected · total jobs · …). It's a <footer>
+ * with `h-7` + `border-t`. CSS wins over the demo.html inline
+ * display:none which can get overwritten by React re-renders.
+ */
+footer[class*="h-7"][class*="border-t"] {
+  display: none !important;
+}
+
+/*
+ * Hub-mode chrome we don't want in the demo: the custom tauri TitleBar,
+ * the left ArcSidebar (project switcher), and the right
+ * ProjectRightSidebar. The tour is meant to showcase the Specs + Rails
+ * workflow, so peripheral chrome only distracts.
+ */
+[data-tauri-drag-region] {
+  display: none !important;
+}
+
+/* ArcSidebar: narrow left column inside HubApp (w-11 … flex-shrink-0) */
+div[class*="w-11"][class*="flex-shrink-0"][class*="border-r"] {
+  display: none !important;
+}
+
+/*
+ * ProjectRightSidebar: border-l + flex-shrink-0 + bg-background. Distinct
+ * from ChatPanel (border-l + backdrop-blur) and ArcSidebar (border-r).
+ */
+div[class*="border-l"][class*="flex-shrink-0"][class*="bg-background"] {
+  display: none !important;
+}
+
+/*
+ * Block all human pointer interaction inside the demo. The tour drives
+ * state directly via tourStore.update(), not via real click/keydown
+ * events, so the page is safe to lock. Hiding the real OS cursor keeps
+ * the synthetic tour cursor from fighting the native one visually.
+ */
+body {
+  cursor: none !important;
+}
+#root {
+  pointer-events: none !important;
+}
+
+/*
+ * Tour "new spec" — id 9999. Hidden by default so existing tickets
+ * render in their normal positions. When the tour adds the
+ * `tour-new-spec-visible` class to <body> (Beat 08), the ticket
+ * smoothly expands to full height, pushing the others DOWN to make
+ * room. On loop reset the class is removed and the ticket collapses
+ * back to zero height.
+ */
+[data-ticket-id="9999"] {
+  max-height: 0;
+  min-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  border-top-width: 0 !important;
+  border-bottom-width: 0 !important;
+  opacity: 0;
+  overflow: hidden;
+  /* COLLAPSE rules — applied when the class is removed. opacity snaps to 0
+     instantly so the card content doesn't look like it's "deleting",
+     while max-height collapses smoothly so the sibling tickets glide up
+     into the freed space. */
+  transition:
+    max-height 450ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 450ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-width 200ms ease,
+    opacity 0s;
+}
+body.tour-new-spec-visible [data-ticket-id="9999"] {
+  max-height: 60px;
+  opacity: 1;
+  padding-top: 0.625rem !important;
+  padding-bottom: 0.625rem !important;
+  margin-top: 0 !important;
+  border-top-width: 1px !important;
+  border-bottom-width: 1px !important;
+  /* EXPAND rules — applied when the class is added. Smooth opacity fade
+     in so the new card "appears" rather than pops. */
+  transition:
+    max-height 600ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 600ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-width 300ms ease,
+    opacity 260ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-tour-cursor],
+  [data-tour-fake-modal],
+  [data-tour-fake-spec-card],
+  [data-tour-rail-running],
+  [data-tour-fullscreen-log] {
+    animation-duration: 0s !important;
+    transition-duration: 0s !important;
+  }
+}

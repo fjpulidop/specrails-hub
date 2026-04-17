@@ -12,13 +12,44 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
 import '../globals.css'
+import './tour/tour.css'
 import App from '../App'
-import { installDemoFetchInterceptor } from './demo-api'
+import { installDemoFetchInterceptor, DEMO_PROJECT } from './demo-api'
 import { demoJobs } from './fixtures/jobs'
+import { TourCursor, TourOverlay, startTour } from './tour'
 
 // ─── 1. Install demo fetch interceptor ──────────────────────────────────────
 
 installDemoFetchInterceptor()
+
+// ─── Clean localStorage + force dashboard route ─────────────────────────────
+// Prior demo runs may have persisted a saved route (e.g. /jobs from when a
+// viewer clicked around in an earlier build), the last-active project id,
+// spec ordering, sidebar pin state, etc. None of that should survive across
+// demo loads — the demo must always open on the dashboard with a stable
+// layout.
+try {
+  localStorage.removeItem('specrails-hub:routeMemory')
+  localStorage.removeItem('specrails-hub:activeProjectId')
+  // Clear any spec-order keys from previous runs
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i)
+    if (key && key.startsWith('specrails-hub:spec-order:')) {
+      localStorage.removeItem(key)
+    }
+  }
+  localStorage.setItem('specrails-hub:onboarding-dismissed', 'true')
+} catch {
+  // no-op (private mode, etc.)
+}
+
+// HashRouter: force the hash to "/" even if the URL landed on /#jobs etc.
+if (typeof window !== 'undefined') {
+  const hash = window.location.hash
+  if (hash && hash !== '#' && hash !== '#/') {
+    window.location.hash = '/'
+  }
+}
 
 // ─── 2. Mock WebSocket ──────────────────────────────────────────────────────
 
@@ -75,6 +106,17 @@ class MockWebSocket {
       const msgEvent = new MessageEvent('message', { data: JSON.stringify(initMsg) })
       this.onmessage?.(msgEvent)
       this._dispatch('message', msgEvent)
+
+      // Send a 'hub.projects' message so HubProvider auto-selects the demo
+      // project. Without this, activeProjectId stays null and useTickets /
+      // useRails never fire, which is why the Specs column appeared empty.
+      const hubMsg = {
+        type: 'hub.projects',
+        projects: [DEMO_PROJECT],
+      }
+      const hubEvent = new MessageEvent('message', { data: JSON.stringify(hubMsg) })
+      this.onmessage?.(hubEvent)
+      this._dispatch('message', hubEvent)
     }, 50)
   }
 
@@ -151,6 +193,19 @@ createRoot(document.getElementById('root')!).render(
     <HashRouter>
       <NavigationBridge />
       <App />
+      <TourOverlay />
+      <TourCursor />
     </HashRouter>
   </StrictMode>,
 )
+
+// Start the scripted tour after the React tree has had a beat to hydrate.
+// requestIdleCallback lets layout settle before the orchestrator starts
+// resolving selectors.
+type IdleCallback = (cb: () => void, opts?: { timeout?: number }) => number
+const ric: IdleCallback =
+  ((window as unknown as { requestIdleCallback?: IdleCallback })
+    .requestIdleCallback ??
+    ((cb: () => void) => window.setTimeout(cb, 400))) as IdleCallback
+
+ric(() => startTour(), { timeout: 1500 })

@@ -94,26 +94,28 @@ export function RailsBoard({ rails, ticketMap, onModeChange, onToggle, onTicketC
       {/* Rail rows */}
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2.5">
         <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-          {rails.map((rail) => (
+          {rails.map((rail, idx) => (
             <SortableRailWrapper key={rail.id} railId={rail.id}>
               {({ listeners, attributes }) => (
-                <RailRow
-                  id={rail.id}
-                  label={rail.label}
-                  tickets={rail.ticketIds.map((id) => ticketMap.get(id)).filter((t): t is LocalTicket => t !== undefined)}
-                  mode={rail.mode}
-                  status={rail.status}
-                  activeJobId={rail.activeJobId}
-                  jiggleMode={jiggleMode}
-                  dragHandleListeners={listeners}
-                  dragHandleAttributes={attributes}
-                  onModeChange={(mode) => onModeChange(rail.id, mode)}
-                  onToggle={() => onToggle(rail.id)}
-                  onTicketClick={onTicketClick}
-                  onDelete={() => onDeleteRail(rail.id)}
-                  onLongPress={() => setJiggleMode(true)}
-                  onRename={(newLabel) => onRenameRail(rail.id, newLabel)}
-                />
+                <div data-tour={idx === 0 ? 'rail-1' : undefined}>
+                  <RailRow
+                    id={rail.id}
+                    label={rail.label}
+                    tickets={rail.ticketIds.map((id) => ticketMap.get(id)).filter((t): t is LocalTicket => t !== undefined)}
+                    mode={rail.mode}
+                    status={rail.status}
+                    activeJobId={rail.activeJobId}
+                    jiggleMode={jiggleMode}
+                    dragHandleListeners={listeners}
+                    dragHandleAttributes={attributes}
+                    onModeChange={(mode) => onModeChange(rail.id, mode)}
+                    onToggle={() => onToggle(rail.id)}
+                    onTicketClick={onTicketClick}
+                    onDelete={() => onDeleteRail(rail.id)}
+                    onLongPress={() => setJiggleMode(true)}
+                    onRename={(newLabel) => onRenameRail(rail.id, newLabel)}
+                  />
+                </div>
               )}
             </SortableRailWrapper>
           ))}

@@ -71,7 +71,13 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
             </span>
           )}
         </div>
-        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setProposeOpen(true)}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs gap-1"
+          onClick={() => setProposeOpen(true)}
+          data-tour="add-spec-btn"
+        >
           <Plus className="w-3.5 h-3.5" />
           Add
         </Button>
@@ -82,6 +88,7 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
         {/* Active specs — droppable zone */}
         <div
           ref={setNodeRef}
+          data-tour="specs-list"
           style={{ flex: `0 0 ${splitRatio * 100}%` }}
           className={`overflow-y-auto px-4 py-3 space-y-1.5 transition-colors duration-150 ${isOver ? 'bg-primary/[0.04]' : ''}`}
         >
