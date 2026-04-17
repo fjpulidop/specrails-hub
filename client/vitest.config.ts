@@ -25,6 +25,9 @@ export default defineConfig({
         // Tauri-only component: returns null in non-Tauri (test) environments.
         // Internal sub-components are structurally unreachable in jsdom tests.
         'src/components/TitleBar.tsx',
+        // hub-demo-only build: loaded by demo-entry.tsx into dist-demo/, never
+        // compiled into the production client bundle.
+        'src/demo-mode/**',
       ],
       thresholds: {
         lines: 80,
