@@ -4,7 +4,6 @@ import { cn } from '../lib/utils'
 import { getApiBase } from '../lib/api'
 
 interface Stats {
-  totalJobs: number
   jobsToday: number
   costToday: number
   totalCostUsd: number
@@ -92,12 +91,7 @@ export function StatusBar({ connectionStatus }: StatusBarProps) {
 
       {/* Stats */}
       <div className="flex items-center gap-3">
-        {stats && (
-          <>
-            <span>total: {stats.totalJobs} jobs</span>
-            {stats.totalCostUsd > 0 && <span>${stats.totalCostUsd.toFixed(2)}</span>}
-          </>
-        )}
+        {stats && stats.totalCostUsd > 0 && <span>${stats.totalCostUsd.toFixed(2)}</span>}
       </div>
     </footer>
   )

@@ -57,7 +57,6 @@ describe('StatusBar', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        totalJobs: 42,
         jobsToday: 5,
         costToday: 0.25,
         totalCostUsd: 1.50,
@@ -66,9 +65,8 @@ describe('StatusBar', () => {
     render(<StatusBar connectionStatus="connected" />)
 
     await waitFor(() => {
-      expect(screen.getByText(/total: 42 jobs/i)).toBeInTheDocument()
+      expect(screen.getByText('$1.50')).toBeInTheDocument()
     })
-    expect(screen.getByText('$1.50')).toBeInTheDocument()
   })
 
   it('does not show stats when fetch fails', async () => {
@@ -76,7 +74,7 @@ describe('StatusBar', () => {
     render(<StatusBar connectionStatus="connected" />)
     // Wait a tick so the fetch can resolve
     await new Promise((r) => setTimeout(r, 50))
-    expect(screen.queryByText(/total:/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/\$/)).not.toBeInTheDocument()
   })
 
   it('shows "Connection restored" toast on reconnect', async () => {
@@ -96,7 +94,6 @@ describe('StatusBar', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        totalJobs: 10,
         jobsToday: 0,
         costToday: 0,
         totalCostUsd: 0,
@@ -104,10 +101,10 @@ describe('StatusBar', () => {
     })
     render(<StatusBar connectionStatus="connected" />)
 
-    await waitFor(() => {
-      expect(screen.getByText(/total: 10 jobs/i)).toBeInTheDocument()
-    })
+    // Wait a tick so the fetch can resolve
+    await new Promise((r) => setTimeout(r, 50))
     // No dollar amount shown when cost is 0
     expect(screen.queryByText(/\$0/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/\$/)).not.toBeInTheDocument()
   })
 })

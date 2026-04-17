@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# prepare-commit-msg hook: ensure every commit carries a Signed-off-by trailer
+# so the DCO check on GitHub Actions always passes.
+#
+# Setup: git config core.hooksPath .githooks
+#
+# Appends `Signed-off-by: <user.name> <user.email>` to the commit message if
+# the trailer is missing. Skips merge, squash, and commits-as-template (so
+# `git commit --amend -m` and `git rebase --interactive` stay well-behaved).
+set -euo pipefail
+
+MSG_FILE="$1"
+COMMIT_SOURCE="${2:-}"
+
+# Skip merge / squash / --amend / template-driven commits — these carry their
+# own message shape and the sign-off will already be in scope when relevant
+# (e.g., rebase --signoff appends across the whole range).
+case "$COMMIT_SOURCE" in
+  merge|squash|commit|template)
+    exit 0
+    ;;
+esac
+
+NAME=$(git config user.name || true)
+EMAIL=$(git config user.email || true)
+
+if [ -z "$NAME" ] || [ -z "$EMAIL" ]; then
+  # Without identity configured we can't sign off; let git handle the error
+  # it would raise anyway at commit time.
+  exit 0
+fi
+
+TRAILER="Signed-off-by: $NAME <$EMAIL>"
+
+if grep -qE "^Signed-off-by: " "$MSG_FILE"; then
+  exit 0
+fi
+
+# Append with a blank line before the trailer if the message doesn't already
+# end with one. git-interpret-trailers would be cleaner but availability varies.
+if [ -s "$MSG_FILE" ] && [ "$(tail -c 1 "$MSG_FILE")" != "" ]; then
+  printf '\n' >> "$MSG_FILE"
+fi
+printf '\n%s\n' "$TRAILER" >> "$MSG_FILE"

@@ -17,6 +17,7 @@ vi.mock('fs', async () => {
     ...actual,
     existsSync: vi.fn().mockReturnValue(false),
     readdirSync: vi.fn().mockReturnValue([]),
+    rmSync: vi.fn(),
     mkdirSync: vi.fn(),
     readFileSync: vi.fn().mockReturnValue('# Enrich prompt content'),
     writeFileSync: vi.fn(),
@@ -32,9 +33,9 @@ vi.mock('./core-compat', () => ({
 
 import { spawn as mockSpawn } from 'child_process'
 import treeKill from 'tree-kill'
-import { existsSync, readdirSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs'
+import { existsSync, readdirSync, rmSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs'
 import { detectCLISync } from './core-compat'
-import { SetupManager, CHECKPOINTS, QUICK_CHECKPOINTS } from './setup-manager'
+import { SetupManager, CHECKPOINTS, QUICK_CHECKPOINTS, computeSummary, sweepLegacySrCommands } from './setup-manager'
 
 function createMockChildProcess() {
   const child = new EventEmitter() as any
@@ -968,7 +969,8 @@ describe('SetupManager', () => {
       vi.mocked(readdirSync).mockReturnValue([])
 
       const result = sm.getSummary('/path/to/project')
-      expect(result).toEqual({ agents: 0, personas: 0, commands: 0 })
+      expect(result).toMatchObject({ agents: 0, personas: 0, specrailsCommands: 0, opsxCommands: 0 })
+      expect(result).not.toHaveProperty('commands')
     })
 
     it('counts sr-*.md files as agents', () => {
@@ -985,7 +987,8 @@ describe('SetupManager', () => {
       const result = sm.getSummary('/path/to/project')
       expect(result.agents).toBe(3)
       expect(result.personas).toBe(0)
-      expect(result.commands).toBe(0)
+      expect(result.specrailsCommands).toBe(0)
+      expect(result.opsxCommands).toBe(0)
     })
 
     it('counts .md files in agents/personas/ as personas', () => {
@@ -1004,38 +1007,7 @@ describe('SetupManager', () => {
       expect(result.personas).toBe(2)
     })
 
-    it('counts .md files in commands/sr/ as commands', () => {
-      vi.mocked(existsSync).mockImplementation((p: any) => {
-        const s = String(p)
-        return s.includes('commands/sr')
-      })
-      vi.mocked(readdirSync).mockImplementation((p: any) => {
-        if (String(p).includes('commands/sr')) {
-          return ['implement.md', 'batch-implement.md', 'get-backlog-specs.md'] as any
-        }
-        return []
-      })
-
-      const result = sm.getSummary('/path/to/project')
-      expect(result.commands).toBe(3)
-    })
-
-    it('does not count non-.md files in commands/sr/', () => {
-      vi.mocked(existsSync).mockImplementation((p: any) =>
-        String(p).includes('commands/sr')
-      )
-      vi.mocked(readdirSync).mockImplementation((p: any) => {
-        if (String(p).includes('commands/sr')) {
-          return ['implement.md', 'README.txt', '.DS_Store'] as any
-        }
-        return []
-      })
-
-      const result = sm.getSummary('/path/to/project')
-      expect(result.commands).toBe(1)
-    })
-
-    it('counts .md files in commands/specrails/ as commands (new install path)', () => {
+    it('counts .md files in commands/specrails/ as specrailsCommands', () => {
       vi.mocked(existsSync).mockImplementation((p: any) =>
         String(p).includes('commands/specrails')
       )
@@ -1047,20 +1019,40 @@ describe('SetupManager', () => {
       })
 
       const result = sm.getSummary('/path/to/project')
-      expect(result.commands).toBe(3)
+      expect(result.specrailsCommands).toBe(3)
+      expect(result.opsxCommands).toBe(0)
+      expect(result).not.toHaveProperty('commands')
     })
 
-    it('counts commands from both commands/sr/ and commands/specrails/ together', () => {
-      vi.mocked(existsSync).mockReturnValue(true)
+    it('counts .md files in commands/opsx/ as opsxCommands', () => {
+      vi.mocked(existsSync).mockImplementation((p: any) =>
+        String(p).includes('commands/opsx')
+      )
       vi.mocked(readdirSync).mockImplementation((p: any) => {
-        const s = String(p)
-        if (s.includes('commands/sr') && !s.includes('specrails')) return ['implement.md'] as any
-        if (s.includes('commands/specrails')) return ['propose-spec.md', 'why.md'] as any
+        if (String(p).includes('commands/opsx')) {
+          return ['deploy.md', 'rollback.md'] as any
+        }
         return []
       })
 
       const result = sm.getSummary('/path/to/project')
-      expect(result.commands).toBe(3)
+      expect(result.opsxCommands).toBe(2)
+      expect(result.specrailsCommands).toBe(0)
+    })
+
+    it('does not count non-.md files in commands/specrails/', () => {
+      vi.mocked(existsSync).mockImplementation((p: any) =>
+        String(p).includes('commands/specrails')
+      )
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        if (String(p).includes('commands/specrails')) {
+          return ['implement.md', 'README.txt', '.DS_Store'] as any
+        }
+        return []
+      })
+
+      const result = sm.getSummary('/path/to/project')
+      expect(result.specrailsCommands).toBe(1)
     })
 
     it('returns zeros and does not throw when readdirSync throws', () => {
@@ -1071,21 +1063,113 @@ describe('SetupManager', () => {
 
       expect(() => sm.getSummary('/path/to/project')).not.toThrow()
       const result = sm.getSummary('/path/to/project')
-      expect(result).toEqual({ agents: 0, personas: 0, commands: 0 })
+      expect(result).toMatchObject({ agents: 0, personas: 0, specrailsCommands: 0, opsxCommands: 0 })
     })
 
-    it('counts all three categories together', () => {
+    it('counts all categories together', () => {
       vi.mocked(existsSync).mockReturnValue(true)
       vi.mocked(readdirSync).mockImplementation((p: any) => {
         const s = String(p)
         if (s.endsWith('.claude/agents')) return ['sr-architect.md', 'sr-developer.md'] as any
         if (s.includes('agents/personas')) return ['the-builder.md'] as any
-        if (s.includes('commands/sr')) return ['implement.md', 'batch-implement.md'] as any
+        if (s.includes('commands/specrails')) return ['implement.md', 'batch-implement.md'] as any
+        if (s.includes('commands/opsx')) return ['deploy.md'] as any
         return []
       })
 
       const result = sm.getSummary('/path/to/project')
-      expect(result).toEqual({ agents: 2, personas: 1, commands: 2 })
+      expect(result).toMatchObject({ agents: 2, personas: 1, specrailsCommands: 2, opsxCommands: 1 })
+    })
+  })
+
+  // ─── computeSummary (unit tests for new shape) ─────────────────────────────
+
+  describe('computeSummary', () => {
+    it('returns specrailsCommands > 0 and opsxCommands === 0 when only specrails/ exists', () => {
+      vi.mocked(existsSync).mockImplementation((p: any) =>
+        String(p).includes('commands/specrails')
+      )
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        if (String(p).includes('commands/specrails')) {
+          return ['implement.md', 'propose-spec.md', 'batch.md'] as any
+        }
+        return []
+      })
+
+      const result = computeSummary('/path/to/project', 'quick')
+      expect(result.specrailsCommands).toBeGreaterThan(0)
+      expect(result.opsxCommands).toBe(0)
+      expect(result).not.toHaveProperty('commands')
+    })
+
+    it('returns both namespace counts when both directories exist, and commands field is absent', () => {
+      vi.mocked(existsSync).mockImplementation((p: any) => {
+        const s = String(p)
+        return s.includes('commands/specrails') || s.includes('commands/opsx')
+      })
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        const s = String(p)
+        if (s.includes('commands/specrails')) return ['implement.md', 'why.md'] as any
+        if (s.includes('commands/opsx')) return ['deploy.md', 'rollback.md', 'status.md'] as any
+        return []
+      })
+
+      const result = computeSummary('/path/to/project', 'full')
+      expect(result.specrailsCommands).toBe(2)
+      expect(result.opsxCommands).toBe(3)
+      expect(result).not.toHaveProperty('commands')
+    })
+
+    it('carries the tier parameter through to the summary', () => {
+      vi.mocked(existsSync).mockReturnValue(false)
+      vi.mocked(readdirSync).mockReturnValue([])
+
+      expect(computeSummary('/path', 'quick').tier).toBe('quick')
+      expect(computeSummary('/path', 'full').tier).toBe('full')
+    })
+  })
+
+  // ─── sweepLegacySrCommands ─────────────────────────────────────────────────
+
+  describe('sweepLegacySrCommands', () => {
+    it('returns the count of .md files and removes the sr/ directory', () => {
+      vi.mocked(existsSync).mockImplementation((p: any) =>
+        String(p).includes('commands/sr')
+      )
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        if (String(p).includes('commands/sr')) return ['a.md', 'b.md'] as any
+        return []
+      })
+
+      const count = sweepLegacySrCommands('/path/to/project')
+      expect(count).toBe(2)
+      expect(vi.mocked(rmSync)).toHaveBeenCalledWith(
+        expect.stringContaining('commands/sr'),
+        { recursive: true, force: true }
+      )
+    })
+
+    it('returns 0 and does not call rmSync when sr/ does not exist', () => {
+      vi.mocked(existsSync).mockReturnValue(false)
+
+      const count = sweepLegacySrCommands('/path/to/project')
+      expect(count).toBe(0)
+      expect(vi.mocked(rmSync)).not.toHaveBeenCalled()
+    })
+
+    it('returns 0 and does not throw when rmSync throws a permission error', () => {
+      vi.mocked(existsSync).mockImplementation((p: any) =>
+        String(p).includes('commands/sr')
+      )
+      vi.mocked(readdirSync).mockImplementation((p: any) => {
+        if (String(p).includes('commands/sr')) return ['a.md'] as any
+        return []
+      })
+      vi.mocked(rmSync).mockImplementation(() => { throw new Error('EACCES: permission denied') })
+
+      expect(() => sweepLegacySrCommands('/path/to/project')).not.toThrow()
+      const count = sweepLegacySrCommands('/path/to/project')
+      expect(count).toBe(0)
     })
   })
 
@@ -1114,8 +1198,10 @@ describe('SetupManager', () => {
       expect(done[0].summary).toMatchObject({
         agents: expect.any(Number),
         personas: expect.any(Number),
-        commands: expect.any(Number),
+        specrailsCommands: expect.any(Number),
+        opsxCommands: expect.any(Number),
       })
+      expect(done[0].summary).not.toHaveProperty('commands')
       // Crucially: agents should be non-zero (not the old hardcoded 0)
       expect(done[0].summary.agents).toBe(3)
     })
@@ -1140,7 +1226,8 @@ describe('SetupManager', () => {
       const complete = getBroadcastedByType(broadcast, 'setup_complete')
       expect(complete).toHaveLength(1)
       expect(complete[0]).toHaveProperty('summary')
-      expect(complete[0].summary).toMatchObject({ agents: 2, personas: 1, commands: 1 })
+      expect(complete[0].summary).toMatchObject({ agents: 2, personas: 1 })
+      expect(complete[0].summary).not.toHaveProperty('commands')
     })
 
     it('startEnrich broadcasts setup_complete when commands are in commands/specrails/ (regression: wizard was stuck)', async () => {
@@ -1165,7 +1252,8 @@ describe('SetupManager', () => {
 
       const complete = getBroadcastedByType(broadcast, 'setup_complete')
       expect(complete).toHaveLength(1)
-      expect(complete[0].summary).toMatchObject({ agents: 2, personas: 0, commands: 2 })
+      expect(complete[0].summary).toMatchObject({ agents: 2, personas: 0, specrailsCommands: 2, opsxCommands: 0 })
+      expect(complete[0].summary).not.toHaveProperty('commands')
       // Should NOT have emitted setup_turn_done (which would leave wizard stuck)
       const turnDone = getBroadcastedByType(broadcast, 'setup_turn_done')
       expect(turnDone).toHaveLength(0)
@@ -1202,7 +1290,8 @@ describe('SetupManager', () => {
       await finishProcess(child, 0)
 
       const done = getBroadcastedByType(broadcast, 'setup_install_done')
-      expect(done[0].summary).toEqual({ agents: 0, personas: 0, commands: 0 })
+      expect(done[0].summary).toMatchObject({ agents: 0, personas: 0, specrailsCommands: 0, opsxCommands: 0 })
+      expect(done[0].summary).not.toHaveProperty('commands')
     })
   })
 

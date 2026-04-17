@@ -367,18 +367,27 @@ export interface SetupChatMessage {
   role: 'assistant' | 'user'
 }
 
+export interface SetupSummaryPayload {
+  agents: number
+  specrailsCommands: number
+  opsxCommands: number
+  personas: number
+  legacySrRemoved: number
+  tier: 'quick' | 'full'
+}
+
 export interface SetupInstallDoneMessage {
   type: 'setup_install_done'
   projectId: string
   timestamp: string
-  summary?: { agents: number; personas: number; commands: number }
+  summary?: SetupSummaryPayload
 }
 
 export interface SetupCompleteMessage {
   type: 'setup_complete'
   projectId: string
   sessionId?: string
-  summary: { agents: number; personas: number; commands: number }
+  summary: SetupSummaryPayload
 }
 
 export interface SetupErrorMessage {

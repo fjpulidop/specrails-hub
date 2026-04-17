@@ -1,6 +1,6 @@
 import { spawn, ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
-import { existsSync, readdirSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs'
+import { existsSync, readdirSync, rmSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs'
 import { join } from 'path'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
@@ -295,15 +295,28 @@ function detectCheckpointFromText(
 
 export interface SetupSummary {
   agents: number
+  specrailsCommands: number
+  opsxCommands: number
   personas: number
-  commands: number
+  legacySrRemoved: number
+  tier: 'quick' | 'full'
 }
 
-function computeSummary(projectPath: string): SetupSummary {
+export const EMPTY_SUMMARY: SetupSummary = {
+  agents: 0,
+  specrailsCommands: 0,
+  opsxCommands: 0,
+  personas: 0,
+  legacySrRemoved: 0,
+  tier: 'quick',
+}
+
+export function computeSummary(projectPath: string, tier: 'quick' | 'full'): SetupSummary {
   const dir = SPECRAILS_DIR
   let agents = 0
   let personas = 0
-  let commands = 0
+  let specrailsCommands = 0
+  let opsxCommands = 0
 
   try {
     const agentsDir = join(projectPath, dir, 'agents')
@@ -315,19 +328,39 @@ function computeSummary(projectPath: string): SetupSummary {
         personas = (readdirSync(personasDir) as string[]).filter((f) => f.endsWith('.md')).length
       }
     }
-    const commandsDirSr = join(projectPath, dir, 'commands', 'sr')
     const commandsDirSpecrails = join(projectPath, dir, 'commands', 'specrails')
-    if (existsSync(commandsDirSr)) {
-      commands += (readdirSync(commandsDirSr) as string[]).filter((f) => f.endsWith('.md')).length
-    }
+    const commandsDirOpsx = join(projectPath, dir, 'commands', 'opsx')
     if (existsSync(commandsDirSpecrails)) {
-      commands += (readdirSync(commandsDirSpecrails) as string[]).filter((f) => f.endsWith('.md')).length
+      specrailsCommands = (readdirSync(commandsDirSpecrails) as string[]).filter((f) => f.endsWith('.md')).length
+    }
+    if (existsSync(commandsDirOpsx)) {
+      opsxCommands = (readdirSync(commandsDirOpsx) as string[]).filter((f) => f.endsWith('.md')).length
     }
   } catch {
     // non-fatal
   }
 
-  return { agents, personas, commands }
+  return { agents, specrailsCommands, opsxCommands, personas, legacySrRemoved: 0, tier }
+}
+
+/**
+ * Deletes the deprecated `.claude/commands/sr/` directory (if present) and returns
+ * the number of `.md` files that were removed. Safe to call even if the directory
+ * does not exist. Never throws — errors are logged at info level.
+ */
+export function sweepLegacySrCommands(projectPath: string): number {
+  const srDir = join(projectPath, SPECRAILS_DIR, 'commands', 'sr')
+  try {
+    if (!existsSync(srDir)) return 0
+    const files = (readdirSync(srDir) as string[]).filter((f) => f.endsWith('.md'))
+    const count = files.length
+    rmSync(srDir, { recursive: true, force: true })
+    console.info(`[SetupManager] Swept ${count} legacy /sr:* command(s) from ${srDir}`)
+    return count
+  } catch (err) {
+    console.info(`[SetupManager] sweepLegacySrCommands failed (non-fatal): ${err}`)
+    return 0
+  }
 }
 
 // ─── Core contract validation ────────────────────────────────────────────────
@@ -491,7 +524,9 @@ export class SetupManager {
         } catch { /* non-fatal */ }
         this._advanceCheckpoint(projectId, 'quick_complete')
         this._completeCheckpoint(projectId, 'quick_complete')
-        const summary = computeSummary(projectPath)
+        const legacySrRemoved = sweepLegacySrCommands(projectPath)
+        const tier = this._projectTiers.get(projectId) ?? 'quick'
+        const summary: SetupSummary = { ...computeSummary(projectPath, tier), legacySrRemoved }
         this._broadcast({
           type: 'setup_install_done',
           projectId,
@@ -568,7 +603,8 @@ export class SetupManager {
             deployTemplates(projectPath, parsedConfig?.selectedAgents ?? [])
           } catch { /* non-fatal */ }
         }
-        const summary = computeSummary(projectPath)
+        const legacySrRemoved = sweepLegacySrCommands(projectPath)
+        const summary: SetupSummary = { ...computeSummary(projectPath, tier), legacySrRemoved }
         this._broadcast({
           type: 'setup_install_done',
           projectId,
@@ -850,7 +886,9 @@ export class SetupManager {
         const isComplete = hasAgents && hasCommands
 
         if (isComplete) {
-          const summary = computeSummary(projectPath)
+          const legacySrRemoved = sweepLegacySrCommands(projectPath)
+          const tier = this._projectTiers.get(projectId) ?? 'full'
+          const summary: SetupSummary = { ...computeSummary(projectPath, tier), legacySrRemoved }
           this._onSetupDone?.(projectId)
           this._broadcast({
             type: 'setup_complete',
@@ -1057,6 +1095,8 @@ export class SetupManager {
   }
 
   getSummary(projectPath: string): SetupSummary {
-    return computeSummary(projectPath)
+    const config = readInstallConfig(projectPath)
+    const tier = config?.tier ?? 'quick'
+    return computeSummary(projectPath, tier)
   }
 }
