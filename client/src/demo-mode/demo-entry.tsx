@@ -22,6 +22,15 @@ import { TourCursor, TourOverlay, startTour } from './tour'
 
 installDemoFetchInterceptor()
 
+// ─── Skip first-run overlays (onboarding + welcome) ─────────────────────────
+// The demo should never show the OnboardingWizard or a first-run welcome
+// screen — it's watched from an iframe with no interaction.
+try {
+  localStorage.setItem('specrails-hub:onboarding-dismissed', 'true')
+} catch {
+  // no-op (private mode, etc.)
+}
+
 // ─── 2. Mock WebSocket ──────────────────────────────────────────────────────
 
 class MockWebSocket {

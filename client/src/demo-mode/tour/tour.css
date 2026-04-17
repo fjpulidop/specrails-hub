@@ -111,9 +111,60 @@ div[class*="w-11"][class*="flex-shrink-0"][class*="border-r"] {
   display: none !important;
 }
 
-/* ProjectRightSidebar: mounted as a sibling of the main column */
-[data-project-right-sidebar] {
+/*
+ * ProjectRightSidebar: border-l + flex-shrink-0 + bg-background. Distinct
+ * from ChatPanel (border-l + backdrop-blur) and ArcSidebar (border-r).
+ */
+div[class*="border-l"][class*="flex-shrink-0"][class*="bg-background"] {
   display: none !important;
+}
+
+/*
+ * Block all human pointer interaction inside the demo. The tour drives
+ * state directly via tourStore.update(), not via real click/keydown
+ * events, so the page is safe to lock. Hiding the real OS cursor keeps
+ * the synthetic tour cursor from fighting the native one visually.
+ */
+body {
+  cursor: none !important;
+}
+#root {
+  pointer-events: none !important;
+}
+
+/*
+ * Tour "new spec" — id 9999. Hidden by default so existing tickets
+ * render in their normal positions. When the tour adds the
+ * `tour-new-spec-visible` class to <body> (Beat 08), the ticket
+ * smoothly expands to full height, pushing the others DOWN to make
+ * room. On loop reset the class is removed and the ticket collapses
+ * back to zero height.
+ */
+[data-ticket-id="9999"] {
+  max-height: 0;
+  min-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  border-top-width: 0 !important;
+  border-bottom-width: 0 !important;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    max-height 650ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 650ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin 650ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 300ms ease,
+    border-width 300ms ease;
+}
+body.tour-new-spec-visible [data-ticket-id="9999"] {
+  max-height: 60px;
+  opacity: 1;
+  padding-top: 0.625rem !important;
+  padding-bottom: 0.625rem !important;
+  margin-top: 0 !important;
+  border-top-width: 1px !important;
+  border-bottom-width: 1px !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

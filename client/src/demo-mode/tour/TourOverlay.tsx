@@ -717,47 +717,27 @@ function TourSummaryCard({ done, progress }: { done: boolean; progress: number }
         style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          gap: 10,
+          fontSize: 14,
+          fontWeight: 600,
           marginBottom: 14,
         }}
       >
-        <div
+        <span
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            fontSize: 14,
-            fontWeight: 600,
-          }}
-        >
-          <span
-            style={{
-              width: 18,
-              height: 18,
-              borderRadius: '50%',
-              border: `2px solid ${accent}`,
-              display: 'grid',
-              placeItems: 'center',
-              fontSize: 11,
-              color: accent,
-            }}
-          >
-            {done ? '✓' : '…'}
-          </span>
-          {title}
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
+            width: 18,
+            height: 18,
+            borderRadius: '50%',
+            border: `2px solid ${accent}`,
+            display: 'grid',
+            placeItems: 'center',
             fontSize: 11,
-            color: 'hsl(225 27% 70%)',
+            color: accent,
           }}
         >
-          <span>{durationLabel}</span>
-          <span style={{ color: 'hsl(50 100% 70%)' }}>{costLabel}</span>
-        </div>
+          {done ? '✓' : '…'}
+        </span>
+        {title}
       </div>
       <div
         style={{

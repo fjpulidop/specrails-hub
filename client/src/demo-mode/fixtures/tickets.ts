@@ -1,6 +1,12 @@
 import type { LocalTicket } from '../../types'
+import { TOUR_NEW_SPEC } from './tour-spec'
 
+// The scripted tour's "new spec" sits at the top of the list so, once the
+// tour flips the CSS flag that reveals it, existing tickets shift DOWN to
+// make room — matching the visual expectation of a just-created spec.
+// openspec: hub-demo-scripted-tour
 export const demoTickets: LocalTicket[] = [
+  TOUR_NEW_SPEC,
   {
     id: 1,
     title: 'Add user authentication with OAuth2',
@@ -74,7 +80,7 @@ export const demoTickets: LocalTicket[] = [
     created_at: '2026-04-10T09:00:00Z',
     updated_at: '2026-04-10T09:00:00Z',
     created_by: 'specrails',
-    source: 'manual',
+    source: 'propose-spec',
   },
   {
     id: 6,
@@ -89,7 +95,7 @@ export const demoTickets: LocalTicket[] = [
     created_at: '2026-04-10T11:00:00Z',
     updated_at: '2026-04-10T11:00:00Z',
     created_by: 'specrails',
-    source: 'manual',
+    source: 'propose-spec',
   },
   {
     id: 7,
@@ -164,7 +170,7 @@ export const demoTickets: LocalTicket[] = [
     created_at: '2026-04-12T10:00:00Z',
     updated_at: '2026-04-12T10:00:00Z',
     created_by: 'specrails',
-    source: 'manual',
+    source: 'propose-spec',
   },
   {
     id: 12,
@@ -179,7 +185,7 @@ export const demoTickets: LocalTicket[] = [
     created_at: '2026-04-12T11:00:00Z',
     updated_at: '2026-04-12T11:00:00Z',
     created_by: 'specrails',
-    source: 'manual',
+    source: 'propose-spec',
   },
   {
     id: 13,
@@ -209,7 +215,7 @@ export const demoTickets: LocalTicket[] = [
     created_at: '2026-04-06T10:00:00Z',
     updated_at: '2026-04-09T12:30:00Z',
     created_by: 'specrails',
-    source: 'manual',
+    source: 'propose-spec',
   },
   {
     id: 15,
@@ -239,7 +245,7 @@ export const demoTickets: LocalTicket[] = [
     created_at: '2026-04-04T08:00:00Z',
     updated_at: '2026-04-06T11:00:00Z',
     created_by: 'specrails',
-    source: 'manual',
+    source: 'propose-spec',
   },
   {
     id: 17,
@@ -254,7 +260,7 @@ export const demoTickets: LocalTicket[] = [
     created_at: '2026-04-03T15:00:00Z',
     updated_at: '2026-04-08T10:30:00Z',
     created_by: 'specrails',
-    source: 'manual',
+    source: 'propose-spec',
   },
   {
     id: 18,
@@ -299,7 +305,7 @@ export const demoTickets: LocalTicket[] = [
     created_at: '2026-04-13T10:00:00Z',
     updated_at: '2026-04-13T10:00:00Z',
     created_by: 'specrails',
-    source: 'manual',
+    source: 'propose-spec',
   },
   {
     id: 21,
@@ -389,7 +395,7 @@ export const demoTickets: LocalTicket[] = [
     created_at: '2026-04-02T09:00:00Z',
     updated_at: '2026-04-05T14:00:00Z',
     created_by: 'specrails',
-    source: 'manual',
+    source: 'propose-spec',
   },
   {
     id: 27,
@@ -404,7 +410,7 @@ export const demoTickets: LocalTicket[] = [
     created_at: '2026-04-01T10:00:00Z',
     updated_at: '2026-04-04T11:00:00Z',
     created_by: 'specrails',
-    source: 'manual',
+    source: 'propose-spec',
   },
   {
     id: 28,
@@ -419,7 +425,7 @@ export const demoTickets: LocalTicket[] = [
     created_at: '2026-03-30T15:00:00Z',
     updated_at: '2026-04-02T12:00:00Z',
     created_by: 'specrails',
-    source: 'manual',
+    source: 'propose-spec',
   },
   {
     id: 29,
@@ -449,6 +455,6 @@ export const demoTickets: LocalTicket[] = [
     created_at: '2026-03-25T10:00:00Z',
     updated_at: '2026-03-28T11:00:00Z',
     created_by: 'specrails',
-    source: 'manual',
+    source: 'propose-spec',
   },
 ]

@@ -31,6 +31,7 @@ export function SpecCard({ ticket, onClick, dragDisabled }: SpecCardProps) {
   return (
     <div
       ref={setNodeRef}
+      data-ticket-id={ticket.id}
       style={style}
       {...(!dragDisabled ? { ...attributes, ...listeners } : {})}
       className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border/40 bg-card/60 hover:bg-card/80 hover:border-border/60 transition-colors cursor-grab active:cursor-grabbing group touch-none"

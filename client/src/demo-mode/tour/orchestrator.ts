@@ -134,6 +134,10 @@ async function runAction(name: string, durationMs: number) {
 
     case 'spawnNewSpecCard':
       tourStore.update({ specCardVisible: true, specCardOnRail: false })
+      // Reveal the real "new spec" card (id 9999) inside the Specs column
+      // so existing tickets shift DOWN to make room. The fake overlay card
+      // sits on top of this real card for the drag animation.
+      document.body.classList.add('tour-new-spec-visible')
       // Transition toast from "loading" to "success" with the same stable
       // id so it doesn't pile up across loops. Auto-dismisses shortly after.
       try {
@@ -157,8 +161,6 @@ async function runAction(name: string, durationMs: number) {
       const railEl = document.querySelector('[data-tour="rail-1"]') as HTMLElement | null
       if (railEl) {
         const rect = railEl.getBoundingClientRect()
-        // Roughly centre the cursor inside the rail body, slightly below
-        // the header so it looks like it dropped the card there.
         tourStore.update({
           specCardOnRail: true,
           cursorX: rect.left + rect.width * 0.25,
@@ -167,6 +169,10 @@ async function runAction(name: string, durationMs: number) {
       } else {
         tourStore.update({ specCardOnRail: true })
       }
+      // The real new-spec ticket disappears from Specs at the same moment
+      // (same as a real drag-drop would): remove the body class so the
+      // ticket collapses, freeing the slot. Existing tickets glide back up.
+      document.body.classList.remove('tour-new-spec-visible')
       await wait(durationMs)
       return
     }
@@ -198,6 +204,9 @@ async function runAction(name: string, durationMs: number) {
 
     case 'resetAll':
       tourStore.softReset()
+      // Ensure the body class is cleared in case a loop aborted mid-beat
+      // and left it on.
+      document.body.classList.remove('tour-new-spec-visible')
       // Dismiss the previous loop's toast so it doesn't bleed into the next
       // loop's toast (which uses the same stable id, but dismiss is cheap
       // insurance against any lingering state).

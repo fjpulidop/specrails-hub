@@ -6,8 +6,11 @@
 
 import type { LocalTicket } from '../../types'
 
+/** ID is used as a DOM selector (`[data-ticket-id="9999"]`) by tour.css. */
+export const TOUR_NEW_SPEC_ID = 9999
+
 export const TOUR_NEW_SPEC: LocalTicket = {
-  id: 9999,
+  id: TOUR_NEW_SPEC_ID,
   title: 'Add JWT auth with refresh tokens',
   description:
     'Add JWT auth with refresh tokens and a rotating session cookie. Support Google and GitHub providers; expire tokens after 30 days.',
