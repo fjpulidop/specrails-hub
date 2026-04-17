@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.0](https://github.com/fjpulidop/specrails-hub/compare/v1.29.0...v1.30.0) (2026-04-17)
+
+
+### Features
+
+* remove NotificationCenter component ([#209](https://github.com/fjpulidop/specrails-hub/issues/209)) ([a570490](https://github.com/fjpulidop/specrails-hub/commit/a570490cb1d61d65a35007a9b78d642b49af9cbc))
+
 ## [1.29.0](https://github.com/fjpulidop/specrails-hub/compare/v1.28.1...v1.29.0) (2026-04-17)
 
 
