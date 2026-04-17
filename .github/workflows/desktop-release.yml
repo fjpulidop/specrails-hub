@@ -222,7 +222,8 @@ jobs:
           set -euo pipefail
           remote="domains/specrails.dev/public_html/downloads/specrails-hub/latest/"
           file="${{ steps.rename.outputs.path }}"
-          curl --fail --silent --show-error --ftp-pasv \
+          # --ftp-create-dirs auto-creates the latest/ folder on first run.
+          curl --fail --silent --show-error --ftp-pasv --ftp-create-dirs \
             --user "${FTP_USER}:${FTP_PASS}" \
             -T "${file}" \
             "ftp://${HOST}/${remote}"
@@ -254,7 +255,9 @@ jobs:
         run: |
           set -euo pipefail
           remote="domains/specrails.dev/public_html/downloads/specrails-hub/latest/"
-          curl --fail --silent --show-error --ftp-pasv \
+          # --ftp-create-dirs is defensive; latest/ should already exist from
+          # the previous step but we keep the flag for idempotency.
+          curl --fail --silent --show-error --ftp-pasv --ftp-create-dirs \
             --user "${FTP_USER}:${FTP_PASS}" \
             -T manifest/manifest.json \
             "ftp://${HOST}/${remote}"
