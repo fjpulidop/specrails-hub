@@ -68,7 +68,10 @@ export const TOUR_TIMELINE: Beat[] = [
   // 08 — new spec card materialises in Specs column + toast transitions to success
   { id: '08-spawn-spec', kind: 'action', name: 'spawnNewSpecCard', duration: 700 },
 
-  // 09 — spec slides Specs → Rail 1
+  // 08b — cursor glides ONTO the new spec card before the drag
+  { id: '08b-cursor-to-spec', kind: 'moveTo', target: 'newSpecCard', duration: 700 },
+
+  // 09 — cursor drags the spec Specs → Rail 1 (cursor + card animate together)
   { id: '09-move-to-rail', kind: 'action', name: 'moveSpecToRail1', duration: 900 },
 
   // 10 — cursor to Play on Rail 1 + click
@@ -85,8 +88,12 @@ export const TOUR_TIMELINE: Beat[] = [
   // 13 — log drawer opens
   { id: '13-open-log', kind: 'action', name: 'openRail1Log', duration: 500 },
 
-  // 14 — log lines tail in (the action is called repeatedly by the orchestrator)
-  { id: '14-tail-log', kind: 'action', name: 'appendLogLine', duration: 4500 },
+  // 14 — log lines tail in slowly (one line every ~650 ms × 11 ≈ 7.2 s)
+  { id: '14-tail-log', kind: 'action', name: 'appendLogLine', duration: 7500 },
+
+  // 14b — hold the completed-job view so the viewer can read the SHIPPED
+  // summary before the loop restarts.
+  { id: '14b-hold-completed', kind: 'wait', duration: 3000 },
 
   // 15 — fade reset, loop
   { id: '15-reset', kind: 'fadeReset', duration: 900 },

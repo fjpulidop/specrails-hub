@@ -13,6 +13,8 @@ export const TOUR_SELECTORS = {
   proposeSpecTextarea: '[data-tour="propose-spec-textarea"]',
   /** "Generate Spec" submit button inside the Propose Spec modal. */
   generateSpecButton: '[data-tour="generate-spec-btn"]',
+  /** The synthetic "new spec" card that materialises in Specs after Beat 08. */
+  newSpecCard: '[data-tour="new-spec-card"]',
   /** The Play control on the first rail (Rail 1). */
   rail1PlayButton: '[data-tour="rail-1-play"]',
   /** The View Log (scroll icon) control on the first rail. Only visible while the rail is running. */

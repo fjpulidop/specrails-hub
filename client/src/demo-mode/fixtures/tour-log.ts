@@ -37,4 +37,4 @@ export const TOUR_LOG_LINES: readonly TourLogLine[] = [
 ]
 
 /** Milliseconds between each line appearing during the tail beat. */
-export const TOUR_LOG_LINE_INTERVAL_MS = 400
+export const TOUR_LOG_LINE_INTERVAL_MS = 650

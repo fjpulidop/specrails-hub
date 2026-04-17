@@ -257,6 +257,7 @@ function TourFakeSpecCard({ onRail }: { onRail: boolean }) {
   return (
     <div
       aria-hidden="true"
+      data-tour="new-spec-card"
       data-tour-fake-spec-card
       style={{
         position: 'fixed',
@@ -325,13 +326,15 @@ function TourFakeRail({ running }: { running: boolean }) {
   if (!railRect) return null
 
   // Real RailControls layout (right-to-left inside the rail header):
-  //   [Logs icon] [Mode pill: Implement | Batch] [Play button]
-  // Header padding: px-3 (12 px) + gap-1.5 (6 px). Button 20×20, mode
-  // pill ~88 px wide. Positions below mirror that so the overlay sits
-  // exactly on top of the real controls.
+  //   [Logs icon 20px] [Mode pill ~115px: Implement | Batch] [Play button 20px]
+  // Header padding-right: px-3 (12 px) + gap-1.5 (6 px × 2 between 3 items).
+  // Offsets below sit the overlay EXACTLY where each real control lives.
   const playLeft = railRect.right - 32 // 12px pad + 20px button
   const playTop = railRect.top + 8
-  const logsLeft = railRect.right - 150 // left of the mode pill + gap
+  //  Right edge …
+  //   Play starts at right-32 · 6gap · Pill ends at right-38 · Pill 115px →
+  //   Pill starts at right-153 · 6gap · Logs ends at right-159 → Logs starts at right-179
+  const logsLeft = railRect.right - 179
 
   return (
     <>

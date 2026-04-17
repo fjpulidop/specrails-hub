@@ -82,10 +82,17 @@ main ~ div[class*="border-l"][class*="backdrop-blur"],
 /*
  * Hide the top Navbar (logo · Home/Analytics · Claude Code badge · Docs ·
  * Settings). Matches the `h-11` + `border-b` classes from Navbar.tsx.
- * The StatusBar (footer) also carries border-b in some states, but it
- * uses `<footer>`, so scoping to <nav> is safe.
  */
 nav[class*="h-11"][class*="border-b"] {
+  display: none !important;
+}
+
+/*
+ * Hide the bottom StatusBar (connected · total jobs · …). It's a <footer>
+ * with `h-7` + `border-t`. CSS wins over the demo.html inline
+ * display:none which can get overwritten by React re-renders.
+ */
+footer[class*="h-7"][class*="border-t"] {
   display: none !important;
 }
 
