@@ -60,12 +60,13 @@ export const TOUR_TIMELINE: Beat[] = [
   { id: '06a-move-to-submit', kind: 'moveTo', target: 'generateSpecButton', duration: 500 },
   { id: '06b-click-submit', kind: 'click', target: 'generateSpecButton', duration: 300 },
 
-  // 07 — modal closes, toast appears
+  // 07 — modal closes, toast appears, brief "generating" pause
   { id: '07a-close-modal', kind: 'action', name: 'closeProposeSpecModal', duration: 400 },
   { id: '07b-toast', kind: 'action', name: 'showToast', duration: 400 },
+  { id: '07c-generating', kind: 'wait', duration: 1800 },
 
-  // 08 — new spec card materialises in Specs column
-  { id: '08-spawn-spec', kind: 'action', name: 'spawnNewSpecCard', duration: 600 },
+  // 08 — new spec card materialises in Specs column + toast transitions to success
+  { id: '08-spawn-spec', kind: 'action', name: 'spawnNewSpecCard', duration: 700 },
 
   // 09 — spec slides Specs → Rail 1
   { id: '09-move-to-rail', kind: 'action', name: 'moveSpecToRail1', duration: 900 },

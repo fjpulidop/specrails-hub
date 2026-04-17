@@ -2,8 +2,8 @@
  * Overlay components that render tour-specific visuals on top of the real
  * demo dashboard. All overlays anchor their position to real DOM elements
  * (via `[data-tour=…]` selectors + getBoundingClientRect) so they appear
- * INSIDE the real Specs column / over the real Rail 1 / fullscreen for the
- * log page — not floating in mid-screen.
+ * INSIDE the real Specs column, INSIDE the real Rail 1 body, or fullscreen
+ * for the log page — not floating at hardcoded coords.
  *
  * None of these interact with production state. All read from tourStore.
  *
@@ -11,8 +11,23 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Sparkles, Send, Search, ChevronRight, Home } from 'lucide-react'
+import {
+  Sparkles,
+  Send,
+  Search,
+  ChevronRight,
+  Home,
+  RotateCcw,
+  Copy,
+  Play,
+  Square,
+  ScrollText,
+} from 'lucide-react'
 import { tourStore } from './tour-store'
+
+/** Approximate height of a RailRow header row (traffic lights + label + controls).
+ *  The card-in-rail must sit BELOW this so it doesn't overlap the rail title. */
+const RAIL_HEADER_HEIGHT = 34
 
 export function TourOverlay() {
   const state = useSyncExternalStore(tourStore.subscribe, tourStore.getState)
@@ -20,9 +35,18 @@ export function TourOverlay() {
   return (
     <>
       {state.modalOpen && <TourFakeModal typedText={state.typedText} />}
-      {state.specCardVisible && <TourFakeSpecCard onRail={state.specCardOnRail} />}
-      {state.specCardOnRail && <TourFakeRail running={state.rail1Running} />}
+
+      {/* Hide the spec card and rail chrome once the fullscreen log page
+          takes over — nothing from the dashboard should bleed through. */}
+      {!state.logDrawerOpen && state.specCardVisible && (
+        <TourFakeSpecCard onRail={state.specCardOnRail} />
+      )}
+      {!state.logDrawerOpen && state.specCardOnRail && (
+        <TourFakeRail running={state.rail1Running} />
+      )}
+
       {state.logDrawerOpen && <TourFullscreenLogPage />}
+
       {state.fadeOpacity > 0 && (
         <div
           aria-hidden="true"
@@ -195,29 +219,40 @@ function TourFakeModal({ typedText }: { typedText: string }) {
   )
 }
 
-// ─── Fake spec card: born inside Specs column, slides to Rail 1 ─────────────
+// ─── Fake spec card: born inside Specs column, slides to Rail 1 body ────────
 
 function TourFakeSpecCard({ onRail }: { onRail: boolean }) {
   const specsRect = useAnchorRect('[data-tour="specs-list"]')
   const railRect = useAnchorRect('[data-tour="rail-1"]')
 
-  // Once positioned, keep rendering even if the rect briefly goes null (e.g.
-  // during re-measure) so we don't flicker mid-animation.
-  const lastSpecsRect = useRef<DOMRect | null>(null)
-  const lastRailRect = useRef<DOMRect | null>(null)
-  if (specsRect) lastSpecsRect.current = specsRect
-  if (railRect) lastRailRect.current = railRect
+  const lastSpecs = useRef<DOMRect | null>(null)
+  const lastRail = useRef<DOMRect | null>(null)
+  if (specsRect) lastSpecs.current = specsRect
+  if (railRect) lastRail.current = railRect
 
-  const start = lastSpecsRect.current
-  const end = lastRailRect.current
+  const start = lastSpecs.current
+  const end = lastRail.current
   if (!start || !end) return null
 
-  // Card lives at the top of the Specs list (first slot) → then top of Rail 1.
-  const CARD_WIDTH = Math.min(start.width - 32, 280)
-  const INNER_PAD_X = 12
-  const current = onRail ? end : start
-  const top = current.top + 12
-  const left = current.left + INNER_PAD_X
+  // SpecsBoard renders its active list with `px-4 py-3` = 16px side, 12px top.
+  // RailRow body has `px-3 py-2` = 12px side, 8px top, PLUS a ~34px header
+  // that we must clear.
+  const SPECS_PAD_X = 16
+  const SPECS_PAD_TOP = 12
+  const RAIL_PAD_X = 12
+  const RAIL_BODY_PAD_TOP = 8
+
+  const inSpecs = {
+    top: start.top + SPECS_PAD_TOP,
+    left: start.left + SPECS_PAD_X,
+    width: Math.max(start.width - SPECS_PAD_X * 2, 120),
+  }
+  const inRail = {
+    top: end.top + RAIL_HEADER_HEIGHT + RAIL_BODY_PAD_TOP,
+    left: end.left + RAIL_PAD_X,
+    width: Math.max(end.width - RAIL_PAD_X * 2, 120),
+  }
+  const current = onRail ? inRail : inSpecs
 
   return (
     <div
@@ -225,9 +260,9 @@ function TourFakeSpecCard({ onRail }: { onRail: boolean }) {
       data-tour-fake-spec-card
       style={{
         position: 'fixed',
-        top,
-        left,
-        width: CARD_WIDTH,
+        top: current.top,
+        left: current.left,
+        width: current.width,
         padding: '10px 12px',
         background: 'hsl(231 15% 20%)',
         border: '1px solid hsl(271 60% 78% / 0.45)',
@@ -267,19 +302,19 @@ function TourFakeSpecCard({ onRail }: { onRail: boolean }) {
   )
 }
 
-// ─── Fake Rail 1 state glow: overlays over the REAL first rail ──────────────
+// ─── Fake Rail 1 chrome: running glow + Play/Stop + Logs overlays ───────────
 
 function TourFakeRail({ running }: { running: boolean }) {
   const railRect = useAnchorRect('[data-tour="rail-1"]')
   if (!railRect) return null
 
-  const glow = running
-    ? '0 0 28px hsl(142 70% 56% / 0.55)'
-    : '0 0 0 transparent'
+  const playRight = railRect.right - 18
+  const playTop = railRect.top + 8
+  const logsRight = railRect.right - 110
 
   return (
     <>
-      {/* Running glow ring overlaid over the real rail */}
+      {/* Running glow ring over the real rail */}
       {running && (
         <div
           aria-hidden="true"
@@ -292,7 +327,7 @@ function TourFakeRail({ running }: { running: boolean }) {
             height: railRect.height,
             borderRadius: 12,
             border: '1px solid hsl(142 70% 56% / 0.75)',
-            boxShadow: glow,
+            boxShadow: '0 0 28px hsl(142 70% 56% / 0.55)',
             pointerEvents: 'none',
             zIndex: 2_147_478_500,
             animation: 'tour-pulse-glow 1.6s ease-in-out infinite',
@@ -300,36 +335,63 @@ function TourFakeRail({ running }: { running: boolean }) {
         />
       )}
 
-      {/* Invisible click targets for the cursor — positioned over where the
-          real Play and Logs buttons would be inside the rail header (right
-          side). The cursor's targetCoords reads these rects. */}
+      {/* Play / Stop overlay — sits EXACTLY where the real Play button is
+          inside the rail header, so the cursor clicks "on it". Play is
+          green until the rail turns running, then flips to red Stop. */}
       <div
         data-tour="rail-1-play"
         aria-hidden="true"
         style={{
           position: 'fixed',
-          top: railRect.top + 10,
-          left: railRect.right - 34,
-          width: 22,
-          height: 22,
+          top: playTop,
+          left: playRight - 20,
+          width: 20,
+          height: 20,
+          borderRadius: '50%',
+          display: 'grid',
+          placeItems: 'center',
+          color: running ? 'hsl(0 100% 67%)' : 'hsl(135 94% 65%)',
+          background: running
+            ? 'hsl(0 100% 67% / 0.16)'
+            : 'hsl(135 94% 65% / 0.16)',
+          boxShadow: running
+            ? '0 0 10px hsl(0 100% 67% / 0.35)'
+            : '0 0 10px hsl(135 94% 65% / 0.35)',
+          transition: 'color 250ms ease, background 250ms ease',
           pointerEvents: 'none',
           zIndex: 2_147_478_600,
         }}
-      />
+      >
+        {running ? (
+          <Square width={10} height={10} fill="currentColor" strokeWidth={0} />
+        ) : (
+          <Play width={10} height={10} fill="currentColor" strokeWidth={0} />
+        )}
+      </div>
+
+      {/* Logs overlay — only visible while running, matching real RailControls */}
       {running && (
         <div
           data-tour="rail-1-logs"
           aria-hidden="true"
           style={{
             position: 'fixed',
-            top: railRect.top + 10,
-            left: railRect.right - 120,
-            width: 22,
-            height: 22,
+            top: playTop,
+            left: logsRight,
+            width: 20,
+            height: 20,
+            borderRadius: '50%',
+            display: 'grid',
+            placeItems: 'center',
+            color: 'hsl(191 97% 77%)',
+            background: 'hsl(191 97% 77% / 0.16)',
+            boxShadow: '0 0 10px hsl(191 97% 77% / 0.35)',
             pointerEvents: 'none',
             zIndex: 2_147_478_600,
           }}
-        />
+        >
+          <ScrollText width={10} height={10} strokeWidth={2} />
+        </div>
       )}
     </>
   )
@@ -341,12 +403,17 @@ function TourFullscreenLogPage() {
   const state = useSyncExternalStore(tourStore.subscribe, tourStore.getState)
   const logRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll the log to bottom as new lines arrive (matches real behaviour).
   useEffect(() => {
     const el = logRef.current
     if (!el) return
     el.scrollTop = el.scrollHeight
   }, [state.logLines])
+
+  const visibleCount = state.logLines.length
+  const totalCount = 11
+  const lastLine = state.logLines[state.logLines.length - 1]
+  const isDone =
+    visibleCount >= totalCount && lastLine?.text.includes('SHIPPED')
 
   return (
     <div
@@ -358,179 +425,322 @@ function TourFullscreenLogPage() {
         background: 'hsl(231 15% 14%)',
         zIndex: 2_147_478_000,
         pointerEvents: 'none',
-        animation: 'tour-fade-in 280ms ease-out',
+        animation: 'tour-fade-in 260ms ease-out',
         display: 'flex',
         flexDirection: 'column',
         color: 'hsl(60 30% 96%)',
+        overflow: 'hidden',
       }}
     >
-      {/* Breadcrumb bar */}
       <div
         style={{
+          maxWidth: 1024,
+          margin: '0 auto',
+          width: '100%',
+          flex: 1,
           display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '12px 24px',
-          borderBottom: '1px solid hsl(231 15% 30% / 0.4)',
-          fontSize: 12,
-          color: 'hsl(225 27% 70%)',
+          flexDirection: 'column',
+          overflow: 'hidden',
         }}
       >
-        <Home width={12} height={12} />
-        <span>Dashboard</span>
-        <ChevronRight width={12} height={12} style={{ opacity: 0.5 }} />
-        <span>Jobs</span>
-        <ChevronRight width={12} height={12} style={{ opacity: 0.5 }} />
-        <span style={{ color: 'hsl(60 30% 96%)', fontFamily: 'monospace' }}>
-          job-rail-1-active
-        </span>
-      </div>
-
-      {/* Header with job title + badges */}
-      <div
-        style={{
-          padding: '20px 24px',
-          borderBottom: '1px solid hsl(231 15% 30% / 0.4)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 18,
-              fontWeight: 600,
-              fontFamily: 'monospace',
-            }}
-          >
-            /sr:implement
-          </h1>
-          <span
-            style={{
-              padding: '3px 10px',
-              borderRadius: 999,
-              background: 'hsl(142 70% 56% / 0.18)',
-              color: 'hsl(142 70% 66%)',
-              fontSize: 11,
-              fontWeight: 500,
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: 'hsl(142 70% 56%)',
-                animation: 'tour-pulse-dot 1.2s ease-in-out infinite',
-              }}
-            />
-            running
-          </span>
-          <span style={{ fontSize: 12, opacity: 0.6 }}>
-            Rail 1 · Add JWT auth with refresh tokens
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 11, opacity: 0.7 }}>
-          <span>turns: 8</span>
-          <span>cost: $0.18</span>
-          <span style={{ fontFamily: 'monospace' }}>claude-sonnet-4</span>
-        </div>
-      </div>
-
-      {/* Pipeline progress strip */}
-      <div
-        style={{
-          padding: '12px 24px',
-          borderBottom: '1px solid hsl(231 15% 30% / 0.4)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          fontSize: 11,
-        }}
-      >
-        {[
-          { label: 'Architect', state: 'done' },
-          { label: 'Develop', state: 'running' },
-          { label: 'Review', state: 'idle' },
-          { label: 'Ship', state: 'idle' },
-        ].map((p, i) => (
+        {/* Breadcrumb + title row */}
+        <div
+          style={{
+            padding: '16px 24px',
+            borderBottom: '1px solid hsl(231 15% 30% / 0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+          }}
+        >
           <div
-            key={p.label}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              padding: '4px 12px',
-              borderRadius: 6,
-              background:
-                p.state === 'done'
-                  ? 'hsl(142 70% 56% / 0.12)'
-                  : p.state === 'running'
-                    ? 'hsl(271 60% 78% / 0.15)'
-                    : 'hsl(231 15% 30% / 0.3)',
-              color:
-                p.state === 'done'
-                  ? 'hsl(142 70% 66%)'
-                  : p.state === 'running'
-                    ? 'hsl(271 60% 78%)'
-                    : 'hsl(225 27% 60%)',
-              fontFamily: 'monospace',
+              fontSize: 12,
+              color: 'hsl(225 27% 70%)',
             }}
           >
-            <span style={{ fontSize: 10 }}>{i + 1}</span>
-            {p.label}
-            {p.state === 'running' && (
-              <span
-                style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: '50%',
-                  background: 'hsl(271 60% 78%)',
-                  animation: 'tour-pulse-dot 1s ease-in-out infinite',
-                }}
-              />
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Log body */}
-      <div
-        ref={logRef}
-        style={{
-          flex: 1,
-          padding: '16px 24px',
-          fontFamily: '"Fira Code", Menlo, Monaco, monospace',
-          fontSize: 13,
-          lineHeight: 1.8,
-          overflow: 'auto',
-        }}
-      >
-        {state.logLines.map((line) => (
-          <div key={line.id} style={{ animation: 'tour-fade-in 200ms ease-out' }}>
-            <span style={{ color: 'hsl(231 15% 55%)' }}>{line.timestamp}</span>
-            {'  '}
+            <Home width={12} height={12} />
+            <span>Dashboard</span>
+            <ChevronRight width={12} height={12} style={{ opacity: 0.5 }} />
             <span
               style={{
-                color:
-                  line.marker === '✓'
-                    ? 'hsl(142 70% 56%)'
-                    : 'hsl(271 60% 78%)',
-                fontWeight: 600,
+                color: 'hsl(60 30% 96%)',
+                fontFamily: 'monospace',
+                letterSpacing: 0.2,
               }}
             >
-              {line.marker}
+              Job #ab3c91f0
             </span>
-            {'  '}
-            <TourLogLineText text={line.text} />
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 16,
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <TourStatusBadge running={!isDone} done={isDone ?? false} />
+                <code
+                  style={{
+                    fontSize: 13,
+                    fontFamily: 'monospace',
+                    color: 'hsl(60 30% 96% / 0.9)',
+                  }}
+                >
+                  /sr:implement #9 --yes
+                </code>
+              </div>
+              <div style={{ fontSize: 11, color: 'hsl(225 27% 70%)' }}>
+                Started just now · claude-sonnet-4-20250514
+              </div>
+            </div>
+
+            {/* Re-execute button (only once done — matches real JobDetailPage) */}
+            {isDone && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '5px 10px',
+                  border: '1px solid hsl(231 15% 30% / 0.6)',
+                  borderRadius: 6,
+                  fontSize: 11,
+                  color: 'hsl(60 30% 96%)',
+                }}
+              >
+                <RotateCcw width={12} height={12} />
+                Re-execute
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Completion / running summary card */}
+        <div style={{ padding: '16px 24px' }}>
+          <TourSummaryCard done={isDone ?? false} />
+        </div>
+
+        {/* Filter + line count bar */}
+        <div
+          style={{
+            padding: '0 24px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              flex: 1,
+              maxWidth: 360,
+              padding: '6px 10px',
+              border: '1px solid hsl(231 15% 30% / 0.5)',
+              borderRadius: 6,
+              fontSize: 12,
+              color: 'hsl(225 27% 70%)',
+            }}
+          >
+            <Search width={12} height={12} />
+            <span>Filter logs...</span>
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              fontSize: 11,
+              color: 'hsl(225 27% 70%)',
+            }}
+          >
+            <Copy width={12} height={12} />
+            <span>
+              {visibleCount} / {totalCount} lines
+            </span>
+          </div>
+        </div>
+
+        {/* Log body */}
+        <div
+          ref={logRef}
+          style={{
+            flex: 1,
+            padding: '4px 24px 24px',
+            fontFamily: '"Fira Code", Menlo, Monaco, monospace',
+            fontSize: 13,
+            lineHeight: 1.85,
+            overflow: 'auto',
+          }}
+        >
+          {state.logLines.map((line) => (
+            <div key={line.id} style={{ animation: 'tour-fade-in 200ms ease-out' }}>
+              <span style={{ color: 'hsl(231 15% 55%)' }}>{line.timestamp}</span>
+              {'  '}
+              <span
+                style={{
+                  color:
+                    line.marker === '✓'
+                      ? 'hsl(142 70% 56%)'
+                      : 'hsl(271 60% 78%)',
+                  fontWeight: 600,
+                }}
+              >
+                {line.marker}
+              </span>
+              {'  '}
+              <TourLogLineText text={line.text} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TourStatusBadge({ running, done }: { running: boolean; done: boolean }) {
+  const bg = done
+    ? 'hsl(142 70% 56% / 0.15)'
+    : running
+      ? 'hsl(271 60% 78% / 0.15)'
+      : 'hsl(231 15% 30% / 0.4)'
+  const color = done
+    ? 'hsl(142 70% 56%)'
+    : running
+      ? 'hsl(271 60% 78%)'
+      : 'hsl(225 27% 70%)'
+  const label = done ? 'completed' : running ? 'running' : 'queued'
+  return (
+    <span
+      style={{
+        padding: '2px 10px',
+        borderRadius: 999,
+        background: bg,
+        color,
+        fontSize: 11,
+        fontWeight: 500,
+        textTransform: 'lowercase',
+        letterSpacing: 0.3,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+      }}
+    >
+      <span
+        style={{
+          width: 5,
+          height: 5,
+          borderRadius: '50%',
+          background: color,
+          animation: running ? 'tour-pulse-dot 1.2s ease-in-out infinite' : undefined,
+        }}
+      />
+      {label}
+    </span>
+  )
+}
+
+function TourSummaryCard({ done }: { done: boolean }) {
+  const accent = done ? 'hsl(142 70% 56%)' : 'hsl(271 60% 78%)'
+  const title = done ? 'Job completed' : 'Job running...'
+  return (
+    <div
+      style={{
+        border: `1px solid ${accent}/0.4`,
+        borderColor: `color-mix(in srgb, ${accent} 40%, transparent)`,
+        borderRadius: 12,
+        background: `color-mix(in srgb, ${accent} 4%, transparent)`,
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 14,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            fontSize: 14,
+            fontWeight: 600,
+          }}
+        >
+          <span
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: '50%',
+              border: `2px solid ${accent}`,
+              display: 'grid',
+              placeItems: 'center',
+              fontSize: 11,
+              color: accent,
+            }}
+          >
+            {done ? '✓' : '…'}
+          </span>
+          {title}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, color: 'hsl(225 27% 70%)' }}>
+          <span>24m 21s</span>
+          <span style={{ color: 'hsl(50 100% 70%)' }}>$6.2408</span>
+        </div>
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 10,
+        }}
+      >
+        {[
+          ['DURATION', '24m 21s'],
+          ['COST', '$6.2408'],
+          ['TURNS', '16'],
+          ['TOKENS', '5.9k'],
+        ].map(([label, value]) => (
+          <div
+            key={label}
+            style={{
+              padding: '10px 12px',
+              border: '1px solid hsl(231 15% 30% / 0.35)',
+              borderRadius: 8,
+              background: 'hsl(231 15% 10% / 0.3)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                letterSpacing: 1,
+                color: 'hsl(225 27% 70%)',
+                marginBottom: 4,
+              }}
+            >
+              {label}
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{value}</div>
           </div>
         ))}
       </div>

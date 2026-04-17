@@ -134,6 +134,18 @@ async function runAction(name: string, durationMs: number) {
 
     case 'spawnNewSpecCard':
       tourStore.update({ specCardVisible: true, specCardOnRail: false })
+      // Transition toast from "loading" to "success" with the same stable
+      // id so it doesn't pile up across loops. Auto-dismisses shortly after.
+      try {
+        const sonner = await import('sonner')
+        sonner.toast.success('specrails-hub · Spec created', {
+          id: TOUR_TOAST_ID,
+          description: 'Add JWT auth with refresh tokens',
+          duration: 2200,
+        })
+      } catch {
+        // no-op
+      }
       await wait(durationMs)
       return
 

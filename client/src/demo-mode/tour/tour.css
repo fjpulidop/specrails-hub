@@ -68,12 +68,27 @@
   }
 }
 
+/*
+ * Hide the ChatPanel right-hand sidebar in the demo build. The panel is
+ * rendered as the next sibling of <main>, carrying the border-l +
+ * backdrop-blur classes from ChatPanel.tsx. Matching both tokens prevents
+ * accidental hits on unrelated sibling divs.
+ *
+ * Also hide anything explicitly marked with data-chat-panel for
+ * forward-compat if we ever add an explicit marker.
+ */
+main + div[class*="border-l"][class*="backdrop-blur"],
+main ~ div[class*="border-l"][class*="backdrop-blur"],
+[data-chat-panel] {
+  display: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-tour-cursor],
   [data-tour-fake-modal],
   [data-tour-fake-spec-card],
   [data-tour-rail-running],
-  [data-tour-fake-log] {
+  [data-tour-fullscreen-log] {
     animation-duration: 0s !important;
     transition-duration: 0s !important;
   }
