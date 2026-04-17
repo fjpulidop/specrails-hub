@@ -71,7 +71,6 @@ jobs:
           server: ${{ secrets.HOSTINGER_HOST }}
           username: ${{ secrets.HOSTINGER_USER }}
           password: ${{ secrets.HOSTINGER_PASSWORD }}
-          protocol: ftps
-          security: loose
+          protocol: ftp
           local-dir: ./artifacts/
           server-dir: domains/specrails.dev/public_html/downloads/specrails-hub/${{ github.ref_name }}/
