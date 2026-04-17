@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { cn } from '../lib/utils'
 import { getApiBase } from '../lib/api'
-import { NotificationCenter } from './NotificationCenter'
 
 interface Stats {
   totalJobs: number
@@ -13,10 +12,9 @@ interface Stats {
 
 interface StatusBarProps {
   connectionStatus: 'connecting' | 'connected' | 'disconnected'
-  activeProjectId?: string | null
 }
 
-export function StatusBar({ connectionStatus, activeProjectId }: StatusBarProps) {
+export function StatusBar({ connectionStatus }: StatusBarProps) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const prevStatusRef = useRef<'connecting' | 'connected' | 'disconnected'>('connecting')
@@ -92,7 +90,7 @@ export function StatusBar({ connectionStatus, activeProjectId }: StatusBarProps)
         </span>
       </div>
 
-      {/* Stats + notifications */}
+      {/* Stats */}
       <div className="flex items-center gap-3">
         {stats && (
           <>
@@ -100,7 +98,6 @@ export function StatusBar({ connectionStatus, activeProjectId }: StatusBarProps)
             {stats.totalCostUsd > 0 && <span>${stats.totalCostUsd.toFixed(2)}</span>}
           </>
         )}
-        <NotificationCenter activeProjectId={activeProjectId ?? null} />
       </div>
     </footer>
   )
