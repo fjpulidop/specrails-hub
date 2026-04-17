@@ -108,5 +108,11 @@ Releases are automated via release-please + GitHub Actions:
   - release-please creates/updates a Release PR (bumps version in `package.json` + `CHANGELOG.md`)
   - When the Release PR is merged, release-please creates the GitHub Release and `npm publish` runs automatically
   - Publishes with **npm provenance attestation** (`--provenance --access public`) for SLSA Level 2 supply chain security. Requires `id-token: write` permission in the workflow.
+- **Desktop Release** (`.github/workflows/desktop-release.yml`) — on every `v*` tag push or manual dispatch:
+  - Builds a signed + notarised macOS Apple Silicon `.dmg` via Tauri.
+  - FTP-uploads the `.dmg` to Hostinger under two paths: the archival versioned folder `downloads/specrails-hub/v<version>/` and a stable `downloads/specrails-hub/latest/` channel.
+  - Writes a machine-readable `manifest.json` into `latest/` describing the release (schemaVersion, version, releasedAt, releaseUrl, platforms.darwin-arm64 with filename/url/sha256/size). Consumers like specrails-web read this to render a Download CTA without hardcoding versions.
+  - Ordering: `.dmg` is uploaded first and HEAD-verified before `manifest.json` is uploaded, so a consumer that sees the new manifest always finds the referenced binary.
+  - **Server-side one-time setup**: the Hostinger `latest/` folder contains a hand-authored `.htaccess` that sets `Cache-Control: no-cache, must-revalidate` and `Access-Control-Allow-Origin: *` on `manifest.json`. This file is server-managed, not in the repo — do not add workflow steps that wipe `latest/` wholesale. See the inline comment in `desktop-release.yml` for the `.htaccess` contents.
 
 Commit message prefixes that affect versioning: `feat:` → minor, `fix:` → patch, `feat!:` → major. Commits without a conventional prefix are ignored by release-please.

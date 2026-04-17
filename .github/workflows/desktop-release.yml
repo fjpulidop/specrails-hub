@@ -65,7 +65,109 @@ jobs:
           path: ./artifacts/
           merge-multiple: true
 
-      - name: Deploy to Hostinger
+      # openspec: add-latest-release-channel
+      # The deploy job publishes the .dmg twice:
+      #   1. downloads/specrails-hub/v<tag>/  — archival, versioned (pre-existing behaviour)
+      #   2. downloads/specrails-hub/latest/  — stable channel consumed by specrails-web
+      #
+      # Consumers (specrails-web) read manifest.json in latest/ to render the
+      # Download CTA and surface the current version without hardcoding.
+      #
+      # IMPORTANT: The latest/ folder on Hostinger also contains a one-time,
+      # hand-authored .htaccess file that must remain in place:
+      #
+      #     <Files "manifest.json">
+      #       Header set Cache-Control "no-cache, must-revalidate"
+      #       Header set Access-Control-Allow-Origin "*"
+      #     </Files>
+      #
+      # The .htaccess is server-managed (Hostinger), NOT from this repo. Do
+      # not add steps that wipe latest/ wholesale — only delete stale .dmg
+      # files explicitly.
+
+      - name: Compute release version
+        id: vars
+        run: |
+          set -euo pipefail
+          # github.ref_name is e.g. "v1.30.0" on tag pushes. Strip the leading "v".
+          # For workflow_dispatch the user must dispatch against a v* tag so
+          # the version is unambiguous; we fail fast otherwise.
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "This workflow must run against a v* tag. Got ref_name=${GITHUB_REF_NAME}"
+            exit 1
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          echo "Release version: ${VERSION}"
+
+      - name: Rename .dmg to canonical filename
+        id: rename
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.vars.outputs.version }}"
+          src="$(ls artifacts/*.dmg | head -n1)"
+          if [[ -z "${src}" ]]; then
+            echo "No .dmg found in artifacts/"
+            exit 1
+          fi
+          canonical="specrails-hub-${VERSION}-aarch64.dmg"
+          if [[ "$(basename "${src}")" != "${canonical}" ]]; then
+            mv "${src}" "artifacts/${canonical}"
+          fi
+          echo "filename=${canonical}" >> "$GITHUB_OUTPUT"
+          echo "path=artifacts/${canonical}" >> "$GITHUB_OUTPUT"
+          ls -la artifacts/
+
+      - name: Compute sha256 and byte size
+        id: hash
+        run: |
+          set -euo pipefail
+          file="${{ steps.rename.outputs.path }}"
+          sha="$(sha256sum "${file}" | awk '{print $1}')"
+          size="$(stat -c%s "${file}")"
+          echo "sha256=${sha}" >> "$GITHUB_OUTPUT"
+          echo "size=${size}" >> "$GITHUB_OUTPUT"
+          echo "sha256: ${sha}"
+          echo "size:   ${size} bytes"
+
+      - name: Build manifest.json
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.vars.outputs.version }}"
+          TAG="${{ steps.vars.outputs.tag }}"
+          FILENAME="${{ steps.rename.outputs.filename }}"
+          SHA="${{ steps.hash.outputs.sha256 }}"
+          SIZE="${{ steps.hash.outputs.size }}"
+          RELEASED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          URL="https://specrails.dev/downloads/specrails-hub/latest/${FILENAME}"
+          RELEASE_URL="https://github.com/fjpulidop/specrails-hub/releases/tag/${TAG}"
+
+          mkdir -p manifest
+          cat > manifest/manifest.json <<JSON
+          {
+            "schemaVersion": 1,
+            "version": "${VERSION}",
+            "releasedAt": "${RELEASED_AT}",
+            "releaseUrl": "${RELEASE_URL}",
+            "platforms": {
+              "darwin-arm64": {
+                "filename": "${FILENAME}",
+                "url": "${URL}",
+                "sha256": "${SHA}",
+                "size": ${SIZE}
+              }
+            }
+          }
+          JSON
+
+          # Fail fast if the JSON is malformed.
+          jq empty manifest/manifest.json
+          cat manifest/manifest.json
+
+      # Pre-existing versioned upload. Behaviour unchanged except the
+      # uploaded .dmg now uses the canonical filename.
+      - name: Deploy versioned .dmg to Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.HOSTINGER_HOST }}
@@ -73,4 +175,105 @@ jobs:
           password: ${{ secrets.HOSTINGER_PASSWORD }}
           protocol: ftp
           local-dir: ./artifacts/
-          server-dir: domains/specrails.dev/public_html/downloads/specrails-hub/${{ github.ref_name }}/
+          server-dir: domains/specrails.dev/public_html/downloads/specrails-hub/${{ steps.vars.outputs.tag }}/
+
+      # ---------------------------------------------------------------
+      # latest/ channel — openspec: add-latest-release-channel
+      # ---------------------------------------------------------------
+      #
+      # Ordering matters (spec: desktop-release-channel):
+      #   1. Delete any prior .dmg in latest/ (keep .htaccess untouched).
+      #   2. Upload the new .dmg.
+      #   3. HEAD-verify the new .dmg is HTTP-reachable.
+      #   4. Upload manifest.json.
+      #   5. HEAD-verify manifest.json is HTTP-reachable and valid JSON.
+      #
+      # A consumer that sees the new manifest must always find the
+      # referenced binary. Never upload manifest.json before step 3 passes.
+
+      - name: Delete stale .dmg in latest/
+        env:
+          HOST: ${{ secrets.HOSTINGER_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          remote="domains/specrails.dev/public_html/downloads/specrails-hub/latest/"
+          # List the directory. Returns just filenames when using --list-only.
+          stale="$(curl -s --ftp-pasv --user "${FTP_USER}:${FTP_PASS}" "ftp://${HOST}/${remote}" --list-only | grep -E '\.dmg$' || true)"
+          if [[ -z "${stale}" ]]; then
+            echo "No stale .dmg files in latest/"
+            exit 0
+          fi
+          while IFS= read -r f; do
+            [[ -z "${f}" ]] && continue
+            echo "Deleting stale: ${f}"
+            curl -s --ftp-pasv --user "${FTP_USER}:${FTP_PASS}" \
+              -Q "DELE ${remote}${f}" \
+              "ftp://${HOST}/${remote}" || echo "  (DELE failed for ${f}; continuing)"
+          done <<< "${stale}"
+
+      - name: Upload new .dmg to latest/
+        env:
+          HOST: ${{ secrets.HOSTINGER_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          remote="domains/specrails.dev/public_html/downloads/specrails-hub/latest/"
+          file="${{ steps.rename.outputs.path }}"
+          curl --fail --silent --show-error --ftp-pasv \
+            --user "${FTP_USER}:${FTP_PASS}" \
+            -T "${file}" \
+            "ftp://${HOST}/${remote}"
+          echo "Uploaded $(basename "${file}") to ${remote}"
+
+      - name: Verify .dmg is HTTP-reachable
+        run: |
+          set -euo pipefail
+          filename="${{ steps.rename.outputs.filename }}"
+          url="https://specrails.dev/downloads/specrails-hub/latest/${filename}"
+          # Retry briefly to absorb FTP-to-HTTP propagation.
+          for i in 1 2 3 4 5 6; do
+            code="$(curl --head --silent --output /dev/null --write-out '%{http_code}' "${url}")"
+            if [[ "${code}" == "200" ]]; then
+              echo "✓ ${url} reachable"
+              exit 0
+            fi
+            echo "  attempt ${i}: ${url} -> HTTP ${code}, retrying in 5s..."
+            sleep 5
+          done
+          echo "✗ ${url} still not reachable"
+          exit 1
+
+      - name: Upload manifest.json to latest/
+        env:
+          HOST: ${{ secrets.HOSTINGER_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          remote="domains/specrails.dev/public_html/downloads/specrails-hub/latest/"
+          curl --fail --silent --show-error --ftp-pasv \
+            --user "${FTP_USER}:${FTP_PASS}" \
+            -T manifest/manifest.json \
+            "ftp://${HOST}/${remote}"
+          echo "Uploaded manifest.json to ${remote}"
+
+      - name: Verify manifest.json is reachable and valid JSON
+        run: |
+          set -euo pipefail
+          url="https://specrails.dev/downloads/specrails-hub/latest/manifest.json"
+          for i in 1 2 3 4 5 6; do
+            if curl --fail --silent --show-error "${url}" -o /tmp/manifest.json; then
+              if jq empty /tmp/manifest.json; then
+                echo "✓ manifest.json reachable and valid"
+                cat /tmp/manifest.json
+                exit 0
+              fi
+            fi
+            echo "  attempt ${i}: manifest.json not yet valid, retrying in 5s..."
+            sleep 5
+          done
+          echo "✗ manifest.json not reachable or invalid"
+          exit 1
