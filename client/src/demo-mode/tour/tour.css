@@ -150,12 +150,15 @@ body {
   border-bottom-width: 0 !important;
   opacity: 0;
   overflow: hidden;
+  /* COLLAPSE rules — applied when the class is removed. opacity snaps to 0
+     instantly so the card content doesn't look like it's "deleting",
+     while max-height collapses smoothly so the sibling tickets glide up
+     into the freed space. */
   transition:
-    max-height 650ms cubic-bezier(0.22, 1, 0.36, 1),
-    padding 650ms cubic-bezier(0.22, 1, 0.36, 1),
-    margin 650ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 300ms ease,
-    border-width 300ms ease;
+    max-height 450ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 450ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-width 200ms ease,
+    opacity 0s;
 }
 body.tour-new-spec-visible [data-ticket-id="9999"] {
   max-height: 60px;
@@ -165,6 +168,13 @@ body.tour-new-spec-visible [data-ticket-id="9999"] {
   margin-top: 0 !important;
   border-top-width: 1px !important;
   border-bottom-width: 1px !important;
+  /* EXPAND rules — applied when the class is added. Smooth opacity fade
+     in so the new card "appears" rather than pops. */
+  transition:
+    max-height 600ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 600ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-width 300ms ease,
+    opacity 260ms ease;
 }
 
 @media (prefers-reduced-motion: reduce) {

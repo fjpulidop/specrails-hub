@@ -22,13 +22,33 @@ import { TourCursor, TourOverlay, startTour } from './tour'
 
 installDemoFetchInterceptor()
 
-// ─── Skip first-run overlays (onboarding + welcome) ─────────────────────────
-// The demo should never show the OnboardingWizard or a first-run welcome
-// screen — it's watched from an iframe with no interaction.
+// ─── Clean localStorage + force dashboard route ─────────────────────────────
+// Prior demo runs may have persisted a saved route (e.g. /jobs from when a
+// viewer clicked around in an earlier build), the last-active project id,
+// spec ordering, sidebar pin state, etc. None of that should survive across
+// demo loads — the demo must always open on the dashboard with a stable
+// layout.
 try {
+  localStorage.removeItem('specrails-hub:routeMemory')
+  localStorage.removeItem('specrails-hub:activeProjectId')
+  // Clear any spec-order keys from previous runs
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i)
+    if (key && key.startsWith('specrails-hub:spec-order:')) {
+      localStorage.removeItem(key)
+    }
+  }
   localStorage.setItem('specrails-hub:onboarding-dismissed', 'true')
 } catch {
   // no-op (private mode, etc.)
+}
+
+// HashRouter: force the hash to "/" even if the URL landed on /#jobs etc.
+if (typeof window !== 'undefined') {
+  const hash = window.location.hash
+  if (hash && hash !== '#' && hash !== '#/') {
+    window.location.hash = '/'
+  }
 }
 
 // ─── 2. Mock WebSocket ──────────────────────────────────────────────────────

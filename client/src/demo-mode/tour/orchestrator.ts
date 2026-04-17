@@ -93,12 +93,11 @@ async function runBeat(beat: Beat) {
     }
 
     case 'fadeReset':
-      // Fade to black, then clear visual state.
-      tourStore.update({ fadeOpacity: 1 })
-      await wait(Math.max(beat.duration - 200, 100))
+      // No more fade-to-black — just clear visual state in place so the
+      // dashboard re-appears and the next loop starts on top of it.
       tourStore.softReset()
-      tourStore.update({ fadeOpacity: 0 })
-      await wait(200)
+      document.body.classList.remove('tour-new-spec-visible')
+      await wait(beat.duration)
       return
   }
 }
@@ -133,10 +132,9 @@ async function runAction(name: string, durationMs: number) {
       return
 
     case 'spawnNewSpecCard':
-      tourStore.update({ specCardVisible: true, specCardOnRail: false })
       // Reveal the real "new spec" card (id 9999) inside the Specs column
-      // so existing tickets shift DOWN to make room. The fake overlay card
-      // sits on top of this real card for the drag animation.
+      // so existing tickets shift DOWN to make room. NO overlay yet — the
+      // viewer sees the real card slot open and the card appear there.
       document.body.classList.add('tour-new-spec-visible')
       // Transition toast from "loading" to "success" with the same stable
       // id so it doesn't pile up across loops. Auto-dismisses shortly after.
@@ -154,6 +152,16 @@ async function runAction(name: string, durationMs: number) {
       return
 
     case 'moveSpecToRail1': {
+      // Step 1: pop the drag overlay in AT the real 9999 card position,
+      // while the real card is still visible. Two paints later we flip to
+      // the rail-bound stage — CSS transitions the top/left/width smoothly
+      // to Rail 1. Using requestAnimationFrame ensures the first render
+      // has the overlay at the Specs position before the transition starts.
+      tourStore.update({ dragOverlayStage: 'at-specs' })
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      })
+
       // Cursor should drag the card — compute rail 1 body center and move
       // cursor there in the same update, so the cursor transition (800 ms)
       // and the card transition (900 ms) play in parallel rather than the
@@ -162,16 +170,18 @@ async function runAction(name: string, durationMs: number) {
       if (railEl) {
         const rect = railEl.getBoundingClientRect()
         tourStore.update({
-          specCardOnRail: true,
+          dragOverlayStage: 'at-rail',
           cursorX: rect.left + rect.width * 0.25,
           cursorY: rect.top + 54,
         })
       } else {
-        tourStore.update({ specCardOnRail: true })
+        tourStore.update({ dragOverlayStage: 'at-rail' })
       }
-      // The real new-spec ticket disappears from Specs at the same moment
-      // (same as a real drag-drop would): remove the body class so the
-      // ticket collapses, freeing the slot. Existing tickets glide back up.
+      // The real 9999 ticket disappears from Specs at the same moment (same
+      // as a real drag-drop would). The CSS has `transition: max-height`
+      // applied from the `.tour-new-spec-visible` class, which APPLIES to
+      // the collapse too → the card smoothly shrinks and the existing
+      // tickets glide up naturally into the freed space.
       document.body.classList.remove('tour-new-spec-visible')
       await wait(durationMs)
       return

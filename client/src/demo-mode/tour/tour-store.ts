@@ -21,18 +21,19 @@ export interface TourState {
   modalOpen: boolean
   /** Text typed into the fake textarea so far. */
   typedText: string
-  /** Show the "new spec" card (Beat 08+). */
-  specCardVisible: boolean
-  /** Animate the spec card moving from Specs → Rail 1. */
-  specCardOnRail: boolean
+  /**
+   * Drag overlay stage. `'hidden'` during Beats 01-08b — the real 9999 card
+   * is what the viewer sees in Specs. `'at-specs'` at the start of Beat 09
+   * — overlay pops in over the real card. `'at-rail'` mid-Beat 09 — overlay
+   * animates to Rail 1. Stays `'at-rail'` through Beats 10-14.
+   */
+  dragOverlayStage: 'hidden' | 'at-specs' | 'at-rail'
   /** Rail 1 is running (Beat 11+). */
   rail1Running: boolean
   /** Log drawer open (Beat 13+). */
   logDrawerOpen: boolean
   /** Log lines currently visible in the drawer. */
   logLines: TourLogLine[]
-  /** Global "fade to black" overlay opacity (0..1), used by fadeReset. */
-  fadeOpacity: number
   /** Paused (debug / window.__specrailsTour.pause). */
   paused: boolean
 }
@@ -45,12 +46,10 @@ const INITIAL_STATE: TourState = {
   cursorVisible: false,
   modalOpen: false,
   typedText: '',
-  specCardVisible: false,
-  specCardOnRail: false,
+  dragOverlayStage: 'hidden',
   rail1Running: false,
   logDrawerOpen: false,
   logLines: [],
-  fadeOpacity: 0,
   paused: false,
 }
 
@@ -81,12 +80,10 @@ class TourStore {
       currentBeatId: null,
       modalOpen: false,
       typedText: '',
-      specCardVisible: false,
-      specCardOnRail: false,
+      dragOverlayStage: 'hidden',
       rail1Running: false,
       logDrawerOpen: false,
       logLines: [],
-      fadeOpacity: 0,
     }
     this.emit()
   }

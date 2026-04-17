@@ -36,31 +36,19 @@ export function TourOverlay() {
     <>
       {state.modalOpen && <TourFakeModal typedText={state.typedText} />}
 
-      {/* Hide the spec card and rail chrome once the fullscreen log page
-          takes over — nothing from the dashboard should bleed through. */}
-      {!state.logDrawerOpen && state.specCardVisible && (
-        <TourFakeSpecCard onRail={state.specCardOnRail} />
+      {/* The drag overlay is invisible during Beats 01-08b (the REAL 9999
+          card is what the viewer sees in Specs). It only pops in at Beat 09
+          start to carry the card to Rail 1. Once it reaches Rail 1 it stays
+          visible through the rail-running and log-opened beats. Hidden
+          entirely once the fullscreen log takes over. */}
+      {!state.logDrawerOpen && state.dragOverlayStage !== 'hidden' && (
+        <TourFakeSpecCard stage={state.dragOverlayStage} />
       )}
-      {!state.logDrawerOpen && state.specCardOnRail && (
+      {!state.logDrawerOpen && state.dragOverlayStage === 'at-rail' && (
         <TourFakeRail running={state.rail1Running} />
       )}
 
       {state.logDrawerOpen && <TourFullscreenLogPage />}
-
-      {state.fadeOpacity > 0 && (
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'black',
-            opacity: state.fadeOpacity,
-            transition: 'opacity 300ms ease',
-            pointerEvents: 'none',
-            zIndex: 2_147_482_000,
-          }}
-        />
-      )}
     </>
   )
 }
@@ -221,7 +209,7 @@ function TourFakeModal({ typedText }: { typedText: string }) {
 
 // ─── Fake spec card: born inside Specs column, slides to Rail 1 body ────────
 
-function TourFakeSpecCard({ onRail }: { onRail: boolean }) {
+function TourFakeSpecCard({ stage }: { stage: 'at-specs' | 'at-rail' }) {
   const specsRect = useAnchorRect('[data-tour="specs-list"]')
   const railRect = useAnchorRect('[data-tour="rail-1"]')
 
@@ -252,7 +240,7 @@ function TourFakeSpecCard({ onRail }: { onRail: boolean }) {
     left: end.left + RAIL_PAD_X,
     width: Math.max(end.width - RAIL_PAD_X * 2, 120),
   }
-  const current = onRail ? inRail : inSpecs
+  const current = stage === 'at-rail' ? inRail : inSpecs
 
   return (
     <div
