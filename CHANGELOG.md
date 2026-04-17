@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.0](https://github.com/fjpulidop/specrails-hub/compare/v1.31.1...v1.32.0) (2026-04-17)
+
+
+### Features
+
+* add scripted product tour to the hub-demo build ([#214](https://github.com/fjpulidop/specrails-hub/issues/214)) ([e2f76e2](https://github.com/fjpulidop/specrails-hub/commit/e2f76e29ff340b2310b8ee6e5f077f5d0afaa627))
+
 ## [1.31.1](https://github.com/fjpulidop/specrails-hub/compare/v1.31.0...v1.31.1) (2026-04-17)
 
 
