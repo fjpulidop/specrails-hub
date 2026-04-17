@@ -1,0 +1,80 @@
+/**
+ * Tour-specific CSS keyframes. Loaded only from demo-entry.tsx so the
+ * production client bundle does not include them.
+ *
+ * openspec: hub-demo-scripted-tour
+ */
+
+@keyframes tour-click-ring {
+  from {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+@keyframes tour-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tour-slide-left {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes tour-caret {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes tour-pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 16px hsl(142 70% 56% / 0.25);
+  }
+  50% {
+    box-shadow: 0 0 28px hsl(142 70% 56% / 0.55);
+  }
+}
+
+@keyframes tour-pulse-dot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-tour-cursor],
+  [data-tour-fake-modal],
+  [data-tour-fake-spec-card],
+  [data-tour-rail-running],
+  [data-tour-fake-log] {
+    animation-duration: 0s !important;
+    transition-duration: 0s !important;
+  }
+}

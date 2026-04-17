@@ -71,7 +71,13 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
             </span>
           )}
         </div>
-        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setProposeOpen(true)}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs gap-1"
+          onClick={() => setProposeOpen(true)}
+          data-tour="add-spec-btn"
+        >
           <Plus className="w-3.5 h-3.5" />
           Add
         </Button>

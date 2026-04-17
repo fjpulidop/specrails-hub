@@ -12,9 +12,11 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
 import '../globals.css'
+import './tour/tour.css'
 import App from '../App'
 import { installDemoFetchInterceptor } from './demo-api'
 import { demoJobs } from './fixtures/jobs'
+import { TourCursor, TourOverlay, startTour } from './tour'
 
 // ─── 1. Install demo fetch interceptor ──────────────────────────────────────
 
@@ -151,6 +153,19 @@ createRoot(document.getElementById('root')!).render(
     <HashRouter>
       <NavigationBridge />
       <App />
+      <TourOverlay />
+      <TourCursor />
     </HashRouter>
   </StrictMode>,
 )
+
+// Start the scripted tour after the React tree has had a beat to hydrate.
+// requestIdleCallback lets layout settle before the orchestrator starts
+// resolving selectors.
+type IdleCallback = (cb: () => void, opts?: { timeout?: number }) => number
+const ric: IdleCallback =
+  ((window as unknown as { requestIdleCallback?: IdleCallback })
+    .requestIdleCallback ??
+    ((cb: () => void) => window.setTimeout(cb, 400))) as IdleCallback
+
+ric(() => startTour(), { timeout: 1500 })
