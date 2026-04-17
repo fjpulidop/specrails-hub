@@ -304,6 +304,12 @@ The server broadcasts events over a single WebSocket connection. All project-sco
 - All SQL operations use parameterized queries
 - Project paths validated as existing directories on registration
 
+## Support
+
+If specrails-hub saves you time, you can donate on [Ko-fi](https://ko-fi.com/D1D81Y002C) ☕ to support ongoing development.
+
+[![Donate on Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-FF5E5B?logo=kofi&logoColor=white&style=flat-square)](https://ko-fi.com/D1D81Y002C)
+
 ## License
 
 MIT
