@@ -276,9 +276,14 @@ export function initDb(dbPath: string): DbInstance {
 }
 
 export function createJob(db: DbInstance, job: NewJob): void {
+  // INSERT OR IGNORE handles the case where the job row already exists (restored from DB
+  // after server restart). The UPDATE that follows always sets status and started_at.
   db.prepare(
-    'INSERT INTO jobs (id, command, started_at, status, priority, depends_on_job_id, pipeline_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    'INSERT OR IGNORE INTO jobs (id, command, started_at, status, priority, depends_on_job_id, pipeline_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
   ).run(job.id, job.command, job.started_at, 'running', job.priority ?? 'normal', job.depends_on_job_id ?? null, job.pipeline_id ?? null)
+  db.prepare(
+    'UPDATE jobs SET status = ?, started_at = ? WHERE id = ?'
+  ).run('running', job.started_at, job.id)
 }
 
 export function finishJob(

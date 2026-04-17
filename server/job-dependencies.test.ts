@@ -345,7 +345,8 @@ describe('Job Dependencies', () => {
 
       expect(restored.dependsOnJobId).toBe('parent-job')
       expect(restored.pipelineId).toBe('pipe-x')
-      expect(restored.status).toBe('queued')
+      // Parent is completed → dependency met → job auto-starts on restore
+      expect(restored.status).toBe('running')
 
       db.close()
     })
