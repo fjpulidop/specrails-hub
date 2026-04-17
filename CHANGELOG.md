@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.0](https://github.com/fjpulidop/specrails-hub/compare/v1.30.0...v1.31.0) (2026-04-17)
+
+
+### Features
+
+* publish latest/manifest.json channel for macOS desktop build ([#210](https://github.com/fjpulidop/specrails-hub/issues/210)) ([cce8671](https://github.com/fjpulidop/specrails-hub/commit/cce867185b8ab55ffc4000c655562d701547a510))
+
 ## [1.30.0](https://github.com/fjpulidop/specrails-hub/compare/v1.29.0...v1.30.0) (2026-04-17)
 
 
