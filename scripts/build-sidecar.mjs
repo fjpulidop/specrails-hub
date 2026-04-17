@@ -184,6 +184,19 @@ async function main() {
   fs.copyFileSync(sqliteAddon, addonDest)
   console.log(`  ${sqliteAddon} → ${addonDest}`)
 
+  // Step 4: Codesign sidecar binary (macOS only, requires APPLE_SIGNING_IDENTITY)
+  // Apple notarization rejects app bundles that contain unsigned binaries.
+  // The sidecar must be signed with a Developer ID cert + hardened runtime
+  // before tauri build attempts to notarize the whole .app.
+  const signingIdentity = process.env.APPLE_SIGNING_IDENTITY
+  if (process.platform === 'darwin' && signingIdentity) {
+    console.log('\n[4/4] Codesigning sidecar binary for notarization...')
+    run(`codesign --force --sign "${signingIdentity}" --options runtime --timestamp "${outputPath}"`)
+    console.log(`  Signed: ${outputPath}`)
+  } else if (process.platform === 'darwin') {
+    console.log('\n[4/4] Skipping codesign (APPLE_SIGNING_IDENTITY not set — local build)')
+  }
+
   console.log(`\n=== Sidecar build complete ===`)
   console.log(`  Binary: ${outputPath}`)
   console.log('')
