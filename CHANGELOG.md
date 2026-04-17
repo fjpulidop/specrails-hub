@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.1](https://github.com/fjpulidop/specrails-hub/compare/v1.31.0...v1.31.1) (2026-04-17)
+
+
+### Bug Fixes
+
+* auto-create latest/ folder on first desktop-release run ([#212](https://github.com/fjpulidop/specrails-hub/issues/212)) ([474a03c](https://github.com/fjpulidop/specrails-hub/commit/474a03c4edb7d702e538eef9bc7701de657e047c))
+
 ## [1.31.0](https://github.com/fjpulidop/specrails-hub/compare/v1.30.0...v1.31.0) (2026-04-17)
 
 
