@@ -71,15 +71,21 @@
 /*
  * Hide the ChatPanel right-hand sidebar in the demo build. The panel is
  * rendered as the next sibling of <main>, carrying the border-l +
- * backdrop-blur classes from ChatPanel.tsx. Matching both tokens prevents
- * accidental hits on unrelated sibling divs.
- *
- * Also hide anything explicitly marked with data-chat-panel for
- * forward-compat if we ever add an explicit marker.
+ * backdrop-blur classes from ChatPanel.tsx.
  */
 main + div[class*="border-l"][class*="backdrop-blur"],
 main ~ div[class*="border-l"][class*="backdrop-blur"],
 [data-chat-panel] {
+  display: none !important;
+}
+
+/*
+ * Hide the top Navbar (logo · Home/Analytics · Claude Code badge · Docs ·
+ * Settings). Matches the `h-11` + `border-b` classes from Navbar.tsx.
+ * The StatusBar (footer) also carries border-b in some states, but it
+ * uses `<footer>`, so scoping to <nav> is safe.
+ */
+nav[class*="h-11"][class*="border-b"] {
   display: none !important;
 }
 

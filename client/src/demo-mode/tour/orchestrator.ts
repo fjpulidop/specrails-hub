@@ -149,10 +149,27 @@ async function runAction(name: string, durationMs: number) {
       await wait(durationMs)
       return
 
-    case 'moveSpecToRail1':
-      tourStore.update({ specCardOnRail: true })
+    case 'moveSpecToRail1': {
+      // Cursor should drag the card — compute rail 1 body center and move
+      // cursor there in the same update, so the cursor transition (800 ms)
+      // and the card transition (900 ms) play in parallel rather than the
+      // cursor standing still while the card magically teleports.
+      const railEl = document.querySelector('[data-tour="rail-1"]') as HTMLElement | null
+      if (railEl) {
+        const rect = railEl.getBoundingClientRect()
+        // Roughly centre the cursor inside the rail body, slightly below
+        // the header so it looks like it dropped the card there.
+        tourStore.update({
+          specCardOnRail: true,
+          cursorX: rect.left + rect.width * 0.25,
+          cursorY: rect.top + 54,
+        })
+      } else {
+        tourStore.update({ specCardOnRail: true })
+      }
       await wait(durationMs)
       return
+    }
 
     case 'markRail1Running':
       tourStore.update({ rail1Running: true })
