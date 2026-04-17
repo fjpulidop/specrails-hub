@@ -14,7 +14,7 @@ import { HashRouter } from 'react-router-dom'
 import '../globals.css'
 import './tour/tour.css'
 import App from '../App'
-import { installDemoFetchInterceptor } from './demo-api'
+import { installDemoFetchInterceptor, DEMO_PROJECT } from './demo-api'
 import { demoJobs } from './fixtures/jobs'
 import { TourCursor, TourOverlay, startTour } from './tour'
 
@@ -77,6 +77,17 @@ class MockWebSocket {
       const msgEvent = new MessageEvent('message', { data: JSON.stringify(initMsg) })
       this.onmessage?.(msgEvent)
       this._dispatch('message', msgEvent)
+
+      // Send a 'hub.projects' message so HubProvider auto-selects the demo
+      // project. Without this, activeProjectId stays null and useTickets /
+      // useRails never fire, which is why the Specs column appeared empty.
+      const hubMsg = {
+        type: 'hub.projects',
+        projects: [DEMO_PROJECT],
+      }
+      const hubEvent = new MessageEvent('message', { data: JSON.stringify(hubMsg) })
+      this.onmessage?.(hubEvent)
+      this._dispatch('message', hubEvent)
     }, 50)
   }
 

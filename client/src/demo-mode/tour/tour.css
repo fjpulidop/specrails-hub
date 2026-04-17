@@ -96,6 +96,26 @@ footer[class*="h-7"][class*="border-t"] {
   display: none !important;
 }
 
+/*
+ * Hub-mode chrome we don't want in the demo: the custom tauri TitleBar,
+ * the left ArcSidebar (project switcher), and the right
+ * ProjectRightSidebar. The tour is meant to showcase the Specs + Rails
+ * workflow, so peripheral chrome only distracts.
+ */
+[data-tauri-drag-region] {
+  display: none !important;
+}
+
+/* ArcSidebar: narrow left column inside HubApp (w-11 … flex-shrink-0) */
+div[class*="w-11"][class*="flex-shrink-0"][class*="border-r"] {
+  display: none !important;
+}
+
+/* ProjectRightSidebar: mounted as a sibling of the main column */
+[data-project-right-sidebar] {
+  display: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-tour-cursor],
   [data-tour-fake-modal],
