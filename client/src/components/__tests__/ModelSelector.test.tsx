@@ -34,29 +34,29 @@ describe('getDefaultModel', () => {
     expect(getDefaultModel('sr-architect', 'max', 'claude')).toBe('claude-opus-4-7')
   })
 
-  it('returns codex-mini-latest for budget preset (codex)', () => {
-    expect(getDefaultModel('sr-developer', 'budget', 'codex')).toBe('codex-mini-latest')
+  it('returns gpt-5.4-mini for budget preset (codex)', () => {
+    expect(getDefaultModel('sr-developer', 'budget', 'codex')).toBe('gpt-5.4-mini')
   })
 
-  it('returns codex-mini-latest for architect in balanced preset (codex)', () => {
-    expect(getDefaultModel('sr-architect', 'balanced', 'codex')).toBe('codex-mini-latest')
+  it('returns gpt-5.4-mini for architect in balanced preset (codex)', () => {
+    expect(getDefaultModel('sr-architect', 'balanced', 'codex')).toBe('gpt-5.4-mini')
   })
 
   it('returns o3 for sr-architect in max preset (codex)', () => {
-    expect(getDefaultModel('sr-architect', 'max', 'codex')).toBe('o3')
+    expect(getDefaultModel('sr-architect', 'max', 'codex')).toBe('gpt-5.3-codex')
   })
 
   it('returns o3 for sr-product-manager in max preset (codex)', () => {
-    expect(getDefaultModel('sr-product-manager', 'max', 'codex')).toBe('o3')
+    expect(getDefaultModel('sr-product-manager', 'max', 'codex')).toBe('gpt-5.3-codex')
   })
 
-  it('returns codex-mini-latest for sr-developer in max preset (codex)', () => {
-    expect(getDefaultModel('sr-developer', 'max', 'codex')).toBe('codex-mini-latest')
+  it('returns gpt-5.4-mini for sr-developer in max preset (codex)', () => {
+    expect(getDefaultModel('sr-developer', 'max', 'codex')).toBe('gpt-5.4-mini')
   })
 
-  it('returns codex-mini-latest for any agent in budget preset (codex)', () => {
-    expect(getDefaultModel('sr-developer', 'budget', 'codex')).toBe('codex-mini-latest')
-    expect(getDefaultModel('sr-architect', 'budget', 'codex')).toBe('codex-mini-latest')
+  it('returns gpt-5.4-mini for any agent in budget preset (codex)', () => {
+    expect(getDefaultModel('sr-developer', 'budget', 'codex')).toBe('gpt-5.4-mini')
+    expect(getDefaultModel('sr-architect', 'budget', 'codex')).toBe('gpt-5.4-mini')
   })
 })
 

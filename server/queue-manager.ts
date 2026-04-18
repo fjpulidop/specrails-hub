@@ -127,7 +127,7 @@ export class QueueManager {
       getCostAlertThreshold?: () => number | null
       getHubDailyBudget?: () => { budget: number | null; totalSpend: number }
       provider?: 'claude' | 'codex'
-      /** Effective model for codex spawns. If omitted, falls back to 'codex-mini-latest'. */
+      /** Effective model for codex spawns. If omitted, falls back to 'gpt-5.4-mini'. */
       resolvedModel?: string
       onJobFinished?: (jobId: string, status: Job['status'], costUsd?: number) => void
     }
@@ -455,7 +455,7 @@ export class QueueManager {
       // local-tickets reminders are preserved end-to-end.
       const resolved = this._resolveCommand(commandToRun)
       const fullPrompt = systemAppend ? `${systemAppend}\n\n---\n\n${resolved}` : resolved
-      const resolvedModel = this._resolvedModel ?? 'codex-mini-latest'
+      const resolvedModel = this._resolvedModel ?? 'gpt-5.4-mini'
       args = ['exec', fullPrompt, '--model', resolvedModel]
     } else {
       binary = 'claude'
@@ -621,7 +621,7 @@ export class QueueManager {
         lastResultEvent = {
           type: 'result',
           total_cost_usd: 0,
-          model: this._resolvedModel ?? 'codex-mini-latest',
+          model: this._resolvedModel ?? 'gpt-5.4-mini',
           duration_ms: durationMs,
           num_turns: 1,
         }

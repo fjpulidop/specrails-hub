@@ -10,9 +10,9 @@ const CLAUDE_MODEL_OPTIONS = [
 ]
 
 const CODEX_MODEL_OPTIONS = [
-  { value: 'codex-mini-latest', label: 'Codex Mini' },
-  { value: 'o4-mini', label: 'o4-mini' },
-  { value: 'o3', label: 'o3' },
+  { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
+  { value: 'gpt-5.4', label: 'GPT-5.4' },
+  { value: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
 ]
 
 interface ChatInputProps {

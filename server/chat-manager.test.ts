@@ -512,7 +512,7 @@ describe('ChatManager', () => {
     })
 
     it('embeds system prompt in codex exec prompt (project name appears in args)', async () => {
-      createConversation(dbCodex, { id: 'codex-conv-1', model: 'codex-mini-latest' })
+      createConversation(dbCodex, { id: 'codex-conv-1', model: 'gpt-5.4-mini' })
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
@@ -532,7 +532,7 @@ describe('ChatManager', () => {
       expect(promptArg).toContain('Hello codex')
     })
 
-    it('defaults to codex-mini-latest when conversation.model is empty string', async () => {
+    it('defaults to gpt-5.4-mini when conversation.model is empty string', async () => {
       // Create a conversation with empty model — simulates a null/missing model override
       createConversation(dbCodex, { id: 'codex-conv-empty-model', model: '' })
       const child = createMockChildProcess()
@@ -544,11 +544,11 @@ describe('ChatManager', () => {
 
       const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
       expect(spawnArgs).toContain('--model')
-      expect(spawnArgs).toContain('codex-mini-latest')
+      expect(spawnArgs).toContain('gpt-5.4-mini')
     })
 
     it('persists synthetic session_id with codex- prefix on successful close', async () => {
-      createConversation(dbCodex, { id: 'codex-conv-session', model: 'codex-mini-latest' })
+      createConversation(dbCodex, { id: 'codex-conv-session', model: 'gpt-5.4-mini' })
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
@@ -563,7 +563,7 @@ describe('ChatManager', () => {
 
     it('auto-title for codex: spawns codex exec with title prompt and sets title', async () => {
       // Two spawns: main message + auto-title
-      createConversation(dbCodex, { id: 'codex-conv-title', model: 'codex-mini-latest' })
+      createConversation(dbCodex, { id: 'codex-conv-title', model: 'gpt-5.4-mini' })
       const mainChild = createMockChildProcess()
       const titleChild = createMockChildProcess()
       vi.mocked(mockSpawn)

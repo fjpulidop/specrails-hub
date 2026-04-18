@@ -25,22 +25,22 @@ export const CLAUDE_MODELS = [
 ]
 
 export const CODEX_MODELS = [
-  { value: 'codex-mini-latest', label: 'Codex Mini' },
-  { value: 'o4-mini', label: 'o4-mini' },
-  { value: 'o3', label: 'o3' },
+  { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
+  { value: 'gpt-5.4', label: 'GPT-5.4' },
+  { value: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
 ]
 
 // Preset → default model per provider (matches specrails-core MODEL_PRESETS)
 export const PRESET_DEFAULTS: Record<ModelPreset, { claude: string; codex: string }> = {
-  balanced: { claude: 'claude-sonnet-4-6', codex: 'codex-mini-latest' },
-  budget: { claude: 'claude-haiku-4-5-20251001', codex: 'codex-mini-latest' },
-  max: { claude: 'claude-sonnet-4-6', codex: 'codex-mini-latest' },
+  balanced: { claude: 'claude-sonnet-4-6', codex: 'gpt-5.4' },
+  budget: { claude: 'claude-haiku-4-5-20251001', codex: 'gpt-5.4-mini' },
+  max: { claude: 'claude-sonnet-4-6', codex: 'gpt-5.4' },
 }
 
 // "max" preset: Opus for architect + PM, Sonnet for rest (matches specrails-core)
 const MAX_OVERRIDES: Record<string, { claude: string; codex: string }> = {
-  'sr-architect': { claude: 'claude-opus-4-7', codex: 'o3' },
-  'sr-product-manager': { claude: 'claude-opus-4-7', codex: 'o3' },
+  'sr-architect': { claude: 'claude-opus-4-7', codex: 'gpt-5.3-codex' },
+  'sr-product-manager': { claude: 'claude-opus-4-7', codex: 'gpt-5.3-codex' },
 }
 
 export function getDefaultModel(
