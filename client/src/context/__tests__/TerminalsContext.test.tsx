@@ -1,0 +1,265 @@
+/** @vitest-environment jsdom */
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { render, act } from '@testing-library/react'
+import { TerminalsProvider, useTerminals } from '../TerminalsContext'
+
+// Stub xterm so we don't need a DOM renderer
+vi.mock('@xterm/xterm', () => {
+  class Terminal {
+    cols = 80
+    rows = 24
+    element: HTMLElement | null = null
+    loadAddon = vi.fn()
+    open = (el: HTMLElement) => { this.element = el }
+    focus = vi.fn()
+    write = vi.fn()
+    dispose = vi.fn()
+    onData = (_: (data: string) => void) => ({ dispose: vi.fn() })
+    onResize = (_: (d: { cols: number; rows: number }) => void) => ({ dispose: vi.fn() })
+  }
+  return { Terminal }
+})
+vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit = vi.fn() } }))
+vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }))
+vi.mock('@xterm/xterm/css/xterm.css', () => ({}))
+
+// Stub WebSocket globally
+class MockWebSocket extends EventTarget {
+  readyState = 0
+  binaryType = 'arraybuffer'
+  url: string
+  sent: Array<unknown> = []
+  static OPEN = 1
+  constructor(url: string) { super(); this.url = url }
+  send(data: unknown) { this.sent.push(data) }
+  close() { this.readyState = 3 }
+  // Required properties for WebSocket typing
+  onmessage: ((e: MessageEvent) => void) | null = null
+  onclose: (() => void) | null = null
+  onerror: (() => void) | null = null
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+;(globalThis as any).WebSocket = MockWebSocket
+
+interface Captured { ctx: ReturnType<typeof useTerminals> | null }
+
+function Harness({ captured, projectId }: { captured: Captured; projectId: string | null }) {
+  captured.ctx = useTerminals()
+  void projectId
+  return null
+}
+
+function mountProvider(projectId: string | null = 'proj-A'): Captured {
+  const captured: Captured = { ctx: null }
+  render(
+    <TerminalsProvider activeProjectId={projectId}>
+      <Harness captured={captured} projectId={projectId} />
+    </TerminalsProvider>,
+  )
+  return captured
+}
+
+describe('TerminalsContext', () => {
+  beforeEach(() => {
+    // Reset localStorage and fetch mock
+    localStorage.clear()
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ sessions: [], limit: 10 }),
+    })
+  })
+
+  it('hydrates project state from localStorage', () => {
+    localStorage.setItem('specrails-hub:terminal-panel:proj-A', JSON.stringify({ visibility: 'restored', userHeight: 420 }))
+    const { ctx } = mountProvider('proj-A')
+    // trigger ensureProject via action
+    act(() => { ctx!.ensureProject('proj-A') })
+    const state = ctx!.getState('proj-A')
+    expect(state.visibility).toBe('restored')
+    expect(state.userHeight).toBe(420)
+  })
+
+  it('defaults to hidden + 320px when no stored state', () => {
+    const captured = mountProvider('proj-A')
+    act(() => { captured.ctx!.ensureProject('proj-A') })
+    const state = captured.ctx!.getState('proj-A')
+    expect(state.visibility).toBe('hidden')
+    expect(state.userHeight).toBe(320)
+  })
+
+  it('toggle flips visibility and persists', () => {
+    const captured = mountProvider('proj-A')
+    act(() => { captured.ctx!.ensureProject('proj-A') })
+    act(() => { captured.ctx!.togglePanel('proj-A') })
+    expect(captured.ctx!.getState('proj-A').visibility).toBe('restored')
+    const stored = JSON.parse(localStorage.getItem('specrails-hub:terminal-panel:proj-A')!)
+    expect(stored.visibility).toBe('restored')
+    act(() => { captured.ctx!.togglePanel('proj-A') })
+    expect(captured.ctx!.getState('proj-A').visibility).toBe('hidden')
+  })
+
+  it('setUserHeight persists', () => {
+    const captured = mountProvider('proj-A')
+    act(() => { captured.ctx!.ensureProject('proj-A') })
+    act(() => { captured.ctx!.setUserHeight('proj-A', 500) })
+    expect(captured.ctx!.getState('proj-A').userHeight).toBe(500)
+    const stored = JSON.parse(localStorage.getItem('specrails-hub:terminal-panel:proj-A')!)
+    expect(stored.userHeight).toBe(500)
+  })
+
+  it('per-project state is isolated', () => {
+    const captured = mountProvider('proj-A')
+    act(() => { captured.ctx!.ensureProject('proj-A') })
+    act(() => { captured.ctx!.ensureProject('proj-B') })
+    act(() => { captured.ctx!.setVisibility('proj-A', 'maximized') })
+    act(() => { captured.ctx!.setVisibility('proj-B', 'restored') })
+    expect(captured.ctx!.getState('proj-A').visibility).toBe('maximized')
+    expect(captured.ctx!.getState('proj-B').visibility).toBe('restored')
+  })
+
+  it('create updates sessions list and activates new terminal', async () => {
+    global.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if ((init?.method ?? 'GET') === 'POST') {
+        return {
+          ok: true,
+          json: async () => ({
+            session: { id: 'sess-1', projectId: 'proj-A', name: 'zsh', cols: 80, rows: 24, createdAt: 1 },
+          }),
+        }
+      }
+      return { ok: true, json: async () => ({ sessions: [], limit: 10 }) }
+    })
+    const captured = mountProvider('proj-A')
+    await act(async () => { await captured.ctx!.create('proj-A') })
+    const state = captured.ctx!.getState('proj-A')
+    expect(state.sessions.map((s) => s.id)).toEqual(['sess-1'])
+    expect(state.activeId).toBe('sess-1')
+  })
+
+  it('disposeProject clears state and localStorage for that project', () => {
+    const captured = mountProvider('proj-A')
+    act(() => { captured.ctx!.ensureProject('proj-A') })
+    act(() => { captured.ctx!.setVisibility('proj-A', 'restored') })
+    expect(captured.ctx!.getState('proj-A').visibility).toBe('restored')
+    expect(localStorage.getItem('specrails-hub:terminal-panel:proj-A')).toBeTruthy()
+    act(() => { captured.ctx!.disposeProject('proj-A') })
+    expect(localStorage.getItem('specrails-hub:terminal-panel:proj-A')).toBeNull()
+  })
+
+  it('setActive updates activeId', () => {
+    const captured = mountProvider('proj-A')
+    act(() => { captured.ctx!.ensureProject('proj-A') })
+    act(() => { captured.ctx!.setActive('proj-A', 'sess-xyz') })
+    expect(captured.ctx!.getState('proj-A').activeId).toBe('sess-xyz')
+  })
+
+  it('getContainer returns null for unknown session', () => {
+    const captured = mountProvider('proj-A')
+    expect(captured.ctx!.getContainer('unknown-id')).toBeNull()
+  })
+
+  it('focusActive is a no-op when no active session', () => {
+    const captured = mountProvider('proj-A')
+    act(() => { captured.ctx!.ensureProject('proj-A') })
+    // Just exercise — shouldn't throw
+    expect(() => captured.ctx!.focusActive('proj-A')).not.toThrow()
+  })
+
+  it('rename updates session name on success', async () => {
+    global.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH') {
+        return { ok: true, json: async () => ({ session: { id: 's1', projectId: 'proj-A', name: 'new name', cols: 80, rows: 24, createdAt: 1 } }) }
+      }
+      if (init?.method === 'POST') {
+        return { ok: true, json: async () => ({ session: { id: 's1', projectId: 'proj-A', name: 'zsh', cols: 80, rows: 24, createdAt: 1 } }) }
+      }
+      return { ok: true, json: async () => ({ sessions: [], limit: 10 }) }
+    })
+    const captured = mountProvider('proj-A')
+    await act(async () => { await captured.ctx!.create('proj-A') })
+    await act(async () => { const ok = await captured.ctx!.rename('proj-A', 's1', 'new name'); expect(ok).toBe(true) })
+    expect(captured.ctx!.getState('proj-A').sessions[0].name).toBe('new name')
+  })
+
+  it('rename returns false when server rejects', async () => {
+    global.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH') return { ok: false, json: async () => ({}) }
+      if (init?.method === 'POST') return { ok: true, json: async () => ({ session: { id: 's1', projectId: 'proj-A', name: 'zsh', cols: 80, rows: 24, createdAt: 1 } }) }
+      return { ok: true, json: async () => ({ sessions: [], limit: 10 }) }
+    })
+    const captured = mountProvider('proj-A')
+    await act(async () => { await captured.ctx!.create('proj-A') })
+    let result: boolean | null = null
+    await act(async () => { result = await captured.ctx!.rename('proj-A', 's1', 'x') })
+    expect(result).toBe(false)
+  })
+
+  it('notifyAdopted is safe when session does not exist', () => {
+    const captured = mountProvider('proj-A')
+    expect(() => captured.ctx!.notifyAdopted('non-existent')).not.toThrow()
+  })
+
+  it('create exercises xterm + WS bridge setup', async () => {
+    global.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return { ok: true, json: async () => ({ session: { id: 'xt-1', projectId: 'proj-A', name: 'zsh', cols: 80, rows: 24, createdAt: 1 } }) }
+      }
+      return { ok: true, json: async () => ({ sessions: [], limit: 10 }) }
+    })
+    const captured = mountProvider('proj-A')
+    await act(async () => { await captured.ctx!.create('proj-A') })
+    // After create, getContainer should return the HTML element for the new session
+    const container = captured.ctx!.getContainer('xt-1')
+    expect(container).not.toBeNull()
+    expect(container instanceof HTMLDivElement).toBe(true)
+  })
+
+  it('notifyAdopted with real session calls fit + focus without error', async () => {
+    global.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return { ok: true, json: async () => ({ session: { id: 'xt-2', projectId: 'proj-A', name: 'zsh', cols: 80, rows: 24, createdAt: 1 } }) }
+      }
+      return { ok: true, json: async () => ({ sessions: [], limit: 10 }) }
+    })
+    const captured = mountProvider('proj-A')
+    await act(async () => { await captured.ctx!.create('proj-A') })
+    expect(() => captured.ctx!.notifyAdopted('xt-2')).not.toThrow()
+  })
+
+  it('create returns null on non-ok response', async () => {
+    global.fetch = vi.fn().mockImplementation(async () => ({ ok: false, json: async () => ({}) }))
+    const captured = mountProvider('proj-A')
+    let result: unknown = 'unset'
+    await act(async () => { result = await captured.ctx!.create('proj-A') })
+    expect(result).toBeNull()
+  })
+
+  it('kill removes session and advances active', async () => {
+    global.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      if (method === 'POST') {
+        const count = (global as unknown as { __c?: number }).__c ?? 0
+        ;(global as unknown as { __c: number }).__c = count + 1
+        return {
+          ok: true,
+          json: async () => ({
+            session: { id: `sess-${count + 1}`, projectId: 'proj-A', name: 'zsh', cols: 80, rows: 24, createdAt: count + 1 },
+          }),
+        }
+      }
+      if (method === 'DELETE') return { ok: true, json: async () => ({ ok: true }) }
+      return { ok: true, json: async () => ({ sessions: [], limit: 10 }) }
+    })
+    ;(global as unknown as { __c: number }).__c = 0
+    const captured = mountProvider('proj-A')
+    await act(async () => { await captured.ctx!.create('proj-A') })
+    await act(async () => { await captured.ctx!.create('proj-A') })
+    const before = captured.ctx!.getState('proj-A')
+    expect(before.sessions).toHaveLength(2)
+    expect(before.activeId).toBe('sess-2')
+    await act(async () => { await captured.ctx!.kill('proj-A', 'sess-2') })
+    const after = captured.ctx!.getState('proj-A')
+    expect(after.sessions.map((s) => s.id)).toEqual(['sess-1'])
+    expect(after.activeId).toBe('sess-1')
+  })
+})

@@ -90,6 +90,14 @@ pub fn run() {
         .setup(move |app| {
             let app_handle = app.handle().clone();
 
+            // --- Force the main window to open maximized ---
+            // tauri.conf.json sets `maximized: true`, but macOS's window-state
+            // restoration can override that on subsequent launches. This explicit
+            // call guarantees the window fills the screen every time.
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.maximize();
+            }
+
             // --- Port conflict check ---
             if !check_port_available(SERVER_PORT) {
                 app_handle

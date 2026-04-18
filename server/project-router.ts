@@ -33,6 +33,15 @@ import { spawn } from 'child_process'
 import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import { createRailsRouter } from './rails-router'
+import {
+  getTerminalManager,
+  TerminalLimitExceededError,
+  TerminalNotFoundError,
+  TerminalNameInvalidError,
+  TERMINAL_MAX_PER_PROJECT,
+} from './terminal-manager'
+
+const TERMINAL_PANEL_ENABLED = process.env.SPECRAILS_TERMINAL_PANEL !== 'false'
 
 // ─── YAML helpers ─────────────────────────────────────────────────────────────
 
@@ -1575,6 +1584,81 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       console.error('[project-router] ticket delete error:', err)
       res.status(500).json({ error: 'Failed to delete ticket' })
     }
+  })
+
+  // ─── Terminals ───────────────────────────────────────────────────────────────
+
+  function requireTerminalsEnabled(_req: Request, res: Response, next: NextFunction): void {
+    if (!TERMINAL_PANEL_ENABLED) {
+      res.status(404).json({ error: 'Terminal panel disabled' })
+      return
+    }
+    next()
+  }
+
+  router.get('/:projectId/terminals', requireTerminalsEnabled, (req: Request, res: Response) => {
+    const projectId = ctx(req).project.id
+    const sessions = getTerminalManager().listForProject(projectId)
+    res.json({ sessions, limit: TERMINAL_MAX_PER_PROJECT })
+  })
+
+  router.post('/:projectId/terminals', requireTerminalsEnabled, (req: Request, res: Response) => {
+    const { cols, rows, name } = req.body ?? {}
+    const project = ctx(req).project
+    try {
+      const meta = getTerminalManager().create(project.id, {
+        cwd: project.path,
+        cols: typeof cols === 'number' ? cols : undefined,
+        rows: typeof rows === 'number' ? rows : undefined,
+        name: typeof name === 'string' ? name : undefined,
+      })
+      res.status(201).json({ session: meta })
+    } catch (err) {
+      if (err instanceof TerminalLimitExceededError) {
+        res.status(409).json({ error: 'terminal_limit_exceeded', limit: TERMINAL_MAX_PER_PROJECT })
+        return
+      }
+      if (err instanceof TerminalNameInvalidError) {
+        res.status(400).json({ error: 'terminal_name_invalid' })
+        return
+      }
+      console.error('[project-router] terminal create error:', err)
+      res.status(500).json({ error: 'Failed to create terminal' })
+    }
+  })
+
+  router.patch('/:projectId/terminals/:id', requireTerminalsEnabled, (req: Request, res: Response) => {
+    const { name } = req.body ?? {}
+    if (typeof name !== 'string') {
+      res.status(400).json({ error: 'name is required' })
+      return
+    }
+    const projectId = ctx(req).project.id
+    try {
+      const meta = getTerminalManager().rename(projectId, req.params.id as string, name)
+      res.json({ session: meta })
+    } catch (err) {
+      if (err instanceof TerminalNotFoundError) {
+        res.status(404).json({ error: 'terminal_not_found' })
+        return
+      }
+      if (err instanceof TerminalNameInvalidError) {
+        res.status(400).json({ error: 'terminal_name_invalid' })
+        return
+      }
+      console.error('[project-router] terminal rename error:', err)
+      res.status(500).json({ error: 'Failed to rename terminal' })
+    }
+  })
+
+  router.delete('/:projectId/terminals/:id', requireTerminalsEnabled, (req: Request, res: Response) => {
+    const projectId = ctx(req).project.id
+    const ok = getTerminalManager().kill(projectId, req.params.id as string)
+    if (!ok) {
+      res.status(404).json({ error: 'terminal_not_found' })
+      return
+    }
+    res.json({ ok: true })
   })
 
   return router

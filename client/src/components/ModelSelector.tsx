@@ -21,7 +21,7 @@ export const CLAUDE_MODELS = [
   { value: 'claude-opus-4-5', label: 'Claude Opus 4.5' },
   { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
   { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-  { value: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
+  { value: 'claude-opus-4-7', label: 'Claude Opus 4.7' },
 ]
 
 export const CODEX_MODELS = [
@@ -39,8 +39,8 @@ export const PRESET_DEFAULTS: Record<ModelPreset, { claude: string; codex: strin
 
 // "max" preset: Opus for architect + PM, Sonnet for rest (matches specrails-core)
 const MAX_OVERRIDES: Record<string, { claude: string; codex: string }> = {
-  'sr-architect': { claude: 'claude-opus-4-6', codex: 'o3' },
-  'sr-product-manager': { claude: 'claude-opus-4-6', codex: 'o3' },
+  'sr-architect': { claude: 'claude-opus-4-7', codex: 'o3' },
+  'sr-product-manager': { claude: 'claude-opus-4-7', codex: 'o3' },
 }
 
 export function getDefaultModel(

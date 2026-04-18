@@ -1,6 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import { Toaster, toast } from 'sonner'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { TooltipProvider } from './ui/tooltip'
 import { StatusBar } from './StatusBar'
 import { ChatPanel } from './ChatPanel'
@@ -8,7 +8,12 @@ import { usePipeline } from '../hooks/usePipeline'
 import { useChat, ChatContext } from '../hooks/useChat'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import type { HubProject } from '../hooks/useHub'
-import { FEATURE_CHAT_ENABLED } from '../lib/feature-flags'
+import { FEATURE_CHAT_ENABLED, FEATURE_TERMINAL_PANEL } from '../lib/feature-flags'
+import { BottomPanel } from './terminal/BottomPanel'
+import { PanelChevronButton } from './terminal/PanelChevronButton'
+import { useTerminals, useProjectTerminals } from '../context/TerminalsContext'
+
+const STATUSBAR_HEIGHT_PX = 28
 
 interface ProjectLayoutProps {
   project: HubProject
@@ -47,10 +52,41 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
     return () => unregisterHandler(id)
   }, [project.id, registerHandler, unregisterHandler])
 
+  // ─── Terminal panel integration ─────────────────────────────────────────────
+  const terminals = useTerminals()
+  const panelState = useProjectTerminals(project.id)
+  const outerRef = useRef<HTMLDivElement | null>(null)
+  const [viewportHeight, setViewportHeight] = useState<number>(
+    typeof window !== 'undefined' ? window.innerHeight : 820,
+  )
+
+  useLayoutEffect(() => {
+    if (!FEATURE_TERMINAL_PANEL) return
+    const el = outerRef.current
+    if (!el) return
+    const update = () => setViewportHeight(el.clientHeight)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!FEATURE_TERMINAL_PANEL) return
+    terminals.ensureProject(project.id)
+  }, [project.id, terminals])
+
+  const chevronSlot = FEATURE_TERMINAL_PANEL && panelState.visibility === 'hidden' ? (
+    <PanelChevronButton
+      isOpen={false}
+      onClick={() => terminals.setVisibility(project.id, 'restored')}
+    />
+  ) : null
+
   return (
     <TooltipProvider delayDuration={400}>
       <ChatContext.Provider value={chat}>
-      <div className="flex flex-col h-full overflow-hidden">
+      <div ref={outerRef} className="flex flex-col h-full overflow-hidden">
         {budgetExceeded && (
           <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-destructive/20 text-xs">
             <span className="text-destructive font-medium">
@@ -65,13 +101,21 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
             </button>
           </div>
         )}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden min-h-0">
           <main className="flex-1 overflow-auto">
             <Outlet />
           </main>
           {FEATURE_CHAT_ENABLED && <ChatPanel chat={chat} project={project} />}
         </div>
-        <StatusBar connectionStatus={connectionStatus} />
+        {FEATURE_TERMINAL_PANEL && (
+          <BottomPanel
+            projectId={project.id}
+            state={panelState}
+            viewportHeight={viewportHeight}
+            statusBarHeight={STATUSBAR_HEIGHT_PX}
+          />
+        )}
+        <StatusBar connectionStatus={connectionStatus} rightSlot={chevronSlot} />
       </div>
       </ChatContext.Provider>
       <Toaster

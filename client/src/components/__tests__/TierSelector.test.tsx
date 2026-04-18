@@ -17,11 +17,23 @@ describe('TierSelector', () => {
     expect(onChange).toHaveBeenCalledWith('quick')
   })
 
-  it('calls onChange with full when Full Setup is clicked', () => {
+  it('Full Setup is disabled (coming soon) — onChange is NOT called', () => {
     const onChange = vi.fn()
     render(<TierSelector tier="quick" onChange={onChange} />)
     fireEvent.click(screen.getByText('Full Setup'))
-    expect(onChange).toHaveBeenCalledWith('full')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('Full Setup shows a "Coming soon" badge', () => {
+    render(<TierSelector tier="quick" onChange={vi.fn()} />)
+    expect(screen.getByText(/coming soon/i)).toBeInTheDocument()
+  })
+
+  it('Full Setup button has disabled + aria-disabled attributes', () => {
+    render(<TierSelector tier="quick" onChange={vi.fn()} />)
+    const btn = screen.getByText('Full Setup').closest('button') as HTMLButtonElement
+    expect(btn.disabled).toBe(true)
+    expect(btn.getAttribute('aria-disabled')).toBe('true')
   })
 
   it('renders tier taglines', () => {

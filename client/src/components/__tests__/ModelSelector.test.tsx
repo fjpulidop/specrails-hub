@@ -31,7 +31,7 @@ describe('getDefaultModel', () => {
   })
 
   it('returns opus for architect in max preset (claude)', () => {
-    expect(getDefaultModel('sr-architect', 'max', 'claude')).toBe('claude-opus-4-6')
+    expect(getDefaultModel('sr-architect', 'max', 'claude')).toBe('claude-opus-4-7')
   })
 
   it('returns codex-mini-latest for budget preset (codex)', () => {
@@ -97,7 +97,7 @@ describe('ModelSelector', () => {
         agents={SAMPLE_AGENTS}
         provider="claude"
         preset="balanced"
-        overrides={{ 'sr-developer': 'claude-opus-4-6' }}
+        overrides={{ 'sr-developer': 'claude-opus-4-7' }}
         onPresetChange={vi.fn()}
         onOverrideChange={vi.fn()}
       />
@@ -112,7 +112,7 @@ describe('ModelSelector', () => {
         agents={SAMPLE_AGENTS}
         provider="claude"
         preset="balanced"
-        overrides={{ 'sr-developer': 'claude-opus-4-6' }}
+        overrides={{ 'sr-developer': 'claude-opus-4-7' }}
         onPresetChange={vi.fn()}
         onOverrideChange={onOverrideChange}
       />
@@ -128,7 +128,7 @@ describe('ModelSelector', () => {
         agents={SAMPLE_AGENTS}
         provider="claude"
         preset="balanced"
-        overrides={{ 'sr-developer': 'claude-opus-4-6', 'sr-architect': 'claude-haiku-4-5-20251001' }}
+        overrides={{ 'sr-developer': 'claude-opus-4-7', 'sr-architect': 'claude-haiku-4-5-20251001' }}
         onPresetChange={vi.fn()}
         onOverrideChange={vi.fn()}
       />

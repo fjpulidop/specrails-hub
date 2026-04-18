@@ -37,8 +37,8 @@ describe('WelcomeScreen', () => {
     expect(onAddProject).toHaveBeenCalledTimes(1)
   })
 
-  it('shows terminal command hint', () => {
+  it('does not show the CLI terminal command hint (UI-first: web / Mac app only)', () => {
     render(<WelcomeScreen onAddProject={vi.fn()} />)
-    expect(screen.getByText(/specrails-hub add/i)).toBeInTheDocument()
+    expect(screen.queryByText(/specrails-hub add/i)).not.toBeInTheDocument()
   })
 })

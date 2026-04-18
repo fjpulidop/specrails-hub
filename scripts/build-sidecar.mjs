@@ -65,6 +65,106 @@ function getPkgTarget(triple) {
   return target
 }
 
+// ─── pkg runtime patches (prepended as esbuild banner) ──────────────────────
+// Pure-JS source that runs BEFORE any bundled `require()` call. Handles:
+//   • better_sqlite3.node — redirected to external path
+//   • node-pty — loaded from external package via createRequire (so spawn-helper
+//     resolves on real fs, not inside pkg snapshot)
+//   • pty.node — redirected for dlopen
+// Under Tauri `.app` the externals live in Contents/Resources/; otherwise they
+// sit alongside the standalone sidecar binary.
+
+const PKG_RUNTIME_PATCHES = `/* BEGIN pkg native-addon hijack (injected by build-sidecar.mjs) */
+if (typeof process !== "undefined" && process.pkg !== undefined) {
+  (function () {
+    var _p = require("path");
+    var _Module = require("module");
+    var _execDir = _p.dirname(process.execPath);
+    var _inAppBundle = process.execPath.indexOf(".app/Contents/MacOS/") !== -1;
+    // Tauri v2 array-form resources preserve directory structure relative to
+    // the project root, so extracted artifacts land at Resources/binaries/*.
+    // Standalone sidecar runs (dev) keep artifacts next to the binary.
+    var _resourcesRoot = _inAppBundle ? _p.resolve(_execDir, "..", "Resources") : _execDir;
+    var _resourcesDir = _inAppBundle ? _p.resolve(_resourcesRoot, "binaries") : _resourcesRoot;
+    var _sqliteReal = _p.resolve(_resourcesDir, "better_sqlite3.node");
+    var _ptyReal = _p.resolve(_resourcesDir, "pty.node");
+    var _ptyDirReal = _p.resolve(_resourcesDir, "node-pty");
+    var _ptyModuleCached = null;
+    function _loadRealNodePty() {
+      if (_ptyModuleCached) return _ptyModuleCached;
+      var pkgPath = _p.join(_ptyDirReal, "package.json");
+      var realReq = _Module.createRequire(pkgPath);
+      _ptyModuleCached = realReq(_ptyDirReal);
+      return _ptyModuleCached;
+    }
+    var _origResolve = _Module._resolveFilename.bind(_Module);
+    _Module._resolveFilename = function () {
+      var req = arguments[0];
+      if (typeof req === "string") {
+        if (req.indexOf("better_sqlite3") !== -1) return _sqliteReal;
+        if (req.slice(-8) === "pty.node") return _ptyReal;
+      }
+      return _origResolve.apply(_Module, arguments);
+    };
+    var _origLoad = _Module._load.bind(_Module);
+    _Module._load = function () {
+      var req = arguments[0];
+      if (typeof req === "string" && (req === "node-pty" || req.indexOf("node-pty/") === 0)) {
+        return _loadRealNodePty();
+      }
+      return _origLoad.apply(_Module, arguments);
+    };
+    var _origDlopen = process.dlopen.bind(process);
+    process.dlopen = function (mod, filename, flags) {
+      if (filename && filename.indexOf("better_sqlite3") !== -1) {
+        return _origDlopen(mod, _sqliteReal, flags == null ? 1 : flags);
+      }
+      if (filename && filename.slice(-8) === "pty.node") {
+        return _origDlopen(mod, _ptyReal, flags == null ? 1 : flags);
+      }
+      return _origDlopen(mod, filename, flags == null ? 1 : flags);
+    };
+    try {
+      process.stderr.write("[pkg-patches] native-addon hijacks installed (resources=" + _resourcesDir + ")\\n");
+    } catch (_e) {}
+  })();
+}
+/* END pkg native-addon hijack */
+`
+
+// ─── node-pty helpers ────────────────────────────────────────────────────────
+
+function copyDirSync(src, dest) {
+  fs.rmSync(dest, { recursive: true, force: true })
+  fs.cpSync(src, dest, { recursive: true, dereference: false })
+}
+
+function ensureSpawnHelperExecutable(nodePtyDir) {
+  if (process.platform === 'win32') return
+  const prebuildsDir = path.join(nodePtyDir, 'prebuilds')
+  if (!fs.existsSync(prebuildsDir)) return
+  for (const entry of fs.readdirSync(prebuildsDir)) {
+    const helper = path.join(prebuildsDir, entry, 'spawn-helper')
+    if (fs.existsSync(helper)) {
+      try { fs.chmodSync(helper, 0o755) } catch {}
+    }
+  }
+}
+
+function resolvePtyAddonForTriple(triple, nodePtySrc) {
+  const map = {
+    'aarch64-apple-darwin':       path.join(nodePtySrc, 'prebuilds', 'darwin-arm64', 'pty.node'),
+    'x86_64-apple-darwin':        path.join(nodePtySrc, 'prebuilds', 'darwin-x64', 'pty.node'),
+    'x86_64-pc-windows-msvc':     path.join(nodePtySrc, 'prebuilds', 'win32-x64', 'pty.node'),
+    'aarch64-pc-windows-msvc':    path.join(nodePtySrc, 'prebuilds', 'win32-arm64', 'pty.node'),
+    'x86_64-unknown-linux-gnu':   path.join(nodePtySrc, 'prebuilds', 'linux-x64', 'pty.node'),
+    'aarch64-unknown-linux-gnu':  path.join(nodePtySrc, 'prebuilds', 'linux-arm64', 'pty.node'),
+  }
+  const p = map[triple]
+  if (!p || !fs.existsSync(p)) return null
+  return p
+}
+
 // ─── Download better-sqlite3 Node 22 compatible prebuild ─────────────────────
 // pkg uses Node 22 (MODULE_VERSION 127). The locally compiled .node may target
 // a different Node version. Always download the matching prebuild from GitHub.
@@ -130,7 +230,16 @@ async function main() {
   ensureDir(BUILD_DIR)
   ensureDir(BINARIES_DIR)
 
+  // Step 0: Patch node-pty to remove POSIX_SPAWN_CLOEXEC_DEFAULT (pkg-Node
+  // incompatibility) and rebuild its native addon. Idempotent — no-op if already patched.
+  console.log('\n[0] Patching node-pty for pkg-Node compatibility...')
+  const { execSync: _execSync } = await import('node:child_process')
+  _execSync(`node "${path.join(ROOT, 'scripts', 'patch-node-pty.mjs')}"`, { stdio: 'inherit' })
+
   // Step 1: Bundle with esbuild
+  // CRITICAL: the pkg-native-addon hijacks must run BEFORE the bundle's hoisted
+  // `require('node-pty')` statement. We inject them as a raw-JS banner so they
+  // execute before any other bundle code.
   console.log('\n[1/3] Bundling server with esbuild...')
   const { build } = await import('esbuild')
   await build({
@@ -139,7 +248,8 @@ async function main() {
     platform: 'node',
     format: 'cjs',
     outfile: BUNDLE_PATH,
-    external: ['better-sqlite3', 'fsevents'],
+    external: ['better-sqlite3', 'fsevents', 'node-pty'],
+    banner: { js: PKG_RUNTIME_PATCHES },
     minify: false,
     sourcemap: false,
     target: 'node22',
@@ -184,24 +294,67 @@ async function main() {
   fs.copyFileSync(sqliteAddon, addonDest)
   console.log(`  ${sqliteAddon} → ${addonDest}`)
 
-  // Step 4: Codesign sidecar + .node addon (macOS only, requires APPLE_SIGNING_IDENTITY)
+  // Step 3b: Copy node-pty package externally so its spawn-helper resolves on real fs.
+  // We load node-pty via createRequire from this location at runtime (see server/index.ts).
+  console.log('\n[3b] Copying node-pty package and native addon...')
+  const nodePtySrc = path.join(ROOT, 'node_modules', 'node-pty')
+  const nodePtyDest = path.join(BINARIES_DIR, 'node-pty')
+  copyDirSync(nodePtySrc, nodePtyDest)
+  // node-pty's prebuilds occasionally lose the +x bit during extraction — restore it
+  // for spawn-helper so posix_spawnp succeeds at runtime.
+  ensureSpawnHelperExecutable(nodePtyDest)
+  // Also copy pty.node to BINARIES_DIR root for the Module._resolveFilename redirect path.
+  const ptyAddonSrc = resolvePtyAddonForTriple(triple, nodePtySrc)
+  const ptyAddonDest = path.join(BINARIES_DIR, 'pty.node')
+  if (ptyAddonSrc) {
+    fs.copyFileSync(ptyAddonSrc, ptyAddonDest)
+    console.log(`  ${ptyAddonSrc} → ${ptyAddonDest}`)
+  } else {
+    console.warn(`  WARN: no pty.node prebuild found for ${triple} — terminal panel will be unavailable in this sidecar`)
+  }
+
+  // Step 4: Codesign sidecar + .node addons (macOS only, requires APPLE_SIGNING_IDENTITY)
   // Apple notarization rejects bundles with unsigned binaries or binaries missing
-  // hardened runtime + secure timestamp. We sign both artifacts here so Tauri can
+  // hardened runtime + secure timestamp. We sign all native artifacts here so Tauri can
   // either keep our signatures or re-sign them with the same identity.
   // The entitlements allow JIT (V8) + unsigned memory + library validation bypass
   // which are required for pkg-compiled Node.js binaries and native .node addons.
   const signingIdentity = process.env.APPLE_SIGNING_IDENTITY
   if (process.platform === 'darwin' && signingIdentity) {
     const entitlementsPath = path.join(ROOT, 'src-tauri', 'entitlements.plist')
-    console.log('\n[4/4] Codesigning sidecar and native addon for notarization...')
+    console.log('\n[4/4] Codesigning sidecar and native addons for notarization...')
 
     // Sign the sidecar binary with hardened runtime + entitlements
     run(`codesign --force --sign "${signingIdentity}" --options runtime --entitlements "${entitlementsPath}" --timestamp "${outputPath}"`)
     console.log(`  Signed: ${outputPath}`)
 
-    // Sign the .node addon (native Mach-O shared lib) — must be signed for notarization
+    // Sign the .node addons (native Mach-O shared libs) — must be signed for notarization
     run(`codesign --force --sign "${signingIdentity}" --timestamp "${addonDest}"`)
     console.log(`  Signed: ${addonDest}`)
+
+    if (fs.existsSync(ptyAddonDest)) {
+      run(`codesign --force --sign "${signingIdentity}" --timestamp "${ptyAddonDest}"`)
+      console.log(`  Signed: ${ptyAddonDest}`)
+    }
+
+    // Sign node-pty's prebuild + spawn-helper binaries inside the extracted dir.
+    // spawn-helper is a Mach-O executable that node-pty invokes via posix_spawnp.
+    const ptyPrebuiltDir = path.join(nodePtyDest, 'prebuilds')
+    if (fs.existsSync(ptyPrebuiltDir)) {
+      for (const entry of fs.readdirSync(ptyPrebuiltDir)) {
+        const dir = path.join(ptyPrebuiltDir, entry)
+        const pty = path.join(dir, 'pty.node')
+        const helper = path.join(dir, 'spawn-helper')
+        if (fs.existsSync(pty)) {
+          run(`codesign --force --sign "${signingIdentity}" --timestamp "${pty}"`)
+          console.log(`  Signed: ${pty}`)
+        }
+        if (fs.existsSync(helper)) {
+          run(`codesign --force --sign "${signingIdentity}" --options runtime --entitlements "${entitlementsPath}" --timestamp "${helper}"`)
+          console.log(`  Signed: ${helper}`)
+        }
+      }
+    }
   } else if (process.platform === 'darwin') {
     console.log('\n[4/4] Skipping codesign (APPLE_SIGNING_IDENTITY not set — local build)')
   }

@@ -85,6 +85,21 @@ When adding a project without specrails, a 5-phase wizard runs:
 
 Managed by `SetupManager` (server) and `SetupWizard` component (client). Hub context tracks which projects are in setup via `setupProjectIds`.
 
+**Install tiers.** The wizard offers two tiers via `TierSelector`:
+
+- **Quick Setup** — template agents, ready in seconds. Always available.
+- **Full Setup** — AI-enriched flow (codebase analysis + persona generation). **Currently disabled in the hub UI** (rendered greyed-out with a "Coming soon" badge). The feature is 100% operational in [specrails-core](https://github.com/fjpulidop/specrails-core) via `npx specrails-core@latest init` — we're working on re-integrating it into the hub. SetupWizard tests that exercise the full-tier flow are marked `it.skip('[full-tier gated] …')` / `describe.skip('[full-tier gated] Complete step', …)` — unskip them when the feature ships.
+
+### Terminal panel
+
+Per-project bottom terminal panel (VSCode/Cursor style) gated by `FEATURE_TERMINAL_PANEL` (set `VITE_FEATURE_TERMINAL_PANEL=true` to enable in the client). Server gate: `SPECRAILS_TERMINAL_PANEL !== 'false'` (default on).
+
+**Server (`server/terminal-manager.ts`)**: singleton `TerminalManager` owns all PTY sessions via `node-pty`. Each session keeps a 256 KB ring buffer of raw output, a set of attached WebSocket clients, and a stored `projectId`. Shells are spawned with `$SHELL -l -i` on POSIX (so `.zshrc` / `.bashrc` load) or `powershell.exe -NoLogo` on Windows, with `TERM=xterm-256color` + `COLORTERM=truecolor` and `cwd = project.path`. Hard cap of 10 sessions per project. REST endpoints under `/api/projects/:projectId/terminals` (GET list, POST create, PATCH rename, DELETE kill). PTY streaming uses a dedicated WebSocket `/ws/terminal/:id?token=...&projectId=...` — NOT the shared `/ws` — so terminal throughput cannot starve the project event stream. Attach protocol: `<scrollback binary>` → `{type:"ready",cols,rows}` JSON → live binary frames. Project removal via `ProjectRegistry.removeProject` calls `killAllForProject(id)`; graceful shutdown (SIGTERM/SIGINT) runs `terminalManager.shutdown()` (SIGTERM, 2s grace, SIGKILL).
+
+**Client (`client/src/context/TerminalsContext.tsx`)**: per-project state (`visibility: hidden|restored|maximized`, `userHeight`, `sessions`, `activeId`) lives in a single provider mounted above the route outlet so it survives project switches. Key invariant: xterm.js `Terminal` instances are created once per session and NEVER unmounted until kill — each session's container div is attached to a hidden `<div id="specrails-terminal-host">` appended to `document.body`. The `TerminalViewport` component `appendChild`s the active session's container into its own subtree on mount and moves it back on unmount (survives StrictMode double-invoke). Panel visibility + `userHeight` persisted per-project to `localStorage` under `specrails-hub:terminal-panel:<projectId>`. `Cmd+J` / `Ctrl+J` toggles the panel (guarded against `[role="dialog"]`) and focuses the active xterm on open. Minimize (panel chevron + StatusBar chevron at pixel-identical offset, both using `PanelChevronButton`) does NOT kill PTYs; close (trash icon + per-terminal `✕`) kills directly with no confirmation.
+
+**Desktop packaging (`scripts/build-sidecar.mjs`)**: `node-pty` is marked external in esbuild, and its full package directory is copied to `src-tauri/binaries/node-pty/` (so `spawn-helper` resolves on real filesystem instead of inside the pkg snapshot). The prebuilt `pty.node` is also copied to `src-tauri/binaries/pty.node` as a `dlopen` target. The `Module._resolveFilename` / `_load` and `process.dlopen` patches at the top of `server/index.ts` redirect `require('node-pty')` to a `createRequire`-based loader anchored at the externally extracted path. `APPLE_SIGNING_IDENTITY` triggers codesigning of `pty.node` + `spawn-helper` (hardened runtime + entitlements for the helper) for notarization.
+
 ## Conventions
 
 - **File naming**: kebab-case for server/CLI, PascalCase for React components

@@ -56,6 +56,7 @@ vi.mock('../../hooks/useChat', () => ({
 // Mock feature flags
 vi.mock('../../lib/feature-flags', () => ({
   FEATURE_CHAT_ENABLED: true,
+  FEATURE_TERMINAL_PANEL: false,
 }))
 
 // Mock child components

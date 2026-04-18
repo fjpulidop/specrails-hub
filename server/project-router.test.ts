@@ -2033,4 +2033,107 @@ describe('project-router', () => {
       expect(sendMessage).toHaveBeenCalledWith(convId, 'hello world', { lightweight: false, maxTurns: undefined })
     })
   })
+
+  // ─── Terminals ──────────────────────────────────────────────────────────────
+
+  describe('terminals', () => {
+    const tmpdir = os.tmpdir()
+
+    beforeEach(async () => {
+      // Clear any leftover sessions between tests
+      const { _resetTerminalManagerForTest } = await import('./terminal-manager')
+      _resetTerminalManagerForTest()
+    })
+
+    afterEach(async () => {
+      const { _resetTerminalManagerForTest } = await import('./terminal-manager')
+      _resetTerminalManagerForTest()
+      // give PTYs a tick to die
+      await new Promise((r) => setTimeout(r, 50))
+    })
+
+    it('GET /terminals returns empty list + limit for a fresh project', async () => {
+      const ctx = makeContext(db, { project: { id: 'proj-1', slug: 'p1', name: 'P1', path: tmpdir, db_path: ':memory:', added_at: '', last_seen_at: '' } })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/terminals')
+      expect(res.status).toBe(200)
+      expect(res.body.sessions).toEqual([])
+      expect(res.body.limit).toBe(10)
+    })
+
+    it('POST /terminals creates a session with project.path as cwd', async () => {
+      const ctx = makeContext(db, { project: { id: 'proj-1', slug: 'p1', name: 'P1', path: tmpdir, db_path: ':memory:', added_at: '', last_seen_at: '' } })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).post('/api/projects/proj-1/terminals').send({ cols: 90, rows: 30 })
+      expect(res.status).toBe(201)
+      expect(res.body.session.cwd).toBe(tmpdir)
+      expect(res.body.session.cols).toBe(90)
+      expect(res.body.session.rows).toBe(30)
+      expect(typeof res.body.session.id).toBe('string')
+    })
+
+    it('POST /terminals returns 409 when limit reached', async () => {
+      const ctx = makeContext(db, { project: { id: 'proj-1', slug: 'p1', name: 'P1', path: tmpdir, db_path: ':memory:', added_at: '', last_seen_at: '' } })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      for (let i = 0; i < 10; i++) {
+        const r = await request(app).post('/api/projects/proj-1/terminals').send({})
+        expect(r.status).toBe(201)
+      }
+      const res = await request(app).post('/api/projects/proj-1/terminals').send({})
+      expect(res.status).toBe(409)
+      expect(res.body.error).toBe('terminal_limit_exceeded')
+      expect(res.body.limit).toBe(10)
+    })
+
+    it('PATCH /terminals/:id rejects empty and overlong names with 400', async () => {
+      const ctx = makeContext(db, { project: { id: 'proj-1', slug: 'p1', name: 'P1', path: tmpdir, db_path: ':memory:', added_at: '', last_seen_at: '' } })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const create = await request(app).post('/api/projects/proj-1/terminals').send({})
+      const id = create.body.session.id
+      const bad1 = await request(app).patch(`/api/projects/proj-1/terminals/${id}`).send({ name: '' })
+      expect(bad1.status).toBe(400)
+      const bad2 = await request(app).patch(`/api/projects/proj-1/terminals/${id}`).send({ name: 'x'.repeat(65) })
+      expect(bad2.status).toBe(400)
+      const ok = await request(app).patch(`/api/projects/proj-1/terminals/${id}`).send({ name: 'build' })
+      expect(ok.status).toBe(200)
+      expect(ok.body.session.name).toBe('build')
+    })
+
+    it('PATCH /terminals/:id returns 404 for session belonging to another project', async () => {
+      const ctxA = makeContext(db, { project: { id: 'proj-A', slug: 'a', name: 'A', path: tmpdir, db_path: ':memory:', added_at: '', last_seen_at: '' } })
+      const ctxB = makeContext(initDb(':memory:'), { project: { id: 'proj-B', slug: 'b', name: 'B', path: tmpdir, db_path: ':memory:', added_at: '', last_seen_at: '' } })
+      const contexts = new Map<string, ProjectContext>()
+      contexts.set('proj-A', ctxA)
+      contexts.set('proj-B', ctxB)
+      const { app } = createApp(contexts)
+      const created = await request(app).post('/api/projects/proj-A/terminals').send({})
+      const id = created.body.session.id
+      const cross = await request(app).patch(`/api/projects/proj-B/terminals/${id}`).send({ name: 'x' })
+      expect(cross.status).toBe(404)
+    })
+
+    it('DELETE /terminals/:id returns 200 then 404 on second call', async () => {
+      const ctx = makeContext(db, { project: { id: 'proj-1', slug: 'p1', name: 'P1', path: tmpdir, db_path: ':memory:', added_at: '', last_seen_at: '' } })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const create = await request(app).post('/api/projects/proj-1/terminals').send({})
+      const id = create.body.session.id
+      const first = await request(app).delete(`/api/projects/proj-1/terminals/${id}`)
+      expect(first.status).toBe(200)
+      const second = await request(app).delete(`/api/projects/proj-1/terminals/${id}`)
+      expect(second.status).toBe(404)
+    })
+
+    it('DELETE /terminals/:id returns 404 for cross-project access', async () => {
+      const ctxA = makeContext(db, { project: { id: 'proj-A', slug: 'a', name: 'A', path: tmpdir, db_path: ':memory:', added_at: '', last_seen_at: '' } })
+      const ctxB = makeContext(initDb(':memory:'), { project: { id: 'proj-B', slug: 'b', name: 'B', path: tmpdir, db_path: ':memory:', added_at: '', last_seen_at: '' } })
+      const contexts = new Map<string, ProjectContext>()
+      contexts.set('proj-A', ctxA)
+      contexts.set('proj-B', ctxB)
+      const { app } = createApp(contexts)
+      const created = await request(app).post('/api/projects/proj-A/terminals').send({})
+      const id = created.body.session.id
+      const cross = await request(app).delete(`/api/projects/proj-B/terminals/${id}`)
+      expect(cross.status).toBe(404)
+    })
+  })
 })

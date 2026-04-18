@@ -4,8 +4,83 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>specrails — Hub</title>
+    <!--
+      Inline splash: renders instantly while the JS bundle parses + initAuth()
+      polls the sidecar. Faded out as soon as React mounts (see main.tsx).
+    -->
+    <style>
+      html, body {
+        margin: 0;
+        background: #282a36;
+        color: #f8f8f2;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      }
+      #specrails-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 18px;
+        background:
+          radial-gradient(1200px 600px at 50% 40%, rgba(189,147,249,0.10), transparent 60%),
+          radial-gradient(900px 500px at 80% 80%, rgba(255,121,198,0.08), transparent 60%),
+          #282a36;
+        z-index: 9999;
+        opacity: 1;
+        transition: opacity 220ms ease-out, visibility 0s linear 220ms;
+        -webkit-font-smoothing: antialiased;
+        -webkit-app-region: drag;
+      }
+      #specrails-splash.is-hidden {
+        opacity: 0;
+        visibility: hidden;
+      }
+      .specrails-splash__brand {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        display: flex;
+        gap: 0;
+      }
+      .specrails-splash__brand .part-a { color: #bd93f9; }
+      .specrails-splash__brand .part-b { color: #ff79c6; }
+      .specrails-splash__brand .part-c {
+        color: #6272a4;
+        font-weight: 400;
+        margin-left: 8px;
+      }
+      .specrails-splash__spinner {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 2px solid rgba(248, 248, 242, 0.12);
+        border-top-color: #bd93f9;
+        animation: specrails-spin 720ms linear infinite;
+      }
+      .specrails-splash__hint {
+        font-size: 11px;
+        color: #6272a4;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      @keyframes specrails-spin {
+        to { transform: rotate(360deg); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .specrails-splash__spinner { animation-duration: 1600ms; }
+      }
+    </style>
   </head>
   <body>
+    <div id="specrails-splash" aria-hidden="false" role="status" aria-label="Loading specrails hub">
+      <div class="specrails-splash__brand">
+        <span class="part-a">spec</span><span class="part-b">rails</span><span class="part-c">hub</span>
+      </div>
+      <div class="specrails-splash__spinner" aria-hidden="true"></div>
+      <div class="specrails-splash__hint">starting</div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

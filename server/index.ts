@@ -1,43 +1,7 @@
-// When running as a pkg binary, redirect better_sqlite3.node to the real filesystem.
-// pkg's own bootstrap patches Module._resolveFilename and throws ENOENT for assets not
-// in the virtual snapshot. We re-patch _resolveFilename (runs before pkg's version) AND
-// patch process.dlopen as belt-and-suspenders.
-// Avoid fs.existsSync — it's patched by pkg to check virtual paths. Instead detect the
-// macOS .app bundle layout by inspecting process.execPath.
-if ((process as NodeJS.Process & { pkg?: unknown }).pkg !== undefined) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const _p = require('path') as typeof import('path')
-  const _execDir = _p.dirname(process.execPath)
-  // In a macOS .app bundle the sidecar lives in Contents/MacOS/ and Tauri resources
-  // land in Contents/Resources/. Detect by path string — avoids patched fs calls.
-  const _inAppBundle = process.execPath.includes('.app/Contents/MacOS/')
-  const _sqliteReal = _inAppBundle
-    ? _p.resolve(_execDir, '..', 'Resources', 'better_sqlite3.node')
-    : _p.resolve(_execDir, 'better_sqlite3.node')   // standalone binary (dev/test)
-
-  // Re-patch Module._resolveFilename so OUR handler runs before pkg's snapshot check.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const _Module = require('module') as { _resolveFilename: (...a: unknown[]) => unknown }
-  const _origResolve = _Module._resolveFilename.bind(_Module)
-  _Module._resolveFilename = function (...args: unknown[]) {
-    if (typeof args[0] === 'string' && args[0].includes('better_sqlite3')) {
-      return _sqliteReal
-    }
-    return _origResolve(...args)
-  }
-
-  // Also patch process.dlopen in case any code path bypasses _resolveFilename.
-  type DlopenFn = (module: object, filename: string, flags?: number) => void
-  const _origDlopen = (process.dlopen as DlopenFn).bind(process)
-  ;(process as NodeJS.Process & { dlopen: DlopenFn }).dlopen = function (
-    module: object, filename: string, flags?: number
-  ) {
-    if (filename.includes('better_sqlite3')) {
-      return _origDlopen(module, _sqliteReal, flags ?? 1)
-    }
-    return _origDlopen(module, filename, flags ?? 1)
-  }
-}
+// Note: the pkg-binary native-addon hijacks (better_sqlite3.node, node-pty, pty.node)
+// used to live here but had to move to an esbuild `banner.js` in scripts/build-sidecar.mjs
+// so they run BEFORE esbuild's top-of-bundle `require('node-pty')` statement.
+// See the banner in that script for the actual patches.
 
 import http from 'http'
 import path from 'path'
@@ -65,6 +29,9 @@ import { getConfig, fetchIssues } from './config'
 import { getAnalytics } from './analytics'
 import { resolveCommand } from './command-resolver'
 import { v4 as uuidv4 } from 'uuid'
+import { getTerminalManager } from './terminal-manager'
+
+const TERMINAL_PANEL_ENABLED = process.env.SPECRAILS_TERMINAL_PANEL !== 'false'
 
 // Read package.json version once at startup
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -193,7 +160,15 @@ app.use(express.json({ limit: '1mb' }))
 
 const server = http.createServer(app)
 const wss = new WebSocketServer({ noServer: true })
+const terminalWss = new WebSocketServer({ noServer: true })
 const clients = new Set<WebSocket>()
+
+const TERMINAL_WS_RE = /^\/ws\/terminal\/([0-9a-f-]+)$/i
+
+function rejectUpgrade(socket: { write: (s: string) => void; destroy: () => void }, status: number, reason: string): void {
+  socket.write(`HTTP/1.1 ${status} ${reason}\r\nConnection: close\r\n\r\n`)
+  socket.destroy()
+}
 
 function broadcast(msg: WsMessage): void {
   const data = JSON.stringify(msg)
@@ -210,6 +185,49 @@ let _getProjectCount: () => number = () => 0
 let _legacyDb: DbInstance | null = null
 
 server.on('upgrade', (request, socket, head) => {
+  const urlStr = request.url ?? '/'
+  // Terminal PTY WebSocket endpoint: /ws/terminal/:id?token=...&projectId=...
+  const pathOnly = urlStr.split('?')[0]
+  const termMatch = pathOnly.match(TERMINAL_WS_RE)
+  if (termMatch) {
+    if (!TERMINAL_PANEL_ENABLED) return rejectUpgrade(socket, 404, 'Not Found')
+    let parsed: URL
+    try { parsed = new URL(urlStr, 'http://localhost') } catch { return rejectUpgrade(socket, 400, 'Bad Request') }
+    const token = parsed.searchParams.get('token')
+    const projectId = parsed.searchParams.get('projectId')
+    if (!token || token !== loadOrGenerateToken()) return rejectUpgrade(socket, 401, 'Unauthorized')
+    const sessionId = termMatch[1]
+    const tm = getTerminalManager()
+    const session = tm.getUnsafe(sessionId)
+    if (!session) return rejectUpgrade(socket, 404, 'Not Found')
+    if (!projectId || session.projectId !== projectId) return rejectUpgrade(socket, 403, 'Forbidden')
+    terminalWss.handleUpgrade(request, socket, head, (ws) => {
+      const meta = tm.attach(sessionId, ws)
+      if (!meta) {
+        try { ws.close(1011, 'attach_failed') } catch { /* ignore */ }
+        return
+      }
+      ws.on('message', (data, isBinary) => {
+        if (isBinary) {
+          tm.write(sessionId, data as Buffer)
+          return
+        }
+        try {
+          const txt = (data as Buffer).toString('utf8')
+          const msg = JSON.parse(txt) as { type?: string; cols?: number; rows?: number; data?: string }
+          if (msg?.type === 'resize' && typeof msg.cols === 'number' && typeof msg.rows === 'number') {
+            tm.resize(sessionId, msg.cols, msg.rows)
+          } else if (msg?.type === 'write' && typeof msg.data === 'string') {
+            tm.write(sessionId, msg.data)
+          }
+        } catch { /* ignore malformed control */ }
+      })
+      ws.on('close', () => tm.detach(sessionId, ws))
+      ws.on('error', () => tm.detach(sessionId, ws))
+    })
+    return
+  }
+  // Default: main event WebSocket.
   wss.handleUpgrade(request, socket, head, (ws) => {
     wss.emit('connection', ws, request)
   })
@@ -708,9 +726,13 @@ server.listen(port, '127.0.0.1', () => {
 
 // ─── Clean shutdown ───────────────────────────────────────────────────────────
 
-function shutdown(): void {
+async function shutdown(): Promise<void> {
   removePidFile()
-  wss.close()
+  try {
+    await getTerminalManager().shutdown()
+  } catch { /* ignore */ }
+  try { wss.close() } catch { /* ignore */ }
+  try { terminalWss.close() } catch { /* ignore */ }
   if (_legacyDb) {
     try { _legacyDb.close() } catch { /* ignore */ }
   }
@@ -719,5 +741,5 @@ function shutdown(): void {
   })
 }
 
-process.on('SIGTERM', shutdown)
-process.on('SIGINT', shutdown)
+process.on('SIGTERM', () => { void shutdown() })
+process.on('SIGINT', () => { void shutdown() })

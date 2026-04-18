@@ -16,7 +16,8 @@
         "minWidth": 900,
         "minHeight": 600,
         "decorations": false,
-        "center": true
+        "center": true,
+        "maximized": true
       }
     ],
     "security": {
@@ -34,9 +35,11 @@
       "icons/icon.ico"
     ],
     "externalBin": ["binaries/specrails-server"],
-    "resources": {
-      "binaries/better_sqlite3.node": "better_sqlite3.node"
-    },
+    "resources": [
+      "binaries/better_sqlite3.node",
+      "binaries/pty.node",
+      "binaries/node-pty/**/*"
+    ],
     "macOS": {
       "entitlements": "./entitlements.plist"
     }
