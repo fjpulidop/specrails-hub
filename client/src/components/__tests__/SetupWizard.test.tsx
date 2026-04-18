@@ -113,6 +113,35 @@ describe('SetupWizard', () => {
       // Default tier is 'quick', so the button reads "Quick Install"
       expect(screen.getByText('Quick Install')).toBeInTheDocument()
     })
+
+    it('centers the install CTA (quick tier)', () => {
+      const project = makeProject()
+      render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      const wrapper = screen.getByTestId('install-cta-wrapper')
+      expect(wrapper).toHaveClass('mx-auto')
+      expect(wrapper).toContainElement(screen.getByText('Quick Install'))
+    })
+
+    it('centers the install CTA (full tier)', () => {
+      const project = makeProject()
+      render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      // Switch to full setup tier
+      fireEvent.click(screen.getByText('Full Setup'))
+      const wrapper = screen.getByTestId('install-cta-wrapper')
+      expect(wrapper).toHaveClass('mx-auto')
+      expect(wrapper).toContainElement(screen.getByText('Install & Enrich'))
+    })
+
+    it('keeps "Skip for now" left-anchored in the footer', () => {
+      const project = makeProject()
+      render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      const skip = screen.getByText('Skip for now')
+      expect(skip.className).toContain('absolute')
+      expect(skip.className).toContain('left-')
+      // And Skip appears before the centered install wrapper in DOM order.
+      const wrapper = screen.getByTestId('install-cta-wrapper')
+      expect(skip.compareDocumentPosition(wrapper) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
   })
 
   describe('Transition to installing step', () => {

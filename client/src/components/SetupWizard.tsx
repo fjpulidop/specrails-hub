@@ -229,23 +229,25 @@ function AgentSelectionStep({
         )}
       </div>
 
-      {/* Footer actions */}
-      <div className="flex-shrink-0 border-t border-border/30 px-6 py-4 flex items-center justify-between gap-3">
+      {/* Footer actions — install CTA centered, skip left-anchored */}
+      <div className="flex-shrink-0 border-t border-border/30 px-6 py-4 relative flex items-center">
         <button
           onClick={onSkip}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="absolute left-6 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           Skip for now
         </button>
-        <Button
-          size="sm"
-          className="gap-2"
-          onClick={onInstall}
-          disabled={config.selectedAgents.length === 0}
-        >
-          <Package className="w-3.5 h-3.5" />
-          {config.tier === 'quick' ? 'Quick Install' : 'Install & Enrich'}
-        </Button>
+        <div data-testid="install-cta-wrapper" className="mx-auto">
+          <Button
+            size="sm"
+            className="gap-2"
+            onClick={onInstall}
+            disabled={config.selectedAgents.length === 0}
+          >
+            <Package className="w-3.5 h-3.5" />
+            {config.tier === 'quick' ? 'Quick Install' : 'Install & Enrich'}
+          </Button>
+        </div>
       </div>
     </div>
   )
