@@ -1479,4 +1479,140 @@ describe('QueueManager', () => {
       expect(job.priority).toBe('normal')
     })
   })
+
+  // ─── Codex parity ─────────────────────────────────────────────────────────
+
+  describe('codex parity', () => {
+    it('embeds systemAppend in the codex prompt (headless --yes flag)', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('codex-sys-job' as any)
+
+      const qmCodex = new QueueManager(broadcast, undefined, [], undefined, {
+        provider: 'codex',
+        resolvedModel: 'codex-mini-latest',
+      })
+      qmCodex.enqueue('/sr:implement #1 --yes')
+
+      const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
+      expect(spawnCall[0]).toBe('codex')
+      const promptArg = spawnCall[1][1] as string
+      // systemAppend (headless mode instructions) should be embedded before the prompt
+      expect(promptArg).toContain('FULLY AUTONOMOUS MODE')
+      expect(promptArg).toContain('---')
+    })
+
+    it('embeds local-tickets reminder in codex prompt for implement commands', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('codex-tickets-job' as any)
+
+      const qmCodex = new QueueManager(broadcast, undefined, [], undefined, { provider: 'codex' })
+      qmCodex.enqueue('/sr:implement #42')
+
+      const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
+      const promptArg = spawnCall[1][1] as string
+      expect(promptArg).toContain('local-tickets.json')
+    })
+
+    it('passes --model flag to codex spawns using resolvedModel', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('codex-model-job' as any)
+
+      const qmCodex = new QueueManager(broadcast, undefined, [], undefined, {
+        provider: 'codex',
+        resolvedModel: 'o3',
+      })
+      qmCodex.enqueue('/sr:implement #1')
+
+      const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      expect(spawnArgs).toContain('--model')
+      expect(spawnArgs).toContain('o3')
+    })
+
+    it('defaults to codex-mini-latest model when no resolvedModel is set', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('codex-default-model-job' as any)
+
+      const qmCodex = new QueueManager(broadcast, undefined, [], undefined, { provider: 'codex' })
+      qmCodex.enqueue('/sr:implement #1')
+
+      const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      expect(spawnArgs).toContain('--model')
+      expect(spawnArgs).toContain('codex-mini-latest')
+    })
+
+    it('creates synthetic result event when codex exits code=0 with no result event', async () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('codex-result-job' as any)
+
+      const db = initDb(':memory:')
+      const qmCodex = new QueueManager(broadcast, db, undefined, undefined, {
+        provider: 'codex',
+        resolvedModel: 'codex-mini-latest',
+      })
+      qmCodex.enqueue('/sr:implement #1')
+
+      // Codex outputs plain text, not JSON result events
+      child.stdout.push('Some output from codex\n')
+      child.stdout.push(null)
+      await new Promise((r) => setImmediate(r))
+      child.emit('close', 0)
+      await new Promise((r) => setTimeout(r, 30))
+
+      const jobs = qmCodex.getJobs()
+      const job = jobs.find((j) => j.id === 'codex-result-job')
+      expect(job?.status).toBe('completed')
+
+      // Cost tracking: job row in DB should have total_cost_usd = 0
+      const row = db.prepare('SELECT total_cost_usd, model FROM jobs WHERE id = ?').get('codex-result-job') as
+        | { total_cost_usd: number | null; model: string | null }
+        | undefined
+      expect(row).toBeDefined()
+      expect(row?.total_cost_usd).toBe(0)
+      expect(row?.model).toBe('codex-mini-latest')
+    })
+
+    it('output chaining: embeds parent resultText in codex prompt via systemAppend', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
+      const child1 = createMockChildProcess()
+      const child2 = createMockChildProcess()
+      vi.mocked(mockSpawn)
+        .mockReturnValueOnce(child1 as any)
+        .mockReturnValueOnce(child2 as any)
+      vi.mocked(mockUuidV4)
+        .mockReturnValueOnce('parent-job' as any)
+        .mockReturnValueOnce('child-job' as any)
+
+      const db = initDb(':memory:')
+      const qmCodex = new QueueManager(broadcast, db, undefined, undefined, { provider: 'codex' })
+
+      qmCodex.enqueue('first step')
+      // Finish parent — codex outputs plain text
+      child1.stdout.push('Parent result text\n')
+      child1.stdout.push(null)
+      // Manually set resultText to simulate parent output
+      const jobs = qmCodex.getJobs()
+      const parentJob = jobs.find((j) => j.id === 'parent-job')
+      if (parentJob) parentJob.resultText = 'Parent result text'
+      child1.emit('close', 0)
+
+      qmCodex.enqueue('second step', { dependsOnJobId: 'parent-job' })
+      // Drain queue manually
+      const spawnCalls = vi.mocked(mockSpawn).mock.calls
+      const secondSpawnArgs = spawnCalls[spawnCalls.length - 1]?.[1] as string[] | undefined
+      if (secondSpawnArgs) {
+        const prompt = secondSpawnArgs[1] as string
+        expect(prompt).toContain('Parent result text')
+      }
+    })
+  })
 })

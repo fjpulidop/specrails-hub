@@ -41,6 +41,23 @@ describe('getDefaultModel', () => {
   it('returns codex-mini-latest for architect in balanced preset (codex)', () => {
     expect(getDefaultModel('sr-architect', 'balanced', 'codex')).toBe('codex-mini-latest')
   })
+
+  it('returns o3 for sr-architect in max preset (codex)', () => {
+    expect(getDefaultModel('sr-architect', 'max', 'codex')).toBe('o3')
+  })
+
+  it('returns o3 for sr-product-manager in max preset (codex)', () => {
+    expect(getDefaultModel('sr-product-manager', 'max', 'codex')).toBe('o3')
+  })
+
+  it('returns codex-mini-latest for sr-developer in max preset (codex)', () => {
+    expect(getDefaultModel('sr-developer', 'max', 'codex')).toBe('codex-mini-latest')
+  })
+
+  it('returns codex-mini-latest for any agent in budget preset (codex)', () => {
+    expect(getDefaultModel('sr-developer', 'budget', 'codex')).toBe('codex-mini-latest')
+    expect(getDefaultModel('sr-architect', 'budget', 'codex')).toBe('codex-mini-latest')
+  })
 })
 
 describe('ModelSelector', () => {

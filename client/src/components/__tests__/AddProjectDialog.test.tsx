@@ -166,4 +166,22 @@ describe('AddProjectDialog', () => {
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
     expect(screen.getByRole('heading', { name: /Add Project/i })).toBeInTheDocument()
   })
+
+  it('when only codex is available, claude button is disabled and codex is auto-selected', async () => {
+    // Mock providers: claude=false, codex=true
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ claude: false, codex: true }),
+    })
+
+    render(<AddProjectDialog open={true} onClose={vi.fn()} />)
+
+    await waitFor(() => {
+      const claudeBtn = screen.getByRole('button', { name: /Claude/i })
+      expect(claudeBtn).toBeDisabled()
+    })
+
+    const codexBtn = screen.getByRole('button', { name: /Codex/i })
+    expect(codexBtn).not.toBeDisabled()
+  })
 })

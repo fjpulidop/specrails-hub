@@ -496,4 +496,100 @@ describe('ChatManager', () => {
     expect(resumeCall).toBeDefined()
     expect(resumeCall![1]).toContain('sess-resume')
   })
+
+  // ─── Codex parity ────────────────────────────────────────────────────────────
+
+  describe('codex provider', () => {
+    let dbCodex: DbInstance
+    let codexBroadcast: ReturnType<typeof vi.fn>
+    let cmCodex: ChatManager
+
+    beforeEach(() => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
+      dbCodex = initDb(':memory:')
+      codexBroadcast = vi.fn()
+      cmCodex = new ChatManager(codexBroadcast, dbCodex, '/some/project', 'MyProject', 'codex')
+    })
+
+    it('embeds system prompt in codex exec prompt (project name appears in args)', async () => {
+      createConversation(dbCodex, { id: 'codex-conv-1', model: 'codex-mini-latest' })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      const sendPromise = cmCodex.sendMessage('codex-conv-1', 'Hello codex')
+
+      child.stdout.push('Hi from codex\n')
+      await finishProcess(child, 0)
+      await sendPromise
+
+      const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
+      expect(spawnCall[0]).toBe('codex')
+      const promptArg = spawnCall[1][1] as string
+      // The system prompt containing project name should be embedded
+      expect(promptArg).toContain('MyProject')
+      // Followed by the separator and user message
+      expect(promptArg).toContain('---')
+      expect(promptArg).toContain('Hello codex')
+    })
+
+    it('defaults to codex-mini-latest when conversation.model is empty string', async () => {
+      // Create a conversation with empty model — simulates a null/missing model override
+      createConversation(dbCodex, { id: 'codex-conv-empty-model', model: '' })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      const sendPromise = cmCodex.sendMessage('codex-conv-empty-model', 'test')
+      await finishProcess(child, 0)
+      await sendPromise
+
+      const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      expect(spawnArgs).toContain('--model')
+      expect(spawnArgs).toContain('codex-mini-latest')
+    })
+
+    it('persists synthetic session_id with codex- prefix on successful close', async () => {
+      createConversation(dbCodex, { id: 'codex-conv-session', model: 'codex-mini-latest' })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      const sendPromise = cmCodex.sendMessage('codex-conv-session', 'Hello')
+      child.stdout.push('Some response\n')
+      await finishProcess(child, 0)
+      await sendPromise
+
+      const conv = getConversation(dbCodex, 'codex-conv-session')
+      expect(conv?.session_id).toMatch(/^codex-codex-conv-session-\d+$/)
+    })
+
+    it('auto-title for codex: spawns codex exec with title prompt and sets title', async () => {
+      // Two spawns: main message + auto-title
+      createConversation(dbCodex, { id: 'codex-conv-title', model: 'codex-mini-latest' })
+      const mainChild = createMockChildProcess()
+      const titleChild = createMockChildProcess()
+      vi.mocked(mockSpawn)
+        .mockReturnValueOnce(mainChild as any)
+        .mockReturnValueOnce(titleChild as any)
+
+      const sendPromise = cmCodex.sendMessage('codex-conv-title', 'What is specrails?')
+      mainChild.stdout.push('Specrails is a pipeline framework\n')
+      await finishProcess(mainChild, 0)
+      await sendPromise
+
+      // The title spawn should be codex exec
+      const titleSpawnCall = vi.mocked(mockSpawn).mock.calls[1]
+      expect(titleSpawnCall[0]).toBe('codex')
+      expect(titleSpawnCall[1][0]).toBe('exec')
+
+      // Simulate title process returning a title
+      titleChild.stdout.push('SpecRails Pipeline Framework\n')
+      await finishProcess(titleChild, 0)
+      await new Promise((r) => setTimeout(r, 30))
+
+      const titleUpdates = codexBroadcast.mock.calls
+        .map((args) => args[0] as Record<string, unknown>)
+        .filter((msg) => msg.type === 'chat_title_update')
+      expect(titleUpdates).toHaveLength(1)
+      expect(titleUpdates[0].title).toBe('SpecRails Pipeline Framework')
+    })
+  })
 })
