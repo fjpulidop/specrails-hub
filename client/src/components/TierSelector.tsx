@@ -25,7 +25,7 @@ const TIERS: {
     bullets: [
       'Template agents with sensible defaults',
       'No AI personalization step',
-      'Run /sr:enrich any time to personalize',
+      'Run /specrails:enrich any time to personalize',
     ],
     icon: Zap,
     color: 'text-dracula-green',
