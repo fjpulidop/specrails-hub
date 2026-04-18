@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.34.1](https://github.com/fjpulidop/specrails-hub/compare/v1.34.0...v1.34.1) (2026-04-18)
+
+
+### Bug Fixes
+
+* **desktop:** purge node-gyp build/ dir before bundling — Apple notarization ([#221](https://github.com/fjpulidop/specrails-hub/issues/221)) ([2a27550](https://github.com/fjpulidop/specrails-hub/commit/2a27550a0092bfe0c32bc6e2cbf7f0e912431e44))
+
 ## [1.34.0](https://github.com/fjpulidop/specrails-hub/compare/v1.33.0...v1.34.0) (2026-04-18)
 
 
