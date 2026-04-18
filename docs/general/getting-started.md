@@ -40,6 +40,13 @@ Starts the Express server on port **4200** and opens the dashboard at `http://12
 
 If specrails-core is not yet installed, a setup wizard launches automatically to install and configure it.
 
+**Install tiers**
+
+The setup wizard offers two tiers:
+
+- **Quick Setup** (default) — template agents with sensible defaults, ready in seconds. Personalize later by running `/specrails:enrich` from any terminal.
+- **Full Setup** — AI-personalized agents: codebase analysis, persona generation, 50+ project-specific placeholders. **Temporarily unavailable from specrails-hub — marked "Coming soon" in the UI.** The functionality is 100% operational in [specrails-core](https://github.com/fjpulidop/specrails-core) (run `npx specrails-core@latest init` → choose full tier) — we're working on bringing it natively into the hub. Until then, use Quick Setup from the hub and run the enrichment commands from specrails-core directly when you need the full flow.
+
 **From the CLI:**
 
 ```bash

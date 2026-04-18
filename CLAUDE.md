@@ -85,6 +85,11 @@ When adding a project without specrails, a 5-phase wizard runs:
 
 Managed by `SetupManager` (server) and `SetupWizard` component (client). Hub context tracks which projects are in setup via `setupProjectIds`.
 
+**Install tiers.** The wizard offers two tiers via `TierSelector`:
+
+- **Quick Setup** — template agents, ready in seconds. Always available.
+- **Full Setup** — AI-enriched flow (codebase analysis + persona generation). **Currently disabled in the hub UI** (rendered greyed-out with a "Coming soon" badge). The feature is 100% operational in [specrails-core](https://github.com/fjpulidop/specrails-core) via `npx specrails-core@latest init` — we're working on re-integrating it into the hub. SetupWizard tests that exercise the full-tier flow are marked `it.skip('[full-tier gated] …')` / `describe.skip('[full-tier gated] Complete step', …)` — unskip them when the feature ships.
+
 ### Terminal panel
 
 Per-project bottom terminal panel (VSCode/Cursor style) gated by `FEATURE_TERMINAL_PANEL` (set `VITE_FEATURE_TERMINAL_PANEL=true` to enable in the client). Server gate: `SPECRAILS_TERMINAL_PANEL !== 'false'` (default on).

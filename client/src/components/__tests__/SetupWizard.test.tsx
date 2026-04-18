@@ -122,14 +122,13 @@ describe('SetupWizard', () => {
       expect(wrapper).toContainElement(screen.getByText('Quick Install'))
     })
 
-    it('centers the install CTA (full tier)', () => {
+    it('Full Setup tier is disabled (coming soon) — clicking does not change tier', () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
-      // Switch to full setup tier
+      // Quick is the default; clicking Full Setup should NOT swap the CTA label.
       fireEvent.click(screen.getByText('Full Setup'))
-      const wrapper = screen.getByTestId('install-cta-wrapper')
-      expect(wrapper).toHaveClass('mx-auto')
-      expect(wrapper).toContainElement(screen.getByText('Install & Enrich'))
+      expect(screen.getByText('Quick Install')).toBeInTheDocument()
+      expect(screen.queryByText('Install & Enrich')).not.toBeInTheDocument()
     })
 
     it('keeps "Skip for now" left-anchored in the footer', () => {
@@ -230,7 +229,7 @@ describe('SetupWizard', () => {
       expect(screen.queryByText('Should not appear')).toBeNull()
     })
 
-    it('transitions to enriching step on setup_install_done (full tier)', async () => {
+    it.skip('[full-tier gated] transitions to enriching step on setup_install_done (full tier)', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
       // Switch to full tier so install_done transitions to enriching
@@ -248,7 +247,7 @@ describe('SetupWizard', () => {
       })
     })
 
-    it('marks complete on setup_complete message (full tier)', async () => {
+    it.skip('[full-tier gated] marks complete on setup_complete message (full tier)', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
       // Switch to full tier
@@ -290,7 +289,7 @@ describe('SetupWizard', () => {
       })
     })
 
-    it('updates checkpoint status on setup_checkpoint message (full tier)', async () => {
+    it.skip('[full-tier gated] updates checkpoint status on setup_checkpoint message (full tier)', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
       // Switch to full tier so install_done transitions to enriching
@@ -376,7 +375,7 @@ describe('SetupWizard', () => {
       })
     })
 
-    it('enriching step shows a Back button (full tier)', async () => {
+    it.skip('[full-tier gated] enriching step shows a Back button (full tier)', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
       fireEvent.click(screen.getByText('Full Setup'))
@@ -390,7 +389,7 @@ describe('SetupWizard', () => {
       expect(screen.getByRole('button', { name: /^back$/i })).toBeInTheDocument()
     })
 
-    it('Back button in enriching step returns to installing (full tier)', async () => {
+    it.skip('[full-tier gated] Back button in enriching step returns to installing (full tier)', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
       fireEvent.click(screen.getByText('Full Setup'))
@@ -407,7 +406,7 @@ describe('SetupWizard', () => {
       })
     })
 
-    it('user input in setup chat is preserved when navigating back and forward (full tier)', async () => {
+    it.skip('[full-tier gated] user input in setup chat is preserved when navigating back and forward (full tier)', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
       fireEvent.click(screen.getByText('Full Setup'))
@@ -428,7 +427,9 @@ describe('SetupWizard', () => {
     })
   })
 
-  describe('Complete step', () => {
+  // All "Complete step" tests exercise the full-tier enrich path, which is
+  // temporarily gated (UI "Coming soon"). Skipped until Full Setup is released.
+  describe.skip('[full-tier gated] Complete step', () => {
     type SummaryOverride = {
       agents?: number
       specrailsCommands?: number
