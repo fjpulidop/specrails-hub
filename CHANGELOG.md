@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.34.0](https://github.com/fjpulidop/specrails-hub/compare/v1.33.0...v1.34.0) (2026-04-18)
+
+
+### Features
+
+* per-project terminal panel ([#219](https://github.com/fjpulidop/specrails-hub/issues/219)) ([e4a2c5d](https://github.com/fjpulidop/specrails-hub/commit/e4a2c5d05bc4d370f9f2104ea3d1c399685e4a31))
+
 ## [1.33.0](https://github.com/fjpulidop/specrails-hub/compare/v1.32.0...v1.33.0) (2026-04-17)
 
 
