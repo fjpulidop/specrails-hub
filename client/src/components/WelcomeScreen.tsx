@@ -25,13 +25,6 @@ export function WelcomeScreen({ onAddProject }: WelcomeScreenProps) {
         <FolderOpen className="w-3.5 h-3.5" />
         Add your first project
       </Button>
-
-      <div className="text-[10px] text-muted-foreground space-y-1">
-        <p>Or register a project from the terminal:</p>
-        <code className="font-mono bg-muted/50 px-2 py-0.5 rounded text-xs">
-          specrails-hub add /path/to/project
-        </code>
-      </div>
     </div>
   )
 }
