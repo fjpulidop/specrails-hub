@@ -5,7 +5,8 @@
   "identifier": "sh.specrails.hub",
   "build": {
     "frontendDist": "../client/dist",
-    "devUrl": "http://localhost:4201"
+    "devUrl": "http://localhost:4201",
+    "beforeBundleCommand": "node ../scripts/fix-desktop-bundle.mjs"
   },
   "app": {
     "windows": [
