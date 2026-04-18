@@ -300,6 +300,13 @@ async function main() {
   const nodePtySrc = path.join(ROOT, 'node_modules', 'node-pty')
   const nodePtyDest = path.join(BINARIES_DIR, 'node-pty')
   copyDirSync(nodePtySrc, nodePtyDest)
+  // Purge node-gyp intermediate outputs — they contain unsigned duplicates of
+  // pty.node + spawn-helper under build/Release/ that Apple notarization
+  // rejects with "binary is not signed with a valid Developer ID certificate"
+  // and "signature does not include a secure timestamp". The signed copies
+  // live under prebuilds/<platform>-<arch>/ and are what node-pty actually
+  // resolves at runtime via node-gyp-build.
+  fs.rmSync(path.join(nodePtyDest, 'build'), { recursive: true, force: true })
   // node-pty's prebuilds occasionally lose the +x bit during extraction — restore it
   // for spawn-helper so posix_spawnp succeeds at runtime.
   ensureSpawnHelperExecutable(nodePtyDest)
