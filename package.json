@@ -28,7 +28,8 @@
     "build:cli": "tsc --project tsconfig.cli.json",
     "build": "npm run build:server && cd client && npm run build && cd .. && npm run build:cli",
     "build:sidecar": "node scripts/build-sidecar.mjs",
-    "build:desktop": "npm run build:server && cd client && npm run build && cd .. && npm run build:sidecar && tauri build",
+    "build:desktop": "npm run build:server && cd client && npm run build && cd .. && npm run build:sidecar && tauri build && npm run postbuild:desktop",
+    "postbuild:desktop": "node scripts/fix-desktop-bundle.mjs",
     "generate-icons": "tauri icon src-tauri/icons/icon.svg",
     "typecheck": "tsc --noEmit && cd client && tsc --noEmit",
     "check-core-compat": "tsx scripts/check-core-compat.ts",
@@ -44,6 +45,7 @@
     "better-sqlite3": "^12.8.0",
     "chokidar": "^5.0.0",
     "express": "^5.2.1",
+    "node-pty": "^1.0.0",
     "tree-kill": "^1.2.2",
     "uuid": "^13.0.0",
     "ws": "^8.16.0"

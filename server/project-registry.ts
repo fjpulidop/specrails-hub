@@ -8,6 +8,7 @@ import { ProposalManager } from './proposal-manager'
 import { SpecLauncherManager } from './spec-launcher-manager'
 import { WebhookManager } from './webhook-manager'
 import { TicketWatcher } from './ticket-watcher'
+import { getTerminalManager } from './terminal-manager'
 import { resolveTicketStoragePath, mutateStore } from './ticket-store'
 import type { WsMessage, TicketUpdatedMessage } from './types'
 import {
@@ -83,6 +84,8 @@ export class ProjectRegistry {
   removeProject(id: string): void {
     const ctx = this._contexts.get(id)
     if (ctx) {
+      // Kill any terminal sessions belonging to this project
+      try { getTerminalManager().killAllForProject(id) } catch { /* ignore */ }
       // Close the ticket file watcher
       ctx.ticketWatcher.close().catch(() => { /* ignore */ })
       // Close the DB connection

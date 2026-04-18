@@ -35,6 +35,8 @@ import { SpecGenTrackerProvider } from './hooks/useSpecGenTracker'
 import { useOsNotifications } from './hooks/useOsNotifications'
 import { WS_URL } from './lib/ws-url'
 import { API_ORIGIN } from './lib/origin'
+import { TerminalsProvider, useTerminals } from './context/TerminalsContext'
+import { FEATURE_TERMINAL_PANEL } from './lib/feature-flags'
 
 // ─── Hub mode detection ───────────────────────────────────────────────────────
 
@@ -139,6 +141,7 @@ function HubApp() {
   const { projects, activeProjectId, isLoading, isSwitchingProject, setupProjectIds, completeSetupWizard, setActiveProjectId } = useHub()
   const { setLeftPinned, setRightPinned } = useSidebarPin()
   const navigate = useNavigate()
+  const terminals = useTerminals()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [analyticsOpen, setAnalyticsOpen] = useState(false)
@@ -163,6 +166,18 @@ function HubApp() {
       const route = PROJECT_PAGES[index - 1]
       if (route) navigate(route)
     },
+    onToggleTerminalPanel: FEATURE_TERMINAL_PANEL ? () => {
+      if (!activeProjectId) return
+      terminals.togglePanel(activeProjectId)
+      const state = terminals.getState(activeProjectId)
+      // After toggle, state.visibility reflects the NEW value (togglePanel is synchronous to state updater)
+      // Focus the active terminal once the panel is opening.
+      if (state.visibility !== 'hidden') terminals.focusActive(activeProjectId)
+      else {
+        // Ensure focus after next tick when panel is now open
+        queueMicrotask(() => terminals.focusActive(activeProjectId))
+      }
+    } : undefined,
   })
 
   // OS notifications for job completions/failures
@@ -277,6 +292,13 @@ function HubApp() {
   )
 }
 
+// ─── Terminals provider wrapper (reads active project from useHub) ───────────
+
+function TerminalsProviderWithHub({ children }: { children: React.ReactNode }) {
+  const { activeProjectId } = useHub()
+  return <TerminalsProvider activeProjectId={activeProjectId}>{children}</TerminalsProvider>
+}
+
 // ─── Legacy mode OS notification hook ────────────────────────────────────────
 
 function LegacyOsNotifications() {
@@ -322,7 +344,9 @@ export default function App() {
               <TitleBar />
               <SpecGenTrackerProvider>
                 <SidebarPinProvider>
-                  <HubApp />
+                  <TerminalsProviderWithHub>
+                    <HubApp />
+                  </TerminalsProviderWithHub>
                 </SidebarPinProvider>
               </SpecGenTrackerProvider>
             </HubProvider>

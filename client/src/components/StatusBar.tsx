@@ -11,9 +11,11 @@ interface Stats {
 
 interface StatusBarProps {
   connectionStatus: 'connecting' | 'connected' | 'disconnected'
+  /** Optional slot rendered at the far right (e.g. the terminal panel chevron). */
+  rightSlot?: React.ReactNode
 }
 
-export function StatusBar({ connectionStatus }: StatusBarProps) {
+export function StatusBar({ connectionStatus, rightSlot }: StatusBarProps) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const prevStatusRef = useRef<'connecting' | 'connected' | 'disconnected'>('connecting')
@@ -89,9 +91,10 @@ export function StatusBar({ connectionStatus }: StatusBarProps) {
         </span>
       </div>
 
-      {/* Stats */}
-      <div className="flex items-center gap-3">
+      {/* Stats + right slot (terminal chevron) */}
+      <div className="flex items-center gap-2">
         {stats && stats.totalCostUsd > 0 && <span>${stats.totalCostUsd.toFixed(2)}</span>}
+        {rightSlot}
       </div>
     </footer>
   )

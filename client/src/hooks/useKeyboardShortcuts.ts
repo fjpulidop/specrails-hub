@@ -16,6 +16,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: 'Esc', description: 'Close modal / sidebar', category: 'general' },
   { keys: '⌘B', description: 'Toggle right sidebar', category: 'general' },
   { keys: '⌥⌘B', description: 'Toggle left sidebar', category: 'general' },
+  { keys: '⌘J', description: 'Toggle terminal panel', category: 'general' },
   { keys: '⌘1–4', description: 'Navigate to project page (Home/Jobs/Analytics/Settings)', category: 'general' },
   { keys: '⌥⌘1–9', description: 'Switch to project by position', category: 'general' },
 
@@ -33,10 +34,24 @@ export const SHORTCUTS: Shortcut[] = [
 // ─── Input detection ─────────────────────────────────────────────────────────
 
 function isEditableTarget(e: KeyboardEvent): boolean {
-  const tag = (e.target as HTMLElement)?.tagName
+  const el = e.target as HTMLElement | null
+  if (!el) return false
+  const tag = el.tagName
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
-  if ((e.target as HTMLElement)?.isContentEditable) return true
+  if (el.isContentEditable) return true
   return false
+}
+
+function isInsideDialog(e: KeyboardEvent): boolean {
+  const el = e.target as HTMLElement | null
+  if (!el || typeof (el as { closest?: unknown }).closest !== 'function') return false
+  return !!el.closest('[role="dialog"]')
+}
+
+function isInsideXterm(e: KeyboardEvent): boolean {
+  const el = e.target as HTMLElement | null
+  if (!el || typeof (el as { closest?: unknown }).closest !== 'function') return false
+  return !!el.closest('.specrails-xterm-container, .xterm')
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
@@ -53,6 +68,8 @@ interface UseKeyboardShortcutsOptions {
   onSwitchProject?: (index: number) => void
   /** Navigate to project page by 1-based index (Home, Jobs, Analytics, Settings…) */
   onSwitchProjectPage?: (index: number) => void
+  /** Toggle the bottom terminal panel (Cmd+J / Ctrl+J) */
+  onToggleTerminalPanel?: () => void
 }
 
 export function useKeyboardShortcuts({
@@ -62,6 +79,7 @@ export function useKeyboardShortcuts({
   onToggleRightSidebar,
   onSwitchProject,
   onSwitchProjectPage,
+  onToggleTerminalPanel,
 }: UseKeyboardShortcutsOptions) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -81,13 +99,26 @@ export function useKeyboardShortcuts({
   onSwitchProjectRef.current = onSwitchProject
   const onSwitchProjectPageRef = useRef(onSwitchProjectPage)
   onSwitchProjectPageRef.current = onSwitchProjectPage
+  const onToggleTerminalPanelRef = useRef(onToggleTerminalPanel)
+  onToggleTerminalPanelRef.current = onToggleTerminalPanel
   const locationRef = useRef(location)
   locationRef.current = location
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // Never intercept when typing in inputs
+      // ⌘J / Ctrl+J → toggle terminal panel (allowed from xterm too — xterm captures
+      // keystrokes but we want this shortcut to work even when terminal is focused).
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.code === 'KeyJ') {
+        if (isInsideDialog(e)) return
+        e.preventDefault()
+        onToggleTerminalPanelRef.current?.()
+        return
+      }
+
+      // Never intercept when typing in inputs or when an xterm has focus
       if (isEditableTarget(e)) return
+      if (isInsideXterm(e)) return
+      if (isInsideDialog(e)) return
 
       // ⌘B → toggle right sidebar  (e.code avoids Option layer chars like '∫')
       if ((e.metaKey || e.ctrlKey) && !e.altKey && e.code === 'KeyB') {
