@@ -101,8 +101,16 @@ if (typeof process !== "undefined" && process.pkg !== undefined) {
     _Module._resolveFilename = function () {
       var req = arguments[0];
       if (typeof req === "string") {
+        // Redirect better-sqlite3's addon lookups to the extracted copy.
         if (req.indexOf("better_sqlite3") !== -1) return _sqliteReal;
-        if (req.slice(-8) === "pty.node") return _ptyReal;
+        // NOTE: intentionally NOT intercepting pty.node lookups here.
+        // node-pty's loadNativeModule probes build/Release, build/Debug, then
+        // prebuilds/<plat>-<arch> and relies on MODULE_NOT_FOUND to advance
+        // through the list. Forcing a redirect made it stop at build/Release
+        // even after that dir was stripped from the bundle (notarization fix),
+        // so spawn-helper resolution went to a non-existent path. The
+        // process.dlopen hook below still redirects the actual pty.node
+        // binary load to _ptyReal, which is all we need.
       }
       return _origResolve.apply(_Module, arguments);
     };
