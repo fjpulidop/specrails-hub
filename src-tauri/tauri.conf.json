@@ -5,8 +5,7 @@
   "identifier": "sh.specrails.hub",
   "build": {
     "frontendDist": "../client/dist",
-    "devUrl": "http://localhost:4201",
-    "beforeBundleCommand": "node scripts/fix-desktop-bundle.mjs"
+    "devUrl": "http://localhost:4201"
   },
   "app": {
     "windows": [
@@ -36,10 +35,11 @@
       "icons/icon.ico"
     ],
     "externalBin": ["binaries/specrails-server"],
-    "resources": {
-      "binaries/better_sqlite3.node": "better_sqlite3.node",
-      "binaries/pty.node": "pty.node"
-    },
+    "resources": [
+      "binaries/better_sqlite3.node",
+      "binaries/pty.node",
+      "binaries/node-pty/**/*"
+    ],
     "macOS": {
       "entitlements": "./entitlements.plist"
     }

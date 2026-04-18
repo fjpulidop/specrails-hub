@@ -81,7 +81,11 @@ if (typeof process !== "undefined" && process.pkg !== undefined) {
     var _Module = require("module");
     var _execDir = _p.dirname(process.execPath);
     var _inAppBundle = process.execPath.indexOf(".app/Contents/MacOS/") !== -1;
-    var _resourcesDir = _inAppBundle ? _p.resolve(_execDir, "..", "Resources") : _execDir;
+    // Tauri v2 array-form resources preserve directory structure relative to
+    // the project root, so extracted artifacts land at Resources/binaries/*.
+    // Standalone sidecar runs (dev) keep artifacts next to the binary.
+    var _resourcesRoot = _inAppBundle ? _p.resolve(_execDir, "..", "Resources") : _execDir;
+    var _resourcesDir = _inAppBundle ? _p.resolve(_resourcesRoot, "binaries") : _resourcesRoot;
     var _sqliteReal = _p.resolve(_resourcesDir, "better_sqlite3.node");
     var _ptyReal = _p.resolve(_resourcesDir, "pty.node");
     var _ptyDirReal = _p.resolve(_resourcesDir, "node-pty");
