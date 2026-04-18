@@ -1201,7 +1201,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
     if (provider === 'codex') {
       binary = 'codex'
-      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'o4-mini']
+      // Use codex-mini-latest (preset balanced/budget default); never hardcode o4-mini
+      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'codex-mini-latest']
     } else {
       binary = 'claude'
       args = [
@@ -1468,7 +1469,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
     if (provider === 'codex') {
       binary = 'codex'
-      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'o4-mini']
+      // Use codex-mini-latest (preset balanced/budget default); never hardcode o4-mini
+      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'codex-mini-latest']
     } else {
       binary = 'claude'
       args = [

@@ -113,6 +113,8 @@ export class QueueManager {
   private _getCostAlertThreshold: (() => number | null) | null
   private _getHubDailyBudget: (() => { budget: number | null; totalSpend: number }) | null
   private _provider: 'claude' | 'codex'
+  /** Effective model to use when spawning codex processes. Ignored for claude (reads from .claude/ config). */
+  private _resolvedModel: string | null
   private _onJobFinished: ((jobId: string, status: Job['status'], costUsd?: number) => void) | null
 
   constructor(
@@ -125,6 +127,8 @@ export class QueueManager {
       getCostAlertThreshold?: () => number | null
       getHubDailyBudget?: () => { budget: number | null; totalSpend: number }
       provider?: 'claude' | 'codex'
+      /** Effective model for codex spawns. If omitted, falls back to 'codex-mini-latest'. */
+      resolvedModel?: string
       onJobFinished?: (jobId: string, status: Job['status'], costUsd?: number) => void
     }
   ) {
@@ -146,6 +150,7 @@ export class QueueManager {
     this._getCostAlertThreshold = options?.getCostAlertThreshold ?? null
     this._getHubDailyBudget = options?.getHubDailyBudget ?? null
     this._provider = options?.provider ?? 'claude'
+    this._resolvedModel = options?.resolvedModel ?? null
     this._onJobFinished = options?.onJobFinished ?? null
 
     const envTimeout = process.env.WM_ZOMBIE_TIMEOUT_MS !== undefined
@@ -444,9 +449,14 @@ export class QueueManager {
     let args: string[]
     if (this._provider === 'codex') {
       binary = 'codex'
-      // Codex doesn't support slash commands — resolve the prompt
+      // Codex doesn't support slash commands — resolve the prompt.
+      // Codex also has no --append-system-prompt flag: embed systemAppend directly
+      // in the prompt so headless-mode instructions, output-chaining context, and
+      // local-tickets reminders are preserved end-to-end.
       const resolved = this._resolveCommand(commandToRun)
-      args = ['exec', resolved]
+      const fullPrompt = systemAppend ? `${systemAppend}\n\n---\n\n${resolved}` : resolved
+      const resolvedModel = this._resolvedModel ?? 'codex-mini-latest'
+      args = ['exec', fullPrompt, '--model', resolvedModel]
     } else {
       binary = 'claude'
       args = [
@@ -598,6 +608,25 @@ export class QueueManager {
 
     child.on('close', (code) => {
       flushPending() // flush any remaining batched messages before job exit
+
+      // Codex doesn't emit a `result` JSON event — synthesise one so token/cost
+      // tracking and cost alerts behave consistently for both providers.
+      // cost is always 0 for codex (no token-level billing API exposed); this is
+      // intentional so cost-threshold alerts remain inactive rather than firing
+      // spuriously with a zero value.
+      if (this._provider === 'codex' && lastResultEvent === null && code === 0) {
+        const durationMs = job.startedAt
+          ? Date.now() - new Date(job.startedAt).getTime()
+          : 0
+        lastResultEvent = {
+          type: 'result',
+          total_cost_usd: 0,
+          model: this._resolvedModel ?? 'codex-mini-latest',
+          duration_ms: durationMs,
+          num_turns: 1,
+        }
+      }
+
       this._onJobExit(jobId, code, lastResultEvent, emitLine)
     })
 
