@@ -160,17 +160,25 @@ function ensureSpawnHelperExecutable(nodePtyDir) {
 }
 
 function resolvePtyAddonForTriple(triple, nodePtySrc) {
-  const map = {
-    'aarch64-apple-darwin':       path.join(nodePtySrc, 'prebuilds', 'darwin-arm64', 'pty.node'),
-    'x86_64-apple-darwin':        path.join(nodePtySrc, 'prebuilds', 'darwin-x64', 'pty.node'),
-    'x86_64-pc-windows-msvc':     path.join(nodePtySrc, 'prebuilds', 'win32-x64', 'pty.node'),
-    'aarch64-pc-windows-msvc':    path.join(nodePtySrc, 'prebuilds', 'win32-arm64', 'pty.node'),
-    'x86_64-unknown-linux-gnu':   path.join(nodePtySrc, 'prebuilds', 'linux-x64', 'pty.node'),
-    'aarch64-unknown-linux-gnu':  path.join(nodePtySrc, 'prebuilds', 'linux-arm64', 'pty.node'),
-  }
-  const p = map[triple]
-  if (!p || !fs.existsSync(p)) return null
+  const sub = prebuildPlatformArch(triple)
+  if (!sub) return null
+  const p = path.join(nodePtySrc, 'prebuilds', sub, 'pty.node')
+  if (!fs.existsSync(p)) return null
   return p
+}
+
+/** Rust target triple → the `<platform>-<arch>` directory name used by
+ *  node-pty's `prebuilds/` layout (and by node-gyp-build at runtime). */
+function prebuildPlatformArch(triple) {
+  switch (triple) {
+    case 'aarch64-apple-darwin':      return 'darwin-arm64'
+    case 'x86_64-apple-darwin':       return 'darwin-x64'
+    case 'x86_64-pc-windows-msvc':    return 'win32-x64'
+    case 'aarch64-pc-windows-msvc':   return 'win32-arm64'
+    case 'x86_64-unknown-linux-gnu':  return 'linux-x64'
+    case 'aarch64-unknown-linux-gnu': return 'linux-arm64'
+    default:                          return null
+  }
 }
 
 // ─── Download better-sqlite3 Node 22 compatible prebuild ─────────────────────
@@ -315,6 +323,25 @@ async function main() {
   // live under prebuilds/<platform>-<arch>/ and are what node-pty actually
   // resolves at runtime via node-gyp-build.
   fs.rmSync(path.join(nodePtyDest, 'build'), { recursive: true, force: true })
+
+  // Trim ~60 MB of dead weight from the .app bundle: other platforms'
+  // prebuilds (win32-arm64 + win32-x64 alone are 58 MB), Windows-only
+  // runtime deps (deps/winpty, third_party/conpty), and dev-only files
+  // (C++ sources, install scripts, node-addon-api headers, typings).
+  // node-pty only needs `lib/`, `package.json`, and the prebuild matching
+  // the current Rust target triple.
+  const prebuildsDir = path.join(nodePtyDest, 'prebuilds')
+  const keepPrebuild = prebuildPlatformArch(triple)
+  if (fs.existsSync(prebuildsDir)) {
+    for (const entry of fs.readdirSync(prebuildsDir)) {
+      if (entry !== keepPrebuild) {
+        fs.rmSync(path.join(prebuildsDir, entry), { recursive: true, force: true })
+      }
+    }
+  }
+  for (const junk of ['src', 'deps', 'third_party', 'scripts', 'node-addon-api', 'typings', 'binding.gyp', 'tsconfig.json', '.github', '.vscode', '.drone.yml']) {
+    fs.rmSync(path.join(nodePtyDest, junk), { recursive: true, force: true })
+  }
   // node-pty's prebuilds occasionally lose the +x bit during extraction — restore it
   // for spawn-helper so posix_spawnp succeeds at runtime.
   ensureSpawnHelperExecutable(nodePtyDest)
