@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.34.2](https://github.com/fjpulidop/specrails-hub/compare/v1.34.1...v1.34.2) (2026-04-18)
+
+
+### Bug Fixes
+
+* **desktop:** terminal panel broken in v1.34.1 — restore node-pty fallback resolution ([#223](https://github.com/fjpulidop/specrails-hub/issues/223)) ([12f1ca3](https://github.com/fjpulidop/specrails-hub/commit/12f1ca394e7e9dea02b23416aae095afee778a5f))
+
 ## [1.34.1](https://github.com/fjpulidop/specrails-hub/compare/v1.34.0...v1.34.1) (2026-04-18)
 
 
