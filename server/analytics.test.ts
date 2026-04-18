@@ -349,13 +349,13 @@ describe('getAnalytics', () => {
       started_at: new Date().toISOString(),
       status: 'completed',
       total_cost_usd: 0.02,
-      model: 'claude-opus-4-6',
+      model: 'claude-opus-4-7',
     })
 
     const result = getAnalytics(db, { period: 'all' })
 
     expect(result.bonusMetrics.modelBreakdown).toHaveLength(2)
-    const opus = result.bonusMetrics.modelBreakdown.find((m: any) => m.model === 'claude-opus-4-6')
+    const opus = result.bonusMetrics.modelBreakdown.find((m: any) => m.model === 'claude-opus-4-7')
     expect(opus).toBeDefined()
     expect(opus!.totalCostUsd).toBeCloseTo(0.02)
   })
