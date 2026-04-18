@@ -16,6 +16,19 @@ async function bootstrap() {
       </BrowserRouter>
     </StrictMode>
   )
+
+  // Fade out the instant HTML/CSS splash once React has hydrated the shell.
+  // One more rAF so the first frame is painted before we start the transition.
+  const splash = document.getElementById('specrails-splash')
+  if (splash) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        splash.classList.add('is-hidden')
+        // Remove from DOM after the CSS transition completes (220ms).
+        setTimeout(() => splash.remove(), 300)
+      })
+    })
+  }
 }
 
 bootstrap()
