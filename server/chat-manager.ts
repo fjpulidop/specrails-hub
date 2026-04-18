@@ -209,9 +209,8 @@ export class ChatManager {
     if (this._provider === 'codex') {
       binary = 'codex'
       // Codex: single-turn exec with model selection.
-      // Default to codex-mini-latest (matches the balanced/budget preset defaults).
-      // Never fall back to o4-mini — that is a user-selectable option, not a default.
-      const model = conversation.model || 'codex-mini-latest'
+      // Default to gpt-5.4-mini (matches the budget preset default).
+      const model = conversation.model || 'gpt-5.4-mini'
       // Embed the system prompt directly in the prompt (codex has no --system-prompt flag).
       // This ensures project context, local-tickets permission, and COMMAND_INSTRUCTION
       // are honoured on every codex chat turn.
@@ -402,7 +401,7 @@ export class ChatManager {
         // Codex outputs plain text — spawn codex exec and take the first non-empty line
         const child = spawn('codex', [
           'exec', titlePrompt,
-          '--model', 'codex-mini-latest',
+          '--model', 'gpt-5.4-mini',
         ], {
           env: process.env,
           shell: false,

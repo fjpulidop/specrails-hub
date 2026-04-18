@@ -1491,7 +1491,7 @@ describe('QueueManager', () => {
 
       const qmCodex = new QueueManager(broadcast, undefined, [], undefined, {
         provider: 'codex',
-        resolvedModel: 'codex-mini-latest',
+        resolvedModel: 'gpt-5.4-mini',
       })
       qmCodex.enqueue('/sr:implement #1 --yes')
 
@@ -1525,16 +1525,16 @@ describe('QueueManager', () => {
 
       const qmCodex = new QueueManager(broadcast, undefined, [], undefined, {
         provider: 'codex',
-        resolvedModel: 'o3',
+        resolvedModel: 'gpt-5.3-codex',
       })
       qmCodex.enqueue('/sr:implement #1')
 
       const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
       expect(spawnArgs).toContain('--model')
-      expect(spawnArgs).toContain('o3')
+      expect(spawnArgs).toContain('gpt-5.3-codex')
     })
 
-    it('defaults to codex-mini-latest model when no resolvedModel is set', () => {
+    it('defaults to gpt-5.4-mini model when no resolvedModel is set', () => {
       vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
@@ -1545,7 +1545,7 @@ describe('QueueManager', () => {
 
       const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
       expect(spawnArgs).toContain('--model')
-      expect(spawnArgs).toContain('codex-mini-latest')
+      expect(spawnArgs).toContain('gpt-5.4-mini')
     })
 
     it('creates synthetic result event when codex exits code=0 with no result event', async () => {
@@ -1557,7 +1557,7 @@ describe('QueueManager', () => {
       const db = initDb(':memory:')
       const qmCodex = new QueueManager(broadcast, db, undefined, undefined, {
         provider: 'codex',
-        resolvedModel: 'codex-mini-latest',
+        resolvedModel: 'gpt-5.4-mini',
       })
       qmCodex.enqueue('/sr:implement #1')
 
@@ -1578,7 +1578,7 @@ describe('QueueManager', () => {
         | undefined
       expect(row).toBeDefined()
       expect(row?.total_cost_usd).toBe(0)
-      expect(row?.model).toBe('codex-mini-latest')
+      expect(row?.model).toBe('gpt-5.4-mini')
     })
 
     it('output chaining: embeds parent resultText in codex prompt via systemAppend', () => {
