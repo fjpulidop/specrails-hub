@@ -139,4 +139,31 @@ describe('ChatInput', () => {
     await user.selectOptions(select, 'claude-opus-4-7')
     expect(onModelChange).toHaveBeenCalledWith('claude-opus-4-7')
   })
+
+  it('when provider=codex, dropdown lists gpt-5.4-mini as the first option', () => {
+    render(
+      <ChatInput
+        {...defaultProps}
+        provider="codex"
+        model="gpt-5.4-mini"
+      />
+    )
+    const select = screen.getByRole('combobox') as HTMLSelectElement
+    const options = Array.from(select.options).map((o) => o.value)
+    expect(options[0]).toBe('gpt-5.4-mini')
+    expect(options).toContain('gpt-5.4')
+    expect(options).toContain('gpt-5.3-codex')
+  })
+
+  it('when provider=codex, model selector value is gpt-5.4-mini when set', () => {
+    render(
+      <ChatInput
+        {...defaultProps}
+        provider="codex"
+        model="gpt-5.4-mini"
+      />
+    )
+    const select = screen.getByRole('combobox') as HTMLSelectElement
+    expect(select.value).toBe('gpt-5.4-mini')
+  })
 })

@@ -135,7 +135,7 @@ export function getCLIStatus(): CLIStatus {
   if (!provider) return { provider: null, version: null }
 
   try {
-    const versionFlag = provider === 'codex' ? '--version' : '--version'
+    const versionFlag = '--version'
     const raw = execSync(`${provider} ${versionFlag}`, {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'ignore'],

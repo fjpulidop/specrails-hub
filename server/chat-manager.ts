@@ -208,9 +208,18 @@ export class ChatManager {
 
     if (this._provider === 'codex') {
       binary = 'codex'
-      // Codex: single-turn exec with model selection
-      const model = conversation.model || 'o4-mini'
-      args = ['exec', resolvedText, '--model', model]
+      // Codex: single-turn exec with model selection.
+      // Default to gpt-5.4-mini (matches the budget preset default).
+      const model = conversation.model || 'gpt-5.4-mini'
+      // Embed the system prompt directly in the prompt (codex has no --system-prompt flag).
+      // This ensures project context, local-tickets permission, and COMMAND_INSTRUCTION
+      // are honoured on every codex chat turn.
+      const lightweight = options?.lightweight ?? false
+      const systemPrompt = lightweight
+        ? this._buildLightweightSystemPrompt()
+        : this._buildSystemPrompt()
+      const fullPrompt = `${systemPrompt}\n\n---\n\n${resolvedText}`
+      args = ['exec', fullPrompt, '--model', model]
     } else {
       binary = 'claude'
       const lightweight = options?.lightweight ?? false
@@ -332,7 +341,12 @@ export class ChatManager {
             addMessage(this._db, { conversation_id: conversationId, role: 'assistant', content: fullText })
           }
 
-          // Update session_id
+          // Update session_id.
+          // For codex: generate a synthetic session ID so that subsequent refreshes
+          // can still resolve the conversation. Pattern mirrors setup-manager.ts:810.
+          if (!capturedSessionId && this._provider === 'codex') {
+            capturedSessionId = `codex-${conversationId}-${Date.now()}`
+          }
           if (capturedSessionId) {
             updateConversation(this._db, conversationId, { session_id: capturedSessionId })
           }
@@ -383,9 +397,43 @@ export class ChatManager {
         `Generate a 4-6 word title for this conversation. Output ONLY the title text, no quotes or punctuation.\n\n` +
         `User: ${firstUserMsg.slice(0, 200)}\nAssistant: ${firstResponse.slice(0, 300)}`
 
-      // Auto-title only available with Claude (needs JSON stream parsing)
-      if (this._provider !== 'claude') return
+      if (this._provider === 'codex') {
+        // Codex outputs plain text — spawn codex exec and take the first non-empty line
+        const child = spawn('codex', [
+          'exec', titlePrompt,
+          '--model', 'gpt-5.4-mini',
+        ], {
+          env: process.env,
+          shell: false,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          cwd: this._cwd,
+        })
 
+        let titleText = ''
+        const reader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
+
+        reader.on('line', (line) => {
+          // Take the first non-empty output line as the title
+          if (!titleText && line.trim()) {
+            titleText = line.trim()
+          }
+        })
+
+        child.on('close', (code) => {
+          if (code === 0 && titleText) {
+            updateConversation(this._db, conversationId, { title: titleText })
+            this._broadcast({
+              type: 'chat_title_update',
+              conversationId,
+              title: titleText,
+              timestamp: new Date().toISOString(),
+            })
+          }
+        })
+        return
+      }
+
+      // Claude: JSON stream parsing
       const child = spawn('claude', [
         '--dangerously-skip-permissions',
         '--output-format', 'stream-json',
