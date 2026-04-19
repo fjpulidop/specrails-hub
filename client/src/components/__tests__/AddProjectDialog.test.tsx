@@ -162,8 +162,30 @@ describe('AddProjectDialog', () => {
     expect(screen.getByRole('button', { name: /Codex/i })).toBeInTheDocument()
   })
 
+  it('Codex button is disabled with "Coming Soon" label (coming soon — in lab)', async () => {
+    render(<AddProjectDialog open={true} onClose={vi.fn()} />)
+    const codexBtn = screen.getByRole('button', { name: /Codex/i })
+    expect(codexBtn).toBeDisabled()
+    expect(codexBtn).toHaveTextContent(/Coming Soon/i)
+  })
+
   it('shows Add Project dialog title', async () => {
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
     expect(screen.getByRole('heading', { name: /Add Project/i })).toBeInTheDocument()
+  })
+
+  it('when only codex is reported by server, codex remains disabled (forced to false client-side)', async () => {
+    // Server may say codex=true, but client forces it to unavailable until the lab feature ships.
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ claude: true, codex: true }),
+    })
+
+    render(<AddProjectDialog open={true} onClose={vi.fn()} />)
+
+    await waitFor(() => {
+      const codexBtn = screen.getByRole('button', { name: /Codex/i })
+      expect(codexBtn).toBeDisabled()
+    })
   })
 })

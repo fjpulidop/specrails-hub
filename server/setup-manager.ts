@@ -368,7 +368,9 @@ export function sweepLegacySrCommands(projectPath: string): number {
 async function validateCoreContract(): Promise<void> {
   const contractPath = await findCoreContract()
   if (!contractPath) {
-    console.warn('[Hub] ⚠️  Could not find integration-contract.json from specrails-core')
+    // specrails-core does not yet ship integration-contract.json (planned in RFC-003).
+    // Fall back silently to runtime defaults — Hub works fine without the contract.
+    console.debug('[Hub] integration-contract.json not found — using runtime defaults')
     return
   }
 
@@ -377,7 +379,7 @@ async function validateCoreContract(): Promise<void> {
     const raw = require('fs').readFileSync(contractPath, 'utf-8') as string
     contract = JSON.parse(raw) as { checkpoints?: string[]; commands?: string[] }
   } catch {
-    console.warn('[Hub] ⚠️  Failed to parse integration-contract.json')
+    console.debug('[Hub] integration-contract.json failed to parse — using runtime defaults')
     return
   }
 
@@ -420,6 +422,8 @@ export class SetupManager {
   private _projectProviders: Map<string, CLIProvider>
   // Track each project's install tier (quick vs full)
   private _projectTiers: Map<string, InstallTier>
+  // Track project names for codex context header injection
+  private _projectNames: Map<string, string>
 
   constructor(
     broadcast: (msg: WsMessage) => void,
@@ -437,6 +441,7 @@ export class SetupManager {
     this._installLogBuffer = new Map()
     this._projectProviders = new Map()
     this._projectTiers = new Map()
+    this._projectNames = new Map()
   }
 
   // ─── Quick Install: Hub writes install-config.yaml + npx init --from-config ──
@@ -624,13 +629,14 @@ export class SetupManager {
 
   // ─── Enrich: claude -p "/specrails:enrich --from-config" ────────────────────
 
-  startEnrich(projectId: string, projectPath: string, provider?: 'claude' | 'codex'): void {
+  startEnrich(projectId: string, projectPath: string, provider?: 'claude' | 'codex', projectName?: string): void {
     if (this._setupProcesses.has(projectId)) {
       console.warn(`[SetupManager] enrich already running for ${projectId}`)
       return
     }
 
     if (provider) this._projectProviders.set(projectId, provider)
+    if (projectName) this._projectNames.set(projectId, projectName)
     this._projectTiers.set(projectId, 'full')
 
     this._initCheckpoints(projectId)
@@ -779,7 +785,16 @@ export class SetupManager {
         }
       }
 
-      resolvedArgs = ['exec', '--full-auto', prompt]
+      // Prepend project context header so codex knows which project/cwd it is
+      // enriching (codex has no CLAUDE.md awareness or file-system context by
+      // default when spawned in --full-auto mode).
+      // Only injected when projectName was provided — callers that don't pass it
+      // get the plain prompt (backward-compatible with existing tests).
+      const projectName = this._projectNames.get(projectId)
+      const finalPrompt = projectName
+        ? `PROJECT: ${projectName}\nCWD: ${projectPath}\n\n---\n\n${prompt}`
+        : prompt
+      resolvedArgs = ['exec', '--full-auto', finalPrompt]
     } else {
       // Default to claude (also covers null — warns and tries claude as fallback)
       if (provider === null) {

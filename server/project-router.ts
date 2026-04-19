@@ -1201,7 +1201,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
     if (provider === 'codex') {
       binary = 'codex'
-      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'o4-mini']
+      // Use gpt-5.4-mini (balanced preset default for Codex per CODEX_MODELS/PRESET_DEFAULTS in ModelSelector); never hardcode o4-mini
+      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'gpt-5.4-mini']
     } else {
       binary = 'claude'
       args = [
@@ -1468,7 +1469,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
     if (provider === 'codex') {
       binary = 'codex'
-      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'o4-mini']
+      // Use gpt-5.4-mini (balanced preset default for Codex per CODEX_MODELS/PRESET_DEFAULTS in ModelSelector); never hardcode o4-mini
+      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'gpt-5.4-mini']
     } else {
       binary = 'claude'
       args = [
