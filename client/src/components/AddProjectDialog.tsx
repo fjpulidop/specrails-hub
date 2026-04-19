@@ -37,9 +37,10 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
     fetch('/api/hub/available-providers')
       .then((r) => r.json())
       .then((data) => {
-        setAvailableProviders(data)
-        if (!data.claude && data.codex) setSelectedProvider('codex')
-        else setSelectedProvider('claude')
+        // Codex support is coming soon (in lab) — force the UI to treat it as unavailable
+        // so the provider selector renders it non-selectable with a "Coming Soon" label.
+        setAvailableProviders({ claude: Boolean(data.claude), codex: false })
+        setSelectedProvider('claude')
       })
       .catch(() => { /* ignore — defaults to claude */ })
   }, [open])
@@ -202,22 +203,21 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
               </button>
 
               <button
-                disabled={!availableProviders.codex}
-                onClick={() => setSelectedProvider('codex')}
+                disabled
+                aria-disabled="true"
+                title="Codex (OpenAI) — Coming Soon. Currently being tested in our lab."
+                onClick={(e) => e.preventDefault()}
                 className={cn(
                   'flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-left transition-colors text-xs',
                   'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                  selectedProvider === 'codex' && availableProviders.codex
-                    ? 'border-dracula-orange/60 bg-dracula-orange/10 text-foreground'
-                    : 'border-border/30 text-muted-foreground hover:border-border/60',
-                  !availableProviders.codex && 'opacity-40 cursor-not-allowed'
+                  'border-border/30 text-muted-foreground opacity-50 cursor-not-allowed'
                 )}
               >
                 <span>⚡</span>
                 <span className="font-medium">Codex</span>
-                {!availableProviders.codex && (
-                  <span className="text-[9px] text-muted-foreground/60">not found</span>
-                )}
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-dracula-orange/80">
+                  Coming Soon
+                </span>
               </button>
             </div>
             <p className="text-[9px] text-muted-foreground/70">

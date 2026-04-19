@@ -483,12 +483,13 @@ describe('hub-router', () => {
   // ─── GET /api/hub/available-providers ───────────────────────────────────────
 
   describe('GET /api/hub/available-providers', () => {
-    it('returns available CLI providers', async () => {
+    it('returns available CLI providers (codex forced to false — coming soon)', async () => {
       const { app } = createApp()
       const res = await request(app).get('/api/hub/available-providers')
       expect(res.status).toBe(200)
       expect(res.body).toHaveProperty('claude')
       expect(res.body).toHaveProperty('codex')
+      expect(res.body.codex).toBe(false)
     })
   })
 
@@ -505,14 +506,14 @@ describe('hub-router', () => {
       expect(res.body.error).toContain('provider')
     })
 
-    it('creates project with explicit codex provider', async () => {
+    it('rejects codex provider with 400 (coming soon — in lab)', async () => {
       const { app } = createApp()
       const res = await request(app).post('/api/hub/projects').send({
         path: '/home/user/proj-codex',
         provider: 'codex',
       })
-      expect(res.status).toBe(201)
-      expect(res.body.project).toBeDefined()
+      expect(res.status).toBe(400)
+      expect(res.body.error).toMatch(/coming soon|lab/i)
     })
 
     it('returns 400 when path is a system-critical directory', async () => {

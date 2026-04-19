@@ -73,12 +73,15 @@ export function createHubRouter(
   })
 
   // GET /api/hub/available-providers — which AI CLIs are installed, plus supported install tiers
+  //
+  // Codex (OpenAI) support is currently being tested in our lab ("Coming Soon") and is
+  // intentionally reported as unavailable so the Hub UI renders it non-selectable.
   router.get('/available-providers', (_req, res) => {
     const providers = detectAvailableCLIs()
     // tiers: quick install is always available (Hub-driven config); full requires an AI CLI
     const tiers: ('quick' | 'full')[] = ['quick']
-    if (providers.claude || providers.codex) tiers.push('full')
-    res.json({ ...providers, tiers })
+    if (providers.claude) tiers.push('full')
+    res.json({ claude: providers.claude, codex: false, tiers })
   })
 
   // POST /api/hub/projects — register a new project by path
@@ -88,8 +91,14 @@ export function createHubRouter(
       res.status(400).json({ error: 'path is required' })
       return
     }
-    if (provider !== undefined && provider !== 'claude' && provider !== 'codex') {
-      res.status(400).json({ error: 'provider must be "claude" or "codex"' })
+    if (provider === 'codex') {
+      res.status(400).json({
+        error: 'Codex (OpenAI) support is coming soon — currently being tested in our lab. Please use Claude for now.',
+      })
+      return
+    }
+    if (provider !== undefined && provider !== 'claude') {
+      res.status(400).json({ error: 'provider must be "claude"' })
       return
     }
 
