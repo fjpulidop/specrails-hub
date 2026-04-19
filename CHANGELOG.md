@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.34.3](https://github.com/fjpulidop/specrails-hub/compare/v1.34.2...v1.34.3) (2026-04-19)
+
+
+### Bug Fixes
+
+* **codex:** gate Codex provider in Hub UI and installer until lab release ships ([#227](https://github.com/fjpulidop/specrails-hub/issues/227)) ([389a6dc](https://github.com/fjpulidop/specrails-hub/commit/389a6dcee6c4465ec147f7e6ce8b2e6d03efcd5b))
+
 ## [1.34.2](https://github.com/fjpulidop/specrails-hub/compare/v1.34.1...v1.34.2) (2026-04-18)
 
 
