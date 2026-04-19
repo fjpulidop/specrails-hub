@@ -368,7 +368,9 @@ export function sweepLegacySrCommands(projectPath: string): number {
 async function validateCoreContract(): Promise<void> {
   const contractPath = await findCoreContract()
   if (!contractPath) {
-    console.warn('[Hub] ⚠️  Could not find integration-contract.json from specrails-core')
+    // specrails-core does not yet ship integration-contract.json (planned in RFC-003).
+    // Fall back silently to runtime defaults — Hub works fine without the contract.
+    console.debug('[Hub] integration-contract.json not found — using runtime defaults')
     return
   }
 
@@ -377,7 +379,7 @@ async function validateCoreContract(): Promise<void> {
     const raw = require('fs').readFileSync(contractPath, 'utf-8') as string
     contract = JSON.parse(raw) as { checkpoints?: string[]; commands?: string[] }
   } catch {
-    console.warn('[Hub] ⚠️  Failed to parse integration-contract.json')
+    console.debug('[Hub] integration-contract.json failed to parse — using runtime defaults')
     return
   }
 

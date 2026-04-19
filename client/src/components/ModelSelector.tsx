@@ -32,9 +32,9 @@ export const CODEX_MODELS = [
 
 // Preset → default model per provider (matches specrails-core MODEL_PRESETS)
 export const PRESET_DEFAULTS: Record<ModelPreset, { claude: string; codex: string }> = {
-  balanced: { claude: 'claude-sonnet-4-6', codex: 'gpt-5.4' },
+  balanced: { claude: 'claude-sonnet-4-6', codex: 'gpt-5.4-mini' },
   budget: { claude: 'claude-haiku-4-5-20251001', codex: 'gpt-5.4-mini' },
-  max: { claude: 'claude-sonnet-4-6', codex: 'gpt-5.4' },
+  max: { claude: 'claude-sonnet-4-6', codex: 'gpt-5.4-mini' },
 }
 
 // "max" preset: Opus for architect + PM, Sonnet for rest (matches specrails-core)

@@ -164,7 +164,7 @@ describe('ModelSelector', () => {
         onOverrideChange={vi.fn()}
       />
     )
-    // Codex model names should appear
-    expect(screen.getAllByText(/Codex Mini/i).length).toBeGreaterThan(0)
+    // Codex model names should appear (GPT-5.x lineup)
+    expect(screen.getAllByText(/GPT-5\.4 Mini/i).length).toBeGreaterThan(0)
   })
 })
