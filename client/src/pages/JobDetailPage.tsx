@@ -33,6 +33,7 @@ export default function JobDetailPage() {
   const [events, setEvents] = useState<EventRow[]>([])
   const [phaseDefinitions, setPhaseDefinitions] = useState<PhaseDefinition[]>([])
   const [phases, setPhases] = useState<PhaseMap>({})
+  const [pipelineJobs, setPipelineJobs] = useState<JobSummary[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
@@ -70,6 +71,18 @@ export default function JobDetailPage() {
     loadJob()
     return () => controller.abort()
   }, [id, activeProjectId])
+
+  // Fetch sibling jobs when this job belongs to a pipeline
+  useEffect(() => {
+    if (!job?.pipeline_id) { setPipelineJobs([]); return }
+    const pipelineId = job.pipeline_id
+    fetch(`${getApiBase()}/pipelines/${pipelineId}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: { jobs: JobSummary[] } | null) => {
+        if (data?.jobs) setPipelineJobs(data.jobs)
+      })
+      .catch(() => {})
+  }, [job?.pipeline_id, job?.status])
 
   // Subscribe to live WebSocket updates for this job
   const activeProjectRef = useRef(activeProjectId)
@@ -260,6 +273,13 @@ export default function JobDetailPage() {
   const isRunning = job.status === 'running'
   const isFinished = job.status === 'completed' || job.status === 'failed'
 
+  const pipelineTotals = pipelineJobs.length > 1 ? {
+    totalCostUsd: pipelineJobs.reduce((s, j) => s + (j.total_cost_usd ?? 0), 0),
+    totalTokensIn: pipelineJobs.reduce((s, j) => s + (j.tokens_in ?? 0), 0),
+    totalTokensOut: pipelineJobs.reduce((s, j) => s + (j.tokens_out ?? 0), 0),
+    jobCount: pipelineJobs.length,
+  } : null
+
   return (
     <div className="flex flex-col h-full max-w-5xl mx-auto w-full">
       {/* Header */}
@@ -363,6 +383,7 @@ export default function JobDetailPage() {
           job={job}
           events={events}
           defaultOpen={job.status === 'completed'}
+          pipelineTotals={pipelineTotals ?? undefined}
         />
       )}
 
