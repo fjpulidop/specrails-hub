@@ -804,6 +804,9 @@ export class SetupManager {
       resolvedArgs = args
     }
 
+    // No OTEL env injection here — SetupManager spawns drive the initial project
+    // setup wizard, not repeatable pipeline jobs. Telemetry is scoped to
+    // QueueManager pipeline runs only.
     const child = spawn(binary, resolvedArgs, {
       cwd: projectPath,
       env: process.env,

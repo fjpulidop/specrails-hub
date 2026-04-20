@@ -323,4 +323,70 @@ describe('JobDetailPage', () => {
     })
   })
 
+  describe('Export diagnostic', () => {
+    it('shows Export diagnostic button when hasTelemetry is true', async () => {
+      const telemetryJob = { ...mockJob, hasTelemetry: true }
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ job: telemetryJob, events: mockEvents }),
+      })
+      render(<JobDetailPage />)
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /Export diagnostic/i })).toBeInTheDocument()
+      })
+    })
+
+    it('Export diagnostic click fetches the endpoint and triggers blob download', async () => {
+      const user = userEvent.setup()
+      const telemetryJob = { ...mockJob, hasTelemetry: true }
+      const fakeBlob = new Blob(['zip-bytes'], { type: 'application/zip' })
+      global.fetch = vi.fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ job: telemetryJob, events: mockEvents }) })
+        .mockResolvedValueOnce({ ok: true, blob: async () => fakeBlob })
+
+      // jsdom URL.createObjectURL / revokeObjectURL shims
+      const origCreate = URL.createObjectURL
+      const origRevoke = URL.revokeObjectURL
+      URL.createObjectURL = vi.fn(() => 'blob:mock-url')
+      URL.revokeObjectURL = vi.fn()
+
+      render(<JobDetailPage />)
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /Export diagnostic/i })).toBeInTheDocument()
+      })
+      await user.click(screen.getByRole('button', { name: /Export diagnostic/i }))
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith('/api/jobs/job-abc123/diagnostic')
+        expect(URL.createObjectURL).toHaveBeenCalledWith(fakeBlob)
+      })
+      URL.createObjectURL = origCreate
+      URL.revokeObjectURL = origRevoke
+    })
+
+    it('does NOT show Export diagnostic when hasTelemetry is false', async () => {
+      const noTelJob = { ...mockJob, hasTelemetry: false }
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ job: noTelJob, events: mockEvents }),
+      })
+      render(<JobDetailPage />)
+      await waitFor(() => {
+        expect(screen.getByText('/sr:implement')).toBeInTheDocument()
+      })
+      expect(screen.queryByRole('button', { name: /Export diagnostic/i })).not.toBeInTheDocument()
+    })
+
+    it('does NOT show Export diagnostic when hasTelemetry is undefined', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ job: mockJob, events: mockEvents }),
+      })
+      render(<JobDetailPage />)
+      await waitFor(() => {
+        expect(screen.getByText('/sr:implement')).toBeInTheDocument()
+      })
+      expect(screen.queryByRole('button', { name: /Export diagnostic/i })).not.toBeInTheDocument()
+    })
+  })
+
 })

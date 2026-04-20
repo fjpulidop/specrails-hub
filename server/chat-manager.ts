@@ -244,6 +244,8 @@ export class ChatManager {
       }
     }
 
+    // No OTEL env injection here — ChatManager spawns are interactive user sessions,
+    // not pipeline jobs. Telemetry is scoped to QueueManager pipeline runs only.
     const child = spawn(binary, args, {
       env: process.env,
       shell: false,

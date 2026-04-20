@@ -30,6 +30,8 @@ import { getAnalytics } from './analytics'
 import { resolveCommand } from './command-resolver'
 import { v4 as uuidv4 } from 'uuid'
 import { getTerminalManager } from './terminal-manager'
+import { createTelemetryRouter } from './telemetry-receiver'
+import { runCompactionForAll } from './telemetry-compactor'
 
 const TERMINAL_PANEL_ENABLED = process.env.SPECRAILS_TERMINAL_PANEL !== 'false'
 
@@ -287,9 +289,19 @@ function applyWsRateLimiting(ws: WebSocket): void {
 // ─── Hub mode ─────────────────────────────────────────────────────────────────
 
 if (isHubMode) {
-  const registry = new ProjectRegistry(broadcast)
+  const registry = new ProjectRegistry(broadcast, undefined, port)
   registry.loadAll()
   _getProjectCount = () => registry.listContexts().length
+
+  // OTLP/JSON receiver — must be mounted before auth middleware would block it,
+  // but after CORS. Requires auth (already applied globally above via requireAuth).
+  // Hub mode only: legacy mode has no per-project routing so receiver is not useful.
+  app.use('/otlp', createTelemetryRouter(registry))
+
+  // Run telemetry compaction at startup after registry is hydrated
+  runCompactionForAll(registry).catch((err) => {
+    console.error('[telemetry-compactor] startup compaction error:', err)
+  })
 
   // Hub-level routes
   app.use('/api/hub', createHubRouter(registry, broadcast))

@@ -131,3 +131,24 @@ Releases are automated via release-please + GitHub Actions:
   - **Server-side one-time setup**: the Hostinger `latest/` folder contains a hand-authored `.htaccess` that sets `Cache-Control: no-cache, must-revalidate` and `Access-Control-Allow-Origin: *` on `manifest.json`. This file is server-managed, not in the repo — do not add workflow steps that wipe `latest/` wholesale. See the inline comment in `desktop-release.yml` for the `.htaccess` contents.
 
 Commit message prefixes that affect versioning: `feat:` → minor, `fix:` → patch, `feat!:` → major. Commits without a conventional prefix are ignored by release-please.
+
+### Pipeline telemetry
+
+Per-project opt-in feature that injects OpenTelemetry env vars into `claude` CLI spawns so the process emits OTLP/JSON signals to the hub.
+
+**Default state**: OFF. Toggle lives in the project `SettingsPage` (hub mode only — hidden in legacy mode).
+
+**Storage paths:**
+- Raw blobs: `~/.specrails/projects/<slug>/telemetry/<jobId>.ndjson.gz` (concatenated gzip; one gzip member per received payload)
+- Pointer rows: `telemetry_blobs` table in the per-project `jobs.sqlite`
+- Aggregated summaries (post-compaction): `telemetry_summaries` table in `jobs.sqlite`
+
+**Retention policy**: Blobs older than 7 days are compacted at server startup — raw file deleted, aggregates written to `telemetry_summaries`, pointer row set to `state="compacted"`. Blobs are never expired automatically beyond compaction.
+
+**QueueManager-only scope**: OTEL env injection happens exclusively in `server/queue-manager.ts` at spawn time. `ChatManager` and `SetupManager` spawns are intentionally left uninstrumented (interactive sessions / wizard flows, not repeatable pipeline jobs).
+
+**OTLP receiver**: `POST /otlp/v1/{traces,metrics,logs}` on the hub port, mounted in hub mode only. Routes signals by `specrails.job_id` + `specrails.project_id` from `resource.attributes`. Returns 400 if attributes missing, 404 if project/job unknown. 10 MB uncompressed cap per blob — logs are dropped once reached (traces/metrics continue), a `logs_truncated` control line is written exactly once.
+
+**Export**: `GET /api/projects/:projectId/jobs/:jobId/diagnostic` streams a ZIP containing `job-metadata.json`, `telemetry.ndjson`, `logs.txt`, and `summary.md`. Export button on job cards visible iff a `telemetry_blobs` row exists (`active` or `compacted` state).
+
+**specrails-core**: This feature is entirely hub-side. The `specrails-core` repository is intentionally not modified — the Claude CLI subprocess emits OTEL signals by reading env vars set by QueueManager.

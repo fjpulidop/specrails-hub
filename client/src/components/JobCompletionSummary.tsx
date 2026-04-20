@@ -16,10 +16,18 @@ function formatWallClock(startedAt: string, finishedAt: string): string {
   return `${hrs}h ${m}m`
 }
 
+interface PipelineTotals {
+  totalCostUsd: number
+  totalTokensIn: number
+  totalTokensOut: number
+  jobCount: number
+}
+
 interface JobCompletionSummaryProps {
   job: JobSummary
   events: EventRow[]
   defaultOpen?: boolean
+  pipelineTotals?: PipelineTotals
 }
 
 function extractModifiedFiles(events: EventRow[]): string[] {
@@ -44,6 +52,7 @@ export function JobCompletionSummary({
   job,
   events,
   defaultOpen = true,
+  pipelineTotals,
 }: JobCompletionSummaryProps) {
   const [open, setOpen] = useState(defaultOpen)
   const modifiedFiles = useMemo(() => extractModifiedFiles(events), [events])
@@ -124,6 +133,26 @@ export function JobCompletionSummary({
               }
             />
           </div>
+
+          {/* Pipeline total */}
+          {pipelineTotals && (
+            <div>
+              <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wider mb-1.5">
+                Pipeline total ({pipelineTotals.jobCount} phases)
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <SummaryMetric
+                  label="Total cost"
+                  value={`$${pipelineTotals.totalCostUsd.toFixed(4)}`}
+                  valueClass="text-yellow-400"
+                />
+                <SummaryMetric
+                  label="Total tokens"
+                  value={`${(((pipelineTotals.totalTokensIn + pipelineTotals.totalTokensOut)) / 1000).toFixed(1)}k`}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Modified files list */}
           {modifiedFiles.length > 0 && (

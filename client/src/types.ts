@@ -26,6 +26,8 @@ export interface JobSummary {
   depends_on_job_id?: string | null
   pipeline_id?: string | null
   skip_reason?: string | null
+  /** True if a telemetry blob (active or compacted) exists for this job */
+  hasTelemetry?: boolean
 }
 
 export interface EventRow {

@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { getApiBase } from '../lib/api'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
-import { ChevronRight, Home, RotateCcw } from 'lucide-react'
+import { ChevronRight, Home, RotateCcw, Download } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
@@ -33,6 +33,7 @@ export default function JobDetailPage() {
   const [events, setEvents] = useState<EventRow[]>([])
   const [phaseDefinitions, setPhaseDefinitions] = useState<PhaseDefinition[]>([])
   const [phases, setPhases] = useState<PhaseMap>({})
+  const [pipelineJobs, setPipelineJobs] = useState<JobSummary[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
@@ -70,6 +71,18 @@ export default function JobDetailPage() {
     loadJob()
     return () => controller.abort()
   }, [id, activeProjectId])
+
+  // Fetch sibling jobs when this job belongs to a pipeline
+  useEffect(() => {
+    if (!job?.pipeline_id) { setPipelineJobs([]); return }
+    const pipelineId = job.pipeline_id
+    fetch(`${getApiBase()}/pipelines/${pipelineId}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: { jobs: JobSummary[] } | null) => {
+        if (data?.jobs) setPipelineJobs(data.jobs)
+      })
+      .catch(() => {})
+  }, [job?.pipeline_id, job?.status])
 
   // Subscribe to live WebSocket updates for this job
   const activeProjectRef = useRef(activeProjectId)
@@ -146,6 +159,26 @@ export default function JobDetailPage() {
     return () => unregisterHandler(`job-detail-${id}`)
   }, [id, handleMessage, registerHandler, unregisterHandler])
 
+  // While a running job has no telemetry yet, poll every 8s to detect when
+  // the first OTLP payload arrives so the Export diagnostic button appears
+  // without a manual refresh. Stops as soon as hasTelemetry flips or status
+  // leaves 'running'.
+  useEffect(() => {
+    if (!id) return
+    if (!job || job.status !== 'running' || job.hasTelemetry) return
+    const iv = setInterval(() => {
+      fetch(`${getApiBase()}/jobs/${id}`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((data: { job: JobSummary } | null) => {
+          if (data?.job?.hasTelemetry) {
+            setJob((prev) => prev ? { ...prev, hasTelemetry: true } : prev)
+          }
+        })
+        .catch(() => {})
+    }, 8000)
+    return () => clearInterval(iv)
+  }, [id, job?.status, job?.hasTelemetry])
+
   async function handleCancel() {
     if (!id) return
     try {
@@ -164,6 +197,31 @@ export default function JobDetailPage() {
       }
     } catch {
       toast.error('Network error')
+    }
+  }
+
+  async function handleExportDiagnostic() {
+    if (!job) return
+    try {
+      // Use fetch so the global auth interceptor attaches X-Hub-Token;
+      // a plain <a download> would bypass JS and get a 401 from the API.
+      const res = await fetch(`${getApiBase()}/jobs/${job.id}/diagnostic`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string }
+        throw new Error(data.error ?? `Export failed (HTTP ${res.status})`)
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const date = new Date().toISOString().slice(0, 10)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `specrails-diagnostic-${job.id}-${date}.zip`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      toast.error('Export failed', { description: (err as Error).message })
     }
   }
 
@@ -215,6 +273,13 @@ export default function JobDetailPage() {
   const isRunning = job.status === 'running'
   const isFinished = job.status === 'completed' || job.status === 'failed'
 
+  const pipelineTotals = pipelineJobs.length > 1 ? {
+    totalCostUsd: pipelineJobs.reduce((s, j) => s + (j.total_cost_usd ?? 0), 0),
+    totalTokensIn: pipelineJobs.reduce((s, j) => s + (j.tokens_in ?? 0), 0),
+    totalTokensOut: pipelineJobs.reduce((s, j) => s + (j.tokens_out ?? 0), 0),
+    jobCount: pipelineJobs.length,
+  } : null
+
   return (
     <div className="flex flex-col h-full max-w-5xl mx-auto w-full">
       {/* Header */}
@@ -251,6 +316,25 @@ export default function JobDetailPage() {
 
           {/* Actions */}
           <div className="flex items-center gap-2 shrink-0">
+            {job.hasTelemetry && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7"
+                    onClick={handleExportDiagnostic}
+                    aria-label="Export diagnostic bundle"
+                  >
+                    <Download className="w-3.5 h-3.5 mr-1.5" />
+                    Export diagnostic
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Download ZIP with telemetry, logs, and summary for this job
+                </TooltipContent>
+              </Tooltip>
+            )}
             {isFinished && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -299,6 +383,7 @@ export default function JobDetailPage() {
           job={job}
           events={events}
           defaultOpen={job.status === 'completed'}
+          pipelineTotals={pipelineTotals ?? undefined}
         />
       )}
 

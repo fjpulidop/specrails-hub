@@ -222,6 +222,37 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_rails_rail_index ON rails(rail_index);
     `)
   },
+
+  // Migration 10: pipeline telemetry blob and summary tables.
+  // The pipelineTelemetryEnabled flag reuses the existing queue_state key-value
+  // store (key = 'config.pipeline_telemetry_enabled') so no schema change needed
+  // for settings; only the raw-data tables are new.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS telemetry_blobs (
+        jobId      TEXT    PRIMARY KEY,
+        path       TEXT,
+        byteSize   INTEGER NOT NULL DEFAULT 0,
+        startedAt  INTEGER,
+        endedAt    INTEGER,
+        state      TEXT    NOT NULL DEFAULT 'active'
+                           CHECK(state IN ('active','compacted','expired'))
+      );
+
+      CREATE TABLE IF NOT EXISTS telemetry_summaries (
+        jobId        TEXT    NOT NULL,
+        phase        TEXT    NOT NULL,
+        durationMs   INTEGER,
+        tokensInput  INTEGER,
+        tokensOutput INTEGER,
+        tokensCache  INTEGER,
+        toolCalls    TEXT,
+        apiErrors    INTEGER,
+        costUsd      REAL,
+        PRIMARY KEY (jobId, phase)
+      );
+    `)
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {
@@ -675,4 +706,116 @@ export function getStats(db: DbInstance): StatsRow {
     costToday: todayRow.costToday ?? 0,
     avgDurationMs: totalRow.avgDurationMs,
   }
+}
+
+// ─── Project settings ─────────────────────────────────────────────────────────
+
+export interface ProjectSettings {
+  pipelineTelemetryEnabled: boolean
+}
+
+export function getProjectSettings(db: DbInstance): ProjectSettings {
+  const row = db.prepare(
+    `SELECT value FROM queue_state WHERE key = 'config.pipeline_telemetry_enabled'`
+  ).get() as { value: string } | undefined
+  return {
+    pipelineTelemetryEnabled: row?.value === 'true',
+  }
+}
+
+export function updateProjectSettings(db: DbInstance, patch: Partial<ProjectSettings>): void {
+  if (patch.pipelineTelemetryEnabled !== undefined) {
+    db.prepare(
+      `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.pipeline_telemetry_enabled', ?)`
+    ).run(patch.pipelineTelemetryEnabled ? 'true' : 'false')
+  }
+}
+
+// ─── Telemetry DB functions ───────────────────────────────────────────────────
+
+export interface TelemetryBlobRow {
+  jobId: string
+  path: string | null
+  byteSize: number
+  startedAt: number | null
+  endedAt: number | null
+  state: 'active' | 'compacted' | 'expired'
+}
+
+export interface TelemetrySummaryRow {
+  jobId: string
+  phase: string
+  durationMs: number | null
+  tokensInput: number | null
+  tokensOutput: number | null
+  tokensCache: number | null
+  toolCalls: string | null
+  apiErrors: number | null
+  costUsd: number | null
+}
+
+export function getTelemetryBlob(db: DbInstance, jobId: string): TelemetryBlobRow | undefined {
+  return db.prepare('SELECT * FROM telemetry_blobs WHERE jobId = ?').get(jobId) as TelemetryBlobRow | undefined
+}
+
+export function upsertTelemetryBlob(db: DbInstance, row: TelemetryBlobRow): void {
+  db.prepare(`
+    INSERT INTO telemetry_blobs (jobId, path, byteSize, startedAt, endedAt, state)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(jobId) DO UPDATE SET
+      path = excluded.path,
+      byteSize = excluded.byteSize,
+      startedAt = COALESCE(telemetry_blobs.startedAt, excluded.startedAt),
+      endedAt = excluded.endedAt,
+      state = excluded.state
+  `).run(row.jobId, row.path ?? null, row.byteSize, row.startedAt ?? null, row.endedAt ?? null, row.state)
+}
+
+export function listActiveTelemetryBlobs(db: DbInstance): TelemetryBlobRow[] {
+  return db.prepare(
+    `SELECT * FROM telemetry_blobs WHERE state = 'active'`
+  ).all() as TelemetryBlobRow[]
+}
+
+export function setTelemetryBlobCompacted(db: DbInstance, jobId: string): void {
+  db.prepare(
+    `UPDATE telemetry_blobs SET state = 'compacted', path = NULL WHERE jobId = ?`
+  ).run(jobId)
+}
+
+export function insertTelemetrySummary(db: DbInstance, row: TelemetrySummaryRow): void {
+  db.prepare(`
+    INSERT OR REPLACE INTO telemetry_summaries
+      (jobId, phase, durationMs, tokensInput, tokensOutput, tokensCache, toolCalls, apiErrors, costUsd)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    row.jobId, row.phase,
+    row.durationMs ?? null, row.tokensInput ?? null, row.tokensOutput ?? null,
+    row.tokensCache ?? null, row.toolCalls ?? null, row.apiErrors ?? null, row.costUsd ?? null
+  )
+}
+
+export function getTelemetrySummaries(db: DbInstance, jobId: string): TelemetrySummaryRow[] {
+  return db.prepare('SELECT * FROM telemetry_summaries WHERE jobId = ?').all(jobId) as TelemetrySummaryRow[]
+}
+
+export function deleteTelemetryForJob(db: DbInstance, jobId: string): void {
+  db.prepare('DELETE FROM telemetry_blobs WHERE jobId = ?').run(jobId)
+  db.prepare('DELETE FROM telemetry_summaries WHERE jobId = ?').run(jobId)
+}
+
+/** Returns a Set of jobIds that have active or compacted telemetry blobs. */
+export function getJobsWithTelemetry(db: DbInstance): Set<string> {
+  const rows = db.prepare(
+    `SELECT jobId FROM telemetry_blobs WHERE state IN ('active','compacted')`
+  ).all() as Array<{ jobId: string }>
+  return new Set(rows.map((r) => r.jobId))
+}
+
+/** True iff the job has an active or compacted telemetry blob row. */
+export function hasJobTelemetry(db: DbInstance, jobId: string): boolean {
+  const row = db.prepare(
+    `SELECT 1 FROM telemetry_blobs WHERE jobId = ? AND state IN ('active','compacted') LIMIT 1`
+  ).get(jobId)
+  return row !== undefined
 }

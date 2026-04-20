@@ -8,14 +8,22 @@ import { Input } from '../components/ui/input'
 import { Separator } from '../components/ui/separator'
 import type { ProjectConfig } from '../types'
 
+interface ProjectSettings {
+  pipelineTelemetryEnabled: boolean
+}
+
 export default function SettingsPage() {
   const { activeProjectId } = useHub()
+  // SettingsPage is only mounted in hub mode; telemetry toggle is hub-only
+  const isHubMode = activeProjectId !== null
   const [config, setConfig] = useState<ProjectConfig | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [dailyBudget, setDailyBudget] = useState('')
   const [isSavingBudget, setIsSavingBudget] = useState(false)
   const [jobCostThreshold, setJobCostThreshold] = useState('')
   const [isSavingJobThreshold, setIsSavingJobThreshold] = useState(false)
+  const [telemetryEnabled, setTelemetryEnabled] = useState(false)
+  const [isSavingTelemetry, setIsSavingTelemetry] = useState(false)
 
   const cacheRef = useRef<Map<string, ProjectConfig>>(new Map())
 
@@ -65,6 +73,21 @@ export default function SettingsPage() {
     void loadBudget()
   }, [activeProjectId])
 
+  useEffect(() => {
+    if (!activeProjectId || !isHubMode) return
+    async function loadTelemetrySettings() {
+      try {
+        const res = await fetch(`${getApiBase()}/settings`)
+        if (!res.ok) return
+        const data = await res.json() as ProjectSettings
+        setTelemetryEnabled(data.pipelineTelemetryEnabled ?? false)
+      } catch {
+        // ignore
+      }
+    }
+    void loadTelemetrySettings()
+  }, [activeProjectId, isHubMode])
+
   async function saveDailyBudget() {
     setIsSavingBudget(true)
     try {
@@ -106,6 +129,26 @@ export default function SettingsPage() {
       toast.error('Failed to save threshold', { description: (err as Error).message })
     } finally {
       setIsSavingJobThreshold(false)
+    }
+  }
+
+  async function saveTelemetryToggle(enabled: boolean) {
+    setIsSavingTelemetry(true)
+    const prev = telemetryEnabled
+    setTelemetryEnabled(enabled)
+    try {
+      const res = await fetch(`${getApiBase()}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pipelineTelemetryEnabled: enabled }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      toast.success(enabled ? 'Pipeline telemetry enabled' : 'Pipeline telemetry disabled')
+    } catch (err) {
+      setTelemetryEnabled(prev)
+      toast.error('Failed to save telemetry setting', { description: (err as Error).message })
+    } finally {
+      setIsSavingTelemetry(false)
     }
   }
 
@@ -197,6 +240,46 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Pipeline Telemetry Section — hub mode only */}
+      {isHubMode && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pipeline Telemetry</CardTitle>
+            <CardDescription>
+              Capture token usage, phase durations, and subagent activity for diagnostic export. Off by default.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <p className="text-xs font-medium">Enable pipeline telemetry</p>
+                <p className="text-[10px] text-muted-foreground">
+                  When on, OTEL data from pipeline jobs is captured locally. Use the{' '}
+                  <span className="font-mono">Export diagnostic</span> button on any job card to download.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-label="Enable pipeline telemetry"
+                aria-checked={telemetryEnabled}
+                disabled={isSavingTelemetry}
+                onClick={() => saveTelemetryToggle(!telemetryEnabled)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 ${
+                  telemetryEnabled ? 'bg-primary' : 'bg-input'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 rounded-full bg-background shadow-sm transition-transform ${
+                    telemetryEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
     </div>
   )
