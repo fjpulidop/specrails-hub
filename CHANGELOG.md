@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.0](https://github.com/fjpulidop/specrails-hub/compare/v1.34.3...v1.35.0) (2026-04-20)
+
+
+### Features
+
+* **telemetry:** opt-in pipeline telemetry + diagnostic export ([#233](https://github.com/fjpulidop/specrails-hub/issues/233)) ([a57f3f7](https://github.com/fjpulidop/specrails-hub/commit/a57f3f76ef0101f2c4b23f1ad07d3a355e328998))
+
 ## [1.34.3](https://github.com/fjpulidop/specrails-hub/compare/v1.34.2...v1.34.3) (2026-04-19)
 
 
