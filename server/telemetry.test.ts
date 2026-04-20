@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { buildTelemetryEnv } from './queue-manager'
 import { initDb } from './db'
 import {
@@ -210,13 +210,18 @@ describe('OTLP resource attribute extraction', () => {
 
 // ─── 7.3 Compactor ───────────────────────────────────────────────────────────
 
-import { runCompaction } from './telemetry-compactor'
+import os from 'os'
+import fs from 'fs'
+import path from 'path'
+import zlib from 'zlib'
+import { runCompaction, runCompactionForAll } from './telemetry-compactor'
 import type { ProjectContext } from './project-registry'
+import type { ProjectRegistry } from './project-registry'
 
 function makeMinimalCtx(db: DbInstance): ProjectContext {
   return {
     db,
-    project: { id: 'p1', slug: 'test-project', name: 'Test', path: '/tmp/test', db_path: ':memory:', provider: 'claude', created_at: '', last_seen_at: '' },
+    project: { id: 'p1', slug: 'test-project', name: 'Test', path: '/tmp/test', db_path: ':memory:', provider: 'claude', added_at: '', last_seen_at: '' } as ProjectContext['project'],
     queueManager: {} as ProjectContext['queueManager'],
     chatManager: {} as ProjectContext['chatManager'],
     setupManager: {} as ProjectContext['setupManager'],
@@ -226,6 +231,12 @@ function makeMinimalCtx(db: DbInstance): ProjectContext {
     broadcast: () => {},
     railJobs: new Map(),
   }
+}
+
+function writeGzipLine(filePath: string, obj: unknown): void {
+  const line = JSON.stringify(obj) + '\n'
+  const compressed = zlib.gzipSync(Buffer.from(line, 'utf-8'))
+  fs.appendFileSync(filePath, compressed)
 }
 
 describe('runCompaction', () => {
@@ -265,6 +276,195 @@ describe('runCompaction', () => {
     const summaries = getTelemetrySummaries(db, 'j-empty')
     expect(summaries.length).toBeGreaterThanOrEqual(1)
     expect(summaries[0].phase).toBe('unknown')
+  })
+})
+
+// ─── 7.3b Compactor — aggregation from real gzip blobs ──────────────────────
+
+describe('runCompaction — aggregateByPhase via real gzip blob', () => {
+  let tmpFile: string
+
+  beforeEach(() => {
+    tmpFile = path.join(os.tmpdir(), `specrails-compact-${Date.now()}.ndjson.gz`)
+  })
+
+  afterEach(() => {
+    try { fs.unlinkSync(tmpFile) } catch { /* ok */ }
+  })
+
+  it('aggregates duration from trace spans', async () => {
+    const db = makeDb()
+    const now = Date.now()
+    const oldAt = now - (10 * 24 * 60 * 60 * 1000)
+
+    writeGzipLine(tmpFile, {
+      signal: 'traces',
+      receivedAt: new Date().toISOString(),
+      payload: {
+        resourceSpans: [{
+          scopeSpans: [{
+            scope: { name: 'architect' },
+            spans: [{
+              name: 'tool_use',
+              startTimeUnixNano: '1000000000',
+              endTimeUnixNano: '2000000000',
+              status: { code: 'STATUS_CODE_OK' },
+            }],
+          }],
+        }],
+      },
+    })
+
+    upsertTelemetryBlob(db, { jobId: 'j-trace', path: tmpFile, byteSize: 100, startedAt: oldAt, endedAt: oldAt, state: 'active' })
+    await runCompaction(makeMinimalCtx(db), now)
+
+    const summaries = getTelemetrySummaries(db, 'j-trace')
+    expect(summaries.length).toBeGreaterThan(0)
+    const archSummary = summaries.find(s => s.phase === 'architect')
+    expect(archSummary).toBeDefined()
+    expect(archSummary!.durationMs).toBe(1000)
+  })
+
+  it('counts API errors from spans with non-OK status', async () => {
+    const db = makeDb()
+    const now = Date.now()
+    const oldAt = now - (10 * 24 * 60 * 60 * 1000)
+
+    writeGzipLine(tmpFile, {
+      signal: 'traces',
+      receivedAt: new Date().toISOString(),
+      payload: {
+        resourceSpans: [{
+          scopeSpans: [{
+            scope: { name: 'dev' },
+            spans: [
+              { name: 'api_call', startTimeUnixNano: '100', endTimeUnixNano: '200', status: { code: 2 } },
+              { name: 'api_call', startTimeUnixNano: '200', endTimeUnixNano: '300', status: { code: 0 } },
+            ],
+          }],
+        }],
+      },
+    })
+
+    upsertTelemetryBlob(db, { jobId: 'j-errors', path: tmpFile, byteSize: 100, startedAt: oldAt, endedAt: oldAt, state: 'active' })
+    await runCompaction(makeMinimalCtx(db), now)
+
+    const summaries = getTelemetrySummaries(db, 'j-errors')
+    const devSummary = summaries.find(s => s.phase === 'dev')
+    expect(devSummary?.apiErrors).toBe(1)
+  })
+
+  it('aggregates token counts from metrics', async () => {
+    const db = makeDb()
+    const now = Date.now()
+    const oldAt = now - (10 * 24 * 60 * 60 * 1000)
+
+    writeGzipLine(tmpFile, {
+      signal: 'metrics',
+      receivedAt: new Date().toISOString(),
+      payload: {
+        resourceMetrics: [{
+          scopeMetrics: [{
+            scope: { name: 'reviewer' },
+            metrics: [
+              {
+                name: 'input_tokens',
+                sum: { dataPoints: [{ asInt: '500' }] },
+              },
+              {
+                name: 'output_tokens',
+                sum: { dataPoints: [{ asDouble: 250 }] },
+              },
+              {
+                name: 'cache_tokens',
+                sum: { dataPoints: [{ asInt: '100' }] },
+              },
+              {
+                name: 'cost_usd',
+                sum: { dataPoints: [{ asDouble: 0.015 }] },
+              },
+            ],
+          }],
+        }],
+      },
+    })
+
+    upsertTelemetryBlob(db, { jobId: 'j-metrics', path: tmpFile, byteSize: 100, startedAt: oldAt, endedAt: oldAt, state: 'active' })
+    await runCompaction(makeMinimalCtx(db), now)
+
+    const summaries = getTelemetrySummaries(db, 'j-metrics')
+    const revSummary = summaries.find(s => s.phase === 'reviewer')
+    expect(revSummary).toBeDefined()
+    expect(revSummary!.tokensInput).toBe(500)
+    expect(revSummary!.tokensOutput).toBe(250)
+    expect(revSummary!.tokensCache).toBe(100)
+    expect(revSummary!.costUsd).toBeCloseTo(0.015)
+  })
+
+  it('skips control signal lines', async () => {
+    const db = makeDb()
+    const now = Date.now()
+    const oldAt = now - (10 * 24 * 60 * 60 * 1000)
+
+    writeGzipLine(tmpFile, {
+      signal: 'control',
+      event: 'logs_truncated',
+      at: new Date().toISOString(),
+    })
+
+    upsertTelemetryBlob(db, { jobId: 'j-ctrl', path: tmpFile, byteSize: 10, startedAt: oldAt, endedAt: oldAt, state: 'active' })
+    await runCompaction(makeMinimalCtx(db), now)
+
+    const summaries = getTelemetrySummaries(db, 'j-ctrl')
+    // Only the fallback 'unknown' phase should exist (no real signal data)
+    expect(summaries.every(s => s.phase === 'unknown')).toBe(true)
+  })
+
+  it('deletes gzip file after compaction', async () => {
+    const db = makeDb()
+    const now = Date.now()
+    const oldAt = now - (10 * 24 * 60 * 60 * 1000)
+
+    writeGzipLine(tmpFile, { signal: 'traces', payload: null })
+    expect(fs.existsSync(tmpFile)).toBe(true)
+
+    upsertTelemetryBlob(db, { jobId: 'j-del', path: tmpFile, byteSize: 10, startedAt: oldAt, endedAt: oldAt, state: 'active' })
+    await runCompaction(makeMinimalCtx(db), now)
+
+    expect(fs.existsSync(tmpFile)).toBe(false)
+  })
+})
+
+describe('runCompactionForAll', () => {
+  it('runs compaction for all contexts in registry', async () => {
+    const db = makeDb()
+    const now = Date.now()
+    const oldAt = now - (10 * 24 * 60 * 60 * 1000)
+
+    upsertTelemetryBlob(db, { jobId: 'j-all', path: null, byteSize: 0, startedAt: oldAt, endedAt: oldAt, state: 'active' })
+
+    const registry = {
+      listContexts: () => [makeMinimalCtx(db)],
+    } as unknown as ProjectRegistry
+
+    await runCompactionForAll(registry)
+
+    const blob = getTelemetryBlob(db, 'j-all')
+    expect(blob?.state).toBe('compacted')
+  })
+
+  it('continues after a context throws', async () => {
+    const registry = {
+      listContexts: () => [{
+        db: null as never,
+        project: { id: 'bad', slug: 'bad' } as ProjectContext['project'],
+        broadcast: () => {},
+        railJobs: new Map(),
+      } as unknown as ProjectContext],
+    } as unknown as ProjectRegistry
+
+    // Should not throw
+    await expect(runCompactionForAll(registry)).resolves.toBeUndefined()
   })
 })
 
