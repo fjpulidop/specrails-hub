@@ -6,9 +6,29 @@ import type { WsMessage, LogMessage, Job, PhaseDefinition, JobPriority } from '.
 import { PRIORITY_WEIGHT, VALID_PRIORITIES } from './types'
 import { resolveCommand } from './command-resolver'
 import { resetPhases, setActivePhases } from './hooks'
-import { createJob, finishJob, appendEvent, skipJob } from './db'
+import { createJob, finishJob, appendEvent, skipJob, getProjectSettings } from './db'
 import type { JobResult } from './db'
 import type { CommandInfo } from './config'
+
+// ─── Telemetry env helpers ────────────────────────────────────────────────────
+
+/** Build the OTEL environment variable block for a spawned claude process.
+ * Extracted as a pure function so it is unit-testable without a full spawn. */
+export function buildTelemetryEnv(
+  jobId: string,
+  projectId: string,
+  hubPort: number
+): Record<string, string> {
+  return {
+    CLAUDE_CODE_ENABLE_TELEMETRY: '1',
+    OTEL_EXPORTER_OTLP_ENDPOINT: `http://127.0.0.1:${hubPort}/otlp`,
+    OTEL_EXPORTER_OTLP_PROTOCOL: 'http/json',
+    OTEL_METRICS_EXPORTER: 'otlp',
+    OTEL_LOGS_EXPORTER: 'otlp',
+    OTEL_TRACES_EXPORTER: 'otlp',
+    OTEL_RESOURCE_ATTRIBUTES: `specrails.job_id=${jobId},specrails.project_id=${projectId}`,
+  }
+}
 
 const LOG_BUFFER_MAX = 5000
 const LOG_BUFFER_DROP = 1000
@@ -116,6 +136,10 @@ export class QueueManager {
   /** Effective model to use when spawning codex processes. Ignored for claude (reads from .claude/ config). */
   private _resolvedModel: string | null
   private _onJobFinished: ((jobId: string, status: Job['status'], costUsd?: number) => void) | null
+  /** Project ID used for OTEL resource attributes (hub mode only) */
+  private _projectId: string | null
+  /** Hub port used to construct the OTLP endpoint URL for env injection */
+  private _hubPort: number
 
   constructor(
     broadcast: (msg: WsMessage) => void,
@@ -130,6 +154,8 @@ export class QueueManager {
       /** Effective model for codex spawns. If omitted, falls back to 'gpt-5.4-mini'. */
       resolvedModel?: string
       onJobFinished?: (jobId: string, status: Job['status'], costUsd?: number) => void
+      projectId?: string
+      hubPort?: number
     }
   ) {
     this._queue = []
@@ -152,6 +178,8 @@ export class QueueManager {
     this._provider = options?.provider ?? 'claude'
     this._resolvedModel = options?.resolvedModel ?? null
     this._onJobFinished = options?.onJobFinished ?? null
+    this._projectId = options?.projectId ?? null
+    this._hubPort = options?.hubPort ?? 4200
 
     const envTimeout = process.env.WM_ZOMBIE_TIMEOUT_MS !== undefined
       ? parseInt(process.env.WM_ZOMBIE_TIMEOUT_MS, 10)
@@ -475,8 +503,22 @@ export class QueueManager {
       args.push('-p', commandToRun)
     }
 
+    // Read pipelineTelemetryEnabled at spawn time (not constructor time) so
+    // toggling the setting takes effect on the next job without restarting.
+    // Only inject for claude provider in hub mode (projectId is only set there).
+    let spawnEnv: NodeJS.ProcessEnv = process.env
+    if (this._provider === 'claude' && this._projectId && this._db) {
+      const settings = getProjectSettings(this._db)
+      if (settings.pipelineTelemetryEnabled) {
+        spawnEnv = {
+          ...process.env,
+          ...buildTelemetryEnv(jobId, this._projectId, this._hubPort),
+        }
+      }
+    }
+
     const child = spawn(binary, args, {
-      env: process.env,
+      env: spawnEnv,
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,

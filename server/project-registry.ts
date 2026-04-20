@@ -1,4 +1,6 @@
 import path from 'path'
+import fs from 'fs'
+import os from 'os'
 import type { DbInstance } from './db'
 import { initDb } from './db'
 import { QueueManager } from './queue-manager'
@@ -51,12 +53,14 @@ export class ProjectRegistry {
   private _contexts: Map<string, ProjectContext>
   private _broadcast: (msg: WsMessage) => void
   private _webhookManager: WebhookManager
+  private _hubPort: number
 
-  constructor(broadcast: (msg: WsMessage) => void, hubDbPath?: string) {
+  constructor(broadcast: (msg: WsMessage) => void, hubDbPath?: string, hubPort?: number) {
     this._broadcast = broadcast
     this._hubDb = initHubDb(hubDbPath ?? getHubDbPath())
     this._contexts = new Map()
     this._webhookManager = new WebhookManager(this._hubDb)
+    this._hubPort = hubPort ?? 4200
   }
 
   get hubDb(): DbInstance {
@@ -88,6 +92,13 @@ export class ProjectRegistry {
       try { getTerminalManager().killAllForProject(id) } catch { /* ignore */ }
       // Close the ticket file watcher
       ctx.ticketWatcher.close().catch(() => { /* ignore */ })
+      // Delete telemetry blob files for this project
+      try {
+        const telemetryDir = path.join(os.homedir(), '.specrails', 'projects', ctx.project.slug, 'telemetry')
+        if (fs.existsSync(telemetryDir)) {
+          fs.rmSync(telemetryDir, { recursive: true, force: true })
+        }
+      } catch { /* ignore — non-fatal */ }
       // Close the DB connection
       try { ctx.db.close() } catch { /* ignore */ }
       this._contexts.delete(id)
@@ -155,6 +166,8 @@ export class ProjectRegistry {
     const queueManager = new QueueManager(boundBroadcast, db, undefined, project.path, {
       zombieTimeoutMs: projectZombieTimeout,
       provider: project.provider ?? 'claude',
+      projectId: project.id,
+      hubPort: this._hubPort,
       getCostAlertThreshold: () => {
         const val = getHubSetting(this._hubDb, 'cost_alert_threshold_usd')
         return val != null ? parseFloat(val) : null

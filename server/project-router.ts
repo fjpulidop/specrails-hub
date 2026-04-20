@@ -11,7 +11,10 @@ import {
   getStats, getPipelineJobs,
   createProposal, getProposal, listProposals, deleteProposal,
   createTemplate, listTemplates, getTemplate, updateTemplate, deleteTemplate,
+  getProjectSettings, updateProjectSettings,
+  getTelemetryBlob, getTelemetrySummaries, getJobsWithTelemetry, hasJobTelemetry,
 } from './db'
+import { createDiagnosticZip } from './telemetry-export'
 import { getProjectSetupSession } from './hub-db'
 import { ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError, DEFAULT_ZOMBIE_TIMEOUT_MS } from './queue-manager'
 import type { JobPriority } from './types'
@@ -264,7 +267,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const status = req.query.status as string | undefined
     const from = req.query.from as string | undefined
     const to = req.query.to as string | undefined
-    const result = listJobs(ctx(req).db, { limit, offset, status, from, to })
+    const { db } = ctx(req)
+    const result = listJobs(db, { limit, offset, status, from, to })
 
     // Merge in-memory queued jobs that haven't been persisted to DB yet
     const { queueManager } = ctx(req)
@@ -302,7 +306,15 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       result.total += queuedRows.length
     }
 
-    res.json(result)
+    // Annotate each job with hasTelemetry so the client can show the
+    // Export diagnostic button without an extra round trip.
+    const jobsWithTelemetry = getJobsWithTelemetry(db)
+    const annotatedJobs = result.jobs.map((j) => ({
+      ...j,
+      hasTelemetry: jobsWithTelemetry.has(j.id),
+    }))
+
+    res.json({ jobs: annotatedJobs, total: result.total })
   })
 
   // ─── CSV helper ──────────────────────────────────────────────────────────────
@@ -353,7 +365,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     if (!job) { res.status(404).json({ error: 'Job not found' }); return }
     const events = getJobEvents(db, req.params.id as string)
     const phaseDefinitions = queueManager.phasesForCommand(job.command)
-    res.json({ job, events, phaseDefinitions })
+    const annotated = { ...job, hasTelemetry: hasJobTelemetry(db, req.params.id as string) }
+    res.json({ job: annotated, events, phaseDefinitions })
   })
 
   router.delete('/:projectId/jobs', (req: Request, res: Response) => {
@@ -1661,6 +1674,73 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       return
     }
     res.json({ ok: true })
+  })
+
+  // ─── Project settings (pipeline telemetry) ───────────────────────────────────
+
+  router.get('/:projectId/settings', (req: Request, res: Response) => {
+    const settings = getProjectSettings(ctx(req).db)
+    res.json(settings)
+  })
+
+  router.patch('/:projectId/settings', (req: Request, res: Response) => {
+    const { pipelineTelemetryEnabled } = req.body ?? {}
+    const patch: Parameters<typeof updateProjectSettings>[1] = {}
+    if (pipelineTelemetryEnabled !== undefined) {
+      patch.pipelineTelemetryEnabled = Boolean(pipelineTelemetryEnabled)
+    }
+    try {
+      updateProjectSettings(ctx(req).db, patch)
+      res.json({ ok: true, settings: getProjectSettings(ctx(req).db) })
+    } catch (err) {
+      console.error('[project-router] settings patch error:', err)
+      res.status(500).json({ error: 'Failed to update settings' })
+    }
+  })
+
+  // ─── Diagnostic export ───────────────────────────────────────────────────────
+
+  router.get('/:projectId/jobs/:jobId/diagnostic', async (req: Request, res: Response) => {
+    const { db } = ctx(req)
+    const jobId = req.params.jobId as string
+
+    const blob = getTelemetryBlob(db, jobId)
+    if (!blob) {
+      res.status(404).json({ error: 'No telemetry data for this job' })
+      return
+    }
+    if (blob.state === 'expired') {
+      res.status(410).json({ error: 'Telemetry data has been expired and is no longer available' })
+      return
+    }
+
+    const job = getJob(db, jobId)
+    if (!job) {
+      res.status(404).json({ error: 'Job not found' })
+      return
+    }
+
+    const summaries = getTelemetrySummaries(db, jobId)
+    const events = getJobEvents(db, jobId)
+
+    try {
+      const dateStr = new Date().toISOString().slice(0, 10)
+      const filename = `specrails-diagnostic-${jobId}-${dateStr}.zip`
+      res.setHeader('Content-Type', 'application/zip')
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+
+      await createDiagnosticZip(res, {
+        job,
+        blob,
+        summaries,
+        events,
+      })
+    } catch (err) {
+      if (!res.headersSent) {
+        console.error('[project-router] diagnostic export error:', err)
+        res.status(500).json({ error: 'Failed to create diagnostic export' })
+      }
+    }
   })
 
   return router
