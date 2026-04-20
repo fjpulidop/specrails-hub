@@ -120,6 +120,7 @@ describe('SettingsPage - extended coverage', () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => mockConfig }) // GET /config
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) })        // GET /budget
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ pipelineTelemetryEnabled: false }) }) // GET /settings
       .mockResolvedValueOnce({ ok: true })                                 // PATCH budget save
     render(<SettingsPage />)
     await waitFor(() => {
@@ -158,6 +159,7 @@ describe('SettingsPage - extended coverage', () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ...mockConfig, dailyBudgetUsd: 5.0 }) })  // GET /config
       .mockResolvedValueOnce({ ok: true, json: async () => ({ dailyBudgetUsd: 5.0 }) })                   // GET /budget
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ pipelineTelemetryEnabled: false }) })        // GET /settings
       .mockResolvedValueOnce({ ok: true })                                                                  // PATCH /budget
     render(<SettingsPage />)
     await waitFor(() => {
