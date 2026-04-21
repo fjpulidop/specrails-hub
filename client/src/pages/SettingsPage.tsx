@@ -371,17 +371,19 @@ export default function SettingsPage() {
               Claude model used by the pipeline orchestrator (the Claude CLI process that runs each job). Defaults to Sonnet.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-3">
+          <CardContent className="space-y-3">
+            <div className="flex justify-end">
               <ModelCombobox
                 value={pendingOrchestratorModel}
                 onChange={setPendingOrchestratorModel}
                 disabled={isSavingOrchestratorModel}
               />
+            </div>
+            <div className="flex justify-end">
               <Button
                 size="sm"
                 variant="secondary"
-                className="h-7 text-xs shrink-0"
+                className="h-7 text-xs"
                 disabled={isSavingOrchestratorModel || pendingOrchestratorModel === orchestratorModel}
                 onClick={saveOrchestratorModel}
               >
