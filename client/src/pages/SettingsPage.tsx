@@ -32,6 +32,7 @@ export default function SettingsPage() {
   const [telemetryEnabled, setTelemetryEnabled] = useState(false)
   const [isSavingTelemetry, setIsSavingTelemetry] = useState(false)
   const [orchestratorModel, setOrchestratorModel] = useState('sonnet')
+  const [pendingOrchestratorModel, setPendingOrchestratorModel] = useState('sonnet')
   const [isSavingOrchestratorModel, setIsSavingOrchestratorModel] = useState(false)
   const [agentModels, setAgentModels] = useState<AgentModel[]>([])
   const [pendingModels, setPendingModels] = useState<Record<string, string>>({})
@@ -95,7 +96,9 @@ export default function SettingsPage() {
         if (!res.ok) return
         const data = await res.json() as ProjectSettings
         setTelemetryEnabled(data.pipelineTelemetryEnabled ?? false)
-        setOrchestratorModel(data.orchestratorModel ?? 'sonnet')
+        const m = data.orchestratorModel ?? 'sonnet'
+        setOrchestratorModel(m)
+        setPendingOrchestratorModel(m)
       } catch {
         // ignore
       }
@@ -192,20 +195,18 @@ export default function SettingsPage() {
     }
   }
 
-  async function saveOrchestratorModel(model: string) {
+  async function saveOrchestratorModel() {
     setIsSavingOrchestratorModel(true)
-    const prev = orchestratorModel
-    setOrchestratorModel(model)
     try {
       const res = await fetch(`${getApiBase()}/settings`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orchestratorModel: model }),
+        body: JSON.stringify({ orchestratorModel: pendingOrchestratorModel }),
       })
       if (!res.ok) throw new Error('Failed to save')
-      toast.success(`Orchestrator model set to ${model}`)
+      setOrchestratorModel(pendingOrchestratorModel)
+      toast.success(`Orchestrator model set to ${pendingOrchestratorModel}`)
     } catch (err) {
-      setOrchestratorModel(prev)
       toast.error('Failed to save orchestrator model', { description: (err as Error).message })
     } finally {
       setIsSavingOrchestratorModel(false)
@@ -373,13 +374,19 @@ export default function SettingsPage() {
           <CardContent>
             <div className="flex items-center gap-3">
               <ModelCombobox
-                value={orchestratorModel}
-                onChange={saveOrchestratorModel}
+                value={pendingOrchestratorModel}
+                onChange={setPendingOrchestratorModel}
                 disabled={isSavingOrchestratorModel}
               />
-              {isSavingOrchestratorModel && (
-                <span className="text-[11px] text-muted-foreground">Saving...</span>
-              )}
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-7 text-xs shrink-0"
+                disabled={isSavingOrchestratorModel || pendingOrchestratorModel === orchestratorModel}
+                onClick={saveOrchestratorModel}
+              >
+                {isSavingOrchestratorModel ? 'Saving...' : 'Save'}
+              </Button>
             </div>
           </CardContent>
         </Card>
