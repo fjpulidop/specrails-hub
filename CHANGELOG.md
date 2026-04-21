@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.36.1](https://github.com/fjpulidop/specrails-hub/compare/v1.36.0...v1.36.1) (2026-04-21)
+
+
+### Bug Fixes
+
+* **settings:** orchestrator model UX polish + generic descriptions + two-column budget ([#238](https://github.com/fjpulidop/specrails-hub/issues/238)) ([81c9d05](https://github.com/fjpulidop/specrails-hub/commit/81c9d05f3f3ba14caf933c81f846204bd19727ba))
+
 ## [1.36.0](https://github.com/fjpulidop/specrails-hub/compare/v1.35.0...v1.36.0) (2026-04-21)
 
 
