@@ -87,6 +87,110 @@ function serializeInstallConfigYaml(config: Record<string, unknown>): string {
   return lines.join('\n')
 }
 
+// ─── Agent model helpers ──────────────────────────────────────────────────────
+
+const VALID_MODEL_ALIASES = ['sonnet', 'opus', 'haiku'] as const
+type ModelAlias = typeof VALID_MODEL_ALIASES[number]
+
+/**
+ * Read installed agents from `.claude/agents/*.md` (top-level only, no subdirs).
+ * Extracts the `model:` field from YAML frontmatter.
+ */
+function readAgentModels(projectPath: string): { name: string; model: string }[] {
+  const agentsDir = path.join(projectPath, '.claude', 'agents')
+  if (!fs.existsSync(agentsDir)) return []
+
+  let entries: string[]
+  try {
+    entries = fs.readdirSync(agentsDir)
+  } catch {
+    return []
+  }
+
+  const agents: { name: string; model: string }[] = []
+  for (const entry of entries) {
+    // Top-level .md files only — skip subdirs
+    if (!entry.endsWith('.md')) continue
+    const filePath = path.join(agentsDir, entry)
+    try {
+      const stat = fs.statSync(filePath)
+      if (!stat.isFile()) continue
+      const content = fs.readFileSync(filePath, 'utf-8')
+      // Extract model from YAML frontmatter between --- markers
+      const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+      if (!frontmatterMatch) continue
+      const frontmatter = frontmatterMatch[1]
+      const modelMatch = frontmatter.match(/^model:\s*(.+)$/m)
+      const model = modelMatch ? modelMatch[1].trim() : 'sonnet'
+      agents.push({ name: entry.slice(0, -3), model })
+    } catch {
+      // skip unreadable files
+    }
+  }
+  return agents
+}
+
+/**
+ * Read `.specrails/install-config.yaml` and patch the `model:` line in each
+ * `.claude/agents/*.md` frontmatter to match the config's defaults/overrides.
+ * No-op if the config file does not exist.
+ */
+function applyModelConfig(projectPath: string): void {
+  const configPath = path.join(projectPath, '.specrails', 'install-config.yaml')
+  if (!fs.existsSync(configPath)) return
+
+  let configText: string
+  try {
+    configText = fs.readFileSync(configPath, 'utf-8')
+  } catch {
+    return
+  }
+
+  // Parse defaults.model
+  const defaultsMatch = configText.match(/defaults:\s*\{\s*model:\s*(\S+)\s*\}/)
+  const defaultModel: string = defaultsMatch ? defaultsMatch[1] : 'sonnet'
+
+  // Parse overrides block — lines like `    agentname: alias`
+  const overrides: Record<string, string> = {}
+  const overridesBlockMatch = configText.match(/overrides:([\s\S]*?)(?:\n\S|$)/)
+  if (overridesBlockMatch) {
+    const block = overridesBlockMatch[1]
+    const overrideLines = block.match(/^ {2,}(\S+):\s*(\S+)/gm) ?? []
+    for (const line of overrideLines) {
+      const m = line.match(/^\s+(\S+):\s*(\S+)/)
+      if (m) overrides[m[1]] = m[2]
+    }
+  }
+
+  const agentsDir = path.join(projectPath, '.claude', 'agents')
+  if (!fs.existsSync(agentsDir)) return
+
+  let entries: string[]
+  try {
+    entries = fs.readdirSync(agentsDir)
+  } catch {
+    return
+  }
+
+  for (const entry of entries) {
+    if (!entry.endsWith('.md')) continue
+    const filePath = path.join(agentsDir, entry)
+    try {
+      const stat = fs.statSync(filePath)
+      if (!stat.isFile()) continue
+      const agentName = entry.slice(0, -3)
+      const targetModel = overrides[agentName] ?? defaultModel
+      const content = fs.readFileSync(filePath, 'utf-8')
+      const patched = content.replace(/^model: .+$/m, `model: ${targetModel}`)
+      if (patched !== content) {
+        fs.writeFileSync(filePath, patched, 'utf-8')
+      }
+    } catch {
+      // skip unwritable files
+    }
+  }
+}
+
 // Extend Express Request to carry resolved ProjectContext
 declare module 'express-serve-static-core' {
   interface Request {
@@ -1684,10 +1788,18 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   router.patch('/:projectId/settings', (req: Request, res: Response) => {
-    const { pipelineTelemetryEnabled } = req.body ?? {}
+    const { pipelineTelemetryEnabled, orchestratorModel } = req.body ?? {}
     const patch: Parameters<typeof updateProjectSettings>[1] = {}
     if (pipelineTelemetryEnabled !== undefined) {
       patch.pipelineTelemetryEnabled = Boolean(pipelineTelemetryEnabled)
+    }
+    const VALID_MODELS = ['sonnet', 'opus', 'haiku']
+    if (orchestratorModel !== undefined) {
+      if (typeof orchestratorModel !== 'string' || !VALID_MODELS.includes(orchestratorModel)) {
+        res.status(400).json({ error: `orchestratorModel must be one of: ${VALID_MODELS.join(', ')}` })
+        return
+      }
+      patch.orchestratorModel = orchestratorModel
     }
     try {
       updateProjectSettings(ctx(req).db, patch)
@@ -1695,6 +1807,125 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     } catch (err) {
       console.error('[project-router] settings patch error:', err)
       res.status(500).json({ error: 'Failed to update settings' })
+    }
+  })
+
+  // ─── Agent models ────────────────────────────────────────────────────────────
+
+  router.get('/:projectId/agent-models', (req: Request, res: Response) => {
+    const { project } = ctx(req)
+    const agents = readAgentModels(project.path)
+    res.json({ agents })
+  })
+
+  router.patch('/:projectId/agent-models', (req: Request, res: Response) => {
+    const { project } = ctx(req)
+    const { defaultModel, overrides } = req.body ?? {}
+
+    // Validate defaultModel if provided
+    if (defaultModel !== undefined) {
+      if (typeof defaultModel !== 'string' || !(VALID_MODEL_ALIASES as readonly string[]).includes(defaultModel)) {
+        res.status(400).json({ error: `Invalid model alias. Must be one of: ${VALID_MODEL_ALIASES.join(', ')}` }); return
+      }
+    }
+    // Validate overrides map if provided
+    if (overrides !== undefined) {
+      if (typeof overrides !== 'object' || Array.isArray(overrides) || overrides === null) {
+        res.status(400).json({ error: 'overrides must be an object' }); return
+      }
+      for (const [agentName, modelValue] of Object.entries(overrides)) {
+        if (typeof modelValue !== 'string' || !(VALID_MODEL_ALIASES as readonly string[]).includes(modelValue)) {
+          res.status(400).json({ error: `Invalid model alias for agent "${agentName}". Must be one of: ${VALID_MODEL_ALIASES.join(', ')}` }); return
+        }
+      }
+    }
+
+    const configDir = path.join(project.path, '.specrails')
+    const configPath = path.join(configDir, 'install-config.yaml')
+
+    // Read existing config or build default shape
+    let existingConfig: Record<string, unknown> = {
+      version: 1,
+      provider: 'claude',
+      tier: 'quick',
+      agents: { selected: [], excluded: [] },
+      models: { preset: 'balanced', defaults: { model: 'sonnet' }, overrides: {} },
+      agent_teams: false,
+    }
+
+    if (fs.existsSync(configPath)) {
+      try {
+        const text = fs.readFileSync(configPath, 'utf-8')
+        // Parse fields we care about from the existing config text
+        const versionMatch = text.match(/^version:\s*(\d+)/m)
+        const providerMatch = text.match(/^provider:\s*(\S+)/m)
+        const tierMatch = text.match(/^tier:\s*(\S+)/m)
+        const presetMatch = text.match(/preset:\s*(\S+)/)
+        const agentTeamsMatch = text.match(/^agent_teams:\s*(\S+)/m)
+
+        // Parse selected agents list
+        const selectedMatch = text.match(/selected:\s*\[([^\]]*)\]/)
+        const excludedMatch = text.match(/excluded:\s*\[([^\]]*)\]/)
+        const parsedSelected = selectedMatch
+          ? selectedMatch[1].split(',').map(s => s.trim()).filter(Boolean)
+          : []
+        const parsedExcluded = excludedMatch
+          ? excludedMatch[1].split(',').map(s => s.trim()).filter(Boolean)
+          : []
+
+        // Parse existing overrides to merge
+        const existingOverrides: Record<string, string> = {}
+        const overridesBlockMatch = text.match(/overrides:([\s\S]*?)(?:\n\S|$)/)
+        if (overridesBlockMatch) {
+          const block = overridesBlockMatch[1]
+          const overrideLines = block.match(/^ {2,}(\S+):\s*(\S+)/gm) ?? []
+          for (const line of overrideLines) {
+            const m = line.match(/^\s+(\S+):\s*(\S+)/)
+            if (m) existingOverrides[m[1]] = m[2]
+          }
+        }
+
+        existingConfig = {
+          version: versionMatch ? parseInt(versionMatch[1], 10) : 1,
+          provider: providerMatch ? providerMatch[1] : 'claude',
+          tier: tierMatch ? tierMatch[1] : 'quick',
+          agents: { selected: parsedSelected, excluded: parsedExcluded },
+          models: {
+            preset: presetMatch ? presetMatch[1] : 'balanced',
+            defaults: { model: 'sonnet' },
+            overrides: existingOverrides,
+          },
+          agent_teams: agentTeamsMatch ? agentTeamsMatch[1] === 'true' : false,
+        }
+      } catch {
+        // use defaults
+      }
+    }
+
+    // Merge new values into config
+    const mergedModels = existingConfig.models as {
+      preset: string
+      defaults: { model: string }
+      overrides: Record<string, string>
+    }
+    if (defaultModel !== undefined) {
+      mergedModels.defaults = { model: defaultModel as ModelAlias }
+    }
+    if (overrides !== undefined) {
+      mergedModels.overrides = overrides as Record<string, string>
+    }
+    existingConfig.models = mergedModels
+
+    try {
+      fs.mkdirSync(configDir, { recursive: true })
+      const yaml = serializeInstallConfigYaml(existingConfig)
+      fs.writeFileSync(configPath, yaml, 'utf-8')
+      applyModelConfig(project.path)
+      const agents = readAgentModels(project.path)
+      res.json({ agents })
+    } catch (err) {
+      console.error('[project-router] agent-models patch error:', err)
+      res.status(500).json({ error: `Failed to apply model config: ${err}` })
     }
   })
 

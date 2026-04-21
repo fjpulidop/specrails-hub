@@ -989,11 +989,19 @@ describe('handleHub dispatch', () => {
   afterEach(async () => { if (server) await closeServer(server) })
 
   it('dispatches stop subcommand', async () => {
-    let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => {
-      const code = await _internal.handleHub(['stop'], 4200)
-      expect(code).toBe(0)
-    }) })
-    expect(so).toContain('not running')
+    const pidFile = _internal.HUB_PID_FILE
+    const bakFile = pidFile + '.dispatch-test-bak'
+    const hadPidFile = fs.existsSync(pidFile)
+    if (hadPidFile) fs.renameSync(pidFile, bakFile)
+    try {
+      let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => {
+        const code = await _internal.handleHub(['stop'], 4200)
+        expect(code).toBe(0)
+      }) })
+      expect(so).toContain('not running')
+    } finally {
+      if (hadPidFile) fs.renameSync(bakFile, pidFile)
+    }
   })
 
   it('dispatches status subcommand', async () => {

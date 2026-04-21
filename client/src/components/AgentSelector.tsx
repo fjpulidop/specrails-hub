@@ -40,12 +40,8 @@ export const CORE_AGENTS = new Set([
   'sr-merge-resolver',
 ])
 
-// Default selection: core agents + test-writer + product-manager
-export const DEFAULT_SELECTED = new Set([
-  ...CORE_AGENTS,
-  'sr-test-writer',
-  'sr-product-manager',
-])
+// Default selection: core agents only
+export const DEFAULT_SELECTED = new Set([...CORE_AGENTS])
 
 export const AGENT_CATEGORIES = ['Architecture', 'Development', 'Review', 'Product', 'Utilities'] as const
 

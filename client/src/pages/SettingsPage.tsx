@@ -6,10 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Separator } from '../components/ui/separator'
+import { ModelCombobox } from '../components/ModelCombobox'
 import type { ProjectConfig } from '../types'
+
+interface AgentModel {
+  name: string
+  model: string
+}
 
 interface ProjectSettings {
   pipelineTelemetryEnabled: boolean
+  orchestratorModel: string
 }
 
 export default function SettingsPage() {
@@ -24,6 +31,13 @@ export default function SettingsPage() {
   const [isSavingJobThreshold, setIsSavingJobThreshold] = useState(false)
   const [telemetryEnabled, setTelemetryEnabled] = useState(false)
   const [isSavingTelemetry, setIsSavingTelemetry] = useState(false)
+  const [orchestratorModel, setOrchestratorModel] = useState('sonnet')
+  const [isSavingOrchestratorModel, setIsSavingOrchestratorModel] = useState(false)
+  const [agentModels, setAgentModels] = useState<AgentModel[]>([])
+  const [pendingModels, setPendingModels] = useState<Record<string, string>>({})
+  const [isLoadingAgents, setIsLoadingAgents] = useState(false)
+  const [isSavingModels, setIsSavingModels] = useState(false)
+  const [applyAllModel, setApplyAllModel] = useState<string>('sonnet')
 
   const cacheRef = useRef<Map<string, ProjectConfig>>(new Map())
 
@@ -81,12 +95,58 @@ export default function SettingsPage() {
         if (!res.ok) return
         const data = await res.json() as ProjectSettings
         setTelemetryEnabled(data.pipelineTelemetryEnabled ?? false)
+        setOrchestratorModel(data.orchestratorModel ?? 'sonnet')
       } catch {
         // ignore
       }
     }
     void loadTelemetrySettings()
   }, [activeProjectId, isHubMode])
+
+  useEffect(() => {
+    if (!activeProjectId || !isHubMode) return
+    setIsLoadingAgents(true)
+    fetch(`${getApiBase()}/agent-models`)
+      .then(r => r.json())
+      .then((data: { agents: AgentModel[] }) => {
+        const agents = data.agents ?? []
+        setAgentModels(agents)
+        const initial: Record<string, string> = {}
+        agents.forEach((a) => { initial[a.name] = a.model })
+        setPendingModels(initial)
+      })
+      .catch(() => { /* ignore */ })
+      .finally(() => setIsLoadingAgents(false))
+  }, [activeProjectId, isHubMode])
+
+  async function saveAgentModels() {
+    setIsSavingModels(true)
+    const prev = { ...pendingModels }
+    try {
+      const defaultModel = agentModels[0] ? (pendingModels[agentModels[0].name] ?? 'sonnet') : 'sonnet'
+      const overrides: Record<string, string> = {}
+      agentModels.forEach(a => {
+        if (pendingModels[a.name] !== defaultModel) overrides[a.name] = pendingModels[a.name]
+      })
+      const res = await fetch(`${getApiBase()}/agent-models`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultModel, overrides }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      const data = await res.json() as { agents: AgentModel[] }
+      setAgentModels(data.agents)
+      const updated: Record<string, string> = {}
+      data.agents.forEach((a) => { updated[a.name] = a.model })
+      setPendingModels(updated)
+      toast.success('Agent models saved')
+    } catch (err) {
+      setPendingModels(prev)
+      toast.error('Failed to save agent models', { description: (err as Error).message })
+    } finally {
+      setIsSavingModels(false)
+    }
+  }
 
   async function saveDailyBudget() {
     setIsSavingBudget(true)
@@ -129,6 +189,26 @@ export default function SettingsPage() {
       toast.error('Failed to save threshold', { description: (err as Error).message })
     } finally {
       setIsSavingJobThreshold(false)
+    }
+  }
+
+  async function saveOrchestratorModel(model: string) {
+    setIsSavingOrchestratorModel(true)
+    const prev = orchestratorModel
+    setOrchestratorModel(model)
+    try {
+      const res = await fetch(`${getApiBase()}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orchestratorModel: model }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      toast.success(`Orchestrator model set to ${model}`)
+    } catch (err) {
+      setOrchestratorModel(prev)
+      toast.error('Failed to save orchestrator model', { description: (err as Error).message })
+    } finally {
+      setIsSavingOrchestratorModel(false)
     }
   }
 
@@ -277,6 +357,103 @@ export default function SettingsPage() {
                 />
               </button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Orchestrator Model Section — hub mode only */}
+      {isHubMode && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Orchestrator Model</CardTitle>
+            <CardDescription>
+              Claude model used by the pipeline orchestrator (the Claude CLI process that runs each job). Defaults to Sonnet.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-3">
+              <ModelCombobox
+                value={orchestratorModel}
+                onChange={saveOrchestratorModel}
+                disabled={isSavingOrchestratorModel}
+              />
+              {isSavingOrchestratorModel && (
+                <span className="text-[11px] text-muted-foreground">Saving...</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Agent Models Section — hub mode only */}
+      {isHubMode && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Agent Models</CardTitle>
+            <CardDescription>
+              Configure the Claude model for each installed agent.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {isLoadingAgents ? (
+              <div className="space-y-1.5">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-7 bg-muted/30 rounded animate-pulse" />
+                ))}
+              </div>
+            ) : agentModels.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No specrails agents installed in this project.
+              </p>
+            ) : (
+              <>
+                {/* Apply to all — subtle top-right control */}
+                <div className="flex items-center justify-end gap-2">
+                  <span className="text-[11px] text-muted-foreground">Apply to all:</span>
+                  <ModelCombobox
+                    value={applyAllModel}
+                    onChange={(v) => {
+                      setApplyAllModel(v)
+                      const updated: Record<string, string> = {}
+                      agentModels.forEach(a => { updated[a.name] = v })
+                      setPendingModels(updated)
+                    }}
+                    disabled={isSavingModels}
+                  />
+                </div>
+
+                <Separator />
+
+                {/* Per-agent rows */}
+                <div className="space-y-0.5">
+                  {agentModels.map((agent) => (
+                    <div key={agent.name} className="flex items-center gap-3 py-1">
+                      <span className="text-xs font-mono text-foreground flex-1 min-w-0 truncate">
+                        {agent.name}
+                      </span>
+                      <ModelCombobox
+                        value={pendingModels[agent.name] ?? agent.model}
+                        onChange={(v) => setPendingModels(prev => ({ ...prev, [agent.name]: v }))}
+                        disabled={isSavingModels}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Save button */}
+                <div className="flex justify-end pt-1">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-7 text-xs"
+                    disabled={isSavingModels || !agentModels.some(a => pendingModels[a.name] !== a.model)}
+                    onClick={saveAgentModels}
+                  >
+                    {isSavingModels ? 'Saving...' : 'Save'}
+                  </Button>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

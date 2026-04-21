@@ -712,14 +712,19 @@ export function getStats(db: DbInstance): StatsRow {
 
 export interface ProjectSettings {
   pipelineTelemetryEnabled: boolean
+  orchestratorModel: string
 }
 
 export function getProjectSettings(db: DbInstance): ProjectSettings {
-  const row = db.prepare(
+  const telemetryRow = db.prepare(
     `SELECT value FROM queue_state WHERE key = 'config.pipeline_telemetry_enabled'`
   ).get() as { value: string } | undefined
+  const modelRow = db.prepare(
+    `SELECT value FROM queue_state WHERE key = 'config.orchestrator_model'`
+  ).get() as { value: string } | undefined
   return {
-    pipelineTelemetryEnabled: row?.value === 'true',
+    pipelineTelemetryEnabled: telemetryRow?.value === 'true',
+    orchestratorModel: modelRow?.value ?? 'sonnet',
   }
 }
 
@@ -728,6 +733,11 @@ export function updateProjectSettings(db: DbInstance, patch: Partial<ProjectSett
     db.prepare(
       `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.pipeline_telemetry_enabled', ?)`
     ).run(patch.pipelineTelemetryEnabled ? 'true' : 'false')
+  }
+  if (patch.orchestratorModel !== undefined) {
+    db.prepare(
+      `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.orchestrator_model', ?)`
+    ).run(patch.orchestratorModel)
   }
 }
 

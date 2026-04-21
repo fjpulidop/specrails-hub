@@ -493,6 +493,11 @@ export class QueueManager {
         '--output-format', 'stream-json',
         '--verbose',
       ]
+      // Read orchestratorModel at spawn time so changes take effect on next job.
+      if (this._db) {
+        const { orchestratorModel } = getProjectSettings(this._db)
+        args.push('--model', orchestratorModel)
+      }
       if (systemAppend) {
         args.push('--append-system-prompt', systemAppend)
       }

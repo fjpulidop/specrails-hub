@@ -1575,6 +1575,70 @@ describe('project-router', () => {
     })
   })
 
+  // ─── GET/PATCH /:projectId/settings ──────────────────────────────────────
+
+  describe('GET /:projectId/settings', () => {
+    it('returns default settings', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/settings')
+      expect(res.status).toBe(200)
+      expect(res.body.pipelineTelemetryEnabled).toBe(false)
+      expect(res.body.orchestratorModel).toBe('sonnet')
+    })
+  })
+
+  describe('PATCH /:projectId/settings', () => {
+    it('updates orchestratorModel to opus', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .patch('/api/projects/proj-1/settings')
+        .send({ orchestratorModel: 'opus' })
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+      expect(res.body.settings.orchestratorModel).toBe('opus')
+    })
+
+    it('updates orchestratorModel to haiku', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .patch('/api/projects/proj-1/settings')
+        .send({ orchestratorModel: 'haiku' })
+      expect(res.status).toBe(200)
+      expect(res.body.settings.orchestratorModel).toBe('haiku')
+    })
+
+    it('rejects invalid orchestratorModel', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .patch('/api/projects/proj-1/settings')
+        .send({ orchestratorModel: 'gpt-5' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('orchestratorModel')
+    })
+
+    it('updates pipelineTelemetryEnabled', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .patch('/api/projects/proj-1/settings')
+        .send({ pipelineTelemetryEnabled: true })
+      expect(res.status).toBe(200)
+      expect(res.body.settings.pipelineTelemetryEnabled).toBe(true)
+    })
+
+    it('accepts empty body without error', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).patch('/api/projects/proj-1/settings').send({})
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+    })
+  })
+
   // ─── POST /config dailyBudgetUsd ─────────────────────────────────────────
 
   describe('POST /:projectId/config dailyBudgetUsd', () => {
