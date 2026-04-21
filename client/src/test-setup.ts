@@ -40,6 +40,12 @@ class ResizeObserverMock {
 }
 global.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver
 
+// Pointer capture mocks required by Radix UI Select/Popover in JSDOM.
+// Without these, Radix pointer-down handlers throw and the dropdown never opens.
+HTMLElement.prototype.setPointerCapture = vi.fn()
+HTMLElement.prototype.releasePointerCapture = vi.fn()
+HTMLElement.prototype.hasPointerCapture = vi.fn(() => false)
+
 // Mock IntersectionObserver
 global.IntersectionObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),

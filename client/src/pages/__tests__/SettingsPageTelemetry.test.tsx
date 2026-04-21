@@ -54,10 +54,13 @@ function makeFetchMock(telemetryEnabled: boolean) {
   return vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
     const urlStr = String(url)
     if (urlStr.endsWith('/settings') && opts?.method === 'PATCH') {
-      return Promise.resolve({ ok: true, json: async () => ({ ok: true, settings: { pipelineTelemetryEnabled: !telemetryEnabled } }) })
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true, settings: { pipelineTelemetryEnabled: !telemetryEnabled, orchestratorModel: 'sonnet' } }) })
     }
     if (urlStr.endsWith('/settings')) {
-      return Promise.resolve({ ok: true, json: async () => ({ pipelineTelemetryEnabled: telemetryEnabled }) })
+      return Promise.resolve({ ok: true, json: async () => ({ pipelineTelemetryEnabled: telemetryEnabled, orchestratorModel: 'sonnet' }) })
+    }
+    if (urlStr.endsWith('/agent-models')) {
+      return Promise.resolve({ ok: true, json: async () => ({ agents: [] }) })
     }
     if (urlStr.endsWith('/budget')) {
       return Promise.resolve({ ok: true, json: async () => ({ dailyBudgetUsd: null, jobCostThresholdUsd: null }) })

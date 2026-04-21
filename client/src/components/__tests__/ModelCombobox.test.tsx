@@ -56,7 +56,8 @@ describe('ModelCombobox', () => {
     const user = userEvent.setup()
     render(<ModelCombobox value="sonnet" onChange={vi.fn()} />)
     await user.click(screen.getByRole('combobox'))
-    expect(screen.getByText(/balanced/i)).toBeInTheDocument()
+    // "Balanced" appears in both the trigger badge and the open dropdown option
+    expect(screen.getAllByText(/balanced/i).length).toBeGreaterThan(0)
   })
 
   it('shows tier badge "Most capable" for opus option', async () => {

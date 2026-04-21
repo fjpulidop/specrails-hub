@@ -1788,10 +1788,18 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   router.patch('/:projectId/settings', (req: Request, res: Response) => {
-    const { pipelineTelemetryEnabled } = req.body ?? {}
+    const { pipelineTelemetryEnabled, orchestratorModel } = req.body ?? {}
     const patch: Parameters<typeof updateProjectSettings>[1] = {}
     if (pipelineTelemetryEnabled !== undefined) {
       patch.pipelineTelemetryEnabled = Boolean(pipelineTelemetryEnabled)
+    }
+    const VALID_MODELS = ['sonnet', 'opus', 'haiku']
+    if (orchestratorModel !== undefined) {
+      if (typeof orchestratorModel !== 'string' || !VALID_MODELS.includes(orchestratorModel)) {
+        res.status(400).json({ error: `orchestratorModel must be one of: ${VALID_MODELS.join(', ')}` })
+        return
+      }
+      patch.orchestratorModel = orchestratorModel
     }
     try {
       updateProjectSettings(ctx(req).db, patch)

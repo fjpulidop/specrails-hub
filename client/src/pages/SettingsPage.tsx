@@ -16,6 +16,7 @@ interface AgentModel {
 
 interface ProjectSettings {
   pipelineTelemetryEnabled: boolean
+  orchestratorModel: string
 }
 
 export default function SettingsPage() {
@@ -30,6 +31,8 @@ export default function SettingsPage() {
   const [isSavingJobThreshold, setIsSavingJobThreshold] = useState(false)
   const [telemetryEnabled, setTelemetryEnabled] = useState(false)
   const [isSavingTelemetry, setIsSavingTelemetry] = useState(false)
+  const [orchestratorModel, setOrchestratorModel] = useState('sonnet')
+  const [isSavingOrchestratorModel, setIsSavingOrchestratorModel] = useState(false)
   const [agentModels, setAgentModels] = useState<AgentModel[]>([])
   const [pendingModels, setPendingModels] = useState<Record<string, string>>({})
   const [isLoadingAgents, setIsLoadingAgents] = useState(false)
@@ -92,6 +95,7 @@ export default function SettingsPage() {
         if (!res.ok) return
         const data = await res.json() as ProjectSettings
         setTelemetryEnabled(data.pipelineTelemetryEnabled ?? false)
+        setOrchestratorModel(data.orchestratorModel ?? 'sonnet')
       } catch {
         // ignore
       }
@@ -105,9 +109,10 @@ export default function SettingsPage() {
     fetch(`${getApiBase()}/agent-models`)
       .then(r => r.json())
       .then((data: { agents: AgentModel[] }) => {
-        setAgentModels(data.agents)
+        const agents = data.agents ?? []
+        setAgentModels(agents)
         const initial: Record<string, string> = {}
-        data.agents.forEach((a) => { initial[a.name] = a.model })
+        agents.forEach((a) => { initial[a.name] = a.model })
         setPendingModels(initial)
       })
       .catch(() => { /* ignore */ })
@@ -184,6 +189,26 @@ export default function SettingsPage() {
       toast.error('Failed to save threshold', { description: (err as Error).message })
     } finally {
       setIsSavingJobThreshold(false)
+    }
+  }
+
+  async function saveOrchestratorModel(model: string) {
+    setIsSavingOrchestratorModel(true)
+    const prev = orchestratorModel
+    setOrchestratorModel(model)
+    try {
+      const res = await fetch(`${getApiBase()}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orchestratorModel: model }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      toast.success(`Orchestrator model set to ${model}`)
+    } catch (err) {
+      setOrchestratorModel(prev)
+      toast.error('Failed to save orchestrator model', { description: (err as Error).message })
+    } finally {
+      setIsSavingOrchestratorModel(false)
     }
   }
 
@@ -331,6 +356,30 @@ export default function SettingsPage() {
                   }`}
                 />
               </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Orchestrator Model Section — hub mode only */}
+      {isHubMode && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Orchestrator Model</CardTitle>
+            <CardDescription>
+              Claude model used by the pipeline orchestrator (the Claude CLI process that runs each job). Defaults to Sonnet.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-3">
+              <ModelCombobox
+                value={orchestratorModel}
+                onChange={saveOrchestratorModel}
+                disabled={isSavingOrchestratorModel}
+              />
+              {isSavingOrchestratorModel && (
+                <span className="text-[11px] text-muted-foreground">Saving...</span>
+              )}
             </div>
           </CardContent>
         </Card>

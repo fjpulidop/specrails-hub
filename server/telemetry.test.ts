@@ -60,6 +60,30 @@ describe('getProjectSettings / updateProjectSettings', () => {
     updateProjectSettings(db, { pipelineTelemetryEnabled: false })
     expect(getProjectSettings(db).pipelineTelemetryEnabled).toBe(false)
   })
+
+  it('defaults orchestratorModel to sonnet', () => {
+    const db = makeDb()
+    expect(getProjectSettings(db).orchestratorModel).toBe('sonnet')
+  })
+
+  it('persists orchestratorModel when updated', () => {
+    const db = makeDb()
+    updateProjectSettings(db, { orchestratorModel: 'opus' })
+    expect(getProjectSettings(db).orchestratorModel).toBe('opus')
+  })
+
+  it('persists orchestratorModel update to haiku', () => {
+    const db = makeDb()
+    updateProjectSettings(db, { orchestratorModel: 'opus' })
+    updateProjectSettings(db, { orchestratorModel: 'haiku' })
+    expect(getProjectSettings(db).orchestratorModel).toBe('haiku')
+  })
+
+  it('does not affect pipelineTelemetryEnabled when only orchestratorModel updated', () => {
+    const db = makeDb()
+    updateProjectSettings(db, { orchestratorModel: 'opus' })
+    expect(getProjectSettings(db).pipelineTelemetryEnabled).toBe(false)
+  })
 })
 
 // ─── Telemetry blob DB ────────────────────────────────────────────────────────

@@ -96,7 +96,9 @@ describe('SettingsPage - extended coverage', () => {
   })
 
   it('handles fetch failure gracefully (config remains null)', async () => {
-    global.fetch = vi.fn().mockResolvedValueOnce({ ok: false })
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: false })                                                                // GET /config fails
+      .mockResolvedValue({ ok: true, json: async () => ({ agents: [], pipelineTelemetryEnabled: false, orchestratorModel: 'sonnet' }) }) // all others succeed
     render(<SettingsPage />)
 
     await waitFor(() => {
@@ -120,7 +122,8 @@ describe('SettingsPage - extended coverage', () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => mockConfig }) // GET /config
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) })        // GET /budget
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ pipelineTelemetryEnabled: false }) }) // GET /settings
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ pipelineTelemetryEnabled: false, orchestratorModel: 'sonnet' }) }) // GET /settings
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ agents: [] }) }) // GET /agent-models
       .mockResolvedValueOnce({ ok: true })                                 // PATCH budget save
     render(<SettingsPage />)
     await waitFor(() => {
@@ -159,7 +162,8 @@ describe('SettingsPage - extended coverage', () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ...mockConfig, dailyBudgetUsd: 5.0 }) })  // GET /config
       .mockResolvedValueOnce({ ok: true, json: async () => ({ dailyBudgetUsd: 5.0 }) })                   // GET /budget
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ pipelineTelemetryEnabled: false }) })        // GET /settings
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ pipelineTelemetryEnabled: false, orchestratorModel: 'sonnet' }) }) // GET /settings
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ agents: [] }) })                             // GET /agent-models
       .mockResolvedValueOnce({ ok: true })                                                                  // PATCH /budget
     render(<SettingsPage />)
     await waitFor(() => {
