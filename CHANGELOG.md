@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.36.2](https://github.com/fjpulidop/specrails-hub/compare/v1.36.1...v1.36.2) (2026-04-21)
+
+
+### Bug Fixes
+
+* **setup:** force fresh registry lookup when installing specrails-core ([#240](https://github.com/fjpulidop/specrails-hub/issues/240)) ([ea8e7f6](https://github.com/fjpulidop/specrails-hub/commit/ea8e7f67c89d6b74bfd3c08e12e3f70095beee5a))
+
 ## [1.36.1](https://github.com/fjpulidop/specrails-hub/compare/v1.36.0...v1.36.1) (2026-04-21)
 
 
