@@ -255,120 +255,13 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* Budget Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Budget</CardTitle>
-          <CardDescription>
-            Set a daily spend cap for this project. The queue auto-pauses when the limit is hit.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium">Daily budget (USD)</label>
-            <div className="flex gap-2 max-w-xs">
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={dailyBudget}
-                onChange={(e) => setDailyBudget(e.target.value)}
-                placeholder="e.g. 5.00"
-                className="h-8 text-xs font-mono"
-              />
-              <Button
-                size="sm"
-                variant="secondary"
-                className="h-8 text-xs shrink-0"
-                disabled={isSavingBudget}
-                onClick={saveDailyBudget}
-              >
-                {isSavingBudget ? 'Saving...' : 'Save'}
-              </Button>
-            </div>
-            <p className="text-[10px] text-muted-foreground">
-              Leave blank to disable. Spend is calculated over the last 24 hours.
-            </p>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium">Per-job cost alert (USD)</label>
-            <div className="flex gap-2 max-w-xs">
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={jobCostThreshold}
-                onChange={(e) => setJobCostThreshold(e.target.value)}
-                placeholder="e.g. 0.50"
-                className="h-8 text-xs font-mono"
-              />
-              <Button
-                size="sm"
-                variant="secondary"
-                className="h-8 text-xs shrink-0"
-                disabled={isSavingJobThreshold}
-                onClick={saveJobCostThreshold}
-              >
-                {isSavingJobThreshold ? 'Saving...' : 'Save'}
-              </Button>
-            </div>
-            <p className="text-[10px] text-muted-foreground">
-              Alert when a single job in this project exceeds this amount.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Pipeline Telemetry Section — hub mode only */}
-      {isHubMode && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Pipeline Telemetry</CardTitle>
-            <CardDescription>
-              Capture token usage, phase durations, and subagent activity for diagnostic export. Off by default.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <p className="text-xs font-medium">Enable pipeline telemetry</p>
-                <p className="text-[10px] text-muted-foreground">
-                  When on, OTEL data from pipeline jobs is captured locally. Use the{' '}
-                  <span className="font-mono">Export diagnostic</span> button on any job card to download.
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-label="Enable pipeline telemetry"
-                aria-checked={telemetryEnabled}
-                disabled={isSavingTelemetry}
-                onClick={() => saveTelemetryToggle(!telemetryEnabled)}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 ${
-                  telemetryEnabled ? 'bg-primary' : 'bg-input'
-                }`}
-              >
-                <span
-                  className={`inline-block h-3.5 w-3.5 rounded-full bg-background shadow-sm transition-transform ${
-                    telemetryEnabled ? 'translate-x-4' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Orchestrator Model Section — hub mode only */}
       {isHubMode && (
         <Card>
           <CardHeader>
             <CardTitle>Orchestrator Model</CardTitle>
             <CardDescription>
-              Claude model used by the pipeline orchestrator (the Claude CLI process that runs each job). Defaults to Sonnet.
+              Model used by the pipeline orchestrator (the CLI process that runs each job). Defaults to Sonnet.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -400,7 +293,7 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle>Agent Models</CardTitle>
             <CardDescription>
-              Configure the Claude model for each installed agent.
+              Configure the model for each installed agent.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -466,6 +359,118 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Pipeline Telemetry Section — hub mode only */}
+      {isHubMode && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pipeline Telemetry</CardTitle>
+            <CardDescription>
+              Capture token usage, phase durations, and subagent activity for diagnostic export. Off by default.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <p className="text-xs font-medium">Enable pipeline telemetry</p>
+                <p className="text-[10px] text-muted-foreground">
+                  When on, OTEL data from pipeline jobs is captured locally. Use the{' '}
+                  <span className="font-mono">Export diagnostic</span> button on any job card to download.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-label="Enable pipeline telemetry"
+                aria-checked={telemetryEnabled}
+                disabled={isSavingTelemetry}
+                onClick={() => saveTelemetryToggle(!telemetryEnabled)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 ${
+                  telemetryEnabled ? 'bg-primary' : 'bg-input'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 rounded-full bg-background shadow-sm transition-transform ${
+                    telemetryEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Budget Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Budget</CardTitle>
+          <CardDescription>
+            Set a daily spend cap for this project. The queue auto-pauses when the limit is hit.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs font-medium">Daily budget (USD)</label>
+                <p className="text-xs text-muted-foreground">
+                  Leave blank to disable. Spend is calculated over the last 24 hours.
+                </p>
+              </div>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={dailyBudget}
+                onChange={(e) => setDailyBudget(e.target.value)}
+                placeholder="e.g. 5.00"
+                className="h-8 text-xs font-mono"
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="h-7 text-xs"
+                  disabled={isSavingBudget}
+                  onClick={saveDailyBudget}
+                >
+                  {isSavingBudget ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs font-medium">Per-job cost alert (USD)</label>
+                <p className="text-xs text-muted-foreground">
+                  Alert when a single job in this project exceeds this amount.
+                </p>
+              </div>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={jobCostThreshold}
+                onChange={(e) => setJobCostThreshold(e.target.value)}
+                placeholder="e.g. 0.50"
+                className="h-8 text-xs font-mono"
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="h-7 text-xs"
+                  disabled={isSavingJobThreshold}
+                  onClick={saveJobCostThreshold}
+                >
+                  {isSavingJobThreshold ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
 
     </div>
   )

@@ -131,9 +131,10 @@ describe('SettingsPage - extended coverage', () => {
     })
     const budgetInput = screen.getByPlaceholderText(/e\.g\. 5\.00/i) as HTMLInputElement
     await user.type(budgetInput, '5.00')
+    // First enabled Save button is the daily budget Save (Orchestrator Save is disabled)
     const saveBtn = screen.getAllByRole('button', { name: /^save$/i }).find(
-      (btn) => (btn as HTMLButtonElement).closest('div')?.querySelector('input[placeholder*="5.00"]')
-    ) ?? screen.getAllByRole('button', { name: /^save$/i })[0]
+      (btn) => !(btn as HTMLButtonElement).disabled
+    )!
     await user.click(saveBtn)
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Daily budget set to $5')
@@ -150,7 +151,10 @@ describe('SettingsPage - extended coverage', () => {
     })
     const budgetInput = screen.getByPlaceholderText(/e\.g\. 5\.00/i) as HTMLInputElement
     await user.type(budgetInput, '-1')
-    await user.click(screen.getAllByRole('button', { name: /^save$/i })[0])
+    const saveBtn = screen.getAllByRole('button', { name: /^save$/i }).find(
+      (btn) => !(btn as HTMLButtonElement).disabled
+    )!
+    await user.click(saveBtn)
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Enter a positive number or leave blank to disable')
     })
@@ -171,7 +175,10 @@ describe('SettingsPage - extended coverage', () => {
     })
     const budgetInput = screen.getByPlaceholderText(/e\.g\. 5\.00/i) as HTMLInputElement
     await user.clear(budgetInput)
-    await user.click(screen.getAllByRole('button', { name: /^save$/i })[0])
+    const saveBtn = screen.getAllByRole('button', { name: /^save$/i }).find(
+      (btn) => !(btn as HTMLButtonElement).disabled
+    )!
+    await user.click(saveBtn)
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Daily budget removed')
     })
