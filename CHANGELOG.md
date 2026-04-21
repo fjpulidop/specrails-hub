@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.36.0](https://github.com/fjpulidop/specrails-hub/compare/v1.35.0...v1.36.0) (2026-04-21)
+
+
+### Features
+
+* **settings:** per-agent Claude model selection ([#235](https://github.com/fjpulidop/specrails-hub/issues/235)) ([57d1062](https://github.com/fjpulidop/specrails-hub/commit/57d10623c1dc4b1617b5111cd15d5ea661cd8113))
+
 ## [1.35.0](https://github.com/fjpulidop/specrails-hub/compare/v1.34.3...v1.35.0) (2026-04-20)
 
 
