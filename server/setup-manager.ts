@@ -28,7 +28,7 @@ function getCoreCommand(): { bin: string; pkg: string } {
 
 function spawnCoreInit(args: string[], cwd: string): ChildProcess {
   const { bin, pkg } = getCoreCommand()
-  const fullArgs = pkg ? [pkg, 'init', ...args] : ['init', ...args]
+  const fullArgs = pkg ? ['--yes', '--prefer-online', pkg, 'init', ...args] : ['init', ...args]
   return spawn(bin, fullArgs, {
     cwd,
     env: process.env,
