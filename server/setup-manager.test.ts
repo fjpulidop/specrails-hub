@@ -157,7 +157,7 @@ describe('SetupManager', () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'npx',
-        ['specrails-core@latest', 'init', '--yes', '--root-dir', '/path/to/project'],
+        ['--yes', '--prefer-online', 'specrails-core@latest', 'init', '--yes', '--root-dir', '/path/to/project'],
         expect.objectContaining({ cwd: '/path/to/project' })
       )
     })
@@ -171,7 +171,7 @@ describe('SetupManager', () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'npx',
-        ['specrails-core@latest', 'init', '--yes', '--from-config', '/path/to/project/.specrails/install-config.yaml'],
+        ['--yes', '--prefer-online', 'specrails-core@latest', 'init', '--yes', '--from-config', '/path/to/project/.specrails/install-config.yaml'],
         expect.objectContaining({ cwd: '/path/to/project' })
       )
     })
