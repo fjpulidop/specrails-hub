@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef, useState } from 'react'
+import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
 import { Sparkles, Send, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
@@ -7,6 +7,8 @@ import { useChatContext } from '../hooks/useChat'
 import { useHub } from '../hooks/useHub'
 import { useSpecGenTracker } from '../hooks/useSpecGenTracker'
 import { API_ORIGIN } from '../lib/origin'
+import { deleteAllAttachments } from '../lib/attachments'
+import { RichAttachmentEditor, type RichAttachmentEditorHandle } from './RichAttachmentEditor'
 import type { LocalTicket } from '../types'
 
 interface ProposeSpecModalProps {
@@ -16,13 +18,27 @@ interface ProposeSpecModalProps {
   onTicketCreated?: (ticket: LocalTicket) => void
 }
 
+function genPendingId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  // fallback (shouldn't be hit in modern browsers)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 export function ProposeSpecModal({ open, onClose, tickets }: ProposeSpecModalProps) {
   const chat = useChatContext()
   const { activeProjectId, projects } = useHub()
   const tracker = useSpecGenTracker()
-  const [inputText, setInputText] = useState('')
   const [exploreCodebase, setExploreCodebase] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [hasText, setHasText] = useState(false)
+  const [attachmentCount, setAttachmentCount] = useState(0)
+  const [pendingSpecId, setPendingSpecId] = useState<string>(() => genPendingId())
+  const editorRef = useRef<RichAttachmentEditorHandle | null>(null)
+  const submittedRef = useRef(false)
 
   const activeProjectIdRef = useRef(activeProjectId)
   useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
@@ -30,18 +46,33 @@ export function ProposeSpecModal({ open, onClose, tickets }: ProposeSpecModalPro
   const projectsRef = useRef(projects)
   useEffect(() => { projectsRef.current = projects }, [projects])
 
-  // Reset input on open
+  // Reset on open; cleanup orphaned attachments on close-without-submit
   useEffect(() => {
     if (open) {
-      setInputText('')
+      setPendingSpecId(genPendingId())
       setIsSubmitting(false)
+      setHasText(false)
+      setAttachmentCount(0)
+      submittedRef.current = false
+      // defer to let dialog mount
+      setTimeout(() => editorRef.current?.focus(), 50)
     }
   }, [open])
 
-  // ── Submit ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    // On close, if not submitted and we had attachments, clean up
+    if (!open && !submittedRef.current && attachmentCount > 0) {
+      deleteAllAttachments(pendingSpecId).catch((err) => console.warn('[ProposeSpec] cleanup failed:', err))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  const canSubmit = useMemo(() => hasText && !isSubmitting, [hasText, isSubmitting])
+
   const handleSubmit = useCallback(async () => {
-    const idea = inputText.trim()
+    const idea = editorRef.current?.getPlainText().trim() ?? ''
     if (!idea) return
+    const attachmentIds = editorRef.current?.getAttachmentIds() ?? []
     if (exploreCodebase && !chat) return
 
     const projectId = activeProjectIdRef.current
@@ -53,19 +84,22 @@ export function ProposeSpecModal({ open, onClose, tickets }: ProposeSpecModalPro
     const knownTicketIds = new Set(tickets.map(t => t.id))
     const startTime = Date.now()
 
-    // Show initial loading toast — tracker takes over updates from here
-    toast.loading(`${projectName} · ${truncated}`, {
-      id: toastId,
-      description: 'Generating...',
-    })
+    toast.loading(`${projectName} · ${truncated}`, { id: toastId, description: 'Generating...' })
 
-    setInputText('')
+    submittedRef.current = true
     setIsSubmitting(true)
+    editorRef.current?.clear()
+    setAttachmentCount(0)
+    setHasText(false)
 
     const reg = { toastId, truncated, knownTicketIds, projectId, projectName, startTime, persistId: toastId }
 
     try {
       if (exploreCodebase && chat) {
+        // Attachments not wired into explore-codebase path in v1 — drop them
+        if (attachmentIds.length > 0) {
+          await deleteAllAttachments(pendingSpecId).catch(() => {})
+        }
         const prompt = [
           '/specrails:propose-spec',
           '',
@@ -82,18 +116,15 @@ export function ProposeSpecModal({ open, onClose, tickets }: ProposeSpecModalPro
         ].join('\n')
 
         const conversationId = await chat.startWithMessage(prompt, { lightweight: true, maxTurns: 8 })
-        if (conversationId) {
-          tracker.registerExploreSpec(conversationId, reg)
-        } else {
-          toast.error(`${projectName} · Failed to start`, { id: toastId })
-        }
+        if (conversationId) tracker.registerExploreSpec(conversationId, reg)
+        else toast.error(`${projectName} · Failed to start`, { id: toastId })
       } else {
         let res: Response
         try {
           res = await fetch(`${API_ORIGIN}/api/projects/${projectId}/tickets/generate-spec`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idea }),
+            body: JSON.stringify({ idea, attachmentIds, pendingSpecId }),
           })
         } catch (err) {
           console.error('[ProposeSpec] generate-spec fetch threw:', err)
@@ -110,14 +141,7 @@ export function ProposeSpecModal({ open, onClose, tickets }: ProposeSpecModalPro
     } finally {
       setIsSubmitting(false)
     }
-  }, [inputText, chat, tickets, exploreCodebase, tracker])
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault()
-      handleSubmit()
-    }
-  }, [handleSubmit])
+  }, [chat, tickets, exploreCodebase, tracker, pendingSpecId])
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -131,16 +155,31 @@ export function ProposeSpecModal({ open, onClose, tickets }: ProposeSpecModalPro
 
         <div className="flex flex-col p-5 gap-4">
           <p className="text-sm text-muted-foreground">
-            Describe the feature or change you want to propose. A spec will be generated automatically.
+            Describe the feature or change you want to propose. Attach mockups, briefs, or data to give Claude more context.
           </p>
-          <textarea
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={handleKeyDown}
+          <RichAttachmentEditor
+            ref={editorRef}
+            ticketKey={pendingSpecId}
             placeholder="e.g. Add a dark mode toggle to the settings page that persists the user's preference..."
-            className="w-full min-h-[160px] max-h-[300px] resize-y rounded-lg border border-border/60 bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/40 transition-colors"
+            minHeight={160}
             autoFocus
+            ariaLabel="Spec idea"
+            onChange={() => setHasText((editorRef.current?.getPlainText().length ?? 0) > 0)}
+            onAttachmentAdded={() => setAttachmentCount((c) => c + 1)}
+            onAttachmentRemoved={(a) => {
+              setAttachmentCount((c) => Math.max(0, c - 1))
+              // fire-and-forget server delete; editor only removed pill
+              fetch(`${API_ORIGIN}/api/projects/${activeProjectIdRef.current}/tickets/${pendingSpecId}/attachments/${a.id}`, { method: 'DELETE' }).catch(() => {})
+            }}
+            onUnsupportedFile={(f) => toast.error(`Unsupported file type: ${f.name}`)}
+            onUploadError={(err, f) => toast.error(`Upload failed for ${f.name}: ${err.message}`)}
+            onSubmit={handleSubmit}
           />
+          {exploreCodebase && attachmentCount > 0 && (
+            <p className="text-[11px] text-amber-500">
+              ⚠ Attachments are ignored in Explore mode. Uncheck “Explore codebase” to include them.
+            </p>
+          )}
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-2 cursor-pointer select-none group">
               <input
@@ -160,7 +199,7 @@ export function ProposeSpecModal({ open, onClose, tickets }: ProposeSpecModalPro
             <Button
               size="sm"
               onClick={handleSubmit}
-              disabled={!inputText.trim() || isSubmitting}
+              disabled={!canSubmit}
               className="gap-1.5"
             >
               <Send className="w-3.5 h-3.5" />

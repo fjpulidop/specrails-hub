@@ -6,6 +6,15 @@ import path from 'path'
 export type TicketStatus = 'todo' | 'in_progress' | 'done' | 'cancelled'
 export type TicketPriority = 'critical' | 'high' | 'medium' | 'low'
 
+export interface Attachment {
+  id: string
+  filename: string
+  storedName: string
+  mimeType: string
+  size: number
+  addedAt: string
+}
+
 export interface Ticket {
   id: number
   title: string
@@ -27,6 +36,7 @@ export interface Ticket {
     created_at: string
     created_by: string
   }>
+  attachments?: Attachment[]
   created_at: string
   updated_at: string
   created_by: string

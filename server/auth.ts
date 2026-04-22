@@ -62,6 +62,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 
   const authHeader = req.headers['authorization']
   const hubTokenHeader = req.headers['x-hub-token']
+  const queryToken = req.query.token
 
   let provided: string | null = null
 
@@ -69,6 +70,10 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     provided = authHeader.slice(7).trim()
   } else if (typeof hubTokenHeader === 'string') {
     provided = hubTokenHeader.trim()
+  } else if (typeof queryToken === 'string') {
+    // Query-string token for URLs that cannot set headers (e.g. <a href>, <img src>).
+    // Acceptable here because the server binds to 127.0.0.1 only.
+    provided = queryToken.trim()
   }
 
   if (!provided || provided !== token) {

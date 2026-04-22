@@ -40,7 +40,7 @@ export function SpecCard({ ticket, onClick, dragDisabled }: SpecCardProps) {
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick(ticket)}
     >
-      <span className="text-[10px] font-mono text-muted-foreground/50 shrink-0">#{ticket.id}</span>
+      <span className="text-[10px] font-mono text-foreground shrink-0">#{ticket.id}</span>
       <span className="flex-1 text-sm truncate">{ticket.title}</span>
       <Badge variant={PRIORITY_VARIANT[ticket.priority]} className="text-[9px] shrink-0">
         {ticket.priority}

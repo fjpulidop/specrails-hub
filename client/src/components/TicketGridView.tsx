@@ -177,7 +177,7 @@ function KanbanCard({
 
           {/* Bottom row: ID, priority, labels */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[9px] font-mono text-muted-foreground/60">
+            <span className="text-[9px] font-mono text-foreground">
               #{ticket.id}
             </span>
 

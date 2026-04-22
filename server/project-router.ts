@@ -35,7 +35,9 @@ import type { TicketCreatedMessage, TicketUpdatedMessage, TicketDeletedMessage, 
 import { spawn } from 'child_process'
 import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
+import multer from 'multer'
 import { createRailsRouter } from './rails-router'
+import { attachmentManager, SUPPORTED_MIME_TYPES, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
 import {
   getTerminalManager,
   TerminalLimitExceededError,
@@ -1284,10 +1286,17 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   // POST /:projectId/tickets/generate-spec — Fast AI spec generation (no codebase exploration)
-  router.post('/:projectId/tickets/generate-spec', (req: Request, res: Response) => {
+  router.post('/:projectId/tickets/generate-spec', async (req: Request, res: Response) => {
     const idea = req.body?.idea as string | undefined
     if (!idea?.trim()) {
       res.status(400).json({ error: 'idea is required' }); return
+    }
+    const attachmentIds = Array.isArray(req.body?.attachmentIds)
+      ? (req.body.attachmentIds as unknown[]).filter((x): x is string => typeof x === 'string')
+      : []
+    const pendingSpecId = typeof req.body?.pendingSpecId === 'string' ? (req.body.pendingSpecId as string) : null
+    if (attachmentIds.length > 0 && !pendingSpecId) {
+      res.status(400).json({ error: 'pendingSpecId is required when attachmentIds are provided' }); return
     }
 
     const { project, broadcast, ticketWatcher } = ctx(req)
@@ -1296,10 +1305,30 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const projectId = project.id
     const filePath = ticketPath(req)
 
-    const systemPrompt =
+    let hasAttachments = false
+    let baseUserPrompt = `Generate a spec for the following idea:\n\n${idea.trim()}`
+    let imageFlags: string[] = []
+    if (attachmentIds.length > 0 && pendingSpecId) {
+      try {
+        const extracted = await attachmentManager.getClaudeArgs(project.slug, pendingSpecId, attachmentIds)
+        imageFlags = extracted.imageFlags
+        if (extracted.textBlocks.length > 0) {
+          hasAttachments = true
+          baseUserPrompt = `${baseUserPrompt}\n\n## Attached Resources\n\n${extracted.textBlocks.join('\n\n')}`
+        }
+      } catch (err) {
+        console.error('[project-router] generate-spec attachment extraction error:', err)
+      }
+    }
+
+    const codebaseRule = hasAttachments
+      ? `- Do NOT explore the project codebase. The resources inside <user-attachment> blocks below are pre-loaded context the user intentionally provided — read and use them freely.`
+      : `- Do NOT read any files or explore the codebase. Work purely from the user's description.`
+
+    let baseSystemPrompt =
       `You are a senior product engineer generating a structured spec proposal.\n\n` +
       `RULES:\n` +
-      `- Do NOT read any files or explore the codebase. Work purely from the user's description.\n` +
+      `${codebaseRule}\n` +
       `- Do NOT create files, tickets, or issues.\n` +
       `- Output ONLY the structured markdown below. No preamble, no explanation.\n\n` +
       `REQUIRED FORMAT:\n` +
@@ -1311,7 +1340,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       `## Technical Considerations\n[Bullet list]\n\n` +
       `## Estimated Complexity\n[Low/Medium/High/Very High + one sentence justification]`
 
-    const userPrompt = `Generate a spec for the following idea:\n\n${idea.trim()}`
+    if (hasAttachments) baseSystemPrompt = `${baseSystemPrompt}\n\n${USER_ATTACHMENT_SYSTEM_NOTE}`
+
+    const systemPrompt = baseSystemPrompt
+    const userPrompt = baseUserPrompt
 
     let binary: string
     let args: string[]
@@ -1327,7 +1359,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         '--tools', 'default',
         '--output-format', 'stream-json',
         '--verbose',
-        '--max-turns', '1',
+        '--max-turns', hasAttachments ? '3' : '1',
+        ...imageFlags,
         '--system-prompt', systemPrompt,
         '-p', userPrompt,
       ]
@@ -1378,7 +1411,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       }
     })
 
-    child.on('close', (code) => {
+    child.on('close', async (code) => {
       if (code === 0 && buffer.trim()) {
         // Extract title from generated spec
         const titleMatch = buffer.match(/##\s*Spec Title\s*\n+(.+)/)
@@ -1415,6 +1448,24 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
             created = ticket
           })
           ticketWatcher.notifyHubWrite(store.revision)
+
+          // Migrate attachments from pendingSpecId → real ticket id (if any were uploaded).
+          // Must complete BEFORE broadcasting ticket_created so WS listeners see the populated attachments[].
+          if (pendingSpecId && created) {
+            try {
+              const migrated = await attachmentManager.renameTicketDir({
+                slug: project.slug,
+                pendingId: pendingSpecId,
+                realTicketId: created.id,
+                projectPath: project.path,
+              })
+              if (migrated.length > 0) {
+                created.attachments = migrated
+              }
+            } catch (err) {
+              console.error('[project-router] generate-spec attachment migration error:', err)
+            }
+          }
 
           const ticketMsg: TicketCreatedMessage = {
             type: 'ticket_created', ticket: created! as unknown as LocalTicket,
@@ -1546,7 +1597,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   // POST /:projectId/tickets/:id/ai-edit — AI-powered description editing
   const _aiEditProcesses = new Map<string, import('child_process').ChildProcess>()
 
-  router.post('/:projectId/tickets/:id/ai-edit', (req: Request, res: Response) => {
+  router.post('/:projectId/tickets/:id/ai-edit', async (req: Request, res: Response) => {
     const ticketId = req.params.id as string
     if (!/^\d+$/.test(ticketId)) {
       res.status(400).json({ error: 'Invalid ticket ID' }); return
@@ -1559,6 +1610,15 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     if (!currentDescription) {
       res.status(400).json({ error: 'description is required' }); return
     }
+    const attachmentIds = Array.isArray(req.body?.attachmentIds)
+      ? (req.body.attachmentIds as unknown[]).filter((x): x is string => typeof x === 'string')
+      : []
+    const priorInstructions = Array.isArray(req.body?.priorInstructions)
+      ? (req.body.priorInstructions as unknown[]).filter((x): x is string => typeof x === 'string')
+      : []
+    const priorProposalRaw = req.body?.priorProposal
+    const priorProposal = typeof priorProposalRaw === 'string' && priorProposalRaw.length > 0 ? priorProposalRaw : null
+    const isRefinement = priorProposal !== null
 
     const { project, broadcast } = ctx(req)
     const provider = project.provider ?? 'claude'
@@ -1566,20 +1626,46 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const projectId = project.id
 
     // Build the focused pre-prompt
-    const systemPrompt =
-      `You are a spec editor. You will receive a ticket description and user instructions for how to modify it. ` +
-      `Your job is to produce an improved version of the description.\n\n` +
-      `RULES:\n` +
+    const baseRules =
       `- Output ONLY the modified description in markdown. No preamble, no explanation, no wrapping.\n` +
       `- Preserve the existing markdown structure and section headings.\n` +
       `- If the user asks to add technical details, briefly check CLAUDE.md and the project directory structure (ls, not deep reads) to ground your edits.\n` +
       `- Keep it concise and actionable.\n` +
       `- Do NOT create files, tickets, or issues. Only output text.`
 
-    const userPrompt =
-      `## Current Description\n\n${currentDescription}\n\n` +
-      `## User Instructions\n\n${instructions.trim()}\n\n` +
-      `Output the modified description now.`
+    const refinementRule = isRefinement
+      ? `\n- You are editing an in-progress draft, not the saved description. Apply the new refinement to the Latest Draft below.`
+      : ''
+
+    let systemPrompt =
+      `You are a spec editor. You will receive a ticket description and user instructions for how to modify it. ` +
+      `Your job is to produce an improved version of the description.\n\n` +
+      `RULES:\n` +
+      `${baseRules}${refinementRule}`
+
+    let userPrompt = isRefinement
+      ? `## Current Description (saved baseline — do not rewrite)\n\n${currentDescription}\n\n` +
+        `## Prior Refinement Turns\n\n${priorInstructions.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n` +
+        `## Latest Draft (from previous turn — apply the new refinement to this)\n\n${priorProposal}\n\n` +
+        `## New Refinement\n\n${instructions.trim()}\n\n` +
+        `Output the updated description now.`
+      : `## Current Description\n\n${currentDescription}\n\n` +
+        `## User Instructions\n\n${instructions.trim()}\n\n` +
+        `Output the modified description now.`
+
+    let imageFlags: string[] = []
+    if (attachmentIds.length > 0) {
+      try {
+        const extracted = await attachmentManager.getClaudeArgs(project.slug, ticketId, attachmentIds)
+        imageFlags = extracted.imageFlags
+        if (extracted.textBlocks.length > 0) {
+          systemPrompt = `${systemPrompt}\n\n${USER_ATTACHMENT_SYSTEM_NOTE}`
+          userPrompt = `${userPrompt}\n\n## Attached Files\n\n${extracted.textBlocks.join('\n\n')}`
+        }
+      } catch (err) {
+        console.error('[project-router] ai-edit attachment extraction error:', err)
+      }
+    }
 
     let binary: string
     let args: string[]
@@ -1596,6 +1682,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         '--output-format', 'stream-json',
         '--verbose',
         '--max-turns', '4',
+        ...imageFlags,
         '--system-prompt', systemPrompt,
         '-p', userPrompt,
       ]
@@ -1696,12 +1783,148 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       }
       const { broadcast, ticketWatcher } = ctx(req)
       ticketWatcher.notifyHubWrite(store.revision)
+      // Cascade-delete attachments for this ticket
+      attachmentManager.deleteAll(ctx(req).project.slug, ticketId).catch((e) => {
+        console.error('[project-router] attachment cascade delete failed:', e)
+      })
       const msg: TicketDeletedMessage = { type: 'ticket_deleted', ticketId: Number(ticketId), projectId: ctx(req).project.id, timestamp: new Date().toISOString() }
       broadcast(msg)
       res.json({ ok: true, revision: store.revision })
     } catch (err) {
       console.error('[project-router] ticket delete error:', err)
       res.status(500).json({ error: 'Failed to delete ticket' })
+    }
+  })
+
+  // ─── Ticket attachments ─────────────────────────────────────────────────────
+
+  const attachmentUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB per file
+    fileFilter: (_req, file, cb) => {
+      if (SUPPORTED_MIME_TYPES.has(file.mimetype)) cb(null, true)
+      else cb(null, false)
+    },
+  })
+
+  /** A ticket key is either a numeric real id or a UUID (pendingSpecId). */
+  function parseTicketKey(raw: string): { key: string; isPending: boolean } | null {
+    if (/^\d+$/.test(raw)) return { key: raw, isPending: false }
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+      return { key: raw, isPending: true }
+    }
+    return null
+  }
+
+  router.post(
+    '/:projectId/tickets/:ticketId/attachments',
+    attachmentUpload.single('file'),
+    async (req: Request, res: Response) => {
+      const parsed = parseTicketKey(req.params.ticketId as string)
+      if (!parsed) {
+        res.status(400).json({ error: 'Invalid ticketId (must be numeric id or UUID)' })
+        return
+      }
+      const file = (req as unknown as { file?: Express.Multer.File }).file
+      if (!file) {
+        res.status(400).json({ error: 'No file uploaded or file type unsupported' })
+        return
+      }
+      if (!parsed.isPending) {
+        const store = readStore(ticketPath(req))
+        if (!store.tickets[parsed.key]) {
+          res.status(404).json({ error: 'Ticket not found' })
+          return
+        }
+      }
+      try {
+        const attachment = await attachmentManager.upload({
+          slug: ctx(req).project.slug,
+          ticketKey: parsed.key,
+          projectPath: parsed.isPending ? null : ctx(req).project.path,
+          file: {
+            buffer: file.buffer,
+            originalname: file.originalname,
+            mimetype: file.mimetype,
+            size: file.size,
+          },
+        })
+        res.status(201).json({ attachment })
+      } catch (err) {
+        const status = (err as { status?: number }).status ?? 500
+        const message = err instanceof Error ? err.message : 'Upload failed'
+        console.error('[project-router] attachment upload error:', err)
+        res.status(status).json({ error: message })
+      }
+    },
+  )
+
+  router.get('/:projectId/tickets/:ticketId/attachments', (req: Request, res: Response) => {
+    const parsed = parseTicketKey(req.params.ticketId as string)
+    if (!parsed) {
+      res.status(400).json({ error: 'Invalid ticketId' })
+      return
+    }
+    const attachments = attachmentManager.list(ctx(req).project.slug, parsed.key)
+    res.json({ attachments })
+  })
+
+  router.get('/:projectId/tickets/:ticketId/attachments/:attachmentId', (req: Request, res: Response) => {
+    const parsed = parseTicketKey(req.params.ticketId as string)
+    if (!parsed) {
+      res.status(400).json({ error: 'Invalid ticketId' })
+      return
+    }
+    const attachmentId = req.params.attachmentId as string
+    const slug = ctx(req).project.slug
+    const meta = attachmentManager.getMeta(slug, parsed.key, attachmentId)
+    const abs = meta ? attachmentManager.getFilePath(slug, parsed.key, attachmentId) : null
+    if (!meta || !abs) {
+      res.status(404).json({ error: 'Attachment not found' })
+      return
+    }
+    res.setHeader('Content-Type', meta.mimeType)
+    res.setHeader('Content-Disposition', `inline; filename="${meta.filename.replace(/"/g, '')}"`)
+    fs.createReadStream(abs).pipe(res)
+  })
+
+  router.delete('/:projectId/tickets/:ticketId/attachments/:attachmentId', async (req: Request, res: Response) => {
+    const parsed = parseTicketKey(req.params.ticketId as string)
+    if (!parsed) {
+      res.status(400).json({ error: 'Invalid ticketId' })
+      return
+    }
+    const attachmentId = req.params.attachmentId as string
+    try {
+      const ok = await attachmentManager.delete({
+        slug: ctx(req).project.slug,
+        ticketKey: parsed.key,
+        attachmentId,
+        projectPath: parsed.isPending ? null : ctx(req).project.path,
+      })
+      if (!ok) {
+        res.status(404).json({ error: 'Attachment not found' })
+        return
+      }
+      res.status(204).end()
+    } catch (err) {
+      console.error('[project-router] attachment delete error:', err)
+      res.status(500).json({ error: 'Delete failed' })
+    }
+  })
+
+  router.delete('/:projectId/tickets/:ticketId/attachments', async (req: Request, res: Response) => {
+    const parsed = parseTicketKey(req.params.ticketId as string)
+    if (!parsed) {
+      res.status(400).json({ error: 'Invalid ticketId' })
+      return
+    }
+    try {
+      await attachmentManager.deleteAll(ctx(req).project.slug, parsed.key)
+      res.status(204).end()
+    } catch (err) {
+      console.error('[project-router] attachment bulk delete error:', err)
+      res.status(500).json({ error: 'Bulk delete failed' })
     }
   })
 

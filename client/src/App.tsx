@@ -77,11 +77,18 @@ function useHubMode(): boolean {
 
 const ROUTE_MEMORY_KEY = 'specrails-hub:routeMemory'
 
+// Paths that should never be remembered as a project's "last visited" —
+// re-entering a project should never land on a config/admin surface.
+const ROUTE_MEMORY_EXCLUDE = new Set<string>(['/settings'])
+
 function readRouteMemory(): Map<string, string> {
   try {
     const raw = localStorage.getItem(ROUTE_MEMORY_KEY)
     if (!raw) return new Map()
-    return new Map(Object.entries(JSON.parse(raw)))
+    const entries = Object.entries(JSON.parse(raw)) as [string, string][]
+    // Strip any previously stored excluded routes so old users get the new default
+    const cleaned = entries.filter(([, path]) => !ROUTE_MEMORY_EXCLUDE.has(path))
+    return new Map(cleaned)
   } catch { return new Map() }
 }
 
@@ -99,7 +106,7 @@ function useProjectRouteMemory(activeProjectId: string | null) {
   const routeMemory = useRef<Map<string, string>>(readRouteMemory())
   const prevProjectId = useRef<string | null>(null)
 
-  // Allow external code (e.g. SpecGenTracker "Ver" button) to force a route
+  // Allow external code (e.g. SpecGenTracker "View" button) to force a route
   // for a project before the switch happens, so route memory restores it.
   useEffect(() => {
     _registerRouteForcer((projectId, route) => {
@@ -128,7 +135,7 @@ function useProjectRouteMemory(activeProjectId: string | null) {
 
   // Also persist the current route continuously for the active project (survives refresh)
   useEffect(() => {
-    if (activeProjectId && location.pathname !== '/') {
+    if (activeProjectId && location.pathname !== '/' && !ROUTE_MEMORY_EXCLUDE.has(location.pathname)) {
       routeMemory.current.set(activeProjectId, location.pathname)
       writeRouteMemory(routeMemory.current)
     }
