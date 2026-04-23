@@ -449,7 +449,10 @@ export function listJobs(
 
   const jobs = db
     .prepare(
-      `SELECT * FROM jobs ${where} ORDER BY started_at DESC LIMIT ? OFFSET ?`
+      `SELECT jobs.*, jp.profile_name AS profile_name
+       FROM jobs LEFT JOIN job_profiles jp ON jp.job_id = jobs.id
+       ${where}
+       ORDER BY started_at DESC LIMIT ? OFFSET ?`
     )
     .all(...params, limit, offset) as JobRow[]
 
