@@ -4,6 +4,7 @@ import path from 'path'
 import Ajv2020 from 'ajv/dist/2020'
 import type { ValidateFunction } from 'ajv'
 import type { DbInstance } from './db'
+import profileSchema from './schemas/profile.v1.json'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -43,15 +44,12 @@ export interface ProfileListEntry {
 
 // ─── Schema loading ──────────────────────────────────────────────────────────
 
-const SCHEMA_PATH = path.resolve(__dirname, 'schemas', 'profile.v1.json')
-
 let cachedValidator: ValidateFunction<Profile> | null = null
 
 function getValidator(): ValidateFunction<Profile> {
   if (cachedValidator) return cachedValidator
-  const schema = JSON.parse(fs.readFileSync(SCHEMA_PATH, 'utf8'))
   const ajv = new Ajv2020({ allErrors: true, strict: false })
-  cachedValidator = ajv.compile<Profile>(schema)
+  cachedValidator = ajv.compile<Profile>(profileSchema)
   return cachedValidator
 }
 
@@ -90,10 +88,6 @@ function profilePath(projectPath: string, name: string): string {
   return path.join(profilesDir(projectPath), `${name}.json`)
 }
 
-function preferredPath(projectPath: string): string {
-  return path.join(profilesDir(projectPath), '.user-preferred.json')
-}
-
 function jobSnapshotPath(slug: string, jobId: string): string {
   return path.join(os.homedir(), '.specrails', 'projects', slug, 'jobs', jobId, 'profile.json')
 }
@@ -114,12 +108,19 @@ function assertValidName(name: string): void {
 // ─── Structural extra checks (beyond JSON schema) ────────────────────────────
 
 function validateStructural(profile: Profile): void {
-  // Custom profiles (non-default) may omit routing entirely, or include any
-  // combination of rules — maximum flexibility. When rules exist we only
-  // enforce soft structural invariants:
-  //   - at most one `default: true` terminal rule
-  //   - if a default rule exists, it is the last element
-  //   - every rule's agent target is present in agents[]
+  const agentIds = new Set(profile.agents.map((a) => a.id))
+
+  // Baseline is required on every profile — default and custom alike. The
+  // pipeline depends on all four agents existing in the chain.
+  const baseline = ['sr-architect', 'sr-developer', 'sr-reviewer', 'sr-merge-resolver']
+  const missing = baseline.filter((id) => !agentIds.has(id))
+  if (missing.length > 0) {
+    throw new ProfileValidationError([
+      `profile must include baseline agents: missing ${missing.join(', ')}`,
+    ])
+  }
+
+  // Routing: at most one default rule, last if present, targets must exist.
   const defaults = profile.routing.filter((r): r is ProfileRoutingDefaultRule =>
     'default' in r && r.default === true,
   )
@@ -136,22 +137,10 @@ function validateStructural(profile: Profile): void {
       ])
     }
   }
-  const agentIds = new Set(profile.agents.map((a) => a.id))
   for (const rule of profile.routing) {
     if (!agentIds.has(rule.agent)) {
       throw new ProfileValidationError([
         `routing references agent '${rule.agent}' which is not in this profile's chain`,
-      ])
-    }
-  }
-  // The shipped `default` profile is additionally expected to include the
-  // baseline quartet. Custom profiles skip this check.
-  if (profile.name === 'default' || profile.name === 'project-default') {
-    const baseline = ['sr-architect', 'sr-developer', 'sr-reviewer', 'sr-merge-resolver']
-    const missing = baseline.filter((id) => !agentIds.has(id))
-    if (missing.length > 0) {
-      throw new ProfileValidationError([
-        `the default profile must include baseline agents: missing ${missing.join(', ')}`,
       ])
     }
   }
@@ -269,42 +258,6 @@ export function renameProfile(
   return renamed
 }
 
-// ─── Preference (per-developer) ──────────────────────────────────────────────
-
-export interface UserPreferred {
-  profile: string
-}
-
-export function getUserPreferred(projectPath: string): UserPreferred | null {
-  const full = preferredPath(projectPath)
-  if (!fs.existsSync(full)) return null
-  try {
-    const raw = JSON.parse(fs.readFileSync(full, 'utf8'))
-    if (typeof raw?.profile === 'string') return { profile: raw.profile }
-  } catch {
-    return null
-  }
-  return null
-}
-
-export function setUserPreferred(projectPath: string, name: string): void {
-  assertValidName(name)
-  fs.mkdirSync(profilesDir(projectPath), { recursive: true })
-  fs.writeFileSync(preferredPath(projectPath), JSON.stringify({ profile: name }, null, 2) + '\n', 'utf8')
-  // Add to .gitignore if not already present.
-  const gitignore = path.join(projectPath, '.gitignore')
-  const entry = '.specrails/profiles/.user-preferred.json'
-  try {
-    const current = fs.existsSync(gitignore) ? fs.readFileSync(gitignore, 'utf8') : ''
-    if (!current.split(/\r?\n/).includes(entry)) {
-      const suffix = current.length === 0 || current.endsWith('\n') ? '' : '\n'
-      fs.appendFileSync(gitignore, `${suffix}${entry}\n`)
-    }
-  } catch {
-    // Non-fatal: the project may not have a writable .gitignore.
-  }
-}
-
 // ─── Resolution (pick which profile applies for an invocation) ───────────────
 
 export interface ResolvedProfile {
@@ -317,8 +270,7 @@ export interface ResolvedProfile {
  *
  * Precedence:
  *   1. Explicit selection passed by the caller (launch-dialog override).
- *   2. Per-developer preference from `.user-preferred.json`.
- *   3. The profile named `default` (or `project-default`).
+ *   2. The profile named `default` (or `project-default`).
  *
  * Returns `null` if the project has no profiles and no fallback — the caller
  * should treat this as legacy mode (do not inject `SPECRAILS_PROFILE_PATH`).
@@ -340,13 +292,6 @@ export function resolveProfile(
     const resolved = tryName(explicit)
     if (resolved) return resolved
     throw new ProfileNotFoundError(explicit)
-  }
-
-  const preferred = getUserPreferred(projectPath)
-  if (preferred) {
-    const resolved = tryName(preferred.profile)
-    if (resolved) return resolved
-    // fall through — stale preference, ignore
   }
 
   return tryName('default') ?? tryName('project-default')
