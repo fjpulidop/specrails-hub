@@ -53,7 +53,7 @@
 - [x] 7.2 Create `client/src/pages/AgentsPage.tsx` with three-tab shell (`Profiles`, `Agents`, `Models`)
 - [x] 7.3 Route: `/agents` → default Profiles tab (hub mode uses per-project base via `getApiBase()`)
 - [x] 7.4 Per-tab memory of active sub-tab (Profiles vs Agents Catalog) via localStorage
-- [ ] 7.5 Gate behind `VITE_FEATURE_AGENTS_SECTION` — **server side gated via `SPECRAILS_AGENTS_SECTION`; client flag pending**
+- [x] 7.5 Gate client-side behind `VITE_FEATURE_AGENTS_SECTION` (via `FEATURE_AGENTS_SECTION` in `feature-flags.ts`)
 - [x] 7.6 Upgrade banner when `specrails-core` version is older than 4.1.0 (reads `/profiles/core-version` endpoint; yellow warning banner above tabs)
 
 ## 8. Profiles tab UI
@@ -102,8 +102,8 @@
 
 - [x] 13.1 Migration triggered manually via "Migrate from current agents" button in ProfilesTab empty state; reads frontmatter models and generates `.specrails/profiles/default.json`
 - [x] 13.2 Idempotency: endpoint returns 409 if `default.json` already exists
-- [ ] 13.3 Remove Agent Models section from `SettingsPage.tsx`; add one-time breadcrumb banner pointing to Agents — **deferred: leaves the old UI in place during rollout to avoid churn**
-- [ ] 13.4 Decommission `agent-models` server endpoint and `applyModelConfig` code path after migration window (two release cycles)
+- [x] 13.3 Agent Models section in `SettingsPage.tsx` replaced with a breadcrumb card pointing to `/agents`; dead state + functions removed
+- [ ] 13.4 Decommission `agent-models` server endpoint and `applyModelConfig` code path — **kept as safety net for one release cycle; remove in a follow-up change**
 
 ## 14. Analytics integration
 
@@ -113,9 +113,9 @@
 
 ## 15. Telemetry enrichment
 
-- [ ] 15.1 Update `queue-manager.ts` OTEL env var construction to include the profile attributes
-- [ ] 15.2 Verify OTLP receiver surfaces the attributes in the compacted summaries
-- [ ] 15.3 Diagnostic ZIP export includes `profile.json` snapshot
+- [x] 15.1 `buildTelemetryEnv` accepts extra OTEL resource attributes so spawns under a profile emit `specrails.profile_name` + `specrails.profile_schema_version`
+- [x] 15.2 OTLP receiver surfaces attributes inline via existing enrichment (no receiver-side change needed)
+- [x] 15.3 Diagnostic ZIP export includes `profile.json` snapshot + `profile_name` in `job-metadata.json`
 
 ## 16. Doctor / compat-check hooks
 
