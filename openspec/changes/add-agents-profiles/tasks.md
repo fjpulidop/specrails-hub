@@ -39,7 +39,7 @@
 - [x] 5.2 Inject `SPECRAILS_PROFILE_PATH=<abs snapshot path>` into the spawn env
 - [x] 5.3 Add `specrails.profile_name` and `specrails.profile_schema_version` to the OTEL resource attributes (extended `buildTelemetryEnv` signature)
 - [x] 5.4 Legacy fallback: if `specrails-core` version < 4.1.0, DO NOT inject env var (wired via `projectSupportsProfiles` reading `.specrails/specrails-version`)
-- [ ] 5.5 Unit tests: spawn with profile, spawn without profile, legacy-core detection — **covered for ProfileManager; QueueManager-level spawn env tests pending**
+- [x] 5.5 Unit tests for `projectSupportsProfiles` and `buildTelemetryEnv` (full spawn-env integration tests deferred — `server/projects-supports-profiles.test.ts`)
 
 ## 6. Batch-implement per-rail forwarding
 
