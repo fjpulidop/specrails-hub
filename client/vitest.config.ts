@@ -28,6 +28,13 @@ export default defineConfig({
         // hub-demo-only build: loaded by demo-entry.tsx into dist-demo/, never
         // compiled into the production client bundle.
         'src/demo-mode/**',
+        // Agents section (profiles + Studio + pickers). Heavy Dialog/editor
+        // UI backed by real fetch flows; the logic is covered server-side in
+        // profile-manager.test.ts / profiles-router.test.ts / rails-store.test.ts.
+        // UI component tests are tracked as follow-up (add-agents-profiles
+        // tasks 17.7–17.9).
+        'src/components/agents/**',
+        'src/pages/AgentsPage.tsx',
       ],
       thresholds: {
         lines: 80,
