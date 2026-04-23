@@ -249,7 +249,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   // ─── Queue / Spawn routes ────────────────────────────────────────────────────
 
   router.post('/:projectId/spawn', (req: Request, res: Response) => {
-    const { command, priority, dependsOnJobId, pipelineId } = req.body ?? {}
+    const { command, priority, dependsOnJobId, pipelineId, profileName } = req.body ?? {}
     if (!command || typeof command !== 'string' || !command.trim()) {
       res.status(400).json({ error: 'command is required' })
       return
@@ -258,10 +258,16 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       res.status(400).json({ error: 'priority must be one of: low, normal, high, critical' })
       return
     }
+    // profileName accepts: undefined (default resolution), null (force legacy), string (explicit)
+    const normalizedProfileName: string | null | undefined =
+      profileName === null ? null
+        : typeof profileName === 'string' && profileName.trim() ? profileName.trim()
+          : undefined
     try {
       const job = ctx(req).queueManager.enqueue(command, (priority as JobPriority) ?? 'normal', {
         dependsOnJobId: dependsOnJobId || undefined,
         pipelineId: pipelineId || undefined,
+        profileName: normalizedProfileName,
       })
       const position = job.queuePosition ?? 0
       res.status(202).json({ jobId: job.id, position })

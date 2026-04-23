@@ -12,6 +12,11 @@ import {
 import { Button } from './ui/button'
 import { IssuePickerStep, FreeFormStep } from './IssuePickerStep'
 import { cn } from '../lib/utils'
+import {
+  ProfilePicker,
+  selectionToSpawnPayload,
+  useDefaultProfileSelection,
+} from './agents/ProfilePicker'
 
 type WizardPath = 'from-issues' | 'free-form' | null
 
@@ -58,6 +63,7 @@ export function ImplementWizard({ open, onClose }: ImplementWizardProps) {
     freeFormTitle: '',
     freeFormDescription: '',
   })
+  const [profileSelection, setProfileSelection] = useDefaultProfileSelection()
 
   function handleClose() {
     dispatch({ type: 'RESET' })
@@ -91,7 +97,7 @@ export function ImplementWizard({ open, onClose }: ImplementWizardProps) {
       const res = await fetch(`${getApiBase()}/spawn`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command }),
+        body: JSON.stringify({ command, ...selectionToSpawnPayload(profileSelection) }),
       })
       const data = await res.json() as { jobId?: string; error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Failed to queue job')
@@ -156,23 +162,28 @@ export function ImplementWizard({ open, onClose }: ImplementWizardProps) {
         )}
 
         {state.path && (
-          <DialogFooter className="gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => dispatch({ type: 'SELECT_PATH', path: null })}
-            >
-              Back
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-            >
-              {state.path === 'from-issues' && state.selectedIssues.length > 1
-                ? `Queue ${state.selectedIssues.length} Jobs`
-                : 'Queue Job'}
-            </Button>
+          <DialogFooter className="gap-2 items-center justify-between">
+            <div className="flex-1">
+              <ProfilePicker value={profileSelection} onChange={setProfileSelection} />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => dispatch({ type: 'SELECT_PATH', path: null })}
+              >
+                Back
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+              >
+                {state.path === 'from-issues' && state.selectedIssues.length > 1
+                  ? `Queue ${state.selectedIssues.length} Jobs`
+                  : 'Queue Job'}
+              </Button>
+            </div>
           </DialogFooter>
         )}
       </DialogContent>
