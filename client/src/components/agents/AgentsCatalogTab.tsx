@@ -371,17 +371,17 @@ export function AgentsCatalogTab() {
       </aside>
 
       {/* Right: selected body */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 min-w-0 overflow-auto">
         {error && (
           <div className="m-4 px-3 py-2 text-xs rounded border border-red-500/30 bg-red-500/10 text-red-400">
             {error}
           </div>
         )}
         {selected && (
-          <div className="p-6">
+          <div className="p-6 min-w-0">
             <div className="flex items-start justify-between gap-4 mb-1">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-base font-mono font-semibold">{selected.id}</h2>
                   <KindBadge kind={selected.kind} />
                   {selected.model && (
@@ -391,7 +391,7 @@ export function AgentsCatalogTab() {
                   )}
                 </div>
                 {selected.description && (
-                  <p className="text-xs text-muted-foreground mt-1">{selected.description}</p>
+                  <p className="text-xs text-muted-foreground mt-1 break-words">{selected.description}</p>
                 )}
               </div>
               <div className="flex gap-2 flex-shrink-0">
@@ -405,16 +405,16 @@ export function AgentsCatalogTab() {
                 )}
               </div>
             </div>
-            <div className="rounded-md border border-border bg-muted/30 mt-4">
+            <div className="rounded-md border border-border bg-muted/30 mt-4 min-w-0 overflow-hidden">
               <div className="flex items-center justify-between px-3 py-1.5 border-b border-border">
-                <span className="text-[11px] font-mono text-muted-foreground">
+                <span className="text-[11px] font-mono text-muted-foreground truncate">
                   .claude/agents/{selected.id}.md
                 </span>
-                <span className="text-[10px] text-muted-foreground">
-                  {selected.kind === 'upstream' ? 'read-only' : 'read-only (Studio coming soon)'}
+                <span className="text-[10px] text-muted-foreground flex-shrink-0 ml-2">
+                  {selected.kind === 'upstream' ? 'read-only' : 'editable — use Edit above'}
                 </span>
               </div>
-              <pre className="p-4 text-xs font-mono overflow-auto max-h-[60vh] whitespace-pre-wrap break-words">
+              <pre className="p-4 text-xs font-mono overflow-auto max-h-[60vh] whitespace-pre-wrap break-all">
                 {bodyLoading ? 'Loading…' : body ?? ''}
               </pre>
             </div>

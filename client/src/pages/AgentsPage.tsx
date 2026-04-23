@@ -93,7 +93,7 @@ export default function AgentsPage() {
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 min-w-0 overflow-auto">
         {tab === 'profiles' && <ProfilesTab />}
         {tab === 'catalog' && <AgentsCatalogTab />}
       </div>
