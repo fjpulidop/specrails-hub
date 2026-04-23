@@ -127,6 +127,8 @@ describe('ProposeSpecModal', () => {
 
   it('sends message with /specrails:propose-spec and user text on submit', async () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} onTicketCreated={onTicketCreatedMock} />)
+    // Explore codebase is off by default — opt in for the ChatManager path.
+    fireEvent.click(screen.getByRole('checkbox'))
     const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
     fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
@@ -141,6 +143,7 @@ describe('ProposeSpecModal', () => {
 
   it('registers explore spec with tracker after submit', async () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    fireEvent.click(screen.getByRole('checkbox'))
     const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
     fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
@@ -164,6 +167,7 @@ describe('ProposeSpecModal', () => {
 
   it('submits via Cmd+Enter keyboard shortcut', async () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    fireEvent.click(screen.getByRole('checkbox'))
     const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     fireEvent.change(textarea, { target: { value: 'Keyboard test' } })
     fireEvent.keyDown(textarea, { key: 'Enter', metaKey: true })
@@ -181,10 +185,7 @@ describe('ProposeSpecModal', () => {
     })
 
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
-    // Uncheck explore codebase
-    const checkbox = screen.getByRole('checkbox')
-    fireEvent.click(checkbox)
-    // Fill and submit
+    // Explore codebase defaults to unchecked — fast mode is the default path.
     const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     fireEvent.change(textarea, { target: { value: 'Fast spec' } })
     fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
@@ -206,8 +207,6 @@ describe('ProposeSpecModal', () => {
     })
 
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
-    const checkbox = screen.getByRole('checkbox')
-    fireEvent.click(checkbox)
     const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     fireEvent.change(textarea, { target: { value: 'Fast spec' } })
     fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
