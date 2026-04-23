@@ -350,7 +350,7 @@ export function AgentsCatalogTab() {
           </Section>
           <Section
             title={`Custom (${custom.length})`}
-            description="Your project's custom-*.md files. Studio editor coming soon."
+            description="Your project's custom-*.md files. Use Template / Generate / Blank above to create one."
           >
             {custom.length === 0 ? (
               <div className="text-[11px] text-muted-foreground px-2 py-2 italic">
@@ -414,7 +414,7 @@ export function AgentsCatalogTab() {
                   {selected.kind === 'upstream' ? 'read-only' : 'read-only (Studio coming soon)'}
                 </span>
               </div>
-              <pre className="p-4 text-xs font-mono overflow-auto max-h-[60vh] whitespace-pre-wrap">
+              <pre className="p-4 text-xs font-mono overflow-auto max-h-[60vh] whitespace-pre-wrap break-words">
                 {bodyLoading ? 'Loading…' : body ?? ''}
               </pre>
             </div>

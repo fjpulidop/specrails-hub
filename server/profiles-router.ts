@@ -254,8 +254,32 @@ export function createProfilesRouter(): Router {
           const body = fs.readFileSync(path.join(dir, file), 'utf8')
           const fm = body.match(/^---\r?\n([\s\S]*?)\r?\n---/)
           if (fm) {
-            const descMatch = fm[1].match(/^description:\s*"([^"]*)"|^description:\s*(.+)$/m)
-            if (descMatch) description = (descMatch[1] ?? descMatch[2] ?? '').trim()
+            // description can be a long JSON-escaped string spanning multiple lines.
+            // Match from `description:` up to the next top-level YAML key or the end
+            // of the frontmatter block. Then unescape \n, \t, \" and strip surrounding
+            // quotes. Collapse whitespace so it fits the one-line header.
+            const descBlock = fm[1].match(
+              /^description:\s*([\s\S]*?)(?=^[a-z_]+:\s|^---|\Z)/m,
+            )
+            if (descBlock) {
+              let raw = descBlock[1].trim()
+              // Strip surrounding quotes (YAML may use '...' or "...")
+              if ((raw.startsWith('"') && raw.endsWith('"')) ||
+                  (raw.startsWith("'") && raw.endsWith("'"))) {
+                raw = raw.slice(1, -1)
+              }
+              // Decode common JSON-style escapes
+              raw = raw
+                .replace(/\\n/g, ' ')
+                .replace(/\\t/g, ' ')
+                .replace(/\\"/g, '"')
+                .replace(/\\'/g, "'")
+                .replace(/\\\\/g, '\\')
+              // Collapse any whitespace (incl. real newlines) and trim
+              description = raw.replace(/\s+/g, ' ').trim()
+              // Cap length for the one-line header preview
+              if (description.length > 280) description = description.slice(0, 277) + '…'
+            }
             const modelMatch = fm[1].match(/^model:\s*(\S+)/m)
             if (modelMatch) model = modelMatch[1]
           }
