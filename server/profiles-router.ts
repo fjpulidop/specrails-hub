@@ -71,15 +71,61 @@ export function createProfilesRouter(): Router {
         res.json({ agents: [] })
         return
       }
-      const agents: Array<{ id: string; kind: 'upstream' | 'custom' }> = []
+      const agents: Array<{
+        id: string
+        kind: 'upstream' | 'custom'
+        description?: string
+        model?: string
+      }> = []
       for (const file of fs.readdirSync(dir)) {
         if (!file.endsWith('.md')) continue
         const id = file.slice(0, -'.md'.length)
-        if (id.startsWith('sr-')) agents.push({ id, kind: 'upstream' })
-        else if (id.startsWith('custom-')) agents.push({ id, kind: 'custom' })
+        const kind: 'upstream' | 'custom' | null = id.startsWith('sr-')
+          ? 'upstream'
+          : id.startsWith('custom-')
+            ? 'custom'
+            : null
+        if (!kind) continue
+        let description: string | undefined
+        let model: string | undefined
+        try {
+          const body = fs.readFileSync(path.join(dir, file), 'utf8')
+          const fm = body.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+          if (fm) {
+            const descMatch = fm[1].match(/^description:\s*"([^"]*)"|^description:\s*(.+)$/m)
+            if (descMatch) description = (descMatch[1] ?? descMatch[2] ?? '').trim()
+            const modelMatch = fm[1].match(/^model:\s*(\S+)/m)
+            if (modelMatch) model = modelMatch[1]
+          }
+        } catch {
+          // ignore unreadable files
+        }
+        agents.push({ id, kind, description, model })
       }
       agents.sort((a, b) => a.id.localeCompare(b.id))
       res.json({ agents })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // GET /api/projects/:projectId/profiles/catalog/:agentId
+  // Return the full .md body of a single agent file (read-only)
+  router.get('/catalog/:agentId', (req, res) => {
+    try {
+      const { project } = ctx(req)
+      const agentId = req.params.agentId
+      if (!/^(sr|custom)-[a-z0-9][a-z0-9-]*$/.test(agentId)) {
+        res.status(400).json({ error: 'invalid agent id' })
+        return
+      }
+      const file = path.join(project.path, '.claude', 'agents', `${agentId}.md`)
+      if (!fs.existsSync(file)) {
+        res.status(404).json({ error: 'agent not found' })
+        return
+      }
+      const body = fs.readFileSync(file, 'utf8')
+      res.json({ id: agentId, body })
     } catch (err) {
       handleError(res, err)
     }

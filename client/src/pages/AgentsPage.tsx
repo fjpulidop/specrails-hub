@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ProfilesTab } from '../components/agents/ProfilesTab'
+import { AgentsCatalogTab } from '../components/agents/AgentsCatalogTab'
 
 type Tab = 'profiles' | 'catalog'
 
@@ -29,7 +30,7 @@ export default function AgentsPage() {
       {/* Body */}
       <div className="flex-1 overflow-auto">
         {tab === 'profiles' && <ProfilesTab />}
-        {tab === 'catalog' && <ComingSoon title="Agents Catalog + Studio" />}
+        {tab === 'catalog' && <AgentsCatalogTab />}
       </div>
     </div>
   )
@@ -60,16 +61,3 @@ function TabButton({
   )
 }
 
-function ComingSoon({ title }: { title: string }) {
-  return (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-center max-w-sm">
-        <div className="text-sm font-medium text-foreground">{title}</div>
-        <div className="text-xs text-muted-foreground mt-1">
-          Coming soon. This tab ships alongside the custom agent editor and default
-          model selectors in a follow-up release.
-        </div>
-      </div>
-    </div>
-  )
-}
