@@ -88,8 +88,8 @@
 - [x] 11.6 Live validation: name regex, frontmatter presence (collision check is server-side via 409)
 - [x] 11.7 Save: validate → write `.claude/agents/<name>.md` → append `agent_versions` row
 - [x] 11.8 Version history panel: list revisions, restore (writes next version on save)
-- [ ] 11.9 "Test agent" action: sandboxed claude spawn — **deferred: substantial scope, own commit**
-- [ ] 11.10 Sample-task library — **deferred with Test-agent**
+- [x] 11.9 "Test agent" action: sandboxed claude spawn (`testCustomAgent` in `agent-generator.ts`), streams output, enforces 4000-token ceiling + 120s wall-clock, persists to `agent_tests`
+- [ ] 11.10 Sample-task library — **deferred: today the user provides their own sample task text; a curated library of pre-canned samples ships in a later polish pass**
 
 ## 12. Launch-time profile pickers
 
