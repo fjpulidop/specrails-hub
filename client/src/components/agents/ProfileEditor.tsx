@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react'
-import { Plus, GripVertical, X, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, GripVertical, X, ArrowUp, ArrowDown, Pin } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -396,9 +396,11 @@ function AgentRow({
   onRemove: () => void
 }) {
   const isRequired = BASELINE_REQUIRED_AGENTS.has(agent.id)
-  // sr-merge-resolver is draggable like the rest; the ProfileEditor's
-  // reorder handler snaps it back to the last slot after any drop so the
-  // pipeline invariant "merge runs last" is preserved at the data layer,
+  const pinnedFirst = agent.id === 'sr-architect'
+  const pinnedLast = agent.id === 'sr-merge-resolver'
+  // sr-merge-resolver and sr-architect stay draggable like the rest; the
+  // ProfileEditor's reorder handler snaps them back to first/last slots
+  // after any drop so the pipeline invariant is preserved at the data layer
   // without making the UI feel inconsistent.
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: agent.id,
@@ -426,7 +428,23 @@ function AgentRow({
         <GripVertical className="w-3.5 h-3.5" />
       </button>
       <span className="text-sm font-mono flex-1 truncate">{agent.id}</span>
-      {isRequired && (
+      {pinnedFirst && (
+        <span
+          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-dracula-purple/15 text-dracula-purple"
+          title="Pinned to first position — pipeline always starts with sr-architect"
+        >
+          <Pin className="w-2.5 h-2.5 rotate-[135deg]" /> first
+        </span>
+      )}
+      {pinnedLast && (
+        <span
+          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-dracula-purple/15 text-dracula-purple"
+          title="Pinned to last position — merge phase always runs last"
+        >
+          <Pin className="w-2.5 h-2.5 rotate-45" /> last
+        </span>
+      )}
+      {isRequired && !pinnedFirst && !pinnedLast && (
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
           required
         </span>
