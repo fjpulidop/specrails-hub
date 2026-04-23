@@ -16,6 +16,7 @@ const JobDetailPage = lazy(() => import('./pages/JobDetailPage'))
 const JobsPage = lazy(() => import('./pages/JobsPage'))
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'))
 const ActivityFeedPage = lazy(() => import('./pages/ActivityFeedPage'))
+const AgentsPage = lazy(() => import('./pages/AgentsPage'))
 const HubAnalyticsPage = lazy(() => import('./pages/HubAnalyticsPage'))
 const DocsPage = lazy(() => import('./pages/DocsPage'))
 const DocsDialog = lazy(() => import('./components/DocsDialog'))
@@ -256,6 +257,7 @@ function HubApp() {
                     <Route path="/jobs/:id" element={<JobDetailPage />} />
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/activity" element={<ActivityFeedPage />} />
+                    <Route path="/agents" element={<AgentsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>
@@ -373,6 +375,7 @@ export default function App() {
                     <Route path="/jobs/:id" element={<JobDetailPage />} />
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/activity" element={<ActivityFeedPage />} />
+                    <Route path="/agents" element={<AgentsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>

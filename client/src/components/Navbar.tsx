@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Settings, BookOpen, LayoutDashboard, BarChart3 } from 'lucide-react'
+import { Settings, BookOpen, LayoutDashboard, BarChart3, Bot } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 
@@ -99,6 +99,20 @@ export function Navbar() {
         >
           <BarChart3 className="w-3.5 h-3.5" />
           <span>Analytics</span>
+        </NavLink>
+        <NavLink
+          to="/agents"
+          className={({ isActive }) =>
+            cn(
+              'h-7 px-2 flex items-center gap-1.5 rounded-md text-xs transition-colors',
+              isActive
+                ? 'text-foreground bg-accent'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            )
+          }
+        >
+          <Bot className="w-3.5 h-3.5" />
+          <span>Agents</span>
         </NavLink>
       </div>
 

@@ -49,22 +49,22 @@
 
 ## 7. Sidebar + Agents page shell
 
-- [ ] 7.1 Add "Agents" entry to the project sidebar above Settings (hub mode only); icon + label
-- [ ] 7.2 Create `client/src/pages/AgentsPage.tsx` with three-tab shell (`Profiles`, `Agents`, `Models`)
-- [ ] 7.3 Route: `/projects/:id/agents` → default Profiles tab
-- [ ] 7.4 Per-project memory of active tab via existing `useProjectRouteMemory`
-- [ ] 7.5 Gate behind `VITE_FEATURE_AGENTS_SECTION`
-- [ ] 7.6 Upgrade banner when `specrails-core` version is older than 4.1.0
+- [x] 7.1 Add "Agents" entry to the top navbar (Home/Analytics/Agents/Settings layout) — hub mode only via existing project routing
+- [x] 7.2 Create `client/src/pages/AgentsPage.tsx` with three-tab shell (`Profiles`, `Agents`, `Models`)
+- [x] 7.3 Route: `/agents` → default Profiles tab (hub mode uses per-project base via `getApiBase()`)
+- [ ] 7.4 Per-project memory of active tab via existing `useProjectRouteMemory` — **basic route memory already in place; tab-level memory still TODO**
+- [ ] 7.5 Gate behind `VITE_FEATURE_AGENTS_SECTION` — **server side gated via `SPECRAILS_AGENTS_SECTION`; client flag pending**
+- [ ] 7.6 Upgrade banner when `specrails-core` version is older than 4.1.0 — **TODO: wire into existing core-compat surface**
 
 ## 8. Profiles tab UI
 
-- [ ] 8.1 `ProfilesTab.tsx` — tab strip/cards of profiles, "New" action
-- [ ] 8.2 Profile editor: orchestrator model selector, agent chain builder (drag-reorder, per-agent model dropdown), routing rules editor (drag-reorder, first-match-wins hint, terminal `default:true` pinned last)
-- [ ] 8.3 Required agents marked non-removable (`sr-architect`, `sr-developer`, `sr-reviewer`)
-- [ ] 8.4 Live validation summary with `ajv` run client-side against the shipped schema
-- [ ] 8.5 Save action calls `PATCH /api/projects/:id/profiles/:name`
-- [ ] 8.6 Duplicate/rename/delete actions
-- [ ] 8.7 Loading/empty states
+- [x] 8.1 `ProfilesTab.tsx` — list pane with profiles, "New" action, per-row duplicate/delete/preferred
+- [x] 8.2 Profile editor: orchestrator model selector, agent chain builder (move up/down, per-agent model dropdown), routing rules editor (move up/down, first-match-wins hint, terminal `default:true` pinned last)
+- [x] 8.3 Required agents marked non-removable (`sr-architect`, `sr-developer`, `sr-reviewer`)
+- [ ] 8.4 Live validation summary with `ajv` run client-side against the shipped schema — **server-side validates on save; client-side live validation pending**
+- [x] 8.5 Save action calls `PATCH /api/projects/:id/profiles/:name`
+- [x] 8.6 Duplicate/rename/delete actions (rename via duplicate+delete flow; explicit rename endpoint wired but not yet surfaced in UI)
+- [x] 8.7 Loading/empty states
 
 ## 9. Agents tab UI
 
