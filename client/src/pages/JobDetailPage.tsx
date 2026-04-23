@@ -309,7 +309,11 @@ export default function JobDetailPage() {
               <code className="text-sm font-mono text-foreground/90 truncate">{job.command}</code>
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-              <span>Started {formatDistanceToNow(new Date(job.started_at), { addSuffix: true })}</span>
+              <span>
+                {job.started_at
+                  ? `Started ${formatDistanceToNow(new Date(job.started_at), { addSuffix: true })}`
+                  : 'Queued — waiting to start'}
+              </span>
               {job.model && <span className="text-muted-foreground/40">{job.model}</span>}
             </div>
           </div>
