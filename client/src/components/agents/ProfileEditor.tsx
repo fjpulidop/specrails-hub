@@ -383,11 +383,12 @@ function AgentRow({
   onRemove: () => void
 }) {
   const isRequired = BASELINE_REQUIRED_AGENTS.has(agent.id)
-  const isPinnedLast = agent.id === 'sr-merge-resolver'
+  // sr-merge-resolver is draggable like the rest; the ProfileEditor's
+  // reorder handler snaps it back to the last slot after any drop so the
+  // pipeline invariant "merge runs last" is preserved at the data layer,
+  // without making the UI feel inconsistent.
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: agent.id,
-    // sr-merge-resolver stays at the end; disable dragging it.
-    disabled: isPinnedLast,
   })
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -403,16 +404,11 @@ function AgentRow({
     >
       <button
         type="button"
-        className={
-          'flex-shrink-0 p-0.5 rounded text-muted-foreground ' +
-          (isPinnedLast
-            ? 'cursor-not-allowed opacity-30'
-            : 'cursor-grab active:cursor-grabbing hover:text-foreground')
-        }
-        title={isPinnedLast ? 'sr-merge-resolver is pinned last — can\'t reorder' : 'Drag to reorder'}
+        className="flex-shrink-0 p-0.5 rounded text-muted-foreground cursor-grab active:cursor-grabbing hover:text-foreground"
+        title="Drag to reorder"
         aria-label="Drag handle"
-        {...(isPinnedLast ? {} : attributes)}
-        {...(isPinnedLast ? {} : listeners)}
+        {...attributes}
+        {...listeners}
       >
         <GripVertical className="w-3.5 h-3.5" />
       </button>
