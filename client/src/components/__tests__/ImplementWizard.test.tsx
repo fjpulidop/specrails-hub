@@ -30,6 +30,16 @@ vi.mock('../../hooks/useHub', () => ({
   }),
 }))
 
+// Mock the profile picker — it fetches and can block rendering in tests.
+// The picker itself is exercised by its own unit tests; here we just want it
+// out of the way so the wizard's path-selection behavior remains testable.
+vi.mock('../agents/ProfilePicker', () => ({
+  ProfilePicker: () => null,
+  selectionToSpawnPayload: () => ({ profileName: null }),
+  useDefaultProfileSelection: () => [{ kind: 'legacy' }, () => {}],
+  useProjectProfiles: () => [],
+}))
+
 // Mock IssuePickerStep and FreeFormStep to avoid heavy dependencies
 vi.mock('../IssuePickerStep', () => ({
   IssuePickerStep: ({ onSelectionChange }: { onSelectionChange: (issues: Array<{ id: string; number: number; title: string; body?: string; labels: string[] }>) => void }) => (
