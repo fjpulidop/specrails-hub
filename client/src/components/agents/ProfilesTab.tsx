@@ -14,6 +14,7 @@ export function ProfilesTab() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [validationIssues, setValidationIssues] = useState<string[]>([])
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -356,13 +357,24 @@ export function ProfilesTab() {
             key={editing.name}
             profile={editing}
             onChange={setEditing}
+            onValidityChange={setValidationIssues}
             footer={
               <div className="flex items-center gap-2">
-                <Button size="sm" onClick={() => void save(editing)} disabled={saving}>
+                <Button
+                  size="sm"
+                  onClick={() => void save(editing)}
+                  disabled={saving || validationIssues.length > 0}
+                  title={validationIssues.length > 0 ? 'Fix validation issues before saving' : undefined}
+                >
                   <Save className="w-3.5 h-3.5 mr-1.5" />
                   Save
                 </Button>
                 {saving && <span className="text-xs text-muted-foreground">Saving…</span>}
+                {validationIssues.length > 0 && (
+                  <span className="text-xs text-yellow-500">
+                    {validationIssues.length} {validationIssues.length === 1 ? 'issue' : 'issues'} to resolve
+                  </span>
+                )}
               </div>
             }
           />

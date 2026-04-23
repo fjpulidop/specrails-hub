@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react'
+import { ReactNode, useEffect, useMemo, useState } from 'react'
 import { Plus, GripVertical, X, ArrowUp, ArrowDown } from 'lucide-react'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
@@ -23,10 +23,12 @@ export function ProfileEditor({
   profile,
   onChange,
   footer,
+  onValidityChange,
 }: {
   profile: Profile
   onChange: (p: Profile) => void
   footer?: ReactNode
+  onValidityChange?: (issues: string[]) => void
 }) {
   const [catalog, setCatalog] = useState<CatalogAgent[]>([])
   const [pickingAgent, setPickingAgent] = useState(false)
@@ -54,6 +56,37 @@ export function ProfileEditor({
 
   const selectedIds = new Set(profile.agents.map((a) => a.id))
   const availableToAdd = catalog.filter((c) => !selectedIds.has(c.id))
+
+  // ── Live validation (structural checks beyond the JSON schema) ─────────────
+  const validationIssues: string[] = useMemo(() => {
+    const issues: string[] = []
+    for (const baseline of ['sr-architect', 'sr-developer', 'sr-reviewer']) {
+      if (!profile.agents.some((a) => a.id === baseline)) {
+        issues.push(`Missing required baseline agent: ${baseline}`)
+      }
+    }
+    if (profile.agents.length === 0) {
+      issues.push('Agent chain is empty')
+    }
+    const defaults = profile.routing.filter((r) => 'default' in r && r.default === true)
+    if (defaults.length !== 1) {
+      issues.push(`Routing needs exactly one default rule (found ${defaults.length})`)
+    }
+    const last = profile.routing[profile.routing.length - 1]
+    if (last && !('default' in last && last.default === true)) {
+      issues.push('The default routing rule must be the last entry')
+    }
+    for (const rule of profile.routing) {
+      if (!profile.agents.some((a) => a.id === rule.agent)) {
+        issues.push(`Routing references agent not in the chain: ${rule.agent}`)
+      }
+    }
+    return issues
+  }, [profile])
+
+  useEffect(() => {
+    if (onValidityChange) onValidityChange(validationIssues)
+  }, [validationIssues, onValidityChange])
 
   const addAgent = (id: string) => {
     update((d) => {
@@ -132,6 +165,18 @@ export function ProfileEditor({
 
   return (
     <div className="p-6 space-y-6 max-w-3xl">
+      {/* Live validation summary */}
+      {validationIssues.length > 0 && (
+        <div className="px-3 py-2 text-xs rounded-md border border-yellow-500/30 bg-yellow-500/10 text-yellow-500">
+          <div className="font-medium mb-1">{validationIssues.length} validation {validationIssues.length === 1 ? 'issue' : 'issues'}</div>
+          <ul className="list-disc list-inside space-y-0.5">
+            {validationIssues.map((issue, i) => (
+              <li key={i}>{issue}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Metadata */}
       <section className="space-y-3">
         <div>

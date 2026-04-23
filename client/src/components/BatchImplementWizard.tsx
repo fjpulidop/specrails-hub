@@ -1,4 +1,4 @@
-import { useReducer } from 'react'
+import { useReducer, useState } from 'react'
 import { toast } from 'sonner'
 import { getApiBase } from '../lib/api'
 import type { IssueItem } from '../types'
@@ -14,8 +14,10 @@ import { IssuePickerStep, BatchFreeFormStep } from './IssuePickerStep'
 import { cn } from '../lib/utils'
 import {
   ProfilePicker,
+  type ProfileSelection,
   selectionToSpawnPayload,
   useDefaultProfileSelection,
+  useProjectProfiles,
 } from './agents/ProfilePicker'
 
 type WizardPath = 'from-issues' | 'free-form' | null
@@ -59,6 +61,9 @@ export function BatchImplementWizard({ open, onClose }: BatchImplementWizardProp
     freeFormItems: [{ title: '', description: '' }],
   })
   const [profileSelection, setProfileSelection] = useDefaultProfileSelection()
+  const availableProfiles = useProjectProfiles()
+  // Per-issue profile overrides (absent = inherit batch default)
+  const [perIssueProfile, setPerIssueProfile] = useState<Record<number, ProfileSelection>>({})
 
   function handleClose() {
     dispatch({ type: 'RESET' })
@@ -78,7 +83,18 @@ export function BatchImplementWizard({ open, onClose }: BatchImplementWizardProp
         if (issue.body?.trim()) text += `\n\n${issue.body.trim()}`
         return text
       }).join('\n\n---\n\n')
-      command = `/specrails:batch-implement ${issueArgs}`
+      // Build --profiles "ref=profile,..." for issues that differ from the batch default
+      const overrides: string[] = []
+      for (const issue of state.selectedIssues) {
+        const override = perIssueProfile[issue.number]
+        if (!override) continue
+        if (override.kind === 'legacy' && profileSelection.kind === 'legacy') continue
+        if (override.kind === 'profile' && profileSelection.kind === 'profile' && override.name === profileSelection.name) continue
+        const value = override.kind === 'legacy' ? '__legacy__' : override.name
+        overrides.push(`#${issue.number}=${value}`)
+      }
+      const profilesFlag = overrides.length > 0 ? ` --profiles "${overrides.join(',')}"` : ''
+      command = `/specrails:batch-implement ${issueArgs}${profilesFlag}`
     } else {
       const validItems = state.freeFormItems.filter((item) => item.title.trim())
       if (validItems.length === 0) {
@@ -139,11 +155,71 @@ export function BatchImplementWizard({ open, onClose }: BatchImplementWizardProp
 
         {/* Issue picker (multi-select) */}
         {state.path === 'from-issues' && (
-          <IssuePickerStep
-            multiSelect={true}
-            selectedIssues={state.selectedIssues}
-            onSelectionChange={(issues) => dispatch({ type: 'SET_ISSUES', issues })}
-          />
+          <>
+            <IssuePickerStep
+              multiSelect={true}
+              selectedIssues={state.selectedIssues}
+              onSelectionChange={(issues) => dispatch({ type: 'SET_ISSUES', issues })}
+            />
+            {state.selectedIssues.length > 1 && availableProfiles.length > 0 && (
+              <div className="mt-3 rounded-md border border-border bg-muted/20">
+                <div className="px-3 py-2 border-b border-border/60 text-[11px] text-muted-foreground uppercase tracking-wide">
+                  Per-feature profile override ({state.selectedIssues.length})
+                </div>
+                <div className="p-2 max-h-40 overflow-auto space-y-1">
+                  {state.selectedIssues.map((issue) => {
+                    const override = perIssueProfile[issue.number]
+                    const effective = override ?? profileSelection
+                    const value = effective.kind === 'legacy' ? '__legacy__' : effective.name
+                    const isInherited = !override
+                    return (
+                      <div key={issue.number} className="flex items-center gap-2 text-xs px-1">
+                        <span className="text-muted-foreground font-mono w-12">#{issue.number}</span>
+                        <span className="flex-1 truncate text-foreground/80">{issue.title}</span>
+                        <select
+                          value={value}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            setPerIssueProfile((prev) => ({
+                              ...prev,
+                              [issue.number]: v === '__legacy__'
+                                ? { kind: 'legacy' }
+                                : { kind: 'profile', name: v },
+                            }))
+                          }}
+                          className="h-6 text-[11px] rounded border border-border bg-background px-1"
+                        >
+                          {availableProfiles.map((p) => (
+                            <option key={p.name} value={p.name}>{p.name}</option>
+                          ))}
+                          <option value="__legacy__">legacy</option>
+                        </select>
+                        {!isInherited && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPerIssueProfile((prev) => {
+                                const next = { ...prev }
+                                delete next[issue.number]
+                                return next
+                              })
+                            }}
+                            className="text-[10px] text-muted-foreground hover:text-foreground"
+                            title="Inherit batch default"
+                          >
+                            reset
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="px-3 py-1.5 border-t border-border/60 text-[10px] text-muted-foreground">
+                  Unchanged rows use the batch-level selection below. Set distinct profiles only when you need a rail to run differently.
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Batch free form */}

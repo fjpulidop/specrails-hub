@@ -111,3 +111,17 @@ export function useDefaultProfileSelection(): [ProfileSelection, (s: ProfileSele
 export function selectionToSpawnPayload(s: ProfileSelection): { profileName: string | null } {
   return s.kind === 'legacy' ? { profileName: null } : { profileName: s.name }
 }
+
+/** Hook: fetch the project's profile list once. Returns [] while loading or on error. */
+export function useProjectProfiles(): ProfileListEntry[] {
+  const [profiles, setProfiles] = useState<ProfileListEntry[]>([])
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${getApiBase()}/profiles`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ profiles: ProfileListEntry[] }>) : { profiles: [] }))
+      .then((data) => { if (!cancelled) setProfiles(data.profiles) })
+      .catch(() => { if (!cancelled) setProfiles([]) })
+    return () => { cancelled = true }
+  }, [])
+  return profiles
+}
