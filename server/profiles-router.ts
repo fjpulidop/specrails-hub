@@ -271,7 +271,7 @@ export function createProfilesRouter(): Router {
   })
 
   // GET /api/projects/:projectId/profiles/catalog/:agentId
-  // Return the full .md body of a single agent file (read-only)
+  // Return the full .md body of a single agent file (read-only for sr-*, editable for custom-*)
   router.get('/catalog/:agentId', (req, res) => {
     try {
       const { project } = ctx(req)
@@ -287,6 +287,117 @@ export function createProfilesRouter(): Router {
       }
       const body = fs.readFileSync(file, 'utf8')
       res.json({ id: agentId, body })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // POST /api/projects/:projectId/profiles/catalog (create a custom agent)
+  // Body: { id: string, body: string }
+  // id must start with `custom-` and match ^custom-[a-z0-9][a-z0-9-]*$
+  router.post('/catalog', (req, res) => {
+    try {
+      const { project, db, broadcast } = ctx(req)
+      const id = (req.body?.id ?? '').toString().trim()
+      const body = (req.body?.body ?? '').toString()
+      if (!/^custom-[a-z0-9][a-z0-9-]*$/.test(id)) {
+        res.status(400).json({ error: "id must match ^custom-[a-z0-9][a-z0-9-]*$ (the 'custom-' prefix is reserved for user-authored agents)" })
+        return
+      }
+      if (!body || body.length === 0) {
+        res.status(400).json({ error: 'body is required' })
+        return
+      }
+      const agentsDir = path.join(project.path, '.claude', 'agents')
+      fs.mkdirSync(agentsDir, { recursive: true })
+      const file = path.join(agentsDir, `${id}.md`)
+      if (fs.existsSync(file)) {
+        res.status(409).json({ error: `agent '${id}' already exists` })
+        return
+      }
+      fs.writeFileSync(file, body, 'utf8')
+      // Record initial version
+      const nextVersion = 1
+      db.prepare(
+        `INSERT INTO agent_versions (agent_name, version, body, created_at) VALUES (?, ?, ?, ?)`,
+      ).run(id, nextVersion, body, Date.now())
+      broadcast({ type: 'agent.changed', projectId: project.id, id } as never)
+      res.status(201).json({ id, body, version: nextVersion })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // PATCH /api/projects/:projectId/profiles/catalog/:agentId
+  // Update a custom agent's body. sr-* agents are read-only (403).
+  router.patch('/catalog/:agentId', (req, res) => {
+    try {
+      const { project, db, broadcast } = ctx(req)
+      const agentId = req.params.agentId
+      if (!/^custom-[a-z0-9][a-z0-9-]*$/.test(agentId)) {
+        res.status(403).json({ error: 'only custom-* agents can be edited from the hub' })
+        return
+      }
+      const body = (req.body?.body ?? '').toString()
+      if (!body || body.length === 0) {
+        res.status(400).json({ error: 'body is required' })
+        return
+      }
+      const file = path.join(project.path, '.claude', 'agents', `${agentId}.md`)
+      if (!fs.existsSync(file)) {
+        res.status(404).json({ error: 'agent not found' })
+        return
+      }
+      fs.writeFileSync(file, body, 'utf8')
+      const maxVersion = (db
+        .prepare(`SELECT COALESCE(MAX(version), 0) AS v FROM agent_versions WHERE agent_name = ?`)
+        .get(agentId) as { v: number }).v
+      const nextVersion = maxVersion + 1
+      db.prepare(
+        `INSERT INTO agent_versions (agent_name, version, body, created_at) VALUES (?, ?, ?, ?)`,
+      ).run(agentId, nextVersion, body, Date.now())
+      broadcast({ type: 'agent.changed', projectId: project.id, id: agentId } as never)
+      res.json({ id: agentId, body, version: nextVersion })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // DELETE /api/projects/:projectId/profiles/catalog/:agentId
+  // Only permitted for custom-* agents.
+  router.delete('/catalog/:agentId', (req, res) => {
+    try {
+      const { project, broadcast } = ctx(req)
+      const agentId = req.params.agentId
+      if (!/^custom-[a-z0-9][a-z0-9-]*$/.test(agentId)) {
+        res.status(403).json({ error: 'only custom-* agents can be deleted' })
+        return
+      }
+      const file = path.join(project.path, '.claude', 'agents', `${agentId}.md`)
+      if (!fs.existsSync(file)) {
+        res.status(404).json({ error: 'agent not found' })
+        return
+      }
+      fs.unlinkSync(file)
+      broadcast({ type: 'agent.changed', projectId: project.id, id: agentId, deleted: true } as never)
+      res.json({ ok: true })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // GET /api/projects/:projectId/profiles/catalog/:agentId/versions
+  router.get('/catalog/:agentId/versions', (req, res) => {
+    try {
+      const { db } = ctx(req)
+      const agentId = req.params.agentId
+      const rows = db
+        .prepare(
+          `SELECT version, body, created_at AS createdAt FROM agent_versions
+           WHERE agent_name = ? ORDER BY version DESC`,
+        )
+        .all(agentId) as Array<{ version: number; body: string; createdAt: number }>
+      res.json({ versions: rows })
     } catch (err) {
       handleError(res, err)
     }

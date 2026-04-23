@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Plus, Pencil, Copy } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
+import { Button } from '../ui/button'
+import { AgentStudio } from './AgentStudio'
 
 interface CatalogAgent {
   id: string
@@ -8,6 +11,12 @@ interface CatalogAgent {
   model?: string
 }
 
+type StudioMode =
+  | { kind: 'closed' }
+  | { kind: 'create' }
+  | { kind: 'edit'; agentId: string }
+  | { kind: 'duplicate'; from: string; initialBody: string }
+
 export function AgentsCatalogTab() {
   const [agents, setAgents] = useState<CatalogAgent[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -15,8 +24,9 @@ export function AgentsCatalogTab() {
   const [loading, setLoading] = useState(true)
   const [bodyLoading, setBodyLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [studio, setStudio] = useState<StudioMode>({ kind: 'closed' })
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     let cancelled = false
     setLoading(true)
     fetch(`${getApiBase()}/profiles/catalog`)
@@ -27,7 +37,7 @@ export function AgentsCatalogTab() {
       .then((data) => {
         if (cancelled) return
         setAgents(data.agents)
-        if (data.agents.length > 0) setSelectedId(data.agents[0].id)
+        if (data.agents.length > 0 && !selectedId) setSelectedId(data.agents[0].id)
       })
       .catch((e) => {
         if (!cancelled) setError((e as Error).message)
@@ -38,7 +48,12 @@ export function AgentsCatalogTab() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedId])
+
+  useEffect(() => {
+    const cleanup = refresh()
+    return cleanup
+  }, [refresh])
 
   const loadBody = useCallback((id: string) => {
     let cancelled = false
@@ -77,16 +92,45 @@ export function AgentsCatalogTab() {
     )
   }
 
+  // Studio view (create / edit / duplicate)
+  if (studio.kind !== 'closed') {
+    return (
+      <AgentStudio
+        agentId={studio.kind === 'edit' ? studio.agentId : undefined}
+        initialBody={studio.kind === 'duplicate' ? studio.initialBody : undefined}
+        onClose={() => setStudio({ kind: 'closed' })}
+        onSaved={(id) => {
+          setSelectedId(id)
+          setStudio({ kind: 'closed' })
+          refresh()
+        }}
+      />
+    )
+  }
+
+  const duplicate = async (fromId: string) => {
+    try {
+      const res = await fetch(`${getApiBase()}/profiles/catalog/${encodeURIComponent(fromId)}`)
+      if (!res.ok) throw new Error(`Load failed: ${res.status}`)
+      const data = (await res.json()) as { body: string }
+      setStudio({ kind: 'duplicate', from: fromId, initialBody: data.body })
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
   if (agents.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center max-w-sm">
           <div className="text-sm font-medium text-foreground">No agents installed</div>
-          <div className="text-xs text-muted-foreground mt-1">
+          <div className="text-xs text-muted-foreground mt-1 mb-4">
             Run <code className="text-foreground">npx specrails-core@latest update</code> in this
-            project to install the upstream agents, or create custom agents from Agent Studio
-            (coming soon).
+            project to install the upstream agents, or create a custom agent now.
           </div>
+          <Button size="sm" onClick={() => setStudio({ kind: 'create' })}>
+            <Plus className="w-3.5 h-3.5 mr-1.5" /> New custom agent
+          </Button>
         </div>
       </div>
     )
@@ -100,6 +144,12 @@ export function AgentsCatalogTab() {
     <div className="flex h-full">
       {/* Left: list grouped by kind */}
       <aside className="w-72 flex-shrink-0 border-r border-border flex flex-col">
+        <div className="px-2 py-2 border-b border-border flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Catalog</span>
+          <Button size="sm" variant="ghost" onClick={() => setStudio({ kind: 'create' })}>
+            <Plus className="w-3.5 h-3.5 mr-1" /> New
+          </Button>
+        </div>
         <div className="flex-1 overflow-auto p-2">
           <Section
             title={`Upstream (${upstream.length})`}
@@ -145,19 +195,33 @@ export function AgentsCatalogTab() {
         )}
         {selected && (
           <div className="p-6">
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-base font-mono font-semibold">{selected.id}</h2>
-              <KindBadge kind={selected.kind} />
-              {selected.model && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                  default model: {selected.model}
-                </span>
-              )}
+            <div className="flex items-start justify-between gap-4 mb-1">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-mono font-semibold">{selected.id}</h2>
+                  <KindBadge kind={selected.kind} />
+                  {selected.model && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                      default model: {selected.model}
+                    </span>
+                  )}
+                </div>
+                {selected.description && (
+                  <p className="text-xs text-muted-foreground mt-1">{selected.description}</p>
+                )}
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <Button size="sm" variant="ghost" onClick={() => void duplicate(selected.id)}>
+                  <Copy className="w-3.5 h-3.5 mr-1" /> Duplicate
+                </Button>
+                {selected.kind === 'custom' && (
+                  <Button size="sm" onClick={() => setStudio({ kind: 'edit', agentId: selected.id })}>
+                    <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+                  </Button>
+                )}
+              </div>
             </div>
-            {selected.description && (
-              <p className="text-xs text-muted-foreground mb-4">{selected.description}</p>
-            )}
-            <div className="rounded-md border border-border bg-muted/30">
+            <div className="rounded-md border border-border bg-muted/30 mt-4">
               <div className="flex items-center justify-between px-3 py-1.5 border-b border-border">
                 <span className="text-[11px] font-mono text-muted-foreground">
                   .claude/agents/{selected.id}.md
