@@ -196,7 +196,15 @@ export function ProfileEditor({
           Orchestrator
         </h2>
         <div className="flex items-center gap-3 p-3 rounded-md border border-border">
-          <span className="text-sm font-mono text-foreground flex-1">implement.md</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-mono text-foreground truncate">
+              /specrails:implement · /specrails:batch-implement
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              Top-level model for both commands. batch-implement delegates to implement
+              per feature, so every rail it spawns inherits this profile's agent chain.
+            </div>
+          </div>
           <ModelSelect
             value={profile.orchestrator.model}
             onChange={(m) =>

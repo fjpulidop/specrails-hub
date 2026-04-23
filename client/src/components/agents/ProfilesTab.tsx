@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Plus, Trash2, Copy, Save, Star, Wand2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
 import { ProfileEditor } from './ProfileEditor'
@@ -84,8 +85,13 @@ export function ProfilesTab() {
       }
       await refresh()
       setSelected('default')
+      toast.success('Profile migrated', {
+        description: 'default profile created from your current agents',
+      })
     } catch (e) {
-      setError((e as Error).message)
+      const message = (e as Error).message
+      setError(message)
+      toast.error('Migration failed', { description: message })
     } finally {
       setSaving(false)
     }
@@ -121,8 +127,11 @@ export function ProfilesTab() {
         }
         await refresh()
         setSelected(trimmed)
+        toast.success('Profile created', { description: trimmed })
       } catch (e) {
-        setError((e as Error).message)
+        const message = (e as Error).message
+        setError(message)
+        toast.error('Failed to create profile', { description: message })
       } finally {
         setSaving(false)
       }
@@ -150,8 +159,11 @@ export function ProfilesTab() {
         }
         await refresh()
         setSelected(newName)
+        toast.success('Profile duplicated', { description: `${from} → ${newName}` })
       } catch (e) {
-        setError((e as Error).message)
+        const message = (e as Error).message
+        setError(message)
+        toast.error('Failed to duplicate profile', { description: message })
       } finally {
         setSaving(false)
       }
@@ -174,8 +186,11 @@ export function ProfilesTab() {
         }
         setSelected((prev) => (prev === name ? null : prev))
         await refresh()
+        toast.success('Profile deleted', { description: name })
       } catch (e) {
-        setError((e as Error).message)
+        const message = (e as Error).message
+        setError(message)
+        toast.error('Failed to delete profile', { description: message })
       } finally {
         setSaving(false)
       }
@@ -201,8 +216,11 @@ export function ProfilesTab() {
         throw new Error(err.error ?? `Save failed: ${res.status}`)
       }
       setEditing(profile)
+      toast.success('Profile saved', { description: profile.name })
     } catch (e) {
-      setError((e as Error).message)
+      const message = (e as Error).message
+      setError(message)
+      toast.error('Failed to save profile', { description: message })
     } finally {
       setSaving(false)
     }
@@ -223,8 +241,11 @@ export function ProfilesTab() {
           throw new Error(err.error ?? `Set preferred failed: ${res.status}`)
         }
         setPreferred({ profile: name })
+        toast.success('Preferred profile set', { description: name })
       } catch (e) {
-        setError((e as Error).message)
+        const message = (e as Error).message
+        setError(message)
+        toast.error('Failed to set preferred profile', { description: message })
       } finally {
         setSaving(false)
       }

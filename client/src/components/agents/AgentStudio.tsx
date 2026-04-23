@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Save, Trash2, History, ArrowLeft, AlertCircle, FlaskConical, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -319,9 +320,16 @@ export function AgentStudio({ agentId, initialBody, initialName, onClose, onSave
         throw new Error(err.error ?? `Save failed: ${res.status}`)
       }
       setDirty(false)
+      toast.success(isCreate ? 'Agent created' : 'Agent saved', {
+        description: isCreate ? id : agentId,
+      })
       if (onSaved) onSaved(isCreate ? id : agentId!)
     } catch (e) {
-      setError((e as Error).message)
+      const message = (e as Error).message
+      setError(message)
+      toast.error(isCreate ? 'Failed to create agent' : 'Failed to save agent', {
+        description: message,
+      })
     } finally {
       setSaving(false)
     }
@@ -340,10 +348,13 @@ export function AgentStudio({ agentId, initialBody, initialName, onClose, onSave
         const err = await res.json().catch(() => ({}))
         throw new Error(err.error ?? `Delete failed: ${res.status}`)
       }
+      toast.success('Agent deleted', { description: agentId })
       if (onSaved) onSaved(agentId!)
       onClose()
     } catch (e) {
-      setError((e as Error).message)
+      const message = (e as Error).message
+      setError(message)
+      toast.error('Failed to delete agent', { description: message })
     } finally {
       setSaving(false)
     }
