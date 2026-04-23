@@ -1,0 +1,71 @@
+import { useEffect, useState } from 'react'
+import { Bot } from 'lucide-react'
+import { getApiBase } from '../../lib/api'
+import type { ProfileListEntry } from './types'
+
+interface Props {
+  /** null = legacy (no profile). undefined = not yet chosen; treated like null. */
+  value: string | null
+  onChange: (value: string | null) => void
+}
+
+const LEGACY_VALUE = '__legacy__'
+
+/**
+ * Compact rail-header profile selector. Hides itself if no profiles exist
+ * in the project (rails default to legacy then). Auto-refreshes on mount.
+ */
+export function RailProfileSelector({ value, onChange }: Props) {
+  const [profiles, setProfiles] = useState<ProfileListEntry[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${getApiBase()}/profiles`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ profiles: ProfileListEntry[] }>) : { profiles: [] }))
+      .then((data) => {
+        if (!cancelled) setProfiles(data.profiles)
+      })
+      .catch(() => {
+        if (!cancelled) setProfiles([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (!loaded) return null
+  if (profiles.length === 0) return null
+
+  const currentValue = value ?? LEGACY_VALUE
+
+  return (
+    <div
+      className="inline-flex items-center"
+      title="Agent profile for this rail"
+      // stop click from bubbling to the rail header's onMouseDown / long-press
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Bot className="w-3 h-3 text-muted-foreground mr-1" />
+      <select
+        value={currentValue}
+        onChange={(e) => {
+          const v = e.target.value
+          onChange(v === LEGACY_VALUE ? null : v)
+        }}
+        className="h-5 text-[10px] rounded border border-border/50 bg-transparent text-muted-foreground hover:text-foreground pr-4 pl-1 focus:outline-none focus:ring-1 focus:ring-primary/40"
+      >
+        {profiles.map((p) => (
+          <option key={p.name} value={p.name}>
+            {p.name}
+          </option>
+        ))}
+        <option value={LEGACY_VALUE}>legacy</option>
+      </select>
+    </div>
+  )
+}

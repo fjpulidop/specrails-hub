@@ -293,6 +293,15 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_agent_tests_name ON agent_tests(agent_name);
     `)
   },
+
+  // Migration 12: remember per-rail agent profile selection across launches.
+  (db) => {
+    try {
+      db.exec(`ALTER TABLE rails ADD COLUMN profile_name TEXT`)
+    } catch {
+      // Column may already exist (partially-migrated DB); no-op.
+    }
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {
