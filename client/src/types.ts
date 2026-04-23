@@ -232,6 +232,15 @@ export interface JobTemplate {
 export type TicketStatus = 'todo' | 'in_progress' | 'done' | 'cancelled'
 export type TicketPriority = 'critical' | 'high' | 'medium' | 'low'
 
+export interface Attachment {
+  id: string
+  filename: string
+  storedName: string
+  mimeType: string
+  size: number
+  addedAt: string
+}
+
 export interface LocalTicket {
   id: number
   title: string
@@ -247,6 +256,7 @@ export interface LocalTicket {
     user_story?: string
     area?: string
   }
+  attachments?: Attachment[]
   created_at: string
   updated_at: string
   created_by: string

@@ -2,13 +2,17 @@ import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } fr
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { formatDistanceToNow } from 'date-fns'
-import { X, Pencil, Trash2, Save, Plus, XCircle, Sparkles, Loader2, Undo2, Send } from 'lucide-react'
+import { X, Pencil, Trash2, Save, Plus, XCircle, Sparkles, Loader2, Undo2, Send, Maximize2, Minimize2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import { getApiBase } from '../lib/api'
-import type { LocalTicket, TicketPriority } from '../types'
+import { AttachmentsSection } from './AttachmentsSection'
+import { AiEditComposer } from './AiEditComposer'
+import { AiEditDiffView } from './AiEditDiffView'
+import { SessionAttachmentBar } from './SessionAttachmentBar'
+import type { Attachment, LocalTicket, TicketPriority } from '../types'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -63,11 +67,38 @@ export function TicketDetailModal({
 
   // AI Edit state
   const [aiEditOpen, setAiEditOpen] = useState(false)
-  const [aiInstructions, setAiInstructions] = useState('')
   const [aiEditing, setAiEditing] = useState(false)
   const [aiRequestId, setAiRequestId] = useState<string | null>(null)
   const [descriptionSnapshot, setDescriptionSnapshot] = useState<string | null>(null)
-  const aiInstructionsRef = useRef<HTMLTextAreaElement>(null)
+
+  // AI Edit refinement session (ephemeral)
+  const [proposedDraft, setProposedDraft] = useState<string | null>(null)
+  const [priorInstructions, setPriorInstructions] = useState<string[]>([])
+  const [sessionAttachmentIds, setSessionAttachmentIds] = useState<string[]>([])
+  const [diffExpanded, setDiffExpanded] = useState(false)
+  const pendingInstructionRef = useRef<string | null>(null)
+
+  // Esc collapses expanded diff before falling through to modal close
+  useEffect(() => {
+    if (!diffExpanded) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        setDiffExpanded(false)
+      }
+    }
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
+  }, [diffExpanded])
+
+  // Attachments (synced from ticket prop)
+  const [attachments, setAttachments] = useState<Attachment[]>(ticket.attachments ?? [])
+  useEffect(() => { setAttachments(ticket.attachments ?? []) }, [ticket.attachments, ticket.id])
+  // Keep sessionAttachmentIds filtered against current ticket attachments (auto-scrub deleted ones)
+  useEffect(() => {
+    const valid = new Set(attachments.map((a) => a.id))
+    setSessionAttachmentIds((prev) => prev.filter((id) => valid.has(id)))
+  }, [attachments])
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
 
   const titleInputRef = useRef<HTMLInputElement>(null)
@@ -140,6 +171,9 @@ export function TicketDetailModal({
   const aiRequestIdRef = useRef(aiRequestId)
   useEffect(() => { aiRequestIdRef.current = aiRequestId }, [aiRequestId])
 
+  // Stream buffer (scoped per request) so we don't leak deltas into description.
+  const streamBufferRef = useRef<string>('')
+
   const handleAiWs = useCallback((raw: unknown) => {
     const msg = raw as Record<string, unknown>
     if (!msg || typeof msg.type !== 'string') return
@@ -148,51 +182,57 @@ export function TicketDetailModal({
 
     if (msg.type === 'ticket_ai_edit_stream') {
       const delta = msg.delta as string
-      setDescription((prev) => prev + delta)
+      streamBufferRef.current += delta
+      setProposedDraft(streamBufferRef.current)
     } else if (msg.type === 'ticket_ai_edit_done') {
       const fullText = msg.fullText as string
-      setDescription(fullText)
+      streamBufferRef.current = ''
+      setProposedDraft(fullText)
       setAiEditing(false)
       setAiRequestId(null)
-      setAiEditOpen(false)
-      setAiInstructions('')
-      setEditingDescription(false)
-      toast.success('AI edit complete')
-    } else if (msg.type === 'ticket_ai_edit_error') {
-      setAiEditing(false)
-      setAiRequestId(null)
-      // Restore snapshot on error
-      if (descriptionSnapshot !== null) {
-        setDescription(descriptionSnapshot)
-        setDescriptionSnapshot(null)
+      // Commit the pending instruction to history (transition Composing→Reviewing on first turn, or append on refine)
+      if (pendingInstructionRef.current) {
+        const queued = pendingInstructionRef.current
+        pendingInstructionRef.current = null
+        setPriorInstructions((prev) => [...prev, queued])
       }
+      toast.success('AI edit ready for review')
+    } else if (msg.type === 'ticket_ai_edit_error') {
+      streamBufferRef.current = ''
+      setAiEditing(false)
+      setAiRequestId(null)
+      pendingInstructionRef.current = null
       toast.error(`AI edit failed: ${msg.error}`)
     }
-  }, [descriptionSnapshot])
+  }, [])
 
   useLayoutEffect(() => {
     registerHandler('ticket_ai_edit', handleAiWs)
     return () => unregisterHandler('ticket_ai_edit')
   }, [handleAiWs, registerHandler, unregisterHandler])
 
-  const handleAiEditSubmit = useCallback(async () => {
-    if (!aiInstructions.trim() || aiEditing) return
-    // Capture current description before clearing
-    const currentDesc = description
-    setDescriptionSnapshot(currentDesc)
+  const submitAiEdit = useCallback(async (instructions: string, attachmentIds: string[]) => {
+    if (!instructions.trim() || aiEditing) return
+    const trimmed = instructions.trim()
+    pendingInstructionRef.current = trimmed
     setAiEditing(true)
-    // Clear description to stream fresh result
-    setDescription('')
-    setEditingDescription(false)
+    streamBufferRef.current = ''
+
+    const body: Record<string, unknown> = {
+      instructions: trimmed,
+      description, // saved baseline
+      attachmentIds,
+    }
+    if (proposedDraft !== null) {
+      body.priorInstructions = priorInstructions
+      body.priorProposal = proposedDraft
+    }
 
     try {
       const res = await fetch(`${getApiBase()}/tickets/${ticket.id}/ai-edit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instructions: aiInstructions.trim(),
-          description: currentDesc,
-        }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Request failed' }))
@@ -202,11 +242,35 @@ export function TicketDetailModal({
       setAiRequestId(data.requestId)
     } catch (err) {
       setAiEditing(false)
-      setDescription(currentDesc)
-      setDescriptionSnapshot(null)
+      pendingInstructionRef.current = null
       toast.error(`AI edit failed: ${(err as Error).message}`)
     }
-  }, [aiInstructions, aiEditing, description, ticket.id])
+  }, [aiEditing, description, proposedDraft, priorInstructions, ticket.id])
+
+  const applyProposedDraft = useCallback(() => {
+    if (proposedDraft === null) return
+    // Capture snapshot only on the first Apply of this modal session
+    if (descriptionSnapshot === null) setDescriptionSnapshot(description)
+    setDescription(proposedDraft)
+    setProposedDraft(null)
+    setPriorInstructions([])
+    setSessionAttachmentIds([])
+    setAiEditOpen(false)
+    toast.success('Draft applied')
+  }, [descriptionSnapshot, description, proposedDraft])
+
+  const discardProposedDraft = useCallback(() => {
+    setProposedDraft(null)
+    setPriorInstructions([])
+    setSessionAttachmentIds([])
+  }, [])
+
+  const closeAiEdit = useCallback(() => {
+    setAiEditOpen(false)
+    setProposedDraft(null)
+    setPriorInstructions([])
+    setSessionAttachmentIds([])
+  }, [])
 
   const handleAiRevert = useCallback(() => {
     if (descriptionSnapshot !== null) {
@@ -216,10 +280,7 @@ export function TicketDetailModal({
     }
   }, [descriptionSnapshot])
 
-  // Focus instructions input when AI panel opens
-  useEffect(() => {
-    if (aiEditOpen) aiInstructionsRef.current?.focus()
-  }, [aiEditOpen])
+  // Focus handled by AiEditComposer autoFocus
 
   const handleSave = useCallback(async () => {
     const changes: Partial<Pick<LocalTicket, 'title' | 'description' | 'priority' | 'labels'>> = {}
@@ -287,7 +348,7 @@ export function TicketDetailModal({
               </button>
             )}
             <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-[10px] text-muted-foreground font-mono">#{ticket.id}</span>
+              <span className="text-[10px] text-foreground font-mono">#{ticket.id}</span>
             </div>
           </div>
 
@@ -304,7 +365,126 @@ export function TicketDetailModal({
           <div className="flex flex-col sm:flex-row h-full">
             {/* Main content */}
             <div className="flex-1 min-w-0 px-5 py-4 space-y-4 flex flex-col">
-              {/* Description */}
+              {/* AI Edit Panel (replaces Description view while active) */}
+              {aiEditOpen && proposedDraft === null && (
+                <AiEditComposer
+                  ticketKey={ticket.id}
+                  sessionIds={sessionAttachmentIds}
+                  onSessionIdsChange={setSessionAttachmentIds}
+                  onAttachmentAdded={(a) => setAttachments((prev) => (prev.some((x) => x.id === a.id) ? prev : [...prev, a]))}
+                  onSubmit={submitAiEdit}
+                  onCancel={closeAiEdit}
+                  busy={aiEditing}
+                  placeholder="Describe the changes you want… (Cmd+Enter to submit)"
+                  submitLabel={aiEditing ? 'Generating…' : 'Submit'}
+                  title="AI Edit"
+                  subtitle={aiEditing ? 'Generating…' : undefined}
+                />
+              )}
+
+              {aiEditOpen && proposedDraft !== null && (
+                <div className="rounded-xl border border-border/50 bg-card shadow-lg p-4 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-primary/80" />
+                      <span className="text-sm font-medium text-foreground">AI Edit · Review</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        Turn {priorInstructions.length + (aiEditing ? 1 : 0)}
+                      </span>
+                      {aiEditing && <Loader2 className="w-3 h-3 animate-spin text-primary/70" />}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => setDiffExpanded(true)}
+                        disabled={aiEditing}
+                        aria-label="Expand diff"
+                        title="Expand diff"
+                      >
+                        <Maximize2 className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={closeAiEdit} disabled={aiEditing} aria-label="Close">
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <AiEditDiffView original={description} proposed={proposedDraft} className="min-h-[160px] max-h-[360px] overflow-y-auto" />
+
+                  <SessionAttachmentBar
+                    ticketKey={ticket.id}
+                    sessionIds={sessionAttachmentIds}
+                    ticketAttachments={attachments}
+                    onRemoveFromSession={(id) => setSessionAttachmentIds((prev) => prev.filter((x) => x !== id))}
+                    onAddAttachment={(a) => {
+                      setAttachments((prev) => (prev.some((x) => x.id === a.id) ? prev : [...prev, a]))
+                      setSessionAttachmentIds((prev) => Array.from(new Set([...prev, a.id])))
+                    }}
+                    onError={(msg) => toast.error(msg)}
+                    disabled={aiEditing}
+                  />
+
+                  {priorInstructions.length > 0 && (
+                    <details className="text-[11px] text-muted-foreground rounded border border-border/40 px-2 py-1.5 bg-muted/10">
+                      <summary className="cursor-pointer select-none">
+                        {priorInstructions.length} prior refinement{priorInstructions.length > 1 ? 's' : ''}
+                      </summary>
+                      <ol className="mt-1.5 list-decimal list-inside space-y-0.5 text-foreground/75">
+                        {priorInstructions.map((ins, i) => (
+                          <li key={i} className="truncate">{ins}</li>
+                        ))}
+                      </ol>
+                    </details>
+                  )}
+
+                  <RefineInput onSubmit={(txt) => submitAiEdit(txt, sessionAttachmentIds)} busy={aiEditing} />
+
+                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-border/30">
+                    <Button variant="ghost" size="sm" onClick={discardProposedDraft} disabled={aiEditing}>
+                      Discard
+                    </Button>
+                    <Button size="sm" onClick={applyProposedDraft} disabled={aiEditing} className="gap-1.5">
+                      <Send className="w-3.5 h-3.5" />
+                      Apply
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Expanded diff overlay */}
+              {aiEditOpen && proposedDraft !== null && diffExpanded && (
+                <div className="fixed inset-0 z-[90] flex flex-col bg-black/80 backdrop-blur-sm p-6 animate-in fade-in-0 duration-150">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2 text-white/90">
+                      <Sparkles className="w-4 h-4 text-primary/80" />
+                      <span className="text-sm font-medium">AI Edit · Review (expanded)</span>
+                      <span className="text-[11px] text-white/60">
+                        Turn {priorInstructions.length + (aiEditing ? 1 : 0)}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-white/85 hover:text-white hover:bg-white/10 gap-1.5"
+                      onClick={() => setDiffExpanded(false)}
+                      aria-label="Collapse diff"
+                    >
+                      <Minimize2 className="w-4 h-4" />
+                      Collapse
+                    </Button>
+                  </div>
+                  <AiEditDiffView
+                    original={description}
+                    proposed={proposedDraft}
+                    className="flex-1 bg-card/95 min-h-0"
+                  />
+                </div>
+              )}
+
+              {/* Description (hidden while AI Edit is active) */}
+              {!aiEditOpen && (
               <div className="flex-1 flex flex-col">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -375,6 +555,14 @@ export function TicketDetailModal({
                   </button>
                 )}
               </div>
+              )}
+
+              {/* Attachments / Resources */}
+              <AttachmentsSection
+                ticketKey={ticket.id}
+                attachments={attachments}
+                onChange={setAttachments}
+              />
 
               {/* Prerequisites */}
               {ticket.prerequisites && ticket.prerequisites.length > 0 && (
@@ -490,80 +678,34 @@ export function TicketDetailModal({
                 )}
               </div>
 
-              {/* AI Edit */}
+              {/* AI Edit trigger — full experience lives in the main content column */}
               <div>
-                {!aiEditOpen ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full h-7 text-[10px] gap-1.5"
-                    onClick={() => setAiEditOpen(true)}
-                    disabled={aiEditing}
-                  >
-                    {aiEditing ? (
-                      <>
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        AI is editing...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3 h-3" />
-                        AI Edit
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <div className="space-y-2">
-                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                      <Sparkles className="w-2.5 h-2.5" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-7 text-[10px] gap-1.5"
+                  onClick={() => setAiEditOpen(true)}
+                  disabled={aiEditing || aiEditOpen}
+                >
+                  {aiEditing ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      AI is editing…
+                    </>
+                  ) : aiEditOpen ? (
+                    <>
+                      <Sparkles className="w-3 h-3" />
+                      AI Edit active
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3 h-3" />
                       AI Edit
-                    </span>
-                    <textarea
-                      ref={aiInstructionsRef}
-                      value={aiInstructions}
-                      onChange={(e) => setAiInstructions(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                          e.preventDefault()
-                          handleAiEditSubmit()
-                        }
-                        if (e.key === 'Escape') {
-                          setAiEditOpen(false)
-                          setAiInstructions('')
-                        }
-                      }}
-                      placeholder="Describe the changes you want..."
-                      className="w-full rounded-lg border border-border bg-input px-2.5 py-2 text-[11px] text-foreground placeholder:text-muted-foreground/50 resize-none min-h-[80px]"
-                      disabled={aiEditing}
-                    />
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        size="sm"
-                        className="h-6 text-[10px] gap-1 flex-1"
-                        onClick={handleAiEditSubmit}
-                        disabled={!aiInstructions.trim() || aiEditing}
-                      >
-                        {aiEditing ? (
-                          <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                        ) : (
-                          <Send className="w-2.5 h-2.5" />
-                        )}
-                        {aiEditing ? 'Editing...' : 'Apply'}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-[10px]"
-                        onClick={() => { setAiEditOpen(false); setAiInstructions('') }}
-                        disabled={aiEditing}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                    </>
+                  )}
+                </Button>
 
-                {descriptionSnapshot !== null && !aiEditing && (
+                {descriptionSnapshot !== null && !aiEditing && !aiEditOpen && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -666,4 +808,44 @@ function formatRelTime(dateStr: string): string {
   } catch {
     return dateStr
   }
+}
+
+function RefineInput({ onSubmit, busy }: { onSubmit: (text: string) => void; busy?: boolean }) {
+  const [text, setText] = useState('')
+  const taRef = useRef<HTMLTextAreaElement | null>(null)
+
+  useEffect(() => {
+    if (!busy) setTimeout(() => taRef.current?.focus(), 30)
+  }, [busy])
+
+  function handle() {
+    const t = text.trim()
+    if (!t || busy) return
+    onSubmit(t)
+    setText('')
+  }
+
+  return (
+    <div className="flex items-stretch gap-2">
+      <textarea
+        ref={taRef}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault()
+            handle()
+          }
+        }}
+        placeholder="Refine further… (e.g. make it shorter, add acceptance criteria)"
+        disabled={busy}
+        rows={2}
+        className="flex-1 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/60 resize-none h-[52px] max-h-[140px] focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+      />
+      <Button size="sm" onClick={handle} disabled={!text.trim() || busy} className="gap-1.5 h-[52px] px-4 shrink-0">
+        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+        Refine
+      </Button>
+    </div>
+  )
 }

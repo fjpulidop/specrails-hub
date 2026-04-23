@@ -242,6 +242,16 @@ describe('ProjectHealthWidget', () => {
     expect(screen.getByText('running')).toBeInTheDocument()
   })
 
+  it('renders FailureWarningBanner when failurePatterns present', () => {
+    mockData = {
+      ...mockMetrics,
+      failurePatterns: [{ command: '/specrails:flaky-cmd', count: 3, lastFailedAt: new Date().toISOString() }],
+    }
+    render(<ProjectHealthWidget />)
+    expect(screen.getByText(/specrails:flaky-cmd/i)).toBeInTheDocument()
+    expect(screen.getByText('3×')).toBeInTheDocument()
+  })
+
   it('renders timeAgo returns days for old timestamps', () => {
     mockData = {
       ...mockMetrics,

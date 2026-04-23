@@ -4,6 +4,32 @@ import { render, screen, fireEvent, waitFor } from '../../test-utils'
 import { ProposeSpecModal } from '../ProposeSpecModal'
 import type { LocalTicket } from '../../types'
 
+// Mock RichAttachmentEditor with a plain textarea so placeholder/change/keydown queries work
+vi.mock('../RichAttachmentEditor', () => ({
+  RichAttachmentEditor: React.forwardRef(function MockEditor(
+    props: { placeholder?: string; ariaLabel?: string; onChange?: () => void; onSubmit?: () => void },
+    ref: React.Ref<{ getPlainText: () => string; getAttachmentIds: () => string[]; insertPill: () => void; focus: () => void; clear: () => void }>,
+  ) {
+    const inputRef = React.useRef<HTMLTextAreaElement>(null)
+    React.useImperativeHandle(ref, () => ({
+      getPlainText: () => inputRef.current?.value ?? '',
+      getAttachmentIds: () => [],
+      insertPill: () => {},
+      focus: () => inputRef.current?.focus(),
+      clear: () => { if (inputRef.current) inputRef.current.value = '' },
+    }))
+    return (
+      <textarea
+        ref={inputRef}
+        aria-label={props.ariaLabel}
+        placeholder={props.placeholder}
+        onChange={(e) => { void e; props.onChange?.() }}
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) props.onSubmit?.() }}
+      />
+    )
+  }),
+}))
+
 const mockStartWithMessage = vi.fn().mockResolvedValue('conv-1')
 const mockAbortStream = vi.fn()
 

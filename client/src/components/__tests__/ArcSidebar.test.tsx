@@ -111,6 +111,21 @@ describe('ArcSidebar', () => {
     expect(defaultProps.onOpenSettings).toHaveBeenCalledOnce()
   })
 
+  it('expands on mouse enter when not pinned', () => {
+    const { container } = render(<ArcSidebar {...defaultProps} />)
+    const sidebar = container.firstChild as Element
+    fireEvent.mouseEnter(sidebar)
+    expect(screen.getByText('Hub')).toBeInTheDocument()
+  })
+
+  it('collapses on mouse leave when not pinned', () => {
+    const { container } = render(<ArcSidebar {...defaultProps} />)
+    const sidebar = container.firstChild as Element
+    fireEvent.mouseEnter(sidebar)
+    fireEvent.mouseLeave(sidebar)
+    expect(screen.queryByText('Hub')).not.toBeInTheDocument()
+  })
+
   it('shows confirm prompt then removes project on second click', async () => {
     render(<ArcSidebar {...defaultProps} />)
     fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
