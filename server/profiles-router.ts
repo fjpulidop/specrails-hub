@@ -1,3 +1,5 @@
+import fs from 'fs'
+import path from 'path'
 import { Router, Request, Response } from 'express'
 import type { ProjectContext } from './project-registry'
 import {
@@ -57,6 +59,30 @@ export function createProfilesRouter(): Router {
       return
     }
     next()
+  })
+
+  // GET /api/projects/:projectId/profiles/catalog
+  // List all agents available in .claude/agents/ (upstream sr-* and custom custom-*)
+  router.get('/catalog', (req, res) => {
+    try {
+      const { project } = ctx(req)
+      const dir = path.join(project.path, '.claude', 'agents')
+      if (!fs.existsSync(dir)) {
+        res.json({ agents: [] })
+        return
+      }
+      const agents: Array<{ id: string; kind: 'upstream' | 'custom' }> = []
+      for (const file of fs.readdirSync(dir)) {
+        if (!file.endsWith('.md')) continue
+        const id = file.slice(0, -'.md'.length)
+        if (id.startsWith('sr-')) agents.push({ id, kind: 'upstream' })
+        else if (id.startsWith('custom-')) agents.push({ id, kind: 'custom' })
+      }
+      agents.sort((a, b) => a.id.localeCompare(b.id))
+      res.json({ agents })
+    } catch (err) {
+      handleError(res, err)
+    }
   })
 
   // GET /api/projects/:projectId/profiles

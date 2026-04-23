@@ -1,7 +1,8 @@
-import { ReactNode } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import { Plus, GripVertical, X, ArrowUp, ArrowDown } from 'lucide-react'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
+import { getApiBase } from '../../lib/api'
 import {
   BASELINE_REQUIRED_AGENTS,
   MODEL_ALIASES,
@@ -13,6 +14,11 @@ import {
   type RoutingTagRule,
 } from './types'
 
+interface CatalogAgent {
+  id: string
+  kind: 'upstream' | 'custom'
+}
+
 export function ProfileEditor({
   profile,
   onChange,
@@ -22,18 +28,38 @@ export function ProfileEditor({
   onChange: (p: Profile) => void
   footer?: ReactNode
 }) {
+  const [catalog, setCatalog] = useState<CatalogAgent[]>([])
+  const [pickingAgent, setPickingAgent] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${getApiBase()}/profiles/catalog`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ agents: CatalogAgent[] }>) : { agents: [] }))
+      .then((data) => {
+        if (!cancelled) setCatalog(data.agents)
+      })
+      .catch(() => {
+        if (!cancelled) setCatalog([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const update = (mutate: (draft: Profile) => void) => {
     const draft = JSON.parse(JSON.stringify(profile)) as Profile
     mutate(draft)
     onChange(draft)
   }
 
-  const addAgent = () => {
-    const id = prompt('Agent id (e.g. sr-data-engineer or custom-pentester):')
-    if (!id) return
+  const selectedIds = new Set(profile.agents.map((a) => a.id))
+  const availableToAdd = catalog.filter((c) => !selectedIds.has(c.id))
+
+  const addAgent = (id: string) => {
     update((d) => {
-      d.agents.push({ id: id.trim(), model: 'sonnet' })
+      d.agents.push({ id, model: 'sonnet' })
     })
+    setPickingAgent(false)
   }
 
   const removeAgent = (idx: number) => {
@@ -60,10 +86,17 @@ export function ProfileEditor({
   }
 
   const addRoutingRule = () => {
+    if (profile.agents.length === 0) return
     const tags = prompt('Tags (comma-separated, e.g. frontend,ui):')
     if (!tags) return
-    const agent = prompt('Route to agent id:', 'sr-developer')
+    const agentOptions = profile.agents.map((a) => a.id).join(', ')
+    const agent = prompt(`Route to which agent?\nAvailable: ${agentOptions}`, profile.agents[0].id)
     if (!agent) return
+    const trimmedAgent = agent.trim()
+    if (!profile.agents.some((a) => a.id === trimmedAgent)) {
+      alert(`"${trimmedAgent}" is not in this profile's agent chain. Add it first.`)
+      return
+    }
     update((d) => {
       const defaultRule = d.routing.pop() as RoutingDefaultRule
       const newRule: RoutingTagRule = {
@@ -71,7 +104,7 @@ export function ProfileEditor({
           .split(',')
           .map((t) => t.trim())
           .filter(Boolean),
-        agent: agent.trim(),
+        agent: trimmedAgent,
       }
       d.routing.push(newRule)
       d.routing.push(defaultRule)
@@ -144,10 +177,63 @@ export function ProfileEditor({
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Agent chain ({profile.agents.length})
           </h2>
-          <Button size="sm" variant="ghost" onClick={addAgent}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setPickingAgent((v) => !v)}
+            disabled={availableToAdd.length === 0}
+            title={availableToAdd.length === 0 ? 'All catalog agents are already in the chain' : 'Add an agent from the catalog'}
+          >
             <Plus className="w-3.5 h-3.5 mr-1" /> Add
           </Button>
         </div>
+
+        {pickingAgent && (
+          <div className="mb-2 p-2 rounded-md border border-border bg-muted/30">
+            <div className="flex items-center justify-between mb-1.5 px-1">
+              <span className="text-[11px] text-muted-foreground">
+                Pick from catalog ({availableToAdd.length} available)
+              </span>
+              <button
+                type="button"
+                className="p-1 hover:bg-accent rounded"
+                onClick={() => setPickingAgent(false)}
+                title="Close"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            {availableToAdd.length === 0 ? (
+              <div className="px-2 py-3 text-xs text-muted-foreground text-center">
+                No more agents in the catalog. Add custom agents from the Agents Catalog tab.
+              </div>
+            ) : (
+              <div className="space-y-0.5 max-h-64 overflow-auto">
+                {availableToAdd.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => addAgent(a.id)}
+                    className="w-full flex items-center justify-between gap-2 px-2 py-1.5 text-left rounded hover:bg-accent transition-colors"
+                  >
+                    <span className="text-sm font-mono">{a.id}</span>
+                    <span
+                      className={
+                        'text-[10px] px-1.5 py-0.5 rounded ' +
+                        (a.kind === 'custom'
+                          ? 'bg-purple-500/15 text-purple-400'
+                          : 'bg-muted text-muted-foreground')
+                      }
+                    >
+                      {a.kind}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="space-y-1.5">
           {profile.agents.map((agent, idx) => (
             <AgentRow
