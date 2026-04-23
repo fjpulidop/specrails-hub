@@ -4,6 +4,7 @@ import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
 import { ProfileEditor } from './ProfileEditor'
 import { ProfileAnalyticsCard } from './ProfileAnalyticsCard'
+import { ConfirmDialog, PromptDialog } from './PromptDialog'
 import type { Profile, ProfileListEntry, UserPreferred } from './types'
 
 export function ProfilesTab() {
@@ -15,6 +16,9 @@ export function ProfilesTab() {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [validationIssues, setValidationIssues] = useState<string[]>([])
+  const [createDialog, setCreateDialog] = useState(false)
+  const [duplicateDialog, setDuplicateDialog] = useState<{ from: string } | null>(null)
+  const [deleteDialog, setDeleteDialog] = useState<{ name: string } | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -87,65 +91,35 @@ export function ProfilesTab() {
     }
   }, [refresh])
 
-  const createNew = useCallback(async () => {
-    const name = prompt('New profile name (lowercase, kebab-case):')
-    if (!name) return
-    const trimmed = name.trim()
-    if (!trimmed) return
-    setSaving(true)
-    setError(null)
-    try {
-      const body: Profile = {
-        schemaVersion: 1,
-        name: trimmed,
-        description: '',
-        orchestrator: { model: 'sonnet' },
-        agents: [
-          { id: 'sr-architect', model: 'sonnet', required: true },
-          { id: 'sr-developer', model: 'sonnet', required: true },
-          { id: 'sr-reviewer', model: 'sonnet', required: true },
-        ],
-        routing: [{ default: true, agent: 'sr-developer' }],
-      }
-      const res = await fetch(`${getApiBase()}/profiles`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? `Create failed: ${res.status}`)
-      }
-      await refresh()
-      setSelected(trimmed)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }, [refresh])
-
-  const duplicate = useCallback(
-    async (name: string) => {
-      const newName = prompt(`Duplicate "${name}" as:`, `${name}-copy`)
-      if (!newName) return
+  const doCreate = useCallback(
+    async (trimmed: string) => {
+      setCreateDialog(false)
       setSaving(true)
       setError(null)
       try {
-        const res = await fetch(
-          `${getApiBase()}/profiles/${encodeURIComponent(name)}/duplicate`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: newName.trim() }),
-          },
-        )
+        const body: Profile = {
+          schemaVersion: 1,
+          name: trimmed,
+          description: '',
+          orchestrator: { model: 'sonnet' },
+          agents: [
+            { id: 'sr-architect', model: 'sonnet', required: true },
+            { id: 'sr-developer', model: 'sonnet', required: true },
+            { id: 'sr-reviewer', model: 'sonnet', required: true },
+          ],
+          routing: [{ default: true, agent: 'sr-developer' }],
+        }
+        const res = await fetch(`${getApiBase()}/profiles`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
-          throw new Error(err.error ?? `Duplicate failed: ${res.status}`)
+          throw new Error(err.error ?? `Create failed: ${res.status}`)
         }
         await refresh()
-        setSelected(newName.trim())
+        setSelected(trimmed)
       } catch (e) {
         setError((e as Error).message)
       } finally {
@@ -155,9 +129,38 @@ export function ProfilesTab() {
     [refresh],
   )
 
-  const remove = useCallback(
+  const doDuplicate = useCallback(
+    async (from: string, newName: string) => {
+      setDuplicateDialog(null)
+      setSaving(true)
+      setError(null)
+      try {
+        const res = await fetch(
+          `${getApiBase()}/profiles/${encodeURIComponent(from)}/duplicate`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: newName }),
+          },
+        )
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error ?? `Duplicate failed: ${res.status}`)
+        }
+        await refresh()
+        setSelected(newName)
+      } catch (e) {
+        setError((e as Error).message)
+      } finally {
+        setSaving(false)
+      }
+    },
+    [refresh],
+  )
+
+  const doRemove = useCallback(
     async (name: string) => {
-      if (!confirm(`Delete profile "${name}"? This cannot be undone.`)) return
+      setDeleteDialog(null)
       setSaving(true)
       setError(null)
       try {
@@ -178,6 +181,10 @@ export function ProfilesTab() {
     },
     [refresh],
   )
+
+  const createNew = useCallback(() => setCreateDialog(true), [])
+  const duplicate = useCallback((name: string) => setDuplicateDialog({ from: name }), [])
+  const remove = useCallback((name: string) => setDeleteDialog({ name }), [])
 
   const save = useCallback(async (profile: Profile) => {
     setSaving(true)
@@ -224,6 +231,47 @@ export function ProfilesTab() {
     [],
   )
 
+  const dialogs = (
+    <>
+      <PromptDialog
+        open={createDialog}
+        title="New profile"
+        description="Pick a lowercase kebab-case name (letters, digits, and hyphens)."
+        placeholder="my-profile"
+        confirmLabel="Create"
+        inputPattern={/^[a-z0-9][a-z0-9-]*$/}
+        inputInvalidHint="Must start with a letter or digit and contain only lowercase letters, digits, and hyphens."
+        onConfirm={(v) => void doCreate(v)}
+        onCancel={() => setCreateDialog(false)}
+      />
+      {duplicateDialog && (
+        <PromptDialog
+          open={true}
+          title={`Duplicate "${duplicateDialog.from}"`}
+          description="Name for the new profile."
+          placeholder={`${duplicateDialog.from}-copy`}
+          initialValue={`${duplicateDialog.from}-copy`}
+          confirmLabel="Duplicate"
+          inputPattern={/^[a-z0-9][a-z0-9-]*$/}
+          inputInvalidHint="Lowercase kebab-case only."
+          onConfirm={(v) => void doDuplicate(duplicateDialog.from, v)}
+          onCancel={() => setDuplicateDialog(null)}
+        />
+      )}
+      {deleteDialog && (
+        <ConfirmDialog
+          open={true}
+          title={`Delete profile "${deleteDialog.name}"?`}
+          description="This cannot be undone. Jobs already launched with this profile keep their snapshot; future launches will fall back to the resolution order."
+          confirmLabel="Delete"
+          destructive
+          onConfirm={() => void doRemove(deleteDialog.name)}
+          onCancel={() => setDeleteDialog(null)}
+        />
+      )}
+    </>
+  )
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -234,6 +282,8 @@ export function ProfilesTab() {
 
   if (profiles.length === 0) {
     return (
+      <>
+      {dialogs}
       <div className="flex items-center justify-center h-full">
         <div className="text-center max-w-md">
           <div className="text-sm font-medium text-foreground">No profiles yet</div>
@@ -256,11 +306,13 @@ export function ProfilesTab() {
           {error && <div className="mt-3 text-xs text-red-400">{error}</div>}
         </div>
       </div>
+      </>
     )
   }
 
   return (
     <div className="flex flex-col h-full">
+      {dialogs}
       <ProfileAnalyticsCard />
       <div className="flex flex-1 min-h-0">
       {/* Left: profile list */}

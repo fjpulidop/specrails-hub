@@ -3,6 +3,7 @@ import { Save, Trash2, History, ArrowLeft, AlertCircle, FlaskConical, Loader2 } 
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
+import { ConfirmDialog } from './PromptDialog'
 
 interface AgentVersion {
   version: number
@@ -253,6 +254,7 @@ export function AgentStudio({ agentId, initialBody, initialName, onClose, onSave
     { output: string; tokens: number; durationMs: number } | null
   >(null)
   const [testError, setTestError] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
     if (isCreate || initialBody !== undefined) return
@@ -327,7 +329,7 @@ export function AgentStudio({ agentId, initialBody, initialName, onClose, onSave
 
   const remove = useCallback(async () => {
     if (isCreate) return
-    if (!confirm(`Delete agent "${agentId}"? This cannot be undone (but version history survives in the DB).`)) return
+    setConfirmDelete(false)
     setSaving(true)
     setError(null)
     try {
@@ -390,6 +392,17 @@ export function AgentStudio({ agentId, initialBody, initialName, onClose, onSave
 
   return (
     <div className="flex flex-col h-full">
+      {!isCreate && (
+        <ConfirmDialog
+          open={confirmDelete}
+          title={`Delete agent "${agentId}"?`}
+          description="This removes the .md from disk. Version history stays in the DB — use a fresh custom agent if you want to recover the body later."
+          confirmLabel="Delete"
+          destructive
+          onConfirm={remove}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
       {/* Top bar */}
       <div className="flex items-center gap-3 px-4 py-2 border-b border-border">
         <button
@@ -449,7 +462,7 @@ export function AgentStudio({ agentId, initialBody, initialName, onClose, onSave
             <Button
               size="sm"
               variant="ghost"
-              onClick={remove}
+              onClick={() => setConfirmDelete(true)}
               disabled={saving}
               className="text-red-400 hover:text-red-300"
             >

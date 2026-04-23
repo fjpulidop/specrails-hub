@@ -3,6 +3,7 @@ import { Plus, GripVertical, X, ArrowUp, ArrowDown } from 'lucide-react'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { getApiBase } from '../../lib/api'
+import { RoutingRuleDialog } from './RoutingRuleDialog'
 import {
   BASELINE_REQUIRED_AGENTS,
   MODEL_ALIASES,
@@ -32,6 +33,7 @@ export function ProfileEditor({
 }) {
   const [catalog, setCatalog] = useState<CatalogAgent[]>([])
   const [pickingAgent, setPickingAgent] = useState(false)
+  const [addRoutingPrompt, setAddRoutingPrompt] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -118,30 +120,14 @@ export function ProfileEditor({
     })
   }
 
-  const addRoutingRule = () => {
-    if (profile.agents.length === 0) return
-    const tags = prompt('Tags (comma-separated, e.g. frontend,ui):')
-    if (!tags) return
-    const agentOptions = profile.agents.map((a) => a.id).join(', ')
-    const agent = prompt(`Route to which agent?\nAvailable: ${agentOptions}`, profile.agents[0].id)
-    if (!agent) return
-    const trimmedAgent = agent.trim()
-    if (!profile.agents.some((a) => a.id === trimmedAgent)) {
-      alert(`"${trimmedAgent}" is not in this profile's agent chain. Add it first.`)
-      return
-    }
+  const addRoutingRule = (tags: string[], agent: string) => {
     update((d) => {
       const defaultRule = d.routing.pop() as RoutingDefaultRule
-      const newRule: RoutingTagRule = {
-        tags: tags
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean),
-        agent: trimmedAgent,
-      }
+      const newRule: RoutingTagRule = { tags, agent }
       d.routing.push(newRule)
       d.routing.push(defaultRule)
     })
+    setAddRoutingPrompt(false)
   }
 
   const removeRoutingRule = (idx: number) => {
@@ -165,6 +151,12 @@ export function ProfileEditor({
 
   return (
     <div className="p-6 space-y-6 max-w-3xl">
+      <RoutingRuleDialog
+        open={addRoutingPrompt}
+        chainAgents={profile.agents.map((a) => a.id)}
+        onConfirm={addRoutingRule}
+        onCancel={() => setAddRoutingPrompt(false)}
+      />
       {/* Live validation summary */}
       {validationIssues.length > 0 && (
         <div className="px-3 py-2 text-xs rounded-md border border-yellow-500/30 bg-yellow-500/10 text-yellow-500">
@@ -299,7 +291,13 @@ export function ProfileEditor({
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Routing ({profile.routing.length})
           </h2>
-          <Button size="sm" variant="ghost" onClick={addRoutingRule}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setAddRoutingPrompt(true)}
+            disabled={profile.agents.length === 0}
+            title={profile.agents.length === 0 ? 'Add at least one agent before creating routing rules' : undefined}
+          >
             <Plus className="w-3.5 h-3.5 mr-1" /> Add rule
           </Button>
         </div>
