@@ -95,7 +95,7 @@
 
 - [x] 12.1 Extend single-feature launch dialog with `ProfilePicker` preselected to the resolved default
 - [x] 12.2 Extend batch-implement launch dialog with `ProfilePicker` (single for all rails) — **per-rail overrides in the batch dialog deferred as polish**
-- [ ] 12.3 Rail header: compact profile picker for quick re-launch (read-only while running)
+- [x] 12.3 Rail header: compact profile picker (`RailProfileSelector`) — persists per rail in the rails table, hides while running, falls back to "legacy" option when the user wants no profile
 - [ ] 12.4 Submitting a launch writes `.user-preferred.json` if the selection changed — **preference is currently set only via the ⭐ in the Profiles tab**
 
 ## 13. Migration from legacy Project Settings
