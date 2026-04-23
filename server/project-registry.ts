@@ -167,6 +167,7 @@ export class ProjectRegistry {
       zombieTimeoutMs: projectZombieTimeout,
       provider: project.provider ?? 'claude',
       projectId: project.id,
+      projectSlug: project.slug,
       hubPort: this._hubPort,
       getCostAlertThreshold: () => {
         const val = getHubSetting(this._hubDb, 'cost_alert_threshold_usd')

@@ -41,6 +41,7 @@
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
+    "ajv": "^8.17.1",
     "better-sqlite3": "^12.8.0",
     "chokidar": "^5.0.0",
     "diff": "^9.0.0",

@@ -17,8 +17,16 @@ import type { CommandInfo } from './config'
 export function buildTelemetryEnv(
   jobId: string,
   projectId: string,
-  hubPort: number
+  hubPort: number,
+  extraResourceAttributes: Record<string, string | number> = {},
 ): Record<string, string> {
+  const baseAttrs: Array<[string, string]> = [
+    ['specrails.job_id', jobId],
+    ['specrails.project_id', projectId],
+  ]
+  for (const [k, v] of Object.entries(extraResourceAttributes)) {
+    baseAttrs.push([k, String(v)])
+  }
   return {
     CLAUDE_CODE_ENABLE_TELEMETRY: '1',
     OTEL_EXPORTER_OTLP_ENDPOINT: `http://127.0.0.1:${hubPort}/otlp`,
@@ -26,7 +34,7 @@ export function buildTelemetryEnv(
     OTEL_METRICS_EXPORTER: 'otlp',
     OTEL_LOGS_EXPORTER: 'otlp',
     OTEL_TRACES_EXPORTER: 'otlp',
-    OTEL_RESOURCE_ATTRIBUTES: `specrails.job_id=${jobId},specrails.project_id=${projectId}`,
+    OTEL_RESOURCE_ATTRIBUTES: baseAttrs.map(([k, v]) => `${k}=${v}`).join(','),
   }
 }
 
@@ -109,6 +117,10 @@ const TERMINAL_STATUSES = new Set(['completed', 'failed', 'canceled', 'zombie_te
 export interface EnqueueOptions {
   dependsOnJobId?: string
   pipelineId?: string
+  /** Agent profile name to apply for this spawn. If omitted, the QueueManager
+   *  resolves via .user-preferred.json → default. Pass null to force legacy
+   *  mode (no profile), even if a default exists. */
+  profileName?: string | null
 }
 
 // ─── QueueManager ─────────────────────────────────────────────────────────────
@@ -140,6 +152,10 @@ export class QueueManager {
   private _projectId: string | null
   /** Hub port used to construct the OTLP endpoint URL for env injection */
   private _hubPort: number
+  /** Project slug used for per-job profile snapshots (hub mode only) */
+  private _projectSlug: string | null
+  /** Pending profile selection keyed by jobId — read at spawn time */
+  private _jobProfileSelection: Map<string, string | null>
 
   constructor(
     broadcast: (msg: WsMessage) => void,
@@ -156,6 +172,9 @@ export class QueueManager {
       onJobFinished?: (jobId: string, status: Job['status'], costUsd?: number) => void
       projectId?: string
       hubPort?: number
+      /** Project slug used to locate per-job profile snapshots at
+       *  ~/.specrails/projects/<slug>/jobs/<jobId>/profile.json */
+      projectSlug?: string
     }
   ) {
     this._queue = []
@@ -180,6 +199,8 @@ export class QueueManager {
     this._onJobFinished = options?.onJobFinished ?? null
     this._projectId = options?.projectId ?? null
     this._hubPort = options?.hubPort ?? 4200
+    this._projectSlug = options?.projectSlug ?? null
+    this._jobProfileSelection = new Map()
 
     const envTimeout = process.env.WM_ZOMBIE_TIMEOUT_MS !== undefined
       ? parseInt(process.env.WM_ZOMBIE_TIMEOUT_MS, 10)
@@ -239,6 +260,12 @@ export class QueueManager {
     }
 
     this._jobs.set(id, job)
+
+    // Record profile selection (if provided) so spawn time can pick it up.
+    // `undefined` means "use default resolution"; `null` means "force legacy".
+    if (resolvedOpts && 'profileName' in resolvedOpts) {
+      this._jobProfileSelection.set(id, resolvedOpts.profileName ?? null)
+    }
 
     // Insert at the correct position based on priority (higher priority first, FIFO within same level)
     const weight = PRIORITY_WEIGHT[priority]
@@ -508,6 +535,38 @@ export class QueueManager {
       args.push('-p', commandToRun)
     }
 
+    // Resolve agent profile (if any) and snapshot per-job before spawn.
+    // Hub mode only (projectId + projectSlug + cwd all present).
+    // Profile injection is skipped in codex mode.
+    let profileSnapshotPath: string | null = null
+    let profileName: string | null = null
+    if (this._provider === 'claude' && this._projectId && this._projectSlug && this._cwd) {
+      try {
+        const selection = this._jobProfileSelection.get(jobId) // undefined|null|string
+        this._jobProfileSelection.delete(jobId)
+        if (selection !== null) {
+          // selection is string (explicit) or undefined (default resolution)
+          const {
+            resolveProfile,
+            snapshotForJob,
+            persistJobProfile,
+          } = require('./profile-manager') as typeof import('./profile-manager')
+          const resolved = resolveProfile(this._cwd, selection ?? undefined)
+          if (resolved) {
+            profileSnapshotPath = snapshotForJob(this._projectSlug, jobId, resolved)
+            profileName = resolved.name
+            if (this._db) {
+              persistJobProfile(this._db, jobId, resolved)
+            }
+          }
+        }
+      } catch (err) {
+        // Profile resolution failures are non-fatal — rail falls back to
+        // legacy behavior. The error is visible in logs for debugging.
+        console.warn(`[queue-manager] profile resolution failed for job ${jobId}: ${(err as Error).message}`)
+      }
+    }
+
     // Read pipelineTelemetryEnabled at spawn time (not constructor time) so
     // toggling the setting takes effect on the next job without restarting.
     // Only inject for claude provider in hub mode (projectId is only set there).
@@ -515,11 +574,18 @@ export class QueueManager {
     if (this._provider === 'claude' && this._projectId && this._db) {
       const settings = getProjectSettings(this._db)
       if (settings.pipelineTelemetryEnabled) {
+        const extra: Record<string, string> = {}
+        if (profileName) extra['specrails.profile_name'] = profileName
+        if (profileName) extra['specrails.profile_schema_version'] = '1'
         spawnEnv = {
           ...process.env,
-          ...buildTelemetryEnv(jobId, this._projectId, this._hubPort),
+          ...buildTelemetryEnv(jobId, this._projectId, this._hubPort, extra),
         }
       }
+    }
+    // Inject the profile path for claude even when telemetry is off.
+    if (profileSnapshotPath) {
+      spawnEnv = { ...spawnEnv, SPECRAILS_PROFILE_PATH: profileSnapshotPath }
     }
 
     const child = spawn(binary, args, {

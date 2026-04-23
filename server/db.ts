@@ -253,6 +253,46 @@ const MIGRATIONS: Migration[] = [
       );
     `)
   },
+
+  // Migration 11: agent profiles — per-rail profile snapshots, custom agent
+  // version history, and sandboxed "test agent" run records. These back the
+  // Agents section (profiles + studio) added by add-agents-profiles.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS job_profiles (
+        job_id        TEXT    PRIMARY KEY,
+        profile_name  TEXT    NOT NULL,
+        profile_json  TEXT    NOT NULL,
+        created_at    INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_job_profiles_name ON job_profiles(profile_name);
+
+      CREATE TABLE IF NOT EXISTS agent_versions (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_name   TEXT    NOT NULL,
+        version      INTEGER NOT NULL,
+        body         TEXT    NOT NULL,
+        created_at   INTEGER NOT NULL,
+        UNIQUE (agent_name, version)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_agent_versions_name ON agent_versions(agent_name);
+
+      CREATE TABLE IF NOT EXISTS agent_tests (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_name     TEXT    NOT NULL,
+        draft_hash     TEXT    NOT NULL,
+        sample_task_id TEXT,
+        tokens         INTEGER,
+        duration_ms    INTEGER,
+        output         TEXT,
+        created_at     INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_agent_tests_name ON agent_tests(agent_name);
+    `)
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {

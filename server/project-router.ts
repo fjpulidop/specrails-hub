@@ -37,6 +37,7 @@ import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import multer from 'multer'
 import { createRailsRouter } from './rails-router'
+import { createProfilesRouter } from './profiles-router'
 import { attachmentManager, SUPPORTED_MIME_TYPES, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
 import {
   getTerminalManager,
@@ -240,6 +241,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   // Mount rails router under each project
   const railsRouter = createRailsRouter()
   router.use('/:projectId/rails', railsRouter)
+
+  // Mount profiles router under each project (agent profiles)
+  const profilesRouter = createProfilesRouter()
+  router.use('/:projectId/profiles', profilesRouter)
 
   // ─── Queue / Spawn routes ────────────────────────────────────────────────────
 
