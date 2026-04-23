@@ -109,7 +109,16 @@ export function ProfileEditor({
 
   const addAgent = (id: string) => {
     update((d) => {
-      d.agents.push({ id, model: 'sonnet' })
+      // Insert the new agent before sr-merge-resolver if present, otherwise
+      // just append. Keeps merge-resolver pinned at the last position
+      // without requiring a manual reorder after every add.
+      const mergeIdx = d.agents.findIndex((a) => a.id === 'sr-merge-resolver')
+      const row: ProfileAgent = { id, model: 'sonnet' }
+      if (mergeIdx >= 0) {
+        d.agents.splice(mergeIdx, 0, row)
+      } else {
+        d.agents.push(row)
+      }
     })
     setPickingAgent(false)
   }
