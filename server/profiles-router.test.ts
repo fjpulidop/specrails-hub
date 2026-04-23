@@ -118,11 +118,19 @@ describe('POST /profiles', () => {
     expect(res.body.error).toContain('validation')
   })
 
-  it('rejects a profile missing the baseline trio', async () => {
-    const bad = baseProfile('broken')
+  it('rejects the default profile when baseline is missing', async () => {
+    const bad = baseProfile('default')
     bad.agents = bad.agents.filter((a) => a.id !== 'sr-reviewer')
     const res = await request(app).post('/api/projects/proj-test/profiles').send(bad)
     expect(res.status).toBe(400)
+  })
+
+  it('allows a custom profile to omit baseline agents', async () => {
+    const custom = baseProfile('lean')
+    custom.agents = [{ id: 'sr-developer', required: false }]
+    custom.routing = []
+    const res = await request(app).post('/api/projects/proj-test/profiles').send(custom)
+    expect(res.status).toBe(201)
   })
 
   it('returns 409 when the name already exists', async () => {

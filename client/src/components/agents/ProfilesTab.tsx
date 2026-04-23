@@ -370,17 +370,22 @@ export function ProfilesTab() {
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span className="truncate font-medium">{p.name}</span>
                   {p.isDefault && (
-                    <span className="text-[10px] text-muted-foreground">(default)</span>
+                    <span className="text-[10px] text-muted-foreground">(team default)</span>
                   )}
                   {isPreferred && (
-                    <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                    <span
+                      className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-yellow-500/15 text-yellow-500 flex-shrink-0"
+                      title="This profile is your personal default — preselected when you open a launch dialog."
+                    >
+                      <Star className="w-2.5 h-2.5 fill-yellow-500" /> mine
+                    </span>
                   )}
                 </div>
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     type="button"
                     className="p-1 hover:bg-accent rounded"
-                    title="Set as my preferred"
+                    title="Set as my personal default — preselected for me at launch time (other devs keep the team default)"
                     onClick={(e) => {
                       e.stopPropagation()
                       void markPreferred(p.name)

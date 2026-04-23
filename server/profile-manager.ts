@@ -114,20 +114,46 @@ function assertValidName(name: string): void {
 // ─── Structural extra checks (beyond JSON schema) ────────────────────────────
 
 function validateStructural(profile: Profile): void {
-  // Exactly one default routing rule, and it must be last.
+  // Custom profiles (non-default) may omit routing entirely, or include any
+  // combination of rules — maximum flexibility. When rules exist we only
+  // enforce soft structural invariants:
+  //   - at most one `default: true` terminal rule
+  //   - if a default rule exists, it is the last element
+  //   - every rule's agent target is present in agents[]
   const defaults = profile.routing.filter((r): r is ProfileRoutingDefaultRule =>
     'default' in r && r.default === true,
   )
-  if (defaults.length !== 1) {
+  if (defaults.length > 1) {
     throw new ProfileValidationError([
-      `routing must contain exactly one entry with 'default: true' (found ${defaults.length})`,
+      `routing may contain at most one entry with 'default: true' (found ${defaults.length})`,
     ])
   }
-  const last = profile.routing[profile.routing.length - 1]
-  if (!('default' in last) || last.default !== true) {
-    throw new ProfileValidationError([
-      "the 'default: true' routing rule must be the last element of 'routing'",
-    ])
+  if (defaults.length === 1 && profile.routing.length > 0) {
+    const last = profile.routing[profile.routing.length - 1]
+    if (!('default' in last) || last.default !== true) {
+      throw new ProfileValidationError([
+        "when a 'default: true' routing rule exists it must be the last element of 'routing'",
+      ])
+    }
+  }
+  const agentIds = new Set(profile.agents.map((a) => a.id))
+  for (const rule of profile.routing) {
+    if (!agentIds.has(rule.agent)) {
+      throw new ProfileValidationError([
+        `routing references agent '${rule.agent}' which is not in this profile's chain`,
+      ])
+    }
+  }
+  // The shipped `default` profile is additionally expected to include the
+  // baseline quartet. Custom profiles skip this check.
+  if (profile.name === 'default' || profile.name === 'project-default') {
+    const baseline = ['sr-architect', 'sr-developer', 'sr-reviewer', 'sr-merge-resolver']
+    const missing = baseline.filter((id) => !agentIds.has(id))
+    if (missing.length > 0) {
+      throw new ProfileValidationError([
+        `the default profile must include baseline agents: missing ${missing.join(', ')}`,
+      ])
+    }
   }
 }
 

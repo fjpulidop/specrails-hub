@@ -77,9 +77,34 @@ describe('validateProfile', () => {
     expect(() => validateProfile(p)).toThrow(ProfileValidationError)
   })
 
-  it('rejects routing without a terminal default rule', () => {
-    const p = baseProfile()
+  it('accepts routing without a terminal default rule on custom profiles', () => {
+    const p = baseProfile('custom-x')
     p.routing = [{ tags: ['frontend'], agent: 'sr-developer' }]
+    expect(() => validateProfile(p)).not.toThrow()
+  })
+
+  it('accepts empty routing on custom profiles', () => {
+    const p = baseProfile('custom-x')
+    p.routing = []
+    expect(() => validateProfile(p)).not.toThrow()
+  })
+
+  it('rejects routing with missing baseline on the default profile', () => {
+    const p = baseProfile('default')
+    p.agents = p.agents.filter((a) => a.id !== 'sr-merge-resolver')
+    expect(() => validateProfile(p)).toThrow(ProfileValidationError)
+  })
+
+  it('allows custom profiles to drop baseline agents entirely', () => {
+    const p = baseProfile('lean-only')
+    p.agents = [{ id: 'sr-developer', required: false }]
+    p.routing = []
+    expect(() => validateProfile(p)).not.toThrow()
+  })
+
+  it('rejects routing that targets an agent not in the chain', () => {
+    const p = baseProfile('custom-x')
+    p.routing = [{ tags: ['etl'], agent: 'sr-ghost' }]
     expect(() => validateProfile(p)).toThrow(ProfileValidationError)
   })
 
