@@ -13,8 +13,10 @@ interface AgentVersion {
 interface Props {
   /** Existing agent id (e.g. `custom-qa`) when editing; omit for create mode. */
   agentId?: string
-  /** Optional initial body (used by "Duplicate" to prefill). */
+  /** Optional initial body (used by "Duplicate" / "Generate" to prefill). */
   initialBody?: string
+  /** Optional initial name for create mode (used by Generate flow). */
+  initialName?: string
   onClose: () => void
   onSaved?: (id: string) => void
 }
@@ -47,9 +49,9 @@ You are ...
 - **focus_areas**: ...
 `
 
-export function AgentStudio({ agentId, initialBody, onClose, onSaved }: Props) {
+export function AgentStudio({ agentId, initialBody, initialName, onClose, onSaved }: Props) {
   const isCreate = !agentId
-  const [id, setId] = useState(agentId ?? '')
+  const [id, setId] = useState(agentId ?? initialName ?? '')
   const [body, setBody] = useState(initialBody ?? BLANK_TEMPLATE)
   const [loading, setLoading] = useState(!isCreate && !initialBody)
   const [saving, setSaving] = useState(false)

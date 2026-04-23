@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Pencil, Copy } from 'lucide-react'
+import { Plus, Pencil, Copy, Sparkles, Loader2 } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
+import { Input } from '../ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { AgentStudio } from './AgentStudio'
 
 interface CatalogAgent {
@@ -13,7 +15,7 @@ interface CatalogAgent {
 
 type StudioMode =
   | { kind: 'closed' }
-  | { kind: 'create' }
+  | { kind: 'create'; initialBody?: string; initialName?: string }
   | { kind: 'edit'; agentId: string }
   | { kind: 'duplicate'; from: string; initialBody: string }
 
@@ -25,6 +27,11 @@ export function AgentsCatalogTab() {
   const [bodyLoading, setBodyLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [studio, setStudio] = useState<StudioMode>({ kind: 'closed' })
+  const [generateOpen, setGenerateOpen] = useState(false)
+  const [genName, setGenName] = useState('')
+  const [genDescription, setGenDescription] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
 
   const refresh = useCallback(() => {
     let cancelled = false
@@ -97,7 +104,14 @@ export function AgentsCatalogTab() {
     return (
       <AgentStudio
         agentId={studio.kind === 'edit' ? studio.agentId : undefined}
-        initialBody={studio.kind === 'duplicate' ? studio.initialBody : undefined}
+        initialBody={
+          studio.kind === 'duplicate'
+            ? studio.initialBody
+            : studio.kind === 'create'
+              ? studio.initialBody
+              : undefined
+        }
+        initialName={studio.kind === 'create' ? studio.initialName : undefined}
         onClose={() => setStudio({ kind: 'closed' })}
         onSaved={(id) => {
           setSelectedId(id)
@@ -106,6 +120,115 @@ export function AgentsCatalogTab() {
         }}
       />
     )
+  }
+
+  const renderGenerateDialog = () => (
+    <Dialog
+      open={generateOpen}
+      onOpenChange={(o) => {
+        if (!o && !generating) {
+          setGenerateOpen(false)
+          setGenError(null)
+        }
+      }}
+    >
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-dracula-purple" /> Generate a custom agent
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">
+              Agent id
+            </label>
+            <Input
+              value={genName}
+              onChange={(e) => setGenName(e.target.value)}
+              placeholder="custom-my-agent"
+              className="text-sm font-mono"
+              disabled={generating}
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Must start with <code>custom-</code>.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">
+              Describe what this agent should do
+            </label>
+            <textarea
+              value={genDescription}
+              onChange={(e) => setGenDescription(e.target.value)}
+              placeholder="e.g. Review Terraform/IaC changes and flag security misconfigurations, excessive IAM permissions, and public S3 buckets before merging. Conservative and terse."
+              className="w-full text-sm p-2 rounded border border-border bg-background min-h-[120px] resize-y"
+              disabled={generating}
+            />
+          </div>
+          {genError && (
+            <div className="px-3 py-2 text-xs rounded border border-red-500/30 bg-red-500/10 text-red-400">
+              {genError}
+            </div>
+          )}
+          <p className="text-[11px] text-muted-foreground">
+            Claude will draft a full <code>.md</code> body. You'll review it in the Studio and
+            can edit before saving. This spawns a one-shot claude invocation and can take up to
+            90 seconds.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setGenerateOpen(false)}
+            disabled={generating}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={runGenerate}
+            disabled={generating || !genName.trim() || !genDescription.trim()}
+          >
+            {generating ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Generating…
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Generate
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+
+  const runGenerate = async () => {
+    setGenerating(true)
+    setGenError(null)
+    try {
+      const res = await fetch(`${getApiBase()}/profiles/catalog/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: genName.trim(), description: genDescription.trim() }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error ?? `Generate failed: ${res.status}`)
+      }
+      const data = (await res.json()) as { draft: string }
+      // Close modal, open Studio in create mode with the draft
+      setGenerateOpen(false)
+      setStudio({ kind: 'create', initialBody: data.draft, initialName: genName.trim() })
+      // Don't reset the fields until the Studio closes, in case user wants to retry
+    } catch (e) {
+      setGenError((e as Error).message)
+    } finally {
+      setGenerating(false)
+    }
   }
 
   const duplicate = async (fromId: string) => {
@@ -121,18 +244,26 @@ export function AgentsCatalogTab() {
 
   if (agents.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center max-w-sm">
-          <div className="text-sm font-medium text-foreground">No agents installed</div>
-          <div className="text-xs text-muted-foreground mt-1 mb-4">
-            Run <code className="text-foreground">npx specrails-core@latest update</code> in this
-            project to install the upstream agents, or create a custom agent now.
+      <>
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center max-w-sm">
+            <div className="text-sm font-medium text-foreground">No agents installed</div>
+            <div className="text-xs text-muted-foreground mt-1 mb-4">
+              Run <code className="text-foreground">npx specrails-core@latest update</code> in this
+              project to install the upstream agents, or create a custom agent now.
+            </div>
+            <div className="flex gap-2 justify-center">
+              <Button size="sm" onClick={() => setGenerateOpen(true)}>
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Generate with Claude
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setStudio({ kind: 'create' })}>
+                <Plus className="w-3.5 h-3.5 mr-1.5" /> Blank
+              </Button>
+            </div>
           </div>
-          <Button size="sm" onClick={() => setStudio({ kind: 'create' })}>
-            <Plus className="w-3.5 h-3.5 mr-1.5" /> New custom agent
-          </Button>
         </div>
-      </div>
+        {renderGenerateDialog()}
+      </>
     )
   }
 
@@ -141,14 +272,21 @@ export function AgentsCatalogTab() {
   const selected = agents.find((a) => a.id === selectedId)
 
   return (
+    <>
+    {renderGenerateDialog()}
     <div className="flex h-full">
       {/* Left: list grouped by kind */}
       <aside className="w-72 flex-shrink-0 border-r border-border flex flex-col">
         <div className="px-2 py-2 border-b border-border flex items-center justify-between">
           <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Catalog</span>
-          <Button size="sm" variant="ghost" onClick={() => setStudio({ kind: 'create' })}>
-            <Plus className="w-3.5 h-3.5 mr-1" /> New
-          </Button>
+          <div className="flex gap-1">
+            <Button size="sm" variant="ghost" onClick={() => setGenerateOpen(true)} title="Generate with Claude">
+              <Sparkles className="w-3.5 h-3.5 mr-1" /> Generate
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setStudio({ kind: 'create' })}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> New
+            </Button>
+          </div>
         </div>
         <div className="flex-1 overflow-auto p-2">
           <Section
@@ -238,6 +376,7 @@ export function AgentsCatalogTab() {
         )}
       </main>
     </div>
+    </>
   )
 }
 

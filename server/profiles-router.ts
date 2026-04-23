@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { Router, Request, Response } from 'express'
 import type { ProjectContext } from './project-registry'
+import { generateCustomAgent } from './agent-generator'
 import {
   createProfile,
   deleteProfile,
@@ -381,6 +382,30 @@ export function createProfilesRouter(): Router {
       fs.unlinkSync(file)
       broadcast({ type: 'agent.changed', projectId: project.id, id: agentId, deleted: true } as never)
       res.json({ ok: true })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // POST /api/projects/:projectId/profiles/catalog/generate
+  // Generate a draft custom agent body via a one-shot claude spawn.
+  // Body: { name: string, description: string }
+  // Returns { draft: string } — caller (the Studio UI) previews and optionally saves.
+  router.post('/catalog/generate', async (req, res) => {
+    try {
+      const { project } = ctx(req)
+      const name = (req.body?.name ?? '').toString().trim()
+      const description = (req.body?.description ?? '').toString().trim()
+      if (!/^custom-[a-z0-9][a-z0-9-]*$/.test(name)) {
+        res.status(400).json({ error: "name must match ^custom-[a-z0-9][a-z0-9-]*$" })
+        return
+      }
+      if (!description) {
+        res.status(400).json({ error: 'description is required' })
+        return
+      }
+      const draft = await generateCustomAgent(project.path, { name, description })
+      res.json({ draft })
     } catch (err) {
       handleError(res, err)
     }
