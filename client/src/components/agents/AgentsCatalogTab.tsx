@@ -320,17 +320,40 @@ export function AgentsCatalogTab() {
     <div className="flex h-full">
       {/* Left: list grouped by kind */}
       <aside className="w-72 flex-shrink-0 border-r border-border flex flex-col">
-        <div className="px-2 py-2 border-b border-border flex items-center justify-between">
-          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Catalog</span>
+        <div className="px-3 py-2 border-b border-border">
+          <div className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1.5">
+            Catalog
+          </div>
+          <div className="text-[10px] text-muted-foreground/70 mb-2">
+            Create a custom agent:
+          </div>
           <div className="flex gap-1">
-            <Button size="sm" variant="ghost" onClick={() => setTemplatesOpen(true)} title="Start from a template">
-              <FileText className="w-3.5 h-3.5 mr-1" /> Template
+            <Button
+              size="sm"
+              variant="ghost"
+              className="flex-1 h-7 text-[11px] px-2"
+              onClick={() => setTemplatesOpen(true)}
+              title="Start from a template"
+            >
+              <FileText className="w-3 h-3 mr-1" /> Template
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setGenerateOpen(true)} title="Generate with Claude">
-              <Sparkles className="w-3.5 h-3.5 mr-1" /> Generate
+            <Button
+              size="sm"
+              variant="ghost"
+              className="flex-1 h-7 text-[11px] px-2"
+              onClick={() => setGenerateOpen(true)}
+              title="Generate with Claude"
+            >
+              <Sparkles className="w-3 h-3 mr-1" /> Generate
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setStudio({ kind: 'create' })}>
-              <Plus className="w-3.5 h-3.5 mr-1" /> Blank
+            <Button
+              size="sm"
+              variant="ghost"
+              className="flex-1 h-7 text-[11px] px-2"
+              onClick={() => setStudio({ kind: 'create' })}
+              title="Start from a blank template"
+            >
+              <Plus className="w-3 h-3 mr-1" /> Blank
             </Button>
           </div>
         </div>
