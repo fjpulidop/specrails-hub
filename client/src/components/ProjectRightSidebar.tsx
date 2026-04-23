@@ -3,12 +3,15 @@ import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, Briefcase, BarChart3, Bot, Settings, PanelRight } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useSidebarPin } from '../context/SidebarPinContext'
+import { FEATURE_AGENTS_SECTION } from '../lib/feature-flags'
 
 const navItems = [
   { to: '/', end: true, icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/jobs', end: false, icon: Briefcase, label: 'Jobs' },
   { to: '/analytics', end: false, icon: BarChart3, label: 'Analytics' },
-  { to: '/agents', end: false, icon: Bot, label: 'Agents' },
+  ...(FEATURE_AGENTS_SECTION
+    ? [{ to: '/agents', end: false, icon: Bot, label: 'Agents' }]
+    : []),
   { to: '/settings', end: false, icon: Settings, label: 'Settings' },
 ]
 

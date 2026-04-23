@@ -7,3 +7,11 @@ export const FEATURE_TERMINAL_PANEL = (() => {
   if (typeof override === 'string') return override !== 'false'
   return true
 })()
+
+/** Gates the Agents section (sidebar entry + /agents route). Default ON. */
+export const FEATURE_AGENTS_SECTION = (() => {
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+  const override = env?.VITE_FEATURE_AGENTS_SECTION
+  if (typeof override === 'string') return override !== 'false'
+  return true
+})()

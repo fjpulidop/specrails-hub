@@ -234,13 +234,15 @@ export interface DiagnosticZipOpts {
   blob: TelemetryBlobRow
   summaries: TelemetrySummaryRow[]
   events: EventRow[]
+  /** Optional profile snapshot the job ran with (from job_profiles). */
+  profile?: { name: string; json: string } | null
 }
 
 export async function createDiagnosticZip(
   res: ServerResponse,
   opts: DiagnosticZipOpts
 ): Promise<void> {
-  const { job, blob, summaries, events } = opts
+  const { job, blob, summaries, events, profile } = opts
   const entries: ZipEntry[] = []
 
   // job-metadata.json
@@ -262,8 +264,16 @@ export async function createDiagnosticZip(
   }
   entries.push({
     name: 'job-metadata.json',
-    data: Buffer.from(JSON.stringify(metadata, null, 2), 'utf-8'),
+    data: Buffer.from(JSON.stringify({ ...metadata, profile_name: profile?.name ?? null }, null, 2), 'utf-8'),
   })
+
+  // profile.json — the snapshot the job ran under (if any)
+  if (profile && profile.json) {
+    entries.push({
+      name: 'profile.json',
+      data: Buffer.from(profile.json, 'utf-8'),
+    })
+  }
 
   // telemetry.ndjson
   let truncated = false

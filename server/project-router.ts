@@ -2194,11 +2194,16 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       res.setHeader('Content-Type', 'application/zip')
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
 
+      const profileRow = db
+        .prepare(`SELECT profile_name, profile_json FROM job_profiles WHERE job_id = ?`)
+        .get(jobId) as { profile_name: string; profile_json: string } | undefined
+
       await createDiagnosticZip(res, {
         job,
         blob,
         summaries,
         events,
+        profile: profileRow ? { name: profileRow.profile_name, json: profileRow.profile_json } : null,
       })
     } catch (err) {
       if (!res.headersSent) {
