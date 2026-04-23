@@ -118,16 +118,15 @@ describe('POST /profiles', () => {
     expect(res.body.error).toContain('validation')
   })
 
-  it('rejects the default profile when baseline is missing', async () => {
-    const bad = baseProfile('default')
+  it('rejects any profile when baseline is missing', async () => {
+    const bad = baseProfile('custom-bad')
     bad.agents = bad.agents.filter((a) => a.id !== 'sr-reviewer')
     const res = await request(app).post('/api/projects/proj-test/profiles').send(bad)
     expect(res.status).toBe(400)
   })
 
-  it('allows a custom profile to omit baseline agents', async () => {
+  it('accepts a custom profile with baseline + optional agents + empty routing', async () => {
     const custom = baseProfile('lean')
-    custom.agents = [{ id: 'sr-developer', required: false }]
     custom.routing = []
     const res = await request(app).post('/api/projects/proj-test/profiles').send(custom)
     expect(res.status).toBe(201)
@@ -219,31 +218,6 @@ describe('POST /profiles/:name/rename', () => {
   })
 })
 
-describe('user-preferred (GET/PUT /profiles/active)', () => {
-  it('reads null when nothing set', async () => {
-    const res = await request(app).get('/api/projects/proj-test/profiles/active')
-    expect(res.status).toBe(200)
-    expect(res.body.preferred).toBeNull()
-  })
-
-  it('sets and reads preferred', async () => {
-    await request(app).post('/api/projects/proj-test/profiles').send(baseProfile('default'))
-    const put = await request(app)
-      .put('/api/projects/proj-test/profiles/active')
-      .send({ profile: 'default' })
-    expect(put.status).toBe(200)
-    const get = await request(app).get('/api/projects/proj-test/profiles/active')
-    expect(get.body.preferred?.profile).toBe('default')
-  })
-
-  it('400 when profile name missing', async () => {
-    const res = await request(app)
-      .put('/api/projects/proj-test/profiles/active')
-      .send({})
-    expect(res.status).toBe(400)
-  })
-})
-
 describe('GET /profiles/resolve', () => {
   it('returns null when no profiles exist', async () => {
     const res = await request(app).get('/api/projects/proj-test/profiles/resolve')
@@ -251,7 +225,7 @@ describe('GET /profiles/resolve', () => {
     expect(res.body.resolved).toBeNull()
   })
 
-  it('resolves to default when no explicit or preferred', async () => {
+  it('resolves to default when no explicit profile is passed', async () => {
     await request(app).post('/api/projects/proj-test/profiles').send(baseProfile('default'))
     const res = await request(app).get('/api/projects/proj-test/profiles/resolve')
     expect(res.body.resolved.name).toBe('default')

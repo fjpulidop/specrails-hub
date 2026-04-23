@@ -12,12 +12,10 @@ import {
   deleteProfile,
   duplicateProfile,
   getProfile,
-  getUserPreferred,
   listProfiles,
   persistJobProfile,
   renameProfile,
   resolveProfile,
-  setUserPreferred,
   snapshotForJob,
   updateProfile,
   validateProfile,
@@ -77,29 +75,29 @@ describe('validateProfile', () => {
     expect(() => validateProfile(p)).toThrow(ProfileValidationError)
   })
 
-  it('accepts routing without a terminal default rule on custom profiles', () => {
+  it('accepts routing without a terminal default rule (rule is optional)', () => {
     const p = baseProfile('custom-x')
     p.routing = [{ tags: ['frontend'], agent: 'sr-developer' }]
     expect(() => validateProfile(p)).not.toThrow()
   })
 
-  it('accepts empty routing on custom profiles', () => {
+  it('accepts empty routing on any profile', () => {
     const p = baseProfile('custom-x')
     p.routing = []
     expect(() => validateProfile(p)).not.toThrow()
   })
 
-  it('rejects routing with missing baseline on the default profile', () => {
-    const p = baseProfile('default')
+  it('rejects any profile missing sr-merge-resolver from baseline', () => {
+    const p = baseProfile('custom-x')
     p.agents = p.agents.filter((a) => a.id !== 'sr-merge-resolver')
     expect(() => validateProfile(p)).toThrow(ProfileValidationError)
   })
 
-  it('allows custom profiles to drop baseline agents entirely', () => {
+  it('rejects custom profiles that drop any baseline agent', () => {
     const p = baseProfile('lean-only')
     p.agents = [{ id: 'sr-developer', required: false }]
     p.routing = []
-    expect(() => validateProfile(p)).not.toThrow()
+    expect(() => validateProfile(p)).toThrow(ProfileValidationError)
   })
 
   it('rejects routing that targets an agent not in the chain', () => {
@@ -178,23 +176,16 @@ describe('CRUD', () => {
     expect(() => createProfile(projectRoot, p)).toThrow(ProfileValidationError)
   })
 
-  it('skips .user-preferred.json when listing', () => {
+  it('skips hidden metadata files when listing', () => {
     createProfile(projectRoot, baseProfile('default'))
-    setUserPreferred(projectRoot, 'default')
+    fs.mkdirSync(path.join(projectRoot, '.specrails/profiles'), { recursive: true })
+    fs.writeFileSync(
+      path.join(projectRoot, '.specrails/profiles/.user-preferred.json'),
+      JSON.stringify({ profile: 'default' }, null, 2) + '\n',
+      'utf8',
+    )
     const names = listProfiles(projectRoot).map((p) => p.name)
     expect(names).not.toContain('.user-preferred')
-  })
-})
-
-describe('user preference', () => {
-  it('setUserPreferred creates gitignored file', () => {
-    createProfile(projectRoot, baseProfile('default'))
-    setUserPreferred(projectRoot, 'default')
-    const file = path.join(projectRoot, '.specrails/profiles/.user-preferred.json')
-    expect(fs.existsSync(file)).toBe(true)
-    expect(getUserPreferred(projectRoot)?.profile).toBe('default')
-    const gitignore = fs.readFileSync(path.join(projectRoot, '.gitignore'), 'utf8')
-    expect(gitignore).toContain('.specrails/profiles/.user-preferred.json')
   })
 })
 
@@ -209,13 +200,7 @@ describe('resolveProfile', () => {
     expect(r?.name).toBe('data-heavy')
   })
 
-  it('falls back to user preference when no explicit', () => {
-    setUserPreferred(projectRoot, 'data-heavy')
-    const r = resolveProfile(projectRoot)
-    expect(r?.name).toBe('data-heavy')
-  })
-
-  it('falls back to default when no preference', () => {
+  it('falls back to default when no explicit', () => {
     const r = resolveProfile(projectRoot)
     expect(r?.name).toBe('default')
   })
