@@ -32,15 +32,15 @@ describe('resolveCommand', () => {
 
   it('returns command as-is when command file does not exist', () => {
     const dir = createTempDir()
-    const result = resolveCommand('/sr:missing-command hello', dir)
-    expect(result).toBe('/sr:missing-command hello')
+    const result = resolveCommand('/specrails:missing-command hello', dir)
+    expect(result).toBe('/specrails:missing-command hello')
   })
 
   it('reads command file, strips frontmatter, substitutes $ARGUMENTS', () => {
     const dir = createTempDir()
     writeCommandFile(
       dir,
-      '.claude/commands/sr/test.md',
+      '.claude/commands/specrails/test.md',
       `---
 description: Test command
 ---
@@ -50,7 +50,7 @@ You are helping with: $ARGUMENTS
 Do something.`
     )
 
-    const result = resolveCommand('/sr:test hello world', dir)
+    const result = resolveCommand('/specrails:test hello world', dir)
     expect(result).not.toContain('---')
     expect(result).not.toContain('description:')
     expect(result).toContain('hello world')
@@ -62,7 +62,7 @@ Do something.`
     const dir = createTempDir()
     writeCommandFile(
       dir,
-      '.claude/skills/sr/skill-cmd.md',
+      '.claude/skills/specrails/skill-cmd.md',
       `---
 description: A skill
 ---
@@ -70,7 +70,7 @@ description: A skill
 Skill prompt with args: $ARGUMENTS`
     )
 
-    const result = resolveCommand('/sr:skill-cmd the-arg', dir)
+    const result = resolveCommand('/specrails:skill-cmd the-arg', dir)
     expect(result).toContain('the-arg')
     expect(result).not.toContain('$ARGUMENTS')
     expect(result).not.toContain('description:')
@@ -80,7 +80,7 @@ Skill prompt with args: $ARGUMENTS`
     const dir = createTempDir()
     writeCommandFile(
       dir,
-      '.claude/commands/sr/multi.md',
+      '.claude/commands/specrails/multi.md',
       `---
 description: Multi sub
 ---
@@ -89,7 +89,7 @@ First: $ARGUMENTS
 Second: $ARGUMENTS`
     )
 
-    const result = resolveCommand('/sr:multi myarg', dir)
+    const result = resolveCommand('/specrails:multi myarg', dir)
     expect(result).toBe('First: myarg\nSecond: myarg')
   })
 
@@ -97,7 +97,7 @@ Second: $ARGUMENTS`
     const dir = createTempDir()
     writeCommandFile(
       dir,
-      '.claude/commands/sr/noargs.md',
+      '.claude/commands/specrails/noargs.md',
       `---
 description: No args
 ---
@@ -105,7 +105,7 @@ description: No args
 Do this: $ARGUMENTS`
     )
 
-    const result = resolveCommand('/sr:noargs', dir)
+    const result = resolveCommand('/specrails:noargs', dir)
     expect(result).toBe('Do this:')
   })
 
@@ -113,7 +113,7 @@ Do this: $ARGUMENTS`
     const dir = createTempDir()
     writeCommandFile(
       dir,
-      '.claude/commands/sr/both.md',
+      '.claude/commands/specrails/both.md',
       `---
 description: Commands version
 ---
@@ -122,7 +122,7 @@ From commands: $ARGUMENTS`
     )
     writeCommandFile(
       dir,
-      '.claude/skills/sr/both.md',
+      '.claude/skills/specrails/both.md',
       `---
 description: Skills version
 ---
@@ -130,7 +130,7 @@ description: Skills version
 From skills: $ARGUMENTS`
     )
 
-    const result = resolveCommand('/sr:both test', dir)
+    const result = resolveCommand('/specrails:both test', dir)
     expect(result).toBe('From commands: test')
   })
 })

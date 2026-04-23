@@ -23,7 +23,7 @@ function makeTemplate(overrides: Partial<JobTemplate> = {}): JobTemplate {
     id: 'tpl-1',
     name: 'Full pipeline',
     description: 'Does everything',
-    commands: ['/sr:implement #1', '/sr:review #1'],
+    commands: ['/specrails:implement #1', '/specrails:review #1'],
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -110,7 +110,7 @@ describe('TemplateLibrary', () => {
   })
 
   it('truncates long commands in the badge', () => {
-    const longCmd = '/sr:implement #1234567890123456789012345678901234567890'
+    const longCmd = '/specrails:implement #1234567890123456789012345678901234567890'
     render(
       <TemplateLibrary
         templates={[makeTemplate({ commands: [longCmd] })]}
@@ -301,7 +301,7 @@ describe('TemplateLibrary', () => {
 
     // Fill in name and command
     await user.type(screen.getByPlaceholderText('e.g. Full pipeline'), 'My Rail')
-    await user.type(screen.getByPlaceholderText('Select a command or type a free prompt...'), '/sr:implement #1')
+    await user.type(screen.getByPlaceholderText('Select a command or type a free prompt...'), '/specrails:implement #1')
 
     // Submit
     await user.click(screen.getByRole('button', { name: /Create/i }))

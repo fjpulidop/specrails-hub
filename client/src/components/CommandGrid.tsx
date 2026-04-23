@@ -225,7 +225,7 @@ function CommandCard({ cmd, onClick }: CommandCardProps) {
         </button>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="max-w-[240px]">
-        <p className="font-medium font-mono text-[11px]">/sr:{cmd.slug}</p>
+        <p className="font-medium font-mono text-[11px]">/specrails:{cmd.slug}</p>
         {cmd.description && (
           <p className="text-muted-foreground mt-0.5">{cmd.description}</p>
         )}
@@ -243,7 +243,7 @@ interface CommandGridProps {
 }
 
 async function spawnCommand(command: string, priority?: string): Promise<string> {
-  const body: Record<string, string> = { command: `/sr:${command}` }
+  const body: Record<string, string> = { command: `/specrails:${command}` }
   if (priority && priority !== 'normal') body.priority = priority
   const res = await fetch(`${getApiBase()}/spawn`, {
     method: 'POST',

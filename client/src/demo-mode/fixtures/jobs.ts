@@ -3,7 +3,7 @@ import type { JobSummary } from '../../types'
 export const demoJobs: JobSummary[] = [
   {
     id: 'job-001',
-    command: '/sr:implement SPEC-003',
+    command: '/specrails:implement SPEC-003',
     started_at: '2026-04-12T09:15:00Z',
     finished_at: '2026-04-12T09:23:45Z',
     status: 'completed',
@@ -19,7 +19,7 @@ export const demoJobs: JobSummary[] = [
   },
   {
     id: 'job-002',
-    command: '/sr:implement SPEC-004',
+    command: '/specrails:implement SPEC-004',
     started_at: '2026-04-12T10:02:00Z',
     finished_at: null,
     status: 'running',
@@ -35,7 +35,7 @@ export const demoJobs: JobSummary[] = [
   },
   {
     id: 'job-003',
-    command: '/sr:review PR-42',
+    command: '/specrails:review PR-42',
     started_at: '2026-04-12T08:30:00Z',
     finished_at: '2026-04-12T08:35:12Z',
     status: 'completed',
@@ -51,7 +51,7 @@ export const demoJobs: JobSummary[] = [
   },
   {
     id: 'job-004',
-    command: '/sr:propose-feature improved error handling',
+    command: '/specrails:propose-feature improved error handling',
     started_at: '2026-04-11T16:45:00Z',
     finished_at: '2026-04-11T16:48:30Z',
     status: 'completed',
@@ -67,7 +67,7 @@ export const demoJobs: JobSummary[] = [
   },
   {
     id: 'job-005',
-    command: '/sr:implement SPEC-002',
+    command: '/specrails:implement SPEC-002',
     started_at: '2026-04-11T14:00:00Z',
     finished_at: '2026-04-11T14:18:00Z',
     status: 'failed',

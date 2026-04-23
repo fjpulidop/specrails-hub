@@ -57,7 +57,7 @@ vi.mock('../../hooks/useProjectCache', () => ({
     data: namespace === 'proposals'
       ? [{ id: 'prop-1', idea: 'Build a feature', status: 'created', created_at: '2024-01-01T00:00:00Z', issue_url: null }]
       : namespace === 'jobs'
-      ? [{ id: 'job-1', command: '/sr:implement', started_at: new Date().toISOString(), status: 'completed' }]
+      ? [{ id: 'job-1', command: '/specrails:implement', started_at: new Date().toISOString(), status: 'completed' }]
       : initialValue,
     isLoading: false,
     isFirstLoad: false,
@@ -116,7 +116,7 @@ describe('JobsPage - extended coverage', () => {
 
   it('renders proposal jobs from proposals list', () => {
     render(<JobsPage />)
-    expect(screen.getByText(/sr:propose-feature/)).toBeInTheDocument()
+    expect(screen.getByText(/specrails:propose-feature/)).toBeInTheDocument()
   })
 
   it('opens proposal detail dialog on proposal job click', async () => {
@@ -164,12 +164,12 @@ describe('JobsPage - extended coverage', () => {
   it('proposal jobs with long idea text get truncated with ellipsis', () => {
     render(<JobsPage />)
     // The mock returns a short idea, but the component truncates > 60 chars
-    expect(screen.getByText(/sr:propose-feature/)).toBeInTheDocument()
+    expect(screen.getByText(/specrails:propose-feature/)).toBeInTheDocument()
   })
 
   it('enrichedCommands shows implement job', () => {
     render(<JobsPage />)
-    expect(screen.getByText('/sr:implement')).toBeInTheDocument()
+    expect(screen.getByText('/specrails:implement')).toBeInTheDocument()
   })
 
   it('renders ExportDropdown', () => {

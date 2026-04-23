@@ -77,14 +77,14 @@ export function ImplementWizard({ open, onClose }: ImplementWizardProps) {
         if (issue.body?.trim()) text += `\n\n${issue.body.trim()}`
         return text
       }).join('\n\n---\n\n')
-      command = `/sr:implement ${issueArgs}`
+      command = `/specrails:implement ${issueArgs}`
     } else {
       if (!state.freeFormTitle.trim()) {
         toast.error('Please enter a feature title')
         return
       }
       const desc = state.freeFormDescription.trim()
-      command = `/sr:implement ${state.freeFormTitle.trim()}${desc ? `\n\n${desc}` : ''}`
+      command = `/specrails:implement ${state.freeFormTitle.trim()}${desc ? `\n\n${desc}` : ''}`
     }
 
     try {

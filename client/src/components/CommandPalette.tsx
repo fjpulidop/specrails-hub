@@ -90,7 +90,7 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
       const res = await fetch(`${getApiBase()}/spawn`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: `/sr:${slug}` }),
+        body: JSON.stringify({ command: `/specrails:${slug}` }),
       })
       const data = await res.json() as { jobId?: string; error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Failed to spawn command')

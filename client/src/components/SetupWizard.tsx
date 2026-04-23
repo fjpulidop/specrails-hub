@@ -412,7 +412,7 @@ function CompleteStep({
 
         {summary.legacySrRemoved > 0 && (
           <p className="mt-3 text-xs text-muted-foreground text-center">
-            Removed {summary.legacySrRemoved} legacy <code className="text-xs">/sr:*</code> command{summary.legacySrRemoved === 1 ? '' : 's'}
+            Removed {summary.legacySrRemoved} legacy <code className="text-xs">/specrails:*</code> command{summary.legacySrRemoved === 1 ? '' : 's'}
           </p>
         )}
       </div>

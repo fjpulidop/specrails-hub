@@ -30,7 +30,7 @@ vi.mock('react-router-dom', async () => {
 const mockJobs: JobSummary[] = [
   {
     id: 'job-1',
-    command: '/sr:implement',
+    command: '/specrails:implement',
     started_at: new Date(Date.now() - 30000).toISOString(),
     finished_at: new Date().toISOString(),
     status: 'completed',
@@ -40,13 +40,13 @@ const mockJobs: JobSummary[] = [
   },
   {
     id: 'job-2',
-    command: '/sr:propose-spec',
+    command: '/specrails:propose-spec',
     started_at: new Date().toISOString(),
     status: 'running',
   },
   {
     id: 'job-3',
-    command: '/sr:health-check',
+    command: '/specrails:health-check',
     started_at: new Date().toISOString(),
     status: 'failed',
   },
@@ -78,9 +78,9 @@ describe('RecentJobs', () => {
 
   it('renders job commands', () => {
     render(<RecentJobs jobs={mockJobs} />)
-    expect(screen.getByText('/sr:implement')).toBeInTheDocument()
-    expect(screen.getByText('/sr:propose-spec')).toBeInTheDocument()
-    expect(screen.getByText('/sr:health-check')).toBeInTheDocument()
+    expect(screen.getByText('/specrails:implement')).toBeInTheDocument()
+    expect(screen.getByText('/specrails:propose-spec')).toBeInTheDocument()
+    expect(screen.getByText('/specrails:health-check')).toBeInTheDocument()
   })
 
   it('renders "All" filter button with correct count', () => {
@@ -102,9 +102,9 @@ describe('RecentJobs', () => {
     const completedFilter = screen.getByRole('button', { name: /completed \(1\)/i })
     await user.click(completedFilter)
     // Only completed job should be visible
-    expect(screen.getByText('/sr:implement')).toBeInTheDocument()
-    expect(screen.queryByText('/sr:propose-spec')).not.toBeInTheDocument()
-    expect(screen.queryByText('/sr:health-check')).not.toBeInTheDocument()
+    expect(screen.getByText('/specrails:implement')).toBeInTheDocument()
+    expect(screen.queryByText('/specrails:propose-spec')).not.toBeInTheDocument()
+    expect(screen.queryByText('/specrails:health-check')).not.toBeInTheDocument()
   })
 
   it('clicking same filter again deselects it (shows all)', async () => {
@@ -113,15 +113,15 @@ describe('RecentJobs', () => {
     const completedFilter = screen.getByRole('button', { name: /completed \(1\)/i })
     await user.click(completedFilter)
     await user.click(completedFilter)
-    expect(screen.getByText('/sr:implement')).toBeInTheDocument()
-    expect(screen.getByText('/sr:propose-spec')).toBeInTheDocument()
-    expect(screen.getByText('/sr:health-check')).toBeInTheDocument()
+    expect(screen.getByText('/specrails:implement')).toBeInTheDocument()
+    expect(screen.getByText('/specrails:propose-spec')).toBeInTheDocument()
+    expect(screen.getByText('/specrails:health-check')).toBeInTheDocument()
   })
 
   it('clicking job row navigates to job detail', async () => {
     const user = userEvent.setup()
     render(<RecentJobs jobs={mockJobs} />)
-    const jobRow = screen.getByText('/sr:implement').closest('[role="button"]')!
+    const jobRow = screen.getByText('/specrails:implement').closest('[role="button"]')!
     await user.click(jobRow)
     expect(mockNavigate).toHaveBeenCalledWith('/jobs/job-1')
   })
@@ -131,12 +131,12 @@ describe('RecentJobs', () => {
     const onProposalClick = vi.fn()
     const proposalJob: JobSummary = {
       id: 'proposal:abc123',
-      command: '/sr:propose-feature some idea',
+      command: '/specrails:propose-feature some idea',
       started_at: new Date().toISOString(),
       status: 'completed',
     }
     render(<RecentJobs jobs={[proposalJob]} onProposalClick={onProposalClick} />)
-    const row = screen.getByText('/sr:propose-feature some idea').closest('[role="button"]')!
+    const row = screen.getByText('/specrails:propose-feature some idea').closest('[role="button"]')!
     await user.click(row)
     expect(onProposalClick).toHaveBeenCalledWith('abc123')
     expect(mockNavigate).not.toHaveBeenCalled()
@@ -217,13 +217,13 @@ describe('RecentJobs', () => {
     it('renders proposal delete button', async () => {
       const proposalJob: JobSummary = {
         id: 'proposal:abc123',
-        command: '/sr:propose-feature',
+        command: '/specrails:propose-feature',
         started_at: new Date().toISOString(),
         status: 'completed',
       }
       render(<RecentJobs jobs={[proposalJob]} onProposalDelete={vi.fn()} />)
       // The row renders with a delete option
-      expect(screen.getByText('/sr:propose-feature')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:propose-feature')).toBeInTheDocument()
     })
   })
 
@@ -231,7 +231,7 @@ describe('RecentJobs', () => {
     it('shows "Load more" when there are more jobs than PAGE_SIZE', () => {
       const manyJobs = Array.from({ length: 12 }, (_, i) => ({
         id: `job-${i}`,
-        command: `/sr:implement-${i}`,
+        command: `/specrails:implement-${i}`,
         started_at: new Date().toISOString(),
         status: 'completed' as const,
       }))
@@ -259,7 +259,7 @@ describe('RecentJobs', () => {
     it('shows "zombie" badge for zombie_terminated status', () => {
       const zombieJob: JobSummary = {
         id: 'zombie-1',
-        command: '/sr:test',
+        command: '/specrails:test',
         started_at: new Date().toISOString(),
         status: 'zombie_terminated',
       }
@@ -272,7 +272,7 @@ describe('RecentJobs', () => {
     it('shows "queued" badge for queued status', () => {
       const queuedJob: JobSummary = {
         id: 'queue-1',
-        command: '/sr:health-check',
+        command: '/specrails:health-check',
         started_at: new Date().toISOString(),
         status: 'queued',
       }
@@ -285,7 +285,7 @@ describe('RecentJobs', () => {
     it('shows "canceled" badge for canceled status', () => {
       const canceledJob: JobSummary = {
         id: 'cancel-1',
-        command: '/sr:implement',
+        command: '/specrails:implement',
         started_at: new Date().toISOString(),
         status: 'canceled',
       }

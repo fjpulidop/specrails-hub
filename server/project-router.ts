@@ -949,10 +949,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       res.status(400).json({ error: 'idea is required' }); return
     }
     // Pre-check: does the propose-feature command exist in this project?
-    const testCmd = `/sr:propose-feature test`
+    const testCmd = `/specrails:propose-feature test`
     const resolved = resolveCommand(testCmd, ctx(req).project.path)
     if (resolved === testCmd) {
-      res.status(400).json({ error: 'This project does not have the /sr:propose-feature command installed. Run "npx specrails-core@latest" to update.' }); return
+      res.status(400).json({ error: 'This project does not have the /specrails:propose-feature command installed. Run "npx specrails-core@latest" to update.' }); return
     }
     const id = uuidv4()
     createProposal(ctx(req).db, { id, idea: idea.trim() })

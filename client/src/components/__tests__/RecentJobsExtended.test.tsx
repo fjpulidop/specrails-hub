@@ -37,7 +37,7 @@ vi.mock('../JobComparisonModal', () => ({
 
 const baseJob: JobSummary = {
   id: 'job-1',
-  command: '/sr:implement',
+  command: '/specrails:implement',
   started_at: new Date(Date.now() - 90000).toISOString(),
   finished_at: new Date().toISOString(),
   status: 'completed',
@@ -118,28 +118,28 @@ describe('RecentJobs - extended coverage', () => {
 
     it('filters jobs by dateFrom', () => {
       const oldJob: JobSummary = { ...baseJob, id: 'old-job', started_at: '2024-01-01T00:00:00Z' }
-      const newJob: JobSummary = { ...baseJob, id: 'new-job', command: '/sr:propose-spec', started_at: '2024-06-01T00:00:00Z' }
+      const newJob: JobSummary = { ...baseJob, id: 'new-job', command: '/specrails:propose-spec', started_at: '2024-06-01T00:00:00Z' }
 
       render(<RecentJobs jobs={[oldJob, newJob]} />)
 
       const dateFromInput = screen.getByTitle('From date')
       fireEvent.change(dateFromInput, { target: { value: '2024-05-01' } })
 
-      expect(screen.getByText('/sr:propose-spec')).toBeInTheDocument()
-      expect(screen.queryByText('/sr:implement')).not.toBeInTheDocument()
+      expect(screen.getByText('/specrails:propose-spec')).toBeInTheDocument()
+      expect(screen.queryByText('/specrails:implement')).not.toBeInTheDocument()
     })
 
     it('filters jobs by dateTo', () => {
       const oldJob: JobSummary = { ...baseJob, id: 'old-job', started_at: '2024-01-01T00:00:00Z' }
-      const newJob: JobSummary = { ...baseJob, id: 'new-job', command: '/sr:propose-spec', started_at: '2024-06-01T00:00:00Z' }
+      const newJob: JobSummary = { ...baseJob, id: 'new-job', command: '/specrails:propose-spec', started_at: '2024-06-01T00:00:00Z' }
 
       render(<RecentJobs jobs={[oldJob, newJob]} />)
 
       const dateToInput = screen.getByTitle('To date')
       fireEvent.change(dateToInput, { target: { value: '2024-03-01' } })
 
-      expect(screen.getByText('/sr:implement')).toBeInTheDocument()
-      expect(screen.queryByText('/sr:propose-spec')).not.toBeInTheDocument()
+      expect(screen.getByText('/specrails:implement')).toBeInTheDocument()
+      expect(screen.queryByText('/specrails:propose-spec')).not.toBeInTheDocument()
     })
   })
 
@@ -274,8 +274,8 @@ describe('RecentJobs - extended coverage', () => {
     it('in compare mode, clicking a job row selects it', async () => {
       const user = userEvent.setup()
       const jobs = [
-        { ...baseJob, id: 'job-1', command: '/sr:implement' },
-        { ...baseJob, id: 'job-2', command: '/sr:health-check', status: 'failed' as const },
+        { ...baseJob, id: 'job-1', command: '/specrails:implement' },
+        { ...baseJob, id: 'job-2', command: '/specrails:health-check', status: 'failed' as const },
       ]
       render(<RecentJobs jobs={jobs} />)
 
@@ -286,7 +286,7 @@ describe('RecentJobs - extended coverage', () => {
         expect(screen.getByText('Select 2 jobs to compare')).toBeInTheDocument()
 
         // Click first job to select
-        const job1Row = screen.getByText('/sr:implement').closest('[role="button"]')!
+        const job1Row = screen.getByText('/specrails:implement').closest('[role="button"]')!
         await user.click(job1Row)
         expect(screen.getByText('Select 1 more job')).toBeInTheDocument()
       }
@@ -295,9 +295,9 @@ describe('RecentJobs - extended coverage', () => {
     it('in compare mode, selecting 2 jobs shows Compare button', async () => {
       const user = userEvent.setup()
       const jobs = [
-        { ...baseJob, id: 'job-1', command: '/sr:implement' },
-        { ...baseJob, id: 'job-2', command: '/sr:health-check', status: 'failed' as const },
-        { ...baseJob, id: 'job-3', command: '/sr:propose-spec', status: 'running' as const },
+        { ...baseJob, id: 'job-1', command: '/specrails:implement' },
+        { ...baseJob, id: 'job-2', command: '/specrails:health-check', status: 'failed' as const },
+        { ...baseJob, id: 'job-3', command: '/specrails:propose-spec', status: 'running' as const },
       ]
       render(<RecentJobs jobs={jobs} />)
 
@@ -307,8 +307,8 @@ describe('RecentJobs - extended coverage', () => {
       if (compareBtn) {
         await user.click(compareBtn as HTMLElement)
 
-        const job1Row = screen.getByText('/sr:implement').closest('[role="button"]')!
-        const job2Row = screen.getByText('/sr:health-check').closest('[role="button"]')!
+        const job1Row = screen.getByText('/specrails:implement').closest('[role="button"]')!
+        const job2Row = screen.getByText('/specrails:health-check').closest('[role="button"]')!
 
         await user.click(job1Row)
         await user.click(job2Row)
@@ -323,7 +323,7 @@ describe('RecentJobs - extended coverage', () => {
       const user = userEvent.setup()
       const proposalJob: JobSummary = {
         id: 'proposal:abc123',
-        command: '/sr:propose-feature some idea',
+        command: '/specrails:propose-feature some idea',
         started_at: new Date().toISOString(),
         status: 'completed',
       }
@@ -342,7 +342,7 @@ describe('RecentJobs - extended coverage', () => {
       const onProposalDelete = vi.fn()
       const proposalJob: JobSummary = {
         id: 'proposal:abc123',
-        command: '/sr:propose-feature some idea',
+        command: '/specrails:propose-feature some idea',
         started_at: new Date().toISOString(),
         status: 'completed',
       }
@@ -363,7 +363,7 @@ describe('RecentJobs - extended coverage', () => {
       const user = userEvent.setup()
       const proposalJob: JobSummary = {
         id: 'proposal:abc123',
-        command: '/sr:propose-feature',
+        command: '/specrails:propose-feature',
         started_at: new Date().toISOString(),
         status: 'completed',
       }
@@ -382,7 +382,7 @@ describe('RecentJobs - extended coverage', () => {
       const user = userEvent.setup()
       const proposalJob: JobSummary = {
         id: 'proposal:abc123',
-        command: '/sr:propose-feature',
+        command: '/specrails:propose-feature',
         started_at: new Date().toISOString(),
         status: 'completed',
       }

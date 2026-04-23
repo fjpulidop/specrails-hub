@@ -65,7 +65,7 @@ function displayName(cmd: CommandInfo): string {
 }
 
 function tooltipSlug(cmd: CommandInfo): string {
-  return `/sr:${cmd.slug}`
+  return `/specrails:${cmd.slug}`
 }
 
 // ---------------------------------------------------------------------------
@@ -264,30 +264,30 @@ describe('DISPLAY_NAMES overrides', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Tooltip slug — always /sr:<slug>, never the overridden display name
+// Tooltip slug — always /specrails:<slug>, never the overridden display name
 // ---------------------------------------------------------------------------
 
-describe('Tooltip /sr:<slug> format', () => {
-  it('update-product-driven-backlog tooltip is /sr:update-product-driven-backlog (not display name)', () => {
+describe('Tooltip /specrails:<slug> format', () => {
+  it('update-product-driven-backlog tooltip is /specrails:update-product-driven-backlog (not display name)', () => {
     const cmd = makeCommand('update-product-driven-backlog')
-    expect(tooltipSlug(cmd)).toBe('/sr:update-product-driven-backlog')
-    expect(tooltipSlug(cmd)).not.toBe(`/sr:${displayName(cmd)}`)
+    expect(tooltipSlug(cmd)).toBe('/specrails:update-product-driven-backlog')
+    expect(tooltipSlug(cmd)).not.toBe(`/specrails:${displayName(cmd)}`)
   })
 
-  it('product-backlog tooltip is /sr:product-backlog (not display name)', () => {
+  it('product-backlog tooltip is /specrails:product-backlog (not display name)', () => {
     const cmd = makeCommand('product-backlog')
-    expect(tooltipSlug(cmd)).toBe('/sr:product-backlog')
-    expect(tooltipSlug(cmd)).not.toBe(`/sr:${displayName(cmd)}`)
+    expect(tooltipSlug(cmd)).toBe('/specrails:product-backlog')
+    expect(tooltipSlug(cmd)).not.toBe(`/specrails:${displayName(cmd)}`)
   })
 
-  it('propose-spec tooltip is /sr:propose-spec', () => {
+  it('propose-spec tooltip is /specrails:propose-spec', () => {
     const cmd = makeCommand('propose-spec')
-    expect(tooltipSlug(cmd)).toBe('/sr:propose-spec')
+    expect(tooltipSlug(cmd)).toBe('/specrails:propose-spec')
   })
 
-  it('implement tooltip is /sr:implement', () => {
+  it('implement tooltip is /specrails:implement', () => {
     const cmd = makeCommand('implement')
-    expect(tooltipSlug(cmd)).toBe('/sr:implement')
+    expect(tooltipSlug(cmd)).toBe('/specrails:implement')
   })
 
   it('tooltip always uses real slug regardless of overridden display name', () => {
@@ -296,7 +296,7 @@ describe('Tooltip /sr:<slug> format', () => {
     for (const [slug, override] of Object.entries(DISPLAY_NAMES)) {
       const cmd = makeCommand(slug)
       const tip  = tooltipSlug(cmd)
-      expect(tip).toBe(`/sr:${slug}`)
+      expect(tip).toBe(`/specrails:${slug}`)
       expect(tip).not.toContain(override)
     }
   })

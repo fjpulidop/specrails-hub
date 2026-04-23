@@ -65,7 +65,7 @@ vi.mock('../../hooks/useSharedWebSocket', () => ({
 
 const mockJob: JobSummary = {
   id: 'job-abc123',
-  command: '/sr:implement',
+  command: '/specrails:implement',
   started_at: '2024-01-15T10:00:00Z',
   finished_at: '2024-01-15T10:00:30Z',
   status: 'completed',
@@ -106,7 +106,7 @@ describe('JobDetailPage', () => {
     })
     render(<JobDetailPage />)
     await waitFor(() => {
-      expect(screen.getByText('/sr:implement')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:implement')).toBeInTheDocument()
     })
   })
 
@@ -169,7 +169,7 @@ describe('JobDetailPage', () => {
     })
     render(<JobDetailPage />)
     await waitFor(() => {
-      expect(screen.getByText('/sr:implement')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:implement')).toBeInTheDocument()
     })
     expect(screen.queryByRole('button', { name: /Cancel Job/i })).not.toBeInTheDocument()
   })
@@ -316,7 +316,7 @@ describe('JobDetailPage', () => {
         '/api/spawn',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ command: '/sr:implement' }),
+          body: JSON.stringify({ command: '/specrails:implement' }),
         })
       )
       expect(mockNavigate).toHaveBeenCalledWith('/jobs/new-job-id')
@@ -371,7 +371,7 @@ describe('JobDetailPage', () => {
       })
       render(<JobDetailPage />)
       await waitFor(() => {
-        expect(screen.getByText('/sr:implement')).toBeInTheDocument()
+        expect(screen.getByText('/specrails:implement')).toBeInTheDocument()
       })
       expect(screen.queryByRole('button', { name: /Export diagnostic/i })).not.toBeInTheDocument()
     })
@@ -383,7 +383,7 @@ describe('JobDetailPage', () => {
       })
       render(<JobDetailPage />)
       await waitFor(() => {
-        expect(screen.getByText('/sr:implement')).toBeInTheDocument()
+        expect(screen.getByText('/specrails:implement')).toBeInTheDocument()
       })
       expect(screen.queryByRole('button', { name: /Export diagnostic/i })).not.toBeInTheDocument()
     })

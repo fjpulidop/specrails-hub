@@ -37,28 +37,28 @@ const baseItems: ActivityItem[] = [
   {
     type: 'job_completed',
     jobId: 'job-1',
-    jobCommand: '/sr:implement --spec SPEA-001',
+    jobCommand: '/specrails:implement --spec SPEA-001',
     timestamp: new Date(Date.now() - 30 * 1000).toISOString(), // 30s ago
     costUsd: 0.0123,
   },
   {
     type: 'job_failed',
     jobId: 'job-2',
-    jobCommand: '/sr:health-check',
+    jobCommand: '/specrails:health-check',
     timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // 5m ago
     costUsd: null,
   },
   {
     type: 'job_canceled',
     jobId: 'job-3',
-    jobCommand: '/sr:propose-spec',
+    jobCommand: '/specrails:propose-spec',
     timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2h ago
     costUsd: 0.0056,
   },
   {
     type: 'job_started',
     jobId: 'job-4',
-    jobCommand: '/sr:batch-implement',
+    jobCommand: '/specrails:batch-implement',
     timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3d ago
     costUsd: null,
   },
@@ -102,10 +102,10 @@ describe('ActivityFeedPage', () => {
   it('renders activity items list when items exist', () => {
     mockItems = baseItems
     render(<ActivityFeedPage />)
-    expect(screen.getByText('/sr:implement --spec SPEA-001')).toBeInTheDocument()
-    expect(screen.getByText('/sr:health-check')).toBeInTheDocument()
-    expect(screen.getByText('/sr:propose-spec')).toBeInTheDocument()
-    expect(screen.getByText('/sr:batch-implement')).toBeInTheDocument()
+    expect(screen.getByText('/specrails:implement --spec SPEA-001')).toBeInTheDocument()
+    expect(screen.getByText('/specrails:health-check')).toBeInTheDocument()
+    expect(screen.getByText('/specrails:propose-spec')).toBeInTheDocument()
+    expect(screen.getByText('/specrails:batch-implement')).toBeInTheDocument()
   })
 
   it('renders "Completed" label for job_completed type', () => {
@@ -187,7 +187,7 @@ describe('ActivityFeedPage', () => {
     mockLoading = true
     const { container } = render(<ActivityFeedPage />)
     // Shows items AND loading spinner at the bottom
-    expect(screen.getByText('/sr:implement --spec SPEA-001')).toBeInTheDocument()
+    expect(screen.getByText('/specrails:implement --spec SPEA-001')).toBeInTheDocument()
     const spinners = container.querySelectorAll('.animate-spin')
     expect(spinners.length).toBeGreaterThanOrEqual(1)
   })
@@ -216,7 +216,7 @@ describe('ActivityFeedPage - formatRelativeTime edge cases', () => {
     mockItems = [{
       type: 'job_completed',
       jobId: 'j1',
-      jobCommand: '/sr:implement',
+      jobCommand: '/specrails:implement',
       timestamp: new Date(Date.now() - 45 * 1000).toISOString(), // 45s ago
       costUsd: null,
     }]
@@ -228,7 +228,7 @@ describe('ActivityFeedPage - formatRelativeTime edge cases', () => {
     mockItems = [{
       type: 'job_failed',
       jobId: 'j2',
-      jobCommand: '/sr:health-check',
+      jobCommand: '/specrails:health-check',
       timestamp: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
       costUsd: null,
     }]

@@ -514,7 +514,7 @@ function TourFullscreenLogPage() {
                     color: 'hsl(60 30% 96% / 0.9)',
                   }}
                 >
-                  /sr:implement #9 --yes
+                  /specrails:implement #9 --yes
                 </code>
               </div>
               <div style={{ fontSize: 11, color: 'hsl(225 27% 70%)' }}>
