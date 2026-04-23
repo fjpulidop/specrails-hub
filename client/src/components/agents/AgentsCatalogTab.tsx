@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Pencil, Copy, Sparkles, Loader2, FileText } from 'lucide-react'
+import { Plus, Pencil, Copy, Sparkles, Loader2, FileText, Search, X, Tag } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
-import { AgentStudio, AGENT_TEMPLATES } from './AgentStudio'
+import { AgentStudio } from './AgentStudio'
+import { AGENT_TEMPLATES, ALL_TEMPLATE_CATEGORIES, type AgentTemplateCategory } from './agentTemplates'
 
 interface CatalogAgent {
   id: string
@@ -28,6 +29,9 @@ export function AgentsCatalogTab() {
   const [error, setError] = useState<string | null>(null)
   const [studio, setStudio] = useState<StudioMode>({ kind: 'closed' })
   const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [templateSearch, setTemplateSearch] = useState('')
+  const [templateCategory, setTemplateCategory] = useState<AgentTemplateCategory | 'all'>('all')
+  const [templateTag, setTemplateTag] = useState<string | null>(null)
   const [generateOpen, setGenerateOpen] = useState(false)
   const [genName, setGenName] = useState('')
   const [genDescription, setGenDescription] = useState('')
@@ -123,39 +127,198 @@ export function AgentsCatalogTab() {
     )
   }
 
+  const templateResults = (() => {
+    const q = templateSearch.trim().toLowerCase()
+    return AGENT_TEMPLATES.filter((t) => {
+      if (templateCategory !== 'all' && t.category !== templateCategory) return false
+      if (templateTag && !t.tags.includes(templateTag)) return false
+      if (q) {
+        const hay = (t.label + ' ' + t.blurb + ' ' + t.tags.join(' ') + ' ' + t.category).toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      return true
+    })
+  })()
+
+  const categoryCounts = (() => {
+    const counts = new Map<AgentTemplateCategory, number>()
+    for (const t of AGENT_TEMPLATES) counts.set(t.category, (counts.get(t.category) ?? 0) + 1)
+    return counts
+  })()
+
+  const closeTemplates = () => {
+    setTemplatesOpen(false)
+    setTemplateSearch('')
+    setTemplateCategory('all')
+    setTemplateTag(null)
+  }
+
   const renderTemplatesDialog = () => (
-    <Dialog open={templatesOpen} onOpenChange={(o) => !o && setTemplatesOpen(false)}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-4 h-4" /> Start from a template
-          </DialogTitle>
-        </DialogHeader>
-        <div className="grid grid-cols-2 gap-3 py-2">
-          {AGENT_TEMPLATES.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => {
-                setTemplatesOpen(false)
-                setStudio({ kind: 'create', initialBody: t.body, initialName: t.nameHint })
-              }}
-              className="text-left p-3 rounded-md border border-border hover:border-primary/40 hover:bg-accent/30 transition-colors"
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg">{t.emoji}</span>
-                <span className="text-sm font-medium">{t.label}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">{t.blurb}</p>
-              <p className="text-[10px] font-mono text-muted-foreground/70 mt-2">{t.nameHint}</p>
-            </button>
-          ))}
+    <Dialog open={templatesOpen} onOpenChange={(o) => { if (!o) closeTemplates() }}>
+      <DialogContent className="max-w-4xl p-0 h-[85vh] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex-shrink-0 px-6 pt-5 pb-3 border-b border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <FileText className="w-4 h-4 text-dracula-purple" /> Agent template library
+              <span className="text-[11px] font-normal text-muted-foreground ml-1">
+                {templateResults.length} of {AGENT_TEMPLATES.length}
+              </span>
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Start from a curated template across engineering, product, science, health, legal,
+              and more. Pick one and open it in the Studio for review and editing before saving.
+            </p>
+          </DialogHeader>
+
+          {/* Search */}
+          <div className="mt-3 relative">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input
+              value={templateSearch}
+              onChange={(e) => setTemplateSearch(e.target.value)}
+              placeholder="Search by name, description, tag, or category…"
+              className="w-full h-9 pl-8 pr-8 text-sm rounded-md border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+              autoFocus
+            />
+            {templateSearch && (
+              <button
+                type="button"
+                onClick={() => setTemplateSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-accent text-muted-foreground"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Category chips */}
+          <div className="flex gap-1.5 overflow-x-auto mt-3 pb-1 scrollbar-thin">
+            <CategoryChip
+              label="All"
+              count={AGENT_TEMPLATES.length}
+              active={templateCategory === 'all'}
+              onClick={() => setTemplateCategory('all')}
+            />
+            {ALL_TEMPLATE_CATEGORIES.map((cat) => (
+              <CategoryChip
+                key={cat}
+                label={cat}
+                count={categoryCounts.get(cat) ?? 0}
+                active={templateCategory === cat}
+                onClick={() => setTemplateCategory(cat)}
+              />
+            ))}
+          </div>
+
+          {/* Active tag filter */}
+          {templateTag && (
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-[11px] text-muted-foreground">Tag filter:</span>
+              <button
+                type="button"
+                onClick={() => setTemplateTag(null)}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-dracula-purple/20 text-dracula-purple hover:bg-dracula-purple/30"
+              >
+                <Tag className="w-3 h-3" /> {templateTag}
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
         </div>
-        <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={() => setTemplatesOpen(false)}>
+
+        {/* Card list */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {templateResults.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-center">
+              <div className="max-w-sm">
+                <div className="text-sm text-muted-foreground">No templates match your filters.</div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTemplateSearch('')
+                    setTemplateCategory('all')
+                    setTemplateTag(null)
+                  }}
+                  className="text-xs text-dracula-purple hover:underline mt-2"
+                >
+                  Clear filters
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {templateResults.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => {
+                    closeTemplates()
+                    setStudio({ kind: 'create', initialBody: t.body, initialName: t.nameHint })
+                  }}
+                  className="group text-left p-4 rounded-lg border border-border bg-card/40 hover:border-dracula-purple/50 hover:bg-accent/40 hover:shadow-sm transition-all"
+                >
+                  <div className="flex items-start gap-3 mb-2">
+                    <span className="text-2xl leading-none mt-0.5">{t.emoji}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-foreground group-hover:text-dracula-purple truncate">
+                        {t.label}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">{t.category}</div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 min-h-[2lh]">
+                    {t.blurb}
+                  </p>
+                  <div className="flex flex-wrap gap-1 mt-3">
+                    {t.tags.slice(0, 5).map((tag) => (
+                      <span
+                        key={tag}
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setTemplateTag(tag)
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setTemplateTag(tag)
+                          }
+                        }}
+                        className={
+                          'text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground hover:bg-dracula-purple/20 hover:text-dracula-purple cursor-pointer transition-colors ' +
+                          (templateTag === tag ? 'bg-dracula-purple/20 text-dracula-purple' : '')
+                        }
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-border/40 flex items-center justify-between">
+                    <code className="text-[10px] font-mono text-muted-foreground/70 truncate">
+                      {t.nameHint}
+                    </code>
+                    <span className="text-[10px] text-dracula-purple opacity-0 group-hover:opacity-100 transition-opacity">
+                      Open in Studio →
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex-shrink-0 px-6 py-3 border-t border-border flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground">
+            Tip: click a tag pill on any card to filter by that tag.
+          </span>
+          <Button variant="ghost" size="sm" onClick={closeTemplates}>
             Cancel
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )
@@ -446,6 +609,41 @@ export function AgentsCatalogTab() {
       </main>
     </div>
     </>
+  )
+}
+
+function CategoryChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string
+  count: number
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        'flex-shrink-0 inline-flex items-center gap-1 h-7 px-2.5 text-[11px] rounded-full border transition-colors whitespace-nowrap ' +
+        (active
+          ? 'bg-dracula-purple/20 border-dracula-purple/50 text-dracula-purple'
+          : 'bg-transparent border-border text-muted-foreground hover:bg-accent/50 hover:text-foreground')
+      }
+    >
+      {label}
+      <span
+        className={
+          'text-[9px] px-1 rounded ' +
+          (active ? 'bg-dracula-purple/30' : 'bg-muted/60')
+        }
+      >
+        {count}
+      </span>
+    </button>
   )
 }
 
