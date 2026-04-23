@@ -3,6 +3,7 @@ import { Plus, Trash2, Copy, Save, Star } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
 import { ProfileEditor } from './ProfileEditor'
+import { ProfileAnalyticsCard } from './ProfileAnalyticsCard'
 import type { Profile, ProfileListEntry, UserPreferred } from './types'
 
 export function ProfilesTab() {
@@ -228,7 +229,9 @@ export function ProfilesTab() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-col h-full">
+      <ProfileAnalyticsCard />
+      <div className="flex flex-1 min-h-0">
       {/* Left: profile list */}
       <aside className="w-64 flex-shrink-0 border-r border-border flex flex-col">
         <div className="p-3 flex items-center justify-between">
@@ -339,6 +342,7 @@ export function ProfilesTab() {
           </div>
         )}
       </main>
+      </div>
     </div>
   )
 }

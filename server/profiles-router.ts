@@ -61,6 +61,53 @@ export function createProfilesRouter(): Router {
     next()
   })
 
+  // GET /api/projects/:projectId/profiles/analytics?windowDays=30
+  // Per-profile aggregated metrics over the requested time window.
+  router.get('/analytics', (req, res) => {
+    try {
+      const { db } = ctx(req)
+      const windowDays = Math.max(1, Math.min(365, parseInt((req.query.windowDays ?? '30') as string, 10) || 30))
+      const since = Date.now() - windowDays * 24 * 60 * 60 * 1000
+      const rows = db
+        .prepare(
+          `SELECT
+             jp.profile_name AS profileName,
+             COUNT(*) AS jobs,
+             SUM(CASE WHEN j.status = 'completed' THEN 1 ELSE 0 END) AS succeeded,
+             AVG(j.duration_ms) AS avgDurationMs,
+             AVG(COALESCE(j.tokens_in, 0) + COALESCE(j.tokens_out, 0)) AS avgTokens,
+             AVG(j.total_cost_usd) AS avgCostUsd
+           FROM job_profiles jp
+           JOIN jobs j ON j.id = jp.job_id
+           WHERE jp.created_at >= ?
+           GROUP BY jp.profile_name
+           ORDER BY jobs DESC`,
+        )
+        .all(since) as Array<{
+          profileName: string
+          jobs: number
+          succeeded: number
+          avgDurationMs: number | null
+          avgTokens: number | null
+          avgCostUsd: number | null
+        }>
+      res.json({
+        windowDays,
+        rows: rows.map((r) => ({
+          profileName: r.profileName,
+          jobs: r.jobs,
+          succeeded: r.succeeded,
+          successRate: r.jobs > 0 ? r.succeeded / r.jobs : 0,
+          avgDurationMs: r.avgDurationMs,
+          avgTokens: r.avgTokens,
+          avgCostUsd: r.avgCostUsd,
+        })),
+      })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
   // GET /api/projects/:projectId/profiles/core-version
   // Report the project's installed specrails-core version for the upgrade banner.
   router.get('/core-version', (req, res) => {
