@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.37.0](https://github.com/fjpulidop/specrails-hub/compare/v1.36.2...v1.37.0) (2026-04-23)
+
+
+### Features
+
+* **specs:** resource attachments + AI edit diff-review iteration ([#242](https://github.com/fjpulidop/specrails-hub/issues/242)) ([ff00382](https://github.com/fjpulidop/specrails-hub/commit/ff003821bc21d6403979c107c62bb630e9eb4738))
+
 ## [1.36.2](https://github.com/fjpulidop/specrails-hub/compare/v1.36.1...v1.36.2) (2026-04-21)
 
 
