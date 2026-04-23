@@ -127,10 +127,14 @@ export function ProfileEditor({
     const oldIndex = profile.agents.findIndex((a) => a.id === activeId)
     const newIndex = profile.agents.findIndex((a) => a.id === overId)
     if (oldIndex < 0 || newIndex < 0) return
-    // Pin sr-merge-resolver to the last slot: refuse drops that move it away
-    // from the end, and refuse drops that would land above sr-merge-resolver
-    // that push it earlier.
     const reordered = arrayMove(profile.agents, oldIndex, newIndex)
+    // Pin sr-architect to the first slot — the pipeline always starts there.
+    const archIdx = reordered.findIndex((a) => a.id === 'sr-architect')
+    if (archIdx > 0) {
+      const [arch] = reordered.splice(archIdx, 1)
+      reordered.unshift(arch)
+    }
+    // Pin sr-merge-resolver to the last slot — merge phase always runs last.
     const mergeIdx = reordered.findIndex((a) => a.id === 'sr-merge-resolver')
     if (mergeIdx >= 0 && mergeIdx !== reordered.length - 1) {
       const [merge] = reordered.splice(mergeIdx, 1)
