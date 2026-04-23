@@ -1,7 +1,8 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import Ajv, { type ValidateFunction } from 'ajv'
+import Ajv2020 from 'ajv/dist/2020'
+import type { ValidateFunction } from 'ajv'
 import type { DbInstance } from './db'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -49,7 +50,7 @@ let cachedValidator: ValidateFunction<Profile> | null = null
 function getValidator(): ValidateFunction<Profile> {
   if (cachedValidator) return cachedValidator
   const schema = JSON.parse(fs.readFileSync(SCHEMA_PATH, 'utf8'))
-  const ajv = new Ajv({ allErrors: true, strict: false })
+  const ajv = new Ajv2020({ allErrors: true, strict: false })
   cachedValidator = ajv.compile<Profile>(schema)
   return cachedValidator
 }
