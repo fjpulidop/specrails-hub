@@ -765,6 +765,7 @@ export function getStats(db: DbInstance): StatsRow {
 export interface ProjectSettings {
   pipelineTelemetryEnabled: boolean
   orchestratorModel: string
+  prePrompt: string
 }
 
 export function getProjectSettings(db: DbInstance): ProjectSettings {
@@ -774,9 +775,13 @@ export function getProjectSettings(db: DbInstance): ProjectSettings {
   const modelRow = db.prepare(
     `SELECT value FROM queue_state WHERE key = 'config.orchestrator_model'`
   ).get() as { value: string } | undefined
+  const prePromptRow = db.prepare(
+    `SELECT value FROM queue_state WHERE key = 'config.pre_prompt'`
+  ).get() as { value: string } | undefined
   return {
     pipelineTelemetryEnabled: telemetryRow?.value === 'true',
     orchestratorModel: modelRow?.value ?? 'sonnet',
+    prePrompt: prePromptRow?.value ?? '',
   }
 }
 
@@ -790,6 +795,15 @@ export function updateProjectSettings(db: DbInstance, patch: Partial<ProjectSett
     db.prepare(
       `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.orchestrator_model', ?)`
     ).run(patch.orchestratorModel)
+  }
+  if (patch.prePrompt !== undefined) {
+    if (patch.prePrompt.trim() === '') {
+      db.prepare(`DELETE FROM queue_state WHERE key = 'config.pre_prompt'`).run()
+    } else {
+      db.prepare(
+        `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.pre_prompt', ?)`
+      ).run(patch.prePrompt)
+    }
   }
 }
 

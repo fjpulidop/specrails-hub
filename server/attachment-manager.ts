@@ -22,6 +22,19 @@ export const SUPPORTED_MIME_TYPES = new Set<string>([
 ])
 
 const IMAGE_MIME_PREFIX = 'image/'
+const SQL_MIME_TYPES = new Set<string>([
+  'application/sql',
+  'application/x-sql',
+  'text/sql',
+  'text/x-sql',
+])
+const SQL_EXTENSION_RE = /\.sql$/i
+const INLINE_TEXT_MIME_TYPES = new Set<string>([
+  'text/csv',
+  'text/plain',
+  'application/json',
+  ...SQL_MIME_TYPES,
+])
 const EXCEL_MIMES = new Set<string>([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-excel',
@@ -32,6 +45,17 @@ export interface UploadedFile {
   originalname: string
   mimetype: string
   size: number
+}
+
+export function normalizeUploadedMimeType(mimetype: string, originalname: string): string {
+  if (SQL_MIME_TYPES.has(mimetype) || SQL_EXTENSION_RE.test(originalname)) {
+    return 'text/plain'
+  }
+  return mimetype
+}
+
+export function isSupportedUploadedFile(file: Pick<UploadedFile, 'mimetype' | 'originalname'>): boolean {
+  return SUPPORTED_MIME_TYPES.has(normalizeUploadedMimeType(file.mimetype, file.originalname))
 }
 
 function sanitizeFilename(name: string): string {
@@ -77,7 +101,8 @@ export class AttachmentManager {
     projectPath: string | null
     file: UploadedFile
   }): Promise<Attachment> {
-    if (!SUPPORTED_MIME_TYPES.has(opts.file.mimetype)) {
+    const normalizedMimeType = normalizeUploadedMimeType(opts.file.mimetype, opts.file.originalname)
+    if (!SUPPORTED_MIME_TYPES.has(normalizedMimeType)) {
       const err = new Error(`Unsupported file type: ${opts.file.mimetype}`) as Error & { status?: number }
       err.status = 400
       throw err
@@ -88,7 +113,7 @@ export class AttachmentManager {
       id,
       filename: opts.file.originalname,
       storedName,
-      mimeType: opts.file.mimetype,
+      mimeType: normalizedMimeType,
       size: opts.file.size,
       addedAt: new Date().toISOString(),
     }
@@ -229,6 +254,43 @@ export class AttachmentManager {
     }
     return { imageFlags: [], textBlocks }
   }
+
+  /**
+   * Synchronous prompt blocks for long-running implement flows where we need to
+   * preserve immediate process spawn semantics.
+   *
+   * - Images keep the same `@<abs-path>` inline reference used elsewhere.
+   * - Plain text / CSV / JSON are read inline synchronously.
+   * - Other binary formats fall back to their absolute local path so the agent
+   *   can open them manually if needed.
+   */
+  getPromptBlocksSync(
+    slug: string,
+    ticketKey: string | number,
+    attachmentIds: string[],
+  ): string[] {
+    const textBlocks: string[] = []
+    for (const id of attachmentIds) {
+      const meta = this.readMeta(slug, ticketKey, id)
+      if (!meta) continue
+      const abs = path.join(this.ticketDir(slug, ticketKey), meta.storedName)
+      if (!fs.existsSync(abs)) continue
+      if (meta.mimeType.startsWith(IMAGE_MIME_PREFIX)) {
+        textBlocks.push(wrapUserAttachment(meta, `@${abs}`))
+        continue
+      }
+      if (INLINE_TEXT_MIME_TYPES.has(meta.mimeType)) {
+        try {
+          textBlocks.push(wrapUserAttachment(meta, fs.readFileSync(abs, 'utf-8')))
+        } catch {
+          textBlocks.push(wrapUserAttachment(meta, '[extraction failed]'))
+        }
+        continue
+      }
+      textBlocks.push(wrapUserAttachment(meta, `[local attachment path: ${abs}]`))
+    }
+    return textBlocks
+  }
 }
 
 function wrapUserAttachment(meta: Attachment, content: string): string {
@@ -251,7 +313,7 @@ async function extractText(absPath: string, mimeType: string): Promise<string> {
     const sheet = wb.Sheets[sheetName]
     return XLSX.utils.sheet_to_csv(sheet)
   }
-  // csv, txt, json → utf-8 raw
+  // csv, txt, json, sql -> utf-8 raw
   return fs.readFileSync(absPath, 'utf-8')
 }
 

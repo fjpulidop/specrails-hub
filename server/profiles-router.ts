@@ -8,11 +8,9 @@ import {
   deleteProfile,
   duplicateProfile,
   getProfile,
-  getUserPreferred,
   listProfiles,
   renameProfile,
   resolveProfile,
-  setUserPreferred,
   updateProfile,
   ProfileConflictError,
   ProfileNotFoundError,
@@ -501,35 +499,6 @@ export function createProfilesRouter(): Router {
     try {
       const { project } = ctx(req)
       res.json({ profiles: listProfiles(project.path) })
-    } catch (err) {
-      handleError(res, err)
-    }
-  })
-
-  // GET /api/projects/:projectId/profiles/active
-  router.get('/active', (req, res) => {
-    try {
-      const { project } = ctx(req)
-      res.json({ preferred: getUserPreferred(project.path) })
-    } catch (err) {
-      handleError(res, err)
-    }
-  })
-
-  // PUT /api/projects/:projectId/profiles/active
-  router.put('/active', (req, res) => {
-    try {
-      const { project, broadcast } = ctx(req)
-      const name = (req.body?.profile ?? '').toString()
-      if (!name) {
-        res.status(400).json({ error: "body field 'profile' is required" })
-        return
-      }
-      // Validate that the profile exists before setting preference.
-      getProfile(project.path, name)
-      setUserPreferred(project.path, name)
-      broadcast({ type: 'profile.changed', projectId: project.id, name } as never)
-      res.json({ ok: true })
     } catch (err) {
       handleError(res, err)
     }
