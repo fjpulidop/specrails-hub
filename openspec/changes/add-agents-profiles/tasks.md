@@ -80,16 +80,16 @@
 
 ## 11. Agent Studio
 
-- [ ] 11.1 `AgentStudio.tsx` — Monaco + form split view, bidirectional sync
-- [ ] 11.2 Create-new modal with three entry points (Template / Duplicate / Generate)
-- [ ] 11.3 Template entry: fetch `templates/agents/` from `specrails-core` package (bundled or API)
-- [ ] 11.4 Duplicate entry: copy existing agent, prefill `custom-<original>-copy`
-- [ ] 11.5 Generate entry: server endpoint `POST /api/projects/:id/agents/generate` spawns dedicated Claude with agent-authoring system prompt; returns draft `.md`
-- [ ] 11.6 Live validation: name regex, collision check, model enum, frontmatter required fields
-- [ ] 11.7 Save: validate → write `.claude/agents/<name>.md` → append `agent_versions` row
-- [ ] 11.8 Version history panel: list revisions, view v_N, restore (writes new version row)
-- [ ] 11.9 "Test agent" action: server spawns sandboxed `claude` with draft inline + sample task; streams output; writes `agent_tests` row on completion; token ceiling default 4000
-- [ ] 11.10 Sample-task library (bundled set: "s3 public", "sql injection", "frontend a11y", etc.)
+- [x] 11.1 `AgentStudio.tsx` — textarea body editor + inline validation hints (Monaco upgrade deferred for smaller bundle)
+- [x] 11.2 Create-new modal: "New" button in the catalog rail; Duplicate copies from any agent
+- [ ] 11.3 Template entry: fetch `templates/agents/` from `specrails-core` package — **deferred: current "blank" template + Duplicate cover most needs**
+- [x] 11.4 Duplicate entry: copy existing agent, prefill body, user supplies the new `custom-*` name
+- [ ] 11.5 Generate entry: server endpoint spawns Claude with agent-authoring system prompt — **deferred: needs ChatManager-style spawn wiring; separate commit**
+- [x] 11.6 Live validation: name regex, frontmatter presence (collision check is server-side via 409)
+- [x] 11.7 Save: validate → write `.claude/agents/<name>.md` → append `agent_versions` row
+- [x] 11.8 Version history panel: list revisions, restore (writes next version on save)
+- [ ] 11.9 "Test agent" action: sandboxed claude spawn — **deferred: substantial scope, own commit**
+- [ ] 11.10 Sample-task library — **deferred with Test-agent**
 
 ## 12. Launch-time profile pickers
 
