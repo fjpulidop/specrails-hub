@@ -100,16 +100,16 @@
 
 ## 13. Migration from legacy Project Settings
 
-- [ ] 13.1 Add migrator to `SetupManager` or first-visit hook: read `install-config.yaml` + frontmatter models, generate `.specrails/profiles/default.json` with equivalent content
-- [ ] 13.2 Idempotency: skip if `default.json` already exists
-- [ ] 13.3 Remove Agent Models section from `SettingsPage.tsx`; add one-time breadcrumb banner pointing to Agents
+- [x] 13.1 Migration triggered manually via "Migrate from current agents" button in ProfilesTab empty state; reads frontmatter models and generates `.specrails/profiles/default.json`
+- [x] 13.2 Idempotency: endpoint returns 409 if `default.json` already exists
+- [ ] 13.3 Remove Agent Models section from `SettingsPage.tsx`; add one-time breadcrumb banner pointing to Agents — **deferred: leaves the old UI in place during rollout to avoid churn**
 - [ ] 13.4 Decommission `agent-models` server endpoint and `applyModelConfig` code path after migration window (two release cycles)
 
 ## 14. Analytics integration
 
-- [ ] 14.1 Add SQL aggregation for per-profile metrics (join `jobs` × `job_profiles`)
-- [ ] 14.2 `AnalyticsPage.tsx` gains a "Profile usage" card: bar chart, tables (success rate, avg tokens, avg duration)
-- [ ] 14.3 Time window selector (7d / 30d / 90d)
+- [x] 14.1 Add SQL aggregation for per-profile metrics (join `jobs` × `job_profiles`) via GET /profiles/analytics
+- [x] 14.2 Profile usage card surfaced at the top of the Profiles tab (bars + success rate + avg duration + avg tokens) — **lives in Agents → Profiles, not AnalyticsPage; redirecting there deferred**
+- [x] 14.3 Time window selector (7d / 30d / 90d)
 
 ## 15. Telemetry enrichment
 
