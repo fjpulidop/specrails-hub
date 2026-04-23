@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Save, Trash2, History, ArrowLeft, AlertCircle } from 'lucide-react'
+import { Save, Trash2, History, ArrowLeft, AlertCircle, FlaskConical, Loader2 } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -59,6 +59,13 @@ export function AgentStudio({ agentId, initialBody, initialName, onClose, onSave
   const [versions, setVersions] = useState<AgentVersion[]>([])
   const [showVersions, setShowVersions] = useState(false)
   const [dirty, setDirty] = useState(!!initialBody && isCreate)
+  const [testPaneOpen, setTestPaneOpen] = useState(false)
+  const [sampleTask, setSampleTask] = useState('')
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<
+    { output: string; tokens: number; durationMs: number } | null
+  >(null)
+  const [testError, setTestError] = useState<string | null>(null)
 
   useEffect(() => {
     if (isCreate || initialBody !== undefined) return
@@ -159,6 +166,33 @@ export function AgentStudio({ agentId, initialBody, initialName, onClose, onSave
     setShowVersions(false)
   }, [])
 
+  const runTest = useCallback(async () => {
+    setTesting(true)
+    setTestError(null)
+    setTestResult(null)
+    try {
+      const res = await fetch(`${getApiBase()}/profiles/catalog/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentId: isCreate ? id || 'draft' : agentId,
+          draftBody: body,
+          sampleTask,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error ?? `Test failed: ${res.status}`)
+      }
+      const data = (await res.json()) as { output: string; tokens: number; durationMs: number }
+      setTestResult(data)
+    } catch (e) {
+      setTestError((e as Error).message)
+    } finally {
+      setTesting(false)
+    }
+  }, [agentId, body, id, isCreate, sampleTask])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -198,11 +232,26 @@ export function AgentStudio({ agentId, initialBody, initialName, onClose, onSave
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setTestPaneOpen((v) => !v)
+              if (!testPaneOpen) setShowVersions(false)
+            }}
+            title="Test this agent against a sample task"
+          >
+            <FlaskConical className="w-3.5 h-3.5 mr-1" />
+            Test
+          </Button>
           {!isCreate && (
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => setShowVersions((v) => !v)}
+              onClick={() => {
+                setShowVersions((v) => !v)
+                if (!showVersions) setTestPaneOpen(false)
+              }}
               title="Version history"
             >
               <History className="w-3.5 h-3.5 mr-1" />
@@ -266,6 +315,74 @@ export function AgentStudio({ agentId, initialBody, initialName, onClose, onSave
           />
         </div>
 
+        {testPaneOpen && (
+          <aside className="w-96 flex-shrink-0 border-l border-border flex flex-col min-h-0">
+            <div className="px-3 py-2 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <FlaskConical className="w-3.5 h-3.5" /> Test agent
+            </div>
+            <div className="p-3 border-b border-border">
+              <label className="block text-[11px] text-muted-foreground mb-1">
+                Sample task
+              </label>
+              <textarea
+                value={sampleTask}
+                onChange={(e) => setSampleTask(e.target.value)}
+                placeholder={'e.g. Review this Terraform diff:\n+ resource "aws_s3_bucket" "logs" {\n+   acl = "public-read"\n+ }'}
+                className="w-full text-xs p-2 rounded border border-border bg-background min-h-[80px] resize-y font-mono"
+                disabled={testing}
+              />
+              <div className="flex items-center gap-2 mt-2">
+                <Button
+                  size="sm"
+                  onClick={runTest}
+                  disabled={testing || !sampleTask.trim() || !body.trim()}
+                >
+                  {testing ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Running…
+                    </>
+                  ) : (
+                    <>
+                      <FlaskConical className="w-3.5 h-3.5 mr-1.5" /> Run
+                    </>
+                  )}
+                </Button>
+                <span className="text-[11px] text-muted-foreground">
+                  Sandboxed; no files written.
+                </span>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-3 min-h-0">
+              {testError && (
+                <div className="px-3 py-2 text-xs rounded border border-red-500/30 bg-red-500/10 text-red-400 mb-2">
+                  {testError}
+                </div>
+              )}
+              {testResult && (
+                <>
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground mb-2">
+                    <span>
+                      <span className="text-foreground font-mono">{testResult.tokens}</span> tokens
+                    </span>
+                    <span>
+                      <span className="text-foreground font-mono">
+                        {(testResult.durationMs / 1000).toFixed(1)}s
+                      </span>
+                    </span>
+                  </div>
+                  <pre className="text-xs font-mono whitespace-pre-wrap leading-relaxed rounded border border-border bg-background p-3">
+                    {testResult.output}
+                  </pre>
+                </>
+              )}
+              {!testing && !testResult && !testError && (
+                <p className="text-[11px] text-muted-foreground italic">
+                  Run a sample task against the current draft. Output appears here.
+                </p>
+              )}
+            </div>
+          </aside>
+        )}
         {showVersions && !isCreate && (
           <aside className="w-72 flex-shrink-0 border-l border-border flex flex-col">
             <div className="px-3 py-2 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide">

@@ -84,7 +84,7 @@
 - [x] 11.2 Create-new modal: "New" button in the catalog rail; Duplicate copies from any agent
 - [ ] 11.3 Template entry: fetch `templates/agents/` from `specrails-core` package — **deferred: current "blank" template + Duplicate cover most needs**
 - [x] 11.4 Duplicate entry: copy existing agent, prefill body, user supplies the new `custom-*` name
-- [ ] 11.5 Generate entry: server endpoint spawns Claude with agent-authoring system prompt — **deferred: needs ChatManager-style spawn wiring; separate commit**
+- [x] 11.5 Generate entry: server endpoint spawns Claude with agent-authoring system prompt (`server/agent-generator.ts`); Studio opens in create mode with the draft for review
 - [x] 11.6 Live validation: name regex, frontmatter presence (collision check is server-side via 409)
 - [x] 11.7 Save: validate → write `.claude/agents/<name>.md` → append `agent_versions` row
 - [x] 11.8 Version history panel: list revisions, restore (writes next version on save)

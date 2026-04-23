@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { Router, Request, Response } from 'express'
 import type { ProjectContext } from './project-registry'
-import { generateCustomAgent } from './agent-generator'
+import { generateCustomAgent, testCustomAgent } from './agent-generator'
 import {
   createProfile,
   deleteProfile,
@@ -382,6 +382,35 @@ export function createProfilesRouter(): Router {
       fs.unlinkSync(file)
       broadcast({ type: 'agent.changed', projectId: project.id, id: agentId, deleted: true } as never)
       res.json({ ok: true })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // POST /api/projects/:projectId/profiles/catalog/test
+  // Smoke-test a draft body against a sample task without writing to disk.
+  // Body: { agentId?: string, draftBody: string, sampleTask: string }
+  // Persists the result to agent_tests; returns { output, tokens, durationMs }.
+  router.post('/catalog/test', async (req, res) => {
+    try {
+      const { project, db } = ctx(req)
+      const agentId = (req.body?.agentId ?? '').toString().trim() || 'draft'
+      const draftBody = (req.body?.draftBody ?? '').toString()
+      const sampleTask = (req.body?.sampleTask ?? '').toString().trim()
+      if (!draftBody) {
+        res.status(400).json({ error: 'draftBody is required' })
+        return
+      }
+      if (!sampleTask) {
+        res.status(400).json({ error: 'sampleTask is required' })
+        return
+      }
+      const result = await testCustomAgent(project.path, { draftBody, sampleTask })
+      db.prepare(
+        `INSERT INTO agent_tests (agent_name, draft_hash, sample_task_id, tokens, duration_ms, output, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ).run(agentId, result.draftHash, null, result.tokens, result.durationMs, result.output, Date.now())
+      res.json(result)
     } catch (err) {
       handleError(res, err)
     }
