@@ -1,5 +1,22 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react'
 import { Plus, GripVertical, X, ArrowUp, ArrowDown } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { getApiBase } from '../../lib/api'
@@ -105,13 +122,34 @@ export function ProfileEditor({
     })
   }
 
-  const moveAgent = (idx: number, dir: -1 | 1) => {
-    const target = idx + dir
-    if (target < 0 || target >= profile.agents.length) return
+  const reorderAgents = (activeId: string, overId: string) => {
+    if (activeId === overId) return
+    const oldIndex = profile.agents.findIndex((a) => a.id === activeId)
+    const newIndex = profile.agents.findIndex((a) => a.id === overId)
+    if (oldIndex < 0 || newIndex < 0) return
+    // Pin sr-merge-resolver to the last slot: refuse drops that move it away
+    // from the end, and refuse drops that would land above sr-merge-resolver
+    // that push it earlier.
+    const reordered = arrayMove(profile.agents, oldIndex, newIndex)
+    const mergeIdx = reordered.findIndex((a) => a.id === 'sr-merge-resolver')
+    if (mergeIdx >= 0 && mergeIdx !== reordered.length - 1) {
+      const [merge] = reordered.splice(mergeIdx, 1)
+      reordered.push(merge)
+    }
     update((d) => {
-      const [item] = d.agents.splice(idx, 1)
-      d.agents.splice(target, 0, item)
+      d.agents = reordered
     })
+  }
+
+  const sortableSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over) return
+    reorderAgents(String(active.id), String(over.id))
   }
 
   const setAgentModel = (idx: number, model: ModelAlias) => {
@@ -279,18 +317,20 @@ export function ProfileEditor({
           </div>
         )}
 
-        <div className="space-y-1.5">
-          {profile.agents.map((agent, idx) => (
-            <AgentRow
-              key={`${agent.id}-${idx}`}
-              agent={agent}
-              onModel={(m) => setAgentModel(idx, m)}
-              onUp={() => moveAgent(idx, -1)}
-              onDown={() => moveAgent(idx, 1)}
-              onRemove={() => removeAgent(idx)}
-            />
-          ))}
-        </div>
+        <DndContext sensors={sortableSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={profile.agents.map((a) => a.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-1.5">
+              {profile.agents.map((agent, idx) => (
+                <AgentRow
+                  key={agent.id}
+                  agent={agent}
+                  onModel={(m) => setAgentModel(idx, m)}
+                  onRemove={() => removeAgent(idx)}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       </section>
 
       {/* Routing */}
@@ -336,20 +376,46 @@ export function ProfileEditor({
 function AgentRow({
   agent,
   onModel,
-  onUp,
-  onDown,
   onRemove,
 }: {
   agent: ProfileAgent
   onModel: (m: ModelAlias) => void
-  onUp: () => void
-  onDown: () => void
   onRemove: () => void
 }) {
   const isRequired = BASELINE_REQUIRED_AGENTS.has(agent.id)
+  const isPinnedLast = agent.id === 'sr-merge-resolver'
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: agent.id,
+    // sr-merge-resolver stays at the end; disable dragging it.
+    disabled: isPinnedLast,
+  })
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+    zIndex: isDragging ? 10 : undefined,
+  }
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-border group hover:bg-accent/30 transition-colors">
-      <GripVertical className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-border group hover:bg-accent/30 transition-colors bg-background"
+    >
+      <button
+        type="button"
+        className={
+          'flex-shrink-0 p-0.5 rounded text-muted-foreground ' +
+          (isPinnedLast
+            ? 'cursor-not-allowed opacity-30'
+            : 'cursor-grab active:cursor-grabbing hover:text-foreground')
+        }
+        title={isPinnedLast ? 'sr-merge-resolver is pinned last — can\'t reorder' : 'Drag to reorder'}
+        aria-label="Drag handle"
+        {...(isPinnedLast ? {} : attributes)}
+        {...(isPinnedLast ? {} : listeners)}
+      >
+        <GripVertical className="w-3.5 h-3.5" />
+      </button>
       <span className="text-sm font-mono flex-1 truncate">{agent.id}</span>
       {isRequired && (
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
@@ -357,23 +423,15 @@ function AgentRow({
         </span>
       )}
       <ModelSelect value={agent.model ?? 'sonnet'} onChange={onModel} />
-      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button type="button" className="p-1 hover:bg-accent rounded" onClick={onUp} title="Move up">
-          <ArrowUp className="w-3 h-3" />
-        </button>
-        <button type="button" className="p-1 hover:bg-accent rounded" onClick={onDown} title="Move down">
-          <ArrowDown className="w-3 h-3" />
-        </button>
-        <button
-          type="button"
-          className="p-1 hover:bg-red-500/20 text-red-400 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-          onClick={onRemove}
-          disabled={isRequired}
-          title={isRequired ? 'Required baseline agent' : 'Remove'}
-        >
-          <X className="w-3 h-3" />
-        </button>
-      </div>
+      <button
+        type="button"
+        className="p-1 hover:bg-red-500/20 text-red-400 rounded disabled:opacity-30 disabled:cursor-not-allowed opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={onRemove}
+        disabled={isRequired}
+        title={isRequired ? 'Required baseline agent' : 'Remove'}
+      >
+        <X className="w-3 h-3" />
+      </button>
     </div>
   )
 }
