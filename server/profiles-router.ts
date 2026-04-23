@@ -92,7 +92,7 @@ export function createProfilesRouter(): Router {
         }
         agents.push({ id, model })
       }
-      const baseline = ['sr-architect', 'sr-developer', 'sr-reviewer']
+      const baseline = ['sr-architect', 'sr-developer', 'sr-reviewer', 'sr-merge-resolver']
       const missing = baseline.filter((id) => !agents.some((a) => a.id === id))
       if (missing.length > 0) {
         res.status(400).json({
@@ -100,13 +100,28 @@ export function createProfilesRouter(): Router {
         })
         return
       }
+      // Order: baseline trio first (architect, developer, reviewer), optional
+      // agents in the middle, sr-merge-resolver pinned last so rails' merge
+      // phase runs after everything else.
+      const pinnedLast = new Set(['sr-merge-resolver'])
+      const baselineFirst = new Set(['sr-architect', 'sr-developer', 'sr-reviewer'])
+      const orderedAgents = [
+        ...agents.filter((a) => baselineFirst.has(a.id))
+          .sort((a, b) => {
+            const rank = ['sr-architect', 'sr-developer', 'sr-reviewer']
+            return rank.indexOf(a.id) - rank.indexOf(b.id)
+          }),
+        ...agents.filter((a) => !baselineFirst.has(a.id) && !pinnedLast.has(a.id))
+          .sort((a, b) => a.id.localeCompare(b.id)),
+        ...agents.filter((a) => pinnedLast.has(a.id)),
+      ]
       // Build the default profile mirroring legacy routing.
       const profile = {
         schemaVersion: 1 as const,
         name: 'default',
         description: 'Baseline profile migrated from your current agent frontmatters.',
         orchestrator: { model: 'sonnet' as const },
-        agents: agents.map((a) => ({
+        agents: orderedAgents.map((a) => ({
           id: a.id,
           model: a.model,
           required: baseline.includes(a.id),

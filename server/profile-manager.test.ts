@@ -36,6 +36,7 @@ function baseProfile(name = 'default'): Profile {
       { id: 'sr-architect', required: true },
       { id: 'sr-developer', required: true },
       { id: 'sr-reviewer', required: true },
+      { id: 'sr-merge-resolver', required: true },
     ],
     routing: [
       { tags: ['frontend'], agent: 'sr-developer' },

@@ -41,6 +41,11 @@ export interface UserPreferred {
   profile: string
 }
 
-export const BASELINE_REQUIRED_AGENTS = new Set(['sr-architect', 'sr-developer', 'sr-reviewer'])
+export const BASELINE_REQUIRED_AGENTS = new Set([
+  'sr-architect',
+  'sr-developer',
+  'sr-reviewer',
+  'sr-merge-resolver',
+])
 
 export const MODEL_ALIASES: ModelAlias[] = ['sonnet', 'opus', 'haiku']

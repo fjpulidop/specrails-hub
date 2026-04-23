@@ -62,7 +62,7 @@ export function ProfileEditor({
   // ── Live validation (structural checks beyond the JSON schema) ─────────────
   const validationIssues: string[] = useMemo(() => {
     const issues: string[] = []
-    for (const baseline of ['sr-architect', 'sr-developer', 'sr-reviewer']) {
+    for (const baseline of BASELINE_REQUIRED_AGENTS) {
       if (!profile.agents.some((a) => a.id === baseline)) {
         issues.push(`Missing required baseline agent: ${baseline}`)
       }

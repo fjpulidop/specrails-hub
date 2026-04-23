@@ -34,6 +34,7 @@ function baseProfile(name = 'default') {
       { id: 'sr-architect', required: true },
       { id: 'sr-developer', required: true },
       { id: 'sr-reviewer', required: true },
+      { id: 'sr-merge-resolver', required: true },
     ],
     routing: [{ default: true, agent: 'sr-developer' }],
   }
@@ -431,9 +432,16 @@ describe('POST /profiles/migrate-from-settings', () => {
     writeAgent('sr-architect', 'opus')
     writeAgent('sr-developer')
     writeAgent('sr-reviewer')
+    writeAgent('sr-merge-resolver')
     const res = await request(app).post('/api/projects/proj-test/profiles/migrate-from-settings')
     expect(res.status).toBe(201)
     expect(res.body.profile.name).toBe('default')
+    // Order: trio first, merge-resolver pinned last
+    const ids = res.body.profile.agents.map((a: { id: string }) => a.id)
+    expect(ids[ids.length - 1]).toBe('sr-merge-resolver')
+    // merge-resolver required
+    const merge = res.body.profile.agents.find((a: { id: string }) => a.id === 'sr-merge-resolver')
+    expect(merge.required).toBe(true)
   })
 
   it('400 when no .claude/agents directory', async () => {
@@ -441,17 +449,20 @@ describe('POST /profiles/migrate-from-settings', () => {
     expect(res.status).toBe(400)
   })
 
-  it('400 when baseline is incomplete', async () => {
+  it('400 when baseline is incomplete (missing sr-merge-resolver)', async () => {
     writeAgent('sr-architect')
     writeAgent('sr-developer')
+    writeAgent('sr-reviewer')
     const res = await request(app).post('/api/projects/proj-test/profiles/migrate-from-settings')
     expect(res.status).toBe(400)
+    expect(res.body.error).toContain('sr-merge-resolver')
   })
 
   it('409 when default already exists', async () => {
     writeAgent('sr-architect')
     writeAgent('sr-developer')
     writeAgent('sr-reviewer')
+    writeAgent('sr-merge-resolver')
     await request(app).post('/api/projects/proj-test/profiles/migrate-from-settings')
     const res = await request(app).post('/api/projects/proj-test/profiles/migrate-from-settings')
     expect(res.status).toBe(409)

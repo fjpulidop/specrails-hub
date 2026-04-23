@@ -39,7 +39,7 @@ function runMigration(projectPath: string): { ok: true } | { ok: false; error: s
     if (m) model = m[1] as 'sonnet' | 'opus' | 'haiku'
     agents.push({ id, model })
   }
-  const baseline = ['sr-architect', 'sr-developer', 'sr-reviewer']
+  const baseline = ['sr-architect', 'sr-developer', 'sr-reviewer', 'sr-merge-resolver']
   const missing = baseline.filter((id) => !agents.some((a) => a.id === id))
   if (missing.length > 0) return { ok: false, error: `missing: ${missing.join(', ')}` }
   const profile = {
@@ -64,23 +64,30 @@ afterEach(() => {
 })
 
 describe('profile migration from existing agent frontmatters', () => {
-  it('creates a default profile mirroring the baseline trio', () => {
+  it('creates a default profile mirroring the 4-agent baseline', () => {
     seedAgent('sr-architect', 'opus')
     seedAgent('sr-developer', 'sonnet')
     seedAgent('sr-reviewer', 'sonnet')
+    seedAgent('sr-merge-resolver', 'sonnet')
     const result = runMigration(projectPath)
     expect(result).toEqual({ ok: true })
     const profile = getProfile(projectPath, 'default')
     expect(profile.name).toBe('default')
-    expect(profile.agents.map((a) => a.id).sort()).toEqual(['sr-architect', 'sr-developer', 'sr-reviewer'])
+    expect(profile.agents.map((a) => a.id).sort()).toEqual(
+      ['sr-architect', 'sr-developer', 'sr-merge-resolver', 'sr-reviewer'],
+    )
     const architect = profile.agents.find((a) => a.id === 'sr-architect')!
     expect(architect.model).toBe('opus')
     expect(architect.required).toBe(true)
+    // merge-resolver is required
+    const merge = profile.agents.find((a) => a.id === 'sr-merge-resolver')!
+    expect(merge.required).toBe(true)
   })
 
-  it('rejects when the baseline trio is incomplete', () => {
+  it('rejects when the baseline is incomplete (missing sr-reviewer)', () => {
     seedAgent('sr-architect')
     seedAgent('sr-developer')
+    seedAgent('sr-merge-resolver')
     // sr-reviewer missing
     const result = runMigration(projectPath)
     expect(result.ok).toBe(false)
@@ -90,10 +97,22 @@ describe('profile migration from existing agent frontmatters', () => {
     expect(() => getProfile(projectPath, 'default')).toThrow(ProfileNotFoundError)
   })
 
+  it('rejects when sr-merge-resolver is missing from the baseline', () => {
+    seedAgent('sr-architect')
+    seedAgent('sr-developer')
+    seedAgent('sr-reviewer')
+    const result = runMigration(projectPath)
+    expect(result.ok).toBe(false)
+    if (result.ok === false) {
+      expect(result.error).toContain('sr-merge-resolver')
+    }
+  })
+
   it('ignores non-sr agents (e.g. custom-*)', () => {
     seedAgent('sr-architect')
     seedAgent('sr-developer')
     seedAgent('sr-reviewer')
+    seedAgent('sr-merge-resolver')
     // custom agent shouldn't block migration and shouldn't appear in the default profile
     const customFile = path.join(projectPath, '.claude', 'agents', 'custom-qa.md')
     fs.writeFileSync(customFile, agentFile('custom-qa'), 'utf8')
@@ -107,6 +126,7 @@ describe('profile migration from existing agent frontmatters', () => {
     seedAgent('sr-architect')
     seedAgent('sr-developer')
     seedAgent('sr-reviewer')
+    seedAgent('sr-merge-resolver')
     runMigration(projectPath)
     expect(() => runMigration(projectPath)).toThrow()
   })
