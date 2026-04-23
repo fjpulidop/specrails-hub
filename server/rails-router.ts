@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import type { ProjectContext } from './project-registry'
-import { getRails, getRail, setRailTickets } from './rails-store'
+import { getRails, getRail, setRailTickets, setRailProfile } from './rails-store'
 import { ClaudeNotFoundError } from './queue-manager'
 import type { RailJobStartedMessage, RailJobStoppedMessage } from './types'
 
@@ -59,6 +59,31 @@ export function createRailsRouter(): Router {
     }
   })
 
+  // PUT /rails/:railIndex/profile — set the default agent profile for a rail
+  // Body: { profileName: string | null } (null = force legacy mode for this rail)
+  router.put('/:railIndex/profile', (req: Request, res: Response) => {
+    const railIndex = parseInt(req.params.railIndex as string, 10)
+    if (isNaN(railIndex) || railIndex < 0) {
+      res.status(400).json({ error: 'Invalid rail index' }); return
+    }
+    const body = req.body ?? {}
+    if (!('profileName' in body)) {
+      res.status(400).json({ error: "body must include 'profileName' (string or null)" }); return
+    }
+    const value = body.profileName
+    if (value !== null && typeof value !== 'string') {
+      res.status(400).json({ error: 'profileName must be a string or null' }); return
+    }
+    const c = ctx(req)
+    try {
+      const rail = setRailProfile(c.db, railIndex, value)
+      res.json({ rail })
+    } catch (err) {
+      console.error('[rails-router] set rail profile error:', err)
+      res.status(500).json({ error: 'Failed to update rail profile' })
+    }
+  })
+
   // POST /rails/:railIndex/launch — launch job(s) for a rail
   router.post('/:railIndex/launch', (req: Request, res: Response) => {
     const railIndex = parseInt(req.params.railIndex as string, 10)
@@ -66,7 +91,7 @@ export function createRailsRouter(): Router {
       res.status(400).json({ error: 'Invalid rail index' }); return
     }
 
-    const { mode = 'implement' } = req.body ?? {}
+    const { mode = 'implement', profileName } = req.body ?? {}
     if (!VALID_MODES.has(mode as string)) {
       res.status(400).json({ error: 'mode must be "implement" or "batch-implement"' }); return
     }
@@ -78,6 +103,19 @@ export function createRailsRouter(): Router {
       res.status(400).json({ error: 'Rail has no tickets assigned' }); return
     }
 
+    // Profile selection precedence: explicit body param > stored rail profile > default resolution.
+    // `null` in the body explicitly forces legacy mode.
+    let resolvedProfile: string | null | undefined
+    if (profileName === null) {
+      resolvedProfile = null
+    } else if (typeof profileName === 'string' && profileName.trim()) {
+      resolvedProfile = profileName.trim()
+    } else if (rail.profileName) {
+      resolvedProfile = rail.profileName
+    } else {
+      resolvedProfile = undefined // fall through to QueueManager default resolution
+    }
+
     try {
       let jobId: string
 
@@ -86,7 +124,7 @@ export function createRailsRouter(): Router {
       const issueArgs = rail.ticketIds.map((id) => `#${id}`).join(' ')
       const commandName = mode === 'batch-implement' ? 'batch-implement' : 'implement'
       const command = `/specrails:${commandName} ${issueArgs} --yes`
-      const job = c.queueManager.enqueue(command, 'normal')
+      const job = c.queueManager.enqueue(command, 'normal', { profileName: resolvedProfile })
       jobId = job.id
       c.railJobs.set(jobId, { railIndex, mode, ticketIds: [...rail.ticketIds] })
 

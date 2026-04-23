@@ -37,7 +37,8 @@ import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import multer from 'multer'
 import { createRailsRouter } from './rails-router'
-import { attachmentManager, SUPPORTED_MIME_TYPES, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
+import { createProfilesRouter } from './profiles-router'
+import { attachmentManager, isSupportedUploadedFile, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
 import {
   getTerminalManager,
   TerminalLimitExceededError,
@@ -241,10 +242,14 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   const railsRouter = createRailsRouter()
   router.use('/:projectId/rails', railsRouter)
 
+  // Mount profiles router under each project (agent profiles)
+  const profilesRouter = createProfilesRouter()
+  router.use('/:projectId/profiles', profilesRouter)
+
   // ─── Queue / Spawn routes ────────────────────────────────────────────────────
 
   router.post('/:projectId/spawn', (req: Request, res: Response) => {
-    const { command, priority, dependsOnJobId, pipelineId } = req.body ?? {}
+    const { command, priority, dependsOnJobId, pipelineId, profileName } = req.body ?? {}
     if (!command || typeof command !== 'string' || !command.trim()) {
       res.status(400).json({ error: 'command is required' })
       return
@@ -253,10 +258,16 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       res.status(400).json({ error: 'priority must be one of: low, normal, high, critical' })
       return
     }
+    // profileName accepts: undefined (default resolution), null (force legacy), string (explicit)
+    const normalizedProfileName: string | null | undefined =
+      profileName === null ? null
+        : typeof profileName === 'string' && profileName.trim() ? profileName.trim()
+          : undefined
     try {
       const job = ctx(req).queueManager.enqueue(command, (priority as JobPriority) ?? 'normal', {
         dependsOnJobId: dependsOnJobId || undefined,
         pipelineId: pipelineId || undefined,
+        profileName: normalizedProfileName,
       })
       const position = job.queuePosition ?? 0
       res.status(202).json({ jobId: job.id, position })
@@ -467,11 +478,45 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
   router.get('/:projectId/jobs/:id', (req: Request, res: Response) => {
     const { db, queueManager } = ctx(req)
-    const job = getJob(db, req.params.id as string)
-    if (!job) { res.status(404).json({ error: 'Job not found' }); return }
-    const events = getJobEvents(db, req.params.id as string)
+    const jobId = req.params.id as string
+    const job = getJob(db, jobId)
+    if (!job) {
+      // Queued jobs live only in memory until spawn time (createJob runs on spawn,
+      // not enqueue). Fall back to the in-memory queue so /jobs/:id returns a
+      // usable payload instead of 404 — the detail page then renders a "queued"
+      // state and flips to live logs via WS once the job starts.
+      const inMemory = queueManager.getJobs().find((j) => j.id === jobId)
+      if (!inMemory) { res.status(404).json({ error: 'Job not found' }); return }
+      const synthetic: JobRow = {
+        id: inMemory.id,
+        command: inMemory.command,
+        started_at: inMemory.startedAt ?? '',
+        finished_at: inMemory.finishedAt,
+        status: inMemory.status,
+        exit_code: inMemory.exitCode,
+        queue_position: inMemory.queuePosition,
+        priority: inMemory.priority,
+        tokens_in: null,
+        tokens_out: null,
+        tokens_cache_read: null,
+        tokens_cache_create: null,
+        total_cost_usd: null,
+        num_turns: null,
+        model: null,
+        duration_ms: null,
+        duration_api_ms: null,
+        session_id: null,
+        depends_on_job_id: inMemory.dependsOnJobId,
+        pipeline_id: inMemory.pipelineId,
+        skip_reason: inMemory.skipReason,
+      }
+      const phaseDefinitions = queueManager.phasesForCommand(synthetic.command)
+      res.json({ job: { ...synthetic, hasTelemetry: false }, events: [], phaseDefinitions })
+      return
+    }
+    const events = getJobEvents(db, jobId)
     const phaseDefinitions = queueManager.phasesForCommand(job.command)
-    const annotated = { ...job, hasTelemetry: hasJobTelemetry(db, req.params.id as string) }
+    const annotated = { ...job, hasTelemetry: hasJobTelemetry(db, jobId) }
     res.json({ job: annotated, events, phaseDefinitions })
   })
 
@@ -1802,7 +1847,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     storage: multer.memoryStorage(),
     limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB per file
     fileFilter: (_req, file, cb) => {
-      if (SUPPORTED_MIME_TYPES.has(file.mimetype)) cb(null, true)
+      if (isSupportedUploadedFile({ mimetype: file.mimetype, originalname: file.originalname })) cb(null, true)
       else cb(null, false)
     },
   })
@@ -2011,7 +2056,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   router.patch('/:projectId/settings', (req: Request, res: Response) => {
-    const { pipelineTelemetryEnabled, orchestratorModel } = req.body ?? {}
+    const { pipelineTelemetryEnabled, orchestratorModel, prePrompt } = req.body ?? {}
     const patch: Parameters<typeof updateProjectSettings>[1] = {}
     if (pipelineTelemetryEnabled !== undefined) {
       patch.pipelineTelemetryEnabled = Boolean(pipelineTelemetryEnabled)
@@ -2023,6 +2068,13 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         return
       }
       patch.orchestratorModel = orchestratorModel
+    }
+    if (prePrompt !== undefined) {
+      if (typeof prePrompt !== 'string') {
+        res.status(400).json({ error: 'prePrompt must be a string' })
+        return
+      }
+      patch.prePrompt = prePrompt
     }
     try {
       updateProjectSettings(ctx(req).db, patch)
@@ -2183,11 +2235,16 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       res.setHeader('Content-Type', 'application/zip')
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
 
+      const profileRow = db
+        .prepare(`SELECT profile_name, profile_json FROM job_profiles WHERE job_id = ?`)
+        .get(jobId) as { profile_name: string; profile_json: string } | undefined
+
       await createDiagnosticZip(res, {
         job,
         blob,
         summaries,
         events,
+        profile: profileRow ? { name: profileRow.profile_name, json: profileRow.profile_json } : null,
       })
     } catch (err) {
       if (!res.headersSent) {

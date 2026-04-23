@@ -4,6 +4,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { GripVertical, Trash2 } from 'lucide-react'
 import { RailControls, type RailMode, type RailStatus } from './RailControls'
 import { SpecCard } from './SpecCard'
+import { RailProfileSelector } from './agents/RailProfileSelector'
 import type { LocalTicket } from '../types'
 
 const LONG_PRESS_MS = 800
@@ -16,10 +17,12 @@ interface RailRowProps {
   mode: RailMode
   status: RailStatus
   activeJobId?: string
+  profileName?: string | null
   jiggleMode: boolean
   dragHandleListeners?: Record<string, Function>
   dragHandleAttributes?: Record<string, any>
   onModeChange: (mode: RailMode) => void
+  onProfileChange?: (profileName: string | null) => void
   onToggle: () => void
   onTicketClick: (ticket: LocalTicket) => void
   onDelete: () => void
@@ -28,9 +31,9 @@ interface RailRowProps {
 }
 
 export function RailRow({
-  id, label, tickets, mode, status, activeJobId, jiggleMode,
+  id, label, tickets, mode, status, activeJobId, profileName, jiggleMode,
   dragHandleListeners, dragHandleAttributes,
-  onModeChange, onToggle, onTicketClick, onDelete, onLongPress, onRename,
+  onModeChange, onProfileChange, onToggle, onTicketClick, onDelete, onLongPress, onRename,
 }: RailRowProps) {
   const { isOver, setNodeRef } = useDroppable({ id })
   const [swipeX, setSwipeX] = useState(0)
@@ -245,6 +248,12 @@ export function RailRow({
             )}
           </div>
           <div className="flex items-center gap-1.5">
+            {onProfileChange && status !== 'running' && (
+              <RailProfileSelector
+                value={profileName ?? null}
+                onChange={onProfileChange}
+              />
+            )}
             <RailControls mode={mode} status={status} activeJobId={activeJobId} ticketCount={tickets.length} onModeChange={onModeChange} onToggle={onToggle} />
             {/* Jiggle-mode delete button */}
             {jiggleMode && canDelete && (

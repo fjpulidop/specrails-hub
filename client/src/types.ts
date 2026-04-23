@@ -28,6 +28,8 @@ export interface JobSummary {
   skip_reason?: string | null
   /** True if a telemetry blob (active or compacted) exists for this job */
   hasTelemetry?: boolean
+  /** Profile the job ran under (null/undefined = legacy mode) */
+  profile_name?: string | null
 }
 
 export interface EventRow {

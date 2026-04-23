@@ -253,6 +253,55 @@ const MIGRATIONS: Migration[] = [
       );
     `)
   },
+
+  // Migration 11: agent profiles — per-rail profile snapshots, custom agent
+  // version history, and sandboxed "test agent" run records. These back the
+  // Agents section (profiles + studio) added by add-agents-profiles.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS job_profiles (
+        job_id        TEXT    PRIMARY KEY,
+        profile_name  TEXT    NOT NULL,
+        profile_json  TEXT    NOT NULL,
+        created_at    INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_job_profiles_name ON job_profiles(profile_name);
+
+      CREATE TABLE IF NOT EXISTS agent_versions (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_name   TEXT    NOT NULL,
+        version      INTEGER NOT NULL,
+        body         TEXT    NOT NULL,
+        created_at   INTEGER NOT NULL,
+        UNIQUE (agent_name, version)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_agent_versions_name ON agent_versions(agent_name);
+
+      CREATE TABLE IF NOT EXISTS agent_tests (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_name     TEXT    NOT NULL,
+        draft_hash     TEXT    NOT NULL,
+        sample_task_id TEXT,
+        tokens         INTEGER,
+        duration_ms    INTEGER,
+        output         TEXT,
+        created_at     INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_agent_tests_name ON agent_tests(agent_name);
+    `)
+  },
+
+  // Migration 12: remember per-rail agent profile selection across launches.
+  (db) => {
+    try {
+      db.exec(`ALTER TABLE rails ADD COLUMN profile_name TEXT`)
+    } catch {
+      // Column may already exist (partially-migrated DB); no-op.
+    }
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {
@@ -409,7 +458,10 @@ export function listJobs(
 
   const jobs = db
     .prepare(
-      `SELECT * FROM jobs ${where} ORDER BY started_at DESC LIMIT ? OFFSET ?`
+      `SELECT jobs.*, jp.profile_name AS profile_name
+       FROM jobs LEFT JOIN job_profiles jp ON jp.job_id = jobs.id
+       ${where}
+       ORDER BY started_at DESC LIMIT ? OFFSET ?`
     )
     .all(...params, limit, offset) as JobRow[]
 
@@ -713,6 +765,7 @@ export function getStats(db: DbInstance): StatsRow {
 export interface ProjectSettings {
   pipelineTelemetryEnabled: boolean
   orchestratorModel: string
+  prePrompt: string
 }
 
 export function getProjectSettings(db: DbInstance): ProjectSettings {
@@ -722,9 +775,13 @@ export function getProjectSettings(db: DbInstance): ProjectSettings {
   const modelRow = db.prepare(
     `SELECT value FROM queue_state WHERE key = 'config.orchestrator_model'`
   ).get() as { value: string } | undefined
+  const prePromptRow = db.prepare(
+    `SELECT value FROM queue_state WHERE key = 'config.pre_prompt'`
+  ).get() as { value: string } | undefined
   return {
     pipelineTelemetryEnabled: telemetryRow?.value === 'true',
     orchestratorModel: modelRow?.value ?? 'sonnet',
+    prePrompt: prePromptRow?.value ?? '',
   }
 }
 
@@ -738,6 +795,15 @@ export function updateProjectSettings(db: DbInstance, patch: Partial<ProjectSett
     db.prepare(
       `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.orchestrator_model', ?)`
     ).run(patch.orchestratorModel)
+  }
+  if (patch.prePrompt !== undefined) {
+    if (patch.prePrompt.trim() === '') {
+      db.prepare(`DELETE FROM queue_state WHERE key = 'config.pre_prompt'`).run()
+    } else {
+      db.prepare(
+        `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.pre_prompt', ?)`
+      ).run(patch.prePrompt)
+    }
   }
 }
 

@@ -353,6 +353,18 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                 </span>
               )}
 
+              {/* Profile badge */}
+              {job.profile_name && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border border-dracula-purple/40 bg-dracula-purple/10 text-dracula-purple/90">
+                      {job.profile_name}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>Profile: {job.profile_name}</TooltipContent>
+                </Tooltip>
+              )}
+
               {/* Command */}
               <div className="flex items-center gap-1 flex-1 min-w-0">
                 {job.pipeline_id && (

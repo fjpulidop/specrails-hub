@@ -1,0 +1,610 @@
+import fs from 'fs'
+import path from 'path'
+import { Router, Request, Response } from 'express'
+import type { ProjectContext } from './project-registry'
+import { generateCustomAgent, testCustomAgent } from './agent-generator'
+import {
+  createProfile,
+  deleteProfile,
+  duplicateProfile,
+  getProfile,
+  listProfiles,
+  renameProfile,
+  resolveProfile,
+  updateProfile,
+  ProfileConflictError,
+  ProfileNotFoundError,
+  ProfileValidationError,
+  type Profile,
+} from './profile-manager'
+
+// Request augmentation declared in project-router.ts
+declare module 'express-serve-static-core' {
+  interface Request {
+    projectCtx?: ProjectContext
+  }
+}
+
+const AGENTS_SECTION_ENABLED = process.env.SPECRAILS_AGENTS_SECTION !== 'false'
+
+function handleError(res: Response, err: unknown): void {
+  if (err instanceof ProfileValidationError) {
+    res.status(400).json({ error: err.message, details: err.errors })
+    return
+  }
+  if (err instanceof ProfileConflictError) {
+    res.status(409).json({ error: err.message })
+    return
+  }
+  if (err instanceof ProfileNotFoundError) {
+    res.status(404).json({ error: err.message })
+    return
+  }
+  const message = err instanceof Error ? err.message : 'unknown error'
+  res.status(500).json({ error: message })
+}
+
+export function createProfilesRouter(): Router {
+  const router = Router({ mergeParams: true })
+
+  function ctx(req: Request): ProjectContext {
+    return req.projectCtx!
+  }
+
+  // Feature-flag gate
+  router.use((_req, res, next) => {
+    if (!AGENTS_SECTION_ENABLED) {
+      res.status(404).json({ error: 'Agents section disabled on this server' })
+      return
+    }
+    next()
+  })
+
+  // POST /api/projects/:projectId/profiles/migrate-from-settings
+  // Seed a `default` profile from the agent frontmatter + legacy routing.
+  // Intended for first-time onboarding of existing projects.
+  router.post('/migrate-from-settings', (req, res) => {
+    try {
+      const { project, broadcast } = ctx(req)
+      const agentsDir = path.join(project.path, '.claude', 'agents')
+      if (!fs.existsSync(agentsDir)) {
+        res.status(400).json({ error: 'no .claude/agents/ directory found' })
+        return
+      }
+      // Gather installed sr-*.md with their declared models.
+      const agents: Array<{ id: string; model: 'sonnet' | 'opus' | 'haiku' }> = []
+      for (const entry of fs.readdirSync(agentsDir)) {
+        if (!entry.endsWith('.md')) continue
+        if (!entry.startsWith('sr-')) continue
+        const id = entry.slice(0, -'.md'.length)
+        let model: 'sonnet' | 'opus' | 'haiku' = 'sonnet'
+        try {
+          const content = fs.readFileSync(path.join(agentsDir, entry), 'utf8')
+          const fm = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+          if (fm) {
+            const m = fm[1].match(/^model:\s*(sonnet|opus|haiku)/m)
+            if (m) model = m[1] as 'sonnet' | 'opus' | 'haiku'
+          }
+        } catch {
+          // skip unreadable files
+        }
+        agents.push({ id, model })
+      }
+      const baseline = ['sr-architect', 'sr-developer', 'sr-reviewer', 'sr-merge-resolver']
+      const missing = baseline.filter((id) => !agents.some((a) => a.id === id))
+      if (missing.length > 0) {
+        res.status(400).json({
+          error: `missing baseline agents in this project: ${missing.join(', ')}. Run 'npx specrails-core@latest update' first.`,
+        })
+        return
+      }
+      // Order: baseline trio first (architect, developer, reviewer), optional
+      // agents in the middle, sr-merge-resolver pinned last so rails' merge
+      // phase runs after everything else.
+      const pinnedLast = new Set(['sr-merge-resolver'])
+      const baselineFirst = new Set(['sr-architect', 'sr-developer', 'sr-reviewer'])
+      const orderedAgents = [
+        ...agents.filter((a) => baselineFirst.has(a.id))
+          .sort((a, b) => {
+            const rank = ['sr-architect', 'sr-developer', 'sr-reviewer']
+            return rank.indexOf(a.id) - rank.indexOf(b.id)
+          }),
+        ...agents.filter((a) => !baselineFirst.has(a.id) && !pinnedLast.has(a.id))
+          .sort((a, b) => a.id.localeCompare(b.id)),
+        ...agents.filter((a) => pinnedLast.has(a.id)),
+      ]
+      // Build the default profile mirroring legacy routing.
+      const profile = {
+        schemaVersion: 1 as const,
+        name: 'default',
+        description: 'Baseline profile migrated from your current agent frontmatters.',
+        orchestrator: { model: 'sonnet' as const },
+        agents: orderedAgents.map((a) => ({
+          id: a.id,
+          model: a.model,
+          required: baseline.includes(a.id),
+        })),
+        routing: [
+          ...(agents.some((a) => a.id === 'sr-frontend-developer')
+            ? [{ tags: ['frontend'], agent: 'sr-frontend-developer' }]
+            : []),
+          ...(agents.some((a) => a.id === 'sr-backend-developer')
+            ? [{ tags: ['backend'], agent: 'sr-backend-developer' }]
+            : []),
+          { default: true, agent: 'sr-developer' },
+        ],
+      }
+      try {
+        createProfile(project.path, profile as never)
+      } catch (err) {
+        if (err instanceof ProfileConflictError) {
+          res.status(409).json({ error: "a profile named 'default' already exists; delete it first or edit it manually" })
+          return
+        }
+        throw err
+      }
+      broadcast({ type: 'profile.changed', projectId: project.id, name: 'default' } as never)
+      res.status(201).json({ profile })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // GET /api/projects/:projectId/profiles/analytics?windowDays=30
+  // Per-profile aggregated metrics over the requested time window.
+  router.get('/analytics', (req, res) => {
+    try {
+      const { db } = ctx(req)
+      const windowDays = Math.max(1, Math.min(365, parseInt((req.query.windowDays ?? '30') as string, 10) || 30))
+      const since = Date.now() - windowDays * 24 * 60 * 60 * 1000
+      const rows = db
+        .prepare(
+          `SELECT
+             jp.profile_name AS profileName,
+             COUNT(*) AS jobs,
+             SUM(CASE WHEN j.status = 'completed' THEN 1 ELSE 0 END) AS succeeded,
+             AVG(j.duration_ms) AS avgDurationMs,
+             AVG(COALESCE(j.tokens_in, 0) + COALESCE(j.tokens_out, 0)) AS avgTokens,
+             AVG(j.total_cost_usd) AS avgCostUsd
+           FROM job_profiles jp
+           JOIN jobs j ON j.id = jp.job_id
+           WHERE jp.created_at >= ?
+           GROUP BY jp.profile_name
+           ORDER BY jobs DESC`,
+        )
+        .all(since) as Array<{
+          profileName: string
+          jobs: number
+          succeeded: number
+          avgDurationMs: number | null
+          avgTokens: number | null
+          avgCostUsd: number | null
+        }>
+      res.json({
+        windowDays,
+        rows: rows.map((r) => ({
+          profileName: r.profileName,
+          jobs: r.jobs,
+          succeeded: r.succeeded,
+          successRate: r.jobs > 0 ? r.succeeded / r.jobs : 0,
+          avgDurationMs: r.avgDurationMs,
+          avgTokens: r.avgTokens,
+          avgCostUsd: r.avgCostUsd,
+        })),
+      })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // GET /api/projects/:projectId/profiles/core-version
+  // Report the project's installed specrails-core version for the upgrade banner.
+  router.get('/core-version', (req, res) => {
+    try {
+      const { project } = ctx(req)
+      const candidates = [
+        path.join(project.path, '.specrails', 'specrails-version'),
+        path.join(project.path, '.specrails-version'),
+      ]
+      let version: string | null = null
+      for (const p of candidates) {
+        if (fs.existsSync(p)) {
+          try {
+            version = fs.readFileSync(p, 'utf8').trim()
+          } catch {
+            // ignore
+          }
+          if (version) break
+        }
+      }
+      // Minimum version required for profile-aware implement
+      const REQUIRED = '4.1.0'
+      let profileAware = false
+      if (version) {
+        const [ma, mi, pa] = version.split('.').map((n) => parseInt(n, 10))
+        const [rma, rmi, rpa] = REQUIRED.split('.').map((n) => parseInt(n, 10))
+        if (!isNaN(ma) && !isNaN(mi) && !isNaN(pa)) {
+          profileAware =
+            ma > rma ||
+            (ma === rma && mi > rmi) ||
+            (ma === rma && mi === rmi && pa >= rpa)
+        }
+      }
+      res.json({ version, required: REQUIRED, profileAware })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // GET /api/projects/:projectId/profiles/catalog
+  // List all agents available in .claude/agents/ (upstream sr-* and custom custom-*)
+  router.get('/catalog', (req, res) => {
+    try {
+      const { project } = ctx(req)
+      const dir = path.join(project.path, '.claude', 'agents')
+      if (!fs.existsSync(dir)) {
+        res.json({ agents: [] })
+        return
+      }
+      const agents: Array<{
+        id: string
+        kind: 'upstream' | 'custom'
+        description?: string
+        model?: string
+      }> = []
+      for (const file of fs.readdirSync(dir)) {
+        if (!file.endsWith('.md')) continue
+        const id = file.slice(0, -'.md'.length)
+        const kind: 'upstream' | 'custom' | null = id.startsWith('sr-')
+          ? 'upstream'
+          : id.startsWith('custom-')
+            ? 'custom'
+            : null
+        if (!kind) continue
+        let description: string | undefined
+        let model: string | undefined
+        try {
+          const body = fs.readFileSync(path.join(dir, file), 'utf8')
+          const fm = body.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+          if (fm) {
+            // description can be a long JSON-escaped string spanning multiple lines.
+            // Match from `description:` up to the next top-level YAML key or the end
+            // of the frontmatter block. Then unescape \n, \t, \" and strip surrounding
+            // quotes. Collapse whitespace so it fits the one-line header.
+            const descBlock = fm[1].match(
+              /^description:\s*([\s\S]*?)(?=^[a-z_]+:\s|^---|\Z)/m,
+            )
+            if (descBlock) {
+              let raw = descBlock[1].trim()
+              // Strip surrounding quotes (YAML may use '...' or "...")
+              if ((raw.startsWith('"') && raw.endsWith('"')) ||
+                  (raw.startsWith("'") && raw.endsWith("'"))) {
+                raw = raw.slice(1, -1)
+              }
+              // Decode common JSON-style escapes
+              raw = raw
+                .replace(/\\n/g, ' ')
+                .replace(/\\t/g, ' ')
+                .replace(/\\"/g, '"')
+                .replace(/\\'/g, "'")
+                .replace(/\\\\/g, '\\')
+              // Collapse any whitespace (incl. real newlines) and trim
+              description = raw.replace(/\s+/g, ' ').trim()
+              // Cap length for the one-line header preview
+              if (description.length > 280) description = description.slice(0, 277) + '…'
+            }
+            const modelMatch = fm[1].match(/^model:\s*(\S+)/m)
+            if (modelMatch) model = modelMatch[1]
+          }
+        } catch {
+          // ignore unreadable files
+        }
+        agents.push({ id, kind, description, model })
+      }
+      agents.sort((a, b) => a.id.localeCompare(b.id))
+      res.json({ agents })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // GET /api/projects/:projectId/profiles/catalog/:agentId
+  // Return the full .md body of a single agent file (read-only for sr-*, editable for custom-*)
+  router.get('/catalog/:agentId', (req, res) => {
+    try {
+      const { project } = ctx(req)
+      const agentId = req.params.agentId
+      if (!/^(sr|custom)-[a-z0-9][a-z0-9-]*$/.test(agentId)) {
+        res.status(400).json({ error: 'invalid agent id' })
+        return
+      }
+      const file = path.join(project.path, '.claude', 'agents', `${agentId}.md`)
+      if (!fs.existsSync(file)) {
+        res.status(404).json({ error: 'agent not found' })
+        return
+      }
+      const body = fs.readFileSync(file, 'utf8')
+      res.json({ id: agentId, body })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // POST /api/projects/:projectId/profiles/catalog (create a custom agent)
+  // Body: { id: string, body: string }
+  // id must start with `custom-` and match ^custom-[a-z0-9][a-z0-9-]*$
+  router.post('/catalog', (req, res) => {
+    try {
+      const { project, db, broadcast } = ctx(req)
+      const id = (req.body?.id ?? '').toString().trim()
+      const body = (req.body?.body ?? '').toString()
+      if (!/^custom-[a-z0-9][a-z0-9-]*$/.test(id)) {
+        res.status(400).json({ error: "id must match ^custom-[a-z0-9][a-z0-9-]*$ (the 'custom-' prefix is reserved for user-authored agents)" })
+        return
+      }
+      if (!body || body.length === 0) {
+        res.status(400).json({ error: 'body is required' })
+        return
+      }
+      const agentsDir = path.join(project.path, '.claude', 'agents')
+      fs.mkdirSync(agentsDir, { recursive: true })
+      const file = path.join(agentsDir, `${id}.md`)
+      if (fs.existsSync(file)) {
+        res.status(409).json({ error: `agent '${id}' already exists` })
+        return
+      }
+      fs.writeFileSync(file, body, 'utf8')
+      // Record initial version
+      const nextVersion = 1
+      db.prepare(
+        `INSERT INTO agent_versions (agent_name, version, body, created_at) VALUES (?, ?, ?, ?)`,
+      ).run(id, nextVersion, body, Date.now())
+      broadcast({ type: 'agent.changed', projectId: project.id, id } as never)
+      res.status(201).json({ id, body, version: nextVersion })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // PATCH /api/projects/:projectId/profiles/catalog/:agentId
+  // Update a custom agent's body. sr-* agents are read-only (403).
+  router.patch('/catalog/:agentId', (req, res) => {
+    try {
+      const { project, db, broadcast } = ctx(req)
+      const agentId = req.params.agentId
+      if (!/^custom-[a-z0-9][a-z0-9-]*$/.test(agentId)) {
+        res.status(403).json({ error: 'only custom-* agents can be edited from the hub' })
+        return
+      }
+      const body = (req.body?.body ?? '').toString()
+      if (!body || body.length === 0) {
+        res.status(400).json({ error: 'body is required' })
+        return
+      }
+      const file = path.join(project.path, '.claude', 'agents', `${agentId}.md`)
+      if (!fs.existsSync(file)) {
+        res.status(404).json({ error: 'agent not found' })
+        return
+      }
+      fs.writeFileSync(file, body, 'utf8')
+      const maxVersion = (db
+        .prepare(`SELECT COALESCE(MAX(version), 0) AS v FROM agent_versions WHERE agent_name = ?`)
+        .get(agentId) as { v: number }).v
+      const nextVersion = maxVersion + 1
+      db.prepare(
+        `INSERT INTO agent_versions (agent_name, version, body, created_at) VALUES (?, ?, ?, ?)`,
+      ).run(agentId, nextVersion, body, Date.now())
+      broadcast({ type: 'agent.changed', projectId: project.id, id: agentId } as never)
+      res.json({ id: agentId, body, version: nextVersion })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // DELETE /api/projects/:projectId/profiles/catalog/:agentId
+  // Only permitted for custom-* agents.
+  router.delete('/catalog/:agentId', (req, res) => {
+    try {
+      const { project, broadcast } = ctx(req)
+      const agentId = req.params.agentId
+      if (!/^custom-[a-z0-9][a-z0-9-]*$/.test(agentId)) {
+        res.status(403).json({ error: 'only custom-* agents can be deleted' })
+        return
+      }
+      const file = path.join(project.path, '.claude', 'agents', `${agentId}.md`)
+      if (!fs.existsSync(file)) {
+        res.status(404).json({ error: 'agent not found' })
+        return
+      }
+      fs.unlinkSync(file)
+      broadcast({ type: 'agent.changed', projectId: project.id, id: agentId, deleted: true } as never)
+      res.json({ ok: true })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // POST /api/projects/:projectId/profiles/catalog/test
+  // Smoke-test a draft body against a sample task without writing to disk.
+  // Body: { agentId?: string, draftBody: string, sampleTask: string }
+  // Persists the result to agent_tests; returns { output, tokens, durationMs }.
+  router.post('/catalog/test', async (req, res) => {
+    try {
+      const { project, db } = ctx(req)
+      const agentId = (req.body?.agentId ?? '').toString().trim() || 'draft'
+      const draftBody = (req.body?.draftBody ?? '').toString()
+      const sampleTask = (req.body?.sampleTask ?? '').toString().trim()
+      if (!draftBody) {
+        res.status(400).json({ error: 'draftBody is required' })
+        return
+      }
+      if (!sampleTask) {
+        res.status(400).json({ error: 'sampleTask is required' })
+        return
+      }
+      const result = await testCustomAgent(project.path, { draftBody, sampleTask })
+      db.prepare(
+        `INSERT INTO agent_tests (agent_name, draft_hash, sample_task_id, tokens, duration_ms, output, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ).run(agentId, result.draftHash, null, result.tokens, result.durationMs, result.output, Date.now())
+      res.json(result)
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // POST /api/projects/:projectId/profiles/catalog/generate
+  // Generate a draft custom agent body via a one-shot claude spawn.
+  // Body: { name: string, description: string }
+  // Returns { draft: string } — caller (the Studio UI) previews and optionally saves.
+  router.post('/catalog/generate', async (req, res) => {
+    try {
+      const { project } = ctx(req)
+      const name = (req.body?.name ?? '').toString().trim()
+      const description = (req.body?.description ?? '').toString().trim()
+      if (!/^custom-[a-z0-9][a-z0-9-]*$/.test(name)) {
+        res.status(400).json({ error: "name must match ^custom-[a-z0-9][a-z0-9-]*$" })
+        return
+      }
+      if (!description) {
+        res.status(400).json({ error: 'description is required' })
+        return
+      }
+      const draft = await generateCustomAgent(project.path, { name, description })
+      res.json({ draft })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // GET /api/projects/:projectId/profiles/catalog/:agentId/versions
+  router.get('/catalog/:agentId/versions', (req, res) => {
+    try {
+      const { db } = ctx(req)
+      const agentId = req.params.agentId
+      const rows = db
+        .prepare(
+          `SELECT version, body, created_at AS createdAt FROM agent_versions
+           WHERE agent_name = ? ORDER BY version DESC`,
+        )
+        .all(agentId) as Array<{ version: number; body: string; createdAt: number }>
+      res.json({ versions: rows })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // GET /api/projects/:projectId/profiles
+  router.get('/', (req, res) => {
+    try {
+      const { project } = ctx(req)
+      res.json({ profiles: listProfiles(project.path) })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // GET /api/projects/:projectId/profiles/resolve?profile=<name>
+  router.get('/resolve', (req, res) => {
+    try {
+      const { project } = ctx(req)
+      const explicit = typeof req.query.profile === 'string' ? req.query.profile : undefined
+      const resolved = resolveProfile(project.path, explicit)
+      if (!resolved) {
+        res.json({ resolved: null })
+        return
+      }
+      res.json({ resolved: { name: resolved.name, profile: resolved.profile } })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // POST /api/projects/:projectId/profiles
+  router.post('/', (req, res) => {
+    try {
+      const { project, broadcast } = ctx(req)
+      const body = req.body as Profile
+      createProfile(project.path, body)
+      broadcast({ type: 'profile.changed', projectId: project.id, name: body.name } as never)
+      res.status(201).json({ profile: body })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // POST /api/projects/:projectId/profiles/:name/duplicate
+  router.post('/:name/duplicate', (req, res) => {
+    try {
+      const { project, broadcast } = ctx(req)
+      const newName = (req.body?.name ?? '').toString()
+      if (!newName) {
+        res.status(400).json({ error: "body field 'name' is required" })
+        return
+      }
+      const copy = duplicateProfile(project.path, req.params.name, newName)
+      broadcast({ type: 'profile.changed', projectId: project.id, name: newName } as never)
+      res.status(201).json({ profile: copy })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // POST /api/projects/:projectId/profiles/:name/rename
+  router.post('/:name/rename', (req, res) => {
+    try {
+      const { project, broadcast } = ctx(req)
+      const newName = (req.body?.name ?? '').toString()
+      if (!newName) {
+        res.status(400).json({ error: "body field 'name' is required" })
+        return
+      }
+      const renamed = renameProfile(project.path, req.params.name, newName)
+      broadcast({ type: 'profile.changed', projectId: project.id, name: newName } as never)
+      res.json({ profile: renamed })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // GET /api/projects/:projectId/profiles/:name
+  router.get('/:name', (req, res) => {
+    try {
+      const { project } = ctx(req)
+      res.json({ profile: getProfile(project.path, req.params.name) })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // PATCH /api/projects/:projectId/profiles/:name
+  router.patch('/:name', (req, res) => {
+    try {
+      const { project, broadcast } = ctx(req)
+      const body = req.body as Profile
+      if (body.name !== req.params.name) {
+        res.status(400).json({ error: "body.name must match path parameter (use /rename to change name)" })
+        return
+      }
+      updateProfile(project.path, body)
+      broadcast({ type: 'profile.changed', projectId: project.id, name: body.name } as never)
+      res.json({ profile: body })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // DELETE /api/projects/:projectId/profiles/:name
+  router.delete('/:name', (req, res) => {
+    try {
+      const { project, broadcast } = ctx(req)
+      deleteProfile(project.path, req.params.name)
+      broadcast({ type: 'profile.changed', projectId: project.id, name: req.params.name, deleted: true } as never)
+      res.json({ ok: true })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  return router
+}

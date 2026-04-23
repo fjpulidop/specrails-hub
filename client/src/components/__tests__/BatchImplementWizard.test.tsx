@@ -30,6 +30,14 @@ vi.mock('../../hooks/useHub', () => ({
   }),
 }))
 
+// Mock the profile picker — it fetches and can block rendering in tests.
+vi.mock('../agents/ProfilePicker', () => ({
+  ProfilePicker: () => null,
+  selectionToSpawnPayload: () => ({ profileName: null }),
+  useDefaultProfileSelection: () => [{ kind: 'legacy' }, () => {}],
+  useProjectProfiles: () => [],
+}))
+
 // Mock IssuePickerStep and BatchFreeFormStep to avoid heavy dependencies
 vi.mock('../IssuePickerStep', () => ({
   IssuePickerStep: ({ onSelectionChange }: { onSelectionChange: (issues: Array<{ id: string; number: number; title: string; body?: string; labels: string[] }>) => void }) => (

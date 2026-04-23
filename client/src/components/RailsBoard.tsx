@@ -20,12 +20,15 @@ export interface RailState {
   mode: RailMode
   status: RailStatus
   activeJobId?: string
+  /** Selected agent profile for this rail. null/undefined = default resolution. */
+  profileName?: string | null
 }
 
 interface RailsBoardProps {
   rails: RailState[]
   ticketMap: Map<number, LocalTicket>
   onModeChange: (railId: string, mode: RailMode) => void
+  onProfileChange?: (railId: string, profileName: string | null) => void
   onToggle: (railId: string) => void
   onTicketClick: (ticket: LocalTicket) => void
   onAddRail: () => void
@@ -49,7 +52,7 @@ function SortableRailWrapper({ railId, children }: { railId: string; children: (
   )
 }
 
-export function RailsBoard({ rails, ticketMap, onModeChange, onToggle, onTicketClick, onAddRail, onDeleteRail, onRenameRail }: RailsBoardProps) {
+export function RailsBoard({ rails, ticketMap, onModeChange, onProfileChange, onToggle, onTicketClick, onAddRail, onDeleteRail, onRenameRail }: RailsBoardProps) {
   const activeRails = rails.filter((r) => r.status === 'running').length
   const [jiggleMode, setJiggleMode] = useState(false)
 
@@ -105,10 +108,12 @@ export function RailsBoard({ rails, ticketMap, onModeChange, onToggle, onTicketC
                     mode={rail.mode}
                     status={rail.status}
                     activeJobId={rail.activeJobId}
+                    profileName={rail.profileName ?? null}
                     jiggleMode={jiggleMode}
                     dragHandleListeners={listeners}
                     dragHandleAttributes={attributes}
                     onModeChange={(mode) => onModeChange(rail.id, mode)}
+                    onProfileChange={onProfileChange ? (p) => onProfileChange(rail.id, p) : undefined}
                     onToggle={() => onToggle(rail.id)}
                     onTicketClick={onTicketClick}
                     onDelete={() => onDeleteRail(rail.id)}

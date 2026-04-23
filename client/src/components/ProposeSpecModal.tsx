@@ -32,7 +32,7 @@ export function ProposeSpecModal({ open, onClose, tickets }: ProposeSpecModalPro
   const chat = useChatContext()
   const { activeProjectId, projects } = useHub()
   const tracker = useSpecGenTracker()
-  const [exploreCodebase, setExploreCodebase] = useState(true)
+  const [exploreCodebase, setExploreCodebase] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [hasText, setHasText] = useState(false)
   const [attachmentCount, setAttachmentCount] = useState(0)

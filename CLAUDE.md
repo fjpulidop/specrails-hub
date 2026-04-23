@@ -90,6 +90,20 @@ Managed by `SetupManager` (server) and `SetupWizard` component (client). Hub con
 - **Quick Setup** — template agents, ready in seconds. Always available.
 - **Full Setup** — AI-enriched flow (codebase analysis + persona generation). **Currently disabled in the hub UI** (rendered greyed-out with a "Coming soon" badge). The feature is 100% operational in [specrails-core](https://github.com/fjpulidop/specrails-core) via `npx specrails-core@latest init` — we're working on re-integrating it into the hub. SetupWizard tests that exercise the full-tier flow are marked `it.skip('[full-tier gated] …')` / `describe.skip('[full-tier gated] Complete step', …)` — unskip them when the feature ships.
 
+### Agent profiles (Agents section)
+
+Per-project catalog of agent profiles — declarative JSON that tells the implement pipeline which agents to run, which models to use per agent, and how to route tasks. Profiles are selected per rail at launch time (snapshot-per-job) so concurrent rails in the same batch can run distinct profiles. Requires `specrails-core >= 4.1.0` in the project; otherwise the hub gracefully falls back to legacy behavior (no env injection).
+
+**Server (`server/profile-manager.ts`)**: CRUD over `<project>/.specrails/profiles/*.json` with `ajv` v1 schema validation (`server/schemas/profile.v1.json`, a copy of the specrails-core schema). Structural checks beyond JSON Schema: exactly one terminal `default: true` routing rule and it must be last; baseline trio (`sr-architect`, `sr-developer`, `sr-reviewer`) must be present in `agents[]`. Resolution order at launch: explicit selection → `.user-preferred.json` (gitignored) → `default` profile. `snapshotForJob` writes the resolved profile to `~/.specrails/projects/<slug>/jobs/<jobId>/profile.json` (chmod 400) before spawn. `persistJobProfile` inserts into `job_profiles` for analytics.
+
+**REST surface (`server/profiles-router.ts`)** mounted at `/api/projects/:projectId/profiles`, gated by `SPECRAILS_AGENTS_SECTION !== 'false'`: list/get/create/update/delete/duplicate/rename profiles; `/active` for the per-developer preference; `/resolve?profile=…` to preview resolution; `/catalog` and `/catalog/:agentId` for the agents catalog viewer; `/core-version` for the upgrade banner; `/analytics?windowDays=30` for per-profile metrics; `/migrate-from-settings` to seed `default.json` from existing frontmatter models.
+
+**QueueManager integration (`server/queue-manager.ts`)**: `EnqueueOptions` accepts `profileName` (string = explicit, null = force legacy, undefined = default resolution). At spawn time `projectSupportsProfiles(cwd)` checks `.specrails/specrails-version` (gate: `>= 4.1.0`); when allowed, profile resolved + snapshotted + persisted + env var `SPECRAILS_PROFILE_PATH` injected. OTEL resource attrs include `specrails.profile_name` and `specrails.profile_schema_version` when profile mode is active.
+
+**Client (`client/src/pages/AgentsPage.tsx`)**: `/agents` route under ProjectLayout, reached from the right sidebar. Two tabs: **Profiles** (full CRUD + agent chain editor with catalog picker + routing rules editor + per-profile analytics card) and **Agents Catalog** (read-only viewer of upstream and custom agents). Yellow banner at the top when the project's core version is below 4.1.0. Launch dialogs (`ImplementWizard`, `BatchImplementWizard`) include a `ProfilePicker` that preselects the resolved default and sends `profileName` in the `/spawn` payload.
+
+**Reserved paths (contract with specrails-core)**: `.specrails/profiles/**` and `.claude/agents/custom-*.md` are never touched by `specrails-core`'s `install.sh` / `update.sh`. Profiles are committable team assets; `.user-preferred.json` inside `.specrails/profiles/` is auto-gitignored on first write.
+
 ### Terminal panel
 
 Per-project bottom terminal panel (VSCode/Cursor style) gated by `FEATURE_TERMINAL_PANEL` (set `VITE_FEATURE_TERMINAL_PANEL=true` to enable in the client). Server gate: `SPECRAILS_TERMINAL_PANEL !== 'false'` (default on).

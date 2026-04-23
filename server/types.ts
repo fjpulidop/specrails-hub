@@ -68,6 +68,9 @@ export interface JobRow {
   depends_on_job_id: string | null
   pipeline_id: string | null
   skip_reason: string | null
+  /** Profile name the job was launched with (null = legacy mode, or job
+   *  predates the profiles feature). Populated via LEFT JOIN job_profiles. */
+  profile_name?: string | null
 }
 
 export interface EventRow {

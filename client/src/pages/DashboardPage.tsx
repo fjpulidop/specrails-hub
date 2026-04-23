@@ -56,6 +56,7 @@ interface PersistedRail {
   ticketIds: number[]
   mode: RailMode
   status: RailStatus
+  profileName?: string | null
 }
 
 function loadRails(projectId: string | null): RailState[] | null {
@@ -475,6 +476,22 @@ export default function DashboardPage() {
     updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, mode } : r)))
   }
 
+  async function handleProfileChange(railId: string, profileName: string | null) {
+    updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, profileName } : r)))
+    const railIndex = rails.findIndex((r) => r.id === railId)
+    if (railIndex === -1) return
+    try {
+      await fetch(`${getApiBase()}/rails/${railIndex}/profile`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileName }),
+      })
+    } catch {
+      // Silent — server persistence is best-effort; localStorage holds the truth
+      // and the profile will be sent inline in the next launch either way.
+    }
+  }
+
   async function handleToggle(railId: string) {
     const railIndex = rails.findIndex((r) => r.id === railId)
     if (railIndex === -1) return
@@ -511,7 +528,12 @@ export default function DashboardPage() {
       const res = await fetch(`${getApiBase()}/rails/${railIndex}/launch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: rail.mode }),
+        body: JSON.stringify({
+          mode: rail.mode,
+          // rail.profileName can be a string (explicit), null (force legacy),
+          // or undefined (let server fall back to stored rail profile or defaults).
+          ...(rail.profileName !== undefined ? { profileName: rail.profileName } : {}),
+        }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: 'Failed to launch' }))
@@ -544,6 +566,7 @@ export default function DashboardPage() {
             rails={rails}
             ticketMap={ticketMap}
             onModeChange={handleModeChange}
+            onProfileChange={handleProfileChange}
             onToggle={handleToggle}
             onTicketClick={setDetailTicket}
             onAddRail={handleAddRail}
