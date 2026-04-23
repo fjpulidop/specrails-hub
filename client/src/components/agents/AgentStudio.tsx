@@ -21,6 +21,33 @@ interface Props {
   onSaved?: (id: string) => void
 }
 
+const SAMPLE_TASKS: Array<{ label: string; prompt: string }> = [
+  {
+    label: '— pick a sample task —',
+    prompt: '',
+  },
+  {
+    label: 'Terraform: public S3 bucket',
+    prompt: 'Review this Terraform diff:\n+ resource "aws_s3_bucket" "logs" {\n+   bucket = "app-logs"\n+   acl    = "public-read"\n+ }',
+  },
+  {
+    label: 'Code review: SQL injection',
+    prompt: 'Review this Node.js snippet for security issues:\n\n```js\napp.get("/user/:id", async (req, res) => {\n  const row = await db.query(`SELECT * FROM users WHERE id = ${req.params.id}`)\n  res.json(row)\n})\n```',
+  },
+  {
+    label: 'Frontend: accessibility',
+    prompt: 'Review this React component for accessibility issues:\n\n```tsx\nfunction ProductCard({ product, onAddToCart }) {\n  return (\n    <div onClick={onAddToCart} className="card">\n      <img src={product.image} />\n      <h3>{product.name}</h3>\n      <div className="price">${product.price}</div>\n    </div>\n  )\n}\n```',
+  },
+  {
+    label: 'Data: schema change',
+    prompt: 'Evaluate this migration plan:\n- Add NOT NULL column `email_verified_at` (timestamp) to a 50M-row `users` table\n- Backfill with `NOW()` for existing rows\n- Deploy without downtime\n\nIs this safe? What would you change?',
+  },
+  {
+    label: 'Performance: slow query',
+    prompt: 'Explain why this Postgres query is slow on a 10M-row `orders` table and propose an index:\n\n```sql\nSELECT * FROM orders\nWHERE customer_id = $1\n  AND status IN (\'pending\', \'paid\')\n  AND created_at > NOW() - INTERVAL \'30 days\'\nORDER BY created_at DESC\nLIMIT 50;\n```',
+  },
+]
+
 const BLANK_TEMPLATE = `---
 name: custom-<name>
 description: "Short description of when to use this agent."
@@ -321,13 +348,26 @@ export function AgentStudio({ agentId, initialBody, initialName, onClose, onSave
               <FlaskConical className="w-3.5 h-3.5" /> Test agent
             </div>
             <div className="p-3 border-b border-border">
-              <label className="block text-[11px] text-muted-foreground mb-1">
-                Sample task
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] text-muted-foreground">Sample task</label>
+                <select
+                  className="h-6 text-[11px] rounded border border-border bg-background px-1"
+                  value=""
+                  onChange={(e) => {
+                    const idx = parseInt(e.target.value, 10)
+                    if (!isNaN(idx) && idx > 0) setSampleTask(SAMPLE_TASKS[idx].prompt)
+                  }}
+                  disabled={testing}
+                >
+                  {SAMPLE_TASKS.map((s, i) => (
+                    <option key={i} value={i}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
               <textarea
                 value={sampleTask}
                 onChange={(e) => setSampleTask(e.target.value)}
-                placeholder={'e.g. Review this Terraform diff:\n+ resource "aws_s3_bucket" "logs" {\n+   acl = "public-read"\n+ }'}
+                placeholder={'Describe what the agent should do, or pick a sample above.'}
                 className="w-full text-xs p-2 rounded border border-border bg-background min-h-[80px] resize-y font-mono"
                 disabled={testing}
               />

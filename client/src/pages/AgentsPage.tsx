@@ -12,8 +12,24 @@ interface CoreVersionStatus {
   profileAware: boolean
 }
 
+const TAB_MEMORY_KEY = 'specrails-hub:agents-tab'
+
+function readTabMemory(): Tab {
+  try {
+    const v = localStorage.getItem(TAB_MEMORY_KEY)
+    if (v === 'profiles' || v === 'catalog') return v
+  } catch {
+    // localStorage unavailable
+  }
+  return 'profiles'
+}
+
 export default function AgentsPage() {
-  const [tab, setTab] = useState<Tab>('profiles')
+  const [tab, setTabState] = useState<Tab>(() => readTabMemory())
+  const setTab = (next: Tab) => {
+    setTabState(next)
+    try { localStorage.setItem(TAB_MEMORY_KEY, next) } catch { /* ignore */ }
+  }
   const [coreStatus, setCoreStatus] = useState<CoreVersionStatus | null>(null)
 
   useEffect(() => {
