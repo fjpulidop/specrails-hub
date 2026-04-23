@@ -61,6 +61,45 @@ export function createProfilesRouter(): Router {
     next()
   })
 
+  // GET /api/projects/:projectId/profiles/core-version
+  // Report the project's installed specrails-core version for the upgrade banner.
+  router.get('/core-version', (req, res) => {
+    try {
+      const { project } = ctx(req)
+      const candidates = [
+        path.join(project.path, '.specrails', 'specrails-version'),
+        path.join(project.path, '.specrails-version'),
+      ]
+      let version: string | null = null
+      for (const p of candidates) {
+        if (fs.existsSync(p)) {
+          try {
+            version = fs.readFileSync(p, 'utf8').trim()
+          } catch {
+            // ignore
+          }
+          if (version) break
+        }
+      }
+      // Minimum version required for profile-aware implement
+      const REQUIRED = '4.1.0'
+      let profileAware = false
+      if (version) {
+        const [ma, mi, pa] = version.split('.').map((n) => parseInt(n, 10))
+        const [rma, rmi, rpa] = REQUIRED.split('.').map((n) => parseInt(n, 10))
+        if (!isNaN(ma) && !isNaN(mi) && !isNaN(pa)) {
+          profileAware =
+            ma > rma ||
+            (ma === rma && mi > rmi) ||
+            (ma === rma && mi === rmi && pa >= rpa)
+        }
+      }
+      res.json({ version, required: REQUIRED, profileAware })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
   // GET /api/projects/:projectId/profiles/catalog
   // List all agents available in .claude/agents/ (upstream sr-* and custom custom-*)
   router.get('/catalog', (req, res) => {

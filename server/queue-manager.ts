@@ -1,4 +1,6 @@
 import { spawn, execSync, ChildProcess } from 'child_process'
+import fsNode from 'fs'
+import pathNode from 'path'
 import { createInterface } from 'readline'
 import { v4 as uuidv4 } from 'uuid'
 import treeKill from 'tree-kill'
@@ -36,6 +38,28 @@ export function buildTelemetryEnv(
     OTEL_TRACES_EXPORTER: 'otlp',
     OTEL_RESOURCE_ATTRIBUTES: baseAttrs.map(([k, v]) => `${k}=${v}`).join(','),
   }
+}
+
+/** Detect whether a project's installed specrails-core version supports the
+ *  profile-aware pipeline (shipped in 4.1.0). Returns false when the version
+ *  file is missing or unparseable so we default to legacy (safer). */
+export function projectSupportsProfiles(projectPath: string): boolean {
+  const candidates = [
+    pathNode.join(projectPath, '.specrails', 'specrails-version'),
+    pathNode.join(projectPath, '.specrails-version'),
+  ]
+  for (const p of candidates) {
+    if (!fsNode.existsSync(p)) continue
+    try {
+      const raw = fsNode.readFileSync(p, 'utf8').trim()
+      const [ma, mi, pa] = raw.split('.').map((n) => parseInt(n, 10))
+      if (isNaN(ma) || isNaN(mi) || isNaN(pa)) return false
+      return ma > 4 || (ma === 4 && mi > 1) || (ma === 4 && mi === 1 && pa >= 0)
+    } catch {
+      return false
+    }
+  }
+  return false
 }
 
 const LOG_BUFFER_MAX = 5000
@@ -537,14 +561,16 @@ export class QueueManager {
 
     // Resolve agent profile (if any) and snapshot per-job before spawn.
     // Hub mode only (projectId + projectSlug + cwd all present).
-    // Profile injection is skipped in codex mode.
+    // Profile injection is skipped in codex mode, and when the project's
+    // installed specrails-core is older than 4.1.0 (legacy fallback).
     let profileSnapshotPath: string | null = null
     let profileName: string | null = null
     if (this._provider === 'claude' && this._projectId && this._projectSlug && this._cwd) {
       try {
         const selection = this._jobProfileSelection.get(jobId) // undefined|null|string
         this._jobProfileSelection.delete(jobId)
-        if (selection !== null) {
+        const coreSupports = projectSupportsProfiles(this._cwd)
+        if (selection !== null && coreSupports) {
           // selection is string (explicit) or undefined (default resolution)
           const {
             resolveProfile,
