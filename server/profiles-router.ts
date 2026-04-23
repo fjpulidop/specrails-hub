@@ -61,6 +61,81 @@ export function createProfilesRouter(): Router {
     next()
   })
 
+  // POST /api/projects/:projectId/profiles/migrate-from-settings
+  // Seed a `default` profile from the agent frontmatter + legacy routing.
+  // Intended for first-time onboarding of existing projects.
+  router.post('/migrate-from-settings', (req, res) => {
+    try {
+      const { project, broadcast } = ctx(req)
+      const agentsDir = path.join(project.path, '.claude', 'agents')
+      if (!fs.existsSync(agentsDir)) {
+        res.status(400).json({ error: 'no .claude/agents/ directory found' })
+        return
+      }
+      // Gather installed sr-*.md with their declared models.
+      const agents: Array<{ id: string; model: 'sonnet' | 'opus' | 'haiku' }> = []
+      for (const entry of fs.readdirSync(agentsDir)) {
+        if (!entry.endsWith('.md')) continue
+        if (!entry.startsWith('sr-')) continue
+        const id = entry.slice(0, -'.md'.length)
+        let model: 'sonnet' | 'opus' | 'haiku' = 'sonnet'
+        try {
+          const content = fs.readFileSync(path.join(agentsDir, entry), 'utf8')
+          const fm = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+          if (fm) {
+            const m = fm[1].match(/^model:\s*(sonnet|opus|haiku)/m)
+            if (m) model = m[1] as 'sonnet' | 'opus' | 'haiku'
+          }
+        } catch {
+          // skip unreadable files
+        }
+        agents.push({ id, model })
+      }
+      const baseline = ['sr-architect', 'sr-developer', 'sr-reviewer']
+      const missing = baseline.filter((id) => !agents.some((a) => a.id === id))
+      if (missing.length > 0) {
+        res.status(400).json({
+          error: `missing baseline agents in this project: ${missing.join(', ')}. Run 'npx specrails-core@latest update' first.`,
+        })
+        return
+      }
+      // Build the default profile mirroring legacy routing.
+      const profile = {
+        schemaVersion: 1 as const,
+        name: 'default',
+        description: 'Baseline profile migrated from your current agent frontmatters.',
+        orchestrator: { model: 'sonnet' as const },
+        agents: agents.map((a) => ({
+          id: a.id,
+          model: a.model,
+          required: baseline.includes(a.id),
+        })),
+        routing: [
+          ...(agents.some((a) => a.id === 'sr-frontend-developer')
+            ? [{ tags: ['frontend'], agent: 'sr-frontend-developer' }]
+            : []),
+          ...(agents.some((a) => a.id === 'sr-backend-developer')
+            ? [{ tags: ['backend'], agent: 'sr-backend-developer' }]
+            : []),
+          { default: true, agent: 'sr-developer' },
+        ],
+      }
+      try {
+        createProfile(project.path, profile as never)
+      } catch (err) {
+        if (err instanceof ProfileConflictError) {
+          res.status(409).json({ error: "a profile named 'default' already exists; delete it first or edit it manually" })
+          return
+        }
+        throw err
+      }
+      broadcast({ type: 'profile.changed', projectId: project.id, name: 'default' } as never)
+      res.status(201).json({ profile })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
   // GET /api/projects/:projectId/profiles/analytics?windowDays=30
   // Per-profile aggregated metrics over the requested time window.
   router.get('/analytics', (req, res) => {

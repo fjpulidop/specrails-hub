@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Trash2, Copy, Save, Star } from 'lucide-react'
+import { Plus, Trash2, Copy, Save, Star, Wand2 } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
 import { ProfileEditor } from './ProfileEditor'
@@ -65,6 +65,26 @@ export function ProfilesTab() {
       cancelled = true
     }
   }, [selected])
+
+  const migrateFromSettings = useCallback(async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch(`${getApiBase()}/profiles/migrate-from-settings`, {
+        method: 'POST',
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error ?? `Migration failed: ${res.status}`)
+      }
+      await refresh()
+      setSelected('default')
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }, [refresh])
 
   const createNew = useCallback(async () => {
     const name = prompt('New profile name (lowercase, kebab-case):')
@@ -214,14 +234,24 @@ export function ProfilesTab() {
   if (profiles.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-center max-w-sm">
+        <div className="text-center max-w-md">
           <div className="text-sm font-medium text-foreground">No profiles yet</div>
           <div className="text-xs text-muted-foreground mt-1 mb-4">
             Profiles let you save orchestrator + agent + routing combinations and pick one per rail.
           </div>
-          <Button size="sm" onClick={createNew} disabled={saving}>
-            <Plus className="w-3.5 h-3.5 mr-1.5" /> Create first profile
-          </Button>
+          <div className="flex items-center gap-2 justify-center">
+            <Button size="sm" onClick={migrateFromSettings} disabled={saving}>
+              <Wand2 className="w-3.5 h-3.5 mr-1.5" /> Migrate from current agents
+            </Button>
+            <Button size="sm" variant="ghost" onClick={createNew} disabled={saving}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" /> Blank profile
+            </Button>
+          </div>
+          <div className="text-[11px] text-muted-foreground/70 mt-3">
+            "Migrate" reads your existing <code className="text-foreground">.claude/agents/</code>{' '}
+            frontmatter models and creates a <code className="text-foreground">default</code> profile
+            mirroring today's behavior — zero-loss.
+          </div>
           {error && <div className="mt-3 text-xs text-red-400">{error}</div>}
         </div>
       </div>
