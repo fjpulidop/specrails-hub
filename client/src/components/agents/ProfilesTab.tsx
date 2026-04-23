@@ -106,6 +106,7 @@ export function ProfilesTab() {
             { id: 'sr-architect', model: 'sonnet', required: true },
             { id: 'sr-developer', model: 'sonnet', required: true },
             { id: 'sr-reviewer', model: 'sonnet', required: true },
+            { id: 'sr-merge-resolver', model: 'sonnet', required: true },
           ],
           routing: [{ default: true, agent: 'sr-developer' }],
         }
