@@ -110,6 +110,12 @@ describe('SpecsBoard', () => {
     expect(screen.getByTestId('propose-spec-modal')).toBeInTheDocument()
   })
 
+  it('opens ProposeSpecModal via Cmd+Enter keyboard shortcut', () => {
+    render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
+    fireEvent.keyDown(window, { key: 'Enter', metaKey: true })
+    expect(screen.getByTestId('propose-spec-modal')).toBeInTheDocument()
+  })
+
   it('closes ProposeSpecModal when onClose is called', () => {
     render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
     fireEvent.click(screen.getByRole('button', { name: /^Add$/i }))
