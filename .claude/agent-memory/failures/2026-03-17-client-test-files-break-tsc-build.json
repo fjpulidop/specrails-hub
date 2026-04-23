@@ -1,8 +1,0 @@
-{
-  "date": "2026-03-17",
-  "feature": "command-grid-sections",
-  "root_cause": "client/src/components/CommandGrid.test.tsx was added to client/src/ without being excluded from client/tsconfig.json. The tsconfig includes all of src/, so tsc compiled the test file during `cd client && npm run build`, failing on missing @testing-library/react types and jest-dom matchers.",
-  "prevention_rule": "Before adding any .test.tsx or .test.ts file inside client/src/, ensure client/tsconfig.json has exclude globs for test files. The canonical fix: add `\"exclude\": [\"src/**/*.test.ts\", \"src/**/*.test.tsx\", \"src/**/*.spec.ts\", \"src/**/*.spec.tsx\"]` to client/tsconfig.json.",
-  "file_pattern": "client/tsconfig.json, client/src/**/*.test.tsx",
-  "severity": "error"
-}

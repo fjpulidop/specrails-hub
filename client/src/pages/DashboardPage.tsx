@@ -82,7 +82,7 @@ export default function DashboardPage() {
   const [detailTicket, setDetailTicket] = useState<LocalTicket | null>(null)
   const [createTicketOpen, setCreateTicketOpen] = useState(false)
 
-  // Open a spec when the tracker signals "Ver" was clicked for this project
+  // Open a spec when the tracker signals "View" was clicked for this project
   useEffect(() => {
     if (!specToOpen || specToOpen.projectId !== activeProjectId) return
     setDetailTicket(specToOpen.ticket)
