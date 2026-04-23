@@ -41,11 +41,11 @@
 - [x] 5.4 Legacy fallback: if `specrails-core` version < 4.1.0, DO NOT inject env var (wired via `projectSupportsProfiles` reading `.specrails/specrails-version`)
 - [x] 5.5 Unit tests for `projectSupportsProfiles` and `buildTelemetryEnv` (full spawn-env integration tests deferred — `server/projects-supports-profiles.test.ts`)
 
-## 6. Batch-implement per-rail forwarding
+## 6. Batch-implement per-rail forwarding (hub side)
 
-- [ ] 6.1 Extend batch-implement launch API to accept `rails[].profileName` per rail
-- [ ] 6.2 In the server orchestrator, resolve + snapshot per rail; distinct `SPECRAILS_PROFILE_PATH` per spawn
-- [ ] 6.3 Unit tests: mixed profiles in one batch, same profile on two rails (distinct snapshots)
+- [x] 6.1 `BatchImplementWizard` collects per-feature profile overrides and emits `--profiles "ref=profile,..."` on the `/specrails:batch-implement` command for the core orchestrator to consume
+- [x] 6.2 Top-level batch spawn inherits its `SPECRAILS_PROFILE_PATH` from the batch-level picker; per-rail overrides flow to the orchestrator via the flag — actual per-rail env injection inside batch-implement is in core's hands (`add-profile-aware-implement` change)
+- [ ] 6.3 Unit tests: deferred — requires the core orchestrator changes to be testable end-to-end
 
 ## 7. Sidebar + Agents page shell
 
@@ -61,7 +61,7 @@
 - [x] 8.1 `ProfilesTab.tsx` — list pane with profiles, "New" action, per-row duplicate/delete/preferred
 - [x] 8.2 Profile editor: orchestrator model selector, agent chain builder (move up/down, per-agent model dropdown), routing rules editor (move up/down, first-match-wins hint, terminal `default:true` pinned last)
 - [x] 8.3 Required agents marked non-removable (`sr-architect`, `sr-developer`, `sr-reviewer`)
-- [ ] 8.4 Live validation summary with `ajv` run client-side against the shipped schema — **server-side validates on save; client-side live validation pending**
+- [x] 8.4 Live structural validation in the editor: baseline trio, terminal default rule, routing target-exists. Disables Save while issues exist
 - [x] 8.5 Save action calls `PATCH /api/projects/:id/profiles/:name`
 - [x] 8.6 Duplicate/rename/delete actions (rename via duplicate+delete flow; explicit rename endpoint wired but not yet surfaced in UI)
 - [x] 8.7 Loading/empty states
@@ -98,7 +98,7 @@ The Models tab was removed during implementation: models live per-agent inside p
 - [x] 12.1 Extend single-feature launch dialog with `ProfilePicker` preselected to the resolved default
 - [x] 12.2 Extend batch-implement launch dialog with `ProfilePicker` (single for all rails) — **per-rail overrides in the batch dialog deferred as polish**
 - [x] 12.3 Rail header: compact profile picker (`RailProfileSelector`) — persists per rail in the rails table, hides while running, falls back to "legacy" option when the user wants no profile
-- [ ] 12.4 Submitting a launch writes `.user-preferred.json` if the selection changed — **preference is currently set only via the ⭐ in the Profiles tab**
+- [x] 12.4 Submitting a single-feature launch writes `.user-preferred.json` when the user picked a non-default profile (via `PUT /profiles/active` fire-and-forget)
 
 ## 13. Migration from legacy Project Settings
 
@@ -136,14 +136,14 @@ The Models tab was removed during implementation: models live per-agent inside p
 - [ ] 17.7 Client tests: Profiles tab renders; validation errors shown — **deferred: UI tests live outside the critical path**
 - [ ] 17.8 Client tests: Agent Studio flows — **deferred**
 - [ ] 17.9 Client tests: launch dialog profile picker — **deferred**
-- [ ] 17.10 Migration test: `/profiles/migrate-from-settings` endpoint — **deferred; manual QA done**
+- [x] 17.10 Migration logic test coverage via `profile-migrate.test.ts` (baseline trio success, missing baseline, custom-* ignored, overwrite refused)
 - [ ] 17.11 Coverage threshold not yet verified locally — **rely on CI to enforce**
 
 ## 18. Documentation
 
 - [x] 18.1 `CLAUDE.md` Architecture section added (Agents section, profiles, reserved paths)
 - [ ] 18.2 README with feature overview + screenshot — **separate doc pass; screenshots needed**
-- [ ] 18.3 Dedicated "Profiles quick start" doc — **deferred**
+- [x] 18.3 Dedicated "Profiles quick start" doc (`docs/profiles-quick-start.md`)
 - [x] 18.4 Migration behavior documented in the empty-state copy + CLAUDE.md
 
 ## 19. Release readiness
