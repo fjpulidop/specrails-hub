@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ProfilesTab } from '../components/agents/ProfilesTab'
 
-type Tab = 'profiles' | 'agents' | 'models'
+type Tab = 'profiles' | 'catalog'
 
 export default function AgentsPage() {
   const [tab, setTab] = useState<Tab>('profiles')
@@ -13,18 +13,15 @@ export default function AgentsPage() {
         <div className="px-6 pt-4">
           <h1 className="text-lg font-semibold">Agents</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Manage agent profiles, custom agents, and model defaults for this project.
+            Manage agent profiles and the catalog of agents (upstream + custom) for this project.
           </p>
         </div>
         <div className="flex items-center gap-1 px-4 pt-3">
           <TabButton active={tab === 'profiles'} onClick={() => setTab('profiles')}>
             Profiles
           </TabButton>
-          <TabButton active={tab === 'agents'} onClick={() => setTab('agents')}>
-            Agents
-          </TabButton>
-          <TabButton active={tab === 'models'} onClick={() => setTab('models')}>
-            Models
+          <TabButton active={tab === 'catalog'} onClick={() => setTab('catalog')}>
+            Agents Catalog
           </TabButton>
         </div>
       </div>
@@ -32,8 +29,7 @@ export default function AgentsPage() {
       {/* Body */}
       <div className="flex-1 overflow-auto">
         {tab === 'profiles' && <ProfilesTab />}
-        {tab === 'agents' && <ComingSoon title="Agents catalog + Studio" />}
-        {tab === 'models' && <ComingSoon title="Default models per role" />}
+        {tab === 'catalog' && <ComingSoon title="Agents Catalog + Studio" />}
       </div>
     </div>
   )
