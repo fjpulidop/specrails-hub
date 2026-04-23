@@ -38,7 +38,7 @@ import treeKill from 'tree-kill'
 import multer from 'multer'
 import { createRailsRouter } from './rails-router'
 import { createProfilesRouter } from './profiles-router'
-import { attachmentManager, SUPPORTED_MIME_TYPES, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
+import { attachmentManager, isSupportedUploadedFile, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
 import {
   getTerminalManager,
   TerminalLimitExceededError,
@@ -478,11 +478,45 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
   router.get('/:projectId/jobs/:id', (req: Request, res: Response) => {
     const { db, queueManager } = ctx(req)
-    const job = getJob(db, req.params.id as string)
-    if (!job) { res.status(404).json({ error: 'Job not found' }); return }
-    const events = getJobEvents(db, req.params.id as string)
+    const jobId = req.params.id as string
+    const job = getJob(db, jobId)
+    if (!job) {
+      // Queued jobs live only in memory until spawn time (createJob runs on spawn,
+      // not enqueue). Fall back to the in-memory queue so /jobs/:id returns a
+      // usable payload instead of 404 — the detail page then renders a "queued"
+      // state and flips to live logs via WS once the job starts.
+      const inMemory = queueManager.getJobs().find((j) => j.id === jobId)
+      if (!inMemory) { res.status(404).json({ error: 'Job not found' }); return }
+      const synthetic: JobRow = {
+        id: inMemory.id,
+        command: inMemory.command,
+        started_at: inMemory.startedAt ?? '',
+        finished_at: inMemory.finishedAt,
+        status: inMemory.status,
+        exit_code: inMemory.exitCode,
+        queue_position: inMemory.queuePosition,
+        priority: inMemory.priority,
+        tokens_in: null,
+        tokens_out: null,
+        tokens_cache_read: null,
+        tokens_cache_create: null,
+        total_cost_usd: null,
+        num_turns: null,
+        model: null,
+        duration_ms: null,
+        duration_api_ms: null,
+        session_id: null,
+        depends_on_job_id: inMemory.dependsOnJobId,
+        pipeline_id: inMemory.pipelineId,
+        skip_reason: inMemory.skipReason,
+      }
+      const phaseDefinitions = queueManager.phasesForCommand(synthetic.command)
+      res.json({ job: { ...synthetic, hasTelemetry: false }, events: [], phaseDefinitions })
+      return
+    }
+    const events = getJobEvents(db, jobId)
     const phaseDefinitions = queueManager.phasesForCommand(job.command)
-    const annotated = { ...job, hasTelemetry: hasJobTelemetry(db, req.params.id as string) }
+    const annotated = { ...job, hasTelemetry: hasJobTelemetry(db, jobId) }
     res.json({ job: annotated, events, phaseDefinitions })
   })
 
@@ -1813,7 +1847,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     storage: multer.memoryStorage(),
     limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB per file
     fileFilter: (_req, file, cb) => {
-      if (SUPPORTED_MIME_TYPES.has(file.mimetype)) cb(null, true)
+      if (isSupportedUploadedFile({ mimetype: file.mimetype, originalname: file.originalname })) cb(null, true)
       else cb(null, false)
     },
   })
@@ -2022,7 +2056,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   router.patch('/:projectId/settings', (req: Request, res: Response) => {
-    const { pipelineTelemetryEnabled, orchestratorModel } = req.body ?? {}
+    const { pipelineTelemetryEnabled, orchestratorModel, prePrompt } = req.body ?? {}
     const patch: Parameters<typeof updateProjectSettings>[1] = {}
     if (pipelineTelemetryEnabled !== undefined) {
       patch.pipelineTelemetryEnabled = Boolean(pipelineTelemetryEnabled)
@@ -2034,6 +2068,13 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         return
       }
       patch.orchestratorModel = orchestratorModel
+    }
+    if (prePrompt !== undefined) {
+      if (typeof prePrompt !== 'string') {
+        res.status(400).json({ error: 'prePrompt must be a string' })
+        return
+      }
+      patch.prePrompt = prePrompt
     }
     try {
       updateProjectSettings(ctx(req).db, patch)
