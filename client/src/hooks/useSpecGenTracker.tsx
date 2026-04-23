@@ -52,7 +52,7 @@ interface SpecToOpen {
 interface SpecGenTrackerValue {
   registerFastSpec: (requestId: string, reg: SpecRegistration) => void
   registerExploreSpec: (conversationId: string, reg: SpecRegistration) => void
-  /** Set when user clicks "Ver". DashboardPage reads and clears this. */
+  /** Set when user clicks "View". DashboardPage reads and clears this. */
   specToOpen: SpecToOpen | null
   clearSpecToOpen: () => void
 }
@@ -116,7 +116,7 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
       id: spec.toastId,
       duration: 10_000,
       description: `Generated in ${elapsed}`,
-      action: { label: 'Ver', onClick: () => openTicket(spec, ticket) },
+      action: { label: 'View', onClick: () => openTicket(spec, ticket) },
     })
   }, [resolveSpec, openTicket])
 
@@ -291,7 +291,7 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
               id: toastId,
               duration: 10_000,
               description: `Generated in ${elapsed}`,
-              action: { label: 'Ver', onClick: () => openTicket(restoredSpec, newTicket) },
+              action: { label: 'View', onClick: () => openTicket(restoredSpec, newTicket) },
             })
             return
           }
