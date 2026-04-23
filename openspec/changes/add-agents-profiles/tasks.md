@@ -52,7 +52,7 @@
 - [x] 7.1 Add "Agents" entry to the top navbar (Home/Analytics/Agents/Settings layout) — hub mode only via existing project routing
 - [x] 7.2 Create `client/src/pages/AgentsPage.tsx` with three-tab shell (`Profiles`, `Agents`, `Models`)
 - [x] 7.3 Route: `/agents` → default Profiles tab (hub mode uses per-project base via `getApiBase()`)
-- [ ] 7.4 Per-project memory of active tab via existing `useProjectRouteMemory` — **basic route memory already in place; tab-level memory still TODO**
+- [x] 7.4 Per-tab memory of active sub-tab (Profiles vs Agents Catalog) via localStorage
 - [ ] 7.5 Gate behind `VITE_FEATURE_AGENTS_SECTION` — **server side gated via `SPECRAILS_AGENTS_SECTION`; client flag pending**
 - [x] 7.6 Upgrade banner when `specrails-core` version is older than 4.1.0 (reads `/profiles/core-version` endpoint; yellow warning banner above tabs)
 
@@ -89,7 +89,7 @@
 - [x] 11.7 Save: validate → write `.claude/agents/<name>.md` → append `agent_versions` row
 - [x] 11.8 Version history panel: list revisions, restore (writes next version on save)
 - [x] 11.9 "Test agent" action: sandboxed claude spawn (`testCustomAgent` in `agent-generator.ts`), streams output, enforces 4000-token ceiling + 120s wall-clock, persists to `agent_tests`
-- [ ] 11.10 Sample-task library — **deferred: today the user provides their own sample task text; a curated library of pre-canned samples ships in a later polish pass**
+- [x] 11.10 Sample-task library — curated 5-entry dropdown in the Test pane (IaC, SQL injection, a11y, migration, perf)
 
 ## 12. Launch-time profile pickers
 
