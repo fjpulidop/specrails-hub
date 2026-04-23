@@ -38,7 +38,7 @@
 - [x] 5.1 Extend `QueueManager` enqueue+spawn to accept `profileName`, resolve via `ProfileManager`, snapshot, and persist to `job_profiles`
 - [x] 5.2 Inject `SPECRAILS_PROFILE_PATH=<abs snapshot path>` into the spawn env
 - [x] 5.3 Add `specrails.profile_name` and `specrails.profile_schema_version` to the OTEL resource attributes (extended `buildTelemetryEnv` signature)
-- [ ] 5.4 Legacy fallback: if `specrails-core` version < 4.1.0, DO NOT inject env var — **TODO: wire into `core-compat` check; currently always injects when profile resolvable**
+- [x] 5.4 Legacy fallback: if `specrails-core` version < 4.1.0, DO NOT inject env var (wired via `projectSupportsProfiles` reading `.specrails/specrails-version`)
 - [ ] 5.5 Unit tests: spawn with profile, spawn without profile, legacy-core detection — **covered for ProfileManager; QueueManager-level spawn env tests pending**
 
 ## 6. Batch-implement per-rail forwarding
@@ -54,7 +54,7 @@
 - [x] 7.3 Route: `/agents` → default Profiles tab (hub mode uses per-project base via `getApiBase()`)
 - [ ] 7.4 Per-project memory of active tab via existing `useProjectRouteMemory` — **basic route memory already in place; tab-level memory still TODO**
 - [ ] 7.5 Gate behind `VITE_FEATURE_AGENTS_SECTION` — **server side gated via `SPECRAILS_AGENTS_SECTION`; client flag pending**
-- [ ] 7.6 Upgrade banner when `specrails-core` version is older than 4.1.0 — **TODO: wire into existing core-compat surface**
+- [x] 7.6 Upgrade banner when `specrails-core` version is older than 4.1.0 (reads `/profiles/core-version` endpoint; yellow warning banner above tabs)
 
 ## 8. Profiles tab UI
 
@@ -68,9 +68,9 @@
 
 ## 9. Agents tab UI
 
-- [ ] 9.1 `AgentsTab.tsx` — catalog segmented into Upstream (`sr-*`, read-only viewer) and Custom (`custom-*`, editable)
-- [ ] 9.2 Read-only viewer for upstream agents shows metadata + body
-- [ ] 9.3 Custom agents expose "Open in Studio" and "Version history"
+- [x] 9.1 `AgentsCatalogTab.tsx` — catalog segmented into Upstream (`sr-*`, read-only viewer) and Custom (`custom-*`, read-only for now)
+- [x] 9.2 Read-only viewer for upstream agents shows metadata + body
+- [ ] 9.3 Custom agents expose "Open in Studio" and "Version history" — **requires Agent Studio (group 11); deferred**
 
 ## 10. Models tab UI
 
@@ -93,10 +93,10 @@
 
 ## 12. Launch-time profile pickers
 
-- [ ] 12.1 Extend single-feature launch dialog with `ProfilePicker` preselected to the resolved default
-- [ ] 12.2 Extend batch-implement launch dialog with per-rail `ProfilePicker` + "Same for all" convenience
+- [x] 12.1 Extend single-feature launch dialog with `ProfilePicker` preselected to the resolved default
+- [x] 12.2 Extend batch-implement launch dialog with `ProfilePicker` (single for all rails) — **per-rail overrides in the batch dialog deferred as polish**
 - [ ] 12.3 Rail header: compact profile picker for quick re-launch (read-only while running)
-- [ ] 12.4 Submitting a launch writes `.user-preferred.json` if the selection changed
+- [ ] 12.4 Submitting a launch writes `.user-preferred.json` if the selection changed — **preference is currently set only via the ⭐ in the Profiles tab**
 
 ## 13. Migration from legacy Project Settings
 
