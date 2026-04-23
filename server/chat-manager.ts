@@ -8,7 +8,7 @@ import { resolveCommand } from './command-resolver'
 
 const COMMAND_INSTRUCTION =
   'When you want to suggest a SpecRails command for the user to execute, wrap it in a command block like this: ' +
-  ':::command\n/sr:implement #42\n::: ' +
+  ':::command\n/specrails:implement #42\n::: ' +
   'The user will be prompted to confirm before the command runs.'
 
 function claudeOnPath(): boolean {
@@ -199,7 +199,7 @@ export class ChatManager {
     // Persist user message
     addMessage(this._db, { conversation_id: conversationId, role: 'user', content: userText })
 
-    // Resolve slash commands (e.g. /sr:propose-spec → prompt content)
+    // Resolve slash commands (e.g. /specrails:propose-spec → prompt content)
     const resolvedText = resolveCommand(userText, this._cwd ?? process.cwd())
 
     // Build spawn args based on provider

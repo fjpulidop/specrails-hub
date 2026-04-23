@@ -143,7 +143,7 @@ describe('ChatManager', () => {
 
     const sendPromise = cm.sendMessage(convId, 'What should I do?')
 
-    const responseWithCommand = 'You should run:\n:::command\n/sr:implement #5\n:::\nThis will help.'
+    const responseWithCommand = 'You should run:\n:::command\n/specrails:implement #5\n:::\nThis will help.'
     pushLine(child, assistantEvent(responseWithCommand))
     pushLine(child, resultEvent('sess-xyz'))
     await finishProcess(child, 0)
@@ -153,7 +153,7 @@ describe('ChatManager', () => {
     const proposalMsgs = getBroadcastedByType(broadcast, 'chat_command_proposal')
     expect(proposalMsgs).toHaveLength(1)
     expect(proposalMsgs[0].conversationId).toBe(convId)
-    expect(proposalMsgs[0].command).toBe('/sr:implement #5')
+    expect(proposalMsgs[0].command).toBe('/specrails:implement #5')
   })
 
   // ─── Test 4: duplicate :::command blocks not emitted twice ────────────────
@@ -166,8 +166,8 @@ describe('ChatManager', () => {
     const sendPromise = cm.sendMessage(convId, 'Suggest something')
 
     // Emit the same command twice across two chunks (buffer accumulates)
-    pushLine(child, assistantEvent(':::command\n/sr:implement #1\n:::'))
-    pushLine(child, assistantEvent(' and again :::command\n/sr:implement #1\n:::'))
+    pushLine(child, assistantEvent(':::command\n/specrails:implement #1\n:::'))
+    pushLine(child, assistantEvent(' and again :::command\n/specrails:implement #1\n:::'))
     pushLine(child, resultEvent('sess-dup'))
     await finishProcess(child, 0)
 
@@ -307,7 +307,7 @@ describe('ChatManager', () => {
     })
 
     it('system prompt includes dashboard context section when jobs exist', async () => {
-      createJob(db, { id: 'job-ctx-1', command: '/sr:implement #42', started_at: new Date().toISOString() })
+      createJob(db, { id: 'job-ctx-1', command: '/specrails:implement #42', started_at: new Date().toISOString() })
       finishJob(db, 'job-ctx-1', { exit_code: 0, status: 'completed', total_cost_usd: 0.05, duration_ms: 30000 })
 
       const cmWithName = new ChatManager(broadcast, db, undefined, 'test-project')
@@ -329,17 +329,17 @@ describe('ChatManager', () => {
       const systemPrompt = spawnArgs[sysPromptIdx + 1]
       expect(systemPrompt).toContain('Dashboard Context')
       expect(systemPrompt).toContain('Recent Jobs')
-      expect(systemPrompt).toContain('/sr:implement #42')
+      expect(systemPrompt).toContain('/specrails:implement #42')
     })
 
     it('success rate uses all-time failedJobs count, not just recent jobs', async () => {
       // Create 10 jobs: 8 completed, 2 failed (historical)
       for (let i = 1; i <= 8; i++) {
-        createJob(db, { id: `job-sr-ok-${i}`, command: `/sr:implement #${i}`, started_at: new Date().toISOString() })
+        createJob(db, { id: `job-sr-ok-${i}`, command: `/specrails:implement #${i}`, started_at: new Date().toISOString() })
         finishJob(db, `job-sr-ok-${i}`, { exit_code: 0, status: 'completed', total_cost_usd: 0.01, duration_ms: 5000 })
       }
       for (let i = 1; i <= 2; i++) {
-        createJob(db, { id: `job-sr-fail-${i}`, command: `/sr:implement #fail-${i}`, started_at: new Date().toISOString() })
+        createJob(db, { id: `job-sr-fail-${i}`, command: `/specrails:implement #fail-${i}`, started_at: new Date().toISOString() })
         finishJob(db, `job-sr-fail-${i}`, { exit_code: 1, status: 'failed', total_cost_usd: 0, duration_ms: 1000 })
       }
 
@@ -389,7 +389,7 @@ describe('ChatManager', () => {
     })
 
     it('system prompt is refreshed on each sendMessage call', async () => {
-      createJob(db, { id: 'job-ctx-seq-1', command: '/sr:implement #1', started_at: new Date().toISOString() })
+      createJob(db, { id: 'job-ctx-seq-1', command: '/specrails:implement #1', started_at: new Date().toISOString() })
       finishJob(db, 'job-ctx-seq-1', { exit_code: 0, status: 'completed', total_cost_usd: 0.01, duration_ms: 5000 })
 
       const cmSeq = new ChatManager(broadcast, db, undefined, 'seq-project')
@@ -408,7 +408,7 @@ describe('ChatManager', () => {
       await send1
 
       // Add a new job after first send
-      createJob(db, { id: 'job-ctx-seq-2', command: '/sr:review #7', started_at: new Date().toISOString() })
+      createJob(db, { id: 'job-ctx-seq-2', command: '/specrails:review #7', started_at: new Date().toISOString() })
       finishJob(db, 'job-ctx-seq-2', { exit_code: 0, status: 'completed', total_cost_usd: 0.02, duration_ms: 8000 })
 
       const child2 = createMockChildProcess()
@@ -432,9 +432,9 @@ describe('ChatManager', () => {
       const prompt1 = getPrompt(mainCalls[0])
       const prompt2 = getPrompt(mainCalls[1])
       // Second prompt should mention the new job
-      expect(prompt2).toContain('/sr:review #7')
+      expect(prompt2).toContain('/specrails:review #7')
       // First prompt should not have mentioned it yet
-      expect(prompt1).not.toContain('/sr:review #7')
+      expect(prompt1).not.toContain('/specrails:review #7')
     })
   })
 

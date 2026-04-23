@@ -43,7 +43,7 @@ import { JobDetailModal } from '../JobDetailModal'
 
 const mockJob = {
   id: 'job-abc123',
-  command: '/sr:implement --spec SPEA-001',
+  command: '/specrails:implement --spec SPEA-001',
   started_at: '2024-03-21T10:00:00Z',
   finished_at: '2024-03-21T10:01:02Z',
   status: 'completed' as const,
@@ -87,7 +87,7 @@ describe('JobDetailModal', () => {
   it('renders command after successful fetch', async () => {
     render(<JobDetailModal jobId="job-abc123" onClose={onClose} />)
     await waitFor(() => {
-      expect(screen.getByText('/sr:implement --spec SPEA-001')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:implement --spec SPEA-001')).toBeInTheDocument()
     })
   })
 
@@ -148,7 +148,7 @@ describe('JobDetailModal', () => {
   it('calls onClose when X button is clicked', async () => {
     render(<JobDetailModal jobId="job-abc123" onClose={onClose} />)
     await waitFor(() => {
-      expect(screen.getByText('/sr:implement --spec SPEA-001')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:implement --spec SPEA-001')).toBeInTheDocument()
     })
     // Find the X close button (last button in header)
     const buttons = document.querySelectorAll('button')

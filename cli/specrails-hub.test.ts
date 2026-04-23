@@ -95,11 +95,11 @@ describe('parseArgs', () => {
     }
   })
   it('passes extra args through', () => { expect(parseArgs(['add', '/some/path'])).toEqual({ mode: 'hub', subArgs: ['add', '/some/path'], port: 4200 }) })
-  it('injects /sr: prefix for known verbs', () => { expect(parseArgs(['implement', '#42'])).toEqual({ mode: 'command', resolved: '/sr:implement #42', port: 4200 }) })
-  it('injects /sr: prefix for batch-implement', () => { expect(parseArgs(['batch-implement', '#40', '#41'])).toEqual({ mode: 'command', resolved: '/sr:batch-implement #40 #41', port: 4200 }) })
-  it('passes through slash-prefixed commands as raw', () => { expect(parseArgs(['/sr:implement', '#42'])).toEqual({ mode: 'raw', resolved: '/sr:implement #42', port: 4200 }) })
+  it('injects /specrails: prefix for known verbs', () => { expect(parseArgs(['implement', '#42'])).toEqual({ mode: 'command', resolved: '/specrails:implement #42', port: 4200 }) })
+  it('injects /specrails: prefix for batch-implement', () => { expect(parseArgs(['batch-implement', '#40', '#41'])).toEqual({ mode: 'command', resolved: '/specrails:batch-implement #40 #41', port: 4200 }) })
+  it('passes through slash-prefixed commands as raw', () => { expect(parseArgs(['/specrails:implement', '#42'])).toEqual({ mode: 'raw', resolved: '/specrails:implement #42', port: 4200 }) })
   it('treats unknown tokens as raw prompt', () => { expect(parseArgs(['do something interesting'])).toEqual({ mode: 'raw', resolved: 'do something interesting', port: 4200 }) })
-  it('strips --port from args before routing', () => { expect(parseArgs(['--port', '9999', 'implement', '#1'])).toEqual({ mode: 'command', resolved: '/sr:implement #1', port: 9999 }) })
+  it('strips --port from args before routing', () => { expect(parseArgs(['--port', '9999', 'implement', '#1'])).toEqual({ mode: 'command', resolved: '/specrails:implement #1', port: 9999 }) })
 })
 
 describe('formatDuration', () => {
@@ -292,10 +292,10 @@ describe('handleJobs', () => {
   it('prints job table', async () => {
     ;({ server, port } = await createMockServer([
       { path: '/api/health', status: 200, body: { status: 'ok' } },
-      { path: '/api/jobs', status: 200, body: { jobs: [{ id: 'abc12345-6789', command: '/sr:implement #42', started_at: '2024-06-15T10:30:00Z', duration_ms: 45000, exit_code: 0, status: 'done' }], total: 1 } },
+      { path: '/api/jobs', status: 200, body: { jobs: [{ id: 'abc12345-6789', command: '/specrails:implement #42', started_at: '2024-06-15T10:30:00Z', duration_ms: 45000, exit_code: 0, status: 'done' }], total: 1 } },
     ]))
     const o = await captureStdoutAsync(async () => { expect(await _internal.handleJobs(port)).toBe(0) })
-    expect(o).toContain('ID'); expect(o).toContain('abc12345'); expect(o).toContain('/sr:implement #42')
+    expect(o).toContain('ID'); expect(o).toContain('abc12345'); expect(o).toContain('/specrails:implement #42')
   })
 
   it('handles 501 from /api/jobs', async () => {
@@ -630,7 +630,7 @@ process.stdout.write(JSON.stringify({ type: 'text', content: 'Hello' }) + '\\n')
 process.stdout.write(JSON.stringify({ type: 'result', cost_usd: 0.01, input_tokens: 100, output_tokens: 50 }) + '\\n');
 process.exit(0);
 `)
-    let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => { expect(await _internal.runDirect('/sr:implement #42')).toBe(0) }) })
+    let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => { expect(await _internal.runDirect('/specrails:implement #42')).toBe(0) }) })
     expect(so).toContain('Hello'); expect(so).toContain('cost: $0.01'); expect(so).toContain('tokens: 150')
   })
 

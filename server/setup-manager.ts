@@ -355,7 +355,7 @@ export function sweepLegacySrCommands(projectPath: string): number {
     const files = (readdirSync(srDir) as string[]).filter((f) => f.endsWith('.md'))
     const count = files.length
     rmSync(srDir, { recursive: true, force: true })
-    console.info(`[SetupManager] Swept ${count} legacy /sr:* command(s) from ${srDir}`)
+    console.info(`[SetupManager] Swept ${count} legacy /specrails:* command(s) from ${srDir}`)
     return count
   } catch (err) {
     console.info(`[SetupManager] sweepLegacySrCommands failed (non-fatal): ${err}`)

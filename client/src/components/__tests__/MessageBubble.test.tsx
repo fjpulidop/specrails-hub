@@ -60,7 +60,7 @@ describe('MessageBubble', () => {
     })
 
     it('renders assistant message with :::command block', () => {
-      const content = 'Here is a suggestion:\n:::command\n/sr:implement --spec SPEA-001\n:::\nGood luck!'
+      const content = 'Here is a suggestion:\n:::command\n/specrails:implement --spec SPEA-001\n:::\nGood luck!'
       render(
         <MessageBubble
           message={makeMessage({ role: 'assistant', content })}
@@ -70,11 +70,11 @@ describe('MessageBubble', () => {
       )
       // CommandProposal renders "Suggested command"
       expect(screen.getByText('Suggested command')).toBeInTheDocument()
-      expect(screen.getByText('/sr:implement --spec SPEA-001')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:implement --spec SPEA-001')).toBeInTheDocument()
     })
 
     it('renders text segments around command block', () => {
-      const content = 'Intro text\n:::command\n/sr:implement\n:::\nTrailing text'
+      const content = 'Intro text\n:::command\n/specrails:implement\n:::\nTrailing text'
       render(
         <MessageBubble
           message={makeMessage({ role: 'assistant', content })}
@@ -87,7 +87,7 @@ describe('MessageBubble', () => {
     })
 
     it('renders multiple command blocks', () => {
-      const content = ':::command\n/sr:implement\n:::\n:::command\n/sr:propose-spec\n:::'
+      const content = ':::command\n/specrails:implement\n:::\n:::command\n/specrails:propose-spec\n:::'
       render(
         <MessageBubble
           message={makeMessage({ role: 'assistant', content })}
@@ -101,7 +101,7 @@ describe('MessageBubble', () => {
 
     it('calls onConfirmCommand with command when Run is clicked', () => {
       const onConfirm = vi.fn()
-      const content = ':::command\n/sr:implement --spec SPEA-001\n:::'
+      const content = ':::command\n/specrails:implement --spec SPEA-001\n:::'
       render(
         <MessageBubble
           message={makeMessage({ role: 'assistant', content })}
@@ -110,12 +110,12 @@ describe('MessageBubble', () => {
         />
       )
       fireEvent.click(screen.getByRole('button', { name: /run/i }))
-      expect(onConfirm).toHaveBeenCalledWith('/sr:implement --spec SPEA-001')
+      expect(onConfirm).toHaveBeenCalledWith('/specrails:implement --spec SPEA-001')
     })
 
     it('calls onDismissCommand with command when Dismiss is clicked', () => {
       const onDismiss = vi.fn()
-      const content = ':::command\n/sr:health-check\n:::'
+      const content = ':::command\n/specrails:health-check\n:::'
       render(
         <MessageBubble
           message={makeMessage({ role: 'assistant', content })}
@@ -124,12 +124,12 @@ describe('MessageBubble', () => {
         />
       )
       fireEvent.click(screen.getByRole('button', { name: /dismiss/i }))
-      expect(onDismiss).toHaveBeenCalledWith('/sr:health-check')
+      expect(onDismiss).toHaveBeenCalledWith('/specrails:health-check')
     })
 
     it('renders message with only whitespace segment as null (no empty span)', () => {
       // A content that has only whitespace between blocks should skip the empty segment
-      const content = ':::command\n/sr:implement\n:::\n   '
+      const content = ':::command\n/specrails:implement\n:::\n   '
       render(
         <MessageBubble
           message={makeMessage({ role: 'assistant', content })}

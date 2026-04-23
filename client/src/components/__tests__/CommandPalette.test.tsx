@@ -57,8 +57,8 @@ function mockFetchResponses() {
         ok: true,
         json: async () => ({
           jobs: [
-            { id: 'j1', command: '/sr:implement', status: 'completed', started_at: '2026-03-20T10:00:00Z' },
-            { id: 'j2', command: '/sr:health-check', status: 'failed', started_at: '2026-03-20T11:00:00Z' },
+            { id: 'j1', command: '/specrails:implement', status: 'completed', started_at: '2026-03-20T10:00:00Z' },
+            { id: 'j2', command: '/specrails:health-check', status: 'failed', started_at: '2026-03-20T11:00:00Z' },
           ],
         }),
       })
@@ -157,8 +157,8 @@ describe('CommandPalette', () => {
     await user.keyboard('{Meta>}k{/Meta}')
 
     await waitFor(() => {
-      expect(screen.getByText('/sr:implement')).toBeInTheDocument()
-      expect(screen.getByText('/sr:health-check')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:implement')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:health-check')).toBeInTheDocument()
     })
   })
 
@@ -261,10 +261,10 @@ describe('CommandPalette', () => {
 
     await user.keyboard('{Meta>}k{/Meta}')
     await waitFor(() => {
-      expect(screen.getByText('/sr:implement')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:implement')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByText('/sr:implement'))
+    await user.click(screen.getByText('/specrails:implement'))
 
     expect(mockNavigate).toHaveBeenCalledWith('/jobs/j1')
   })
@@ -285,7 +285,7 @@ describe('CommandPalette', () => {
         '/api/projects/p1/spawn',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ command: '/sr:health-check' }),
+          body: JSON.stringify({ command: '/specrails:health-check' }),
         })
       )
       expect(mockNavigate).toHaveBeenCalledWith('/jobs/new-job-1')

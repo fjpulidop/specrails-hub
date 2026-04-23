@@ -389,7 +389,7 @@ export class QueueManager {
   }
 
   private _phasesForCommand(command: string): PhaseDefinition[] {
-    // Extract slug from command strings like "/sr:implement #5" or "implement"
+    // Extract slug from command strings like "/specrails:implement #5" or "implement"
     const firstToken = command.trim().split(/\s+/)[0]
     const slug = firstToken.includes(':') ? firstToken.split(':').pop()! : firstToken.replace(/^\//, '')
     const info = this._commands.find((c) => c.slug === slug)

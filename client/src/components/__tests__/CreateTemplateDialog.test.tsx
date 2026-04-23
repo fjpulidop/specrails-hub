@@ -23,7 +23,7 @@ function makeTemplate(overrides: Partial<JobTemplate> = {}): JobTemplate {
     id: 'tpl-1',
     name: 'Full pipeline',
     description: 'Does everything',
-    commands: ['/sr:implement #1', '/sr:review #1'],
+    commands: ['/specrails:implement #1', '/specrails:review #1'],
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -78,7 +78,7 @@ describe('CreateTemplateDialog', () => {
     )
     expect(screen.getByDisplayValue('Full pipeline')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Does everything')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('/sr:implement #1')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('/specrails:implement #1')).toBeInTheDocument()
   })
 
   it('starts with one empty command row when creating', () => {
@@ -128,8 +128,8 @@ describe('CreateTemplateDialog', () => {
     const user = userEvent.setup()
     render(<CreateTemplateDialog open={true} onClose={onClose} onSaved={onSaved} />)
     const input = screen.getByPlaceholderText('Select a command or type a free prompt...')
-    await user.type(input, '/sr:implement #99')
-    expect(input).toHaveValue('/sr:implement #99')
+    await user.type(input, '/specrails:implement #99')
+    expect(input).toHaveValue('/specrails:implement #99')
   })
 
   it('moves command up via the move button', async () => {
@@ -147,8 +147,8 @@ describe('CreateTemplateDialog', () => {
     // First "Move up" is disabled (index 0), second is for index 1
     await user.click(moveUpButtons[1])
     const inputs = screen.getAllByPlaceholderText('Select a command or type a free prompt...')
-    expect(inputs[0]).toHaveValue('/sr:review #1')
-    expect(inputs[1]).toHaveValue('/sr:implement #1')
+    expect(inputs[0]).toHaveValue('/specrails:review #1')
+    expect(inputs[1]).toHaveValue('/specrails:implement #1')
   })
 
   it('does not move command when already at boundary (first item up / last item down)', async () => {
@@ -201,7 +201,7 @@ describe('CreateTemplateDialog', () => {
     render(<CreateTemplateDialog open={true} onClose={onClose} onSaved={onSaved} />)
 
     await user.type(screen.getByPlaceholderText('e.g. Full pipeline'), 'My Template')
-    await user.type(screen.getByPlaceholderText('Select a command or type a free prompt...'), '/sr:implement #1')
+    await user.type(screen.getByPlaceholderText('Select a command or type a free prompt...'), '/specrails:implement #1')
     await user.click(screen.getByRole('button', { name: /Create/i }))
 
     await waitFor(() => {
@@ -247,7 +247,7 @@ describe('CreateTemplateDialog', () => {
     render(<CreateTemplateDialog open={true} onClose={onClose} onSaved={onSaved} />)
 
     await user.type(screen.getByPlaceholderText('e.g. Full pipeline'), 'My Template')
-    await user.type(screen.getByPlaceholderText('Select a command or type a free prompt...'), '/sr:implement #1')
+    await user.type(screen.getByPlaceholderText('Select a command or type a free prompt...'), '/specrails:implement #1')
     await user.click(screen.getByRole('button', { name: /Create/i }))
 
     await waitFor(() => {

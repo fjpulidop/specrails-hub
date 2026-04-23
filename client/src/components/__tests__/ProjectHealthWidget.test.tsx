@@ -64,7 +64,7 @@ const mockMetrics = {
   pipeline: {
     lastJobId: 'job-1',
     lastJobStatus: 'completed',
-    lastJobCommand: '/sr:implement',
+    lastJobCommand: '/specrails:implement',
     lastJobAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(), // 1 hour ago
   },
 }
@@ -178,7 +178,7 @@ describe('ProjectHealthWidget', () => {
   it('renders last job command when available', () => {
     mockData = mockMetrics
     render(<ProjectHealthWidget />)
-    expect(screen.getByText('/sr:implement')).toBeInTheDocument()
+    expect(screen.getByText('/specrails:implement')).toBeInTheDocument()
   })
 
   it('renders recent commits list', () => {

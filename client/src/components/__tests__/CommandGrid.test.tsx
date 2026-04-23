@@ -202,13 +202,13 @@ describe('Display name overrides', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Tooltips — must show /sr:<slug>, not the display name
+// Tooltips — must show /specrails:<slug>, not the display name
 // ---------------------------------------------------------------------------
 
 // Note: Radix UI Tooltip content renders into a portal only after pointer events
 // that jsdom doesn't fully support. We verify the tooltip trigger exists and the
 // command slug is correctly associated with each command card.
-describe('Tooltips show real /sr:<slug> command', () => {
+describe('Tooltips show real /specrails:<slug> command', () => {
   it('update-product-driven-backlog command button is a tooltip trigger', () => {
     renderGrid()
     // The button for "Auto-propose" is wrapped in a TooltipTrigger — it renders fine
@@ -225,8 +225,8 @@ describe('Tooltips show real /sr:<slug> command', () => {
     renderGrid()
     const button = screen.getByRole('button', { name: /Auto-propose/i })
     await user.hover(button)
-    // The tooltip should show the slug-based text, not /sr:Auto-propose
-    expect(document.body).not.toHaveTextContent('/sr:Auto-propose')
+    // The tooltip should show the slug-based text, not /specrails:Auto-propose
+    expect(document.body).not.toHaveTextContent('/specrails:Auto-propose')
   })
 })
 

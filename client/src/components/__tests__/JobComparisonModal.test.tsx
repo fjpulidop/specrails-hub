@@ -11,7 +11,7 @@ const mockCompareResponse = {
   jobs: [
     {
       id: 'job-aaa111',
-      command: '/sr:implement --spec SPEA-001',
+      command: '/specrails:implement --spec SPEA-001',
       status: 'completed',
       startedAt: '2024-03-21T10:00:00Z',
       finishedAt: '2024-03-21T10:01:02Z',
@@ -25,7 +25,7 @@ const mockCompareResponse = {
     },
     {
       id: 'job-bbb222',
-      command: '/sr:implement --spec SPEA-002',
+      command: '/specrails:implement --spec SPEA-002',
       status: 'failed',
       startedAt: '2024-03-21T11:00:00Z',
       finishedAt: '2024-03-21T11:00:30Z',
@@ -67,8 +67,8 @@ describe('JobComparisonModal', () => {
   it('renders job commands after successful fetch', async () => {
     render(<JobComparisonModal jobIds={jobIds} onClose={onClose} />)
     await waitFor(() => {
-      expect(screen.getByText('/sr:implement --spec SPEA-001')).toBeInTheDocument()
-      expect(screen.getByText('/sr:implement --spec SPEA-002')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:implement --spec SPEA-001')).toBeInTheDocument()
+      expect(screen.getByText('/specrails:implement --spec SPEA-002')).toBeInTheDocument()
     })
   })
 

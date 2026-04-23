@@ -55,7 +55,7 @@ export default function JobsPage() {
 
   const proposalJobs: JobSummary[] = proposals.map((p) => ({
     id: `proposal:${p.id}`,
-    command: `/sr:propose-feature ${p.idea.length > 60 ? p.idea.slice(0, 57) + '...' : p.idea}`,
+    command: `/specrails:propose-feature ${p.idea.length > 60 ? p.idea.slice(0, 57) + '...' : p.idea}`,
     started_at: p.created_at,
     status: PROPOSAL_STATUS_MAP[p.status] ?? 'queued',
   }))

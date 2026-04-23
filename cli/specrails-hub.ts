@@ -6,8 +6,8 @@
  * claude directly when the manager is not reachable.
  *
  * Usage:
- *   specrails-hub implement #42           → /sr:implement #42 (via manager or direct)
- *   specrails-hub "any raw prompt"        → raw prompt (no /sr: prefix)
+ *   specrails-hub implement #42           → /specrails:implement #42 (via manager or direct)
+ *   specrails-hub "any raw prompt"        → raw prompt (no /specrails: prefix)
  *   specrails-hub --status                → print manager state
  *   specrails-hub --jobs                  → print job history table
  *   specrails-hub --port 5000 <command>   → use port 5000 instead of 4200
@@ -151,9 +151,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
     return { mode: 'raw', resolved, port, projectOverride }
   }
 
-  // Known verb: inject /sr: prefix
+  // Known verb: inject /specrails: prefix
   if (KNOWN_VERBS.has(first)) {
-    const resolved = `/sr:${args.join(' ')}`
+    const resolved = `/specrails:${args.join(' ')}`
     return { mode: 'command', resolved, port, projectOverride }
   }
 
@@ -195,7 +195,7 @@ ${bold('Project Required:')}
     specrails-hub implement #42
 
 ${bold('Usage:')}
-  specrails-hub implement #42                Run a known specrails verb (prepends /sr:)
+  specrails-hub implement #42                Run a known specrails verb (prepends /specrails:)
   specrails-hub batch-implement #40 #41      Batch implementation across issues
   specrails-hub why                          Explain recent changes
   specrails-hub get-backlog-specs            View prioritized spec backlog

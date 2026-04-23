@@ -421,17 +421,17 @@ describe('job templates', () => {
   })
 
   it('creates and retrieves a template', () => {
-    createTemplate(db, { id: 'tpl-1', name: 'My Rail', commands: ['/sr:health-check', '/sr:implement #1'] })
+    createTemplate(db, { id: 'tpl-1', name: 'My Rail', commands: ['/specrails:health-check', '/specrails:implement #1'] })
     const row = getTemplate(db, 'tpl-1')
     expect(row).toBeDefined()
     expect(row!.name).toBe('My Rail')
     const commands = JSON.parse(row!.commands) as string[]
-    expect(commands).toEqual(['/sr:health-check', '/sr:implement #1'])
+    expect(commands).toEqual(['/specrails:health-check', '/specrails:implement #1'])
     expect(row!.description).toBeNull()
   })
 
   it('stores optional description', () => {
-    createTemplate(db, { id: 'tpl-2', name: 'With Desc', description: 'Does stuff', commands: ['/sr:implement'] })
+    createTemplate(db, { id: 'tpl-2', name: 'With Desc', description: 'Does stuff', commands: ['/specrails:implement'] })
     const row = getTemplate(db, 'tpl-2')!
     expect(row.description).toBe('Does stuff')
   })

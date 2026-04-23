@@ -72,7 +72,7 @@ export function BatchImplementWizard({ open, onClose }: BatchImplementWizardProp
         if (issue.body?.trim()) text += `\n\n${issue.body.trim()}`
         return text
       }).join('\n\n---\n\n')
-      command = `/sr:batch-implement ${issueArgs}`
+      command = `/specrails:batch-implement ${issueArgs}`
     } else {
       const validItems = state.freeFormItems.filter((item) => item.title.trim())
       if (validItems.length === 0) {
@@ -82,7 +82,7 @@ export function BatchImplementWizard({ open, onClose }: BatchImplementWizardProp
       const featureList = validItems
         .map((item) => `- ${item.title.trim()}${item.description.trim() ? `: ${item.description.trim()}` : ''}`)
         .join('\n')
-      command = `/sr:batch-implement\n${featureList}`
+      command = `/specrails:batch-implement\n${featureList}`
     }
 
     try {

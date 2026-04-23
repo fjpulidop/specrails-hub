@@ -133,7 +133,7 @@ export function CreateTemplateDialog({ open, template, commands = [], onClose, o
             {commands.length > 0 && (
               <datalist id="sr-commands-list">
                 {commands.map((c) => (
-                  <option key={c.slug} value={`/sr:${c.slug}`}>{c.name}</option>
+                  <option key={c.slug} value={`/specrails:${c.slug}`}>{c.name}</option>
                 ))}
               </datalist>
             )}

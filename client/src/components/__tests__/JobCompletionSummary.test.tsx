@@ -6,7 +6,7 @@ import type { JobSummary, EventRow } from '../../types'
 
 const completedJob: JobSummary = {
   id: 'job-1',
-  command: '/sr:implement --spec SPEA-001',
+  command: '/specrails:implement --spec SPEA-001',
   started_at: '2024-03-21T10:00:00Z',
   finished_at: '2024-03-21T10:01:02Z',  // 62s wall-clock
   status: 'completed',
@@ -19,7 +19,7 @@ const completedJob: JobSummary = {
 
 const failedJob: JobSummary = {
   id: 'job-2',
-  command: '/sr:health-check',
+  command: '/specrails:health-check',
   started_at: '2024-03-21T11:00:00Z',
   finished_at: null,
   status: 'failed',

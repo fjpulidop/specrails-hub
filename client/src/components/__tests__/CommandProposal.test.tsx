@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from '../../test-utils'
 import { CommandProposal } from '../CommandProposal'
 
 describe('CommandProposal', () => {
-  const command = '/sr:implement --spec SPEA-001'
+  const command = '/specrails:implement --spec SPEA-001'
   const onRun = vi.fn()
   const onDismiss = vi.fn()
 

@@ -205,7 +205,7 @@ export const demoTickets: LocalTicket[] = [
   {
     id: 14,
     title: 'Scaffold project health check command',
-    description: 'Initial cut of /sr:health-check command — basic linting, test coverage, and dependency freshness.',
+    description: 'Initial cut of /specrails:health-check command — basic linting, test coverage, and dependency freshness.',
     status: 'done',
     priority: 'medium',
     labels: ['cli', 'quality'],
@@ -219,7 +219,7 @@ export const demoTickets: LocalTicket[] = [
   },
   {
     id: 15,
-    title: 'Add `--fast` flag to /sr:implement',
+    title: 'Add `--fast` flag to /specrails:implement',
     description: 'Opt-out of exploration phase for simple specs to cut execution time by ~40%.',
     status: 'done',
     priority: 'medium',
@@ -399,7 +399,7 @@ export const demoTickets: LocalTicket[] = [
   },
   {
     id: 27,
-    title: 'Add `/sr:propose-spec` slash command',
+    title: 'Add `/specrails:propose-spec` slash command',
     description: 'Scaffold a new spec draft from a user description using the Claude agent directly inside the hub chat.',
     status: 'done',
     priority: 'high',

@@ -951,10 +951,10 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const res = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'My Template', description: 'A test template', commands: ['/sr:test', '/sr:build'] })
+        .send({ name: 'My Template', description: 'A test template', commands: ['/specrails:test', '/specrails:build'] })
       expect(res.status).toBe(201)
       expect(res.body.template.name).toBe('My Template')
-      expect(res.body.template.commands).toEqual(['/sr:test', '/sr:build'])
+      expect(res.body.template.commands).toEqual(['/specrails:test', '/specrails:build'])
     })
 
     it('POST /templates returns 400 when name is missing', async () => {
@@ -962,7 +962,7 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const res = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ commands: ['/sr:test'] })
+        .send({ commands: ['/specrails:test'] })
       expect(res.status).toBe(400)
       expect(res.body.error).toMatch(/name/)
     })
@@ -991,10 +991,10 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Dup', commands: ['/sr:test'] })
+        .send({ name: 'Dup', commands: ['/specrails:test'] })
       const res = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Dup', commands: ['/sr:build'] })
+        .send({ name: 'Dup', commands: ['/specrails:build'] })
       expect(res.status).toBe(409)
     })
 
@@ -1003,7 +1003,7 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const createRes = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Get Me', commands: ['/sr:run'] })
+        .send({ name: 'Get Me', commands: ['/specrails:run'] })
       const id = createRes.body.template.id
       const res = await request(app).get(`/api/projects/proj-1/templates/${id}`)
       expect(res.status).toBe(200)
@@ -1022,7 +1022,7 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const createRes = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Old Name', commands: ['/sr:run'] })
+        .send({ name: 'Old Name', commands: ['/specrails:run'] })
       const id = createRes.body.template.id
       const res = await request(app)
         .patch(`/api/projects/proj-1/templates/${id}`)
@@ -1045,7 +1045,7 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const createRes = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Valid', commands: ['/sr:run'] })
+        .send({ name: 'Valid', commands: ['/specrails:run'] })
       const id = createRes.body.template.id
       const res = await request(app)
         .patch(`/api/projects/proj-1/templates/${id}`)
@@ -1058,7 +1058,7 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const createRes = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Valid2', commands: ['/sr:run'] })
+        .send({ name: 'Valid2', commands: ['/specrails:run'] })
       const id = createRes.body.template.id
       const res = await request(app)
         .patch(`/api/projects/proj-1/templates/${id}`)
@@ -1071,10 +1071,10 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Alpha', commands: ['/sr:run'] })
+        .send({ name: 'Alpha', commands: ['/specrails:run'] })
       const createRes = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Beta', commands: ['/sr:run'] })
+        .send({ name: 'Beta', commands: ['/specrails:run'] })
       const betaId = createRes.body.template.id
       const res = await request(app)
         .patch(`/api/projects/proj-1/templates/${betaId}`)
@@ -1087,7 +1087,7 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const createRes = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'To Delete', commands: ['/sr:run'] })
+        .send({ name: 'To Delete', commands: ['/specrails:run'] })
       const id = createRes.body.template.id
       const deleteRes = await request(app).delete(`/api/projects/proj-1/templates/${id}`)
       expect(deleteRes.status).toBe(200)
@@ -1112,7 +1112,7 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const createRes = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Run Me', commands: ['/sr:test', '/sr:build'] })
+        .send({ name: 'Run Me', commands: ['/specrails:test', '/specrails:build'] })
       const id = createRes.body.template.id
       const res = await request(app).post(`/api/projects/proj-1/templates/${id}/run`)
       expect(res.status).toBe(202)
@@ -1134,7 +1134,7 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const createRes = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Fail Run', commands: ['/sr:test'] })
+        .send({ name: 'Fail Run', commands: ['/specrails:test'] })
       const id = createRes.body.template.id
       const res = await request(app).post(`/api/projects/proj-1/templates/${id}/run`)
       expect(res.status).toBe(400)
@@ -1145,7 +1145,7 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const createRes = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Desc Test', description: 'Initial', commands: ['/sr:run'] })
+        .send({ name: 'Desc Test', description: 'Initial', commands: ['/specrails:run'] })
       const id = createRes.body.template.id
       const res = await request(app)
         .patch(`/api/projects/proj-1/templates/${id}`)
@@ -1158,7 +1158,7 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const createRes = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'CmdTest', commands: ['/sr:run'] })
+        .send({ name: 'CmdTest', commands: ['/specrails:run'] })
       const id = createRes.body.template.id
       const res = await request(app)
         .patch(`/api/projects/proj-1/templates/${id}`)
@@ -1176,7 +1176,7 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const createRes = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'No Chain', commands: ['/sr:test', '/sr:build'] })
+        .send({ name: 'No Chain', commands: ['/specrails:test', '/specrails:build'] })
       const id = createRes.body.template.id
       const res = await request(app)
         .post(`/api/projects/proj-1/templates/${id}/run`)
@@ -1196,7 +1196,7 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const createRes = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Error Run', commands: ['/sr:test'] })
+        .send({ name: 'Error Run', commands: ['/specrails:test'] })
       const id = createRes.body.template.id
       const res = await request(app).post(`/api/projects/proj-1/templates/${id}/run`)
       expect(res.status).toBe(500)
@@ -2026,9 +2026,9 @@ describe('project-router', () => {
 
     it('passes active commands from running and queued jobs', async () => {
       const getJobs = vi.fn(() => [
-        { status: 'running', command: '/sr:implement #1' },
-        { status: 'queued', command: '/sr:test' },
-        { status: 'completed', command: '/sr:build' },
+        { status: 'running', command: '/specrails:implement #1' },
+        { status: 'queued', command: '/specrails:test' },
+        { status: 'completed', command: '/specrails:build' },
       ])
       const qm = makeQueueManager({ getJobs })
       const ctx = makeContext(db, {
@@ -2051,7 +2051,7 @@ describe('project-router', () => {
       // Create a template first
       await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'List Test', commands: ['/sr:run'] })
+        .send({ name: 'List Test', commands: ['/specrails:run'] })
       const res = await request(app).get('/api/projects/proj-1/templates')
       expect(res.status).toBe(200)
       expect(res.body.templates.length).toBeGreaterThan(0)
@@ -2067,13 +2067,13 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const createRes = await request(app)
         .post('/api/projects/proj-1/templates')
-        .send({ name: 'Cmd Update', commands: ['/sr:run'] })
+        .send({ name: 'Cmd Update', commands: ['/specrails:run'] })
       const id = createRes.body.template.id
       const res = await request(app)
         .patch(`/api/projects/proj-1/templates/${id}`)
-        .send({ commands: ['/sr:test', '/sr:build'] })
+        .send({ commands: ['/specrails:test', '/specrails:build'] })
       expect(res.status).toBe(200)
-      expect(res.body.template.commands).toEqual(['/sr:test', '/sr:build'])
+      expect(res.body.template.commands).toEqual(['/specrails:test', '/specrails:build'])
     })
   })
 

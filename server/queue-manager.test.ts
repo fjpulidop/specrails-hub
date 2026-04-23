@@ -1458,7 +1458,7 @@ describe('QueueManager', () => {
         },
       ]
       qm.setCommands(commands as any)
-      const phases = qm.phasesForCommand('/sr:implement #42')
+      const phases = qm.phasesForCommand('/specrails:implement #42')
       // The command may or may not match, but this exercises the code path
       expect(Array.isArray(phases)).toBe(true)
     })
@@ -1493,7 +1493,7 @@ describe('QueueManager', () => {
         provider: 'codex',
         resolvedModel: 'gpt-5.4-mini',
       })
-      qmCodex.enqueue('/sr:implement #1 --yes')
+      qmCodex.enqueue('/specrails:implement #1 --yes')
 
       const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
       expect(spawnCall[0]).toBe('codex')
@@ -1510,7 +1510,7 @@ describe('QueueManager', () => {
       vi.mocked(mockUuidV4).mockReturnValue('codex-tickets-job' as any)
 
       const qmCodex = new QueueManager(broadcast, undefined, [], undefined, { provider: 'codex' })
-      qmCodex.enqueue('/sr:implement #42')
+      qmCodex.enqueue('/specrails:implement #42')
 
       const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
       const promptArg = spawnCall[1][1] as string
@@ -1527,7 +1527,7 @@ describe('QueueManager', () => {
         provider: 'codex',
         resolvedModel: 'gpt-5.3-codex',
       })
-      qmCodex.enqueue('/sr:implement #1')
+      qmCodex.enqueue('/specrails:implement #1')
 
       const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
       expect(spawnArgs).toContain('--model')
@@ -1541,7 +1541,7 @@ describe('QueueManager', () => {
       vi.mocked(mockUuidV4).mockReturnValue('codex-default-model-job' as any)
 
       const qmCodex = new QueueManager(broadcast, undefined, [], undefined, { provider: 'codex' })
-      qmCodex.enqueue('/sr:implement #1')
+      qmCodex.enqueue('/specrails:implement #1')
 
       const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
       expect(spawnArgs).toContain('--model')
@@ -1559,7 +1559,7 @@ describe('QueueManager', () => {
         provider: 'codex',
         resolvedModel: 'gpt-5.4-mini',
       })
-      qmCodex.enqueue('/sr:implement #1')
+      qmCodex.enqueue('/specrails:implement #1')
 
       // Codex outputs plain text, not JSON result events
       child.stdout.push('Some output from codex\n')

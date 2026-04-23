@@ -38,11 +38,11 @@ export class ProposalManager {
     }
 
     // Resolve the command file — error if not installed
-    const rawCommand = `/sr:propose-feature ${idea}`
+    const rawCommand = `/specrails:propose-feature ${idea}`
     const prompt = resolveCommand(rawCommand, this._cwd)
     if (prompt === rawCommand) {
       updateProposal(this._db, proposalId, { status: 'cancelled' })
-      this._broadcastError(proposalId, 'This project does not have the /sr:propose-feature command installed. Run "npx specrails-core@latest" to update.')
+      this._broadcastError(proposalId, 'This project does not have the /specrails:propose-feature command installed. Run "npx specrails-core@latest" to update.')
       return
     }
 
