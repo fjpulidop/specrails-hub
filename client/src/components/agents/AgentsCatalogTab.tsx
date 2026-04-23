@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Pencil, Copy, Sparkles, Loader2 } from 'lucide-react'
+import { Plus, Pencil, Copy, Sparkles, Loader2, FileText } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
-import { AgentStudio } from './AgentStudio'
+import { AgentStudio, AGENT_TEMPLATES } from './AgentStudio'
 
 interface CatalogAgent {
   id: string
@@ -27,6 +27,7 @@ export function AgentsCatalogTab() {
   const [bodyLoading, setBodyLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [studio, setStudio] = useState<StudioMode>({ kind: 'closed' })
+  const [templatesOpen, setTemplatesOpen] = useState(false)
   const [generateOpen, setGenerateOpen] = useState(false)
   const [genName, setGenName] = useState('')
   const [genDescription, setGenDescription] = useState('')
@@ -121,6 +122,43 @@ export function AgentsCatalogTab() {
       />
     )
   }
+
+  const renderTemplatesDialog = () => (
+    <Dialog open={templatesOpen} onOpenChange={(o) => !o && setTemplatesOpen(false)}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="w-4 h-4" /> Start from a template
+          </DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3 py-2">
+          {AGENT_TEMPLATES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => {
+                setTemplatesOpen(false)
+                setStudio({ kind: 'create', initialBody: t.body, initialName: t.nameHint })
+              }}
+              className="text-left p-3 rounded-md border border-border hover:border-primary/40 hover:bg-accent/30 transition-colors"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">{t.emoji}</span>
+                <span className="text-sm font-medium">{t.label}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">{t.blurb}</p>
+              <p className="text-[10px] font-mono text-muted-foreground/70 mt-2">{t.nameHint}</p>
+            </button>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" size="sm" onClick={() => setTemplatesOpen(false)}>
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 
   const renderGenerateDialog = () => (
     <Dialog
@@ -252,9 +290,12 @@ export function AgentsCatalogTab() {
               Run <code className="text-foreground">npx specrails-core@latest update</code> in this
               project to install the upstream agents, or create a custom agent now.
             </div>
-            <div className="flex gap-2 justify-center">
+            <div className="flex gap-2 justify-center flex-wrap">
               <Button size="sm" onClick={() => setGenerateOpen(true)}>
                 <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Generate with Claude
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setTemplatesOpen(true)}>
+                <FileText className="w-3.5 h-3.5 mr-1.5" /> Template
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setStudio({ kind: 'create' })}>
                 <Plus className="w-3.5 h-3.5 mr-1.5" /> Blank
@@ -262,6 +303,7 @@ export function AgentsCatalogTab() {
             </div>
           </div>
         </div>
+        {renderTemplatesDialog()}
         {renderGenerateDialog()}
       </>
     )
@@ -273,6 +315,7 @@ export function AgentsCatalogTab() {
 
   return (
     <>
+    {renderTemplatesDialog()}
     {renderGenerateDialog()}
     <div className="flex h-full">
       {/* Left: list grouped by kind */}
@@ -280,11 +323,14 @@ export function AgentsCatalogTab() {
         <div className="px-2 py-2 border-b border-border flex items-center justify-between">
           <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Catalog</span>
           <div className="flex gap-1">
+            <Button size="sm" variant="ghost" onClick={() => setTemplatesOpen(true)} title="Start from a template">
+              <FileText className="w-3.5 h-3.5 mr-1" /> Template
+            </Button>
             <Button size="sm" variant="ghost" onClick={() => setGenerateOpen(true)} title="Generate with Claude">
               <Sparkles className="w-3.5 h-3.5 mr-1" /> Generate
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setStudio({ kind: 'create' })}>
-              <Plus className="w-3.5 h-3.5 mr-1" /> New
+              <Plus className="w-3.5 h-3.5 mr-1" /> Blank
             </Button>
           </div>
         </div>
