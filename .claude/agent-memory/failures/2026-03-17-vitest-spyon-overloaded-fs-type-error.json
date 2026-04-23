@@ -1,8 +1,0 @@
-{
-  "date": "2026-03-17",
-  "feature": "command-grid-sections (pre-existing in server/config.test.ts since initial commit)",
-  "root_cause": "server/config.test.ts lines 18-20 declared spy variables as `ReturnType<typeof vi.spyOn>`. The generic form resolves to `MockInstance<(this: unknown, ...args: unknown[]) => unknown>`, which is not assignable to the concrete overloaded types of fs.existsSync, fs.readdirSync, fs.readFileSync returned by the actual vi.spyOn() call. TypeScript strict mode flags the mismatch.",
-  "prevention_rule": "When spying on overloaded Node.js built-in functions (fs.existsSync, fs.readdirSync, fs.readFileSync, etc.), do not type the variable as `ReturnType<typeof vi.spyOn>`. Instead, type it as `any` with a comment, or let TypeScript infer the type (omit the annotation and declare without initializer using `let spy!: ReturnType<typeof vi.spyOn<typeof fs, 'existsSync'>>`). The `any` approach is safest for overloaded signatures.",
-  "file_pattern": "server/**/*.test.ts",
-  "severity": "error"
-}
