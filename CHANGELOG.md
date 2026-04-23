@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.38.0](https://github.com/fjpulidop/specrails-hub/compare/v1.37.0...v1.38.0) (2026-04-23)
+
+
+### Features
+
+* agent profiles + Agent Studio ([#246](https://github.com/fjpulidop/specrails-hub/issues/246)) ([c6f0681](https://github.com/fjpulidop/specrails-hub/commit/c6f06819237b05237fb86f93f1650fe2f27b2614))
+
 ## [1.37.0](https://github.com/fjpulidop/specrails-hub/compare/v1.36.2...v1.37.0) (2026-04-23)
 
 
