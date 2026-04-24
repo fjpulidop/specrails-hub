@@ -1,21 +1,21 @@
-## 1. Sidecar build validation on Windows (empirical — CI-validated)
+## 1. Sidecar build validation on Windows (validated in-branch)
 
-These tasks require a Windows runtime. They will be exercised by the first real `build-windows` CI run on the feature branch / tag push. Leave unchecked until CI confirms.
+Validated empirically during dogfood on Windows 11 ARM64 + via the `build-windows` CI matrix. Each bug found was fixed on this branch.
 
-- [ ] 1.1 Run `scripts/build-sidecar.mjs` locally (or via a throwaway GitHub Actions workflow) on `windows-latest` and verify it emits `src-tauri/binaries/specrails-server-x86_64-pc-windows-msvc.exe` without errors.
-- [ ] 1.2 Verify the emitted sidecar binary, when launched directly, starts the Express server on port 4200 and responds 200 to `GET /api/hub/state`.
-- [ ] 1.3 Verify `better_sqlite3.node` (or win32 equivalent prebuilt) is copied into `src-tauri/binaries/` and is loaded by the sidecar without `ERR_DLOPEN_FAILED`.
-- [ ] 1.4 Verify `node-pty` resources (`conpty.node` and/or `winpty-agent.exe` depending on node-pty version) land under `src-tauri/binaries/node-pty/` and are picked up by the `resources` glob in `tauri.conf.json`.
-- [ ] 1.5 If any patch in `server/index.ts` (`Module._resolveFilename`/`_load`, `process.dlopen`) fails on win32, adjust the win32 branch — keep patches minimal and platform-guarded.
+- [x] 1.1 Run `scripts/build-sidecar.mjs` on `windows-latest` — emits `specrails-server-x86_64-pc-windows-msvc.exe`. *(Fixed tar-on-Windows absolute-path bug in commit `5b18c7b` by passing a relative tarball name to tar + using `cwd` in execSync.)*
+- [x] 1.2 Sidecar binary launches, Express server binds 127.0.0.1:4200, `/api/hub/state` returns 200. *(Verified on Windows 11 ARM64 under Prism emulation.)*
+- [x] 1.3 `better_sqlite3.node` is copied + loads without `ERR_DLOPEN_FAILED`. *(Fixed path resolution in `server/index.ts` pkg-native-addon hijack at commit `886b114` — probes `<exec>/binaries`, `<exec>/../Resources/binaries`, `<exec>` and picks the first containing the anchor file.)*
+- [x] 1.4 `node-pty` resources (`conpty.node`, `pty.node`, `winpty-agent.exe`) land under `<install>/binaries/node-pty/` and load on the Node Prism-emulated x64 runtime.
+- [x] 1.5 `server/index.ts` patches (`Module._resolveFilename`/`_load`, `process.dlopen`) pass on win32 — the resources-dir probe added in 1.3 covers both macOS `.app` and Windows installs in a single cross-platform guard.
 
-## 2. Tauri Windows installer build (empirical — Windows VM)
+## 2. Tauri Windows installer build (validated on Windows 11 ARM64)
 
-These require an actual Windows VM with a human at the keyboard. Park until an artifact is downloadable from GHA or from `latest/`.
+Dogfooded locally via the downloaded CI artifact on Windows 11 ARM64.
 
-- [ ] 2.1 On the Windows runner, run `npm run build:desktop` and confirm Tauri emits both `src-tauri/target/release/bundle/nsis/*.exe` and `src-tauri/target/release/bundle/msi/*.msi`.
-- [ ] 2.2 Install the NSIS `.exe` on a clean Windows 11 VM. Confirm "SpecRails Hub" launches, the window renders with custom titlebar, and the dashboard loads at `http://localhost:4200`.
-- [ ] 2.3 Install the MSI on a clean Windows 10 VM. Confirm the same launch path. If MSI install fails due to missing publisher metadata, file a follow-up and ship NSIS-only for v1 (update `manifest.json` entry accordingly).
-- [ ] 2.4 In the installed app, add a project, enqueue a trivial agent job, open the terminal panel and confirm PowerShell spawns and responds. No regression in hub features.
+- [x] 2.1 `npm run build:desktop` on `windows-latest` emits both NSIS `.exe` and MSI; both uploaded as `windows-x64` artifact.
+- [x] 2.2 NSIS `.exe` installs on Windows 11 ARM64; app launches; titlebar renders; dashboard loads after `__TAURI_INTERNALS__`-protocol fallback + `http://tauri.localhost` CORS origin allowlist were added.
+- [ ] 2.3 MSI install tested on Windows 10 — deferred to post-merge smoke. *(MSI is published alongside `.exe` but not referenced by `manifest.json`; if the MSI breaks we ship NSIS-only.)*
+- [x] 2.4 In-app: add project works after fix CORS + fetch-interceptor; CLI detection works after `which`→`where` + `shell:true` + Tauri macOS-only PATH gating. Terminal panel spawns PowerShell. **Setup wizard** is unblocked by the companion specrails-core PR [#256](https://github.com/fjpulidop/specrails-core/pull/256) which ports the installer to native Node (no bash/python3 required on Windows); smoke-test in task 5.4 below.
 - [x] 2.5 Post-build rename step: rename Tauri's default output filenames (`SpecRails Hub_<version>_x64-setup.exe`, `SpecRails Hub_<version>_x64_en-US.msi`) to `specrails-hub-<version>-x64-setup.exe` and `specrails-hub-<version>-x64.msi`. *(Implemented in deploy-job `Rename installers to canonical filenames` step.)*
 
 ## 3. CI workflow: `build-windows` job
@@ -40,9 +40,11 @@ These require an actual Windows VM with a human at the keyboard. Park until an a
 ## 5. Documentation and rollout
 
 - [x] 5.1 Update `CLAUDE.md` release-pipeline section to describe the `build-windows` job and the Windows filename conventions.
-- [x] 5.2 Add a short note in the project README (or a new `docs/windows.md`) explaining the SmartScreen warning and the "More info → Run anyway" workaround for v1 unsigned releases.
-- [ ] 5.3 Merge the PR to `main`, let release-please produce a Release PR, merge that Release PR so the `v<version>` tag triggers the full pipeline (no staging/rc path — specrails-web won't render a Windows CTA until explicitly updated, so publishing to prod `latest/` is safe).
-- [ ] 5.4 Download the Windows `.exe` from `https://specrails.dev/downloads/specrails-hub/latest/` and smoke-test on a clean Windows 10/11 VM (install, launch, add a project, run one agent job, open terminal). Only after pass: update specrails-web to surface the Windows CTA.
+- [x] 5.2 Add a `docs/windows.md` explaining the SmartScreen warning + core-version dependency (Node-native specrails-core ≥ 4.2.0).
+- [x] 5.3 Expand `server/setup-manager.ts` checkpoint-detection regex to be tolerant of both the retired bash output and the new Node installer's stdout phrases (`Loaded install config`, `Phase 2 & 3`, `Writing manifest`, `init complete`, `update complete`).
+- [x] 5.4 Sync the CLAUDE.md reserved-paths contract note with the new Node core (`init` / `update` subcommands replace `install.sh` / `update.sh`).
+- [ ] 5.5 Order of release: **(a)** merge `specrails-core#256` to main → release-please → publish `specrails-core@4.2.0` on npm. **(b)** Then merge hub PR #251 → release-please → tag `v<hub-version>` → Desktop Release workflow publishes Windows + macOS builds. **(c)** Revert the temporary `tauri = { features = ["devtools"] }` in `src-tauri/Cargo.toml` right before (b).
+- [ ] 5.6 Download the released Windows `.exe` from `https://specrails.dev/downloads/specrails-hub/latest/`, install on a clean Windows 10/11 VM, run the full setup wizard against a fresh project. Expected: base_install + config_written + quick_complete checkpoints all advance, at least one agent job completes end-to-end. Only after pass: update specrails-web to surface the Windows CTA.
 
 ## 6. Validation against specs
 

@@ -39,8 +39,15 @@ Compare the output against `platforms["windows-x64"].sha256` in `manifest.json` 
 - NSIS: use the **Start Menu → SpecRails Hub → Uninstall** entry, or *Settings → Apps*.
 - MSI: use *Settings → Apps* or `msiexec /x <msi-path>`.
 
+## Setup wizard
+
+The project setup wizard invokes `npx specrails-core@latest init --from-config` under the hood. **This requires specrails-core ≥ 4.2.0** — the first release whose installer is Node-native (prior versions were bash + python3 and cannot run on Windows without WSL). The hub pins `@latest` on every spawn so the version constraint resolves automatically as long as the user has internet access at install time.
+
+Reserved paths (`.specrails/profiles/**`, `.claude/agents/custom-*.md`) are preserved across re-runs per the contract documented in [specrails-core's README](https://github.com/fjpulidop/specrails-core#reserved-paths).
+
 ## Known limitations
 
 - **Terminal panel**: on Windows, the bottom terminal panel spawns `powershell.exe -NoLogo`. If you prefer `cmd` or `pwsh.exe`, configure the system default shell via environment — per-session shell selection is not yet exposed in the UI.
 - **Port 4200** must be free on launch. If another process holds it, the app will exit with a native error dialog.
 - **Custom window chrome**: the app uses a frameless window with a custom titlebar. The Windows min/max/close controls are rendered by the hub; snap-layouts on Windows 11 may not be fully wired yet.
+- **Git Bash PATH interference**: on dev machines with Git for Windows installed, the bundled `git-bash` may shadow Windows-native utilities (notably `tar`). The hub's build-time sidecar script guards against this; at runtime the installer routes all shell lookups through Windows `where.exe` rather than GNU `which`.

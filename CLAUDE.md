@@ -102,7 +102,7 @@ Per-project catalog of agent profiles — declarative JSON that tells the implem
 
 **Client (`client/src/pages/AgentsPage.tsx`)**: `/agents` route under ProjectLayout, reached from the right sidebar. Two tabs: **Profiles** (full CRUD + agent chain editor with catalog picker + routing rules editor + per-profile analytics card) and **Agents Catalog** (read-only viewer of upstream and custom agents). Yellow banner at the top when the project's core version is below 4.1.0. Launch dialogs (`ImplementWizard`, `BatchImplementWizard`) include a `ProfilePicker` that preselects the resolved default and sends `profileName` in the `/spawn` payload.
 
-**Reserved paths (contract with specrails-core)**: `.specrails/profiles/**` and `.claude/agents/custom-*.md` are never touched by `specrails-core`'s `install.sh` / `update.sh`. Profiles are committable team assets; `.user-preferred.json` inside `.specrails/profiles/` is auto-gitignored on first write.
+**Reserved paths (contract with specrails-core)**: `.specrails/profiles/**` and `.claude/agents/custom-*.md` are never touched by specrails-core's `init` / `update` commands (Node-native from v4.2.0, bash `install.sh`/`update.sh` before). Profiles are committable team assets; `.user-preferred.json` inside `.specrails/profiles/` is auto-gitignored on first write.
 
 ### Terminal panel
 

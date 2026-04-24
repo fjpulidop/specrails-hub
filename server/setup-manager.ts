@@ -7,8 +7,9 @@ import type { WsMessage } from './types'
 import { findCoreContract, detectCLISync, CLIProvider } from './core-compat'
 
 /**
- * specrails-core's install.sh always scaffolds into `.claude/` regardless of
- * which AI CLI the project uses.  The provider choice affects which binary
+ * specrails-core's installer (Node-native from v4.2.0 onward, bash
+ * prior) always scaffolds into `.claude/` regardless of which AI
+ * CLI the project uses. The provider choice affects which binary
  * runs (claude vs codex), not where the framework files live.
  */
 const SPECRAILS_DIR = '.claude'
@@ -264,11 +265,21 @@ function detectCheckpointFromText(
     hits.push({ key: 'command_config', detail: 'Configuring commands...' })
   }
 
-  // TUI output patterns from specrails-core init --from-config
-  if (/✓\s*config\s*loaded|reading.*install-config|from-config/i.test(text)) {
+  // TUI output patterns from specrails-core init --from-config.
+  // Covers both the retired bash installer (✓ config loaded, reading
+  // install-config.yaml) and the Node installer ≥ v4.2.0 (Loaded
+  // install config from <path>, Phase 1 / 2 / 3 step headers, final
+  // `init complete` sentinel).
+  if (/✓\s*config\s*loaded|reading.*install-config|loaded\s*install\s*config|from-config/i.test(text)) {
     hits.push({ key: 'config_written' })
   }
-  if (/✓\s*installed|installation\s*complete|init\s*complete/i.test(text)) {
+  if (/installing\s*specrails|phase\s*2\s*&\s*3|placing\s*agents/i.test(text)) {
+    hits.push({ key: 'agent_generation', detail: 'Installing specrails artefacts...' })
+  }
+  if (/writing\s*manifest|wrote\s+.*specrails-manifest/i.test(text)) {
+    hits.push({ key: 'final_verification' })
+  }
+  if (/✓\s*installed|installation\s*complete|init\s*complete|update\s*complete/i.test(text)) {
     hits.push({ key: 'quick_complete' })
   }
 
