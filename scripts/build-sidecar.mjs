@@ -223,7 +223,14 @@ async function downloadSqliteAddonForNode22(triple) {
 
   // Extract: the .node file is at build/Release/better_sqlite3.node inside the tarball
   // --strip-components=2 removes "build/Release/" prefix → file lands as better_sqlite3.node
-  execSync(`tar -xzf "${tarPath}" -C "${destDir}" --strip-components=2 build/Release/better_sqlite3.node`, { stdio: 'inherit' })
+  //
+  // cwd=destDir with a relative tar filename sidesteps a GNU-tar-on-Windows
+  // quirk where a Windows absolute path like "D:\a\..." is interpreted as a
+  // remote-host spec ("host:path") and fails with "Cannot connect to D:".
+  execSync(`tar -xzf "${fileName}" --strip-components=2 build/Release/better_sqlite3.node`, {
+    stdio: 'inherit',
+    cwd: destDir,
+  })
 
   if (!fs.existsSync(addonPath)) {
     throw new Error(`Extraction failed — ${addonPath} not found after tar`)
