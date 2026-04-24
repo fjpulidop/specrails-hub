@@ -11,9 +11,12 @@ const COMMAND_INSTRUCTION =
   ':::command\n/specrails:implement #42\n::: ' +
   'The user will be prompted to confirm before the command runs.'
 
+// Windows has no `which`; probe via `where` instead.
+const _WHICH_CMD = process.platform === 'win32' ? 'where' : 'which'
+
 function claudeOnPath(): boolean {
   try {
-    execSync('which claude', { stdio: 'ignore' })
+    execSync(`${_WHICH_CMD} claude`, { stdio: 'ignore' })
     return true
   } catch {
     return false
@@ -22,7 +25,7 @@ function claudeOnPath(): boolean {
 
 function codexOnPath(): boolean {
   try {
-    execSync('which codex', { stdio: 'ignore' })
+    execSync(`${_WHICH_CMD} codex`, { stdio: 'ignore' })
     return true
   } catch {
     return false
@@ -248,7 +251,8 @@ export class ChatManager {
     // not pipeline jobs. Telemetry is scoped to QueueManager pipeline runs only.
     const child = spawn(binary, args, {
       env: process.env,
-      shell: false,
+      // Windows claude/codex are .cmd shims; shell: true needed post-CVE-2024-27980.
+      shell: process.platform === 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })
@@ -406,7 +410,7 @@ export class ChatManager {
           '--model', 'gpt-5.4-mini',
         ], {
           env: process.env,
-          shell: false,
+          shell: process.platform === 'win32',
           stdio: ['ignore', 'pipe', 'pipe'],
           cwd: this._cwd,
         })
@@ -443,7 +447,7 @@ export class ChatManager {
         '-p', titlePrompt,
       ], {
         env: process.env,
-        shell: false,
+        shell: process.platform === 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd: this._cwd,
       })

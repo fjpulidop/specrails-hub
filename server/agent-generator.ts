@@ -58,7 +58,7 @@ export async function generateCustomAgent(
       ],
       {
         env: process.env,
-        shell: false,
+        shell: process.platform === 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd,
       },
@@ -169,7 +169,7 @@ export async function testCustomAgent(
       ],
       {
         env: process.env,
-        shell: false,
+        shell: process.platform === 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd,
       },

@@ -100,9 +100,13 @@ export class JobAlreadyTerminalError extends Error {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Windows has no `which`; probe via `where` instead. Both exit non-zero
+// when the command is missing, which the try/catch relies on.
+const _WHICH_CMD = process.platform === 'win32' ? 'where' : 'which'
+
 function claudeOnPath(): boolean {
   try {
-    execSync('which claude', { stdio: 'ignore' })
+    execSync(`${_WHICH_CMD} claude`, { stdio: 'ignore' })
     return true
   } catch {
     return false
@@ -111,7 +115,7 @@ function claudeOnPath(): boolean {
 
 function codexOnPath(): boolean {
   try {
-    execSync('which codex', { stdio: 'ignore' })
+    execSync(`${_WHICH_CMD} codex`, { stdio: 'ignore' })
     return true
   } catch {
     return false
@@ -677,7 +681,9 @@ export class QueueManager {
 
     const child = spawn(binary, args, {
       env: spawnEnv,
-      shell: false,
+      // On Windows claude/codex ship as .cmd shims; Node.js requires
+      // shell: true to execute .cmd/.bat since the CVE-2024-27980 patches.
+      shell: process.platform === 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })

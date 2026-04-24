@@ -32,7 +32,9 @@ function spawnCoreInit(args: string[], cwd: string): ChildProcess {
   return spawn(bin, fullArgs, {
     cwd,
     env: process.env,
-    shell: false,
+    // npx / specrails-hub / claude / codex are .cmd shims on Windows;
+    // Node requires shell: true for .cmd after CVE-2024-27980.
+    shell: process.platform === 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 }
@@ -810,7 +812,7 @@ export class SetupManager {
     const child = spawn(binary, resolvedArgs, {
       cwd: projectPath,
       env: process.env,
-      shell: false,
+      shell: process.platform === 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
     })
 
