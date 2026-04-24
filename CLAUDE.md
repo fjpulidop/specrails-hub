@@ -138,11 +138,17 @@ Releases are automated via release-please + GitHub Actions:
   - When the Release PR is merged, release-please creates the GitHub Release and `npm publish` runs automatically
   - Publishes with **npm provenance attestation** (`--provenance --access public`) for SLSA Level 2 supply chain security. Requires `id-token: write` permission in the workflow.
 - **Desktop Release** (`.github/workflows/desktop-release.yml`) — on every `v*` tag push or manual dispatch:
-  - Builds a signed + notarised macOS Apple Silicon `.dmg` via Tauri.
-  - FTP-uploads the `.dmg` to Hostinger under two paths: the archival versioned folder `downloads/specrails-hub/v<version>/` and a stable `downloads/specrails-hub/latest/` channel.
-  - Writes a machine-readable `manifest.json` into `latest/` describing the release (schemaVersion, version, releasedAt, releaseUrl, platforms.darwin-arm64 with filename/url/sha256/size). Consumers like specrails-web read this to render a Download CTA without hardcoding versions.
-  - Ordering: `.dmg` is uploaded first and HEAD-verified before `manifest.json` is uploaded, so a consumer that sees the new manifest always finds the referenced binary.
-  - **Server-side one-time setup**: the Hostinger `latest/` folder contains a hand-authored `.htaccess` that sets `Cache-Control: no-cache, must-revalidate` and `Access-Control-Allow-Origin: *` on `manifest.json`. This file is server-managed, not in the repo — do not add workflow steps that wipe `latest/` wholesale. See the inline comment in `desktop-release.yml` for the `.htaccess` contents.
+  - Runs two build jobs in parallel:
+    - `build-macos` on `macos-latest`: signed + notarised Apple Silicon `.dmg`.
+    - `build-windows` on `windows-latest`: **unsigned** NSIS `.exe` installer and MSI. v1 ships without Authenticode signing on purpose — users see a SmartScreen warning and must click "More info → Run anyway". Code signing is a separate follow-up change. See `docs/windows.md`.
+  - Canonical installer filenames, enforced by a rename step in `deploy`:
+    - `specrails-hub-<version>-aarch64.dmg`
+    - `specrails-hub-<version>-x64-setup.exe` (NSIS)
+    - `specrails-hub-<version>-x64.msi`
+  - FTP-uploads every installer to Hostinger under two paths: the archival versioned folder `downloads/specrails-hub/v<version>/` and the stable `downloads/specrails-hub/latest/` channel.
+  - Writes a machine-readable `manifest.json` into `latest/` describing the release (schemaVersion, version, releasedAt, releaseUrl, `platforms.darwin-arm64` and `platforms.windows-x64`, each with filename/url/sha256/size). The `windows-x64` entry points at the NSIS `.exe`; the MSI is reachable via the versioned folder but is NOT referenced by manifest. Consumers like specrails-web read this to render Download CTAs without hardcoding versions.
+  - Ordering: every installer referenced by the manifest (`.dmg`, `.exe`) is uploaded AND HEAD-verified before `manifest.json` is uploaded. A consumer that sees the new manifest must always find the referenced binary, for every platform.
+  - **Server-side one-time setup**: the Hostinger `latest/` folder contains a hand-authored `.htaccess` that sets `Cache-Control: no-cache, must-revalidate` and `Access-Control-Allow-Origin: *` on `manifest.json`. This file is server-managed, not in the repo — do not add workflow steps that wipe `latest/` wholesale. The `Delete stale installers in latest/` step only removes `.dmg|.exe|.msi` files. See the inline comment in `desktop-release.yml` for the `.htaccess` contents.
 
 Commit message prefixes that affect versioning: `feat:` → minor, `fix:` → patch, `feat!:` → major. Commits without a conventional prefix are ignored by release-please.
 

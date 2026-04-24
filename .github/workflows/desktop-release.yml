@@ -54,8 +54,56 @@ jobs:
           path: src-tauri/target/release/bundle/dmg/*.dmg
           if-no-files-found: error
 
+  # ---------------------------------------------------------------
+  # openspec: add-windows-desktop-release
+  #
+  # Windows x64 build. v1 is intentionally UNSIGNED — users will see
+  # a SmartScreen warning and must click "More info → Run anyway".
+  # Code signing (Authenticode via Azure Trusted Signing or similar)
+  # is deferred to a follow-up change. Do not add signing steps here
+  # without an accompanying spec update.
+  # ---------------------------------------------------------------
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6.3.0
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install dependencies
+        shell: bash
+        run: npm ci && cd client && npm ci
+
+      - name: Build desktop app
+        shell: bash
+        run: npm run build:desktop
+
+      - name: Upload Windows installer artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: windows-x64
+          # Tauri emits NSIS under bundle/nsis/*.exe and MSI under bundle/msi/*.msi.
+          # We upload both patterns; the deploy job renames them to the canonical
+          # specrails-hub-<version>-x64-setup.exe / specrails-hub-<version>-x64.msi.
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
+
   deploy:
-    needs: build-macos
+    needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
 
     steps:
@@ -101,46 +149,94 @@ jobs:
           echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           echo "Release version: ${VERSION}"
 
-      - name: Rename .dmg to canonical filename
+      - name: Rename installers to canonical filenames
         id: rename
         run: |
           set -euo pipefail
           VERSION="${{ steps.vars.outputs.version }}"
-          src="$(ls artifacts/*.dmg | head -n1)"
-          if [[ -z "${src}" ]]; then
+
+          # macOS .dmg (Tauri emits with a space in the product name, we standardise
+          # to kebab-case with version + arch).
+          dmg_src="$(ls artifacts/*.dmg 2>/dev/null | head -n1 || true)"
+          if [[ -z "${dmg_src}" ]]; then
             echo "No .dmg found in artifacts/"
             exit 1
           fi
-          canonical="specrails-hub-${VERSION}-aarch64.dmg"
-          if [[ "$(basename "${src}")" != "${canonical}" ]]; then
-            mv "${src}" "artifacts/${canonical}"
+          dmg_canonical="specrails-hub-${VERSION}-aarch64.dmg"
+          if [[ "$(basename "${dmg_src}")" != "${dmg_canonical}" ]]; then
+            mv "${dmg_src}" "artifacts/${dmg_canonical}"
           fi
-          echo "filename=${canonical}" >> "$GITHUB_OUTPUT"
-          echo "path=artifacts/${canonical}" >> "$GITHUB_OUTPUT"
+
+          # Windows NSIS .exe (Tauri emits e.g. "SpecRails Hub_1.40.0_x64-setup.exe").
+          exe_src="$(ls artifacts/*.exe 2>/dev/null | head -n1 || true)"
+          if [[ -z "${exe_src}" ]]; then
+            echo "No .exe (NSIS) found in artifacts/"
+            exit 1
+          fi
+          exe_canonical="specrails-hub-${VERSION}-x64-setup.exe"
+          if [[ "$(basename "${exe_src}")" != "${exe_canonical}" ]]; then
+            mv "${exe_src}" "artifacts/${exe_canonical}"
+          fi
+
+          # Windows MSI (Tauri emits e.g. "SpecRails Hub_1.40.0_x64_en-US.msi").
+          # Not referenced by manifest.json but published alongside for enterprise
+          # consumers who prefer MSI for group-policy deployment.
+          msi_src="$(ls artifacts/*.msi 2>/dev/null | head -n1 || true)"
+          if [[ -z "${msi_src}" ]]; then
+            echo "No .msi found in artifacts/"
+            exit 1
+          fi
+          msi_canonical="specrails-hub-${VERSION}-x64.msi"
+          if [[ "$(basename "${msi_src}")" != "${msi_canonical}" ]]; then
+            mv "${msi_src}" "artifacts/${msi_canonical}"
+          fi
+
+          echo "dmg_filename=${dmg_canonical}" >> "$GITHUB_OUTPUT"
+          echo "dmg_path=artifacts/${dmg_canonical}" >> "$GITHUB_OUTPUT"
+          echo "exe_filename=${exe_canonical}" >> "$GITHUB_OUTPUT"
+          echo "exe_path=artifacts/${exe_canonical}" >> "$GITHUB_OUTPUT"
+          echo "msi_filename=${msi_canonical}" >> "$GITHUB_OUTPUT"
+          echo "msi_path=artifacts/${msi_canonical}" >> "$GITHUB_OUTPUT"
           ls -la artifacts/
 
-      - name: Compute sha256 and byte size
+      - name: Compute sha256 and byte size for each manifest-referenced binary
         id: hash
         run: |
           set -euo pipefail
-          file="${{ steps.rename.outputs.path }}"
-          sha="$(sha256sum "${file}" | awk '{print $1}')"
-          size="$(stat -c%s "${file}")"
-          echo "sha256=${sha}" >> "$GITHUB_OUTPUT"
-          echo "size=${size}" >> "$GITHUB_OUTPUT"
-          echo "sha256: ${sha}"
-          echo "size:   ${size} bytes"
+
+          dmg="${{ steps.rename.outputs.dmg_path }}"
+          dmg_sha="$(sha256sum "${dmg}" | awk '{print $1}')"
+          dmg_size="$(stat -c%s "${dmg}")"
+          echo "dmg_sha256=${dmg_sha}" >> "$GITHUB_OUTPUT"
+          echo "dmg_size=${dmg_size}" >> "$GITHUB_OUTPUT"
+          echo "dmg: sha256=${dmg_sha} size=${dmg_size}"
+
+          exe="${{ steps.rename.outputs.exe_path }}"
+          exe_sha="$(sha256sum "${exe}" | awk '{print $1}')"
+          exe_size="$(stat -c%s "${exe}")"
+          echo "exe_sha256=${exe_sha}" >> "$GITHUB_OUTPUT"
+          echo "exe_size=${exe_size}" >> "$GITHUB_OUTPUT"
+          echo "exe: sha256=${exe_sha} size=${exe_size}"
+
+          # MSI is not referenced by manifest.json, so no sha/size required here.
 
       - name: Build manifest.json
         run: |
           set -euo pipefail
           VERSION="${{ steps.vars.outputs.version }}"
           TAG="${{ steps.vars.outputs.tag }}"
-          FILENAME="${{ steps.rename.outputs.filename }}"
-          SHA="${{ steps.hash.outputs.sha256 }}"
-          SIZE="${{ steps.hash.outputs.size }}"
+
+          DMG_FILENAME="${{ steps.rename.outputs.dmg_filename }}"
+          DMG_SHA="${{ steps.hash.outputs.dmg_sha256 }}"
+          DMG_SIZE="${{ steps.hash.outputs.dmg_size }}"
+          DMG_URL="https://specrails.dev/downloads/specrails-hub/latest/${DMG_FILENAME}"
+
+          EXE_FILENAME="${{ steps.rename.outputs.exe_filename }}"
+          EXE_SHA="${{ steps.hash.outputs.exe_sha256 }}"
+          EXE_SIZE="${{ steps.hash.outputs.exe_size }}"
+          EXE_URL="https://specrails.dev/downloads/specrails-hub/latest/${EXE_FILENAME}"
+
           RELEASED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-          URL="https://specrails.dev/downloads/specrails-hub/latest/${FILENAME}"
           RELEASE_URL="https://github.com/fjpulidop/specrails-hub/releases/tag/${TAG}"
 
           mkdir -p manifest
@@ -152,10 +248,16 @@ jobs:
             "releaseUrl": "${RELEASE_URL}",
             "platforms": {
               "darwin-arm64": {
-                "filename": "${FILENAME}",
-                "url": "${URL}",
-                "sha256": "${SHA}",
-                "size": ${SIZE}
+                "filename": "${DMG_FILENAME}",
+                "url": "${DMG_URL}",
+                "sha256": "${DMG_SHA}",
+                "size": ${DMG_SIZE}
+              },
+              "windows-x64": {
+                "filename": "${EXE_FILENAME}",
+                "url": "${EXE_URL}",
+                "sha256": "${EXE_SHA}",
+                "size": ${EXE_SIZE}
               }
             }
           }
@@ -165,9 +267,9 @@ jobs:
           jq empty manifest/manifest.json
           cat manifest/manifest.json
 
-      # Pre-existing versioned upload. Behaviour unchanged except the
-      # uploaded .dmg now uses the canonical filename.
-      - name: Deploy versioned .dmg to Hostinger
+      # Pre-existing versioned upload. Uploads the entire artifacts/ directory,
+      # which now contains the renamed .dmg, .exe (NSIS), and .msi alongside.
+      - name: Deploy versioned installers to Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.HOSTINGER_HOST }}
@@ -178,20 +280,21 @@ jobs:
           server-dir: domains/specrails.dev/public_html/downloads/specrails-hub/${{ steps.vars.outputs.tag }}/
 
       # ---------------------------------------------------------------
-      # latest/ channel — openspec: add-latest-release-channel
+      # latest/ channel — openspec: add-latest-release-channel + add-windows-desktop-release
       # ---------------------------------------------------------------
       #
       # Ordering matters (spec: desktop-release-channel):
-      #   1. Delete any prior .dmg in latest/ (keep .htaccess untouched).
-      #   2. Upload the new .dmg.
-      #   3. HEAD-verify the new .dmg is HTTP-reachable.
+      #   1. Delete any prior installer files in latest/ (keep .htaccess untouched).
+      #   2. Upload the new .dmg, .exe, and .msi.
+      #   3. HEAD-verify every binary referenced by manifest.json is HTTP-reachable.
       #   4. Upload manifest.json.
       #   5. HEAD-verify manifest.json is HTTP-reachable and valid JSON.
       #
       # A consumer that sees the new manifest must always find the
-      # referenced binary. Never upload manifest.json before step 3 passes.
+      # referenced binary. Never upload manifest.json before step 3 passes
+      # for EVERY platform listed in the manifest.
 
-      - name: Delete stale .dmg in latest/
+      - name: Delete stale installers in latest/
         env:
           HOST: ${{ secrets.HOSTINGER_HOST }}
           FTP_USER: ${{ secrets.HOSTINGER_USER }}
@@ -200,9 +303,11 @@ jobs:
           set -euo pipefail
           remote="domains/specrails.dev/public_html/downloads/specrails-hub/latest/"
           # List the directory. Returns just filenames when using --list-only.
-          stale="$(curl -s --ftp-pasv --user "${FTP_USER}:${FTP_PASS}" "ftp://${HOST}/${remote}" --list-only | grep -E '\.dmg$' || true)"
+          # Match .dmg (mac), .exe (Windows NSIS), .msi (Windows MSI). Do NOT
+          # delete manifest.json (it gets overwritten) or .htaccess (server-managed).
+          stale="$(curl -s --ftp-pasv --user "${FTP_USER}:${FTP_PASS}" "ftp://${HOST}/${remote}" --list-only | grep -E '\.(dmg|exe|msi)$' || true)"
           if [[ -z "${stale}" ]]; then
-            echo "No stale .dmg files in latest/"
+            echo "No stale installer files in latest/"
             exit 0
           fi
           while IFS= read -r f; do
@@ -213,7 +318,7 @@ jobs:
               "ftp://${HOST}/${remote}" || echo "  (DELE failed for ${f}; continuing)"
           done <<< "${stale}"
 
-      - name: Upload new .dmg to latest/
+      - name: Upload new installers to latest/
         env:
           HOST: ${{ secrets.HOSTINGER_HOST }}
           FTP_USER: ${{ secrets.HOSTINGER_USER }}
@@ -221,31 +326,45 @@ jobs:
         run: |
           set -euo pipefail
           remote="domains/specrails.dev/public_html/downloads/specrails-hub/latest/"
-          file="${{ steps.rename.outputs.path }}"
           # --ftp-create-dirs auto-creates the latest/ folder on first run.
-          curl --fail --silent --show-error --ftp-pasv --ftp-create-dirs \
-            --user "${FTP_USER}:${FTP_PASS}" \
-            -T "${file}" \
-            "ftp://${HOST}/${remote}"
-          echo "Uploaded $(basename "${file}") to ${remote}"
+          for file in \
+            "${{ steps.rename.outputs.dmg_path }}" \
+            "${{ steps.rename.outputs.exe_path }}" \
+            "${{ steps.rename.outputs.msi_path }}"; do
+            curl --fail --silent --show-error --ftp-pasv --ftp-create-dirs \
+              --user "${FTP_USER}:${FTP_PASS}" \
+              -T "${file}" \
+              "ftp://${HOST}/${remote}"
+            echo "Uploaded $(basename "${file}") to ${remote}"
+          done
 
-      - name: Verify .dmg is HTTP-reachable
+      - name: Verify manifest-referenced binaries are HTTP-reachable
         run: |
           set -euo pipefail
-          filename="${{ steps.rename.outputs.filename }}"
-          url="https://specrails.dev/downloads/specrails-hub/latest/${filename}"
-          # Retry briefly to absorb FTP-to-HTTP propagation.
-          for i in 1 2 3 4 5 6; do
-            code="$(curl --head --silent --output /dev/null --write-out '%{http_code}' "${url}")"
-            if [[ "${code}" == "200" ]]; then
-              echo "✓ ${url} reachable"
-              exit 0
+          # HEAD every URL that manifest.json will reference. The MSI is NOT in
+          # manifest.json (consumers reach it via the versioned folder) so we
+          # don't gate the manifest upload on it here.
+          for filename in \
+            "${{ steps.rename.outputs.dmg_filename }}" \
+            "${{ steps.rename.outputs.exe_filename }}"; do
+            url="https://specrails.dev/downloads/specrails-hub/latest/${filename}"
+            ok=""
+            # Retry briefly to absorb FTP-to-HTTP propagation.
+            for i in 1 2 3 4 5 6; do
+              code="$(curl --head --silent --output /dev/null --write-out '%{http_code}' "${url}")"
+              if [[ "${code}" == "200" ]]; then
+                echo "✓ ${url} reachable"
+                ok="1"
+                break
+              fi
+              echo "  attempt ${i}: ${url} -> HTTP ${code}, retrying in 5s..."
+              sleep 5
+            done
+            if [[ -z "${ok}" ]]; then
+              echo "✗ ${url} still not reachable"
+              exit 1
             fi
-            echo "  attempt ${i}: ${url} -> HTTP ${code}, retrying in 5s..."
-            sleep 5
           done
-          echo "✗ ${url} still not reachable"
-          exit 1
 
       - name: Upload manifest.json to latest/
         env:
