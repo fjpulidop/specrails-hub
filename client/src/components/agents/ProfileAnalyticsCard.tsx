@@ -47,7 +47,40 @@ export function ProfileAnalyticsCard() {
   }, [windowDays])
 
   if (loading && !data) return null
-  if (!data || data.rows.length === 0) return null
+  if (!data || data.rows.length === 0) {
+    return (
+      <div className="mx-6 my-4 rounded-md border border-border bg-muted/20">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+          <div>
+            <div className="text-xs font-medium text-foreground">Profile usage</div>
+            <div className="text-[11px] text-muted-foreground">
+              Jobs launched per profile in the selected window.
+            </div>
+          </div>
+          <div className="flex gap-0.5">
+            {WINDOW_OPTIONS.map((opt) => (
+              <button
+                key={opt.days}
+                type="button"
+                onClick={() => setWindowDays(opt.days)}
+                className={
+                  'text-[10px] px-2 py-1 rounded transition-colors ' +
+                  (windowDays === opt.days
+                    ? 'bg-accent text-foreground'
+                    : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground')
+                }
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="px-4 py-8 text-xs text-muted-foreground">
+          No profile-scoped jobs yet.
+        </div>
+      </div>
+    )
+  }
 
   const maxJobs = Math.max(...data.rows.map((r) => r.jobs), 1)
 

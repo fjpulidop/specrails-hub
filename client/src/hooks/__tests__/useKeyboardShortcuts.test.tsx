@@ -74,6 +74,21 @@ describe('useKeyboardShortcuts', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/')
   })
 
+  it('forwards cmd+5 to the project-page index handler', () => {
+    const onSwitchProjectPage = vi.fn()
+    renderHook(
+      () =>
+        useKeyboardShortcuts({
+          onOpenCheatsheet: vi.fn(),
+          onSwitchProjectPage,
+        }),
+      { wrapper },
+    )
+
+    fireKey('5', { metaKey: true, code: 'Digit5' })
+    expect(onSwitchProjectPage).toHaveBeenCalledWith(5)
+  })
+
   it('does not trigger shortcuts when typing in an input', () => {
     const onOpen = vi.fn()
     renderHook(() => useKeyboardShortcuts({ onOpenCheatsheet: onOpen }), { wrapper })

@@ -97,6 +97,18 @@ describe('SettingsPage', () => {
     })
   })
 
+  it('shows Rail Pre-prompt section after load', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => mockConfig,
+    })
+    render(<SettingsPage />)
+    await waitFor(() => {
+      expect(screen.getByText('Rail Pre-prompt')).toBeInTheDocument()
+      expect(screen.getByLabelText('Pre-prompt')).toBeInTheDocument()
+    })
+  })
+
   it('shows daily budget input after load', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

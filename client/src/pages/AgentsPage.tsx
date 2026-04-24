@@ -3,8 +3,9 @@ import { AlertTriangle } from 'lucide-react'
 import { getApiBase } from '../lib/api'
 import { ProfilesTab } from '../components/agents/ProfilesTab'
 import { AgentsCatalogTab } from '../components/agents/AgentsCatalogTab'
+import { ProfileAnalyticsCard } from '../components/agents/ProfileAnalyticsCard'
 
-type Tab = 'profiles' | 'catalog'
+type Tab = 'profiles' | 'usage' | 'catalog'
 
 interface CoreVersionStatus {
   version: string | null
@@ -17,7 +18,7 @@ const TAB_MEMORY_KEY = 'specrails-hub:agents-tab'
 function readTabMemory(): Tab {
   try {
     const v = localStorage.getItem(TAB_MEMORY_KEY)
-    if (v === 'profiles' || v === 'catalog') return v
+    if (v === 'profiles' || v === 'usage' || v === 'catalog') return v
   } catch {
     // localStorage unavailable
   }
@@ -79,15 +80,18 @@ export default function AgentsPage() {
         <div className="px-6 pt-4">
           <h1 className="text-lg font-semibold">Agents</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Manage agent profiles and the catalog of agents (upstream + custom) for this project.
+            Manage agent profiles and the catalog (upstream + custom) for this project.
           </p>
         </div>
         <div className="flex items-center gap-1 px-4 pt-3">
           <TabButton active={tab === 'profiles'} onClick={() => setTab('profiles')}>
             Profiles
           </TabButton>
+          <TabButton active={tab === 'usage'} onClick={() => setTab('usage')}>
+            Usage
+          </TabButton>
           <TabButton active={tab === 'catalog'} onClick={() => setTab('catalog')}>
-            Agents Catalog
+            Catalog
           </TabButton>
         </div>
       </div>
@@ -95,8 +99,17 @@ export default function AgentsPage() {
       {/* Body */}
       <div className="flex-1 min-w-0 overflow-auto">
         {tab === 'profiles' && <ProfilesTab />}
+        {tab === 'usage' && <UsageTab />}
         {tab === 'catalog' && <AgentsCatalogTab />}
       </div>
+    </div>
+  )
+}
+
+function UsageTab() {
+  return (
+    <div className="min-h-full">
+      <ProfileAnalyticsCard />
     </div>
   )
 }
@@ -125,4 +138,3 @@ function TabButton({
     </button>
   )
 }
-

@@ -11,6 +11,8 @@ import { resetPhases, setActivePhases } from './hooks'
 import { createJob, finishJob, appendEvent, skipJob, getProjectSettings } from './db'
 import type { JobResult } from './db'
 import type { CommandInfo } from './config'
+import { attachmentManager, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
+import { readStore, resolveTicketStoragePath } from './ticket-store'
 
 // ─── Telemetry env helpers ────────────────────────────────────────────────────
 
@@ -142,7 +144,7 @@ export interface EnqueueOptions {
   dependsOnJobId?: string
   pipelineId?: string
   /** Agent profile name to apply for this spawn. If omitted, the QueueManager
-   *  resolves via .user-preferred.json → default. Pass null to force legacy
+   *  resolves via default. Pass null to force legacy
    *  mode (no profile), even if a default exists. */
   profileName?: string | null
 }
@@ -447,6 +449,54 @@ export class QueueManager {
     return info?.phases ?? []
   }
 
+  private _extractTicketIds(command: string): number[] {
+    const ids = new Set<number>()
+    for (const match of command.matchAll(/#(\d+)/g)) {
+      const id = Number.parseInt(match[1], 10)
+      if (!Number.isNaN(id)) ids.add(id)
+    }
+    return Array.from(ids)
+  }
+
+  private _buildImplementAttachmentContext(command: string): string {
+    if (!this._cwd || !this._projectSlug) return ''
+
+    const ticketIds = this._extractTicketIds(command)
+    if (ticketIds.length === 0) return ''
+
+    try {
+      const store = readStore(resolveTicketStoragePath(this._cwd))
+      const sections: string[] = []
+
+      for (const ticketId of ticketIds) {
+        const storeAttachmentIds = new Set(
+          (store.tickets[String(ticketId)]?.attachments ?? []).map((attachment) => attachment.id),
+        )
+        const diskAttachmentIds = attachmentManager
+          .list(this._projectSlug, ticketId)
+          .map((attachment) => attachment.id)
+        const attachmentIds = Array.from(new Set([...storeAttachmentIds, ...diskAttachmentIds]))
+        if (attachmentIds.length === 0) continue
+
+        const blocks = attachmentManager.getPromptBlocksSync(this._projectSlug, ticketId, attachmentIds)
+        if (blocks.length === 0) continue
+
+        sections.push(`## Ticket #${ticketId} Attached Resources\n\n${blocks.join('\n\n')}`)
+      }
+
+      if (sections.length === 0) return ''
+
+      return '\n\nIMPORTANT: Referenced ticket attachments are also part of the spec context. ' +
+        `You have explicit permission to read local attachment files stored under ~/.specrails/projects/${this._projectSlug}/attachments/<ticketId>/.\n\n` +
+        `${USER_ATTACHMENT_SYSTEM_NOTE}\n\n` +
+        'If a <user-attachment> block contains only a local file path, open that file directly before implementing.\n\n' +
+        sections.join('\n\n')
+    } catch (err) {
+      console.warn(`[queue-manager] failed to build attachment context: ${(err as Error).message}`)
+      return ''
+    }
+  }
+
   private _drainQueue(): void {
     if (this._activeJobId !== null) return
     if (this._paused) return
@@ -522,6 +572,17 @@ export class QueueManager {
         'You MUST read specs from this file. Do NOT attempt to fetch tickets from Jira, Linear, GitHub Issues, or any other external tracker. ' +
         'The #<id> references in the command correspond to ticket IDs inside .specrails/local-tickets.json.'
 
+      const attachmentContext = this._buildImplementAttachmentContext(commandToRun)
+      if (attachmentContext) {
+        systemAppend += attachmentContext
+      }
+
+      const prePrompt = this._db ? getProjectSettings(this._db).prePrompt.trim() : ''
+      if (prePrompt) {
+        systemAppend += '\n\nPROJECT PRE-PROMPT:\n' +
+          'Apply the following project-specific instructions in addition to the ticket/spec and its attached resources.\n\n' +
+          prePrompt
+      }
     }
 
     let binary: string

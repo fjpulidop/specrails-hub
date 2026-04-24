@@ -1,22 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Trash2, Copy, Save, Star, Wand2 } from 'lucide-react'
+import { Plus, Trash2, Copy, Save, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
 import { ProfileEditor } from './ProfileEditor'
-import { ProfileAnalyticsCard } from './ProfileAnalyticsCard'
 import { ConfirmDialog, PromptDialog } from './PromptDialog'
-import type { Profile, ProfileListEntry, UserPreferred } from './types'
+import type { Profile, ProfileListEntry } from './types'
 
 export function ProfilesTab() {
   const [profiles, setProfiles] = useState<ProfileListEntry[]>([])
-  const [preferred, setPreferred] = useState<UserPreferred | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [editing, setEditing] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [validationIssues, setValidationIssues] = useState<string[]>([])
+  const [agentsMissingRouting, setAgentsMissingRouting] = useState<string[]>([])
   const [createDialog, setCreateDialog] = useState(false)
   const [duplicateDialog, setDuplicateDialog] = useState<{ from: string } | null>(null)
   const [deleteDialog, setDeleteDialog] = useState<{ name: string } | null>(null)
@@ -25,17 +24,10 @@ export function ProfilesTab() {
     setLoading(true)
     setError(null)
     try {
-      const [profilesRes, activeRes] = await Promise.all([
-        fetch(`${getApiBase()}/profiles`),
-        fetch(`${getApiBase()}/profiles/active`),
-      ])
+      const profilesRes = await fetch(`${getApiBase()}/profiles`)
       if (!profilesRes.ok) throw new Error(`List failed: ${profilesRes.status}`)
       const profilesData = (await profilesRes.json()) as { profiles: ProfileListEntry[] }
       setProfiles(profilesData.profiles)
-      if (activeRes.ok) {
-        const activeData = (await activeRes.json()) as { preferred: UserPreferred | null }
-        setPreferred(activeData.preferred)
-      }
       if (profilesData.profiles.length > 0 && !selected) {
         setSelected(profilesData.profiles[0].name)
       }
@@ -202,7 +194,7 @@ export function ProfilesTab() {
   const duplicate = useCallback((name: string) => setDuplicateDialog({ from: name }), [])
   const remove = useCallback((name: string) => setDeleteDialog({ name }), [])
 
-  const save = useCallback(async (profile: Profile) => {
+  const save = useCallback(async (profile: Profile, missingRouting: string[]) => {
     setSaving(true)
     setError(null)
     try {
@@ -216,7 +208,14 @@ export function ProfilesTab() {
         throw new Error(err.error ?? `Save failed: ${res.status}`)
       }
       setEditing(profile)
-      toast.success('Profile saved', { description: profile.name })
+      if (missingRouting.length > 0) {
+        toast.warning('Profile saved with untargeted agents', {
+          description: `No routing rule points to: ${missingRouting.join(', ')}. Add a tag rule or retarget the default rule if you want them to run.`,
+          duration: 6000,
+        })
+      } else {
+        toast.success('Profile saved', { description: profile.name })
+      }
     } catch (e) {
       const message = (e as Error).message
       setError(message)
@@ -225,33 +224,6 @@ export function ProfilesTab() {
       setSaving(false)
     }
   }, [])
-
-  const markPreferred = useCallback(
-    async (name: string) => {
-      setSaving(true)
-      setError(null)
-      try {
-        const res = await fetch(`${getApiBase()}/profiles/active`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profile: name }),
-        })
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}))
-          throw new Error(err.error ?? `Set preferred failed: ${res.status}`)
-        }
-        setPreferred({ profile: name })
-        toast.success('Preferred profile set', { description: name })
-      } catch (e) {
-        const message = (e as Error).message
-        setError(message)
-        toast.error('Failed to set preferred profile', { description: message })
-      } finally {
-        setSaving(false)
-      }
-    },
-    [],
-  )
 
   const dialogs = (
     <>
@@ -335,7 +307,6 @@ export function ProfilesTab() {
   return (
     <div className="flex flex-col h-full">
       {dialogs}
-      <ProfileAnalyticsCard />
       <div className="flex flex-1 min-h-0">
       {/* Left: profile list */}
       <aside className="w-64 flex-shrink-0 border-r border-border flex flex-col">
@@ -350,7 +321,6 @@ export function ProfilesTab() {
         <div className="flex-1 overflow-auto px-2 pb-3">
           {profiles.map((p) => {
             const isSelected = p.name === selected
-            const isPreferred = preferred?.profile === p.name
             return (
               <div
                 key={p.name}
@@ -372,27 +342,8 @@ export function ProfilesTab() {
                   {p.isDefault && (
                     <span className="text-[10px] text-muted-foreground">(team default)</span>
                   )}
-                  {isPreferred && (
-                    <span
-                      className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-yellow-500/15 text-yellow-500 flex-shrink-0"
-                      title="This profile is your personal default — preselected when you open a launch dialog."
-                    >
-                      <Star className="w-2.5 h-2.5 fill-yellow-500" /> mine
-                    </span>
-                  )}
                 </div>
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    type="button"
-                    className="p-1 hover:bg-accent rounded"
-                    title="Set as my personal default — preselected for me at launch time (other devs keep the team default)"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      void markPreferred(p.name)
-                    }}
-                  >
-                    <Star className="w-3 h-3" />
-                  </button>
                   <button
                     type="button"
                     className="p-1 hover:bg-accent rounded"
@@ -437,11 +388,12 @@ export function ProfilesTab() {
             profile={editing}
             onChange={setEditing}
             onValidityChange={setValidationIssues}
+            onSoftWarningsChange={(w) => setAgentsMissingRouting(w.agentsMissingRouting)}
             footer={
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
-                  onClick={() => void save(editing)}
+                  onClick={() => void save(editing, agentsMissingRouting)}
                   disabled={saving || validationIssues.length > 0}
                   title={validationIssues.length > 0 ? 'Fix validation issues before saving' : undefined}
                 >

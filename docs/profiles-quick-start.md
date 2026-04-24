@@ -18,34 +18,34 @@ the case).
 From any project, click **Agents** in the right sidebar (next to
 Dashboard/Jobs/Analytics/Settings).
 
-- **Profiles** tab — create, edit, select profiles.
-- **Agents Catalog** tab — read the upstream `sr-*` agents or author custom
+- **Profiles** tab — create and edit profiles.
+- **Usage** tab — see which profiles are actually being used.
+- **Catalog** tab — read the upstream `sr-*` agents or author custom
   `custom-*` ones via the Studio.
 
 If the project already has agents installed with per-agent model choices,
 the empty state offers **Migrate from current agents**: one click creates
 a `default` profile mirroring today's frontmatter.
 
-## 2. Catalog vs selection
+## 2. Saved profiles vs selection
 
 Two orthogonal concepts:
 
-- **Catalog** — the set of profiles in the project (`.specrails/profiles/*.json`).
+- **Saved profiles** — the set of profiles in the project (`.specrails/profiles/*.json`).
   Committed to git, shared with the team.
 - **Selection** — which profile this particular invocation uses. Per-rail,
   per-launch.
 
 Resolution order when no explicit selection is passed:
 
-1. The developer's preferred profile (`.specrails/profiles/.user-preferred.json`, gitignored).
-2. The profile named `default` (or `project-default`).
-3. Legacy mode (no profile active).
+1. The profile named `default` (or `project-default`).
+2. Legacy mode (no profile active).
 
 ## 3. Pick a profile at launch
 
 - **Single feature** (Implement Wizard): the footer has a Profile dropdown
-  preselected to your preferred profile. Picking a different one here
-  updates your preference for the next launch.
+  preselected to the project default profile when one exists. Picking a
+  different one only affects that launch.
 - **Batch** (Batch Implement Wizard): the footer has a batch-level picker
   that applies to every rail, plus a per-feature override table when you
   select more than one issue. Override the rows that need it; leave the
@@ -53,12 +53,12 @@ Resolution order when no explicit selection is passed:
 - **Dashboard rails**: each rail has a compact profile dropdown in its
   header. Pick once and it persists across launches of that rail.
 
-The "Legacy (no profile)" option is always available — use it to run a
+The "No profile" option is always available — use it to run a
 rail exactly as it did pre-4.1.0.
 
 ## 4. Author a custom agent (Agent Studio)
 
-From the Agents Catalog tab, create a new custom agent via:
+From the Catalog tab, create a new custom agent via:
 
 - **Template** — pick from Security Reviewer, Data Engineer, Performance
   Profiler, or UI/UX Polisher.
@@ -79,8 +79,8 @@ see output, token count, and duration inline.
 
 - A purple **profile badge** appears on each job row showing which profile
   it ran under.
-- The **Analytics card** above the Profiles tab shows usage per profile
-  for the last 7/30/90 days: jobs, success rate, avg tokens, avg duration.
+- The **Usage** tab shows usage per profile for the last 7/30/90 days:
+  jobs, success rate, avg tokens, avg duration.
 - The **diagnostic ZIP export** on a job includes `profile.json` with
   the exact snapshot that rail used.
 

@@ -3,7 +3,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('../api', () => ({ getApiBase: () => '/api/projects/proj-1' }))
 vi.mock('../auth', () => ({ getHubToken: vi.fn(() => null) }))
 
-import { uploadAttachment, deleteAttachment, deleteAllAttachments, listAttachments, attachmentFileUrl } from '../attachments'
+import {
+  ATTACHMENT_ACCEPT_MIME,
+  attachmentFileUrl,
+  deleteAllAttachments,
+  deleteAttachment,
+  isSupportedAttachmentFile,
+  listAttachments,
+  uploadAttachment,
+} from '../attachments'
 import { getHubToken } from '../auth'
 
 describe('attachments lib', () => {
@@ -125,6 +133,25 @@ describe('attachments lib', () => {
       vi.mocked(getHubToken).mockReturnValue('tok en+val')
       const url = attachmentFileUrl('1', 'att-1')
       expect(url).toContain('token=tok%20en%2Bval')
+    })
+  })
+
+  describe('isSupportedAttachmentFile', () => {
+    it('accepts .sql files even when the browser provides no mime type', () => {
+      const file = new File(['select 1;'], 'schema.sql')
+      expect(isSupportedAttachmentFile(file)).toBe(true)
+    })
+
+    it('accepts SQL mime types explicitly listed in the picker accept string', () => {
+      const file = new File(['select 1;'], 'schema.sql', { type: 'application/sql' })
+      expect(ATTACHMENT_ACCEPT_MIME).toContain('.sql')
+      expect(ATTACHMENT_ACCEPT_MIME).toContain('application/sql')
+      expect(isSupportedAttachmentFile(file)).toBe(true)
+    })
+
+    it('rejects unsupported non-sql files', () => {
+      const file = new File([''], 'video.mp4', { type: 'video/mp4' })
+      expect(isSupportedAttachmentFile(file)).toBe(false)
     })
   })
 })

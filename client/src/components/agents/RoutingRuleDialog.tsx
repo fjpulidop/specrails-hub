@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
+
+const ROUTING_TAG_PATTERN = /^[a-z0-9][a-z0-9-]*$/
 
 interface Props {
   open: boolean
@@ -28,13 +37,20 @@ export function RoutingRuleDialog({ open, chainAgents, onConfirm, onCancel }: Pr
   }, [open, chainAgents])
 
   const parsedTags = tags.split(',').map((t) => t.trim()).filter(Boolean)
-  const canConfirm = parsedTags.length > 0 && chainAgents.includes(agent)
+  const invalidTags = parsedTags.filter((tag) => !ROUTING_TAG_PATTERN.test(tag))
+  const canConfirm =
+    parsedTags.length > 0 &&
+    invalidTags.length === 0 &&
+    chainAgents.includes(agent)
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel() }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Add routing rule</DialogTitle>
+          <DialogDescription>
+            Add a tag-matched routing rule using lowercase kebab-case tags.
+          </DialogDescription>
         </DialogHeader>
         <div className="py-2 space-y-3">
           <div>
@@ -46,11 +62,18 @@ export function RoutingRuleDialog({ open, chainAgents, onConfirm, onCancel }: Pr
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               placeholder="frontend, ui"
+              aria-label="Tags"
               className="text-sm font-mono"
             />
             <p className="text-[11px] text-muted-foreground mt-1">
-              Comma-separated. Rule fires when any of these tags appears on a task.
+              Comma-separated. Use lowercase kebab-case like <code>frontend</code> or <code>api-design</code>.
             </p>
+            {invalidTags.length > 0 && (
+              <p className="text-[11px] text-red-400 mt-1">
+                Invalid tag{invalidTags.length === 1 ? '' : 's'}: {invalidTags.join(', ')}.
+                Tags must use lowercase letters, digits, and hyphens only.
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">
@@ -59,6 +82,7 @@ export function RoutingRuleDialog({ open, chainAgents, onConfirm, onCancel }: Pr
             <select
               value={agent}
               onChange={(e) => setAgent(e.target.value)}
+              aria-label="Route to"
               className="w-full h-9 px-2 text-sm rounded-md border border-border bg-background"
             >
               {chainAgents.map((a) => (

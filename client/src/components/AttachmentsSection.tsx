@@ -33,7 +33,7 @@ function iconForMime(mime: string): string {
   if (mime === 'application/pdf') return '📄'
   if (mime === 'text/csv' || mime.includes('spreadsheetml') || mime === 'application/vnd.ms-excel') return '📊'
   if (mime === 'application/json') return '{ }'
-  if (mime === 'text/plain') return '📝'
+  if (mime === 'text/plain' || mime.includes('sql')) return '📝'
   return '📎'
 }
 

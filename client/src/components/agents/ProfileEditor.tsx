@@ -32,6 +32,8 @@ import {
   type RoutingTagRule,
 } from './types'
 
+const ROUTING_TAG_PATTERN = /^[a-z0-9][a-z0-9-]*$/
+
 interface CatalogAgent {
   id: string
   kind: 'upstream' | 'custom'
@@ -42,17 +44,17 @@ export function ProfileEditor({
   onChange,
   footer,
   onValidityChange,
+  onSoftWarningsChange,
 }: {
   profile: Profile
   onChange: (p: Profile) => void
   footer?: ReactNode
   onValidityChange?: (issues: string[]) => void
+  onSoftWarningsChange?: (warnings: { agentsMissingRouting: string[] }) => void
 }) {
-  // The shipped `default` profile keeps the strict baseline/pin constraints —
-  // removing architect or moving merge-resolver would break the pipeline the
-  // hub ships. Custom profiles get max flexibility: every agent is removable
-  // and every routing rule is deletable, including the default catch-all.
-  const isDefaultProfile = profile.name === 'default' || profile.name === 'project-default'
+  // Baseline agents (architect / developer / reviewer / merge-resolver) are
+  // required and pinned in every profile — default and custom alike — because
+  // the pipeline relies on all four. Routing rules stay fully flexible.
   const [catalog, setCatalog] = useState<CatalogAgent[]>([])
   const [pickingAgent, setPickingAgent] = useState(false)
   const [addRoutingPrompt, setAddRoutingPrompt] = useState(false)
@@ -84,16 +86,10 @@ export function ProfileEditor({
   // ── Live validation (structural checks beyond the JSON schema) ─────────────
   const validationIssues: string[] = useMemo(() => {
     const issues: string[] = []
-    // At least one agent is always required (schema minItems: 1).
-    if (profile.agents.length === 0) {
-      issues.push('Agent chain is empty — add at least one agent before saving')
-    }
-    // Baseline requirement only binds the shipped default profile.
-    if (isDefaultProfile) {
-      for (const baseline of BASELINE_REQUIRED_AGENTS) {
-        if (!profile.agents.some((a) => a.id === baseline)) {
-          issues.push(`Missing required baseline agent: ${baseline}`)
-        }
+    // Baseline is required on every profile — default and custom alike.
+    for (const baseline of BASELINE_REQUIRED_AGENTS) {
+      if (!profile.agents.some((a) => a.id === baseline)) {
+        issues.push(`Missing required baseline agent: ${baseline}`)
       }
     }
     // Routing: at most one default rule, last if present.
@@ -111,40 +107,62 @@ export function ProfileEditor({
       if (!profile.agents.some((a) => a.id === rule.agent)) {
         issues.push(`Routing references agent not in the chain: ${rule.agent}`)
       }
+      if ('tags' in rule) {
+        const invalidTags = rule.tags.filter((tag) => !ROUTING_TAG_PATTERN.test(tag))
+        if (invalidTags.length > 0) {
+          issues.push(
+            `Routing rule ${rule.agent} has invalid tags: ${invalidTags.join(', ')} (use lowercase kebab-case)`,
+          )
+        }
+      }
     }
     return issues
-  }, [profile, isDefaultProfile])
+  }, [profile])
+
+  // ── Soft warnings (non-blocking, surfaced at save-time) ─────────────────────
+  // Only surface this when explicit routing exists. If routing is empty the
+  // runtime falls back to the first developer-shaped agent in the chain.
+  const agentsMissingRouting: string[] = useMemo(() => {
+    if (profile.routing.length === 0) return []
+    const routedIds = new Set(profile.routing.map((r) => r.agent))
+    return profile.agents
+      .filter((a) => !BASELINE_REQUIRED_AGENTS.has(a.id) && !routedIds.has(a.id))
+      .map((a) => a.id)
+  }, [profile])
+
+  const hasDefaultRoutingRule = useMemo(
+    () => profile.routing.some((r) => 'default' in r && r.default === true),
+    [profile.routing],
+  )
 
   useEffect(() => {
     if (onValidityChange) onValidityChange(validationIssues)
   }, [validationIssues, onValidityChange])
 
+  useEffect(() => {
+    if (onSoftWarningsChange) onSoftWarningsChange({ agentsMissingRouting })
+  }, [agentsMissingRouting, onSoftWarningsChange])
+
   const addAgent = (id: string) => {
     update((d) => {
-      // On the default profile, insert before sr-merge-resolver so the merge
-      // row stays pinned last without a manual move. Custom profiles just
-      // append — user reorders freely.
+      // Insert before sr-merge-resolver if present so the merge row stays
+      // pinned last without a manual reorder after every add.
       const row: ProfileAgent = { id, model: 'sonnet' }
-      if (isDefaultProfile) {
-        const mergeIdx = d.agents.findIndex((a) => a.id === 'sr-merge-resolver')
-        if (mergeIdx >= 0) {
-          d.agents.splice(mergeIdx, 0, row)
-          setPickingAgent(false)
-          return
-        }
+      const mergeIdx = d.agents.findIndex((a) => a.id === 'sr-merge-resolver')
+      if (mergeIdx >= 0) {
+        d.agents.splice(mergeIdx, 0, row)
+      } else {
+        d.agents.push(row)
       }
-      d.agents.push(row)
     })
     setPickingAgent(false)
   }
 
   const removeAgent = (idx: number) => {
     const agent = profile.agents[idx]
-    // Baseline agents can only be removed in custom profiles; the default
-    // profile keeps them locked.
-    if (isDefaultProfile && BASELINE_REQUIRED_AGENTS.has(agent.id)) return
-    // Custom profiles must still hold at least one agent (schema minItems: 1).
-    if (profile.agents.length <= 1) return
+    // Baseline agents (architect/developer/reviewer/merge-resolver) can't be
+    // removed from any profile — the pipeline depends on all four.
+    if (BASELINE_REQUIRED_AGENTS.has(agent.id)) return
     update((d) => {
       d.agents.splice(idx, 1)
       // Cascade: drop routing rules that target the removed agent.
@@ -158,18 +176,16 @@ export function ProfileEditor({
     const newIndex = profile.agents.findIndex((a) => a.id === overId)
     if (oldIndex < 0 || newIndex < 0) return
     const reordered = arrayMove(profile.agents, oldIndex, newIndex)
-    // Pins only apply to the default profile. Custom profiles get free reorder.
-    if (isDefaultProfile) {
-      const archIdx = reordered.findIndex((a) => a.id === 'sr-architect')
-      if (archIdx > 0) {
-        const [arch] = reordered.splice(archIdx, 1)
-        reordered.unshift(arch)
-      }
-      const mergeIdx = reordered.findIndex((a) => a.id === 'sr-merge-resolver')
-      if (mergeIdx >= 0 && mergeIdx !== reordered.length - 1) {
-        const [merge] = reordered.splice(mergeIdx, 1)
-        reordered.push(merge)
-      }
+    // Pins apply to every profile: architect starts the pipeline, merge runs last.
+    const archIdx = reordered.findIndex((a) => a.id === 'sr-architect')
+    if (archIdx > 0) {
+      const [arch] = reordered.splice(archIdx, 1)
+      reordered.unshift(arch)
+    }
+    const mergeIdx = reordered.findIndex((a) => a.id === 'sr-merge-resolver')
+    if (mergeIdx >= 0 && mergeIdx !== reordered.length - 1) {
+      const [merge] = reordered.splice(mergeIdx, 1)
+      reordered.push(merge)
     }
     update((d) => {
       d.agents = reordered
@@ -195,19 +211,38 @@ export function ProfileEditor({
 
   const addRoutingRule = (tags: string[], agent: string) => {
     update((d) => {
-      const defaultRule = d.routing.pop() as RoutingDefaultRule
       const newRule: RoutingTagRule = { tags, agent }
-      d.routing.push(newRule)
-      d.routing.push(defaultRule)
+      const defaultIdx = d.routing.findIndex((r) => 'default' in r && r.default === true)
+      if (defaultIdx >= 0) {
+        d.routing.splice(defaultIdx, 0, newRule)
+      } else {
+        d.routing.push(newRule)
+      }
     })
     setAddRoutingPrompt(false)
   }
 
+  const addDefaultRoutingRule = () => {
+    update((d) => {
+      if (d.routing.some((r) => 'default' in r && r.default === true)) return
+      const fallbackAgent =
+        d.agents.find((a) => a.id === 'sr-developer')?.id ?? d.agents[0]?.id ?? ''
+      if (!fallbackAgent) return
+      const newRule: RoutingDefaultRule = { default: true, agent: fallbackAgent }
+      d.routing.push(newRule)
+    })
+  }
+
+  const setRoutingRuleAgent = (idx: number, agent: string) => {
+    update((d) => {
+      if (!d.routing[idx]) return
+      d.routing[idx].agent = agent
+    })
+  }
+
   const removeRoutingRule = (idx: number) => {
-    const rule = profile.routing[idx]
-    // Default profile keeps its terminal default rule locked. Custom profiles
-    // can delete everything.
-    if (isDefaultProfile && 'default' in rule && rule.default) return
+    // Every rule is removable — including the default catch-all. Users can
+    // rebuild their routing from scratch.
     update((d) => {
       d.routing.splice(idx, 1)
     })
@@ -218,11 +253,9 @@ export function ProfileEditor({
     if (target < 0 || target >= profile.routing.length) return
     const rule = profile.routing[idx]
     const targetRule = profile.routing[target]
-    // Default profile enforces: default rule stays last, others can't jump past it.
-    if (isDefaultProfile) {
-      if ('default' in rule && rule.default) return
-      if ('default' in targetRule && targetRule.default) return
-    }
+    // Keep the default rule last at all times — enforced regardless of profile type.
+    if ('default' in rule && rule.default) return
+    if ('default' in targetRule && targetRule.default) return
     update((d) => {
       const [item] = d.routing.splice(idx, 1)
       d.routing.splice(target, 0, item)
@@ -366,8 +399,7 @@ export function ProfileEditor({
                 <AgentRow
                   key={agent.id}
                   agent={agent}
-                  strictMode={isDefaultProfile}
-                  canRemove={profile.agents.length > 1 && (!isDefaultProfile || !BASELINE_REQUIRED_AGENTS.has(agent.id))}
+                  canRemove={!BASELINE_REQUIRED_AGENTS.has(agent.id)}
                   onModel={(m) => setAgentModel(idx, m)}
                   onRemove={() => removeAgent(idx)}
                 />
@@ -383,33 +415,56 @@ export function ProfileEditor({
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Routing ({profile.routing.length})
           </h2>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setAddRoutingPrompt(true)}
-            disabled={profile.agents.length === 0}
-            title={profile.agents.length === 0 ? 'Add at least one agent before creating routing rules' : undefined}
-          >
-            <Plus className="w-3.5 h-3.5 mr-1" /> Add rule
-          </Button>
+          <div className="flex items-center gap-1">
+            {!hasDefaultRoutingRule && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={addDefaultRoutingRule}
+                disabled={profile.agents.length === 0}
+                title={profile.agents.length === 0 ? 'Add at least one agent before creating routing rules' : undefined}
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add default
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setAddRoutingPrompt(true)}
+              disabled={profile.agents.length === 0}
+              title={profile.agents.length === 0 ? 'Add at least one agent before creating routing rules' : undefined}
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" /> Add rule
+            </Button>
+          </div>
         </div>
         <p className="text-[11px] text-muted-foreground mb-2">
-          {isDefaultProfile
-            ? 'First matching rule wins. The default rule catches unmatched tasks and must stay at the end.'
-            : 'First matching rule wins. Routing is fully optional on custom profiles — leave empty to send everything to the first agent in the chain.'}
+          First matching rule wins. Rules are editable and removable, and the default catch-all
+          stays last when present. If you leave routing empty, the pipeline falls back to the
+          first developer-shaped agent in the chain.
         </p>
+        {agentsMissingRouting.length > 0 && (
+          <div className="mb-2 px-3 py-2 text-xs rounded-md border border-yellow-500/30 bg-yellow-500/10 text-yellow-500">
+            <div className="font-medium mb-1">Untargeted agents in the chain</div>
+            <div>
+              No routing rule points to: <span className="font-mono">{agentsMissingRouting.join(', ')}</span>.
+              Add a tag rule or retarget the default rule if you want them to run.
+            </div>
+          </div>
+        )}
         <div className="space-y-1.5">
           {profile.routing.map((rule, idx) => {
             const isDefault = 'default' in rule && rule.default === true
-            const locked = isDefaultProfile && isDefault
             return (
               <RoutingRow
                 key={idx}
                 rule={rule}
                 ordinal={idx + 1}
                 isLast={idx === profile.routing.length - 1}
-                canMove={!locked}
-                canRemove={!locked}
+                canMove={!isDefault}
+                canRemove={true}
+                chainAgents={profile.agents.map((a) => a.id)}
+                onAgentChange={(agent) => setRoutingRuleAgent(idx, agent)}
                 onUp={() => moveRoutingRule(idx, -1)}
                 onDown={() => moveRoutingRule(idx, 1)}
                 onRemove={() => removeRoutingRule(idx)}
@@ -426,22 +481,20 @@ export function ProfileEditor({
 
 function AgentRow({
   agent,
-  strictMode,
   canRemove,
   onModel,
   onRemove,
 }: {
   agent: ProfileAgent
-  strictMode: boolean
   canRemove: boolean
   onModel: (m: ModelAlias) => void
   onRemove: () => void
 }) {
-  // Badges + pins only apply under strict mode (default profile). Custom
-  // profiles get free reordering and removal.
-  const isRequired = strictMode && BASELINE_REQUIRED_AGENTS.has(agent.id)
-  const pinnedFirst = strictMode && agent.id === 'sr-architect'
-  const pinnedLast = strictMode && agent.id === 'sr-merge-resolver'
+  // Baseline is required + pinned on every profile. Architect first,
+  // merge-resolver last.
+  const isRequired = BASELINE_REQUIRED_AGENTS.has(agent.id)
+  const pinnedFirst = agent.id === 'sr-architect'
+  const pinnedLast = agent.id === 'sr-merge-resolver'
   // sr-merge-resolver and sr-architect stay draggable like the rest; the
   // ProfileEditor's reorder handler snaps them back to first/last slots
   // after any drop so the pipeline invariant is preserved at the data layer
@@ -502,9 +555,7 @@ function AgentRow({
         title={
           canRemove
             ? 'Remove'
-            : isRequired
-              ? 'Required baseline agent (default profile)'
-              : 'At least one agent must remain'
+            : 'Required baseline agent — the pipeline depends on this row'
         }
       >
         <X className="w-3 h-3" />
@@ -519,6 +570,8 @@ function RoutingRow({
   isLast,
   canMove,
   canRemove,
+  chainAgents,
+  onAgentChange,
   onUp,
   onDown,
   onRemove,
@@ -528,6 +581,8 @@ function RoutingRow({
   isLast: boolean
   canMove: boolean
   canRemove: boolean
+  chainAgents: string[]
+  onAgentChange: (agent: string) => void
   onUp: () => void
   onDown: () => void
   onRemove: () => void
@@ -550,7 +605,18 @@ function RoutingRow({
         </span>
       )}
       <span className="text-xs text-muted-foreground">→</span>
-      <span className="text-sm font-mono">{rule.agent}</span>
+      <select
+        value={rule.agent}
+        onChange={(e) => onAgentChange(e.target.value)}
+        aria-label={isDefault ? 'Default routing target' : `Routing target for rule ${ordinal}`}
+        className="h-7 max-w-[15rem] px-2 text-xs font-mono rounded border border-border bg-background"
+      >
+        {chainAgents.map((agentId) => (
+          <option key={agentId} value={agentId}>
+            {agentId}
+          </option>
+        ))}
+      </select>
       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
         {canMove && !isLast && (
           <button type="button" className="p-1 hover:bg-accent rounded" onClick={onDown} title="Move down">

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Terminal as TerminalIcon, X } from 'lucide-react'
+import { Pencil, Terminal as TerminalIcon, X } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import type { TerminalRef } from '../../context/TerminalsContext'
 
@@ -63,6 +63,11 @@ function SidebarItem({ session, active, onActivate, onRename, onKill }: SidebarI
     if (trimmed && trimmed !== session.name) onRename(trimmed)
     setEditing(false)
   }
+
+  function startEditing() {
+    setEditing(true)
+  }
+
   function cancel() {
     setEditing(false)
     setDraft(session.name)
@@ -79,7 +84,7 @@ function SidebarItem({ session, active, onActivate, onRename, onKill }: SidebarI
           if (editing) return
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onActivate() }
         }}
-        onDoubleClick={() => setEditing(true)}
+        onDoubleClick={startEditing}
         className={cn(
           'flex items-center gap-2 px-2 py-1.5 rounded-md text-xs cursor-pointer select-none',
           'transition-colors duration-120',
@@ -108,6 +113,23 @@ function SidebarItem({ session, active, onActivate, onRename, onKill }: SidebarI
           />
         ) : (
           <span className="flex-1 truncate">{session.name}</span>
+        )}
+        {!editing && (
+          <button
+            type="button"
+            aria-label={`Rename ${session.name}`}
+            title={`Rename ${session.name}`}
+            onClick={(e) => { e.stopPropagation(); startEditing() }}
+            className={cn(
+              'inline-flex items-center justify-center h-4 w-4 rounded',
+              'text-muted-foreground opacity-0 group-hover:opacity-100',
+              'hover:bg-border/40 hover:text-foreground',
+              'transition-opacity duration-120',
+              active && 'opacity-70',
+            )}
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
         )}
         <button
           type="button"
