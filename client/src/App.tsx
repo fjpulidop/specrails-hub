@@ -41,7 +41,12 @@ import { FEATURE_AGENTS_SECTION, FEATURE_TERMINAL_PANEL } from './lib/feature-fl
 
 // ─── Hub mode detection ───────────────────────────────────────────────────────
 
-const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+// __TAURI_INTERNALS__ may not be present at module-load time under WebView2
+// on Windows ARM64 emulation; fall back to a protocol check.
+const IS_TAURI =
+  typeof window !== 'undefined' &&
+  ('__TAURI_INTERNALS__' in window ||
+    (window.location.protocol !== 'http:' && window.location.protocol !== 'https:'))
 
 function useHubMode(): boolean {
   // In Tauri the server ALWAYS runs in hub mode — skip the network round-trip.

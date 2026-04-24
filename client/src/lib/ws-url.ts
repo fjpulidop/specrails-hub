@@ -5,8 +5,15 @@ function getWsUrl(): string {
   if (typeof __WS_URL__ !== 'undefined' && __WS_URL__) {
     return __WS_URL__
   }
-  // In Tauri, window.location is tauri://localhost — must use explicit port 4200
-  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+  // In Tauri, window.location is tauri://localhost — must use explicit port 4200.
+  // Check __TAURI_INTERNALS__ OR any non-http(s) protocol: WebView2 under Windows
+  // ARM64 emulation may not expose the IPC symbol at module-load time.
+  const inTauri =
+    (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) ||
+    (typeof window !== 'undefined' &&
+      window.location.protocol !== 'http:' &&
+      window.location.protocol !== 'https:')
+  if (inTauri) {
     return 'ws://localhost:4200'
   }
   // In production browser, derive from page origin
