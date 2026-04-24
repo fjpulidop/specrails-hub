@@ -37,7 +37,7 @@ import { useOsNotifications } from './hooks/useOsNotifications'
 import { WS_URL } from './lib/ws-url'
 import { API_ORIGIN } from './lib/origin'
 import { TerminalsProvider, useTerminals } from './context/TerminalsContext'
-import { FEATURE_TERMINAL_PANEL } from './lib/feature-flags'
+import { FEATURE_AGENTS_SECTION, FEATURE_TERMINAL_PANEL } from './lib/feature-flags'
 
 // ─── Hub mode detection ───────────────────────────────────────────────────────
 
@@ -161,7 +161,9 @@ function HubApp() {
 
   // Keyboard shortcuts
   const { cheatsheetOpen, setCheatsheetOpen, openCheatsheet } = useCheatsheetState()
-  const PROJECT_PAGES = ['/', '/jobs', '/analytics', '/settings']
+  const PROJECT_PAGES = FEATURE_AGENTS_SECTION
+    ? ['/', '/jobs', '/analytics', '/agents', '/settings']
+    : ['/', '/jobs', '/analytics', '/settings']
   useKeyboardShortcuts({
     onOpenCheatsheet: openCheatsheet,
     onToggleLeftSidebar: () => setLeftPinned((p) => !p),

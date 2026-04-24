@@ -37,10 +37,6 @@ export interface ProfileListEntry {
   updatedAt: number
 }
 
-export interface UserPreferred {
-  profile: string
-}
-
 export const BASELINE_REQUIRED_AGENTS = new Set([
   'sr-architect',
   'sr-developer',

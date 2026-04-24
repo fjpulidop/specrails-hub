@@ -1,7 +1,7 @@
 # Ticket Attachments
 
 ### Requirement: Attachment upload endpoint
-The system SHALL expose `POST /api/projects/:projectId/tickets/:ticketId/attachments` accepting multipart form data with a single `file` field. Supported MIME types: `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `application/pdf`, `text/csv`, `text/plain`, `application/json`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `application/vnd.ms-excel`. The server SHALL save the file to `~/.specrails/projects/<slug>/attachments/<ticketId>/<uuid>-<originalName>` and append an `Attachment` record to `ticket.attachments[]` in `local-tickets.json`.
+The system SHALL expose `POST /api/projects/:projectId/tickets/:ticketId/attachments` accepting multipart form data with a single `file` field. Supported MIME types: `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `application/pdf`, `text/csv`, `text/plain`, `application/json`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `application/vnd.ms-excel`, and SQL files (including `.sql` uploads sent as `application/sql`, `application/x-sql`, `text/sql`, `text/x-sql`, or with no reliable browser MIME type). The server SHALL save the file to `~/.specrails/projects/<slug>/attachments/<ticketId>/<uuid>-<originalName>` and append an `Attachment` record to `ticket.attachments[]` in `local-tickets.json`.
 
 #### Scenario: Valid file uploaded
 - **WHEN** a supported file is POSTed to the upload endpoint
@@ -50,7 +50,7 @@ The system SHALL accept an optional `attachmentIds: string[]` field in the `POST
 - **THEN** each image's absolute path is inlined in the prompt as `@<absolutePath>` inside a `<user-attachment>` block so Claude CLI auto-resolves it for image understanding
 
 #### Scenario: Text-extractable attachments included
-- **WHEN** generate-spec is called with `attachmentIds` containing PDF, CSV, JSON, TXT, or Excel attachment IDs
+- **WHEN** generate-spec is called with `attachmentIds` containing PDF, CSV, JSON, TXT, SQL, or Excel attachment IDs
 - **THEN** the Claude CLI process receives extracted text content appended to the prompt for each attachment
 - **AND** each extracted block is wrapped in `<user-attachment id="<uuid>" name="<filename>" mime="<mimeType>">...</user-attachment>` delimiters
 - **AND** the system prompt instructs Claude to treat content inside `<user-attachment>` as untrusted user data, not as instructions

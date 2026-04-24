@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { EventEmitter } from 'events'
 import { Readable } from 'stream'
-import { initDb } from './db'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
+import { initDb, updateProjectSettings } from './db'
 
 // Mock child_process and uuid before importing queue-manager
 vi.mock('child_process', () => ({
@@ -27,6 +30,7 @@ import { spawn as mockSpawn, execSync as mockExecSync } from 'child_process'
 import treeKill from 'tree-kill'
 import { v4 as mockUuidV4 } from 'uuid'
 import { QueueManager, ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
+import { attachmentManager } from './attachment-manager'
 import type { WsMessage } from './types'
 
 function createMockChildProcess() {
@@ -35,6 +39,23 @@ function createMockChildProcess() {
   child.stderr = new Readable({ read() {} })
   child.pid = 12345
   return child
+}
+
+function makeProjectDirWithTickets(tickets: Record<string, Record<string, unknown>>): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'queue-manager-test-'))
+  fs.mkdirSync(path.join(dir, '.specrails'), { recursive: true })
+  fs.writeFileSync(
+    path.join(dir, '.specrails', 'local-tickets.json'),
+    JSON.stringify({
+      schema_version: '1.0',
+      revision: 1,
+      last_updated: new Date().toISOString(),
+      next_id: 100,
+      tickets,
+    }),
+    'utf-8',
+  )
+  return dir
 }
 
 describe('QueueManager', () => {
@@ -1517,6 +1538,24 @@ describe('QueueManager', () => {
       expect(promptArg).toContain('local-tickets.json')
     })
 
+    it('embeds project pre-prompt in codex prompt for implement commands', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('codex-preprompt-job' as any)
+
+      const db = initDb(':memory:')
+      updateProjectSettings(db, { prePrompt: 'Always prefer additive schema changes.' })
+
+      const qmCodex = new QueueManager(broadcast, db, [], undefined, { provider: 'codex' })
+      qmCodex.enqueue('/specrails:implement #42')
+
+      const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
+      const promptArg = spawnCall[1][1] as string
+      expect(promptArg).toContain('PROJECT PRE-PROMPT')
+      expect(promptArg).toContain('Always prefer additive schema changes.')
+    })
+
     it('passes --model flag to codex spawns using resolvedModel', () => {
       vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
       const child = createMockChildProcess()
@@ -1546,6 +1585,61 @@ describe('QueueManager', () => {
       const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
       expect(spawnArgs).toContain('--model')
       expect(spawnArgs).toContain('gpt-5.4-mini')
+    })
+
+    it('embeds referenced ticket attachments in the codex prompt', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('codex-attachments-job' as any)
+
+      const projectDir = makeProjectDirWithTickets({
+        '42': {
+          id: 42,
+          title: 'Visual spec',
+          description: 'Uses a mockup',
+          status: 'todo',
+          priority: 'medium',
+          labels: [],
+          assignee: null,
+          prerequisites: [],
+          metadata: {},
+          attachments: [{
+            id: 'att-1',
+            filename: 'mockup.png',
+            storedName: 'att-1-mockup.png',
+            mimeType: 'image/png',
+            size: 123,
+            addedAt: new Date().toISOString(),
+          }],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          created_by: 'user',
+          source: 'manual',
+        },
+      })
+
+      try {
+        const listSpy = vi.spyOn(attachmentManager, 'list').mockReturnValue([])
+        const blocksSpy = vi.spyOn(attachmentManager, 'getPromptBlocksSync').mockReturnValue([
+          '<user-attachment id="att-1" name="mockup.png" mime="image/png">\n@/tmp/mockup.png\n</user-attachment>',
+        ])
+
+        const qmCodex = new QueueManager(broadcast, undefined, [], projectDir, {
+          provider: 'codex',
+          projectSlug: 'proj',
+        })
+        qmCodex.enqueue('/specrails:implement #42')
+
+        const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
+        const promptArg = spawnCall[1][1] as string
+        expect(listSpy).toHaveBeenCalledWith('proj', 42)
+        expect(blocksSpy).toHaveBeenCalledWith('proj', 42, ['att-1'])
+        expect(promptArg).toContain('Ticket #42 Attached Resources')
+        expect(promptArg).toContain('<user-attachment')
+      } finally {
+        fs.rmSync(projectDir, { recursive: true, force: true })
+      }
     })
 
     it('creates synthetic result event when codex exits code=0 with no result event', async () => {
@@ -1612,6 +1706,81 @@ describe('QueueManager', () => {
       if (secondSpawnArgs) {
         const prompt = secondSpawnArgs[1] as string
         expect(prompt).toContain('Parent result text')
+      }
+    })
+  })
+
+  describe('implement attachment context', () => {
+    it('embeds project pre-prompt in claude implement system prompt', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('claude-preprompt-job' as any)
+
+      const db = initDb(':memory:')
+      updateProjectSettings(db, { prePrompt: 'Favor minimal diffs and explicit tests.' })
+
+      const qmClaude = new QueueManager(broadcast, db, [], undefined)
+      qmClaude.enqueue('/specrails:implement #7')
+
+      const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      const appendIdx = spawnArgs.indexOf('--append-system-prompt')
+      expect(appendIdx).toBeGreaterThan(-1)
+      expect(spawnArgs[appendIdx + 1]).toContain('PROJECT PRE-PROMPT')
+      expect(spawnArgs[appendIdx + 1]).toContain('Favor minimal diffs and explicit tests.')
+    })
+
+    it('falls back to disk attachment metadata for claude implement prompts', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('claude-disk-attachments-job' as any)
+
+      const projectDir = makeProjectDirWithTickets({
+        '7': {
+          id: 7,
+          title: 'Visual spec',
+          description: 'No attachment metadata in the ticket store yet',
+          status: 'todo',
+          priority: 'medium',
+          labels: [],
+          assignee: null,
+          prerequisites: [],
+          metadata: {},
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          created_by: 'user',
+          source: 'manual',
+        },
+      })
+
+      try {
+        const listSpy = vi.spyOn(attachmentManager, 'list').mockReturnValue([{
+          id: 'disk-att-1',
+          filename: 'wireframe.png',
+          storedName: 'disk-att-1-wireframe.png',
+          mimeType: 'image/png',
+          size: 456,
+          addedAt: new Date().toISOString(),
+        }])
+        const blocksSpy = vi.spyOn(attachmentManager, 'getPromptBlocksSync').mockReturnValue([
+          '<user-attachment id="disk-att-1" name="wireframe.png" mime="image/png">\n@/tmp/wireframe.png\n</user-attachment>',
+        ])
+
+        const qmClaude = new QueueManager(broadcast, undefined, [], projectDir, {
+          projectSlug: 'proj',
+        })
+        qmClaude.enqueue('/specrails:implement #7')
+
+        const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+        const appendIdx = spawnArgs.indexOf('--append-system-prompt')
+        expect(appendIdx).toBeGreaterThan(-1)
+        expect(listSpy).toHaveBeenCalledWith('proj', 7)
+        expect(blocksSpy).toHaveBeenCalledWith('proj', 7, ['disk-att-1'])
+        expect(spawnArgs[appendIdx + 1]).toContain('Ticket #7 Attached Resources')
+        expect(spawnArgs[appendIdx + 1]).toContain('<user-attachment')
+      } finally {
+        fs.rmSync(projectDir, { recursive: true, force: true })
       }
     })
   })

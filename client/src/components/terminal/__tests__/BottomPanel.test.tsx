@@ -166,6 +166,19 @@ describe('BottomPanel', () => {
     expect(sawPatch).toBe(true)
   })
 
+  it('sidebar rename button triggers PATCH', () => {
+    const s: TerminalRef = { id: 's1', projectId: 'p', name: 'initial', cols: 80, rows: 24, createdAt: 1 }
+    const { getByLabelText, getByDisplayValue } = wrap(
+      <BottomPanel projectId="p" state={makeState({ sessions: [s], activeId: 's1' })} viewportHeight={800} statusBarHeight={28} />,
+    )
+    fireEvent.click(getByLabelText(/rename initial/i))
+    const input = getByDisplayValue('initial')
+    fireEvent.change(input, { target: { value: 'renamed-from-button' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    const sawPatch = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.some(([, init]) => init?.method === 'PATCH')
+    expect(sawPatch).toBe(true)
+  })
+
   it('sidebar ✕ triggers kill DELETE for that session', () => {
     const s1: TerminalRef = { id: 's1', projectId: 'p', name: 'one', cols: 80, rows: 24, createdAt: 1 }
     const s2: TerminalRef = { id: 's2', projectId: 'p', name: 'two', cols: 80, rows: 24, createdAt: 2 }

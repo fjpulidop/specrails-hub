@@ -51,4 +51,13 @@ export function attachmentFileUrl(ticketKey: string | number, attachmentId: stri
 }
 
 export const ATTACHMENT_ACCEPT_MIME =
-  'image/jpeg,image/png,image/gif,image/webp,application/pdf,text/csv,text/plain,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel'
+  'image/jpeg,image/png,image/gif,image/webp,application/pdf,text/csv,text/plain,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/sql,application/x-sql,text/sql,text/x-sql,.sql'
+
+const SUPPORTED_ATTACHMENT_MIMES = new Set(
+  ATTACHMENT_ACCEPT_MIME.split(',').filter((part) => !part.startsWith('.')),
+)
+const SQL_EXTENSION_RE = /\.sql$/i
+
+export function isSupportedAttachmentFile(file: Pick<File, 'name' | 'type'>): boolean {
+  return SUPPORTED_ATTACHMENT_MIMES.has(file.type) || SQL_EXTENSION_RE.test(file.name)
+}

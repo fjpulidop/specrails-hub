@@ -103,6 +103,11 @@ describe('AttachmentChip', () => {
     expect(container.textContent).toContain('📝')
   })
 
+  it('shows text icon for sql mime types', () => {
+    const { container } = render(<AttachmentChip attachment={makeAttachment({ mimeType: 'application/sql', filename: 'schema.sql' })} />)
+    expect(container.textContent).toContain('📝')
+  })
+
   it('shows fallback icon for unknown mime type', () => {
     const { container } = render(<AttachmentChip attachment={makeAttachment({ mimeType: 'application/octet-stream', filename: 'file.bin' })} />)
     expect(container.textContent).toContain('📎')

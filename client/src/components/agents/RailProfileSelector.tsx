@@ -64,7 +64,7 @@ export function RailProfileSelector({ value, onChange }: Props) {
             {p.name}
           </option>
         ))}
-        <option value={LEGACY_VALUE}>legacy</option>
+        <option value={LEGACY_VALUE}>No profile</option>
       </select>
     </div>
   )

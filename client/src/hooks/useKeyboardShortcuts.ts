@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { FEATURE_AGENTS_SECTION } from '../lib/feature-flags'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -17,7 +18,13 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: '⌘B', description: 'Toggle right sidebar', category: 'general' },
   { keys: '⌥⌘B', description: 'Toggle left sidebar', category: 'general' },
   { keys: '⌘J', description: 'Toggle terminal panel', category: 'general' },
-  { keys: '⌘1–4', description: 'Navigate to project page (Home/Jobs/Analytics/Settings)', category: 'general' },
+  {
+    keys: FEATURE_AGENTS_SECTION ? '⌘1–5' : '⌘1–4',
+    description: FEATURE_AGENTS_SECTION
+      ? 'Navigate to project page (Dashboard/Jobs/Analytics/Agents/Settings)'
+      : 'Navigate to project page (Dashboard/Jobs/Analytics/Settings)',
+    category: 'general',
+  },
   { keys: '⌥⌘1–9', description: 'Switch to project by position', category: 'general' },
 
   // Navigation
@@ -66,7 +73,7 @@ interface UseKeyboardShortcutsOptions {
   onToggleRightSidebar?: () => void
   /** Switch to project by 1-based index */
   onSwitchProject?: (index: number) => void
-  /** Navigate to project page by 1-based index (Home, Jobs, Analytics, Settings…) */
+  /** Navigate to project page by 1-based index (Dashboard, Jobs, Analytics, Agents, Settings…) */
   onSwitchProjectPage?: (index: number) => void
   /** Toggle the bottom terminal panel (Cmd+J / Ctrl+J) */
   onToggleTerminalPanel?: () => void

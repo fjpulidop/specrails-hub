@@ -1,17 +1,16 @@
 import { useEffect, useState, useRef } from 'react'
-import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
-import { ModelCombobox } from '../components/ModelCombobox'
 import type { ProjectConfig } from '../types'
 
 interface ProjectSettings {
   pipelineTelemetryEnabled: boolean
-  orchestratorModel: string
+  orchestratorModel?: string
+  prePrompt?: string
 }
 
 export default function SettingsPage() {
@@ -26,9 +25,8 @@ export default function SettingsPage() {
   const [isSavingJobThreshold, setIsSavingJobThreshold] = useState(false)
   const [telemetryEnabled, setTelemetryEnabled] = useState(false)
   const [isSavingTelemetry, setIsSavingTelemetry] = useState(false)
-  const [orchestratorModel, setOrchestratorModel] = useState('sonnet')
-  const [pendingOrchestratorModel, setPendingOrchestratorModel] = useState('sonnet')
-  const [isSavingOrchestratorModel, setIsSavingOrchestratorModel] = useState(false)
+  const [prePrompt, setPrePrompt] = useState('')
+  const [isSavingPrePrompt, setIsSavingPrePrompt] = useState(false)
 
   const cacheRef = useRef<Map<string, ProjectConfig>>(new Map())
 
@@ -86,16 +84,13 @@ export default function SettingsPage() {
         if (!res.ok) return
         const data = await res.json() as ProjectSettings
         setTelemetryEnabled(data.pipelineTelemetryEnabled ?? false)
-        const m = data.orchestratorModel ?? 'sonnet'
-        setOrchestratorModel(m)
-        setPendingOrchestratorModel(m)
+        setPrePrompt(data.prePrompt ?? '')
       } catch {
         // ignore
       }
     }
     void loadTelemetrySettings()
   }, [activeProjectId, isHubMode])
-
 
   async function saveDailyBudget() {
     setIsSavingBudget(true)
@@ -141,24 +136,6 @@ export default function SettingsPage() {
     }
   }
 
-  async function saveOrchestratorModel() {
-    setIsSavingOrchestratorModel(true)
-    try {
-      const res = await fetch(`${getApiBase()}/settings`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orchestratorModel: pendingOrchestratorModel }),
-      })
-      if (!res.ok) throw new Error('Failed to save')
-      setOrchestratorModel(pendingOrchestratorModel)
-      toast.success(`Orchestrator model set to ${pendingOrchestratorModel}`)
-    } catch (err) {
-      toast.error('Failed to save orchestrator model', { description: (err as Error).message })
-    } finally {
-      setIsSavingOrchestratorModel(false)
-    }
-  }
-
   async function saveTelemetryToggle(enabled: boolean) {
     setIsSavingTelemetry(true)
     const prev = telemetryEnabled
@@ -176,6 +153,26 @@ export default function SettingsPage() {
       toast.error('Failed to save telemetry setting', { description: (err as Error).message })
     } finally {
       setIsSavingTelemetry(false)
+    }
+  }
+
+  async function savePrePrompt() {
+    setIsSavingPrePrompt(true)
+    try {
+      const res = await fetch(`${getApiBase()}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prePrompt }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      const data = await res.json() as { settings?: ProjectSettings }
+      const savedValue = data.settings?.prePrompt ?? ''
+      setPrePrompt(savedValue)
+      toast.success(savedValue.trim() === '' ? 'Pre-prompt cleared' : 'Pre-prompt saved')
+    } catch (err) {
+      toast.error('Failed to save pre-prompt', { description: (err as Error).message })
+    } finally {
+      setIsSavingPrePrompt(false)
     }
   }
 
@@ -200,64 +197,6 @@ export default function SettingsPage() {
           </p>
         )}
       </div>
-
-      {/* Orchestrator Model Section — hub mode only */}
-      {isHubMode && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Orchestrator Model</CardTitle>
-            <CardDescription>
-              Model used by the pipeline orchestrator (the CLI process that runs each job). Defaults to Sonnet.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-end">
-              <ModelCombobox
-                value={pendingOrchestratorModel}
-                onChange={setPendingOrchestratorModel}
-                disabled={isSavingOrchestratorModel}
-              />
-            </div>
-            <div className="flex justify-end">
-              <Button
-                size="sm"
-                variant="secondary"
-                className="h-7 text-xs"
-                disabled={isSavingOrchestratorModel || pendingOrchestratorModel === orchestratorModel}
-                onClick={saveOrchestratorModel}
-              >
-                {isSavingOrchestratorModel ? 'Saving...' : 'Save'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Agent Models moved to Agents section (hub mode only) */}
-      {isHubMode && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Agent Models</CardTitle>
-            <CardDescription>
-              Moved to the new Agents section. Per-agent models now live inside profiles
-              so you can run different chains/models per rail.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link
-              to="/agents"
-              className="inline-flex items-center gap-2 h-8 px-3 rounded-md bg-primary/10 text-primary hover:bg-primary/20 text-xs font-medium transition-colors"
-            >
-              Open Agents → Profiles →
-            </Link>
-            <p className="text-[11px] text-muted-foreground mt-2">
-              Your existing per-agent model selections are preserved in the current agent
-              frontmatter; the first time you open Agents you'll be offered a one-click
-              migration into a <code>default</code> profile.
-            </p>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Pipeline Telemetry Section — hub mode only */}
       {isHubMode && (
@@ -298,6 +237,43 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Rail Pre-prompt</CardTitle>
+          <CardDescription>
+            Extra project-specific instructions appended to implement and batch-implement rail jobs after the ticket context and before execution.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <label htmlFor="project-pre-prompt" className="text-xs font-medium">
+              Pre-prompt
+            </label>
+            <textarea
+              id="project-pre-prompt"
+              value={prePrompt}
+              onChange={(e) => setPrePrompt(e.target.value)}
+              placeholder="Example: Prefer incremental changes, keep migrations backward compatible, and add tests for every rail change."
+              className="min-h-32 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20"
+            />
+            <p className="text-xs text-muted-foreground">
+              Use this for stable project guidance that should accompany every rail implementation run.
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-7 text-xs"
+              disabled={isSavingPrePrompt}
+              onClick={savePrePrompt}
+            >
+              {isSavingPrePrompt ? 'Saving...' : 'Save pre-prompt'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Budget Section */}
       <Card>
