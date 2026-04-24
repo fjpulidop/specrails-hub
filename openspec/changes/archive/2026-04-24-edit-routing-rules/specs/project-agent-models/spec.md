@@ -1,8 +1,5 @@
-# project-agent-models Specification
+## ADDED Requirements
 
-## Purpose
-TBD - created by archiving change add-agents-profiles. Update Purpose after archive.
-## Requirements
 ### Requirement: Tag-rule editing in routing rules
 The Profile Editor SHALL allow editing the tag set of any non-default routing rule on any profile type (`default`, `project-default`, custom). The edit flow SHALL reuse the existing routing-rule dialog in an edit mode, pre-populated with the current tags and target agent.
 
@@ -44,4 +41,3 @@ Non-default routing rules SHALL remain editable (tags, target agent), reorderabl
 #### Scenario: Edit non-default rule on default profile
 - **WHEN** a user edits a tag rule on the `default` profile
 - **THEN** the edit is persisted and the profile remains valid
-
