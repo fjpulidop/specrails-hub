@@ -137,6 +137,14 @@ describe('POST /profiles', () => {
     const res = await request(app).post('/api/projects/proj-test/profiles').send(baseProfile('dup'))
     expect(res.status).toBe(409)
   })
+
+  it('rejects a profile whose default routing rule targets a non-sr-developer agent', async () => {
+    const bad = baseProfile('custom-bad-default')
+    bad.agents.push({ id: 'custom-foo' })
+    bad.routing = [{ default: true, agent: 'custom-foo' }]
+    const res = await request(app).post('/api/projects/proj-test/profiles').send(bad)
+    expect(res.status).toBe(400)
+  })
 })
 
 describe('GET /profiles/:name', () => {

@@ -123,6 +123,21 @@ describe('validateProfile', () => {
     ]
     expect(() => validateProfile(p)).toThrow(ProfileValidationError)
   })
+
+  it('rejects default routing rule that targets an agent other than sr-developer', () => {
+    const p = baseProfile('custom-x')
+    p.agents.push({ id: 'custom-foo' })
+    p.routing = [
+      { default: true, agent: 'custom-foo' },
+    ]
+    expect(() => validateProfile(p)).toThrow(ProfileValidationError)
+  })
+
+  it('accepts default routing rule when agent is sr-developer', () => {
+    const p = baseProfile()
+    p.routing = [{ default: true, agent: 'sr-developer' }]
+    expect(() => validateProfile(p)).not.toThrow()
+  })
 })
 
 describe('CRUD', () => {

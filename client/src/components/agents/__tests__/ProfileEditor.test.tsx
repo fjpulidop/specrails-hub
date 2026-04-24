@@ -51,22 +51,44 @@ describe('ProfileEditor', () => {
     expect(screen.queryByText(/untargeted agents in the chain/i)).not.toBeInTheDocument()
   })
 
-  it('lets the user retarget the default rule to a custom agent', async () => {
+  it('locks the default routing rule to sr-developer with no controls', async () => {
+    await act(async () => {
+      render(<ProfileEditor profile={makeProfile()} onChange={vi.fn()} />)
+    })
+
+    // No editable select for the default rule target — it renders as a read-only span.
+    expect(screen.queryByRole('combobox', { name: /routing target/i })).not.toBeInTheDocument()
+    // A "core · default" badge is rendered.
+    expect(screen.getByText(/core · default/i)).toBeInTheDocument()
+    // No edit / remove / reorder buttons for the default rule.
+    expect(screen.queryByRole('button', { name: /edit rule 1/i })).not.toBeInTheDocument()
+  })
+
+  it('edits tags on a tag rule in place via the edit dialog', async () => {
     const onChange = vi.fn()
+    const withTagRule = makeProfile({
+      routing: [
+        { tags: ['frontend'], agent: 'custom-data-engineer' },
+        { default: true, agent: 'sr-developer' },
+      ],
+    })
 
     await act(async () => {
-      render(<ProfileEditor profile={makeProfile()} onChange={onChange} />)
+      render(<ProfileEditor profile={withTagRule} onChange={onChange} />)
     })
 
-    expect(screen.getByText(/untargeted agents in the chain/i)).toBeInTheDocument()
-
-    fireEvent.change(screen.getByLabelText('Default routing target'), {
-      target: { value: 'custom-data-engineer' },
+    fireEvent.click(screen.getByRole('button', { name: /edit rule 1/i }))
+    fireEvent.change(screen.getByLabelText('Tags'), {
+      target: { value: 'frontend, ui' },
     })
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }))
 
     expect(onChange).toHaveBeenCalled()
     expect(onChange.mock.calls.at(-1)?.[0]).toMatchObject({
-      routing: [{ default: true, agent: 'custom-data-engineer' }],
+      routing: [
+        { tags: ['frontend', 'ui'], agent: 'custom-data-engineer' },
+        { default: true, agent: 'sr-developer' },
+      ],
     })
   })
 })
