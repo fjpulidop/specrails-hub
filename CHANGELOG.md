@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.39.0](https://github.com/fjpulidop/specrails-hub/compare/v1.38.0...v1.39.0) (2026-04-24)
+
+
+### Features
+
+* **profiles:** inject ticket attachments + pre-prompt, enforce 4-agent baseline ([#249](https://github.com/fjpulidop/specrails-hub/issues/249)) ([f12409c](https://github.com/fjpulidop/specrails-hub/commit/f12409c1af06a5696941f454066792043faf977d))
+
 ## [1.38.0](https://github.com/fjpulidop/specrails-hub/compare/v1.37.0...v1.38.0) (2026-04-23)
 
 
