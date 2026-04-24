@@ -12,12 +12,11 @@ import {
 import type { Attachment } from '../types'
 import {
   ATTACHMENT_ACCEPT_MIME,
+  isSupportedAttachmentFile,
   uploadAttachment,
 } from '../lib/attachments'
 import { cn } from '../lib/utils'
 import { AttachmentChip } from './AttachmentChip'
-
-const SUPPORTED = new Set(ATTACHMENT_ACCEPT_MIME.split(','))
 
 export interface RichAttachmentEditorHandle {
   getPlainText: () => string
@@ -247,7 +246,7 @@ export const RichAttachmentEditor = forwardRef<RichAttachmentEditorHandle, RichA
 
     const uploadFile = useCallback(
       async (file: File) => {
-        if (!SUPPORTED.has(file.type)) {
+        if (!isSupportedAttachmentFile(file)) {
           onUnsupportedFile?.(file)
           return
         }

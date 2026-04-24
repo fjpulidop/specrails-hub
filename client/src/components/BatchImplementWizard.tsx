@@ -192,7 +192,7 @@ export function BatchImplementWizard({ open, onClose }: BatchImplementWizardProp
                           {availableProfiles.map((p) => (
                             <option key={p.name} value={p.name}>{p.name}</option>
                           ))}
-                          <option value="__legacy__">legacy</option>
+                          <option value="__legacy__">No profile</option>
                         </select>
                         {!isInherited && (
                           <button

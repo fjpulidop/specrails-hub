@@ -116,6 +116,75 @@ describe('SettingsPage - extended coverage', () => {
     })
   })
 
+  it('loads prePrompt from project settings', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (String(url).endsWith('/settings')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ pipelineTelemetryEnabled: false, orchestratorModel: 'sonnet', prePrompt: 'Always add release notes.' }),
+        })
+      }
+      if (String(url).endsWith('/budget')) {
+        return Promise.resolve({ ok: true, json: async () => ({ dailyBudgetUsd: null, jobCostThresholdUsd: null }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => mockConfig })
+    })
+
+    render(<SettingsPage />)
+    await waitFor(() => {
+      expect(screen.getByLabelText('Pre-prompt')).toHaveValue('Always add release notes.')
+    })
+  })
+
+  it('saves prePrompt successfully', async () => {
+    const user = userEvent.setup()
+    const { toast } = await import('sonner')
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (String(url).endsWith('/settings') && opts?.method === 'PATCH') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            ok: true,
+            settings: {
+              pipelineTelemetryEnabled: false,
+              orchestratorModel: 'sonnet',
+              prePrompt: 'Always write migration notes.',
+            },
+          }),
+        })
+      }
+      if (String(url).endsWith('/settings')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ pipelineTelemetryEnabled: false, orchestratorModel: 'sonnet', prePrompt: '' }),
+        })
+      }
+      if (String(url).endsWith('/budget')) {
+        return Promise.resolve({ ok: true, json: async () => ({ dailyBudgetUsd: null, jobCostThresholdUsd: null }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => mockConfig })
+    })
+    global.fetch = fetchMock
+
+    render(<SettingsPage />)
+    await waitFor(() => {
+      expect(screen.getByLabelText('Pre-prompt')).toBeInTheDocument()
+    })
+
+    await user.type(screen.getByLabelText('Pre-prompt'), 'Always write migration notes.')
+    await user.click(screen.getByRole('button', { name: /save pre-prompt/i }))
+
+    await waitFor(() => {
+      const patchCall = fetchMock.mock.calls.find(
+        ([url, opts]: [string, RequestInit]) =>
+          String(url).endsWith('/settings') && opts?.method === 'PATCH'
+      )
+      expect(patchCall).toBeDefined()
+      expect(JSON.parse(patchCall![1].body as string)).toEqual({ prePrompt: 'Always write migration notes.' })
+      expect(toast.success).toHaveBeenCalledWith('Pre-prompt saved')
+    })
+  })
+
   it('saves daily budget successfully', async () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')

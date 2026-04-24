@@ -5,6 +5,8 @@ import os from 'os'
 
 import {
   AttachmentManager,
+  isSupportedUploadedFile,
+  normalizeUploadedMimeType,
   SUPPORTED_MIME_TYPES,
   USER_ATTACHMENT_SYSTEM_NOTE,
   UploadedFile,
@@ -139,6 +141,18 @@ describe('AttachmentManager', () => {
       )
       expect(store.tickets['1'].attachments).toHaveLength(1)
       expect(store.tickets['1'].attachments[0].filename).toBe('test.txt')
+    })
+
+    it('accepts .sql uploads and stores them as text/plain', async () => {
+      const attachment = await manager.upload({
+        slug: 'proj',
+        ticketKey: '1',
+        projectPath: null,
+        file: makeFile({ originalname: 'schema.sql', mimetype: 'application/sql' }),
+      })
+
+      expect(attachment.filename).toBe('schema.sql')
+      expect(attachment.mimeType).toBe('text/plain')
     })
 
     it('skips store mutation for missing ticket when projectPath provided', async () => {
@@ -412,6 +426,18 @@ describe('AttachmentManager', () => {
       expect(result.textBlocks[0]).toContain(json)
     })
 
+    it('reads SQL files as raw utf-8', async () => {
+      const sql = 'select * from users;'
+      const att = await manager.upload({
+        slug: 'proj', ticketKey: '1', projectPath: null,
+        file: makeFile({ buffer: Buffer.from(sql), originalname: 'schema.sql', mimetype: '', size: sql.length }),
+      })
+
+      const result = await manager.getClaudeArgs('proj', '1', [att.id])
+      expect(result.textBlocks[0]).toContain(sql)
+      expect(result.textBlocks[0]).toContain('schema.sql')
+    })
+
     it('handles extraction failure gracefully', async () => {
       // Mock pdf-parse to fail
       vi.doMock('pdf-parse', () => {
@@ -443,6 +469,34 @@ describe('AttachmentManager', () => {
     })
   })
 
+  // ─── getPromptBlocksSync ──────────────────────────────────────────────────
+
+  describe('getPromptBlocksSync', () => {
+    it('inlines images as @<abs-path> references synchronously', async () => {
+      const att = await manager.upload({
+        slug: 'proj', ticketKey: '1', projectPath: null,
+        file: makeFile({ mimetype: 'image/png', originalname: 'sync-photo.png', buffer: Buffer.from('PNG') }),
+      })
+
+      const result = manager.getPromptBlocksSync('proj', '1', [att.id])
+      expect(result).toHaveLength(1)
+      expect(result[0]).toContain('@')
+      expect(result[0]).toContain('sync-photo.png')
+    })
+
+    it('falls back to a local file path for binary non-image attachments', async () => {
+      const att = await manager.upload({
+        slug: 'proj', ticketKey: '1', projectPath: null,
+        file: makeFile({ mimetype: 'application/pdf', originalname: 'brief.pdf', buffer: Buffer.from('%PDF') }),
+      })
+
+      const result = manager.getPromptBlocksSync('proj', '1', [att.id])
+      expect(result).toHaveLength(1)
+      expect(result[0]).toContain('local attachment path:')
+      expect(result[0]).toContain('brief.pdf')
+    })
+  })
+
   // ─── constants ─────────────────────────────────────────────────────────────
 
   describe('constants', () => {
@@ -459,6 +513,12 @@ describe('AttachmentManager', () => {
     it('USER_ATTACHMENT_SYSTEM_NOTE mentions user-attachment and untrusted', () => {
       expect(USER_ATTACHMENT_SYSTEM_NOTE).toContain('user-attachment')
       expect(USER_ATTACHMENT_SYSTEM_NOTE).toContain('untrusted')
+    })
+
+    it('normalizes SQL uploads to text/plain and treats them as supported', () => {
+      expect(normalizeUploadedMimeType('application/sql', 'schema.sql')).toBe('text/plain')
+      expect(normalizeUploadedMimeType('', 'schema.sql')).toBe('text/plain')
+      expect(isSupportedUploadedFile({ mimetype: '', originalname: 'schema.sql' })).toBe(true)
     })
   })
 })

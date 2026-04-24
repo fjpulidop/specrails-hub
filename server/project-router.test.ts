@@ -1585,6 +1585,7 @@ describe('project-router', () => {
       expect(res.status).toBe(200)
       expect(res.body.pipelineTelemetryEnabled).toBe(false)
       expect(res.body.orchestratorModel).toBe('sonnet')
+      expect(res.body.prePrompt).toBe('')
     })
   })
 
@@ -1628,6 +1629,26 @@ describe('project-router', () => {
         .send({ pipelineTelemetryEnabled: true })
       expect(res.status).toBe(200)
       expect(res.body.settings.pipelineTelemetryEnabled).toBe(true)
+    })
+
+    it('updates prePrompt', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .patch('/api/projects/proj-1/settings')
+        .send({ prePrompt: 'Prefer backward-compatible migrations.' })
+      expect(res.status).toBe(200)
+      expect(res.body.settings.prePrompt).toBe('Prefer backward-compatible migrations.')
+    })
+
+    it('rejects non-string prePrompt', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .patch('/api/projects/proj-1/settings')
+        .send({ prePrompt: 42 })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('prePrompt')
     })
 
     it('accepts empty body without error', async () => {

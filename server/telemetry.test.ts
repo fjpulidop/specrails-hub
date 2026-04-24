@@ -84,6 +84,24 @@ describe('getProjectSettings / updateProjectSettings', () => {
     updateProjectSettings(db, { orchestratorModel: 'opus' })
     expect(getProjectSettings(db).pipelineTelemetryEnabled).toBe(false)
   })
+
+  it('defaults prePrompt to an empty string', () => {
+    const db = makeDb()
+    expect(getProjectSettings(db).prePrompt).toBe('')
+  })
+
+  it('persists prePrompt when updated', () => {
+    const db = makeDb()
+    updateProjectSettings(db, { prePrompt: 'Always add regression tests.' })
+    expect(getProjectSettings(db).prePrompt).toBe('Always add regression tests.')
+  })
+
+  it('clears prePrompt when updated with whitespace', () => {
+    const db = makeDb()
+    updateProjectSettings(db, { prePrompt: 'Always add regression tests.' })
+    updateProjectSettings(db, { prePrompt: '   ' })
+    expect(getProjectSettings(db).prePrompt).toBe('')
+  })
 })
 
 // ─── Telemetry blob DB ────────────────────────────────────────────────────────

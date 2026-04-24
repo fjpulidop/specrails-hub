@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef } from 'react'
+import { useReducer } from 'react'
 import { toast } from 'sonner'
 import { getApiBase } from '../lib/api'
 import type { IssueItem } from '../types'
@@ -14,7 +14,6 @@ import { IssuePickerStep, FreeFormStep } from './IssuePickerStep'
 import { cn } from '../lib/utils'
 import {
   ProfilePicker,
-  type ProfileSelection,
   selectionToSpawnPayload,
   useDefaultProfileSelection,
 } from './agents/ProfilePicker'
@@ -65,13 +64,6 @@ export function ImplementWizard({ open, onClose }: ImplementWizardProps) {
     freeFormDescription: '',
   })
   const [profileSelection, setProfileSelection] = useDefaultProfileSelection()
-  const initialProfileRef = useRef<ProfileSelection | null>(null)
-  // Capture the resolved default once so we know when the user changed it
-  useEffect(() => {
-    if (initialProfileRef.current === null) {
-      initialProfileRef.current = profileSelection
-    }
-  }, [profileSelection])
 
   function handleClose() {
     dispatch({ type: 'RESET' })
@@ -109,18 +101,6 @@ export function ImplementWizard({ open, onClose }: ImplementWizardProps) {
       })
       const data = await res.json() as { jobId?: string; error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Failed to queue job')
-
-      // Persist per-developer preference when the user explicitly picked a
-      // non-default profile in this launch (fire-and-forget).
-      const initial = initialProfileRef.current
-      if (profileSelection.kind === 'profile' &&
-          (!initial || initial.kind !== 'profile' || initial.name !== profileSelection.name)) {
-        void fetch(`${getApiBase()}/profiles/active`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profile: profileSelection.name }),
-        }).catch(() => { /* non-fatal */ })
-      }
       const toastDesc = state.path === 'from-issues'
         ? state.selectedIssues.length === 1
           ? `#${state.selectedIssues[0].number}: ${state.selectedIssues[0].title}`

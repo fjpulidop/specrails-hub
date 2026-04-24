@@ -52,6 +52,16 @@ describe('TerminalSidebar', () => {
     expect(onRename).toHaveBeenCalledWith('a', 'new name')
   })
 
+  it('enters rename when rename button is clicked', () => {
+    const onRename = vi.fn()
+    const s = makeSession('a', 'build')
+    const { getByLabelText, getByDisplayValue } = render(
+      <TerminalSidebar sessions={[s]} activeId="a" onActivate={() => {}} onRename={onRename} onKill={() => {}} />,
+    )
+    fireEvent.click(getByLabelText(/rename build/i))
+    expect(getByDisplayValue('build')).toBeDefined()
+  })
+
   it('cancels rename on Escape', () => {
     const onRename = vi.fn()
     const s = makeSession('a', 'keep')

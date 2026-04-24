@@ -33,6 +33,9 @@ describe('KeyboardShortcutsCheatsheet', () => {
     render(
       <KeyboardShortcutsCheatsheet open={true} onOpenChange={vi.fn()} />,
     )
+    expect(
+      screen.getByText('Navigate to project page (Dashboard/Jobs/Analytics/Agents/Settings)'),
+    ).toBeInTheDocument()
     expect(screen.getByText('Go to Dashboard')).toBeInTheDocument()
     expect(screen.getByText('Go to Analytics')).toBeInTheDocument()
     expect(screen.getByText('Go to Settings')).toBeInTheDocument()
