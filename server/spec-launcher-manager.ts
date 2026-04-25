@@ -3,6 +3,7 @@ import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
 import { resolveCommand } from './command-resolver'
+import { resolveWindowsBinary } from './util/win-spawn'
 
 // ─── SpecLauncherManager ──────────────────────────────────────────────────────
 
@@ -39,10 +40,11 @@ export class SpecLauncherManager {
       '-p', prompt,
     ]
 
-    // Windows claude is a .cmd shim; shell:true needed to resolve via PATH.
-    const child = spawn('claude', args, {
+    // Resolve .cmd shim on Windows so shell:false preserves multi-line args.
+    const resolvedBin = resolveWindowsBinary('claude')
+    const child = spawn(resolvedBin, args, {
       env: process.env,
-      shell: process.platform === 'win32',
+      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })

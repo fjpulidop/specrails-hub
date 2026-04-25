@@ -1,6 +1,7 @@
 import { spawn, ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
+import { resolveWindowsBinary } from './util/win-spawn'
 import type { WsMessage } from './types'
 import type { DbInstance } from './db'
 import {
@@ -197,10 +198,12 @@ export class ProposalManager {
     onSuccess: (fullText: string, sessionId: string | null) => void,
     onError: () => void
   ): Promise<void> {
-    // Windows claude is a .cmd shim; shell:true needed to resolve via PATH.
-    const child = spawn('claude', args, {
+    // Resolve .cmd shim on Windows so we can stay shell:false and keep
+    // multi-line `--system-prompt` intact (cmd.exe truncates at \n).
+    const resolvedBin = resolveWindowsBinary('claude')
+    const child = spawn(resolvedBin, args, {
       env: process.env,
-      shell: process.platform === 'win32',
+      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })

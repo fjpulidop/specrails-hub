@@ -5,6 +5,7 @@ import type { WsMessage } from './types'
 import type { DbInstance } from './db'
 import { getConversation, addMessage, updateConversation, getStats, listJobs } from './db'
 import { resolveCommand } from './command-resolver'
+import { resolveWindowsBinary } from './util/win-spawn'
 
 const COMMAND_INSTRUCTION =
   'When you want to suggest a SpecRails command for the user to execute, wrap it in a command block like this: ' +
@@ -249,10 +250,11 @@ export class ChatManager {
 
     // No OTEL env injection here — ChatManager spawns are interactive user sessions,
     // not pipeline jobs. Telemetry is scoped to QueueManager pipeline runs only.
-    const child = spawn(binary, args, {
+    // Resolve .cmd shim on Windows so shell:false preserves multi-line args.
+    const resolvedBin = resolveWindowsBinary(binary)
+    const child = spawn(resolvedBin, args, {
       env: process.env,
-      // Windows claude/codex are .cmd shims; shell: true needed post-CVE-2024-27980.
-      shell: process.platform === 'win32',
+      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })
@@ -419,12 +421,12 @@ export class ChatManager {
 
       if (this._provider === 'codex') {
         // Codex outputs plain text — spawn codex exec and take the first non-empty line
-        const child = spawn('codex', [
+        const child = spawn(resolveWindowsBinary('codex'), [
           'exec', titlePrompt,
           '--model', 'gpt-5.4-mini',
         ], {
           env: process.env,
-          shell: process.platform === 'win32',
+          shell: false,
           stdio: ['ignore', 'pipe', 'pipe'],
           cwd: this._cwd,
         })
@@ -454,14 +456,14 @@ export class ChatManager {
       }
 
       // Claude: JSON stream parsing
-      const child = spawn('claude', [
+      const child = spawn(resolveWindowsBinary('claude'), [
         '--dangerously-skip-permissions',
         '--output-format', 'stream-json',
         '--verbose',
         '-p', titlePrompt,
       ], {
         env: process.env,
-        shell: process.platform === 'win32',
+        shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd: this._cwd,
       })

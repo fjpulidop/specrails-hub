@@ -7,6 +7,7 @@ import treeKill from 'tree-kill'
 import type { WsMessage, LogMessage, Job, PhaseDefinition, JobPriority } from './types'
 import { PRIORITY_WEIGHT, VALID_PRIORITIES } from './types'
 import { resolveCommand } from './command-resolver'
+import { resolveWindowsBinary } from './util/win-spawn'
 import { resetPhases, setActivePhases } from './hooks'
 import { createJob, finishJob, appendEvent, skipJob, getProjectSettings } from './db'
 import type { JobResult } from './db'
@@ -679,11 +680,12 @@ export class QueueManager {
       spawnEnv = { ...spawnEnv, SPECRAILS_PROFILE_PATH: profileSnapshotPath }
     }
 
-    const child = spawn(binary, args, {
+    // Resolve .cmd shim on Windows so shell:false preserves multi-line args
+    // (e.g. --append-system-prompt) that cmd.exe would truncate at \n.
+    const resolvedBin = resolveWindowsBinary(binary)
+    const child = spawn(resolvedBin, args, {
       env: spawnEnv,
-      // On Windows claude/codex ship as .cmd shims; Node.js requires
-      // shell: true to execute .cmd/.bat since the CVE-2024-27980 patches.
-      shell: process.platform === 'win32',
+      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })
