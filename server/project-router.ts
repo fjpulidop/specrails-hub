@@ -1393,10 +1393,19 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     let binary: string
     let args: string[]
 
+    // Windows cmd.exe (used by cross-spawn for .cmd shims) does not
+    // preserve newlines inside argv strings — multi-line --system-prompt
+    // / -p values get truncated mid-arg, and downstream args become
+    // orphan tokens (manifests as "-p without input" claude errors).
+    // Pipe the combined prompt via stdin instead; both claude and codex
+    // accept that.
+    let stdinPayload: string | null = null
+
     if (provider === 'codex') {
       binary = 'codex'
       // Use gpt-5.4-mini (balanced preset default for Codex per CODEX_MODELS/PRESET_DEFAULTS in ModelSelector); never hardcode o4-mini
-      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'gpt-5.4-mini']
+      args = ['exec', '-', '--model', 'gpt-5.4-mini']
+      stdinPayload = `${systemPrompt}\n\n${userPrompt}`
     } else {
       binary = 'claude'
       args = [
@@ -1406,18 +1415,25 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         '--verbose',
         '--max-turns', hasAttachments ? '3' : '1',
         ...imageFlags,
-        '--system-prompt', systemPrompt,
-        '-p', userPrompt,
+        '-p',
       ]
+      // claude reads from stdin when --print/-p has no positional argument.
+      // Embed the system prompt as a leading instruction block; claude
+      // treats it as the user message but instruction-following stays solid.
+      stdinPayload = `${systemPrompt}\n\n---\n\n${userPrompt}`
     }
 
     // cross-spawn handles Windows .cmd shims + verbatim arg escaping.
     console.log(`[project-router] spec-gen spawn: ${binary} (cwd=${project.path}, requestId=${requestId})`)
     const child = spawnCli(binary, args, {
       env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
       cwd: project.path,
     })
+
+    if (stdinPayload !== null && child.stdin) {
+      child.stdin.end(stdinPayload)
+    }
 
     // Capture stderr so failures (auth missing, model errors, etc.) surface
     // in the server log instead of being swallowed.
