@@ -5,7 +5,7 @@ import type { WsMessage } from './types'
 import type { DbInstance } from './db'
 import { getConversation, addMessage, updateConversation, getStats, listJobs } from './db'
 import { resolveCommand } from './command-resolver'
-import { spawnCli } from './util/win-spawn'
+import { spawnAiCli, spawnClaude, spawnCodex } from './util/cli-prompt'
 
 const COMMAND_INSTRUCTION =
   'When you want to suggest a SpecRails command for the user to execute, wrap it in a command block like this: ' +
@@ -250,8 +250,8 @@ export class ChatManager {
 
     // No OTEL env injection here — ChatManager spawns are interactive user sessions,
     // not pipeline jobs. Telemetry is scoped to QueueManager pipeline runs only.
-    // cross-spawn handles Windows .cmd shims + verbatim arg escaping.
-    const child = spawnCli(binary, args, {
+    // spawnAiCli reroutes multi-line argv values through stdin on Windows.
+    const child = spawnAiCli(binary, args, {
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
@@ -419,7 +419,7 @@ export class ChatManager {
 
       if (this._provider === 'codex') {
         // Codex outputs plain text — spawn codex exec and take the first non-empty line
-        const child = spawnCli('codex', [
+        const child = spawnCodex([
           'exec', titlePrompt,
           '--model', 'gpt-5.4-mini',
         ], {
@@ -453,7 +453,7 @@ export class ChatManager {
       }
 
       // Claude: JSON stream parsing
-      const child = spawnCli('claude', [
+      const child = spawnClaude([
         '--dangerously-skip-permissions',
         '--output-format', 'stream-json',
         '--verbose',

@@ -6,7 +6,7 @@ import { tmpdir } from 'os'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
 import { findCoreContract, detectCLISync, CLIProvider } from './core-compat'
-import { spawnCli } from './util/win-spawn'
+import { spawnAiCli } from './util/cli-prompt'
 
 /**
  * specrails-core's installer (Node-native from v4.2.0 onward, bash
@@ -1061,8 +1061,8 @@ export class SetupManager {
     // No OTEL env injection here — SetupManager spawns drive the initial project
     // setup wizard, not repeatable pipeline jobs. Telemetry is scoped to
     // QueueManager pipeline runs only.
-    // cross-spawn handles Windows .cmd shims + verbatim arg escaping.
-    const child = spawnCli(binary, resolvedArgs, {
+    // spawnAiCli reroutes multi-line argv values through stdin on Windows.
+    const child = spawnAiCli(binary, resolvedArgs, {
       cwd: projectPath,
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],

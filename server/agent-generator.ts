@@ -1,6 +1,6 @@
 import { createInterface } from 'readline'
 import { createHash } from 'crypto'
-import { spawnCli } from './util/win-spawn'
+import { spawnClaude } from './util/cli-prompt'
 
 /**
  * Generate a draft `custom-*.md` body by spawning a one-shot claude
@@ -44,8 +44,7 @@ export async function generateCustomAgent(
   ].join('\n')
 
   return new Promise<string>((resolve, reject) => {
-    const child = spawnCli(
-      'claude',
+    const child = spawnClaude(
       [
         '--dangerously-skip-permissions',
         '--output-format',
@@ -154,8 +153,7 @@ export async function testCustomAgent(
   const started = Date.now()
 
   return new Promise<TestAgentResult>((resolve, reject) => {
-    const child = spawnCli(
-      'claude',
+    const child = spawnClaude(
       [
         '--dangerously-skip-permissions',
         '--output-format',

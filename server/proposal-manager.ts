@@ -1,7 +1,7 @@
 import { ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
-import { spawnCli } from './util/win-spawn'
+import { spawnClaude } from './util/cli-prompt'
 import type { WsMessage } from './types'
 import type { DbInstance } from './db'
 import {
@@ -198,9 +198,8 @@ export class ProposalManager {
     onSuccess: (fullText: string, sessionId: string | null) => void,
     onError: () => void
   ): Promise<void> {
-    // cross-spawn handles Windows .cmd shims + verbatim arg escaping so
-    // multi-line `--system-prompt` survives intact.
-    const child = spawnCli('claude', args, {
+    // spawnClaude reroutes multi-line argv values through stdin on Windows.
+    const child = spawnClaude(args, {
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,

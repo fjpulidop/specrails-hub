@@ -32,7 +32,7 @@ import {
   type Ticket,
 } from './ticket-store'
 import type { TicketCreatedMessage, TicketUpdatedMessage, TicketDeletedMessage, TicketAiEditStreamMessage, TicketAiEditDoneMessage, TicketAiEditErrorMessage, SpecGenStreamMessage, SpecGenDoneMessage, SpecGenErrorMessage, LocalTicket } from './types'
-import { spawnCli } from './util/win-spawn'
+import { spawnAiCli } from './util/cli-prompt'
 import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import multer from 'multer'
@@ -1393,56 +1393,32 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     let binary: string
     let args: string[]
 
-    // On Windows cmd.exe (used by cross-spawn for .cmd shims) does not
-    // preserve newlines inside argv strings — multi-line --system-prompt
-    // / -p values get truncated mid-arg, and downstream args become
-    // orphan tokens (manifests as "-p without input" claude errors).
-    // Pipe the combined prompt via stdin instead; both binaries accept it.
-    // POSIX keeps the original argv path so behaviour there is unchanged.
-    const isWin = process.platform === 'win32'
-    let stdinPayload: string | null = null
-
     if (provider === 'codex') {
       binary = 'codex'
       // Use gpt-5.4-mini (balanced preset default for Codex per CODEX_MODELS/PRESET_DEFAULTS in ModelSelector); never hardcode o4-mini
-      if (isWin) {
-        args = ['exec', '-', '--model', 'gpt-5.4-mini']
-        stdinPayload = `${systemPrompt}\n\n${userPrompt}`
-      } else {
-        args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'gpt-5.4-mini']
-      }
+      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'gpt-5.4-mini']
     } else {
       binary = 'claude'
-      const baseClaudeArgs = [
+      args = [
         '--dangerously-skip-permissions',
         '--tools', 'default',
         '--output-format', 'stream-json',
         '--verbose',
         '--max-turns', hasAttachments ? '3' : '1',
         ...imageFlags,
+        '--system-prompt', systemPrompt,
+        '-p', userPrompt,
       ]
-      if (isWin) {
-        // claude reads from stdin when --print/-p has no positional argument.
-        // Embed the system prompt as a leading instruction block; claude
-        // treats it as the user message but instruction-following stays solid.
-        args = [...baseClaudeArgs, '-p']
-        stdinPayload = `${systemPrompt}\n\n---\n\n${userPrompt}`
-      } else {
-        args = [...baseClaudeArgs, '--system-prompt', systemPrompt, '-p', userPrompt]
-      }
     }
 
-    // cross-spawn handles Windows .cmd shims + verbatim arg escaping.
+    // spawnAiCli reroutes multi-line argv values through stdin on Windows;
+    // POSIX argv path unchanged.
     console.log(`[project-router] spec-gen spawn: ${binary} (cwd=${project.path}, requestId=${requestId})`)
-    const child = spawnCli(binary, args, {
+    const child = spawnAiCli(binary, args, {
       env: process.env,
-      stdio: [isWin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe'],
       cwd: project.path,
     })
-
-    if (stdinPayload !== null && child.stdin) {
-      child.stdin.end(stdinPayload)
-    }
 
     // Capture stderr so failures (auth missing, model errors, etc.) surface
     // in the server log instead of being swallowed.
@@ -1767,50 +1743,32 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
     let binary: string
     let args: string[]
-    // Windows cmd.exe (used by cross-spawn for .cmd shims) does not preserve
-    // newlines inside argv strings — multi-line --system-prompt / -p values
-    // get truncated. Pipe via stdin on Windows. POSIX keeps argv unchanged.
-    const isWin = process.platform === 'win32'
-    let stdinPayload: string | null = null
 
     if (provider === 'codex') {
       binary = 'codex'
       // Use gpt-5.4-mini (balanced preset default for Codex per CODEX_MODELS/PRESET_DEFAULTS in ModelSelector); never hardcode o4-mini
-      if (isWin) {
-        args = ['exec', '-', '--model', 'gpt-5.4-mini']
-        stdinPayload = `${systemPrompt}\n\n${userPrompt}`
-      } else {
-        args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'gpt-5.4-mini']
-      }
+      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'gpt-5.4-mini']
     } else {
       binary = 'claude'
-      const baseClaudeArgs = [
+      args = [
         '--dangerously-skip-permissions',
         '--tools', 'default',
         '--output-format', 'stream-json',
         '--verbose',
         '--max-turns', '4',
         ...imageFlags,
+        '--system-prompt', systemPrompt,
+        '-p', userPrompt,
       ]
-      if (isWin) {
-        args = [...baseClaudeArgs, '-p']
-        stdinPayload = `${systemPrompt}\n\n---\n\n${userPrompt}`
-      } else {
-        args = [...baseClaudeArgs, '--system-prompt', systemPrompt, '-p', userPrompt]
-      }
     }
 
-    // cross-spawn handles Windows .cmd shims + verbatim arg escaping.
+    // spawnAiCli reroutes multi-line argv values through stdin on Windows.
     console.log(`[project-router] ai-edit spawn: ${binary} (cwd=${project.path}, requestId=${requestId})`)
-    const child = spawnCli(binary, args, {
+    const child = spawnAiCli(binary, args, {
       env: process.env,
-      stdio: [isWin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe'],
       cwd: project.path,
     })
-
-    if (stdinPayload !== null && child.stdin) {
-      child.stdin.end(stdinPayload)
-    }
 
     _aiEditProcesses.set(requestId, child)
 

@@ -3,7 +3,7 @@ import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
 import { resolveCommand } from './command-resolver'
-import { spawnCli } from './util/win-spawn'
+import { spawnClaude } from './util/cli-prompt'
 
 // ─── SpecLauncherManager ──────────────────────────────────────────────────────
 
@@ -40,8 +40,8 @@ export class SpecLauncherManager {
       '-p', prompt,
     ]
 
-    // cross-spawn handles Windows .cmd shims + verbatim arg escaping.
-    const child = spawnCli('claude', args, {
+    // spawnClaude reroutes multi-line argv values through stdin on Windows.
+    const child = spawnClaude(args, {
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
