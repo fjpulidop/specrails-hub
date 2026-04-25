@@ -1,49 +1,44 @@
-// Windows .cmd resolution helper.
+// Cross-platform spawn wrapper.
 //
-// `spawn(name, args, { shell: true })` on Windows finds .cmd shims
-// but concatenates args into a single command line — multi-line
-// strings (e.g. claude's `--system-prompt`) get truncated at the
-// first newline by cmd.exe.
+// Two Windows-specific problems forced this helper:
 //
-// `spawn(name, args, { shell: false })` preserves args correctly but
-// can't resolve .cmd shims on Windows.
+// 1) `claude` (and similar npm-installed binaries) is shipped as a
+//    `.cmd` shim. `spawn('claude', ..., { shell: false })` fails
+//    with ENOENT because Node looks for an exact `claude` file
+//    without extension expansion.
 //
-// This helper bridges the gap: probe `where <name>` once to get the
-// absolute path of the .cmd shim, then callers can spawn that path
-// with shell:false and intact args.
+// 2) Setting `shell: true` makes Windows resolve the shim, but
+//    cmd.exe then re-parses the concatenated command line and
+//    truncates any arg containing `\n` (e.g. claude's
+//    `--system-prompt "You are a...\n..."`).
+//
+// Since Node 20.12 / CVE-2024-27980 the obvious middle ground —
+// `spawn('claude.cmd', ..., { shell: false })` — also fails, this
+// time with EINVAL: Node refuses to spawn .cmd/.bat without a
+// shell. `cross-spawn` is the de-facto fix: on Windows it
+// internally launches `cmd.exe /d /s /c` with quoted-then-escaped
+// args so newlines and shell metacharacters survive intact, and on
+// POSIX it falls through to the native `child_process.spawn`.
 
-import { spawnSync } from 'child_process'
+import { spawn } from 'child_process'
+import type { ChildProcess, SpawnOptions } from 'child_process'
+import crossSpawn from 'cross-spawn'
 
-const cache = new Map<string, string>()
-
-export function resolveWindowsBinary(name: string): string {
-  if (process.platform !== 'win32') return name
-  const cached = cache.get(name)
-  if (cached !== undefined) return cached
-
-  const result = spawnSync('where', [name], {
-    encoding: 'utf-8',
-    shell: false,
-  })
-  if (result.error || (result.status ?? 1) !== 0) {
-    cache.set(name, name)
-    return name
+export function spawnCli(
+  binary: string,
+  args: string[],
+  options: SpawnOptions = {},
+): ChildProcess {
+  if (process.platform === 'win32') {
+    return crossSpawn(binary, args, options)
   }
 
-  // `where claude` typically returns multiple lines:
-  //   C:\Users\x\AppData\Roaming\npm\claude       (sh script — fails ENOENT on spawn)
-  //   C:\Users\x\AppData\Roaming\npm\claude.cmd   (the one Node can spawn directly)
-  //   C:\Users\x\AppData\Roaming\npm\claude.ps1
-  // Prefer Windows-executable extensions; the bare entry is a sh script
-  // and Node cannot exec it without a shell.
-  const lines = `${result.stdout ?? ''}`
-    .split(/\r?\n/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
+  return spawn(binary, args, options)
+}
 
-  const exeExt = /\.(cmd|bat|exe|com)$/i
-  const preferred = lines.find((p) => exeExt.test(p)) ?? lines[0]
-  const resolved = preferred && preferred.length > 0 ? preferred : name
-  cache.set(name, resolved)
-  return resolved
+// Back-compat for callsites that only need the resolved binary
+// (e.g. logging). Kept as a no-op identity on POSIX; on Windows
+// `where`-based resolution lives inside cross-spawn now.
+export function resolveWindowsBinary(name: string): string {
+  return name
 }

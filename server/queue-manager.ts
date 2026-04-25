@@ -1,4 +1,4 @@
-import { spawn, execSync, ChildProcess } from 'child_process'
+import { execSync, ChildProcess } from 'child_process'
 import fsNode from 'fs'
 import pathNode from 'path'
 import { createInterface } from 'readline'
@@ -7,7 +7,7 @@ import treeKill from 'tree-kill'
 import type { WsMessage, LogMessage, Job, PhaseDefinition, JobPriority } from './types'
 import { PRIORITY_WEIGHT, VALID_PRIORITIES } from './types'
 import { resolveCommand } from './command-resolver'
-import { resolveWindowsBinary } from './util/win-spawn'
+import { spawnCli } from './util/win-spawn'
 import { resetPhases, setActivePhases } from './hooks'
 import { createJob, finishJob, appendEvent, skipJob, getProjectSettings } from './db'
 import type { JobResult } from './db'
@@ -680,12 +680,9 @@ export class QueueManager {
       spawnEnv = { ...spawnEnv, SPECRAILS_PROFILE_PATH: profileSnapshotPath }
     }
 
-    // Resolve .cmd shim on Windows so shell:false preserves multi-line args
-    // (e.g. --append-system-prompt) that cmd.exe would truncate at \n.
-    const resolvedBin = resolveWindowsBinary(binary)
-    const child = spawn(resolvedBin, args, {
+    // cross-spawn handles Windows .cmd shims + verbatim arg escaping.
+    const child = spawnCli(binary, args, {
       env: spawnEnv,
-      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })

@@ -32,8 +32,7 @@ import {
   type Ticket,
 } from './ticket-store'
 import type { TicketCreatedMessage, TicketUpdatedMessage, TicketDeletedMessage, TicketAiEditStreamMessage, TicketAiEditDoneMessage, TicketAiEditErrorMessage, SpecGenStreamMessage, SpecGenDoneMessage, SpecGenErrorMessage, LocalTicket } from './types'
-import { spawn } from 'child_process'
-import { resolveWindowsBinary } from './util/win-spawn'
+import { spawnCli } from './util/win-spawn'
 import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import multer from 'multer'
@@ -1412,12 +1411,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       ]
     }
 
-    // Resolve .cmd shim on Windows so we can stay shell:false and keep
-    // multi-line `--system-prompt` intact (cmd.exe truncates at \n).
-    const resolvedBin = resolveWindowsBinary(binary)
-    const child = spawn(resolvedBin, args, {
+    // cross-spawn handles Windows .cmd shims + verbatim arg escaping.
+    const child = spawnCli(binary, args, {
       env: process.env,
-      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: project.path,
     })
@@ -1749,12 +1745,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       ]
     }
 
-    // Resolve .cmd shim on Windows so we can stay shell:false and keep
-    // multi-line `--system-prompt` intact (cmd.exe truncates at \n).
-    const resolvedBin = resolveWindowsBinary(binary)
-    const child = spawn(resolvedBin, args, {
+    // cross-spawn handles Windows .cmd shims + verbatim arg escaping.
+    const child = spawnCli(binary, args, {
       env: process.env,
-      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: project.path,
     })

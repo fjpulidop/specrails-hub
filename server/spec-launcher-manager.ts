@@ -1,9 +1,9 @@
-import { spawn, ChildProcess } from 'child_process'
+import { ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
 import { resolveCommand } from './command-resolver'
-import { resolveWindowsBinary } from './util/win-spawn'
+import { spawnCli } from './util/win-spawn'
 
 // ─── SpecLauncherManager ──────────────────────────────────────────────────────
 
@@ -40,11 +40,9 @@ export class SpecLauncherManager {
       '-p', prompt,
     ]
 
-    // Resolve .cmd shim on Windows so shell:false preserves multi-line args.
-    const resolvedBin = resolveWindowsBinary('claude')
-    const child = spawn(resolvedBin, args, {
+    // cross-spawn handles Windows .cmd shims + verbatim arg escaping.
+    const child = spawnCli('claude', args, {
       env: process.env,
-      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })

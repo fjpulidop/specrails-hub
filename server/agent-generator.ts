@@ -1,7 +1,6 @@
-import { spawn } from 'child_process'
 import { createInterface } from 'readline'
 import { createHash } from 'crypto'
-import { resolveWindowsBinary } from './util/win-spawn'
+import { spawnCli } from './util/win-spawn'
 
 /**
  * Generate a draft `custom-*.md` body by spawning a one-shot claude
@@ -45,8 +44,8 @@ export async function generateCustomAgent(
   ].join('\n')
 
   return new Promise<string>((resolve, reject) => {
-    const child = spawn(
-      resolveWindowsBinary('claude'),
+    const child = spawnCli(
+      'claude',
       [
         '--dangerously-skip-permissions',
         '--output-format',
@@ -59,7 +58,6 @@ export async function generateCustomAgent(
       ],
       {
         env: process.env,
-        shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd,
       },
@@ -156,8 +154,8 @@ export async function testCustomAgent(
   const started = Date.now()
 
   return new Promise<TestAgentResult>((resolve, reject) => {
-    const child = spawn(
-      resolveWindowsBinary('claude'),
+    const child = spawnCli(
+      'claude',
       [
         '--dangerously-skip-permissions',
         '--output-format',
@@ -170,7 +168,6 @@ export async function testCustomAgent(
       ],
       {
         env: process.env,
-        shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd,
       },

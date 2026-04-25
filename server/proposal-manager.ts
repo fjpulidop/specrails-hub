@@ -1,7 +1,7 @@
-import { spawn, ChildProcess } from 'child_process'
+import { ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
-import { resolveWindowsBinary } from './util/win-spawn'
+import { spawnCli } from './util/win-spawn'
 import type { WsMessage } from './types'
 import type { DbInstance } from './db'
 import {
@@ -198,12 +198,10 @@ export class ProposalManager {
     onSuccess: (fullText: string, sessionId: string | null) => void,
     onError: () => void
   ): Promise<void> {
-    // Resolve .cmd shim on Windows so we can stay shell:false and keep
-    // multi-line `--system-prompt` intact (cmd.exe truncates at \n).
-    const resolvedBin = resolveWindowsBinary('claude')
-    const child = spawn(resolvedBin, args, {
+    // cross-spawn handles Windows .cmd shims + verbatim arg escaping so
+    // multi-line `--system-prompt` survives intact.
+    const child = spawnCli('claude', args, {
       env: process.env,
-      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })
