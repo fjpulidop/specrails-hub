@@ -1767,33 +1767,60 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
     let binary: string
     let args: string[]
+    // Windows cmd.exe (used by cross-spawn for .cmd shims) does not preserve
+    // newlines inside argv strings — multi-line --system-prompt / -p values
+    // get truncated. Pipe via stdin on Windows. POSIX keeps argv unchanged.
+    const isWin = process.platform === 'win32'
+    let stdinPayload: string | null = null
 
     if (provider === 'codex') {
       binary = 'codex'
       // Use gpt-5.4-mini (balanced preset default for Codex per CODEX_MODELS/PRESET_DEFAULTS in ModelSelector); never hardcode o4-mini
-      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'gpt-5.4-mini']
+      if (isWin) {
+        args = ['exec', '-', '--model', 'gpt-5.4-mini']
+        stdinPayload = `${systemPrompt}\n\n${userPrompt}`
+      } else {
+        args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'gpt-5.4-mini']
+      }
     } else {
       binary = 'claude'
-      args = [
+      const baseClaudeArgs = [
         '--dangerously-skip-permissions',
         '--tools', 'default',
         '--output-format', 'stream-json',
         '--verbose',
         '--max-turns', '4',
         ...imageFlags,
-        '--system-prompt', systemPrompt,
-        '-p', userPrompt,
       ]
+      if (isWin) {
+        args = [...baseClaudeArgs, '-p']
+        stdinPayload = `${systemPrompt}\n\n---\n\n${userPrompt}`
+      } else {
+        args = [...baseClaudeArgs, '--system-prompt', systemPrompt, '-p', userPrompt]
+      }
     }
 
     // cross-spawn handles Windows .cmd shims + verbatim arg escaping.
+    console.log(`[project-router] ai-edit spawn: ${binary} (cwd=${project.path}, requestId=${requestId})`)
     const child = spawnCli(binary, args, {
       env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [isWin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
       cwd: project.path,
     })
 
+    if (stdinPayload !== null && child.stdin) {
+      child.stdin.end(stdinPayload)
+    }
+
     _aiEditProcesses.set(requestId, child)
+
+    // Pipe stderr to server log so failures surface for debugging.
+    let aiEditStderrBuf = ''
+    child.stderr?.on('data', (chunk: Buffer) => {
+      const s = chunk.toString()
+      aiEditStderrBuf += s
+      console.error(`[project-router] ai-edit stderr (${requestId}): ${s.trimEnd()}`)
+    })
 
     // Without this listener, ENOENT (binary missing on PATH) propagates as
     // an unhandled 'error' event and crashes the entire hub process.
@@ -1855,9 +1882,15 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         }
         broadcast(msg)
       } else {
+        const reason = code === 0 ? 'Empty response from AI' : `Process exited with code ${code}`
+        console.error(
+          `[project-router] ai-edit failed (${requestId}): ${reason}` +
+            (aiEditStderrBuf.trim() ? `\n  stderr: ${aiEditStderrBuf.trim()}` : '') +
+            (buffer.trim() ? `\n  stdout-buffer: ${buffer.trim().slice(0, 500)}` : ''),
+        )
         const msg: TicketAiEditErrorMessage = {
           type: 'ticket_ai_edit_error', projectId, ticketId: Number(ticketId),
-          requestId, error: code === 0 ? 'Empty response from AI' : `Process exited with code ${code}`,
+          requestId, error: reason,
           timestamp: new Date().toISOString(),
         }
         broadcast(msg)
