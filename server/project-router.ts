@@ -1412,10 +1412,20 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     }
 
     // cross-spawn handles Windows .cmd shims + verbatim arg escaping.
+    console.log(`[project-router] spec-gen spawn: ${binary} (cwd=${project.path}, requestId=${requestId})`)
     const child = spawnCli(binary, args, {
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: project.path,
+    })
+
+    // Capture stderr so failures (auth missing, model errors, etc.) surface
+    // in the server log instead of being swallowed.
+    let stderrBuf = ''
+    child.stderr?.on('data', (chunk: Buffer) => {
+      const s = chunk.toString()
+      stderrBuf += s
+      console.error(`[project-router] spec-gen stderr (${requestId}): ${s.trimEnd()}`)
     })
 
     // Without this listener, ENOENT (binary missing on PATH) propagates as
@@ -1544,9 +1554,15 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
           broadcast(errMsg)
         }
       } else {
+        const reason = code === 0 ? 'Empty response from AI' : `Process exited with code ${code}`
+        console.error(
+          `[project-router] spec-gen failed (${requestId}): ${reason}` +
+            (stderrBuf.trim() ? `\n  stderr: ${stderrBuf.trim()}` : '') +
+            (buffer.trim() ? `\n  stdout-buffer: ${buffer.trim().slice(0, 500)}` : ''),
+        )
         const msg: SpecGenErrorMessage = {
           type: 'spec_gen_error', projectId, requestId,
-          error: code === 0 ? 'Empty response from AI' : `Process exited with code ${code}`,
+          error: reason,
           timestamp: new Date().toISOString(),
         }
         broadcast(msg)
