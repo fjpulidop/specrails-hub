@@ -1393,41 +1393,50 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     let binary: string
     let args: string[]
 
-    // Windows cmd.exe (used by cross-spawn for .cmd shims) does not
+    // On Windows cmd.exe (used by cross-spawn for .cmd shims) does not
     // preserve newlines inside argv strings — multi-line --system-prompt
     // / -p values get truncated mid-arg, and downstream args become
     // orphan tokens (manifests as "-p without input" claude errors).
-    // Pipe the combined prompt via stdin instead; both claude and codex
-    // accept that.
+    // Pipe the combined prompt via stdin instead; both binaries accept it.
+    // POSIX keeps the original argv path so behaviour there is unchanged.
+    const isWin = process.platform === 'win32'
     let stdinPayload: string | null = null
 
     if (provider === 'codex') {
       binary = 'codex'
       // Use gpt-5.4-mini (balanced preset default for Codex per CODEX_MODELS/PRESET_DEFAULTS in ModelSelector); never hardcode o4-mini
-      args = ['exec', '-', '--model', 'gpt-5.4-mini']
-      stdinPayload = `${systemPrompt}\n\n${userPrompt}`
+      if (isWin) {
+        args = ['exec', '-', '--model', 'gpt-5.4-mini']
+        stdinPayload = `${systemPrompt}\n\n${userPrompt}`
+      } else {
+        args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'gpt-5.4-mini']
+      }
     } else {
       binary = 'claude'
-      args = [
+      const baseClaudeArgs = [
         '--dangerously-skip-permissions',
         '--tools', 'default',
         '--output-format', 'stream-json',
         '--verbose',
         '--max-turns', hasAttachments ? '3' : '1',
         ...imageFlags,
-        '-p',
       ]
-      // claude reads from stdin when --print/-p has no positional argument.
-      // Embed the system prompt as a leading instruction block; claude
-      // treats it as the user message but instruction-following stays solid.
-      stdinPayload = `${systemPrompt}\n\n---\n\n${userPrompt}`
+      if (isWin) {
+        // claude reads from stdin when --print/-p has no positional argument.
+        // Embed the system prompt as a leading instruction block; claude
+        // treats it as the user message but instruction-following stays solid.
+        args = [...baseClaudeArgs, '-p']
+        stdinPayload = `${systemPrompt}\n\n---\n\n${userPrompt}`
+      } else {
+        args = [...baseClaudeArgs, '--system-prompt', systemPrompt, '-p', userPrompt]
+      }
     }
 
     // cross-spawn handles Windows .cmd shims + verbatim arg escaping.
     console.log(`[project-router] spec-gen spawn: ${binary} (cwd=${project.path}, requestId=${requestId})`)
     const child = spawnCli(binary, args, {
       env: process.env,
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: [isWin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
       cwd: project.path,
     })
 
