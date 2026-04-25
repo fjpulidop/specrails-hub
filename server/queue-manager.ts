@@ -691,6 +691,14 @@ export class QueueManager {
     this._activeProcess = child
     this._activeJobId = jobId
 
+    // Without this listener, an ENOENT (e.g. claude not on PATH) propagates
+    // as an unhandled 'error' event and crashes the entire hub. Node still
+    // emits 'close' afterwards, so the existing close handler fails the job
+    // through the normal path — we only need to absorb the error event.
+    child.on('error', (err) => {
+      console.error(`[QueueManager] spawn failed for job ${jobId} (${binary}): ${err.message}`)
+    })
+
     // Start zombie detection timer. Reset on any raw data from the process.
     // Using 'data' events (not readline 'line') ensures the timer resets
     // synchronously in test environments with fake timers.
