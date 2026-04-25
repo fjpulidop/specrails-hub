@@ -25,6 +25,7 @@ import { useHub } from './useHub'
 import { API_ORIGIN } from '../lib/origin'
 import { forceProjectRoute } from '../lib/route-memory'
 import { formatElapsed, readPendingSpecs, savePendingSpec, removePendingSpec } from '../lib/pending-specs'
+import { markSpecGenInFlight, unmarkSpecGenInFlight } from '../lib/spec-gen-suppression'
 import type { LocalTicket } from '../types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -94,6 +95,7 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
   const resolveSpec = useCallback((spec: TrackedSpec) => {
     clearInterval(spec.timerId)
     removePendingSpec(spec.persistId)
+    unmarkSpecGenInFlight(spec.projectId)
   }, [])
 
   const openTicket = useCallback((spec: TrackedSpec, ticket: LocalTicket) => {
@@ -156,6 +158,7 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
 
   const registerSpec = useCallback((reg: SpecRegistration): TrackedSpec => {
     const spec: TrackedSpec = { ...reg, timerId: 0 as unknown as ReturnType<typeof setInterval> }
+    markSpecGenInFlight(reg.projectId)
     startTimer(spec)
     savePendingSpec({
       id: reg.persistId,
@@ -263,6 +266,7 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
       }
       updateToast()
       const timerId = setInterval(updateToast, 1000)
+      markSpecGenInFlight(p.projectId)
 
       let attempts = 0
       const restoredSpec: TrackedSpec = {
@@ -286,6 +290,7 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
           if (newTicket) {
             clearInterval(timerId)
             removePendingSpec(p.id)
+            unmarkSpecGenInFlight(p.projectId)
             const elapsed = formatElapsed(Date.now() - p.startTime)
             toast.success(`${p.projectName} · ${newTicket.title || 'Spec created'}`, {
               id: toastId,
@@ -301,6 +306,7 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
         else {
           clearInterval(timerId)
           removePendingSpec(p.id)
+          unmarkSpecGenInFlight(p.projectId)
           toast.error(`${p.projectName} · Could not confirm spec was created`, { id: toastId })
         }
       }

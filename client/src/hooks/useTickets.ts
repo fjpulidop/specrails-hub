@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { getApiBase } from '../lib/api'
 import { useSharedWebSocket } from './useSharedWebSocket'
 import { useHub } from './useHub'
+import { isSpecGenInFlight } from '../lib/spec-gen-suppression'
 import type { LocalTicket } from '../types'
 
 // Re-export for backward compat
@@ -137,7 +138,9 @@ export function useTickets() {
         })
         knownIdsRef.current.add(ticket.id)
         setNewTicketIds((prev) => new Set([...prev, ticket.id]))
-        toast.success(`New ticket: ${ticket.title}`)
+        if (!isSpecGenInFlight(currentProjectId)) {
+          toast.success(`New ticket: ${ticket.title}`)
+        }
         setTimeout(() => {
           setNewTicketIds((prev) => {
             const next = new Set(prev)
