@@ -30,13 +30,20 @@ export function resolveWindowsBinary(name: string): string {
     return name
   }
 
-  const first = `${result.stdout ?? ''}`
-    .trim()
+  // `where claude` typically returns multiple lines:
+  //   C:\Users\x\AppData\Roaming\npm\claude       (sh script — fails ENOENT on spawn)
+  //   C:\Users\x\AppData\Roaming\npm\claude.cmd   (the one Node can spawn directly)
+  //   C:\Users\x\AppData\Roaming\npm\claude.ps1
+  // Prefer Windows-executable extensions; the bare entry is a sh script
+  // and Node cannot exec it without a shell.
+  const lines = `${result.stdout ?? ''}`
     .split(/\r?\n/)
     .map((s) => s.trim())
-    .find((s) => s.length > 0)
+    .filter((s) => s.length > 0)
 
-  const resolved = first && first.length > 0 ? first : name
+  const exeExt = /\.(cmd|bat|exe|com)$/i
+  const preferred = lines.find((p) => exeExt.test(p)) ?? lines[0]
+  const resolved = preferred && preferred.length > 0 ? preferred : name
   cache.set(name, resolved)
   return resolved
 }
