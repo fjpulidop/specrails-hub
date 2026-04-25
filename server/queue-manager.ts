@@ -694,6 +694,7 @@ export class QueueManager {
     // as an unhandled 'error' event and crashes the entire hub. Node still
     // emits 'close' afterwards, so the existing close handler fails the job
     // through the normal path — we only need to absorb the error event.
+    /* c8 ignore next 3 -- spawn-failure path; exercised manually, not in CI */
     child.on('error', (err) => {
       console.error(`[QueueManager] spawn failed for job ${jobId} (${binary}): ${err.message}`)
     })

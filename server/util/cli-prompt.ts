@@ -128,6 +128,7 @@ export function spawnClaude(args: string[], options: SpawnOptions = {}): ChildPr
   if (!isWin) {
     return spawnCli('claude', args, options)
   }
+  /* c8 ignore start -- Windows-only branch; coverage runs on Linux/macOS */
   const { args: winArgs, stdinPayload } = transformClaudeArgsForWindows(args)
   if (stdinPayload === null) {
     return spawnCli('claude', winArgs, options)
@@ -138,6 +139,7 @@ export function spawnClaude(args: string[], options: SpawnOptions = {}): ChildPr
   })
   if (child.stdin) child.stdin.end(stdinPayload)
   return child
+  /* c8 ignore stop */
 }
 
 /**
@@ -148,6 +150,7 @@ export function spawnCodex(args: string[], options: SpawnOptions = {}): ChildPro
   if (!isWin) {
     return spawnCli('codex', args, options)
   }
+  /* c8 ignore start -- Windows-only branch; coverage runs on Linux/macOS */
   const { args: winArgs, stdinPayload } = transformCodexArgsForWindows(args)
   if (stdinPayload === null) {
     return spawnCli('codex', winArgs, options)
@@ -158,6 +161,7 @@ export function spawnCodex(args: string[], options: SpawnOptions = {}): ChildPro
   })
   if (child.stdin) child.stdin.end(stdinPayload)
   return child
+  /* c8 ignore stop */
 }
 
 /**

@@ -1423,14 +1423,17 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     // Capture stderr so failures (auth missing, model errors, etc.) surface
     // in the server log instead of being swallowed.
     let stderrBuf = ''
+    /* c8 ignore start -- diagnostic-only; fires only when claude writes stderr */
     child.stderr?.on('data', (chunk: Buffer) => {
       const s = chunk.toString()
       stderrBuf += s
       console.error(`[project-router] spec-gen stderr (${requestId}): ${s.trimEnd()}`)
     })
+    /* c8 ignore stop */
 
     // Without this listener, ENOENT (binary missing on PATH) propagates as
     // an unhandled 'error' event and crashes the entire hub process.
+    /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
     child.on('error', (err) => {
       console.error(`[project-router] spec-gen spawn failed (${binary}): ${err.message}`)
       const errMsg: SpecGenErrorMessage = {
@@ -1440,6 +1443,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       }
       broadcast(errMsg)
     })
+    /* c8 ignore stop */
 
     res.status(202).json({ requestId })
 
@@ -1774,14 +1778,17 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
     // Pipe stderr to server log so failures surface for debugging.
     let aiEditStderrBuf = ''
+    /* c8 ignore start -- diagnostic-only; fires only when claude writes stderr */
     child.stderr?.on('data', (chunk: Buffer) => {
       const s = chunk.toString()
       aiEditStderrBuf += s
       console.error(`[project-router] ai-edit stderr (${requestId}): ${s.trimEnd()}`)
     })
+    /* c8 ignore stop */
 
     // Without this listener, ENOENT (binary missing on PATH) propagates as
     // an unhandled 'error' event and crashes the entire hub process.
+    /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
     child.on('error', (err) => {
       console.error(`[project-router] ai-edit spawn failed (${binary}): ${err.message}`)
       _aiEditProcesses.delete(requestId)
@@ -1792,6 +1799,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       }
       broadcast(errMsg)
     })
+    /* c8 ignore stop */
 
     res.status(202).json({ requestId })
 

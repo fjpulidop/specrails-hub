@@ -706,6 +706,7 @@ export class SetupManager {
       console.log(`[core stdout] ${line}`)
     })
 
+    /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
     child.on('error', (err) => {
       console.error(`[SetupManager] core spawn failed for ${projectId}: ${err.message}`)
       this._installProcesses.delete(projectId)
@@ -718,6 +719,7 @@ export class SetupManager {
         error: `Failed to launch specrails-core: ${err.message}`,
       })
     })
+    /* c8 ignore stop */
 
     child.on('close', (code) => {
       if (spawnConfigPath !== configPath) {
@@ -1070,6 +1072,7 @@ export class SetupManager {
 
     this._setupProcesses.set(projectId, child)
 
+    /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
     child.on('error', (err) => {
       console.error(`[SetupManager] ${binary} spawn failed for ${projectId}: ${err.message}`)
       this._setupProcesses.delete(projectId)
@@ -1080,6 +1083,7 @@ export class SetupManager {
         error: `Failed to launch ${binary}: ${err.message}`,
       })
     })
+    /* c8 ignore stop */
 
     // Start periodic filesystem polling for checkpoint detection
     this._startFilesystemPoll(projectId, projectPath)

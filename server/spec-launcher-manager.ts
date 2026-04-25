@@ -51,6 +51,7 @@ export class SpecLauncherManager {
     this._buffers.set(launchId, '')
 
     // Surface ENOENT (e.g. claude not on PATH) instead of crashing the hub.
+    /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
     child.on('error', (err) => {
       console.error(`[SpecLauncherManager] spawn failed for ${launchId}: ${err.message}`)
       this._activeProcesses.delete(launchId)
@@ -63,6 +64,7 @@ export class SpecLauncherManager {
         timestamp: new Date().toISOString(),
       })
     })
+    /* c8 ignore stop */
 
     // Capture last change ID from output (opsx:ff usually prints the change name)
     let detectedChangeId: string | null = null

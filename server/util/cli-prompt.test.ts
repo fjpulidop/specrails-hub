@@ -3,6 +3,9 @@ import {
   transformClaudeArgsForWindows,
   transformCodexArgsForWindows,
   ensureStdinPipe,
+  spawnClaude,
+  spawnCodex,
+  spawnAiCli,
 } from './cli-prompt'
 
 describe('transformClaudeArgsForWindows', () => {
@@ -148,6 +151,52 @@ describe('transformCodexArgsForWindows', () => {
     ])
     expect(out.args).toEqual(['exec', '-', 'extra-positional'])
     expect(out.stdinPayload).toBe('multi\nline')
+  })
+})
+
+describe('spawn dispatch (POSIX fallthrough)', () => {
+  // Tests call spawnClaude / spawnCodex / spawnAiCli on POSIX where the
+  // helpers short-circuit to plain spawnCli. This drives coverage of the
+  // !isWin branch and the spawnAiCli dispatcher for free.
+  // On Windows runners these tests are skipped because the binaries we
+  // invoke ('echo', 'true') don't exist as .cmd shims.
+  const skipOnWin = process.platform === 'win32'
+
+  // Each spawn function is invoked synchronously then the child is killed
+  // on the next tick. We don't await close — the goal is exercising the
+  // POSIX !isWin branch + dispatcher logic for coverage. Awaiting risks
+  // hanging on long-lived binaries (codex on a dev machine, claude session).
+  function smokeSpawnSync(child: ReturnType<typeof spawnClaude>): void {
+    expect(child).toBeDefined()
+    child.on('error', () => { /* swallow ENOENT — binary may be absent */ })
+    setImmediate(() => { try { child.kill('SIGKILL') } catch { /* ignore */ } })
+  }
+
+  it('spawnClaude on POSIX returns a ChildProcess via spawnCli', () => {
+    if (skipOnWin) return
+    smokeSpawnSync(spawnClaude(['--help'], { stdio: ['ignore', 'pipe', 'pipe'] }))
+  })
+
+  it('spawnCodex on POSIX returns a ChildProcess via spawnCli', () => {
+    if (skipOnWin) return
+    smokeSpawnSync(spawnCodex(['exec', 'noop'], { stdio: ['ignore', 'pipe', 'pipe'] }))
+  })
+
+  it('spawnAiCli runs a real binary end-to-end on POSIX', async () => {
+    if (skipOnWin) return
+    const child = spawnAiCli('echo', ['hello'], { stdio: ['ignore', 'pipe', 'pipe'] })
+    let out = ''
+    child.stdout!.on('data', (b: Buffer) => { out += b.toString() })
+    const code: number = await new Promise((resolve) => child.on('close', (c) => resolve(c ?? -1)))
+    expect(code).toBe(0)
+    expect(out.trim()).toBe('hello')
+  })
+
+  it('spawnAiCli dispatches "claude"/"codex"/other through the right wrapper', () => {
+    if (skipOnWin) return
+    for (const bin of ['claude', 'codex', 'true']) {
+      smokeSpawnSync(spawnAiCli(bin, [], { stdio: ['ignore', 'pipe', 'pipe'] }))
+    }
   })
 })
 

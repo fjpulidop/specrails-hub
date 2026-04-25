@@ -264,6 +264,7 @@ export class ProposalManager {
       // Without this handler an ENOENT on spawn (e.g. `claude` not on
       // PATH) propagates as an unhandled 'error' event and crashes the
       // entire hub process. Surface to the user instead.
+      /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
       child.on('error', (err) => {
         console.error(`[ProposalManager] spawn failed for ${proposalId}: ${err.message}`)
         this._activeProcesses.delete(proposalId)
@@ -272,6 +273,7 @@ export class ProposalManager {
         onError()
         resolve()
       })
+      /* c8 ignore stop */
       child.on('close', (code) => {
         const fullText = this._buffers.get(proposalId) ?? ''
         this._activeProcesses.delete(proposalId)

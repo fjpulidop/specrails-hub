@@ -29,6 +29,7 @@ export function spawnCli(
   args: string[],
   options: SpawnOptions = {},
 ): ChildProcess {
+  /* c8 ignore next 3 -- Windows-only branch; coverage runs on Linux/macOS */
   if (process.platform === 'win32') {
     return crossSpawn(binary, args, options)
   }

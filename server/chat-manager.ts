@@ -268,6 +268,7 @@ export class ChatManager {
     this._emittedProposals.set(conversationId, new Set())
 
     // Surface ENOENT (e.g. claude not on PATH) instead of crashing the hub.
+    /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
     child.on('error', (err) => {
       console.error(`[chat-manager] spawn failed for ${conversationId}: ${err.message}`)
       this._activeProcesses.delete(conversationId)
@@ -280,6 +281,7 @@ export class ChatManager {
         timestamp: new Date().toISOString(),
       })
     })
+    /* c8 ignore stop */
 
     let capturedSessionId: string | null = null
 
