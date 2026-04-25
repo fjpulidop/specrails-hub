@@ -705,6 +705,19 @@ export class SetupManager {
       console.log(`[core stdout] ${line}`)
     })
 
+    child.on('error', (err) => {
+      console.error(`[SetupManager] core spawn failed for ${projectId}: ${err.message}`)
+      this._installProcesses.delete(projectId)
+      if (spawnConfigPath !== configPath) {
+        try { rmSync(spawnConfigPath, { force: true }) } catch { /* non-fatal */ }
+      }
+      this._broadcast({
+        type: 'setup_error',
+        projectId,
+        error: `Failed to launch specrails-core: ${err.message}`,
+      })
+    })
+
     child.on('close', (code) => {
       if (spawnConfigPath !== configPath) {
         try { rmSync(spawnConfigPath, { force: true }) } catch { /* non-fatal */ }
@@ -1055,6 +1068,17 @@ export class SetupManager {
     })
 
     this._setupProcesses.set(projectId, child)
+
+    child.on('error', (err) => {
+      console.error(`[SetupManager] ${binary} spawn failed for ${projectId}: ${err.message}`)
+      this._setupProcesses.delete(projectId)
+      this._stopFilesystemPoll(projectId)
+      this._broadcast({
+        type: 'setup_error',
+        projectId,
+        error: `Failed to launch ${binary}: ${err.message}`,
+      })
+    })
 
     // Start periodic filesystem polling for checkpoint detection
     this._startFilesystemPoll(projectId, projectPath)

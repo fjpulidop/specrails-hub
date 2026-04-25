@@ -1411,11 +1411,24 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       ]
     }
 
+    // Windows claude/codex are .cmd shims; shell:true to resolve via PATH.
     const child = spawn(binary, args, {
       env: process.env,
-      shell: false,
+      shell: process.platform === 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: project.path,
+    })
+
+    // Without this listener, ENOENT (binary missing on PATH) propagates as
+    // an unhandled 'error' event and crashes the entire hub process.
+    child.on('error', (err) => {
+      console.error(`[project-router] spec-gen spawn failed (${binary}): ${err.message}`)
+      const errMsg: SpecGenErrorMessage = {
+        type: 'spec_gen_error', projectId, requestId,
+        error: `Failed to launch ${binary}: ${err.message}`,
+        timestamp: new Date().toISOString(),
+      }
+      broadcast(errMsg)
     })
 
     res.status(202).json({ requestId })
@@ -1733,14 +1746,29 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       ]
     }
 
+    // Windows claude/codex are .cmd shims; shell:true to resolve via PATH.
     const child = spawn(binary, args, {
       env: process.env,
-      shell: false,
+      shell: process.platform === 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: project.path,
     })
 
     _aiEditProcesses.set(requestId, child)
+
+    // Without this listener, ENOENT (binary missing on PATH) propagates as
+    // an unhandled 'error' event and crashes the entire hub process.
+    child.on('error', (err) => {
+      console.error(`[project-router] ai-edit spawn failed (${binary}): ${err.message}`)
+      _aiEditProcesses.delete(requestId)
+      const errMsg: TicketAiEditErrorMessage = {
+        type: 'ticket_ai_edit_error', projectId, ticketId: Number(ticketId),
+        requestId, error: `Failed to launch ${binary}: ${err.message}`,
+        timestamp: new Date().toISOString(),
+      }
+      broadcast(errMsg)
+    })
+
     res.status(202).json({ requestId })
 
     let buffer = ''
