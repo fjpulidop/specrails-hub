@@ -197,9 +197,10 @@ export class ProposalManager {
     onSuccess: (fullText: string, sessionId: string | null) => void,
     onError: () => void
   ): Promise<void> {
+    // Windows claude is a .cmd shim; shell:true needed to resolve via PATH.
     const child = spawn('claude', args, {
       env: process.env,
-      shell: false,
+      shell: process.platform === 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })
@@ -260,6 +261,17 @@ export class ProposalManager {
     })
 
     return new Promise<void>((resolve) => {
+      // Without this handler an ENOENT on spawn (e.g. `claude` not on
+      // PATH) propagates as an unhandled 'error' event and crashes the
+      // entire hub process. Surface to the user instead.
+      child.on('error', (err) => {
+        console.error(`[ProposalManager] spawn failed for ${proposalId}: ${err.message}`)
+        this._activeProcesses.delete(proposalId)
+        this._buffers.delete(proposalId)
+        this._broadcastError(proposalId, `Failed to launch claude: ${err.message}`)
+        onError()
+        resolve()
+      })
       child.on('close', (code) => {
         const fullText = this._buffers.get(proposalId) ?? ''
         this._activeProcesses.delete(proposalId)

@@ -267,6 +267,20 @@ export class ChatManager {
     this._buffers.set(conversationId, '')
     this._emittedProposals.set(conversationId, new Set())
 
+    // Surface ENOENT (e.g. claude not on PATH) instead of crashing the hub.
+    child.on('error', (err) => {
+      console.error(`[chat-manager] spawn failed for ${conversationId}: ${err.message}`)
+      this._activeProcesses.delete(conversationId)
+      this._buffers.delete(conversationId)
+      this._emittedProposals.delete(conversationId)
+      this._broadcast({
+        type: 'chat_error',
+        conversationId,
+        error: `Failed to launch ${binary}: ${err.message}`,
+        timestamp: new Date().toISOString(),
+      })
+    })
+
     let capturedSessionId: string | null = null
 
     const stdoutReader = createInterface({ input: child.stdout!, crlfDelay: Infinity })

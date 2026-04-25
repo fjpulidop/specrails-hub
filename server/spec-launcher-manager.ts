@@ -39,15 +39,30 @@ export class SpecLauncherManager {
       '-p', prompt,
     ]
 
+    // Windows claude is a .cmd shim; shell:true needed to resolve via PATH.
     const child = spawn('claude', args, {
       env: process.env,
-      shell: false,
+      shell: process.platform === 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })
 
     this._activeProcesses.set(launchId, child)
     this._buffers.set(launchId, '')
+
+    // Surface ENOENT (e.g. claude not on PATH) instead of crashing the hub.
+    child.on('error', (err) => {
+      console.error(`[SpecLauncherManager] spawn failed for ${launchId}: ${err.message}`)
+      this._activeProcesses.delete(launchId)
+      this._buffers.delete(launchId)
+      this._broadcast({
+        type: 'spec_launcher_error',
+        projectId: '',
+        launchId,
+        error: `Failed to launch claude: ${err.message}`,
+        timestamp: new Date().toISOString(),
+      })
+    })
 
     // Capture last change ID from output (opsx:ff usually prints the change name)
     let detectedChangeId: string | null = null
