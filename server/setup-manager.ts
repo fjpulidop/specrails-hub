@@ -2,6 +2,7 @@ import { spawn, spawnSync, ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import { existsSync, readdirSync, rmSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs'
 import { isAbsolute, join, resolve as resolvePath } from 'path'
+import { tmpdir } from 'os'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
 import { findCoreContract, detectCLISync, CLIProvider } from './core-compat'
@@ -133,7 +134,7 @@ function serializeInstallConfigYaml(config: Record<string, unknown>): string {
 }
 
 function writeSpawnInstallConfig(projectId: string, yamlText: string): string {
-  const tmpDir = process.env.TMPDIR || '/tmp'
+  const tmpDir = tmpdir()
   const tempPath = join(tmpDir, `specrails-hub-install-config-${projectId}-${Date.now()}.yaml`)
   writeFileSync(tempPath, yamlText, 'utf-8')
   return tempPath
