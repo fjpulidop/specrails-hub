@@ -73,12 +73,14 @@ function createMockRegistry(hubDb: DbInstance) {
 describe('hub-router', () => {
   let hubDb: DbInstance
   let existsSyncSpy: any
+  let realpathSyncSpy: any
 
   beforeEach(() => {
     vi.restoreAllMocks()
     hubDb = initHubDb(':memory:')
     // Spy on fs.existsSync so the router's `fs.existsSync(resolvedPath)` is intercepted
     existsSyncSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(true)
+    realpathSyncSpy = vi.spyOn(fs, 'realpathSync').mockImplementation((p: fs.PathLike) => String(p))
   })
 
   function createApp() {
@@ -179,6 +181,14 @@ describe('hub-router', () => {
       expect(addMsgs).toHaveLength(1)
       expect(addMsgs[0].project).toBeDefined()
     })
+
+    it('stores canonical project path when realpath differs', async () => {
+      realpathSyncSpy.mockReturnValue('/private/tmp/test-wizard')
+      const { app } = createApp()
+      const res = await request(app).post('/api/hub/projects').send({ path: '/tmp/test-wizard' })
+      expect(res.status).toBe(201)
+      expect(res.body.project.path).toBe('/private/tmp/test-wizard')
+    })
   })
 
   // ─── DELETE /projects/:id ──────────────────────────────────────────────────
@@ -236,11 +246,15 @@ describe('hub-router', () => {
     })
 
     it('resolves registered project by path', async () => {
+      realpathSyncSpy.mockImplementation((p: fs.PathLike) => {
+        const s = String(p)
+        return s === '/tmp/test-wizard' ? '/private/tmp/test-wizard' : s
+      })
       const { app, registry } = createApp()
       // Create a project first
-      await request(app).post('/api/hub/projects').send({ path: '/home/user/proj' })
+      await request(app).post('/api/hub/projects').send({ path: '/tmp/test-wizard' })
 
-      const res = await request(app).get('/api/hub/resolve?path=/home/user/proj')
+      const res = await request(app).get('/api/hub/resolve?path=/tmp/test-wizard')
       expect(res.status).toBe(200)
       expect(res.body.project).toBeDefined()
       expect(registry.touchProject).toHaveBeenCalled()

@@ -1,7 +1,7 @@
-import { spawn, ChildProcess } from 'child_process'
+import { spawn, spawnSync, ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import { existsSync, readdirSync, rmSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs'
-import { join } from 'path'
+import { isAbsolute, join, resolve as resolvePath } from 'path'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
 import { findCoreContract, detectCLISync, CLIProvider } from './core-compat'
@@ -19,17 +19,40 @@ const SPECRAILS_DIR = '.claude'
 // Override: set SPECRAILS_CORE_BIN to use a local/linked version, e.g.
 //   SPECRAILS_CORE_BIN=specrails-core npm run dev
 
+const WHICH_CMD = process.platform === 'win32' ? 'where' : 'which'
+
+function resolveCoreBinary(bin: string): string {
+  if (isAbsolute(bin)) return bin
+  if (bin.includes('/') || bin.includes('\\')) return resolvePath(bin)
+
+  const result = spawnSync(WHICH_CMD, [bin], {
+    env: process.env,
+    shell: process.platform === 'win32',
+    encoding: 'utf-8',
+  })
+  if (result.error || (result.status ?? 1) !== 0) return bin
+
+  const first = `${result.stdout ?? ''}`.trim().split(/\r?\n/)[0]?.trim()
+  return first && first.length > 0 ? first : bin
+}
+
 function getCoreCommand(): { bin: string; pkg: string } {
   const override = process.env.SPECRAILS_CORE_BIN
   if (override) {
-    return { bin: override, pkg: '' }
+    return { bin: resolveCoreBinary(override), pkg: '' }
   }
   return { bin: 'npx', pkg: 'specrails-core@latest' }
 }
 
-function spawnCoreInit(args: string[], cwd: string): ChildProcess {
+function buildCoreArgs(args: string[]): { bin: string; fullArgs: string[] } {
   const { bin, pkg } = getCoreCommand()
-  const fullArgs = pkg ? ['--yes', '--prefer-online', pkg, 'init', ...args] : ['init', ...args]
+  const fullArgs = pkg ? ['--yes', '--prefer-online', pkg, ...args] : args
+  return { bin, fullArgs }
+}
+
+function spawnCoreInit(args: string[], cwd: string): ChildProcess {
+  const { bin, fullArgs } = buildCoreArgs(['init', ...args])
+  console.log(`[SetupManager] spawning core: ${bin} ${fullArgs.join(' ')} (cwd=${cwd}) (SPECRAILS_CORE_BIN=${process.env.SPECRAILS_CORE_BIN ?? '<unset>'})`)
   return spawn(bin, fullArgs, {
     cwd,
     env: process.env,
@@ -38,6 +61,33 @@ function spawnCoreInit(args: string[], cwd: string): ChildProcess {
     shell: process.platform === 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],
   })
+}
+
+function probeCoreRuntimeVersion(cwd: string): { ok: boolean; bin: string; version?: string; error?: string } {
+  const { bin, fullArgs } = buildCoreArgs(['version'])
+  const result = spawnSync(bin, fullArgs, {
+    cwd,
+    env: process.env,
+    shell: process.platform === 'win32',
+    encoding: 'utf-8',
+  })
+
+  if (result.error) {
+    return { ok: false, bin, error: result.error.message }
+  }
+  if ((result.status ?? 1) !== 0) {
+    const stderr = typeof result.stderr === 'string' ? result.stderr.trim() : ''
+    const stdout = typeof result.stdout === 'string' ? result.stdout.trim() : ''
+    return { ok: false, bin, error: stderr || stdout || `exit code ${result.status ?? 'unknown'}` }
+  }
+
+  const output = `${result.stdout ?? ''}`.trim()
+  const match = output.match(/\d+\.\d+\.\d+/)
+  if (!match) {
+    return { ok: false, bin, error: `could not parse version from output: ${output}` }
+  }
+
+  return { ok: true, bin, version: match[0] }
 }
 
 // ─── YAML helpers ─────────────────────────────────────────────────────────────
@@ -80,6 +130,13 @@ function serializeInstallConfigYaml(config: Record<string, unknown>): string {
   ]
 
   return lines.join('\n')
+}
+
+function writeSpawnInstallConfig(projectId: string, yamlText: string): string {
+  const tmpDir = process.env.TMPDIR || '/tmp'
+  const tempPath = join(tmpDir, `specrails-hub-install-config-${projectId}-${Date.now()}.yaml`)
+  writeFileSync(tempPath, yamlText, 'utf-8')
+  return tempPath
 }
 
 // ─── Install config reader ───────────────────────────────────────────────────
@@ -324,6 +381,74 @@ export const EMPTY_SUMMARY: SetupSummary = {
   tier: 'quick',
 }
 
+const MIN_NODE_NATIVE_CORE_VERSION = '4.1.0'
+
+interface InstallValidationResult {
+  ok: boolean
+  reasons: string[]
+}
+
+function compareSemver(a: string, b: string): number | null {
+  const aParts = a.trim().split('.').map((n) => parseInt(n, 10))
+  const bParts = b.trim().split('.').map((n) => parseInt(n, 10))
+  if (aParts.length < 3 || bParts.length < 3) return null
+  if ([...aParts, ...bParts].some((n) => Number.isNaN(n))) return null
+
+  for (let i = 0; i < 3; i++) {
+    if (aParts[i]! > bParts[i]!) return 1
+    if (aParts[i]! < bParts[i]!) return -1
+  }
+  return 0
+}
+
+export function validateInstalledCore(projectPath: string): InstallValidationResult {
+  const reasons: string[] = []
+
+  const versionCandidates = [
+    join(projectPath, '.specrails', 'specrails-version'),
+    join(projectPath, '.specrails-version'),
+  ]
+
+  for (const candidate of versionCandidates) {
+    if (!existsSync(candidate)) continue
+    try {
+      const raw = readFileSync(candidate, 'utf-8').trim()
+      const cmp = compareSemver(raw, MIN_NODE_NATIVE_CORE_VERSION)
+      if (cmp !== null && cmp < 0) {
+        reasons.push(
+          `installed specrails-core version ${raw} is older than required ${MIN_NODE_NATIVE_CORE_VERSION}`,
+        )
+      }
+      break
+    } catch {
+      reasons.push(`failed to read installed specrails-core version from ${candidate}`)
+      break
+    }
+  }
+
+  const legacyMarkers = [
+    { path: join(projectPath, '.specrails', 'bin', 'doctor.sh'), reason: 'legacy bash doctor detected' },
+    {
+      path: join(projectPath, '.specrails', 'setup-templates', 'settings', 'integration-contract.json'),
+      reason: 'legacy integration-contract copy detected in setup-templates',
+    },
+  ]
+
+  for (const marker of legacyMarkers) {
+    if (existsSync(marker.path)) reasons.push(marker.reason)
+  }
+
+  return { ok: reasons.length === 0, reasons }
+}
+
+function formatLegacyInstallError(reasons: string[]): string {
+  return [
+    'Installed specrails-core is legacy; expected the Node-native installer.',
+    '',
+    ...reasons.map((reason) => `- ${reason}`),
+  ].join('\n')
+}
+
 export function computeSummary(projectPath: string, tier: 'quick' | 'full'): SetupSummary {
   const dir = SPECRAILS_DIR
   let agents = 0
@@ -418,6 +543,22 @@ async function validateCoreContract(): Promise<void> {
 
 const INSTALL_LOG_BUFFER_MAX = 2000
 
+function formatBufferedInstallError(baseMessage: string, logBuffer: string[]): string {
+  const recentLines = logBuffer
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-8)
+
+  if (recentLines.length === 0) return baseMessage
+
+  return [
+    baseMessage,
+    '',
+    'Recent output:',
+    ...recentLines.map((line) => `- ${line}`),
+  ].join('\n')
+}
+
 export class SetupManager {
   private _broadcast: (msg: WsMessage) => void
   private _onSessionCaptured?: (projectId: string, sessionId: string) => void
@@ -472,9 +613,10 @@ export class SetupManager {
     const configDir = join(projectPath, '.specrails')
     const configPath = join(configDir, 'install-config.yaml')
 
+    const yamlText = serializeInstallConfigYaml(installConfig)
     try {
       mkdirSync(configDir, { recursive: true })
-      writeFileSync(configPath, serializeInstallConfigYaml(installConfig), 'utf-8')
+      writeFileSync(configPath, yamlText, 'utf-8')
     } catch (err) {
       console.warn(`[SetupManager] Failed to write install-config.yaml: ${err}`)
       this._broadcast({
@@ -500,7 +642,35 @@ export class SetupManager {
     this._advanceCheckpoint(projectId, 'config_written')
     this._completeCheckpoint(projectId, 'config_written')
 
-    const child = spawnCoreInit(['--yes', '--from-config', configPath], projectPath)
+    const probe = probeCoreRuntimeVersion(projectPath)
+    if (!probe.ok) {
+      this._broadcast({
+        type: 'setup_error',
+        projectId,
+        error: `Failed to verify specrails-core runtime before install: ${probe.error ?? 'unknown error'}`,
+      })
+      return
+    }
+    console.log(`[SetupManager] core runtime probe: ${probe.bin} -> ${probe.version}`)
+    const probeCmp = compareSemver(probe.version!, MIN_NODE_NATIVE_CORE_VERSION)
+    if (probeCmp !== null && probeCmp < 0) {
+      this._broadcast({
+        type: 'setup_error',
+        projectId,
+        error:
+          `Resolved specrails-core@${probe.version} is legacy; expected Node-native >= ${MIN_NODE_NATIVE_CORE_VERSION}.`,
+      })
+      return
+    }
+
+    let spawnConfigPath = configPath
+    try {
+      spawnConfigPath = writeSpawnInstallConfig(projectId, yamlText)
+    } catch (err) {
+      console.warn(`[SetupManager] Failed to write temp install-config.yaml: ${err}`)
+    }
+
+    const child = spawnCoreInit(['--yes', '--from-config', spawnConfigPath], projectPath)
 
     this._installProcesses.set(projectId, child)
     this._installLogBuffer.set(projectId, [])
@@ -526,20 +696,32 @@ export class SetupManager {
 
     stderrReader.on('line', (line) => {
       appendLog(line)
+      console.error(`[core stderr] ${line}`)
       this._broadcast({ type: 'setup_log', projectId, line, stream: 'stderr' })
     })
 
+    stdoutReader.on('line', (line) => {
+      console.log(`[core stdout] ${line}`)
+    })
+
     child.on('close', (code) => {
+      if (spawnConfigPath !== configPath) {
+        try { rmSync(spawnConfigPath, { force: true }) } catch { /* non-fatal */ }
+      }
       console.log(`[SetupManager] quickInstall child exited code=${code} for ${projectId}`)
       this._installProcesses.delete(projectId)
       if (code === 0) {
+        const validation = validateInstalledCore(projectPath)
+        if (!validation.ok) {
+          this._broadcast({
+            type: 'setup_error',
+            projectId,
+            error: formatLegacyInstallError(validation.reasons),
+          })
+          return
+        }
         this._advanceCheckpoint(projectId, 'base_install')
         this._completeCheckpoint(projectId, 'base_install')
-        // Deploy agent/command templates that specrails-core scaffolded but didn't activate
-        try {
-          const config = readInstallConfig(projectPath)
-          deployTemplates(projectPath, config?.selectedAgents ?? [])
-        } catch { /* non-fatal */ }
         this._advanceCheckpoint(projectId, 'quick_complete')
         this._completeCheckpoint(projectId, 'quick_complete')
         const legacySrRemoved = sweepLegacySrCommands(projectPath)
@@ -553,10 +735,14 @@ export class SetupManager {
         })
         validateCoreContract().catch(() => { /* non-fatal */ })
       } else {
+        const logBuffer = this._installLogBuffer.get(projectId) ?? []
         this._broadcast({
           type: 'setup_error',
           projectId,
-          error: `npx specrails-core init --from-config exited with code ${code ?? 'unknown'}`,
+          error: formatBufferedInstallError(
+            `npx specrails-core init --from-config exited with code ${code ?? 'unknown'}`,
+            logBuffer,
+          ),
         })
       }
     })
@@ -577,8 +763,38 @@ export class SetupManager {
     this._projectTiers.set(projectId, tier)
     this._initCheckpoints(projectId)
 
+    const probe = probeCoreRuntimeVersion(projectPath)
+    if (!probe.ok) {
+      this._broadcast({
+        type: 'setup_error',
+        projectId,
+        error: `Failed to verify specrails-core runtime before install: ${probe.error ?? 'unknown error'}`,
+      })
+      return
+    }
+    console.log(`[SetupManager] core runtime probe: ${probe.bin} -> ${probe.version}`)
+    const probeCmp = compareSemver(probe.version!, MIN_NODE_NATIVE_CORE_VERSION)
+    if (probeCmp !== null && probeCmp < 0) {
+      this._broadcast({
+        type: 'setup_error',
+        projectId,
+        error:
+          `Resolved specrails-core@${probe.version} is legacy; expected Node-native >= ${MIN_NODE_NATIVE_CORE_VERSION}.`,
+      })
+      return
+    }
+
+    let spawnConfigPath: string | null = null
+    if (hasConfig) {
+      try {
+        spawnConfigPath = writeSpawnInstallConfig(projectId, readFileSync(configPath, 'utf-8'))
+      } catch (err) {
+        console.warn(`[SetupManager] Failed to write temp install-config.yaml: ${err}`)
+      }
+    }
+
     const initArgs = hasConfig
-      ? ['--yes', '--from-config', configPath]
+      ? ['--yes', '--from-config', spawnConfigPath ?? configPath]
       : ['--yes', '--root-dir', projectPath]
 
     const child = spawnCoreInit(initArgs, projectPath)
@@ -611,16 +827,22 @@ export class SetupManager {
     })
 
     child.on('close', (code) => {
+      if (spawnConfigPath) {
+        try { rmSync(spawnConfigPath, { force: true }) } catch { /* non-fatal */ }
+      }
       this._installProcesses.delete(projectId)
       if (code === 0) {
+        const validation = validateInstalledCore(projectPath)
+        if (!validation.ok) {
+          this._broadcast({
+            type: 'setup_error',
+            projectId,
+            error: formatLegacyInstallError(validation.reasons),
+          })
+          return
+        }
         this._advanceCheckpoint(projectId, 'base_install')
         this._completeCheckpoint(projectId, 'base_install')
-        // Deploy agent/command templates that specrails-core scaffolded but didn't activate
-        if (tier !== 'full') {
-          try {
-            deployTemplates(projectPath, parsedConfig?.selectedAgents ?? [])
-          } catch { /* non-fatal */ }
-        }
         const legacySrRemoved = sweepLegacySrCommands(projectPath)
         const summary: SetupSummary = { ...computeSummary(projectPath, tier), legacySrRemoved }
         this._broadcast({
@@ -631,10 +853,14 @@ export class SetupManager {
         })
         validateCoreContract().catch(() => { /* non-fatal */ })
       } else {
+        const logBuffer = this._installLogBuffer.get(projectId) ?? []
         this._broadcast({
           type: 'setup_error',
           projectId,
-          error: `npx specrails-core exited with code ${code ?? 'unknown'}`,
+          error: formatBufferedInstallError(
+            `npx specrails-core exited with code ${code ?? 'unknown'}`,
+            logBuffer,
+          ),
         })
       }
     })
