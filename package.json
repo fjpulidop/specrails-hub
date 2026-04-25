@@ -24,7 +24,7 @@
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "cd client && npm run dev",
     "dev:desktop": "tauri dev",
-    "build:server": "rm -rf server/dist && tsc --project tsconfig.json",
+    "build:server": "node -e \"require('fs').rmSync('server/dist',{recursive:true,force:true})\" && tsc --project tsconfig.json",
     "build:cli": "tsc --project tsconfig.cli.json",
     "build": "npm run build:server && cd client && npm run build && cd .. && npm run build:cli",
     "build:sidecar": "node scripts/build-sidecar.mjs",

@@ -37,7 +37,7 @@ interface WindowsTransform {
   stdinPayload: string | null
 }
 
-function transformClaudeArgsForWindows(args: string[]): WindowsTransform {
+export function transformClaudeArgsForWindows(args: string[]): WindowsTransform {
   const collected: string[] = []
   const out: string[] = []
   for (let i = 0; i < args.length; i++) {
@@ -61,7 +61,7 @@ function transformClaudeArgsForWindows(args: string[]): WindowsTransform {
 // boolean). Update if we ever pass new value-bearing flags.
 const CODEX_EXEC_VALUE_FLAGS = new Set(['--model'])
 
-function transformCodexArgsForWindows(args: string[]): WindowsTransform {
+export function transformCodexArgsForWindows(args: string[]): WindowsTransform {
   // Expected shape: `exec [...flags] <prompt> [...flags]`.
   if (args.length === 0 || args[0] !== 'exec') {
     return { args, stdinPayload: null }
@@ -103,7 +103,7 @@ function transformCodexArgsForWindows(args: string[]): WindowsTransform {
   return { args: out, stdinPayload: stdin }
 }
 
-function ensureStdinPipe(stdio: StdioOptions | undefined): StdioOptions {
+export function ensureStdinPipe(stdio: StdioOptions | undefined): StdioOptions {
   const fallback: StdioOptions = ['pipe', 'pipe', 'pipe']
   if (stdio === undefined) return fallback
   if (typeof stdio === 'string') {
