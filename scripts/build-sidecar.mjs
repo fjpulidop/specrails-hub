@@ -47,7 +47,9 @@ function getTargetTriple() {
   if (p === 'darwin' && a === 'arm64') return 'aarch64-apple-darwin'
   if (p === 'darwin' && a === 'x64')   return 'x86_64-apple-darwin'
   if (p === 'win32'  && a === 'x64')   return 'x86_64-pc-windows-msvc'
+  if (p === 'win32'  && a === 'arm64') return 'aarch64-pc-windows-msvc'
   if (p === 'linux'  && a === 'x64')   return 'x86_64-unknown-linux-gnu'
+  if (p === 'linux'  && a === 'arm64') return 'aarch64-unknown-linux-gnu'
   throw new Error(`Cannot determine Rust target triple for platform=${p} arch=${a}`)
 }
 
@@ -57,6 +59,7 @@ function getPkgTarget(triple) {
     'aarch64-apple-darwin':       'node22-macos-arm64',
     'x86_64-apple-darwin':        'node22-macos-x64',
     'x86_64-pc-windows-msvc':     'node22-win-x64',
+    'aarch64-pc-windows-msvc':    'node22-win-arm64',
     'x86_64-unknown-linux-gnu':   'node22-linux-x64',
     'aarch64-unknown-linux-gnu':  'node22-linux-arm64',
   }
