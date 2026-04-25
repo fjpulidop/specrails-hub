@@ -592,6 +592,14 @@ export class QueueManager {
 
     let binary: string
     let args: string[]
+    // Windows cmd.exe (used by cross-spawn for .cmd shims) does not preserve
+    // newlines inside argv strings — multi-line --append-system-prompt
+    // truncates and downstream args become orphan tokens (manifests as
+    // "Input must be provided ... when using --print"). Pipe via stdin on
+    // Windows; POSIX keeps argv unchanged.
+    const isWin = process.platform === 'win32'
+    let stdinPayload: string | null = null
+
     if (this._provider === 'codex') {
       binary = 'codex'
       // Codex doesn't support slash commands — resolve the prompt.
@@ -601,7 +609,12 @@ export class QueueManager {
       const resolved = this._resolveCommand(commandToRun)
       const fullPrompt = systemAppend ? `${systemAppend}\n\n---\n\n${resolved}` : resolved
       const resolvedModel = this._resolvedModel ?? 'gpt-5.4-mini'
-      args = ['exec', fullPrompt, '--model', resolvedModel]
+      if (isWin) {
+        args = ['exec', '-', '--model', resolvedModel]
+        stdinPayload = fullPrompt
+      } else {
+        args = ['exec', fullPrompt, '--model', resolvedModel]
+      }
     } else {
       binary = 'claude'
       args = [
@@ -615,14 +628,24 @@ export class QueueManager {
         const { orchestratorModel } = getProjectSettings(this._db)
         args.push('--model', orchestratorModel)
       }
-      if (systemAppend) {
-        args.push('--append-system-prompt', systemAppend)
+      if (isWin) {
+        // Windows: combine system context + command into stdin; claude reads
+        // the whole thing as the user message. Slash commands still resolve
+        // because claude inspects the prompt content for `/specrails:...`.
+        args.push('-p')
+        stdinPayload = systemAppend
+          ? `${systemAppend}\n\n---\n\n${commandToRun}`
+          : commandToRun
+      } else {
+        if (systemAppend) {
+          args.push('--append-system-prompt', systemAppend)
+        }
+        // Pass the raw command to Claude CLI so it resolves skills natively.
+        // This ensures skills get proper execution priority over CLAUDE.md
+        // instructions — pre-resolving to plain text caused the project's
+        // CLAUDE.md to override the pipeline prompt.
+        args.push('-p', commandToRun)
       }
-      // Pass the raw command to Claude CLI so it resolves skills natively.
-      // This ensures skills get proper execution priority over CLAUDE.md
-      // instructions — pre-resolving to plain text caused the project's
-      // CLAUDE.md to override the pipeline prompt.
-      args.push('-p', commandToRun)
     }
 
     // Resolve agent profile (if any) and snapshot per-job before spawn.
@@ -683,9 +706,13 @@ export class QueueManager {
     // cross-spawn handles Windows .cmd shims + verbatim arg escaping.
     const child = spawnCli(binary, args, {
       env: spawnEnv,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [isWin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })
+
+    if (stdinPayload !== null && child.stdin) {
+      child.stdin.end(stdinPayload)
+    }
 
     this._activeProcess = child
     this._activeJobId = jobId
