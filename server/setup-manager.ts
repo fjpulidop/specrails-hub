@@ -243,7 +243,7 @@ function hasFiles(dir: string, pattern: RegExp): boolean {
 
 // ─── Stream-based checkpoint detection ───────────────────────────────────────
 
-function detectCheckpointFromText(
+export function detectCheckpointFromText(
   text: string
 ): { key: string; detail?: string }[] {
   const hits: { key: string; detail?: string }[] = []

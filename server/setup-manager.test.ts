@@ -1406,3 +1406,70 @@ describe('SetupManager', () => {
     })
   })
 })
+
+// ─────────────────────────────────────────────────────────────────
+// detectCheckpointFromText — stdout regex contract.
+// Locks down the matchers that translate specrails-core stdout into
+// setup-wizard checkpoint advancement. Both the retired bash phrasing
+// AND the Node installer (≥ 4.2.0) phrasing must hit; regressing
+// either side breaks the live setup wizard progress UI silently.
+// ─────────────────────────────────────────────────────────────────
+
+import { detectCheckpointFromText } from './setup-manager'
+
+describe('detectCheckpointFromText', () => {
+  const keys = (line: string): string[] =>
+    detectCheckpointFromText(line).map((h) => h.key)
+
+  it('matches the Node installer "Loaded install config" sentinel → config_written', () => {
+    expect(keys('  → Loaded install config from /tmp/repo/.specrails/install-config.yaml'))
+      .toContain('config_written')
+  })
+
+  it('matches the retired bash "✓ config loaded" line → config_written', () => {
+    expect(keys('  ✓ config loaded')).toContain('config_written')
+  })
+
+  it('matches the Node installer "Phase 2 & 3" header → agent_generation', () => {
+    expect(keys('Phase 2 & 3: Installing specrails artifacts'))
+      .toContain('agent_generation')
+  })
+
+  it('matches "Placing agents and commands" (quick tier) → agent_generation', () => {
+    expect(keys('Phase 3c: Placing agents and commands (quick install)'))
+      .toContain('agent_generation')
+  })
+
+  it('matches the "Writing manifest" Node step → final_verification', () => {
+    expect(keys('Phase 3b: Writing manifest')).toContain('final_verification')
+  })
+
+  it('matches "Wrote ...specrails-manifest.json" path log → final_verification', () => {
+    expect(keys('  ✓ Wrote .specrails/specrails-manifest.json'))
+      .toContain('final_verification')
+  })
+
+  it('matches the Node installer terminal "init complete" sentinel → quick_complete', () => {
+    expect(keys('  ✓ init complete')).toContain('quick_complete')
+  })
+
+  it('matches the Node installer terminal "update complete" sentinel → quick_complete', () => {
+    expect(keys('  ✓ update complete')).toContain('quick_complete')
+  })
+
+  it('matches the retired bash "installation complete" line → quick_complete', () => {
+    expect(keys('Installation complete')).toContain('quick_complete')
+  })
+
+  it('matches enrich phase 1 / codebase analysis → repo_analysis', () => {
+    expect(keys('Phase 1: codebase analysis')).toContain('repo_analysis')
+  })
+
+  it('matches the .specrails/specrails-version path log → base_install', () => {
+    expect(keys('  ✓ Wrote .specrails/specrails-version')).toContain('base_install')
+  })
+
+  it('returns no hits on unrelated noise', () => {
+    expect(detectCheckpointFromText('hello world this is not specrails')).toEqual([])
+  })
+})
