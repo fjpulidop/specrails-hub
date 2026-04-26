@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom'
-import { Toaster, toast } from 'sonner'
+import { toast } from 'sonner'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { TooltipProvider } from './ui/tooltip'
 import { StatusBar } from './StatusBar'
@@ -118,18 +118,6 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
         <StatusBar connectionStatus={connectionStatus} rightSlot={chevronSlot} />
       </div>
       </ChatContext.Provider>
-      <Toaster
-        position="bottom-right"
-        offset={{ bottom: STATUSBAR_HEIGHT_PX + 12, right: 16 }}
-        toastOptions={{
-          unstyled: true,
-          classNames: {
-            toast: 'glass-card border border-border/30 text-foreground text-xs p-3 rounded-lg flex items-start gap-2 w-[356px]',
-            title: 'font-medium',
-            description: 'text-muted-foreground mt-0.5',
-          },
-        }}
-      />
     </TooltipProvider>
   )
 }
