@@ -46,16 +46,25 @@ function ProjectTab({
     }
   }
 
+  function handleSelectKeyDown(e: React.KeyboardEvent) {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    e.preventDefault()
+    onSelect()
+  }
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={handleSelectKeyDown}
       className={cn(
         'group relative flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-t-md border-b-0 transition-colors whitespace-nowrap',
         isActive
           ? 'bg-background text-foreground border border-border border-b-background z-10'
           : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent'
       )}
+      aria-current={isActive ? 'page' : undefined}
     >
       <FolderOpen className="w-3 h-3 flex-shrink-0" />
       <span className="max-w-[120px] truncate">{project.name}</span>
@@ -75,7 +84,7 @@ function ProjectTab({
       >
         {confirming ? 'confirm?' : <X className="w-2.5 h-2.5" />}
       </button>
-    </button>
+    </div>
   )
 }
 

@@ -104,7 +104,7 @@ describe('useHub - error paths', () => {
     const newProject = makeProject({ id: 'named-proj', name: 'Named Project' })
     ;(global.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ projects: [] }) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ project: newProject }) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ project: newProject, has_specrails: true }) })
 
     const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
@@ -118,6 +118,7 @@ describe('useHub - error paths', () => {
     expect(postCall).toBeDefined()
     const body = JSON.parse(postCall![1].body as string)
     expect(body.name).toBe('Named Project')
+    expect(body.provider).toBe('claude')
   })
 
   it('removeProject: throws when fetch returns non-ok', async () => {

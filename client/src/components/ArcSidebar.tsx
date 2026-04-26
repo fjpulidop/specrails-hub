@@ -49,10 +49,18 @@ function ProjectItem({
     }
   }
 
+  function handleSelectKeyDown(e: React.KeyboardEvent) {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    e.preventDefault()
+    onSelect()
+  }
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={handleSelectKeyDown}
       className={cn(
         'group relative flex items-center gap-2 w-full h-8 rounded-md transition-colors',
         expanded ? 'px-2' : 'px-0 justify-center',
@@ -61,6 +69,7 @@ function ProjectItem({
           : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
       )}
       title={!expanded ? project.name : undefined}
+      aria-current={isActive ? 'page' : undefined}
     >
       <FolderOpen
         className={cn(
@@ -87,7 +96,7 @@ function ProjectItem({
           </button>
         </>
       )}
-    </button>
+    </div>
   )
 }
 

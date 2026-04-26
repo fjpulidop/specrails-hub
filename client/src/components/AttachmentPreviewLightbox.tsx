@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, Download } from 'lucide-react'
 import type { Attachment } from '../types'
-import { attachmentFileUrl } from '../lib/attachments'
+import { fetchAttachmentBlob } from '../lib/attachments'
 import { cn } from '../lib/utils'
 
 interface Props {
@@ -11,6 +11,9 @@ interface Props {
 }
 
 export function AttachmentPreviewLightbox({ ticketKey, attachment, onClose }: Props) {
+  const [objectUrl, setObjectUrl] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
   useEffect(() => {
     if (!attachment) return
     function onKey(e: KeyboardEvent) {
@@ -25,9 +28,39 @@ export function AttachmentPreviewLightbox({ ticketKey, attachment, onClose }: Pr
     }
   }, [attachment, onClose])
 
+  useEffect(() => {
+    if (!attachment) {
+      setObjectUrl(null)
+      setLoadError(null)
+      return
+    }
+
+    let disposed = false
+    setObjectUrl(null)
+    setLoadError(null)
+    fetchAttachmentBlob(ticketKey, attachment.id)
+      .then((blob) => {
+        if (disposed) return
+        setObjectUrl(URL.createObjectURL(blob))
+      })
+      .catch((err) => {
+        if (disposed) return
+        setLoadError(err instanceof Error ? err.message : 'Failed to load attachment')
+      })
+
+    return () => {
+      disposed = true
+    }
+  }, [attachment, ticketKey])
+
+  useEffect(() => {
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [objectUrl])
+
   if (!attachment) return null
 
-  const url = attachmentFileUrl(ticketKey, attachment.id)
   const isImage = attachment.mimeType.startsWith('image/')
   const isPdf = attachment.mimeType === 'application/pdf'
 
@@ -58,9 +91,12 @@ export function AttachmentPreviewLightbox({ ticketKey, attachment, onClose }: Pr
           <div className="text-[11px] text-white/50">{attachment.mimeType}</div>
         </div>
         <a
-          href={url}
+          href={objectUrl ?? '#'}
           download={attachment.filename}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (!objectUrl) e.preventDefault()
+          }}
           className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-white/85 hover:bg-white/10 hover:text-white transition-colors"
           aria-label="Download"
         >
@@ -74,16 +110,30 @@ export function AttachmentPreviewLightbox({ ticketKey, attachment, onClose }: Pr
         className={cn('flex-1 flex items-center justify-center overflow-auto p-6')}
         onClick={onClose}
       >
-        {isImage ? (
+        {loadError ? (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="text-center text-white/80 px-8 py-10 rounded-lg bg-white/5 border border-white/10"
+          >
+            <p className="text-sm">Could not load attachment: {loadError}</p>
+          </div>
+        ) : !objectUrl ? (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="text-center text-white/70 px-8 py-10 rounded-lg bg-white/5 border border-white/10"
+          >
+            <p className="text-sm">Loading attachment...</p>
+          </div>
+        ) : isImage ? (
           <img
-            src={url}
+            src={objectUrl}
             alt={attachment.filename}
             onClick={(e) => e.stopPropagation()}
             className="max-h-full max-w-full rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
           />
         ) : isPdf ? (
           <iframe
-            src={url}
+            src={objectUrl}
             title={attachment.filename}
             onClick={(e) => e.stopPropagation()}
             className="w-full h-full max-w-5xl bg-white rounded-lg shadow-2xl"
@@ -95,7 +145,7 @@ export function AttachmentPreviewLightbox({ ticketKey, attachment, onClose }: Pr
           >
             <p className="text-sm mb-3">Preview not available for this file type.</p>
             <a
-              href={url}
+              href={objectUrl}
               download={attachment.filename}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors"
             >

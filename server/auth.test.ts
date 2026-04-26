@@ -6,7 +6,7 @@ import fs from 'fs'
 // Mock fs so we don't touch the real ~/.specrails/hub.token during tests
 vi.mock('fs')
 
-import { requireAuth, getServerToken, _resetTokenForTest, loadOrGenerateToken } from './auth'
+import { requireAuth, getServerToken, _resetTokenForTest, loadOrGenerateToken, tokenFromUpgradeRequest } from './auth'
 
 const mockFs = fs as typeof fs & {
   existsSync: ReturnType<typeof vi.fn>
@@ -140,6 +140,25 @@ describe('auth middleware', () => {
         .set('Authorization', 'Bearer ')
       expect(res.status).toBe(401)
     })
+
+    it('does not accept query-string tokens', async () => {
+      const app = createTestApp()
+      const token = getServerToken()
+      const res = await request(app).get(`/protected?token=${token}`)
+      expect(res.status).toBe(401)
+    })
+  })
+})
+
+describe('tokenFromUpgradeRequest', () => {
+  it('reads bearer tokens from upgrade requests', () => {
+    const req = { headers: { authorization: 'Bearer abc' } }
+    expect(tokenFromUpgradeRequest(req as any)).toBe('abc')
+  })
+
+  it('reads hub-token WebSocket subprotocols', () => {
+    const req = { headers: { 'sec-websocket-protocol': 'json, hub-token.def' } }
+    expect(tokenFromUpgradeRequest(req as any)).toBe('def')
   })
 })
 

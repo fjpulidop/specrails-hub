@@ -14,6 +14,7 @@ vi.mock('sonner', () => ({
 
 const mockStartSetupWizard = vi.fn()
 const mockSetActiveProjectId = vi.fn()
+const mockAddProject = vi.fn()
 
 vi.mock('../../hooks/useHub', () => ({
   useHub: () => ({
@@ -22,7 +23,7 @@ vi.mock('../../hooks/useHub', () => ({
     projects: [],
     activeProjectId: null,
     isLoading: false,
-    addProject: vi.fn(),
+    addProject: mockAddProject,
     removeProject: vi.fn(),
     setupProjectIds: new Set(),
     completeSetupWizard: vi.fn(),
@@ -48,6 +49,11 @@ describe('AddProjectDialog', () => {
   beforeEach(() => {
     mockStartSetupWizard.mockClear()
     mockSetActiveProjectId.mockClear()
+    mockAddProject.mockReset()
+    mockAddProject.mockResolvedValue({
+      project: { id: 'new-proj', name: 'My Project' },
+      has_specrails: true,
+    })
     vi.clearAllMocks()
     mockFetchSequence()
   })
@@ -87,13 +93,6 @@ describe('AddProjectDialog', () => {
   it('successful submit calls API and closes dialog', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
-    mockFetchSequence({
-      ok: true,
-      json: async () => ({
-        project: { id: 'new-proj', name: 'My Project' },
-        has_specrails: true,
-      }),
-    })
 
     render(<AddProjectDialog open={true} onClose={onClose} />)
     const pathInput = screen.getByPlaceholderText('/Users/me/my-project')
@@ -102,6 +101,7 @@ describe('AddProjectDialog', () => {
     await user.click(addBtn)
 
     await waitFor(() => {
+      expect(mockAddProject).toHaveBeenCalledWith('/some/path', undefined, 'claude')
       expect(onClose).toHaveBeenCalled()
     })
   })
@@ -109,10 +109,7 @@ describe('AddProjectDialog', () => {
   it('error response shows toast.error', async () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
-    mockFetchSequence({
-      ok: false,
-      json: async () => ({ error: 'Path not found' }),
-    })
+    mockAddProject.mockRejectedValueOnce(new Error('Path not found'))
 
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
     const pathInput = screen.getByPlaceholderText('/Users/me/my-project')
@@ -127,12 +124,9 @@ describe('AddProjectDialog', () => {
 
   it('when has_specrails=false, triggers setup wizard and sets active project', async () => {
     const user = userEvent.setup()
-    mockFetchSequence({
-      ok: true,
-      json: async () => ({
-        project: { id: 'new-proj', name: 'New Project' },
-        has_specrails: false,
-      }),
+    mockAddProject.mockResolvedValueOnce({
+      project: { id: 'new-proj', name: 'New Project' },
+      has_specrails: false,
     })
 
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)

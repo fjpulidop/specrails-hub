@@ -1,23 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('../api', () => ({ getApiBase: () => '/api/projects/proj-1' }))
-vi.mock('../auth', () => ({ getHubToken: vi.fn(() => null) }))
 
 import {
   ATTACHMENT_ACCEPT_MIME,
   attachmentFileUrl,
   deleteAllAttachments,
   deleteAttachment,
+  fetchAttachmentBlob,
   isSupportedAttachmentFile,
   listAttachments,
   uploadAttachment,
 } from '../attachments'
-import { getHubToken } from '../auth'
 
 describe('attachments lib', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    vi.mocked(getHubToken).mockReturnValue(null)
   })
 
   describe('uploadAttachment', () => {
@@ -117,22 +115,26 @@ describe('attachments lib', () => {
   })
 
   describe('attachmentFileUrl', () => {
-    it('returns bare URL when no token', () => {
-      vi.mocked(getHubToken).mockReturnValue(null)
+    it('returns the authenticated attachment endpoint URL', () => {
       const url = attachmentFileUrl('1', 'att-1')
       expect(url).toBe('/api/projects/proj-1/tickets/1/attachments/att-1')
     })
+  })
 
-    it('appends token as query param when token present', () => {
-      vi.mocked(getHubToken).mockReturnValue('my-token')
-      const url = attachmentFileUrl('1', 'att-1')
-      expect(url).toContain('?token=my-token')
+  describe('fetchAttachmentBlob', () => {
+    it('fetches an attachment as a blob', async () => {
+      const blob = new Blob(['hello'], { type: 'text/plain' })
+      ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        blob: async () => blob,
+      })
+      await expect(fetchAttachmentBlob('1', 'att-1')).resolves.toBe(blob)
+      expect(global.fetch).toHaveBeenCalledWith('/api/projects/proj-1/tickets/1/attachments/att-1')
     })
 
-    it('encodes token in query param', () => {
-      vi.mocked(getHubToken).mockReturnValue('tok en+val')
-      const url = attachmentFileUrl('1', 'att-1')
-      expect(url).toContain('token=tok%20en%2Bval')
+    it('throws on non-ok attachment fetch', async () => {
+      ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, status: 401 })
+      await expect(fetchAttachmentBlob('1', 'att-1')).rejects.toThrow('Fetch failed (401)')
     })
   })
 

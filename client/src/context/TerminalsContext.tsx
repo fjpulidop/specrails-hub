@@ -22,7 +22,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 import { API_ORIGIN } from '../lib/origin'
 import { WS_URL } from '../lib/ws-url'
-import { getHubToken } from '../lib/auth'
+import { getHubTokenProtocol } from '../lib/auth'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -463,16 +463,16 @@ function ensureXtermForSession(
 
   if (host) host.appendChild(container)
 
-  const token = getHubToken()
   // Use WS_URL (not window.location) — the vite dev server runs on 4201 without
   // WS proxying, while the Express server (real PTY endpoint) lives on 4200.
   // WS_URL already handles dev / production browser / Tauri cases.
   const wsBase = WS_URL || (typeof window !== 'undefined'
     ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`
     : 'ws://localhost:4200')
-  const wsUrl = `${wsBase}/ws/terminal/${sessionId}?token=${encodeURIComponent(token ?? '')}&projectId=${encodeURIComponent(projectId)}`
+  const wsUrl = `${wsBase}/ws/terminal/${sessionId}?projectId=${encodeURIComponent(projectId)}`
 
-  const ws = new WebSocket(wsUrl)
+  const protocol = getHubTokenProtocol()
+  const ws = protocol ? new WebSocket(wsUrl, ['specrails-hub', protocol]) : new WebSocket(wsUrl)
   ws.binaryType = 'arraybuffer'
 
   const disposers: Array<() => void> = []

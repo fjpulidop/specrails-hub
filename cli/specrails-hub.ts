@@ -503,11 +503,14 @@ async function runViaWebManager(command: string, baseUrl: string, projectOverrid
 
   // Connect WebSocket and stream logs
   const wsUrl = baseUrl.replace(/^http/, 'ws')
+  const token = loadHubToken()
   let exitCode = 1
   let resolved = false
 
   await new Promise<void>((resolve) => {
-    const ws = new WebSocket(wsUrl)
+    const ws = new WebSocket(wsUrl, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
 
     ws.on('message', (data) => {
       let msg: WsMsg

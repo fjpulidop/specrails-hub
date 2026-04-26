@@ -1,5 +1,4 @@
 import { getApiBase } from './api'
-import { getHubToken } from './auth'
 import type { Attachment } from '../types'
 
 export async function uploadAttachment(
@@ -44,10 +43,13 @@ export async function listAttachments(ticketKey: string | number): Promise<Attac
 }
 
 export function attachmentFileUrl(ticketKey: string | number, attachmentId: string): string {
-  const base = `${getApiBase()}/tickets/${ticketKey}/attachments/${attachmentId}`
-  const token = getHubToken()
-  // <a href> / <img src> navigations cannot set headers — append token as query param.
-  return token ? `${base}?token=${encodeURIComponent(token)}` : base
+  return `${getApiBase()}/tickets/${ticketKey}/attachments/${attachmentId}`
+}
+
+export async function fetchAttachmentBlob(ticketKey: string | number, attachmentId: string): Promise<Blob> {
+  const res = await fetch(attachmentFileUrl(ticketKey, attachmentId))
+  if (!res.ok) throw new Error(`Fetch failed (${res.status})`)
+  return res.blob()
 }
 
 export const ATTACHMENT_ACCEPT_MIME =

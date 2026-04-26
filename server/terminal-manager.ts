@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { spawn as ptySpawn, type IPty } from 'node-pty'
-import { v4 as uuidv4 } from 'uuid'
+import { newId as uuidv4 } from './ids'
 import type { WebSocket } from 'ws'
 
 export const TERMINAL_SCROLLBACK_BYTES = 262_144

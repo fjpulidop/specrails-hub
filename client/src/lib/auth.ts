@@ -37,10 +37,14 @@ export function getHubToken(): string | null {
   return _token
 }
 
+export function getHubTokenProtocol(): string | undefined {
+  return _token ? `hub-token.${_token}` : undefined
+}
+
 /**
  * Patches `window.fetch` so that:
  * 1. In Tauri: relative /api/* paths are rewritten to http://localhost:4200/api/*
- * 2. All requests to relative paths or localhost get X-Hub-Token header attached.
+ * 2. Requests to the hub API origin get X-Hub-Token attached.
  *
  * Call this once after `initAuth()` succeeds.
  */
@@ -70,12 +74,20 @@ export function installFetchInterceptor(): void {
       input = url
     }
 
-    const isLocal =
-      url.startsWith('/') ||
-      url.includes('localhost') ||
-      url.includes('127.0.0.1')
+    const isHubApiRequest = (() => {
+      if (url.startsWith('/')) return true
+      try {
+        const target = new URL(url)
+        const apiOrigin = API_ORIGIN
+          ? new URL(API_ORIGIN).origin
+          : window.location.origin
+        return target.origin === apiOrigin
+      } catch {
+        return false
+      }
+    })()
 
-    if (isLocal && _token) {
+    if (isHubApiRequest && _token) {
       const headers = new Headers(init.headers)
       if (!headers.has('X-Hub-Token')) {
         headers.set('X-Hub-Token', _token)

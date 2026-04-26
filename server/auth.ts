@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import { randomUUID } from 'crypto'
+import type { IncomingMessage } from 'http'
 import type { Request, Response, NextFunction } from 'express'
 
 const TOKEN_DIR = path.join(os.homedir(), '.specrails')
@@ -62,18 +63,13 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 
   const authHeader = req.headers['authorization']
   const hubTokenHeader = req.headers['x-hub-token']
-  const queryToken = req.query.token
 
   let provided: string | null = null
 
-  if (authHeader && authHeader.startsWith('Bearer ')) {
+  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
     provided = authHeader.slice(7).trim()
   } else if (typeof hubTokenHeader === 'string') {
     provided = hubTokenHeader.trim()
-  } else if (typeof queryToken === 'string') {
-    // Query-string token for URLs that cannot set headers (e.g. <a href>, <img src>).
-    // Acceptable here because the server binds to 127.0.0.1 only.
-    provided = queryToken.trim()
   }
 
   if (!provided || provided !== token) {
@@ -82,4 +78,29 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
 
   next()
+}
+
+/**
+ * Extracts the hub token from a WebSocket upgrade request.
+ *
+ * Browsers cannot set custom headers for WebSocket upgrades, so the frontend
+ * sends the token as a subprotocol: `hub-token.<token>`. The CLI can use the
+ * standard Authorization header.
+ */
+export function tokenFromUpgradeRequest(request: IncomingMessage): string | null {
+  const authHeader = request.headers.authorization
+  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+    return authHeader.slice(7).trim()
+  }
+
+  const protocolHeader = request.headers['sec-websocket-protocol']
+  if (typeof protocolHeader !== 'string') return null
+
+  for (const part of protocolHeader.split(',')) {
+    const protocol = part.trim()
+    if (protocol.startsWith('hub-token.')) {
+      return protocol.slice('hub-token.'.length).trim()
+    }
+  }
+  return null
 }

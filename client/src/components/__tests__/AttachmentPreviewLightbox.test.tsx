@@ -1,11 +1,12 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '../../test-utils'
+import { render, screen, fireEvent, waitFor } from '../../test-utils'
 import { AttachmentPreviewLightbox } from '../AttachmentPreviewLightbox'
 import type { Attachment } from '../../types'
+import { fetchAttachmentBlob } from '../../lib/attachments'
 
 vi.mock('../../lib/attachments', () => ({
-  attachmentFileUrl: vi.fn((_key: string, id: string) => `/files/${id}`),
+  fetchAttachmentBlob: vi.fn(),
 }))
 
 function makeAttachment(overrides: Partial<Attachment> = {}): Attachment {
@@ -23,7 +24,19 @@ function makeAttachment(overrides: Partial<Attachment> = {}): Attachment {
 describe('AttachmentPreviewLightbox', () => {
   const onClose = vi.fn()
 
-  beforeEach(() => vi.resetAllMocks())
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    vi.clearAllMocks()
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:attachment'),
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(),
+    })
+    vi.mocked(fetchAttachmentBlob).mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
+  })
 
   it('renders nothing when attachment is null', () => {
     const { container } = render(
@@ -40,25 +53,25 @@ describe('AttachmentPreviewLightbox', () => {
     expect(screen.getByText('photo.png')).toBeInTheDocument()
   })
 
-  it('renders image for image mime type', () => {
+  it('renders image for image mime type', async () => {
     render(
       <AttachmentPreviewLightbox ticketKey="1" attachment={makeAttachment({ mimeType: 'image/png' })} onClose={onClose} />,
     )
-    expect(screen.getByRole('img')).toBeInTheDocument()
+    expect(await screen.findByRole('img')).toBeInTheDocument()
   })
 
-  it('renders iframe for pdf mime type', () => {
+  it('renders iframe for pdf mime type', async () => {
     const { container } = render(
       <AttachmentPreviewLightbox ticketKey="1" attachment={makeAttachment({ mimeType: 'application/pdf', filename: 'doc.pdf' })} onClose={onClose} />,
     )
-    expect(container.querySelector('iframe')).toBeInTheDocument()
+    await waitFor(() => expect(container.querySelector('iframe')).toBeInTheDocument())
   })
 
-  it('renders download fallback for unknown mime type', () => {
+  it('renders download fallback for unknown mime type', async () => {
     render(
       <AttachmentPreviewLightbox ticketKey="1" attachment={makeAttachment({ mimeType: 'application/zip', filename: 'file.zip' })} onClose={onClose} />,
     )
-    expect(screen.getByText(/preview not available/i)).toBeInTheDocument()
+    expect(await screen.findByText(/preview not available/i)).toBeInTheDocument()
   })
 
   it('calls onClose when Back button clicked', () => {
@@ -94,11 +107,11 @@ describe('AttachmentPreviewLightbox', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('does not close when clicking the image', () => {
+  it('does not close when clicking the image', async () => {
     render(
       <AttachmentPreviewLightbox ticketKey="1" attachment={makeAttachment({ mimeType: 'image/png' })} onClose={onClose} />,
     )
-    fireEvent.click(screen.getByRole('img'))
+    fireEvent.click(await screen.findByRole('img'))
     expect(onClose).not.toHaveBeenCalled()
   })
 
@@ -110,20 +123,21 @@ describe('AttachmentPreviewLightbox', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('does not propagate click from iframe to dialog backdrop', () => {
+  it('does not propagate click from iframe to dialog backdrop', async () => {
     const { container } = render(
       <AttachmentPreviewLightbox ticketKey="1" attachment={makeAttachment({ mimeType: 'application/pdf', filename: 'doc.pdf' })} onClose={onClose} />,
     )
+    await waitFor(() => expect(container.querySelector('iframe')).toBeInTheDocument())
     const iframe = container.querySelector('iframe')!
     fireEvent.click(iframe)
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('does not close when clicking inside the fallback download div', () => {
+  it('does not close when clicking inside the fallback download div', async () => {
     render(
       <AttachmentPreviewLightbox ticketKey="1" attachment={makeAttachment({ mimeType: 'application/zip', filename: 'file.zip' })} onClose={onClose} />,
     )
-    const fallback = screen.getByText(/preview not available/i).closest('div')!
+    const fallback = (await screen.findByText(/preview not available/i)).closest('div')!
     fireEvent.click(fallback)
     expect(onClose).not.toHaveBeenCalled()
   })

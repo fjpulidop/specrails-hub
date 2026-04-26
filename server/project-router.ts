@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { Router, Request, Response, NextFunction } from 'express'
-import { v4 as uuidv4 } from 'uuid'
+import { newId as uuidv4 } from './ids'
 import type { AnalyticsOpts } from './types'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import {

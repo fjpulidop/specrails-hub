@@ -25,11 +25,16 @@ export interface HubProject {
   last_seen_at: string
 }
 
+export interface AddProjectResult {
+  project: HubProject
+  has_specrails: boolean
+}
+
 interface HubContextValue {
   projects: HubProject[]
   activeProjectId: string | null
   setActiveProjectId: (id: string | null) => void
-  addProject: (path: string, name?: string) => Promise<HubProject | null>
+  addProject: (path: string, name?: string, provider?: 'claude') => Promise<AddProjectResult | null>
   removeProject: (id: string) => Promise<void>
   isLoading: boolean
   /** True briefly after switching active project — triggers the loading bar */
@@ -141,10 +146,11 @@ export function HubProvider({ children }: { children: ReactNode }) {
     return () => unregisterHandler('hub')
   }, [handleMessage, registerHandler, unregisterHandler])
 
-  const addProject = useCallback(async (projectPath: string, name?: string): Promise<HubProject | null> => {
+  const addProject = useCallback(async (projectPath: string, name?: string, provider: 'claude' = 'claude'): Promise<AddProjectResult | null> => {
     try {
       const body: Record<string, string> = { path: projectPath }
       if (name) body.name = name
+      if (provider) body.provider = provider
 
       const res = await fetch('/api/hub/projects', {
         method: 'POST',
@@ -157,13 +163,18 @@ export function HubProvider({ children }: { children: ReactNode }) {
         throw new Error(err.error ?? `HTTP ${res.status}`)
       }
 
-      const data = await res.json() as { project: HubProject }
-      return data.project
+      const data = await res.json() as AddProjectResult
+      setProjects((prev) => {
+        if (prev.find((p) => p.id === data.project.id)) return prev
+        return [...prev, data.project]
+      })
+      setActiveProjectId(data.project.id)
+      return data
     } catch (err) {
       console.error('[useHub] addProject error:', err)
       throw err
     }
-  }, [])
+  }, [setActiveProjectId])
 
   const removeProject = useCallback(async (id: string): Promise<void> => {
     try {
@@ -172,6 +183,19 @@ export function HubProvider({ children }: { children: ReactNode }) {
         const err = await res.json() as { error?: string }
         throw new Error(err.error ?? `HTTP ${res.status}`)
       }
+      setProjects((prev) => prev.filter((p) => p.id !== id))
+      setSetupProjectIds((prev) => {
+        if (!prev.has(id)) return prev
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+      setActiveProjectIdRaw((prev) => {
+        if (prev !== id) return prev
+        writeSavedProjectId(null)
+        setApiContext(true, null)
+        return null
+      })
     } catch (err) {
       console.error('[useHub] removeProject error:', err)
       throw err
