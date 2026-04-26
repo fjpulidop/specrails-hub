@@ -120,6 +120,7 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
       </ChatContext.Provider>
       <Toaster
         position="bottom-right"
+        offset={{ bottom: STATUSBAR_HEIGHT_PX + 12, right: 16 }}
         toastOptions={{
           unstyled: true,
           classNames: {
