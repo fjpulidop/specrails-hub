@@ -34,6 +34,7 @@ import { SharedWebSocketProvider } from './hooks/useSharedWebSocket'
 import { HubProvider, useHub } from './hooks/useHub'
 import { SpecGenTrackerProvider } from './hooks/useSpecGenTracker'
 import { useOsNotifications } from './hooks/useOsNotifications'
+import { useDesktopUpdateNotifier } from './hooks/useDesktopUpdateNotifier'
 import { WS_URL } from './lib/ws-url'
 import { API_ORIGIN } from './lib/origin'
 import { TerminalsProvider, useTerminals } from './context/TerminalsContext'
@@ -334,6 +335,7 @@ function LegacyKeyboardShortcuts() {
 
 export default function App() {
   const isHub = useHubMode()
+  useDesktopUpdateNotifier()
 
   return (
     <div

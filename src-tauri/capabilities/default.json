@@ -23,6 +23,8 @@
     },
     "dialog:allow-message",
     "dialog:allow-confirm",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "process:default",
+    "updater:default"
   ]
 }
