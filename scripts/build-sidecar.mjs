@@ -294,7 +294,7 @@ async function main() {
     platform: 'node',
     format: 'cjs',
     outfile: BUNDLE_PATH,
-    external: ['better-sqlite3', 'fsevents', 'node-pty', '@aws-sdk/client-s3'],
+    external: ['better-sqlite3', 'fsevents', 'node-pty', '@aws-sdk/client-s3', 'read-excel-file/node', 'pdf-parse'],
     banner: { js: PKG_RUNTIME_PATCHES },
     minify: false,
     sourcemap: false,
