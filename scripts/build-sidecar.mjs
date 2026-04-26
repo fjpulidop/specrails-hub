@@ -149,7 +149,11 @@ if (typeof process !== "undefined" && process.pkg !== undefined) {
       if (filename && filename.indexOf("better_sqlite3") !== -1) {
         return _origDlopen(mod, _sqliteReal, flags == null ? 1 : flags);
       }
-      if (filename && filename.slice(-8) === "pty.node") {
+      // Windows: pty.node has co-located DLL deps (winpty.dll, conpty.node, ...)
+      // that only exist inside prebuilds/win32-<arch>/. Redirecting to the root
+      // copy makes LoadLibrary fail to find those deps → terminal never opens.
+      // Let node-gyp-build resolve to the prebuilds path on Windows.
+      if (filename && filename.slice(-8) === "pty.node" && process.platform !== "win32") {
         return _origDlopen(mod, _ptyReal, flags == null ? 1 : flags);
       }
       return _origDlopen(mod, filename, flags == null ? 1 : flags);
