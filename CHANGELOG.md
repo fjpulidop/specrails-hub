@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.40.0](https://github.com/fjpulidop/specrails-hub/compare/v1.39.0...v1.40.0) (2026-04-26)
+
+
+### Features
+
+* windows desktop release (unsigned) + routing-rule edit flow ([#251](https://github.com/fjpulidop/specrails-hub/issues/251)) ([b54b7f7](https://github.com/fjpulidop/specrails-hub/commit/b54b7f7bae3b83f297d843081c8b882e5c76d162))
+
 ## [1.39.0](https://github.com/fjpulidop/specrails-hub/compare/v1.38.0...v1.39.0) (2026-04-24)
 
 
