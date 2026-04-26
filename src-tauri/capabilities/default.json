@@ -21,7 +21,6 @@
         }
       ]
     },
-    "shell:allow-execute",
     "dialog:allow-message",
     "dialog:allow-confirm",
     "dialog:allow-open"

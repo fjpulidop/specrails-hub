@@ -753,12 +753,20 @@ describe('hub-router', () => {
     })
 
     it('returns list of webhooks', async () => {
-      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
+      addWebhook(hubDb, {
+        id: 'wh-1',
+        projectId: null,
+        url: 'https://example.com/hook',
+        events: ['job.completed'],
+        secret: 'stored-secret',
+      })
       const { app } = createApp()
       const res = await request(app).get('/api/hub/webhooks')
       expect(res.status).toBe(200)
       expect(res.body.webhooks).toHaveLength(1)
       expect(res.body.webhooks[0].url).toBe('https://example.com/hook')
+      expect(res.body.webhooks[0].secret).toBeUndefined()
+      expect(res.body.webhooks[0].hasSecret).toBe(true)
     })
   })
 
@@ -814,7 +822,26 @@ describe('hub-router', () => {
         .post('/api/hub/webhooks')
         .send({ url: 'https://example.com/hook', secret: 'mysecret' })
       expect(res.status).toBe(201)
-      expect(res.body.webhook.secret).toBe('mysecret')
+      expect(res.body.webhook.secret).toBeUndefined()
+      expect(res.body.webhook.hasSecret).toBe(true)
+    })
+
+    it('rejects non-https webhook urls', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .post('/api/hub/webhooks')
+        .send({ url: 'http://example.com/hook' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('webhook url must be https')
+    })
+
+    it('rejects localhost webhook urls', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .post('/api/hub/webhooks')
+        .send({ url: 'https://localhost/hook' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('webhook url must be https')
     })
 
     it('returns 400 when projectId does not match a registered project', async () => {
@@ -881,7 +908,18 @@ describe('hub-router', () => {
       const { app } = createApp()
       const res = await request(app).patch('/api/hub/webhooks/wh-1').send({ secret: 'new-secret' })
       expect(res.status).toBe(200)
-      expect(res.body.webhook.secret).toBe('new-secret')
+      expect(res.body.webhook.secret).toBeUndefined()
+      expect(res.body.webhook.hasSecret).toBe(true)
+    })
+
+    it('rejects updated webhook urls that target private IPs', async () => {
+      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
+      const { app } = createApp()
+      const res = await request(app)
+        .patch('/api/hub/webhooks/wh-1')
+        .send({ url: 'https://127.0.0.1/hook' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('webhook url must be https')
     })
   })
 

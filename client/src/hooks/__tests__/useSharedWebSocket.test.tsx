@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import React from 'react'
 import { SharedWebSocketProvider, useSharedWebSocket } from '../useSharedWebSocket'
+import { getHubTokenProtocol } from '../../lib/auth'
+
+vi.mock('../../lib/auth', () => ({
+  getHubTokenProtocol: vi.fn(() => undefined),
+}))
 
 // ─── Mock WebSocket ────────────────────────────────────────────────────────────
 
@@ -15,9 +20,11 @@ class MockWebSocket {
   onerror: ((e: unknown) => void) | null = null
   readyState = 0
   url: string
+  protocols?: string | string[]
 
-  constructor(url: string) {
+  constructor(url: string, protocols?: string | string[]) {
     this.url = url
+    this.protocols = protocols
     MockWebSocket.instances.push(this)
     MockWebSocket.lastInstance = this
   }
@@ -59,6 +66,8 @@ describe('useSharedWebSocket', () => {
     vi.useFakeTimers()
     MockWebSocket.instances = []
     MockWebSocket.lastInstance = null
+    vi.clearAllMocks()
+    vi.mocked(getHubTokenProtocol).mockReturnValue(undefined)
     ;(global as unknown as Record<string, unknown>).WebSocket = MockWebSocket
   })
 
@@ -70,6 +79,14 @@ describe('useSharedWebSocket', () => {
     renderHook(() => useSharedWebSocket(), { wrapper: makeWrapper() })
     expect(MockWebSocket.instances).toHaveLength(1)
     expect(MockWebSocket.instances[0].url).toBe('ws://localhost:4200')
+  })
+
+  it('uses hub token subprotocol when available', async () => {
+    vi.mocked(getHubTokenProtocol).mockReturnValue('hub-token.test')
+
+    renderHook(() => useSharedWebSocket(), { wrapper: makeWrapper() })
+
+    expect(MockWebSocket.instances[0].protocols).toEqual(['hub-token.test'])
   })
 
   it('sets connectionStatus to connected on open', async () => {

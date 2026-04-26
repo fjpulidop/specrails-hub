@@ -16,7 +16,7 @@ import { createHubRouter } from './hub-router'
 import { createProjectRouter } from './project-router'
 import { createHooksRouter, getPhaseStates, getPhaseDefinitions } from './hooks'
 import { createDocsRouter } from './docs-router'
-import { requireAuth, loadOrGenerateToken } from './auth'
+import { requireAuth, loadOrGenerateToken, tokenFromUpgradeRequest } from './auth'
 import { QueueManager, ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
 import { initDb, type DbInstance, listJobs, getJob, getJobEvents, getStats, purgeJobs,
   createConversation, listConversations, getConversation,
@@ -28,7 +28,7 @@ import type { ChatConversationRow } from './types'
 import { getConfig, fetchIssues } from './config'
 import { getAnalytics } from './analytics'
 import { resolveCommand } from './command-resolver'
-import { v4 as uuidv4 } from 'uuid'
+import { newId as uuidv4 } from './ids'
 import { getTerminalManager } from './terminal-manager'
 import { createTelemetryRouter } from './telemetry-receiver'
 import { runCompactionForAll } from './telemetry-compactor'
@@ -134,6 +134,10 @@ const app = express()
 //     custom scheme; shows up as a regular http origin from the fetch layer)
 const ALLOWED_ORIGIN_PATTERN = /^(https?:\/\/(localhost|127\.0\.0\.1|tauri\.localhost)(:\d+)?|tauri:\/\/localhost)$/
 
+function isAllowedBrowserOrigin(origin: string | undefined): boolean {
+  return origin === undefined || ALLOWED_ORIGIN_PATTERN.test(origin)
+}
+
 function corsMiddleware(req: Request, res: Response, next: NextFunction): void {
   const origin = req.headers['origin']
   if (origin) {
@@ -164,8 +168,13 @@ app.use(corsMiddleware)
 app.use(express.json({ limit: '1mb' }))
 
 const server = http.createServer(app)
-const wss = new WebSocketServer({ noServer: true })
-const terminalWss = new WebSocketServer({ noServer: true })
+const wsServerOptions = {
+  noServer: true,
+  handleProtocols: () => false,
+} satisfies ConstructorParameters<typeof WebSocketServer>[0]
+
+const wss = new WebSocketServer(wsServerOptions)
+const terminalWss = new WebSocketServer(wsServerOptions)
 const clients = new Set<WebSocket>()
 
 const TERMINAL_WS_RE = /^\/ws\/terminal\/([0-9a-f-]+)$/i
@@ -173,6 +182,16 @@ const TERMINAL_WS_RE = /^\/ws\/terminal\/([0-9a-f-]+)$/i
 function rejectUpgrade(socket: { write: (s: string) => void; destroy: () => void }, status: number, reason: string): void {
   socket.write(`HTTP/1.1 ${status} ${reason}\r\nConnection: close\r\n\r\n`)
   socket.destroy()
+}
+
+function authorizeUpgrade(request: http.IncomingMessage): 'ok' | 'forbidden' | 'unauthorized' {
+  const origin = request.headers.origin
+  if (!isAllowedBrowserOrigin(origin)) return 'forbidden'
+
+  const provided = tokenFromUpgradeRequest(request)
+  if (!provided || provided !== loadOrGenerateToken()) return 'unauthorized'
+
+  return 'ok'
 }
 
 function broadcast(msg: WsMessage): void {
@@ -191,16 +210,18 @@ let _legacyDb: DbInstance | null = null
 
 server.on('upgrade', (request, socket, head) => {
   const urlStr = request.url ?? '/'
-  // Terminal PTY WebSocket endpoint: /ws/terminal/:id?token=...&projectId=...
+  const auth = authorizeUpgrade(request)
+  if (auth === 'forbidden') return rejectUpgrade(socket, 403, 'Forbidden')
+  if (auth === 'unauthorized') return rejectUpgrade(socket, 401, 'Unauthorized')
+
+  // Terminal PTY WebSocket endpoint: /ws/terminal/:id?projectId=...
   const pathOnly = urlStr.split('?')[0]
   const termMatch = pathOnly.match(TERMINAL_WS_RE)
   if (termMatch) {
     if (!TERMINAL_PANEL_ENABLED) return rejectUpgrade(socket, 404, 'Not Found')
     let parsed: URL
     try { parsed = new URL(urlStr, 'http://localhost') } catch { return rejectUpgrade(socket, 400, 'Bad Request') }
-    const token = parsed.searchParams.get('token')
     const projectId = parsed.searchParams.get('projectId')
-    if (!token || token !== loadOrGenerateToken()) return rejectUpgrade(socket, 401, 'Unauthorized')
     const sessionId = termMatch[1]
     const tm = getTerminalManager()
     const session = tm.getUnsafe(sessionId)

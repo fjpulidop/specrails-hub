@@ -9,8 +9,8 @@ vi.mock('child_process', () => ({
   execSync: vi.fn(),
 }))
 
-vi.mock('uuid', () => ({
-  v4: vi.fn(() => 'test-uuid'),
+vi.mock('./ids', () => ({
+  newId: vi.fn(() => 'test-uuid'),
 }))
 
 vi.mock('tree-kill', () => ({
@@ -23,7 +23,7 @@ vi.mock('./hooks', () => ({
 }))
 
 import { spawn as mockSpawn, execSync as mockExecSync } from 'child_process'
-import { v4 as mockUuidV4 } from 'uuid'
+import { newId as mockUuidV4 } from './ids'
 import { QueueManager } from './queue-manager'
 import type { WsMessage } from './types'
 

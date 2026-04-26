@@ -7,6 +7,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
+import { getHubTokenProtocol } from '../lib/auth'
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
 
@@ -35,7 +36,8 @@ export function SharedWebSocketProvider({ url, children }: { url: string; childr
 
     function connect() {
       if (disposed) return
-      const ws = new WebSocket(url)
+      const protocol = getHubTokenProtocol()
+      const ws = protocol ? new WebSocket(url, [protocol]) : new WebSocket(url)
       wsRef.current = ws
       setConnectionStatus('connecting')
 

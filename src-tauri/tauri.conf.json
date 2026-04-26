@@ -21,7 +21,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; connect-src 'self' http://localhost:4200 http://127.0.0.1:4200 ws://localhost:4200 ws://127.0.0.1:4200; img-src 'self' blob: data: http://localhost:4200 http://127.0.0.1:4200; media-src 'self' blob:; frame-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     }
   },
   "bundle": {

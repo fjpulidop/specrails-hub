@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { getHubTokenProtocol } from '../lib/auth'
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
 
@@ -16,7 +17,8 @@ export function useWebSocket(
   onMessageRef.current = onMessage
 
   const connect = useCallback(() => {
-    const ws = new WebSocket(url)
+    const protocol = getHubTokenProtocol()
+    const ws = protocol ? new WebSocket(url, [protocol]) : new WebSocket(url)
     wsRef.current = ws
     setConnectionStatus('connecting')
 

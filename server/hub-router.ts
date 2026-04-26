@@ -1,7 +1,8 @@
 import { Router } from 'express'
-import { v4 as uuidv4 } from 'uuid'
+import { randomUUID } from 'crypto'
 import path from 'path'
 import fs from 'fs'
+import net from 'net'
 import type { WsMessage } from './types'
 import type { ProjectRegistry } from './project-registry'
 import { getHubSetting, setHubSetting, listProjects, listAgents, getAgent, addAgent, updateAgent, listWebhooks, getWebhook, addWebhook, updateWebhook, removeWebhook, getProjectSetupSession } from './hub-db'
@@ -52,6 +53,49 @@ function canonicalizePath(resolvedPath: string): string {
   } catch {
     return resolvedPath
   }
+}
+
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase()
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1'
+}
+
+function isPrivateIp(hostname: string): boolean {
+  const ipVersion = net.isIP(hostname)
+  if (ipVersion === 0) return false
+  if (ipVersion === 6) {
+    const host = hostname.toLowerCase()
+    return host === '::1' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:')
+  }
+  const parts = hostname.split('.').map((p) => Number.parseInt(p, 10))
+  const [a, b] = parts
+  return a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+}
+
+function validateHttpUrl(raw: string, opts: { allowLoopback: boolean; requireHttps: boolean }): string | null {
+  let parsed: URL
+  try {
+    parsed = new URL(raw)
+  } catch {
+    return null
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+  if (opts.requireHttps && parsed.protocol !== 'https:') {
+    if (!opts.allowLoopback || !isLoopbackHost(parsed.hostname)) return null
+  }
+  if (!opts.allowLoopback && (isLoopbackHost(parsed.hostname) || isPrivateIp(parsed.hostname))) return null
+  return parsed.toString().replace(/\/$/, '')
+}
+
+function publicWebhook(row: ReturnType<typeof getWebhook>) {
+  if (!row) return row
+  const { secret: _secret, ...rest } = row
+  return { ...rest, hasSecret: row.secret.length > 0 }
 }
 
 export function createHubRouter(
@@ -130,7 +174,7 @@ export function createHubRouter(
       ? name.trim()
       : deriveProjectName(canonicalPath)
     const slug = slugify(derivedName)
-    const id = crypto.randomUUID()
+    const id = randomUUID()
     const specrailsInstalled = hasSpecrails(canonicalPath)
 
     try {
@@ -237,7 +281,15 @@ export function createHubRouter(
       setHubSetting(registry.hubDb, 'port', String(port))
     }
     if (specrailsTechUrl !== undefined && typeof specrailsTechUrl === 'string') {
-      setHubSetting(registry.hubDb, 'specrails_tech_url', specrailsTechUrl.trim())
+      const normalized = validateHttpUrl(specrailsTechUrl.trim(), {
+        allowLoopback: true,
+        requireHttps: false,
+      })
+      if (!normalized) {
+        res.status(400).json({ error: 'specrailsTechUrl must be a valid http(s) URL' })
+        return
+      }
+      setHubSetting(registry.hubDb, 'specrails_tech_url', normalized)
     }
     if (costAlertThresholdUsd !== undefined) {
       if (costAlertThresholdUsd === null) {
@@ -312,7 +364,7 @@ export function createHubRouter(
       res.status(400).json({ error: 'name is required' })
       return
     }
-    const id = crypto.randomUUID()
+    const id = randomUUID()
     try {
       const agent = addAgent(registry.hubDb, { id, slug, name, role, config })
       res.status(201).json({ agent })
@@ -429,7 +481,7 @@ export function createHubRouter(
 
   // GET /api/hub/webhooks — list all webhooks
   router.get('/webhooks', (_req, res) => {
-    res.json({ webhooks: listWebhooks(registry.hubDb) })
+    res.json({ webhooks: listWebhooks(registry.hubDb).map(publicWebhook) })
   })
 
   // POST /api/hub/webhooks — create a webhook
@@ -458,14 +510,23 @@ export function createHubRouter(
       }
     }
 
+    const normalizedUrl = validateHttpUrl(url.trim(), {
+      allowLoopback: process.env.SPECRAILS_ALLOW_LOCAL_WEBHOOKS === '1',
+      requireHttps: true,
+    })
+    if (!normalizedUrl) {
+      res.status(400).json({ error: 'webhook url must be https and must not target localhost/private IPs' })
+      return
+    }
+
     const webhook = addWebhook(registry.hubDb, {
-      id: uuidv4(),
+      id: randomUUID(),
       projectId: projectId ?? null,
-      url: url.trim(),
+      url: normalizedUrl,
       secret: typeof secret === 'string' ? secret.trim() : '',
       events: parsedEvents,
     })
-    res.status(201).json({ webhook })
+    res.status(201).json({ webhook: publicWebhook(webhook) })
   })
 
   // PATCH /api/hub/webhooks/:id — update a webhook
@@ -482,13 +543,26 @@ export function createHubRouter(
       ? (events as string[]).filter((e): e is WebhookEvent => validEvents.includes(e as WebhookEvent))
       : undefined
 
+    let normalizedUrl: string | undefined
+    if (typeof url === 'string') {
+      const candidate = validateHttpUrl(url.trim(), {
+        allowLoopback: process.env.SPECRAILS_ALLOW_LOCAL_WEBHOOKS === '1',
+        requireHttps: true,
+      })
+      if (!candidate) {
+        res.status(400).json({ error: 'webhook url must be https and must not target localhost/private IPs' })
+        return
+      }
+      normalizedUrl = candidate
+    }
+
     const updated = updateWebhook(registry.hubDb, req.params.id, {
-      url: typeof url === 'string' ? url.trim() : undefined,
+      url: normalizedUrl,
       secret: typeof secret === 'string' ? secret.trim() : undefined,
       events: parsedEvents,
       enabled: typeof enabled === 'boolean' ? enabled : undefined,
     })
-    res.json({ webhook: updated })
+    res.json({ webhook: publicWebhook(updated) })
   })
 
   // DELETE /api/hub/webhooks/:id — delete a webhook

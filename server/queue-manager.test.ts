@@ -6,14 +6,14 @@ import os from 'os'
 import path from 'path'
 import { initDb, updateProjectSettings } from './db'
 
-// Mock child_process and uuid before importing queue-manager
+// Mock child_process and ids before importing queue-manager
 vi.mock('child_process', () => ({
   spawn: vi.fn(),
   execSync: vi.fn(),
 }))
 
-vi.mock('uuid', () => ({
-  v4: vi.fn(() => 'test-uuid-1111'),
+vi.mock('./ids', () => ({
+  newId: vi.fn(() => 'test-uuid-1111'),
 }))
 
 vi.mock('tree-kill', () => ({
@@ -28,7 +28,7 @@ vi.mock('./hooks', () => ({
 
 import { spawn as mockSpawn, execSync as mockExecSync } from 'child_process'
 import treeKill from 'tree-kill'
-import { v4 as mockUuidV4 } from 'uuid'
+import { newId as mockUuidV4 } from './ids'
 import { QueueManager, ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
 import { attachmentManager } from './attachment-manager'
 import type { WsMessage } from './types'

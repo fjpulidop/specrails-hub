@@ -1,7 +1,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import { v4 as uuid } from 'uuid'
+import { newId } from './ids'
 import {
   Attachment,
   mutateStore,
@@ -107,7 +107,7 @@ export class AttachmentManager {
       err.status = 400
       throw err
     }
-    const id = uuid()
+    const id = newId()
     const storedName = `${id}-${sanitizeFilename(opts.file.originalname)}`
     const attachment: Attachment = {
       id,
@@ -306,15 +306,18 @@ async function extractText(absPath: string, mimeType: string): Promise<string> {
     return res.text
   }
   if (EXCEL_MIMES.has(mimeType)) {
-    const XLSX = require('xlsx') as typeof import('xlsx')
-    const wb = XLSX.readFile(absPath)
-    const sheetName = wb.SheetNames[0]
-    if (!sheetName) return ''
-    const sheet = wb.Sheets[sheetName]
-    return XLSX.utils.sheet_to_csv(sheet)
+    const readXlsxFile = require('read-excel-file/node') as (filePath: string) => Promise<unknown[][]>
+    const rows = await readXlsxFile(absPath)
+    return rows.map((row) => row.map(csvCell).join(',')).join('\n')
   }
   // csv, txt, json, sql -> utf-8 raw
   return fs.readFileSync(absPath, 'utf-8')
+}
+
+function csvCell(value: unknown): string {
+  if (value == null) return ''
+  const text = String(typeof value === 'object' && 'text' in value ? value.text : value)
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
 /** Helper that hub injects into the system prompt so Claude treats <user-attachment> as untrusted. */

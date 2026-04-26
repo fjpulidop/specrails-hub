@@ -65,6 +65,16 @@ describe('auth', () => {
       const { getHubToken } = await import('../auth')
       expect(getHubToken()).toBeNull()
     })
+
+    it('returns a WebSocket subprotocol when token is initialized', async () => {
+      ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: 'abc123' }),
+      })
+      const { initAuth, getHubTokenProtocol } = await import('../auth')
+      await initAuth()
+      expect(getHubTokenProtocol()).toBe('hub-token.abc123')
+    })
   })
 
   describe('installFetchInterceptor', () => {
@@ -184,6 +194,31 @@ describe('auth', () => {
       const lastCall = spyFetch.mock.calls[spyFetch.mock.calls.length - 1]
       const callInit = lastCall[1]
       // External URLs pass through unchanged — no X-Hub-Token header modification
+      if (callInit?.headers) {
+        const headers = callInit.headers as Headers
+        expect(headers.get?.('X-Hub-Token')).toBeNull()
+      }
+    })
+
+    it('does not add header to unrelated localhost URLs', async () => {
+      const spyFetch = vi.fn(() =>
+        Promise.resolve({ ok: true, json: async () => ({}) } as Response)
+      )
+      ;(window as unknown as Record<string, unknown>).fetch = spyFetch
+
+      spyFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: 'my-token' }),
+      } as unknown as Response)
+
+      const { initAuth, installFetchInterceptor } = await import('../auth')
+      await initAuth()
+      installFetchInterceptor()
+
+      await window.fetch('http://localhost:9999/data')
+
+      const lastCall = spyFetch.mock.calls[spyFetch.mock.calls.length - 1]
+      const callInit = lastCall[1]
       if (callInit?.headers) {
         const headers = callInit.headers as Headers
         expect(headers.get?.('X-Hub-Token')).toBeNull()
