@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { Search } from 'lucide-react'
+import { Minus, Search, Square, X } from 'lucide-react'
 import { useHub } from '../hooks/useHub'
 
 // ─── Detect Tauri environment ─────────────────────────────────────────────────
@@ -47,12 +47,13 @@ function SRIcon() {
 
 interface WinButtonProps {
   onClick: () => void
-  label: string
+  icon: React.ReactNode
   hoverColor: string
+  hoverTextColor?: string
   ariaLabel: string
 }
 
-function WinButton({ onClick, label, hoverColor, ariaLabel }: WinButtonProps) {
+function WinButton({ onClick, icon, hoverColor, hoverTextColor = '#f8f8f2', ariaLabel }: WinButtonProps) {
   const [hovered, setHovered] = useState(false)
 
   return (
@@ -62,22 +63,21 @@ function WinButton({ onClick, label, hoverColor, ariaLabel }: WinButtonProps) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        width: 28,
+        width: 34,
         height: 28,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 4,
+        borderRadius: 7,
         border: 'none',
         cursor: 'pointer',
         background: hovered ? hoverColor : 'transparent',
-        color: '#f8f8f2',
-        fontSize: 14,
-        lineHeight: 1,
-        transition: 'background 0.1s ease',
-      }}
+        color: hovered ? hoverTextColor : 'rgba(248,248,242,0.62)',
+        transition: 'background 0.12s ease, color 0.12s ease',
+        WebkitAppRegion: 'no-drag',
+      } as React.CSSProperties}
     >
-      {label}
+      {icon}
     </button>
   )
 }
@@ -152,7 +152,8 @@ function SearchPill({ projectName }: { projectName: string | null }) {
  * Custom frameless titlebar for the Tauri desktop app.
  *
  * macOS (titleBarStyle: Overlay): compact 28px drag region + centered search pill.
- * Windows/Linux: 38px bar with SR icon, app name, and custom window control buttons.
+ * Windows/Linux: matching compact chrome with centered search pill and quiet
+ * custom window controls.
  *
  * Renders null in browser / non-Tauri contexts — no impact on web usage.
  * Must be mounted as the very first child of the root layout so it sits at
@@ -195,6 +196,8 @@ function MacTitleBar() {
 }
 
 function DefaultTitleBar() {
+  const { projects, activeProjectId } = useHub()
+  const activeProject = projects.find((p) => p.id === activeProjectId) ?? null
   const appWindow = getCurrentWindow()
 
   const handleMinimize = useCallback(() => {
@@ -213,52 +216,67 @@ function DefaultTitleBar() {
     <div
       data-tauri-drag-region
       style={{
-        height: 38,
-        minHeight: 38,
+        position: 'relative',
+        height: 36,
+        minHeight: 36,
         background: '#282a36',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 8px 0 12px',
+        padding: '0 10px',
         userSelect: 'none',
         flexShrink: 0,
+        borderBottom: '1px solid #44475a',
       }}
     >
-      {/* Left: SR icon + app name */}
+      <SearchPill projectName={activeProject?.name ?? null} />
+
+      {/* Left: restrained brand mark, keeps Windows chrome aligned with macOS */}
       <div
         data-tauri-drag-region
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: 8,
-          color: '#f8f8f2',
-          fontSize: 13,
-          fontWeight: 500,
+          minWidth: 116,
+          color: 'rgba(248,248,242,0.78)',
+          fontSize: 12,
+          fontWeight: 600,
           pointerEvents: 'none',
         }}
       >
         <SRIcon />
-        SpecRails Hub
+        <span style={{ opacity: 0.9 }}>SpecRails Hub</span>
       </div>
 
-      {/* Right: window control buttons */}
-      <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+      {/* Right: native-feeling window controls for frameless Windows/Linux */}
+      <div
+        style={{
+          minWidth: 116,
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 2,
+          alignItems: 'center',
+          WebkitAppRegion: 'no-drag',
+        } as React.CSSProperties}
+      >
         <WinButton
           onClick={handleMinimize}
-          label="−"
-          hoverColor="#44475a"
+          icon={<Minus size={14} strokeWidth={1.8} />}
+          hoverColor="rgba(68,71,90,0.8)"
           ariaLabel="Minimize window"
         />
         <WinButton
           onClick={handleMaximize}
-          label="□"
-          hoverColor="#44475a"
+          icon={<Square size={12} strokeWidth={1.8} />}
+          hoverColor="rgba(68,71,90,0.8)"
           ariaLabel="Maximize window"
         />
         <WinButton
           onClick={handleClose}
-          label="✕"
-          hoverColor="#ff5555"
+          icon={<X size={15} strokeWidth={1.8} />}
+          hoverColor="rgba(255,85,85,0.92)"
+          hoverTextColor="#282a36"
           ariaLabel="Close window"
         />
       </div>
