@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.40.1](https://github.com/fjpulidop/specrails-hub/compare/v1.40.0...v1.40.1) (2026-04-26)
+
+
+### Bug Fixes
+
+* harden hub security boundaries ([#253](https://github.com/fjpulidop/specrails-hub/issues/253)) ([e194a91](https://github.com/fjpulidop/specrails-hub/commit/e194a91e76def475237925dbaf3d26c82e59d75e))
+
 ## [1.40.0](https://github.com/fjpulidop/specrails-hub/compare/v1.39.0...v1.40.0) (2026-04-26)
 
 
