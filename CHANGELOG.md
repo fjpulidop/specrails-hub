@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.41.0](https://github.com/fjpulidop/specrails-hub/compare/v1.40.1...v1.41.0) (2026-04-26)
+
+
+### Features
+
+* release desktop updater and unified title bar ([#257](https://github.com/fjpulidop/specrails-hub/issues/257)) ([dc9e8a4](https://github.com/fjpulidop/specrails-hub/commit/dc9e8a4fbd80bdc4ef9ec6736632011700db14f9))
+
 ## [1.40.1](https://github.com/fjpulidop/specrails-hub/compare/v1.40.0...v1.40.1) (2026-04-26)
 
 
