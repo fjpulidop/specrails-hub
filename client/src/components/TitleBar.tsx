@@ -15,34 +15,6 @@ function isMacOverlay(): boolean {
   return isTauriEnv() && /mac/i.test(navigator.platform)
 }
 
-// ─── SR lettermark icon ───────────────────────────────────────────────────────
-
-function SRIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 512 512"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-      style={{ flexShrink: 0 }}
-    >
-      <rect width="512" height="512" rx="100" fill="#6272a4" />
-      <text
-        x="256"
-        y="340"
-        fontFamily="system-ui,sans-serif"
-        fontWeight="bold"
-        fontSize="280"
-        textAnchor="middle"
-        fill="#f8f8f2"
-      >
-        SR
-      </text>
-    </svg>
-  )
-}
-
 // ─── Window control button ────────────────────────────────────────────────────
 
 interface WinButtonProps {
@@ -231,23 +203,7 @@ function DefaultTitleBar() {
     >
       <SearchPill projectName={activeProject?.name ?? null} />
 
-      {/* Left: restrained brand mark, keeps Windows chrome aligned with macOS */}
-      <div
-        data-tauri-drag-region
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          minWidth: 116,
-          color: 'rgba(248,248,242,0.78)',
-          fontSize: 12,
-          fontWeight: 600,
-          pointerEvents: 'none',
-        }}
-      >
-        <SRIcon />
-        <span style={{ opacity: 0.9 }}>SpecRails Hub</span>
-      </div>
+      <div data-tauri-drag-region style={{ minWidth: 116, height: '100%' }} />
 
       {/* Right: native-feeling window controls for frameless Windows/Linux */}
       <div
