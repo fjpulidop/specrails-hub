@@ -393,7 +393,6 @@ export default function App() {
           )}
           <Toaster
             position="bottom-right"
-            offset={{ bottom: 40, right: 16 }}
             theme="dark"
             gap={8}
             closeButton
