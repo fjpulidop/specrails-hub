@@ -60,20 +60,20 @@ describe('TabBar', () => {
   it('active tab has distinct styling (bg-background class)', () => {
     render(<TabBar onAddProject={vi.fn()} />)
     // Active project is proj-1 = "Project One"
-    const activeBtn = screen.getByText('Project One').closest('button')
+    const activeBtn = screen.getByText('Project One').closest('[role="button"]')
     expect(activeBtn).toHaveClass('bg-background')
   })
 
   it('inactive tab does not have bg-background class', () => {
     render(<TabBar onAddProject={vi.fn()} />)
-    const inactiveBtn = screen.getByText('Project Two').closest('button')
+    const inactiveBtn = screen.getByText('Project Two').closest('[role="button"]')
     expect(inactiveBtn).not.toHaveClass('bg-background')
   })
 
   it('clicking a tab calls setActiveProjectId with correct id', async () => {
     const user = userEvent.setup()
     render(<TabBar onAddProject={vi.fn()} />)
-    const tab = screen.getByText('Project Two').closest('button')!
+    const tab = screen.getByText('Project Two').closest('[role="button"]')!
     await user.click(tab)
     expect(mockSetActiveProjectId).toHaveBeenCalledWith('proj-2')
   })

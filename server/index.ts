@@ -170,7 +170,15 @@ app.use(express.json({ limit: '1mb' }))
 const server = http.createServer(app)
 const wsServerOptions = {
   noServer: true,
-  handleProtocols: () => false,
+  handleProtocols: (protocols: Set<string>) => {
+    if (protocols.has('specrails-hub')) return 'specrails-hub'
+
+    // Backward compatibility for clients that only offer the auth carrier.
+    for (const protocol of protocols) {
+      if (protocol.startsWith('hub-token.')) return protocol
+    }
+    return false
+  },
 } satisfies ConstructorParameters<typeof WebSocketServer>[0]
 
 const wss = new WebSocketServer(wsServerOptions)

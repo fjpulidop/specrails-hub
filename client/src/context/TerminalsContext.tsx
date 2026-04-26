@@ -472,7 +472,7 @@ function ensureXtermForSession(
   const wsUrl = `${wsBase}/ws/terminal/${sessionId}?projectId=${encodeURIComponent(projectId)}`
 
   const protocol = getHubTokenProtocol()
-  const ws = protocol ? new WebSocket(wsUrl, [protocol]) : new WebSocket(wsUrl)
+  const ws = protocol ? new WebSocket(wsUrl, ['specrails-hub', protocol]) : new WebSocket(wsUrl)
   ws.binaryType = 'arraybuffer'
 
   const disposers: Array<() => void> = []

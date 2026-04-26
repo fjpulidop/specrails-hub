@@ -30,7 +30,7 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [availableProviders, setAvailableProviders] = useState<{ claude: boolean; codex: boolean }>({ claude: true, codex: false })
 
-  const { startSetupWizard, setActiveProjectId } = useHub()
+  const { addProject, startSetupWizard, setActiveProjectId } = useHub()
 
   useEffect(() => {
     if (!open) return
@@ -54,24 +54,14 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
 
     setIsAdding(true)
     try {
-      const res = await fetch('/api/hub/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          path: trimmedPath,
-          name: projectName.trim() || undefined,
-          provider: selectedProvider,
-        }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        toast.error('Failed to add project', { description: data.error })
+      if (selectedProvider !== 'claude') {
+        toast.error('Codex support is coming soon')
         return
       }
 
-      const project = data.project
+      const data = await addProject(trimmedPath, projectName.trim() || undefined, selectedProvider)
+      if (!data) return
+      const { project } = data
 
       if (data.has_specrails === false) {
         resetAndClose()

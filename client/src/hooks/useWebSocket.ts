@@ -18,7 +18,7 @@ export function useWebSocket(
 
   const connect = useCallback(() => {
     const protocol = getHubTokenProtocol()
-    const ws = protocol ? new WebSocket(url, [protocol]) : new WebSocket(url)
+    const ws = protocol ? new WebSocket(url, ['specrails-hub', protocol]) : new WebSocket(url)
     wsRef.current = ws
     setConnectionStatus('connecting')
 

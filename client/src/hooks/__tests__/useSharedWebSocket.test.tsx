@@ -86,7 +86,7 @@ describe('useSharedWebSocket', () => {
 
     renderHook(() => useSharedWebSocket(), { wrapper: makeWrapper() })
 
-    expect(MockWebSocket.instances[0].protocols).toEqual(['hub-token.test'])
+    expect(MockWebSocket.instances[0].protocols).toEqual(['specrails-hub', 'hub-token.test'])
   })
 
   it('sets connectionStatus to connected on open', async () => {

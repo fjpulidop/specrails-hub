@@ -103,7 +103,7 @@ describe('useHub', () => {
     const newProject = makeProject({ id: 'new-proj', name: 'New Project' })
     ;(global.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ projects: [] }) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ project: newProject }) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ project: newProject, has_specrails: true }) })
 
     const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
@@ -117,7 +117,9 @@ describe('useHub', () => {
       '/api/hub/projects',
       expect.objectContaining({ method: 'POST' })
     )
-    expect(returned).toEqual(newProject)
+    expect(returned).toEqual({ project: newProject, has_specrails: true })
+    expect(result.current.projects).toContainEqual(newProject)
+    expect(result.current.activeProjectId).toBe('new-proj')
   })
 
   it('removeProject: DELETEs project', async () => {
@@ -136,6 +138,7 @@ describe('useHub', () => {
       '/api/hub/projects/proj-1',
       expect.objectContaining({ method: 'DELETE' })
     )
+    expect(result.current.projects).toHaveLength(0)
   })
 
   it('WS hub.projects: bulk update', async () => {
