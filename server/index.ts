@@ -128,8 +128,11 @@ const app = express()
 
 // ─── CORS — allow only localhost origins (CRIT-02) ────────────────────────────
 
-// tauri://localhost is the origin used by Tauri's WebView in the desktop app
-const ALLOWED_ORIGIN_PATTERN = /^(https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?|tauri:\/\/localhost)$/
+// Tauri's desktop WebView exposes two different origin formats:
+//   - macOS / Linux: tauri://localhost
+//   - Windows WebView2: http://tauri.localhost (virtual-host mapping on the
+//     custom scheme; shows up as a regular http origin from the fetch layer)
+const ALLOWED_ORIGIN_PATTERN = /^(https?:\/\/(localhost|127\.0\.0\.1|tauri\.localhost)(:\d+)?|tauri:\/\/localhost)$/
 
 function corsMiddleware(req: Request, res: Response, next: NextFunction): void {
   const origin = req.headers['origin']

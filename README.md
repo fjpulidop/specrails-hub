@@ -18,9 +18,10 @@ A local dashboard and CLI for managing all your [specrails-core](https://github.
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 20+ (specrails-core ≥ 4.2.0 dependency)
 - `claude` CLI on your PATH ([Claude Code](https://claude.com/claude-code))
-- At least one project with specrails-core installed (`npx specrails-core`)
+- At least one project with specrails-core installed (`npx specrails-core@latest init`)
+- **Windows users:** see [docs/windows.md](docs/windows.md) for Windows 10/11 specifics (PowerShell ExecutionPolicy, SmartScreen warning, ARM64 emulation)
 
 ## Installation
 

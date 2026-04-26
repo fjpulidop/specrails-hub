@@ -1,8 +1,9 @@
-import { spawn, ChildProcess } from 'child_process'
+import { ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
 import { resolveCommand } from './command-resolver'
+import { spawnClaude } from './util/cli-prompt'
 
 // ─── SpecLauncherManager ──────────────────────────────────────────────────────
 
@@ -39,15 +40,31 @@ export class SpecLauncherManager {
       '-p', prompt,
     ]
 
-    const child = spawn('claude', args, {
+    // spawnClaude reroutes multi-line argv values through stdin on Windows.
+    const child = spawnClaude(args, {
       env: process.env,
-      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })
 
     this._activeProcesses.set(launchId, child)
     this._buffers.set(launchId, '')
+
+    // Surface ENOENT (e.g. claude not on PATH) instead of crashing the hub.
+    /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
+    child.on('error', (err) => {
+      console.error(`[SpecLauncherManager] spawn failed for ${launchId}: ${err.message}`)
+      this._activeProcesses.delete(launchId)
+      this._buffers.delete(launchId)
+      this._broadcast({
+        type: 'spec_launcher_error',
+        projectId: '',
+        launchId,
+        error: `Failed to launch claude: ${err.message}`,
+        timestamp: new Date().toISOString(),
+      })
+    })
+    /* c8 ignore stop */
 
     // Capture last change ID from output (opsx:ff usually prints the change name)
     let detectedChangeId: string | null = null

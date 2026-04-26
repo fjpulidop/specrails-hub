@@ -7,7 +7,7 @@
     "url": "git+https://github.com/fjpulidop/specrails-hub.git"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "bin": {
     "specrails-hub": "cli/dist/specrails-hub.js"
@@ -24,7 +24,7 @@
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "cd client && npm run dev",
     "dev:desktop": "tauri dev",
-    "build:server": "rm -rf server/dist && tsc --project tsconfig.json",
+    "build:server": "node -e \"require('fs').rmSync('server/dist',{recursive:true,force:true})\" && tsc --project tsconfig.json",
     "build:cli": "tsc --project tsconfig.cli.json",
     "build": "npm run build:server && cd client && npm run build && cd .. && npm run build:cli",
     "build:sidecar": "node scripts/build-sidecar.mjs",
@@ -44,6 +44,7 @@
     "ajv": "^8.17.1",
     "better-sqlite3": "^12.8.0",
     "chokidar": "^5.0.0",
+    "cross-spawn": "^7.0.6",
     "diff": "^9.0.0",
     "express": "^5.2.1",
     "multer": "^2.1.1",
@@ -58,6 +59,7 @@
     "@tauri-apps/cli": "^2.0.0",
     "@types/better-sqlite3": "^7.6.0",
     "@types/chokidar": "^1.7.5",
+    "@types/cross-spawn": "^6.0.6",
     "@types/diff": "^7.0.2",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.1.0",

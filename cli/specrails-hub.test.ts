@@ -678,6 +678,36 @@ process.exit(0);
 // ---------------------------------------------------------------------------
 
 describe('hubStart', () => {
+  // hubStart short-circuits with "hub already running" when
+  // ~/.specrails/manager.pid points at a live PID. Tests must not
+  // depend on the developer's machine state — back up + clear the
+  // pid file for the duration of each test, restore afterwards.
+  let _pidBackup: string | null = null
+
+  beforeEach(() => {
+    try {
+      _pidBackup = fs.readFileSync(_internal.HUB_PID_FILE, 'utf-8')
+    } catch {
+      _pidBackup = null
+    }
+    try {
+      fs.rmSync(_internal.HUB_PID_FILE, { force: true })
+    } catch {
+      /* not present — fine */
+    }
+  })
+
+  afterEach(() => {
+    if (_pidBackup !== null) {
+      try {
+        fs.mkdirSync(path.dirname(_internal.HUB_PID_FILE), { recursive: true })
+        fs.writeFileSync(_internal.HUB_PID_FILE, _pidBackup, 'utf-8')
+      } catch {
+        /* best-effort restore */
+      }
+    }
+  })
+
   it('port busy error', async () => {
     const srv = net.createServer()
     await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r))

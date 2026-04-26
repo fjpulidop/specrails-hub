@@ -108,46 +108,56 @@ pub fn run() {
                 std::process::exit(1);
             }
 
-            // --- Resolve user's shell PATH (GUI apps get a minimal PATH from launchd) ---
-            // Strategy: merge the zsh login PATH with hardcoded user bin dirs so
-            // tools like claude (in ~/.local/bin) are always found from Finder/Dock.
-            let home = dirs_next::home_dir()
-                .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
-            let home_s = home.to_string_lossy();
-
-            // Try to get PATH from a zsh login shell
-            let zsh_path = std::process::Command::new("/bin/zsh")
-                .args(["-l", "-c", "echo $PATH"])
-                .output()
-                .ok()
-                .and_then(|o| String::from_utf8(o.stdout).ok())
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .unwrap_or_default();
-
-            // Always-prepend: common user tool dirs that GUI apps miss
-            let prepend = format!(
-                "{home}/.local/bin:{home}/.bun/bin:{home}/.cargo/bin:\
-                 /opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin",
-                home = home_s
-            );
-
-            // Merge: prepend + zsh path + system fallback (dedup not needed — PATH search is first-wins)
-            let base = if zsh_path.is_empty() {
-                "/usr/bin:/bin:/usr/sbin:/sbin".to_string()
-            } else {
-                zsh_path
-            };
-            let shell_path = format!("{prepend}:{base}");
-
             // --- Spawn sidecar ---
             let parent_pid_arg = format!("--parent-pid={}", std::process::id());
-            let (mut rx, child) = app_handle
+
+            let sidecar = app_handle
                 .shell()
                 .sidecar("specrails-server")
                 .expect("specrails-server sidecar not configured")
-                .args([&parent_pid_arg])
-                .env("PATH", &shell_path)
+                .args([&parent_pid_arg]);
+
+            // On macOS, GUI apps launched from Finder/Dock inherit a minimal PATH
+            // from launchd that omits user tool dirs (homebrew, cargo, bun,
+            // ~/.local/bin). We rebuild PATH from a zsh login shell and prepend
+            // well-known locations so tools like `claude` are found.
+            //
+            // On Windows and Linux, GUI apps inherit the user's PATH correctly
+            // from Explorer / the desktop environment, so we do NOT override —
+            // any override here would be POSIX-only garbage and hide real tools.
+            #[cfg(target_os = "macos")]
+            let sidecar = {
+                let home = dirs_next::home_dir()
+                    .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+                let home_s = home.to_string_lossy();
+
+                // zsh login PATH (covers nvm, pyenv, etc. configured in .zshrc)
+                let zsh_path = std::process::Command::new("/bin/zsh")
+                    .args(["-l", "-c", "echo $PATH"])
+                    .output()
+                    .ok()
+                    .and_then(|o| String::from_utf8(o.stdout).ok())
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_default();
+
+                let prepend = format!(
+                    "{home}/.local/bin:{home}/.bun/bin:{home}/.cargo/bin:\
+                     /opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin",
+                    home = home_s
+                );
+
+                let base = if zsh_path.is_empty() {
+                    "/usr/bin:/bin:/usr/sbin:/sbin".to_string()
+                } else {
+                    zsh_path
+                };
+                let shell_path = format!("{prepend}:{base}");
+
+                sidecar.env("PATH", &shell_path)
+            };
+
+            let (mut rx, child) = sidecar
                 .spawn()
                 .expect("failed to spawn specrails-server sidecar");
 

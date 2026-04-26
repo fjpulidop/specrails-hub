@@ -46,6 +46,14 @@ function hasSpecrails(projectPath: string): boolean {
     || hasCommandFiles(path.join(projectPath, '.claude', 'commands', 'specrails'))
 }
 
+function canonicalizePath(resolvedPath: string): string {
+  try {
+    return fs.realpathSync(resolvedPath)
+  } catch {
+    return resolvedPath
+  }
+}
+
 export function createHubRouter(
   registry: ProjectRegistry,
   broadcast: (msg: WsMessage) => void
@@ -110,21 +118,23 @@ export function createHubRouter(
       return
     }
 
+    const canonicalPath = canonicalizePath(resolvedPath)
+
     // LOW-04: Reject registration of system-critical directories
-    if (!isPathSafe(resolvedPath)) {
+    if (!isPathSafe(canonicalPath)) {
       res.status(400).json({ error: 'Registering system directories is not allowed' })
       return
     }
 
     const derivedName = (name && typeof name === 'string' && name.trim())
       ? name.trim()
-      : deriveProjectName(resolvedPath)
+      : deriveProjectName(canonicalPath)
     const slug = slugify(derivedName)
     const id = crypto.randomUUID()
-    const specrailsInstalled = hasSpecrails(resolvedPath)
+    const specrailsInstalled = hasSpecrails(canonicalPath)
 
     try {
-      const ctx = registry.addProject({ id, slug, name: derivedName, path: resolvedPath, provider: provider ?? 'claude' })
+      const ctx = registry.addProject({ id, slug, name: derivedName, path: canonicalPath, provider: provider ?? 'claude' })
       broadcast({
         type: 'hub.project_added',
         project: ctx.project,
@@ -197,7 +207,7 @@ export function createHubRouter(
       return
     }
 
-    const resolvedPath = path.resolve(queryPath)
+    const resolvedPath = canonicalizePath(path.resolve(queryPath))
     const ctx = registry.getContextByPath(resolvedPath)
     if (!ctx) {
       res.status(404).json({ error: 'No project registered for this path' })

@@ -1,4 +1,4 @@
-import { spawn, execSync, ChildProcess } from 'child_process'
+import { execSync, ChildProcess } from 'child_process'
 import fsNode from 'fs'
 import pathNode from 'path'
 import { createInterface } from 'readline'
@@ -7,6 +7,7 @@ import treeKill from 'tree-kill'
 import type { WsMessage, LogMessage, Job, PhaseDefinition, JobPriority } from './types'
 import { PRIORITY_WEIGHT, VALID_PRIORITIES } from './types'
 import { resolveCommand } from './command-resolver'
+import { spawnAiCli } from './util/cli-prompt'
 import { resetPhases, setActivePhases } from './hooks'
 import { createJob, finishJob, appendEvent, skipJob, getProjectSettings } from './db'
 import type { JobResult } from './db'
@@ -100,9 +101,13 @@ export class JobAlreadyTerminalError extends Error {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Windows has no `which`; probe via `where` instead. Both exit non-zero
+// when the command is missing, which the try/catch relies on.
+const _WHICH_CMD = process.platform === 'win32' ? 'where' : 'which'
+
 function claudeOnPath(): boolean {
   try {
-    execSync('which claude', { stdio: 'ignore' })
+    execSync(`${_WHICH_CMD} claude`, { stdio: 'ignore' })
     return true
   } catch {
     return false
@@ -111,7 +116,7 @@ function claudeOnPath(): boolean {
 
 function codexOnPath(): boolean {
   try {
-    execSync('which codex', { stdio: 'ignore' })
+    execSync(`${_WHICH_CMD} codex`, { stdio: 'ignore' })
     return true
   } catch {
     return false
@@ -675,15 +680,24 @@ export class QueueManager {
       spawnEnv = { ...spawnEnv, SPECRAILS_PROFILE_PATH: profileSnapshotPath }
     }
 
-    const child = spawn(binary, args, {
+    // spawnAiCli reroutes multi-line argv values through stdin on Windows.
+    const child = spawnAiCli(binary, args, {
       env: spawnEnv,
-      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })
 
     this._activeProcess = child
     this._activeJobId = jobId
+
+    // Without this listener, an ENOENT (e.g. claude not on PATH) propagates
+    // as an unhandled 'error' event and crashes the entire hub. Node still
+    // emits 'close' afterwards, so the existing close handler fails the job
+    // through the normal path — we only need to absorb the error event.
+    /* c8 ignore next 3 -- spawn-failure path; exercised manually, not in CI */
+    child.on('error', (err) => {
+      console.error(`[QueueManager] spawn failed for job ${jobId} (${binary}): ${err.message}`)
+    })
 
     // Start zombie detection timer. Reset on any raw data from the process.
     // Using 'data' events (not readline 'line') ensures the timer resets

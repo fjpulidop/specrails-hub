@@ -1,19 +1,23 @@
-import { spawn, execSync, ChildProcess } from 'child_process'
+import { execSync, ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
 import type { DbInstance } from './db'
 import { getConversation, addMessage, updateConversation, getStats, listJobs } from './db'
 import { resolveCommand } from './command-resolver'
+import { spawnAiCli, spawnClaude, spawnCodex } from './util/cli-prompt'
 
 const COMMAND_INSTRUCTION =
   'When you want to suggest a SpecRails command for the user to execute, wrap it in a command block like this: ' +
   ':::command\n/specrails:implement #42\n::: ' +
   'The user will be prompted to confirm before the command runs.'
 
+// Windows has no `which`; probe via `where` instead.
+const _WHICH_CMD = process.platform === 'win32' ? 'where' : 'which'
+
 function claudeOnPath(): boolean {
   try {
-    execSync('which claude', { stdio: 'ignore' })
+    execSync(`${_WHICH_CMD} claude`, { stdio: 'ignore' })
     return true
   } catch {
     return false
@@ -22,7 +26,7 @@ function claudeOnPath(): boolean {
 
 function codexOnPath(): boolean {
   try {
-    execSync('which codex', { stdio: 'ignore' })
+    execSync(`${_WHICH_CMD} codex`, { stdio: 'ignore' })
     return true
   } catch {
     return false
@@ -246,9 +250,9 @@ export class ChatManager {
 
     // No OTEL env injection here — ChatManager spawns are interactive user sessions,
     // not pipeline jobs. Telemetry is scoped to QueueManager pipeline runs only.
-    const child = spawn(binary, args, {
+    // spawnAiCli reroutes multi-line argv values through stdin on Windows.
+    const child = spawnAiCli(binary, args, {
       env: process.env,
-      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })
@@ -262,6 +266,22 @@ export class ChatManager {
     this._activeProcesses.set(conversationId, child)
     this._buffers.set(conversationId, '')
     this._emittedProposals.set(conversationId, new Set())
+
+    // Surface ENOENT (e.g. claude not on PATH) instead of crashing the hub.
+    /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
+    child.on('error', (err) => {
+      console.error(`[chat-manager] spawn failed for ${conversationId}: ${err.message}`)
+      this._activeProcesses.delete(conversationId)
+      this._buffers.delete(conversationId)
+      this._emittedProposals.delete(conversationId)
+      this._broadcast({
+        type: 'chat_error',
+        conversationId,
+        error: `Failed to launch ${binary}: ${err.message}`,
+        timestamp: new Date().toISOString(),
+      })
+    })
+    /* c8 ignore stop */
 
     let capturedSessionId: string | null = null
 
@@ -401,12 +421,11 @@ export class ChatManager {
 
       if (this._provider === 'codex') {
         // Codex outputs plain text — spawn codex exec and take the first non-empty line
-        const child = spawn('codex', [
+        const child = spawnCodex([
           'exec', titlePrompt,
           '--model', 'gpt-5.4-mini',
         ], {
           env: process.env,
-          shell: false,
           stdio: ['ignore', 'pipe', 'pipe'],
           cwd: this._cwd,
         })
@@ -436,14 +455,13 @@ export class ChatManager {
       }
 
       // Claude: JSON stream parsing
-      const child = spawn('claude', [
+      const child = spawnClaude([
         '--dangerously-skip-permissions',
         '--output-format', 'stream-json',
         '--verbose',
         '-p', titlePrompt,
       ], {
         env: process.env,
-        shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd: this._cwd,
       })

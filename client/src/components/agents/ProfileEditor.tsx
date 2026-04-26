@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react'
-import { Plus, GripVertical, X, ArrowUp, ArrowDown, Pin } from 'lucide-react'
+import { Plus, GripVertical, X, ArrowUp, ArrowDown, Pin, Pencil } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -58,6 +58,7 @@ export function ProfileEditor({
   const [catalog, setCatalog] = useState<CatalogAgent[]>([])
   const [pickingAgent, setPickingAgent] = useState(false)
   const [addRoutingPrompt, setAddRoutingPrompt] = useState(false)
+  const [editRoutingIdx, setEditRoutingIdx] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -225,25 +226,41 @@ export function ProfileEditor({
   const addDefaultRoutingRule = () => {
     update((d) => {
       if (d.routing.some((r) => 'default' in r && r.default === true)) return
-      const fallbackAgent =
-        d.agents.find((a) => a.id === 'sr-developer')?.id ?? d.agents[0]?.id ?? ''
-      if (!fallbackAgent) return
-      const newRule: RoutingDefaultRule = { default: true, agent: fallbackAgent }
+      // Default rule is the pipeline's last-resort fallback — always sr-developer.
+      if (!d.agents.some((a) => a.id === 'sr-developer')) return
+      const newRule: RoutingDefaultRule = { default: true, agent: 'sr-developer' }
       d.routing.push(newRule)
     })
   }
 
+  const isDefaultRule = (r: RoutingRule): boolean =>
+    'default' in r && r.default === true
+
   const setRoutingRuleAgent = (idx: number, agent: string) => {
     update((d) => {
-      if (!d.routing[idx]) return
-      d.routing[idx].agent = agent
+      const r = d.routing[idx]
+      if (!r) return
+      // Default rule is pinned to sr-developer — core fallback is not retargetable.
+      if (isDefaultRule(r)) return
+      r.agent = agent
+    })
+  }
+
+  const updateTagRule = (idx: number, tags: string[], agent: string) => {
+    update((d) => {
+      const r = d.routing[idx]
+      if (!r) return
+      if (isDefaultRule(r)) return
+      ;(r as RoutingTagRule).tags = tags
+      r.agent = agent
     })
   }
 
   const removeRoutingRule = (idx: number) => {
-    // Every rule is removable — including the default catch-all. Users can
-    // rebuild their routing from scratch.
     update((d) => {
+      const r = d.routing[idx]
+      if (!r) return
+      if (isDefaultRule(r)) return
       d.routing.splice(idx, 1)
     })
   }
@@ -253,9 +270,8 @@ export function ProfileEditor({
     if (target < 0 || target >= profile.routing.length) return
     const rule = profile.routing[idx]
     const targetRule = profile.routing[target]
-    // Keep the default rule last at all times — enforced regardless of profile type.
-    if ('default' in rule && rule.default) return
-    if ('default' in targetRule && targetRule.default) return
+    if (isDefaultRule(rule)) return
+    if (isDefaultRule(targetRule)) return
     update((d) => {
       const [item] = d.routing.splice(idx, 1)
       d.routing.splice(target, 0, item)
@@ -266,9 +282,29 @@ export function ProfileEditor({
     <div className="p-6 space-y-6 max-w-3xl">
       <RoutingRuleDialog
         open={addRoutingPrompt}
+        mode="add"
         chainAgents={profile.agents.map((a) => a.id)}
         onConfirm={addRoutingRule}
         onCancel={() => setAddRoutingPrompt(false)}
+      />
+      <RoutingRuleDialog
+        open={editRoutingIdx !== null}
+        mode="edit"
+        initial={
+          editRoutingIdx !== null && profile.routing[editRoutingIdx] && !('default' in profile.routing[editRoutingIdx])
+            ? {
+                tags: (profile.routing[editRoutingIdx] as RoutingTagRule).tags,
+                agent: profile.routing[editRoutingIdx].agent,
+              }
+            : undefined
+        }
+        chainAgents={profile.agents.map((a) => a.id)}
+        onConfirm={(tags, agent) => {
+          if (editRoutingIdx === null) return
+          updateTagRule(editRoutingIdx, tags, agent)
+          setEditRoutingIdx(null)
+        }}
+        onCancel={() => setEditRoutingIdx(null)}
       />
       {/* Live validation summary */}
       {validationIssues.length > 0 && (
@@ -462,9 +498,11 @@ export function ProfileEditor({
                 ordinal={idx + 1}
                 isLast={idx === profile.routing.length - 1}
                 canMove={!isDefault}
-                canRemove={true}
+                canRemove={!isDefault}
+                canEdit={!isDefault}
                 chainAgents={profile.agents.map((a) => a.id)}
                 onAgentChange={(agent) => setRoutingRuleAgent(idx, agent)}
+                onEdit={() => setEditRoutingIdx(idx)}
                 onUp={() => moveRoutingRule(idx, -1)}
                 onDown={() => moveRoutingRule(idx, 1)}
                 onRemove={() => removeRoutingRule(idx)}
@@ -570,8 +608,10 @@ function RoutingRow({
   isLast,
   canMove,
   canRemove,
+  canEdit,
   chainAgents,
   onAgentChange,
+  onEdit,
   onUp,
   onDown,
   onRemove,
@@ -581,8 +621,10 @@ function RoutingRow({
   isLast: boolean
   canMove: boolean
   canRemove: boolean
+  canEdit: boolean
   chainAgents: string[]
   onAgentChange: (agent: string) => void
+  onEdit: () => void
   onUp: () => void
   onDown: () => void
   onRemove: () => void
@@ -605,19 +647,40 @@ function RoutingRow({
         </span>
       )}
       <span className="text-xs text-muted-foreground">→</span>
-      <select
-        value={rule.agent}
-        onChange={(e) => onAgentChange(e.target.value)}
-        aria-label={isDefault ? 'Default routing target' : `Routing target for rule ${ordinal}`}
-        className="h-7 max-w-[15rem] px-2 text-xs font-mono rounded border border-border bg-background"
-      >
-        {chainAgents.map((agentId) => (
-          <option key={agentId} value={agentId}>
-            {agentId}
-          </option>
-        ))}
-      </select>
+      {isDefault ? (
+        <span
+          className="h-7 max-w-[15rem] px-2 text-xs font-mono rounded border border-border bg-muted/40 text-muted-foreground inline-flex items-center"
+          aria-label="Default routing target (core, read-only)"
+          title="Core fallback — not editable"
+        >
+          {rule.agent}
+        </span>
+      ) : (
+        <select
+          value={rule.agent}
+          onChange={(e) => onAgentChange(e.target.value)}
+          aria-label={`Routing target for rule ${ordinal}`}
+          className="h-7 max-w-[15rem] px-2 text-xs font-mono rounded border border-border bg-background"
+        >
+          {chainAgents.map((agentId) => (
+            <option key={agentId} value={agentId}>
+              {agentId}
+            </option>
+          ))}
+        </select>
+      )}
       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {canEdit && (
+          <button
+            type="button"
+            className="p-1 hover:bg-accent rounded"
+            onClick={onEdit}
+            title="Edit rule"
+            aria-label={`Edit rule ${ordinal}`}
+          >
+            <Pencil className="w-3 h-3" />
+          </button>
+        )}
         {canMove && !isLast && (
           <button type="button" className="p-1 hover:bg-accent rounded" onClick={onDown} title="Move down">
             <ArrowDown className="w-3 h-3" />
@@ -640,8 +703,11 @@ function RoutingRow({
         )}
       </div>
       {isDefault && (
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-          default
+        <span
+          className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+          title="Core fallback — the pipeline's last-resort rule, pinned to sr-developer"
+        >
+          core · default
         </span>
       )}
     </div>

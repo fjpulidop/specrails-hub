@@ -137,6 +137,14 @@ function validateStructural(profile: Profile): void {
       ])
     }
   }
+  // Pipeline's last-resort fallback is owned by the core developer agent.
+  // Retargeting it would let custom agents silently swallow every untagged
+  // task; hub UI hides the control, server check is the enforcement.
+  if (defaults.length === 1 && defaults[0].agent !== 'sr-developer') {
+    throw new ProfileValidationError([
+      "default routing rule must target 'sr-developer' (got '" + defaults[0].agent + "')",
+    ])
+  }
   for (const rule of profile.routing) {
     if (!agentIds.has(rule.agent)) {
       throw new ProfileValidationError([

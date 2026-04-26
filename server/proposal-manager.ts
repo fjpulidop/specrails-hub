@@ -1,6 +1,7 @@
-import { spawn, ChildProcess } from 'child_process'
+import { ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
+import { spawnClaude } from './util/cli-prompt'
 import type { WsMessage } from './types'
 import type { DbInstance } from './db'
 import {
@@ -197,9 +198,9 @@ export class ProposalManager {
     onSuccess: (fullText: string, sessionId: string | null) => void,
     onError: () => void
   ): Promise<void> {
-    const child = spawn('claude', args, {
+    // spawnClaude reroutes multi-line argv values through stdin on Windows.
+    const child = spawnClaude(args, {
       env: process.env,
-      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._cwd,
     })
@@ -260,6 +261,19 @@ export class ProposalManager {
     })
 
     return new Promise<void>((resolve) => {
+      // Without this handler an ENOENT on spawn (e.g. `claude` not on
+      // PATH) propagates as an unhandled 'error' event and crashes the
+      // entire hub process. Surface to the user instead.
+      /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
+      child.on('error', (err) => {
+        console.error(`[ProposalManager] spawn failed for ${proposalId}: ${err.message}`)
+        this._activeProcesses.delete(proposalId)
+        this._buffers.delete(proposalId)
+        this._broadcastError(proposalId, `Failed to launch claude: ${err.message}`)
+        onError()
+        resolve()
+      })
+      /* c8 ignore stop */
       child.on('close', (code) => {
         const fullText = this._buffers.get(proposalId) ?? ''
         this._activeProcesses.delete(proposalId)

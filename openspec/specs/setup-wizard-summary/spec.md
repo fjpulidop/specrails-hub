@@ -32,7 +32,7 @@ The setup summary SHALL include the install tier (`quick` or `full`) selected by
 
 ### Requirement: Setup process removes deprecated /sr: commands
 
-The setup process SHALL delete the `.claude/commands/sr/` directory on every install run that reaches the summary step, after `install.sh` has completed, and SHALL report the number of `.md` files that were deleted as part of the sweep.
+The setup process SHALL delete the `.claude/commands/sr/` directory on every install run that reaches the summary step, after the specrails-core installer (`npx specrails-core init`, Node-native from v4.2.0; `install.sh` before) has completed, and SHALL report the number of `.md` files that were deleted as part of the sweep.
 
 #### Scenario: Legacy /sr: directory exists before install completes
 - **WHEN** an install run reaches the summary step with `.claude/commands/sr/` containing one or more `.md` files

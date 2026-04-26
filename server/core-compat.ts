@@ -3,6 +3,9 @@ import fs from 'fs'
 import path from 'path'
 import { CHECKPOINTS } from './setup-manager'
 
+// Windows has no `which`; probe PATH via `where` instead.
+const WHICH_CMD = process.platform === 'win32' ? 'where' : 'which'
+
 // These must mirror KNOWN_VERBS in cli/specrails-hub.ts
 const HUB_KNOWN_COMMANDS = new Set([
   'implement',
@@ -93,11 +96,11 @@ export type CLIProvider = 'claude' | 'codex'
  */
 export function detectCLISync(): CLIProvider | null {
   try {
-    execSync('which claude', { stdio: 'ignore' })
+    execSync(`${WHICH_CMD} claude`, { stdio: 'ignore' })
     return 'claude'
   } catch { /* not found */ }
   try {
-    execSync('which codex', { stdio: 'ignore' })
+    execSync(`${WHICH_CMD} codex`, { stdio: 'ignore' })
     return 'codex'
   } catch { /* not found */ }
   return null
@@ -110,8 +113,8 @@ export function detectCLISync(): CLIProvider | null {
 export function detectAvailableCLIs(): { claude: boolean; codex: boolean } {
   let claude = false
   let codex = false
-  try { execSync('which claude', { stdio: 'ignore' }); claude = true } catch { /* not found */ }
-  try { execSync('which codex', { stdio: 'ignore' }); codex = true } catch { /* not found */ }
+  try { execSync(`${WHICH_CMD} claude`, { stdio: 'ignore' }); claude = true } catch { /* not found */ }
+  try { execSync(`${WHICH_CMD} codex`, { stdio: 'ignore' }); codex = true } catch { /* not found */ }
   return { claude, codex }
 }
 

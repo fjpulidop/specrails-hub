@@ -47,7 +47,9 @@ function getTargetTriple() {
   if (p === 'darwin' && a === 'arm64') return 'aarch64-apple-darwin'
   if (p === 'darwin' && a === 'x64')   return 'x86_64-apple-darwin'
   if (p === 'win32'  && a === 'x64')   return 'x86_64-pc-windows-msvc'
+  if (p === 'win32'  && a === 'arm64') return 'aarch64-pc-windows-msvc'
   if (p === 'linux'  && a === 'x64')   return 'x86_64-unknown-linux-gnu'
+  if (p === 'linux'  && a === 'arm64') return 'aarch64-unknown-linux-gnu'
   throw new Error(`Cannot determine Rust target triple for platform=${p} arch=${a}`)
 }
 
@@ -57,6 +59,7 @@ function getPkgTarget(triple) {
     'aarch64-apple-darwin':       'node22-macos-arm64',
     'x86_64-apple-darwin':        'node22-macos-x64',
     'x86_64-pc-windows-msvc':     'node22-win-x64',
+    'aarch64-pc-windows-msvc':    'node22-win-arm64',
     'x86_64-unknown-linux-gnu':   'node22-linux-x64',
     'aarch64-unknown-linux-gnu':  'node22-linux-arm64',
   }
@@ -78,14 +81,33 @@ const PKG_RUNTIME_PATCHES = `/* BEGIN pkg native-addon hijack (injected by build
 if (typeof process !== "undefined" && process.pkg !== undefined) {
   (function () {
     var _p = require("path");
+    var _Fs = require("fs");
     var _Module = require("module");
     var _execDir = _p.dirname(process.execPath);
-    var _inAppBundle = process.execPath.indexOf(".app/Contents/MacOS/") !== -1;
     // Tauri v2 array-form resources preserve directory structure relative to
-    // the project root, so extracted artifacts land at Resources/binaries/*.
-    // Standalone sidecar runs (dev) keep artifacts next to the binary.
-    var _resourcesRoot = _inAppBundle ? _p.resolve(_execDir, "..", "Resources") : _execDir;
-    var _resourcesDir = _inAppBundle ? _p.resolve(_resourcesRoot, "binaries") : _resourcesRoot;
+    // the project root, so artifacts land under a "binaries/" subfolder:
+    //   - macOS .app:    <app>.app/Contents/Resources/binaries/
+    //   - Windows NSIS:  <install>\binaries\
+    //   - Linux/other:   <install>/binaries/
+    // Standalone dev runs (sidecar executed from src-tauri/binaries/) keep
+    // artifacts alongside the binary, no "binaries/" subfolder.
+    // Probe each candidate for an anchor file (better_sqlite3.node) and pick
+    // the first that exists; fall back to the exec dir so the original error
+    // path is reported if nothing matches.
+    var _candidateDirs = [
+      _p.resolve(_execDir, "binaries"),                     // Windows/Linux install
+      _p.resolve(_execDir, "..", "Resources", "binaries"),  // macOS .app bundle
+      _execDir,                                              // dev standalone
+    ];
+    var _resourcesDir = _execDir;
+    for (var _i = 0; _i < _candidateDirs.length; _i++) {
+      try {
+        if (_Fs.existsSync(_p.join(_candidateDirs[_i], "better_sqlite3.node"))) {
+          _resourcesDir = _candidateDirs[_i];
+          break;
+        }
+      } catch (_e) { /* keep probing */ }
+    }
     var _sqliteReal = _p.resolve(_resourcesDir, "better_sqlite3.node");
     var _ptyReal = _p.resolve(_resourcesDir, "pty.node");
     var _ptyDirReal = _p.resolve(_resourcesDir, "node-pty");
@@ -191,6 +213,7 @@ async function downloadSqliteAddonForNode22(triple) {
     'aarch64-apple-darwin':       { platform: 'darwin', arch: 'arm64' },
     'x86_64-apple-darwin':        { platform: 'darwin', arch: 'x64' },
     'x86_64-pc-windows-msvc':     { platform: 'win32',  arch: 'x64' },
+    'aarch64-pc-windows-msvc':    { platform: 'win32',  arch: 'arm64' },
     'x86_64-unknown-linux-gnu':   { platform: 'linux',  arch: 'x64' },
     'aarch64-unknown-linux-gnu':  { platform: 'linux',  arch: 'arm64' },
   }
@@ -223,7 +246,14 @@ async function downloadSqliteAddonForNode22(triple) {
 
   // Extract: the .node file is at build/Release/better_sqlite3.node inside the tarball
   // --strip-components=2 removes "build/Release/" prefix → file lands as better_sqlite3.node
-  execSync(`tar -xzf "${tarPath}" -C "${destDir}" --strip-components=2 build/Release/better_sqlite3.node`, { stdio: 'inherit' })
+  //
+  // cwd=destDir with a relative tar filename sidesteps a GNU-tar-on-Windows
+  // quirk where a Windows absolute path like "D:\a\..." is interpreted as a
+  // remote-host spec ("host:path") and fails with "Cannot connect to D:".
+  execSync(`tar -xzf "${fileName}" --strip-components=2 build/Release/better_sqlite3.node`, {
+    stdio: 'inherit',
+    cwd: destDir,
+  })
 
   if (!fs.existsSync(addonPath)) {
     throw new Error(`Extraction failed — ${addonPath} not found after tar`)

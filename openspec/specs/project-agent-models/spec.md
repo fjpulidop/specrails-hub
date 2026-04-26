@@ -1,91 +1,47 @@
-## ADDED Requirements
+# project-agent-models Specification
 
-### Requirement: Agent model list reflects installed agents
-The system SHALL discover installed agents by reading `.claude/agents/*.md` in the project directory and extract the current `model:` value from each file's YAML frontmatter. Only agents present on disk SHALL appear in the UI.
+## Purpose
+TBD - created by archiving change add-agents-profiles. Update Purpose after archive.
+## Requirements
+### Requirement: Tag-rule editing in routing rules
+The Profile Editor SHALL allow editing the tag set of any non-default routing rule on any profile type (`default`, `project-default`, custom). The edit flow SHALL reuse the existing routing-rule dialog in an edit mode, pre-populated with the current tags and target agent.
 
-#### Scenario: Project has agents installed
-- **WHEN** the user opens the Agent Models settings section
-- **THEN** a combobox row appears for each `.md` file found in `.claude/agents/` (excluding subdirectories like `personas/`)
-- **AND** each row shows the agent name and its current model value read from frontmatter
+#### Scenario: Edit tags on an existing tag rule
+- **WHEN** a user clicks the pencil (edit) action on a tag-based routing rule
+- **THEN** the routing-rule dialog opens with the current tags and target agent pre-filled
+- **AND** confirming with new tags replaces the rule at the same position without altering rule order
 
-#### Scenario: Project has no agents installed
-- **WHEN** `.claude/agents/` does not exist or contains no `.md` files
-- **THEN** the section shows an empty state: "No specrails agents installed in this project."
+#### Scenario: Tag validation on edit
+- **WHEN** a user submits the edit dialog with a tag that violates the kebab-case pattern `^[a-z0-9][a-z0-9-]*$`
+- **THEN** the dialog surfaces the invalid tags and blocks confirmation
 
-### Requirement: Per-agent model selection via combobox
-The system SHALL render a premium combobox for each installed agent that displays available Claude models as selectable options. The combobox SHALL show the model's human-readable label, full model ID, and a cost/capability indicator.
+#### Scenario: Edit preserves rule position
+- **WHEN** an edit completes on the rule at index N
+- **THEN** the rule remains at index N in the profile's routing array
 
-Available models (alias → full ID):
-- `sonnet` → `claude-sonnet-4-6` (Balanced)
-- `opus` → `claude-opus-4-7` (Most capable)
-- `haiku` → `claude-haiku-4-5-20251001` (Fastest)
+### Requirement: Default routing rule is immutable and pinned to sr-developer
+Every profile's `default: true` routing rule SHALL have `agent === 'sr-developer'`. The hub SHALL NOT permit clients to retarget, reorder, or delete this rule. The UI SHALL hide the agent selector, delete, and reorder controls for this rule and render a "core" indicator. The server SHALL reject profile create/update requests whose default rule targets any agent other than `sr-developer`.
 
-#### Scenario: User opens model combobox for an agent
-- **WHEN** the user clicks the combobox for an agent
-- **THEN** all three model options appear with label, full ID subtitle, and tier badge
-- **AND** the current model is visually marked as selected
+#### Scenario: Default rule UI is read-only
+- **WHEN** the Profile Editor renders a routing list that contains a `default: true` rule
+- **THEN** that row displays `sr-developer` as the target with the agent select disabled or hidden
+- **AND** the row does not render a delete button
+- **AND** the row does not render reorder arrows
+- **AND** the row displays a "core" badge or equivalent indicator
 
-#### Scenario: User selects a different model
-- **WHEN** the user selects a model from the combobox
-- **THEN** the combobox updates immediately to reflect the selection (optimistic UI)
-- **AND** the selection is pending until the user saves
+#### Scenario: Server rejects default rule with non-developer target
+- **WHEN** a POST or PATCH request reaches `/api/projects/:projectId/profiles` with a body whose routing contains `{ default: true, agent: 'custom-foo' }`
+- **THEN** the server responds with HTTP 400 and the profile is not written to disk
 
-### Requirement: Apply to all agents shortcut
-The system SHALL provide an "Apply to all" control that sets all agent comboboxes to the same model in a single action.
+#### Scenario: Server rejects default rule deletion by payload omission
+- **WHEN** a PATCH payload rewrites routing without any `default: true` entry on a profile that previously had one
+- **THEN** the server accepts the payload only if the resulting routing contains no `default: true` entry at all
+- **AND** if a default entry is present, its agent MUST be `sr-developer`
 
-#### Scenario: User applies a model globally
-- **WHEN** the user selects a model in the "Apply to all" combobox and confirms
-- **THEN** all per-agent comboboxes update to the selected model
-- **AND** the change is pending until the user saves
+### Requirement: Non-default rules remain fully editable on every profile type
+Non-default routing rules SHALL remain editable (tags, target agent), reorderable, and deletable on `default`, `project-default`, and custom profiles alike.
 
-### Requirement: Save persists model config
-The system SHALL write changes on explicit Save action. The save operation SHALL:
-1. Update `install-config.yaml` (`models.defaults` and `models.overrides`) via the existing serialization path
-2. Call `applyModelConfig` which reads the updated config and patches `model:` in each `.claude/agents/*.md` frontmatter
+#### Scenario: Edit non-default rule on default profile
+- **WHEN** a user edits a tag rule on the `default` profile
+- **THEN** the edit is persisted and the profile remains valid
 
-#### Scenario: User saves model changes
-- **WHEN** the user clicks Save
-- **THEN** the server writes `install-config.yaml` with the new defaults/overrides
-- **AND** patches all agent frontmatter files
-- **AND** shows a success toast
-
-#### Scenario: Save fails due to filesystem error
-- **WHEN** the server cannot write to `install-config.yaml` or an agent file
-- **THEN** returns HTTP 500
-- **AND** the UI shows an error toast
-- **AND** agent comboboxes revert to their pre-save state
-
-### Requirement: Agent Models section is hub-mode only
-The Agent Models card SHALL only render when the hub is running in hub mode (active project context exists). It SHALL be hidden in legacy single-project mode.
-
-#### Scenario: Hub mode active
-- **WHEN** `activeProjectId` is non-null
-- **THEN** the Agent Models card is visible in SettingsPage
-
-#### Scenario: Legacy mode
-- **WHEN** `activeProjectId` is null
-- **THEN** the Agent Models card is not rendered
-
-### Requirement: GET endpoint returns installed agents and models
-`GET /api/projects/:projectId/agent-models` SHALL return the list of installed agents with their current model values read from agent frontmatter files.
-
-#### Scenario: Agents exist
-- **WHEN** GET is called and `.claude/agents/*.md` exist
-- **THEN** returns `{ agents: [{ name, model }] }`
-
-#### Scenario: No agents installed
-- **WHEN** GET is called and no agent files exist
-- **THEN** returns `{ agents: [] }`
-
-### Requirement: PATCH endpoint applies model config
-`PATCH /api/projects/:projectId/agent-models` SHALL accept `{ defaultModel, overrides }`, write `install-config.yaml`, and apply models to agent frontmatter.
-
-#### Scenario: Valid PATCH request
-- **WHEN** PATCH is called with `{ defaultModel: "sonnet", overrides: { "sr-architect": "opus" } }`
-- **THEN** `install-config.yaml` is updated with `defaults.model = "sonnet"` and `overrides = { sr-architect: opus }`
-- **AND** each agent's `.md` frontmatter `model:` is patched (override takes precedence over default)
-- **AND** returns HTTP 200 with the updated agent list
-
-#### Scenario: Invalid model value
-- **WHEN** PATCH is called with an unrecognized model alias
-- **THEN** returns HTTP 400 with a descriptive error

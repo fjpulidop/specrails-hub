@@ -5,6 +5,7 @@ import { Readable } from 'stream'
 // Mock child_process before importing
 vi.mock('child_process', () => ({
   spawn: vi.fn(),
+  spawnSync: vi.fn().mockReturnValue({ status: 0, stdout: 'specrails-core v4.1.1\n', stderr: '' }),
 }))
 
 vi.mock('tree-kill', () => ({
@@ -31,11 +32,11 @@ vi.mock('./core-compat', () => ({
   detectCLISync: vi.fn().mockReturnValue('claude'),
 }))
 
-import { spawn as mockSpawn } from 'child_process'
+import { spawn as mockSpawn, spawnSync as mockSpawnSync } from 'child_process'
 import treeKill from 'tree-kill'
 import { existsSync, readdirSync, rmSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs'
 import { detectCLISync } from './core-compat'
-import { SetupManager, CHECKPOINTS, QUICK_CHECKPOINTS, computeSummary, sweepLegacySrCommands } from './setup-manager'
+import { SetupManager, CHECKPOINTS, QUICK_CHECKPOINTS, computeSummary, sweepLegacySrCommands, validateInstalledCore } from './setup-manager'
 
 function createMockChildProcess() {
   const child = new EventEmitter() as any
@@ -48,6 +49,10 @@ function createMockChildProcess() {
 
 function pushLine(child: any, line: string) {
   child.stdout.push(line + '\n')
+}
+
+function pushErrorLine(child: any, line: string) {
+  child.stderr.push(line + '\n')
 }
 
 function finishProcess(child: any, code: number): Promise<void> {
@@ -75,6 +80,11 @@ describe('SetupManager', () => {
     vi.resetAllMocks()
     broadcast = vi.fn()
     sm = new SetupManager(broadcast)
+    vi.mocked(mockSpawnSync).mockReturnValue({
+      status: 0,
+      stdout: 'specrails-core v4.1.1\n',
+      stderr: '',
+    } as any)
 
     // Default: existsSync returns false, readdirSync returns []
     vi.mocked(existsSync).mockReturnValue(false)
@@ -82,6 +92,7 @@ describe('SetupManager', () => {
   })
 
   afterEach(() => {
+    delete process.env.SPECRAILS_CORE_BIN
     vi.restoreAllMocks()
   })
 
@@ -110,6 +121,36 @@ describe('SetupManager', () => {
       expect(keys).toContain('config_written')
       expect(keys).toContain('base_install')
       expect(keys).toContain('quick_complete')
+    })
+  })
+
+  describe('validateInstalledCore', () => {
+    it('accepts installs without legacy markers', () => {
+      vi.mocked(existsSync).mockImplementation((p: any) =>
+        String(p).includes('.specrails/specrails-version')
+      )
+      vi.mocked(readFileSync).mockImplementation((p: any) => {
+        if (String(p).includes('.specrails/specrails-version')) return '4.1.1\n' as any
+        return '# Enrich prompt content' as any
+      })
+
+      expect(validateInstalledCore('/path/to/project')).toEqual({ ok: true, reasons: [] })
+    })
+
+    it('rejects legacy installs', () => {
+      vi.mocked(existsSync).mockImplementation((p: any) => {
+        const s = String(p)
+        return s.includes('.specrails/specrails-version') || s.includes('.specrails/bin/doctor.sh')
+      })
+      vi.mocked(readFileSync).mockImplementation((p: any) => {
+        if (String(p).includes('.specrails/specrails-version')) return '4.0.5\n' as any
+        return '# Enrich prompt content' as any
+      })
+
+      const result = validateInstalledCore('/path/to/project')
+      expect(result.ok).toBe(false)
+      expect(result.reasons.join('\n')).toContain('4.0.5')
+      expect(result.reasons.join('\n')).toContain('legacy bash doctor detected')
     })
   })
 
@@ -169,11 +210,14 @@ describe('SetupManager', () => {
 
       sm.startInstall('p1', '/path/to/project')
 
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'npx',
-        ['--yes', '--prefer-online', 'specrails-core@latest', 'init', '--yes', '--from-config', '/path/to/project/.specrails/install-config.yaml'],
-        expect.objectContaining({ cwd: '/path/to/project' })
+      const [, spawnArgs, spawnOpts] = vi.mocked(mockSpawn).mock.calls[0]
+      expect(spawnArgs).toEqual(
+        expect.arrayContaining(['--yes', '--prefer-online', 'specrails-core@latest', 'init', '--yes', '--from-config'])
       )
+      const fromConfigIdx = (spawnArgs as string[]).indexOf('--from-config')
+      expect(fromConfigIdx).toBeGreaterThanOrEqual(0)
+      expect((spawnArgs as string[])[fromConfigIdx + 1]).toContain('specrails-hub-install-config-p1-')
+      expect(spawnOpts).toEqual(expect.objectContaining({ cwd: '/path/to/project' }))
     })
 
     it('broadcasts setup_log for stdout', async () => {
@@ -209,11 +253,79 @@ describe('SetupManager', () => {
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
       sm.startInstall('p1', '/path/to/project')
+      pushErrorLine(child, 'No Claude authentication found.')
       await finishProcess(child, 1)
 
       const errors = getBroadcastedByType(broadcast, 'setup_error')
       expect(errors).toHaveLength(1)
       expect(errors[0].error).toContain('code 1')
+      expect(errors[0].error).toContain('Recent output:')
+      expect(errors[0].error).toContain('No Claude authentication found.')
+    })
+
+    it('fails before spawn when resolved specrails-core runtime is legacy', () => {
+      vi.mocked(mockSpawnSync).mockReturnValue({
+        status: 0,
+        stdout: 'specrails-core v4.0.5\n',
+        stderr: '',
+      } as any)
+
+      sm.startInstall('p1', '/path/to/project')
+
+      const errors = getBroadcastedByType(broadcast, 'setup_error')
+      expect(errors).toHaveLength(1)
+      expect(errors[0].error).toContain('4.0.5')
+      expect(vi.mocked(mockSpawn)).not.toHaveBeenCalled()
+    })
+
+    it('resolves SPECRAILS_CORE_BIN command names to absolute paths before spawn', () => {
+      process.env.SPECRAILS_CORE_BIN = 'specrails-core'
+      vi.mocked(mockSpawnSync).mockImplementation((cmd: any, args: any) => {
+        if (cmd === 'which' && Array.isArray(args) && args[0] === 'specrails-core') {
+          return { status: 0, stdout: '/opt/homebrew/bin/specrails-core\n', stderr: '' } as any
+        }
+        if (cmd === '/opt/homebrew/bin/specrails-core' && Array.isArray(args) && args[0] === 'version') {
+          return { status: 0, stdout: 'specrails-core v4.1.1\n', stderr: '' } as any
+        }
+        return { status: 1, stdout: '', stderr: '' } as any
+      })
+
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockReturnValue(false)
+
+      sm.startInstall('p1', '/path/to/project')
+
+      expect(vi.mocked(mockSpawn)).toHaveBeenCalledWith(
+        '/opt/homebrew/bin/specrails-core',
+        expect.arrayContaining(['init', '--yes', '--root-dir', '/path/to/project']),
+        expect.objectContaining({ cwd: '/path/to/project' }),
+      )
+      delete process.env.SPECRAILS_CORE_BIN
+    })
+
+    it('rejects legacy installs even when the child exits 0', async () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockImplementation((p: any) => {
+        const s = String(p)
+        return s.includes('.specrails/specrails-version') || s.includes('.specrails/bin/doctor.sh')
+      })
+      vi.mocked(readFileSync).mockImplementation((p: any) => {
+        if (String(p).includes('.specrails/specrails-version')) return '4.0.5\n' as any
+        return '# Enrich prompt content' as any
+      })
+
+      sm.startInstall('p1', '/path/to/project')
+      await finishProcess(child, 0)
+
+      const errors = getBroadcastedByType(broadcast, 'setup_error')
+      expect(errors).toHaveLength(1)
+      expect(errors[0].error).toContain('legacy')
+      expect(errors[0].error).toContain('4.0.5')
+
+      const done = getBroadcastedByType(broadcast, 'setup_install_done')
+      expect(done).toHaveLength(0)
     })
 
     it('passes --root-dir when no config exists (fallback for non-git repos)', () => {
@@ -579,11 +691,14 @@ describe('SetupManager', () => {
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
       sm.startQuickInstall('p1', '/path/to/project', {})
+      pushErrorLine(child, 'npm error code EPERM')
       await finishProcess(child, 1)
 
       const errors = getBroadcastedByType(broadcast, 'setup_error')
       expect(errors).toHaveLength(1)
       expect(errors[0].error).toContain('--from-config')
+      expect(errors[0].error).toContain('Recent output:')
+      expect(errors[0].error).toContain('npm error code EPERM')
     })
 
     it('getCheckpointStatus returns 3 checkpoints for quick tier', () => {
@@ -1295,9 +1410,9 @@ describe('SetupManager', () => {
     })
   })
 
-  // ─── Template deployment (post-install) ──────────────────────────────────────
+  // ─── Quick-tier post-install behaviour ───────────────────────────────────────
 
-  describe('template deployment after install', () => {
+  describe('quick-tier post-install behaviour', () => {
     const quickConfig = [
       'version: 1',
       'tier: quick',
@@ -1305,7 +1420,7 @@ describe('SetupManager', () => {
       '  selected: [sr-architect, sr-developer]',
     ].join('\n')
 
-    it('startQuickInstall deploys agent templates to .claude/agents/', async () => {
+    it('startQuickInstall does not re-copy agent templates after specrails-core finishes', async () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
       vi.mocked(existsSync).mockImplementation((p) => {
@@ -1327,16 +1442,10 @@ describe('SetupManager', () => {
       sm.startQuickInstall('p1', '/path/to/project', { tier: 'quick', agents: { selected: ['sr-architect', 'sr-developer'] } })
       await finishProcess(child, 0)
 
-      const copyCalls = vi.mocked(copyFileSync).mock.calls
-      const agentCopies = copyCalls.filter(([, dest]) => String(dest).includes('.claude/agents/'))
-      expect(agentCopies).toHaveLength(2)
-      expect(agentCopies.some(([, d]) => String(d).includes('sr-architect.md'))).toBe(true)
-      expect(agentCopies.some(([, d]) => String(d).includes('sr-developer.md'))).toBe(true)
-      // sr-reviewer.md should NOT be copied (not in selected)
-      expect(agentCopies.some(([, d]) => String(d).includes('sr-reviewer.md'))).toBe(false)
+      expect(vi.mocked(copyFileSync).mock.calls).toHaveLength(0)
     })
 
-    it('startQuickInstall deploys command templates to .claude/commands/specrails/', async () => {
+    it('startQuickInstall does not re-copy command templates after specrails-core finishes', async () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
       vi.mocked(existsSync).mockImplementation((p) => {
@@ -1357,12 +1466,10 @@ describe('SetupManager', () => {
       sm.startQuickInstall('p1', '/path/to/project', { tier: 'quick' })
       await finishProcess(child, 0)
 
-      const copyCalls = vi.mocked(copyFileSync).mock.calls
-      const cmdCopies = copyCalls.filter(([, dest]) => String(dest).includes('commands/specrails/'))
-      expect(cmdCopies).toHaveLength(2)
+      expect(vi.mocked(copyFileSync).mock.calls).toHaveLength(0)
     })
 
-    it('startInstall reads tier from config and deploys templates for quick tier', async () => {
+    it('startInstall reads tier from config but leaves quick-tier placement to specrails-core', async () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
       vi.mocked(existsSync).mockImplementation((p) => {
@@ -1383,11 +1490,10 @@ describe('SetupManager', () => {
       sm.startInstall('p1', '/path/to/project')
       await finishProcess(child, 0)
 
-      const copyCalls = vi.mocked(copyFileSync).mock.calls
-      expect(copyCalls.length).toBeGreaterThan(0)
+      expect(vi.mocked(copyFileSync).mock.calls).toHaveLength(0)
     })
 
-    it('startInstall does NOT deploy templates for full tier (enrich handles it)', async () => {
+    it('startInstall does not re-copy templates for full tier (enrich handles it)', async () => {
       const fullConfig = 'version: 1\ntier: full\nagents:\n  selected: [sr-architect]'
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
@@ -1404,5 +1510,72 @@ describe('SetupManager', () => {
       const copyCalls = vi.mocked(copyFileSync).mock.calls
       expect(copyCalls).toHaveLength(0)
     })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────
+// detectCheckpointFromText — stdout regex contract.
+// Locks down the matchers that translate specrails-core stdout into
+// setup-wizard checkpoint advancement. Both the retired bash phrasing
+// AND the Node installer (≥ 4.2.0) phrasing must hit; regressing
+// either side breaks the live setup wizard progress UI silently.
+// ─────────────────────────────────────────────────────────────────
+
+import { detectCheckpointFromText } from './setup-manager'
+
+describe('detectCheckpointFromText', () => {
+  const keys = (line: string): string[] =>
+    detectCheckpointFromText(line).map((h) => h.key)
+
+  it('matches the Node installer "Loaded install config" sentinel → config_written', () => {
+    expect(keys('  → Loaded install config from /tmp/repo/.specrails/install-config.yaml'))
+      .toContain('config_written')
+  })
+
+  it('matches the retired bash "✓ config loaded" line → config_written', () => {
+    expect(keys('  ✓ config loaded')).toContain('config_written')
+  })
+
+  it('matches the Node installer "Phase 2 & 3" header → agent_generation', () => {
+    expect(keys('Phase 2 & 3: Installing specrails artifacts'))
+      .toContain('agent_generation')
+  })
+
+  it('matches "Placing agents and commands" (quick tier) → agent_generation', () => {
+    expect(keys('Phase 3c: Placing agents and commands (quick install)'))
+      .toContain('agent_generation')
+  })
+
+  it('matches the "Writing manifest" Node step → final_verification', () => {
+    expect(keys('Phase 3b: Writing manifest')).toContain('final_verification')
+  })
+
+  it('matches "Wrote ...specrails-manifest.json" path log → final_verification', () => {
+    expect(keys('  ✓ Wrote .specrails/specrails-manifest.json'))
+      .toContain('final_verification')
+  })
+
+  it('matches the Node installer terminal "init complete" sentinel → quick_complete', () => {
+    expect(keys('  ✓ init complete')).toContain('quick_complete')
+  })
+
+  it('matches the Node installer terminal "update complete" sentinel → quick_complete', () => {
+    expect(keys('  ✓ update complete')).toContain('quick_complete')
+  })
+
+  it('matches the retired bash "installation complete" line → quick_complete', () => {
+    expect(keys('Installation complete')).toContain('quick_complete')
+  })
+
+  it('matches enrich phase 1 / codebase analysis → repo_analysis', () => {
+    expect(keys('Phase 1: codebase analysis')).toContain('repo_analysis')
+  })
+
+  it('matches the .specrails/specrails-version path log → base_install', () => {
+    expect(keys('  ✓ Wrote .specrails/specrails-version')).toContain('base_install')
+  })
+
+  it('returns no hits on unrelated noise', () => {
+    expect(detectCheckpointFromText('hello world this is not specrails')).toEqual([])
   })
 })

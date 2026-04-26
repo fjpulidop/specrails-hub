@@ -46,7 +46,12 @@ export function getHubToken(): string | null {
  */
 export function installFetchInterceptor(): void {
   const origFetch = window.fetch.bind(window)
-  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+  // __TAURI_INTERNALS__ may not be present at install time under WebView2 on
+  // Windows ARM64; the tauri:// protocol is a reliable fallback signal.
+  const proto = typeof window !== 'undefined' ? window.location.protocol : ''
+  const isTauri =
+    (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) ||
+    (proto !== '' && proto !== 'http:' && proto !== 'https:')
 
   window.fetch = function (
     input: RequestInfo | URL,

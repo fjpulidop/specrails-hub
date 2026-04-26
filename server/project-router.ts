@@ -32,7 +32,7 @@ import {
   type Ticket,
 } from './ticket-store'
 import type { TicketCreatedMessage, TicketUpdatedMessage, TicketDeletedMessage, TicketAiEditStreamMessage, TicketAiEditDoneMessage, TicketAiEditErrorMessage, SpecGenStreamMessage, SpecGenDoneMessage, SpecGenErrorMessage, LocalTicket } from './types'
-import { spawn } from 'child_process'
+import { spawnAiCli } from './util/cli-prompt'
 import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import multer from 'multer'
@@ -1411,12 +1411,39 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       ]
     }
 
-    const child = spawn(binary, args, {
+    // spawnAiCli reroutes multi-line argv values through stdin on Windows;
+    // POSIX argv path unchanged.
+    console.log(`[project-router] spec-gen spawn: ${binary} (cwd=${project.path}, requestId=${requestId})`)
+    const child = spawnAiCli(binary, args, {
       env: process.env,
-      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: project.path,
     })
+
+    // Capture stderr so failures (auth missing, model errors, etc.) surface
+    // in the server log instead of being swallowed.
+    let stderrBuf = ''
+    /* c8 ignore start -- diagnostic-only; fires only when claude writes stderr */
+    child.stderr?.on('data', (chunk: Buffer) => {
+      const s = chunk.toString()
+      stderrBuf += s
+      console.error(`[project-router] spec-gen stderr (${requestId}): ${s.trimEnd()}`)
+    })
+    /* c8 ignore stop */
+
+    // Without this listener, ENOENT (binary missing on PATH) propagates as
+    // an unhandled 'error' event and crashes the entire hub process.
+    /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
+    child.on('error', (err) => {
+      console.error(`[project-router] spec-gen spawn failed (${binary}): ${err.message}`)
+      const errMsg: SpecGenErrorMessage = {
+        type: 'spec_gen_error', projectId, requestId,
+        error: `Failed to launch ${binary}: ${err.message}`,
+        timestamp: new Date().toISOString(),
+      }
+      broadcast(errMsg)
+    })
+    /* c8 ignore stop */
 
     res.status(202).json({ requestId })
 
@@ -1532,9 +1559,15 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
           broadcast(errMsg)
         }
       } else {
+        const reason = code === 0 ? 'Empty response from AI' : `Process exited with code ${code}`
+        console.error(
+          `[project-router] spec-gen failed (${requestId}): ${reason}` +
+            (stderrBuf.trim() ? `\n  stderr: ${stderrBuf.trim()}` : '') +
+            (buffer.trim() ? `\n  stdout-buffer: ${buffer.trim().slice(0, 500)}` : ''),
+        )
         const msg: SpecGenErrorMessage = {
           type: 'spec_gen_error', projectId, requestId,
-          error: code === 0 ? 'Empty response from AI' : `Process exited with code ${code}`,
+          error: reason,
           timestamp: new Date().toISOString(),
         }
         broadcast(msg)
@@ -1733,14 +1766,41 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       ]
     }
 
-    const child = spawn(binary, args, {
+    // spawnAiCli reroutes multi-line argv values through stdin on Windows.
+    console.log(`[project-router] ai-edit spawn: ${binary} (cwd=${project.path}, requestId=${requestId})`)
+    const child = spawnAiCli(binary, args, {
       env: process.env,
-      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: project.path,
     })
 
     _aiEditProcesses.set(requestId, child)
+
+    // Pipe stderr to server log so failures surface for debugging.
+    let aiEditStderrBuf = ''
+    /* c8 ignore start -- diagnostic-only; fires only when claude writes stderr */
+    child.stderr?.on('data', (chunk: Buffer) => {
+      const s = chunk.toString()
+      aiEditStderrBuf += s
+      console.error(`[project-router] ai-edit stderr (${requestId}): ${s.trimEnd()}`)
+    })
+    /* c8 ignore stop */
+
+    // Without this listener, ENOENT (binary missing on PATH) propagates as
+    // an unhandled 'error' event and crashes the entire hub process.
+    /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
+    child.on('error', (err) => {
+      console.error(`[project-router] ai-edit spawn failed (${binary}): ${err.message}`)
+      _aiEditProcesses.delete(requestId)
+      const errMsg: TicketAiEditErrorMessage = {
+        type: 'ticket_ai_edit_error', projectId, ticketId: Number(ticketId),
+        requestId, error: `Failed to launch ${binary}: ${err.message}`,
+        timestamp: new Date().toISOString(),
+      }
+      broadcast(errMsg)
+    })
+    /* c8 ignore stop */
+
     res.status(202).json({ requestId })
 
     let buffer = ''
@@ -1788,9 +1848,15 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         }
         broadcast(msg)
       } else {
+        const reason = code === 0 ? 'Empty response from AI' : `Process exited with code ${code}`
+        console.error(
+          `[project-router] ai-edit failed (${requestId}): ${reason}` +
+            (aiEditStderrBuf.trim() ? `\n  stderr: ${aiEditStderrBuf.trim()}` : '') +
+            (buffer.trim() ? `\n  stdout-buffer: ${buffer.trim().slice(0, 500)}` : ''),
+        )
         const msg: TicketAiEditErrorMessage = {
           type: 'ticket_ai_edit_error', projectId, ticketId: Number(ticketId),
-          requestId, error: code === 0 ? 'Empty response from AI' : `Process exited with code ${code}`,
+          requestId, error: reason,
           timestamp: new Date().toISOString(),
         }
         broadcast(msg)
