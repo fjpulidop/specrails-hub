@@ -217,26 +217,33 @@ jobs:
             echo "  ${src} -> ${out_dir}/${dest}"
           }
 
+          # Tauri preserves the bundle/{dmg,nsis,msi}/ subdir structure inside
+          # each artifact zip, so we use `find` to locate the binary regardless
+          # of where exactly upload-artifact preserved the prefix.
+          find_one() {
+            find "$1" -type f -name "$2" 2>/dev/null | head -n1
+          }
+
           # macOS .dmg from build-macos artifact dir (dmg-aarch64/).
-          dmg_src="$(ls artifacts/dmg-aarch64/*.dmg 2>/dev/null | head -n1 || true)"
+          dmg_src="$(find_one artifacts/dmg-aarch64 '*.dmg')"
           dmg_canonical="specrails-hub-${VERSION}-aarch64.dmg"
           rename_one "${dmg_src}" "${dmg_canonical}"
 
-          # Windows x64 from windows-x64/ artifact dir.
-          exe_x64_src="$(ls artifacts/windows-x64/*.exe 2>/dev/null | head -n1 || true)"
+          # Windows x64 from windows-x64/ artifact dir (nested in nsis/ + msi/).
+          exe_x64_src="$(find_one artifacts/windows-x64 '*.exe')"
           exe_x64_canonical="specrails-hub-${VERSION}-x64-setup.exe"
           rename_one "${exe_x64_src}" "${exe_x64_canonical}"
 
-          msi_x64_src="$(ls artifacts/windows-x64/*.msi 2>/dev/null | head -n1 || true)"
+          msi_x64_src="$(find_one artifacts/windows-x64 '*.msi')"
           msi_x64_canonical="specrails-hub-${VERSION}-x64.msi"
           rename_one "${msi_x64_src}" "${msi_x64_canonical}"
 
-          # Windows ARM64 from windows-arm64/ artifact dir.
-          exe_arm64_src="$(ls artifacts/windows-arm64/*.exe 2>/dev/null | head -n1 || true)"
+          # Windows ARM64 from windows-arm64/ artifact dir (nested in nsis/ + msi/).
+          exe_arm64_src="$(find_one artifacts/windows-arm64 '*.exe')"
           exe_arm64_canonical="specrails-hub-${VERSION}-arm64-setup.exe"
           rename_one "${exe_arm64_src}" "${exe_arm64_canonical}"
 
-          msi_arm64_src="$(ls artifacts/windows-arm64/*.msi 2>/dev/null | head -n1 || true)"
+          msi_arm64_src="$(find_one artifacts/windows-arm64 '*.msi')"
           msi_arm64_canonical="specrails-hub-${VERSION}-arm64.msi"
           rename_one "${msi_arm64_src}" "${msi_arm64_canonical}"
 
