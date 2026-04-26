@@ -5,6 +5,9 @@ on:
     tags: ["v*"]
   workflow_dispatch:  # allows manual trigger from GitHub UI or: gh workflow run desktop-release.yml
 
+permissions:
+  contents: write
+
 jobs:
   build-macos:
     runs-on: macos-latest  # Apple Silicon (arm64)
@@ -43,6 +46,8 @@ jobs:
       - name: Build desktop app
         run: npm run build:desktop
         env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
@@ -51,7 +56,10 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: dmg-aarch64
-          path: src-tauri/target/release/bundle/dmg/*.dmg
+          path: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
           if-no-files-found: error
 
   # ---------------------------------------------------------------
@@ -89,6 +97,9 @@ jobs:
       - name: Build desktop app
         shell: bash
         run: npm run build:desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Upload Windows installer artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
@@ -98,8 +109,8 @@ jobs:
           # We upload both patterns; the deploy job renames them to the canonical
           # specrails-hub-<version>-x64-setup.exe / specrails-hub-<version>-x64.msi.
           path: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe*
+            src-tauri/target/release/bundle/msi/*.msi*
           if-no-files-found: error
 
   # ---------------------------------------------------------------
@@ -137,14 +148,17 @@ jobs:
       - name: Build desktop app
         shell: bash
         run: npm run build:desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Upload Windows ARM64 installer artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: windows-arm64
           path: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe*
+            src-tauri/target/release/bundle/msi/*.msi*
           if-no-files-found: error
 
   deploy:
@@ -347,6 +361,81 @@ jobs:
           # Fail fast if the JSON is malformed.
           jq empty manifest/manifest.json
           cat manifest/manifest.json
+
+      - name: Build Tauri updater latest.json
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.vars.outputs.version }}"
+          TAG="${{ steps.vars.outputs.tag }}"
+          RELEASED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          RELEASE_URL_BASE="https://github.com/fjpulidop/specrails-hub/releases/download/${TAG}"
+
+          mkdir -p updater
+          platforms='{}'
+
+          add_platform() {
+            local platform="$1"
+            local dir="$2"
+            local pattern="$3"
+            local canonical="$4"
+            local sig
+            local pkg
+            sig="$(find "${dir}" -type f -name "${pattern}.sig" 2>/dev/null | head -n1)"
+            if [[ -z "${sig}" ]]; then
+              echo "Missing updater signature for ${platform}: ${dir}/${pattern}.sig"
+              exit 1
+            fi
+            pkg="${sig%.sig}"
+            if [[ ! -f "${pkg}" ]]; then
+              echo "Missing updater package paired with ${sig}"
+              exit 1
+            fi
+
+            cp "${pkg}" "updater/${canonical}"
+            cp "${sig}" "updater/${canonical}.sig"
+
+            local signature
+            signature="$(tr -d '\r\n' < "${sig}")"
+            local url="${RELEASE_URL_BASE}/${canonical}"
+            platforms="$(jq -c \
+              --arg platform "${platform}" \
+              --arg signature "${signature}" \
+              --arg url "${url}" \
+              '. + {($platform): {signature: $signature, url: $url}}' \
+              <<< "${platforms}")"
+
+            echo "Updater ${platform}: ${canonical}"
+          }
+
+          add_platform "darwin-aarch64" "artifacts/dmg-aarch64" "*.app.tar.gz" \
+            "specrails-hub-${VERSION}-darwin-aarch64.app.tar.gz"
+          add_platform "windows-x86_64" "artifacts/windows-x64" "*.msi" \
+            "specrails-hub-${VERSION}-windows-x86_64.msi"
+          add_platform "windows-aarch64" "artifacts/windows-arm64" "*.msi" \
+            "specrails-hub-${VERSION}-windows-aarch64.msi"
+
+          jq -n \
+            --arg version "${VERSION}" \
+            --arg pub_date "${RELEASED_AT}" \
+            --arg body "SpecRails Hub ${VERSION}" \
+            --argjson platforms "${platforms}" \
+            '{version: $version, notes: $body, pub_date: $pub_date, platforms: $platforms}' \
+            > updater/latest.json
+
+          jq empty updater/latest.json
+          cat updater/latest.json
+          ls -la updater/
+
+      - name: Publish Tauri updater assets to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.vars.outputs.tag }}"
+          if ! gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release create "${TAG}" --title "SpecRails Hub ${TAG}" --notes "SpecRails Hub ${TAG}"
+          fi
+          gh release upload "${TAG}" updater/* --clobber
 
       # Pre-existing versioned upload. Uploads only the canonical-named
       # installers (artifacts/canonical/) — the per-job subdirectories with
