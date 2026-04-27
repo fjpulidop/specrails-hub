@@ -11,6 +11,7 @@ import { WebhookManager } from './webhook-manager'
 import { createSpecrailsTechClient } from './specrails-tech-client'
 import { checkCoreCompat, getCLIStatus, detectAvailableCLIs } from './core-compat'
 import { getHubAnalytics, getHubTodayStats, getHubRecentJobs } from './hub-analytics'
+import { getSetupPrerequisitesStatus } from './setup-prerequisites'
 import type { AnalyticsOpts, AnalyticsPeriod } from './types'
 
 function slugify(name: string): string {
@@ -134,6 +135,10 @@ export function createHubRouter(
     const tiers: ('quick' | 'full')[] = ['quick']
     if (providers.claude) tiers.push('full')
     res.json({ claude: providers.claude, codex: false, tiers })
+  })
+
+  router.get('/setup-prerequisites', (_req, res) => {
+    res.json(getSetupPrerequisitesStatus())
   })
 
   // POST /api/hub/projects — register a new project by path

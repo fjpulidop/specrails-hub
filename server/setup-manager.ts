@@ -7,6 +7,7 @@ import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
 import { findCoreContract, detectCLISync, CLIProvider } from './core-compat'
 import { spawnAiCli } from './util/cli-prompt'
+import { formatMissingSetupPrerequisites } from './setup-prerequisites'
 
 /**
  * specrails-core's installer (Node-native from v4.2.0 onward, bash
@@ -644,6 +645,16 @@ export class SetupManager {
     this._advanceCheckpoint(projectId, 'config_written')
     this._completeCheckpoint(projectId, 'config_written')
 
+    const missingPrerequisites = formatMissingSetupPrerequisites()
+    if (missingPrerequisites) {
+      this._broadcast({
+        type: 'setup_error',
+        projectId,
+        error: missingPrerequisites,
+      })
+      return
+    }
+
     const probe = probeCoreRuntimeVersion(projectPath)
     if (!probe.ok) {
       this._broadcast({
@@ -779,6 +790,16 @@ export class SetupManager {
     const tier = parsedConfig?.tier ?? 'full'
     this._projectTiers.set(projectId, tier)
     this._initCheckpoints(projectId)
+
+    const missingPrerequisites = formatMissingSetupPrerequisites()
+    if (missingPrerequisites) {
+      this._broadcast({
+        type: 'setup_error',
+        projectId,
+        error: missingPrerequisites,
+      })
+      return
+    }
 
     const probe = probeCoreRuntimeVersion(projectPath)
     if (!probe.ok) {

@@ -24,11 +24,12 @@ export function RailControls({ mode, status, activeJobId, ticketCount, onModeCha
         <Button
           size="sm"
           variant="ghost"
-          className="h-5 w-5 p-0 rounded-full transition-all duration-200 text-[hsl(191_97%_77%)] hover:text-[hsl(191_97%_87%)] hover:bg-[hsl(191_97%_77%/0.1)] hover:shadow-[0_0_8px_hsl(191_97%_77%/0.4)]"
+          className="group h-6 px-2 gap-1 rounded-md border border-dracula-cyan/20 bg-dracula-cyan/5 text-[10px] font-semibold text-dracula-cyan transition-all duration-200 hover:-translate-y-px hover:border-dracula-cyan/50 hover:bg-dracula-cyan/15 hover:text-dracula-cyan hover:shadow-[0_0_14px_hsl(191_97%_77%/0.22)] active:translate-y-0 active:scale-[0.98]"
           onClick={() => navigate(`/jobs/${activeJobId}`)}
           title="View job log"
         >
-          <ScrollText className="w-2.5 h-2.5" />
+          <ScrollText className="w-3 h-3 transition-transform duration-200 group-hover:scale-110" />
+          <span>Log</span>
         </Button>
       )}
 
