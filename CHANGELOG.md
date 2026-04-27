@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.41.1](https://github.com/fjpulidop/specrails-hub/compare/v1.41.0...v1.41.1) (2026-04-27)
+
+
+### Bug Fixes
+
+* **release:** set GitHub repo for updater asset upload ([#259](https://github.com/fjpulidop/specrails-hub/issues/259)) ([3ddc6b3](https://github.com/fjpulidop/specrails-hub/commit/3ddc6b30ed702adab882e6973b6bcad27956e37d))
+
 ## [1.41.0](https://github.com/fjpulidop/specrails-hub/compare/v1.40.1...v1.41.0) (2026-04-26)
 
 
