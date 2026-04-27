@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.43.0](https://github.com/fjpulidop/specrails-hub/compare/v1.42.0...v1.43.0) (2026-04-27)
+
+
+### Features
+
+* hub-only server mode + prerequisites gate on add project ([#274](https://github.com/fjpulidop/specrails-hub/issues/274)) ([8517e64](https://github.com/fjpulidop/specrails-hub/commit/8517e649be0ca73f5e30d55b673637116882349c))
+
 ## [1.42.0](https://github.com/fjpulidop/specrails-hub/compare/v1.41.1...v1.42.0) (2026-04-27)
 
 
