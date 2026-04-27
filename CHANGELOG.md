@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.42.0](https://github.com/fjpulidop/specrails-hub/compare/v1.41.1...v1.42.0) (2026-04-27)
+
+
+### Features
+
+* **setup:** check developer prerequisites before install ([#261](https://github.com/fjpulidop/specrails-hub/issues/261)) ([fcf3df5](https://github.com/fjpulidop/specrails-hub/commit/fcf3df5feb3705b3191afee0a1ad7b555c918a3d))
+
 ## [1.41.1](https://github.com/fjpulidop/specrails-hub/compare/v1.41.0...v1.41.1) (2026-04-27)
 
 
