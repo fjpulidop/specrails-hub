@@ -278,9 +278,32 @@ describe('SetupManager', () => {
       expect(vi.mocked(mockSpawn)).not.toHaveBeenCalled()
     })
 
+    it('fails before spawn when Git is missing from PATH', () => {
+      vi.mocked(mockSpawnSync).mockImplementation((cmd: any, args: any) => {
+        if (cmd === 'which' && Array.isArray(args)) {
+          return { status: args[0] === 'git' ? 1 : 0, stdout: '', stderr: '' } as any
+        }
+        return { status: 0, stdout: `${cmd} 1.0.0\n`, stderr: '' } as any
+      })
+
+      sm.startInstall('p1', '/path/to/project')
+
+      const errors = getBroadcastedByType(broadcast, 'setup_error')
+      expect(errors).toHaveLength(1)
+      expect(errors[0].error).toContain('Git')
+      expect(errors[0].error).toContain('PATH')
+      expect(vi.mocked(mockSpawn)).not.toHaveBeenCalled()
+    })
+
     it('resolves SPECRAILS_CORE_BIN command names to absolute paths before spawn', () => {
       process.env.SPECRAILS_CORE_BIN = 'specrails-core'
       vi.mocked(mockSpawnSync).mockImplementation((cmd: any, args: any) => {
+        if (cmd === 'which' && Array.isArray(args) && ['node', 'npm', 'npx', 'git'].includes(args[0])) {
+          return { status: 0, stdout: `/usr/bin/${args[0]}\n`, stderr: '' } as any
+        }
+        if (['node', 'npm', 'npx', 'git'].includes(cmd) && Array.isArray(args) && args[0] === '--version') {
+          return { status: 0, stdout: `${cmd} 1.0.0\n`, stderr: '' } as any
+        }
         if (cmd === 'which' && Array.isArray(args) && args[0] === 'specrails-core') {
           return { status: 0, stdout: '/opt/homebrew/bin/specrails-core\n', stderr: '' } as any
         }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect, memo } from 'react'
-import { Check, ArrowRight, Package, Bot, ChevronLeft, Settings2 } from 'lucide-react'
+import { Check, ArrowRight, Package, Bot, ChevronLeft, Settings2, AlertTriangle, CheckCircle2, ExternalLink, RefreshCw } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Button } from './ui/button'
@@ -48,6 +48,66 @@ interface InstallConfig {
   modelOverrides: ModelOverrides
 }
 
+interface SetupPrerequisite {
+  key: 'node' | 'npm' | 'npx' | 'git'
+  label: string
+  command: string
+  required: boolean
+  installed: boolean
+  version?: string
+  installUrl: string
+  installHint: string
+}
+
+interface SetupPrerequisitesStatus {
+  ok: boolean
+  prerequisites: SetupPrerequisite[]
+  missingRequired: SetupPrerequisite[]
+}
+
+const DEFAULT_SETUP_PREREQUISITES: SetupPrerequisitesStatus = {
+  ok: true,
+  prerequisites: [
+    {
+      key: 'node',
+      label: 'Node.js',
+      command: 'node',
+      required: true,
+      installed: true,
+      installUrl: 'https://nodejs.org/en/download',
+      installHint: 'Install Node.js LTS, then restart SpecRails Hub.',
+    },
+    {
+      key: 'npm',
+      label: 'npm',
+      command: 'npm',
+      required: true,
+      installed: true,
+      installUrl: 'https://nodejs.org/en/download',
+      installHint: 'npm ships with Node.js LTS.',
+    },
+    {
+      key: 'npx',
+      label: 'npx',
+      command: 'npx',
+      required: true,
+      installed: true,
+      installUrl: 'https://nodejs.org/en/download',
+      installHint: 'npx ships with npm.',
+    },
+    {
+      key: 'git',
+      label: 'Git',
+      command: 'git',
+      required: true,
+      installed: true,
+      installUrl: 'https://git-scm.com/downloads',
+      installHint: 'Install Git, then restart SpecRails Hub.',
+    },
+  ],
+  missingRequired: [],
+}
+
 // Map full model IDs to short names used by specrails-core
 function toShortModelName(modelId: string): string {
   if (modelId.includes('opus')) return 'opus'
@@ -73,6 +133,103 @@ function buildDefaultConfig(): InstallConfig {
     modelPreset: 'balanced',
     modelOverrides: {},
   }
+}
+
+function isSetupPrerequisitesStatus(value: unknown): value is SetupPrerequisitesStatus {
+  const candidate = value as SetupPrerequisitesStatus
+  return Boolean(candidate) &&
+    typeof candidate.ok === 'boolean' &&
+    Array.isArray(candidate.prerequisites) &&
+    Array.isArray(candidate.missingRequired)
+}
+
+function SetupPrerequisitesPanel({
+  status,
+  onRefresh,
+  isRefreshing,
+}: {
+  status: SetupPrerequisitesStatus
+  onRefresh: () => void
+  isRefreshing: boolean
+}) {
+  const missingCount = status.missingRequired.length
+
+  return (
+    <div className={cn(
+      'rounded-lg border px-3 py-2',
+      status.ok
+        ? 'border-dracula-green/25 bg-dracula-green/5'
+        : 'border-dracula-purple/40 bg-dracula-purple/10'
+    )}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          {status.ok ? (
+            <CheckCircle2 className="w-4 h-4 text-dracula-green flex-shrink-0" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 text-dracula-purple flex-shrink-0" />
+          )}
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-foreground">
+              {status.ok ? 'Developer tools ready' : `${missingCount} developer tool${missingCount === 1 ? '' : 's'} required`}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              SpecRails needs Node.js, npm, npx and Git available on PATH.
+            </p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+          className="h-7 px-2 gap-1.5 text-[11px] flex-shrink-0"
+        >
+          <RefreshCw className={cn('w-3 h-3', isRefreshing && 'animate-spin')} />
+          Refresh
+        </Button>
+      </div>
+
+      {!status.ok && (
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {status.prerequisites.map((item) => (
+            <div
+              key={item.key}
+              className={cn(
+                'flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-[11px]',
+                item.installed
+                  ? 'border-border/30 bg-background/30 text-muted-foreground'
+                  : 'border-dracula-purple/30 bg-background/50 text-foreground'
+              )}
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  {item.installed ? (
+                    <CheckCircle2 className="w-3 h-3 text-dracula-green flex-shrink-0" />
+                  ) : (
+                    <AlertTriangle className="w-3 h-3 text-dracula-purple flex-shrink-0" />
+                  )}
+                  <span className="font-medium truncate">{item.label}</span>
+                </div>
+                <p className="truncate text-muted-foreground">{item.installed ? item.version ?? 'Detected' : item.installHint}</p>
+              </div>
+              {!item.installed && (
+                <a
+                  href={item.installUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-dracula-purple hover:bg-dracula-purple/15 flex-shrink-0"
+                  aria-label={`Install ${item.label}`}
+                >
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Initial checkpoint states ────────────────────────────────────────────────
@@ -141,15 +298,22 @@ function AgentSelectionStep({
   onInstall,
   onSkip,
   provider,
+  prerequisites,
+  onRefreshPrerequisites,
+  isRefreshingPrerequisites,
 }: {
   config: InstallConfig
   onChange: (config: InstallConfig) => void
   onInstall: () => void
   onSkip: () => void
   provider: 'claude' | 'codex'
+  prerequisites: SetupPrerequisitesStatus
+  onRefreshPrerequisites: () => void
+  isRefreshingPrerequisites: boolean
 }) {
   const [activeTab, setActiveTab] = useState<AgentSelectionTab>('agents')
   const selectedAgents = ALL_AGENTS.filter((a) => config.selectedAgents.includes(a.id))
+  const installDisabled = config.selectedAgents.length === 0 || !prerequisites.ok
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -166,6 +330,12 @@ function AgentSelectionStep({
             </p>
           </div>
         </div>
+
+        <SetupPrerequisitesPanel
+          status={prerequisites}
+          onRefresh={onRefreshPrerequisites}
+          isRefreshing={isRefreshingPrerequisites}
+        />
 
         {/* Tier selector */}
         <TierSelector
@@ -242,7 +412,7 @@ function AgentSelectionStep({
             size="sm"
             className="gap-2"
             onClick={onInstall}
-            disabled={config.selectedAgents.length === 0}
+            disabled={installDisabled}
           >
             <Package className="w-3.5 h-3.5" />
             {config.tier === 'quick' ? 'Quick Install' : 'Install & Enrich'}
@@ -551,6 +721,8 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
   const [streamingText, setStreamingText] = useState('')
   const [isStreaming, setIsStreaming] = useState(cached?.isStreaming ?? false)
   const [sessionId, setSessionId] = useState<string | null>(cached?.sessionId ?? null)
+  const [setupPrerequisites, setSetupPrerequisites] = useState<SetupPrerequisitesStatus>(DEFAULT_SETUP_PREREQUISITES)
+  const [isRefreshingPrerequisites, setIsRefreshingPrerequisites] = useState(false)
 
   const pendingEnrichStart = useRef(false)
   const streamingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -585,6 +757,24 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
       })
     }
   }, [project.id])
+
+  const refreshSetupPrerequisites = useCallback(async () => {
+    setIsRefreshingPrerequisites(true)
+    try {
+      const res = await fetch('/api/hub/setup-prerequisites')
+      if (!res.ok) return
+      const data = await res.json()
+      if (isSetupPrerequisitesStatus(data)) setSetupPrerequisites(data)
+    } catch {
+      // Keep the optimistic default; the backend install guard still validates before spawning.
+    } finally {
+      setIsRefreshingPrerequisites(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshSetupPrerequisites()
+  }, [refreshSetupPrerequisites])
 
   // On remount after tab switch: check if the install/enrich finished while we were away
   useEffect(() => {
@@ -781,6 +971,18 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
     const cfg = installConfigRef.current
     const provider = (project as { provider?: 'claude' | 'codex' }).provider ?? 'claude'
 
+    if (!setupPrerequisites.ok) {
+      setWizardStep({
+        step: 'error',
+        retryStep: 'installing',
+        message: [
+          'SpecRails setup needs Node.js, npm, npx and Git available on PATH before it can install this project.',
+          'Install the missing tools, restart SpecRails Hub, then retry setup.',
+        ].join('\n\n'),
+      })
+      return
+    }
+
     // Ensure core agents are always included
     const selectedWithCore = [...new Set([...CORE_AGENTS, ...cfg.selectedAgents])]
     const excluded = ALL_AGENTS.map((a) => a.id).filter((id) => !selectedWithCore.includes(id))
@@ -891,6 +1093,9 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
             onInstall={handleInstall}
             onSkip={onSkip}
             provider={(project as { provider?: 'claude' | 'codex' }).provider ?? 'claude'}
+            prerequisites={setupPrerequisites}
+            onRefreshPrerequisites={refreshSetupPrerequisites}
+            isRefreshingPrerequisites={isRefreshingPrerequisites}
           />
         )}
 
