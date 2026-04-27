@@ -9,6 +9,7 @@ import { SharedWebSocketProvider } from '../useSharedWebSocket'
 const mockSetApiContext = vi.fn()
 
 vi.mock('../../lib/api', () => ({
+  setActiveProjectId: (...args: unknown[]) => mockSetApiContext(...args),
   setApiContext: (...args: unknown[]) => mockSetApiContext(...args),
   getApiBase: () => '/api',
 }))
@@ -226,7 +227,7 @@ describe('useHub', () => {
 
     act(() => { result.current.setActiveProjectId('proj-2') })
 
-    expect(mockSetApiContext).toHaveBeenCalledWith(true, 'proj-2')
+    expect(mockSetApiContext).toHaveBeenCalledWith('proj-2')
     expect(result.current.activeProjectId).toBe('proj-2')
   })
 

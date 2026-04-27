@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { FolderOpen } from 'lucide-react'
 import { Button } from './ui/button'
@@ -14,6 +14,9 @@ import {
   DialogFooter,
 } from './ui/dialog'
 import { useHub } from '../hooks/useHub'
+import { usePrerequisites } from '../hooks/usePrerequisites'
+import { PrerequisitesPanel } from './PrerequisitesPanel'
+import { InstallInstructionsModal } from './InstallInstructionsModal'
 import { cn } from '../lib/utils'
 
 interface AddProjectDialogProps {
@@ -29,8 +32,22 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
   const [projectName, setProjectName] = useState('')
   const [isAdding, setIsAdding] = useState(false)
   const [availableProviders, setAvailableProviders] = useState<{ claude: boolean; codex: boolean }>({ claude: true, codex: false })
+  const [installModalOpen, setInstallModalOpen] = useState(false)
 
   const { addProject, startSetupWizard, setActiveProjectId } = useHub()
+  const { status: prereqStatus, isLoading: prereqLoading, error: prereqError, recheck: prereqRecheck } = usePrerequisites()
+
+  const missingToolsLabel = useMemo(() => {
+    if (!prereqStatus || prereqStatus.ok) return null
+    const labels = prereqStatus.missingRequired.map((item) => item.label)
+    if (labels.length === 0) return null
+    if (labels.length === 1) return `${labels[0]} is required to add a project`
+    return `${labels.join(', ')} are required to add a project`
+  }, [prereqStatus])
+
+  // Soft block: only enforce gating when we have a definitive negative answer.
+  // If the fetch errored we let the user proceed and rely on the server install guard.
+  const prereqsBlock = prereqStatus !== null && !prereqStatus.ok && !prereqError
 
   useEffect(() => {
     if (!open) return
@@ -108,6 +125,14 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
             No AI CLI detected. Install Claude Code or Codex CLI first.
           </p>
         )}
+
+        <PrerequisitesPanel
+          status={prereqStatus}
+          isLoading={prereqLoading}
+          error={prereqError}
+          onMoreInfo={() => setInstallModalOpen(true)}
+          onRefresh={prereqRecheck}
+        />
 
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
@@ -223,11 +248,21 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
           <Button
             size="sm"
             onClick={handleAdd}
-            disabled={isAdding || !projectPath.trim() || noProviderAvailable}
+            disabled={isAdding || !projectPath.trim() || noProviderAvailable || prereqsBlock || prereqLoading}
+            title={prereqsBlock ? missingToolsLabel ?? undefined : undefined}
+            data-testid="add-project-submit"
           >
             {isAdding ? 'Adding...' : 'Add Project'}
           </Button>
         </DialogFooter>
+
+        <InstallInstructionsModal
+          open={installModalOpen}
+          onClose={() => setInstallModalOpen(false)}
+          status={prereqStatus}
+          onRecheck={prereqRecheck}
+          isRechecking={prereqLoading}
+        />
       </DialogContent>
     </Dialog>
   )

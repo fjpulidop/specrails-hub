@@ -14,6 +14,7 @@ vi.mock('sonner', () => ({
 
 vi.mock('../lib/api', () => ({
   getApiBase: () => '/api',
+  setActiveProjectId: vi.fn(),
   setApiContext: vi.fn(),
 }))
 
@@ -70,47 +71,24 @@ vi.mock('../hooks/useHub', async () => {
   }
 })
 
-describe('App — hub mode detection', () => {
+describe('App — hub bootstrap', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('renders in legacy mode when /api/hub/state fetch fails', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('fetch error'))
-    render(<App />)
-    // In legacy mode, Routes renders and eventually renders RootLayout or some fallback
-    // The hub state detection starts as false, so legacy mode renders first
-    // We just confirm it doesn't crash
-    await waitFor(() => {
-      // App renders without throwing
-      expect(document.body).toBeInTheDocument()
-    })
-  })
-
-  it('renders in legacy mode when /api/hub/state returns not ok', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 })
-    render(<App />)
-    await waitFor(() => {
-      expect(document.body).toBeInTheDocument()
-    })
-    // isHub stays false, so Routes (legacy) branch renders
-    // SharedWebSocketProvider is always rendered
-    expect(screen.queryByTestId('hub-provider')).not.toBeInTheDocument()
-  })
-
-  it('renders hub mode (HubProvider) when /api/hub/state returns ok', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) })
+  it('mounts HubProvider unconditionally', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ projects: [] }) })
     render(<App />)
     await waitFor(() => {
       expect(screen.getByTestId('hub-provider')).toBeInTheDocument()
     })
   })
 
-  it('initially renders in legacy mode before fetch completes', () => {
-    // fetch never resolves
-    global.fetch = vi.fn().mockImplementation(() => new Promise(() => {}))
+  it('does not probe /api/hub/state for mode detection', () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ projects: [] }) })
+    global.fetch = fetchMock
     render(<App />)
-    // isHub starts as false, so legacy Routes branch is rendered
-    expect(screen.queryByTestId('hub-provider')).not.toBeInTheDocument()
+    const hubStateCalls = fetchMock.mock.calls.filter(([url]) => typeof url === 'string' && url.includes('/api/hub/state'))
+    expect(hubStateCalls).toHaveLength(0)
   })
 })

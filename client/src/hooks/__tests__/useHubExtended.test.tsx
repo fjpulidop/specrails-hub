@@ -5,6 +5,7 @@ import { HubProvider, useHub } from '../useHub'
 import { SharedWebSocketProvider } from '../useSharedWebSocket'
 
 vi.mock('../../lib/api', () => ({
+  setActiveProjectId: vi.fn(),
   setApiContext: vi.fn(),
   getApiBase: () => '/api',
 }))

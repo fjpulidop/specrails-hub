@@ -211,17 +211,13 @@ function loadPersistedConfig(db: any): { active: string | null; labelFilter: str
 }
 
 export function getConfig(cwd: string, db?: any, projectName?: string): ProjectConfig {
-  // Resolve project root.
-  // In single-project mode: manager lives at <project>/specrails/manager/,
-  // so we walk up two levels to find the project root.
-  // In hub mode: cwd is the project root directly — we detect this by checking
-  // if the .claude directory already lives at cwd.
+  // Resolve project root. Hub mode passes project.path directly, which has a
+  // `.claude` directory at its root; the walk-up fallback covers callers that
+  // pass a manager-relative cwd.
   let projectRoot: string
   if (fs.existsSync(path.join(cwd, '.claude'))) {
-    // cwd is already the project root (hub mode passes project.path directly)
     projectRoot = cwd
   } else {
-    // Single-project mode: walk up two levels
     projectRoot = path.resolve(cwd, '../..')
   }
   const commandsDir = path.join(projectRoot, '.claude', 'commands', 'sr')
