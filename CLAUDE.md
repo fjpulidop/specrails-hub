@@ -35,9 +35,9 @@ cli/        → specrails-hub CLI bridge (TypeScript, CommonJS)
 
 Server and CLI compile to CommonJS (`tsconfig.json`). Client is ESM with its own `client/tsconfig.json`. Two separate `npm install` are needed (root + `client/`).
 
-### Hub mode (default)
+### Hub mode
 
-The server runs in **hub mode** by default — one Express process manages multiple projects. Use `--legacy` flag for single-project mode.
+The server runs in **hub mode** — one Express process manages multiple projects. Hub is the only supported mode.
 
 **Data layout:**
 ```
@@ -58,9 +58,9 @@ The server runs in **hub mode** by default — one Express process manages multi
 
 ### Client architecture
 
-- `App.tsx` detects hub mode via `GET /api/hub/state`, renders `HubApp` or legacy `RootLayout`
+- `App.tsx` mounts `HubProvider` and `HubApp` unconditionally
 - `useHub.tsx` — `HubProvider` context: project list, active project, setup wizard state
-- `getApiBase()` (`lib/api.ts`) — module-level store returns `/api/projects/<id>` in hub mode, `/api` in legacy. Updated by `HubProvider` on project switch.
+- `getApiBase()` (`lib/api.ts`) — module-level store returns `/api/projects/<id>` for the active project; throws when no project is set. Updated by `HubProvider` on project switch.
 - `useProjectCache.ts` — stale-while-revalidate cache per project to eliminate flicker on tab switch
 - `useProjectRouteMemory` (in `App.tsx`) — saves/restores URL route per project
 
@@ -84,6 +84,8 @@ When adding a project without specrails, a 5-phase wizard runs:
 5. Completion summary
 
 Managed by `SetupManager` (server) and `SetupWizard` component (client). Hub context tracks which projects are in setup via `setupProjectIds`.
+
+**Developer prerequisites gate.** `AddProjectDialog` and `SetupWizard` both render `<PrerequisitesPanel />` driven by the shared `usePrerequisites()` hook (60s in-memory cache, recheck on `window.focus`, manual recheck via the install-instructions modal). The hook fetches `GET /api/hub/setup-prerequisites` (server enriches the response with `platform`, `minVersion`, and `meetsMinimum` per tool). `AddProjectDialog` disables its submit while any required tool is missing, surfaces a "More info" link only when the panel is in the missing state, and opens `<InstallInstructionsModal />` with OS-aware install commands (Homebrew on macOS, winget on Windows, apt/dnf on Linux) plus copy-to-clipboard. `SetupManager.startInstall` keeps `formatMissingSetupPrerequisites()` as a server-side defence-in-depth before spawning `npx specrails-core`.
 
 **Install tiers.** The wizard offers two tiers via `TierSelector`:
 
@@ -156,7 +158,7 @@ Commit message prefixes that affect versioning: `feat:` → minor, `fix:` → pa
 
 Per-project opt-in feature that injects OpenTelemetry env vars into `claude` CLI spawns so the process emits OTLP/JSON signals to the hub.
 
-**Default state**: OFF. Toggle lives in the project `SettingsPage` (hub mode only — hidden in legacy mode).
+**Default state**: OFF. Toggle lives in the project `SettingsPage`.
 
 **Storage paths:**
 - Raw blobs: `~/.specrails/projects/<slug>/telemetry/<jobId>.ndjson.gz` (concatenated gzip; one gzip member per received payload)
@@ -167,7 +169,7 @@ Per-project opt-in feature that injects OpenTelemetry env vars into `claude` CLI
 
 **QueueManager-only scope**: OTEL env injection happens exclusively in `server/queue-manager.ts` at spawn time. `ChatManager` and `SetupManager` spawns are intentionally left uninstrumented (interactive sessions / wizard flows, not repeatable pipeline jobs).
 
-**OTLP receiver**: `POST /otlp/v1/{traces,metrics,logs}` on the hub port, mounted in hub mode only. Routes signals by `specrails.job_id` + `specrails.project_id` from `resource.attributes`. Returns 400 if attributes missing, 404 if project/job unknown. 10 MB uncompressed cap per blob — logs are dropped once reached (traces/metrics continue), a `logs_truncated` control line is written exactly once.
+**OTLP receiver**: `POST /otlp/v1/{traces,metrics,logs}` on the hub port. Routes signals by `specrails.job_id` + `specrails.project_id` from `resource.attributes`. Returns 400 if attributes missing, 404 if project/job unknown. 10 MB uncompressed cap per blob — logs are dropped once reached (traces/metrics continue), a `logs_truncated` control line is written exactly once.
 
 **Export**: `GET /api/projects/:projectId/jobs/:jobId/diagnostic` streams a ZIP containing `job-metadata.json`, `telemetry.ndjson`, `logs.txt`, and `summary.md`. Export button on job cards visible iff a `telemetry_blobs` row exists (`active` or `compacted` state).
 

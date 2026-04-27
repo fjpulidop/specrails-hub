@@ -239,7 +239,7 @@ function createTestApp() {
       version: '0.0.0-test',
       uptime: Math.floor(process.uptime()),
       projects: 1,
-      mode: 'legacy',
+      mode: 'hub',
     })
   })
 
@@ -560,21 +560,7 @@ describe('API endpoints', () => {
       expect(res.body.uptime).toBeGreaterThanOrEqual(0)
       expect(typeof res.body.projects).toBe('number')
       expect(res.body.projects).toBeGreaterThanOrEqual(0)
-      expect(['hub', 'legacy']).toContain(res.body.mode)
-    })
-
-    it('returns mode=legacy in legacy (single-project) setup', async () => {
-      const res = await request(app).get('/api/health')
-
-      expect(res.status).toBe(200)
-      expect(res.body.mode).toBe('legacy')
-    })
-
-    it('returns projects=1 in legacy mode', async () => {
-      const res = await request(app).get('/api/health')
-
-      expect(res.status).toBe(200)
-      expect(res.body.projects).toBe(1)
+      expect(res.body.mode).toBe('hub')
     })
   })
 })

@@ -3,6 +3,28 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '../../test-utils'
 import userEvent from '@testing-library/user-event'
 import { AddProjectDialog } from '../AddProjectDialog'
+import { __resetPrerequisitesCacheForTest } from '../../hooks/usePrerequisites'
+
+const goodPrereqsStatus = {
+  ok: true,
+  platform: 'darwin' as const,
+  prerequisites: [
+    { key: 'node', label: 'Node.js', command: 'node', required: true, installed: true, version: 'v20.0.0', minVersion: '18.0.0', meetsMinimum: true, installUrl: '', installHint: '' },
+  ],
+  missingRequired: [],
+}
+
+const missingGitPrereqsStatus = {
+  ok: false,
+  platform: 'darwin' as const,
+  prerequisites: [
+    { key: 'node', label: 'Node.js', command: 'node', required: true, installed: true, version: 'v20.0.0', minVersion: '18.0.0', meetsMinimum: true, installUrl: '', installHint: '' },
+    { key: 'git', label: 'Git', command: 'git', required: true, installed: false, meetsMinimum: false, installUrl: '', installHint: '' },
+  ],
+  missingRequired: [
+    { key: 'git', label: 'Git', command: 'git', required: true, installed: false, meetsMinimum: false, installUrl: '', installHint: '' },
+  ],
+}
 
 vi.mock('sonner', () => ({
   toast: {
@@ -30,19 +52,27 @@ vi.mock('../../hooks/useHub', () => ({
   }),
 }))
 
-/** Mock fetch to return available-providers and optionally a project response */
-function mockFetchSequence(projectResponse?: { ok: boolean; json: () => Promise<unknown> }) {
-  const providersResponse = {
-    ok: true,
-    json: async () => ({ claude: true, codex: false }),
-  }
-  if (!projectResponse) {
-    global.fetch = vi.fn().mockResolvedValue(providersResponse)
-    return
-  }
-  global.fetch = vi.fn()
-    .mockResolvedValueOnce(providersResponse)
-    .mockResolvedValueOnce(projectResponse)
+/** URL-aware mock: routes by request URL so call order doesn't matter. */
+function mockFetchSequence(opts?: {
+  prereqStatus?: typeof goodPrereqsStatus | typeof missingGitPrereqsStatus
+  prereqOk?: boolean
+  projectResponse?: { ok: boolean; json: () => Promise<unknown> }
+}) {
+  const prereqStatus = opts?.prereqStatus ?? goodPrereqsStatus
+  const prereqOk = opts?.prereqOk ?? true
+  const providersResponse = { ok: true, json: async () => ({ claude: true, codex: false }) }
+
+  global.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input.toString()
+    if (url.includes('/api/hub/available-providers')) return providersResponse
+    if (url.includes('/api/hub/setup-prerequisites')) {
+      return prereqOk
+        ? { ok: true, json: async () => prereqStatus }
+        : { ok: false, status: 500, json: async () => ({}) }
+    }
+    if (opts?.projectResponse) return opts.projectResponse
+    return { ok: true, json: async () => ({}) }
+  })
 }
 
 describe('AddProjectDialog', () => {
@@ -55,6 +85,7 @@ describe('AddProjectDialog', () => {
       has_specrails: true,
     })
     vi.clearAllMocks()
+    __resetPrerequisitesCacheForTest()
     mockFetchSequence()
   })
 
@@ -81,13 +112,53 @@ describe('AddProjectDialog', () => {
     expect(addBtn).toBeDisabled()
   })
 
-  it('submit button is enabled when path is filled', async () => {
+  it('submit button is enabled when path is filled and prerequisites are healthy', async () => {
     const user = userEvent.setup()
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
+    const addBtn = screen.getByRole('button', { name: /Add Project/i })
+    // Wait for the prereq fetch to settle into ok state
+    await waitFor(() => expect(screen.getByTestId('prerequisites-panel')).toHaveAttribute('data-state', 'ok'))
     const pathInput = screen.getByPlaceholderText('/Users/me/my-project')
     await user.type(pathInput, '/some/path')
-    const addBtn = screen.getByRole('button', { name: /Add Project/i })
     expect(addBtn).not.toBeDisabled()
+  })
+
+  it('submit button stays disabled when a required tool is missing, even with a valid path', async () => {
+    const user = userEvent.setup()
+    mockFetchSequence({ prereqStatus: missingGitPrereqsStatus })
+
+    render(<AddProjectDialog open={true} onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getByTestId('prerequisites-panel')).toHaveAttribute('data-state', 'missing'))
+
+    const pathInput = screen.getByPlaceholderText('/Users/me/my-project')
+    await user.type(pathInput, '/some/path')
+
+    const addBtn = screen.getByTestId('add-project-submit')
+    expect(addBtn).toBeDisabled()
+    expect(addBtn).toHaveAttribute('title', expect.stringMatching(/Git is required/i))
+  })
+
+  it('clicking "More info" opens the install instructions modal', async () => {
+    const user = userEvent.setup()
+    mockFetchSequence({ prereqStatus: missingGitPrereqsStatus })
+
+    render(<AddProjectDialog open={true} onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getByTestId('prerequisites-more-info')).toBeInTheDocument())
+
+    await user.click(screen.getByTestId('prerequisites-more-info'))
+    expect(screen.getByRole('heading', { name: /install developer tools/i })).toBeInTheDocument()
+  })
+
+  it('does not block submit when the prereq fetch errors (server install guard takes over)', async () => {
+    const user = userEvent.setup()
+    mockFetchSequence({ prereqOk: false })
+
+    render(<AddProjectDialog open={true} onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getByTestId('prerequisites-panel')).toHaveAttribute('data-state', 'error'))
+
+    const pathInput = screen.getByPlaceholderText('/Users/me/my-project')
+    await user.type(pathInput, '/some/path')
+    expect(screen.getByTestId('add-project-submit')).not.toBeDisabled()
   })
 
   it('successful submit calls API and closes dialog', async () => {

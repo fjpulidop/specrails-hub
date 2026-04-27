@@ -6,6 +6,7 @@ import { useChat } from '../../hooks/useChat'
 // Mock dependencies
 vi.mock('../../lib/api', () => ({
   getApiBase: () => '/api',
+  setActiveProjectId: vi.fn(),
   setApiContext: vi.fn(),
 }))
 

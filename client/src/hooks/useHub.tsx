@@ -12,7 +12,7 @@ import {
 import { API_ORIGIN } from '../lib/origin'
 import { toast } from 'sonner'
 import { useSharedWebSocket } from './useSharedWebSocket'
-import { setApiContext, setHubMode } from '../lib/api'
+import { setActiveProjectId as setApiActiveProjectId } from '../lib/api'
 
 export interface HubProject {
   id: string
@@ -66,7 +66,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
 
   const setActiveProjectId = useCallback((id: string | null): void => {
     writeSavedProjectId(id)
-    setApiContext(true, id)
+    setApiActiveProjectId(id)
     setActiveProjectIdRaw((prev) => {
       if (prev !== null && prev !== id) {
         // Briefly flag project switching for the progress bar
@@ -91,12 +91,8 @@ export function HubProvider({ children }: { children: ReactNode }) {
         if (data.setupProjectIds && data.setupProjectIds.length > 0) {
           setSetupProjectIds(new Set(data.setupProjectIds))
         }
-        // Mark hub mode without overwriting any project already set by the WS
-        // handler (hub.projects fires concurrently and may have already called
-        // setApiContext(true, projectId) — resetting it here would break API calls).
-        setHubMode(true)
       } catch {
-        // Hub may not be running in hub mode — treat as empty
+        // Network error — treat as empty project list
       } finally {
         setIsLoading(false)
       }
@@ -115,7 +111,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
       setActiveProjectIdRaw((prev) => {
         const next = (prev && incoming.find((p) => p.id === prev)) ? prev : (incoming.length > 0 ? incoming[0].id : null)
         writeSavedProjectId(next)
-        setApiContext(true, next)
+        setApiActiveProjectId(next)
         return next
       })
       setIsLoading(false)
@@ -135,7 +131,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
       setActiveProjectIdRaw((prev) => {
         if (prev !== projectId) return prev
         writeSavedProjectId(null)
-        setApiContext(true, null)
+        setApiActiveProjectId(null)
         return null
       })
     }
@@ -193,7 +189,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
       setActiveProjectIdRaw((prev) => {
         if (prev !== id) return prev
         writeSavedProjectId(null)
-        setApiContext(true, null)
+        setApiActiveProjectId(null)
         return null
       })
     } catch (err) {

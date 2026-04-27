@@ -132,22 +132,6 @@ This does not affect your project source code or specrails-core installations.
 
 ---
 
-## Legacy mode
-
-Legacy mode runs the server for a single project without a project registry. Use it when migrating from an older specrails installation or when you only manage one project.
-
-```bash
-specrails-hub start --legacy
-```
-
-In legacy mode:
-- No `hub.sqlite` project registry is used
-- The server serves one project, determined by the current working directory at startup
-- Hub-mode routes (`/api/hub/*`) are not available
-- CLI commands do not resolve a project from CWD
-
----
-
 ## Further reading
 
 - [Getting Started](../general/getting-started.md) — installation guide

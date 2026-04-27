@@ -32,6 +32,18 @@ vi.mock('./core-compat', () => ({
   detectCLISync: vi.fn().mockReturnValue('claude'),
 }))
 
+// Default: prerequisites pass. Override per-test if the suite needs to exercise
+// the missing-prereq guard.
+vi.mock('./setup-prerequisites', () => ({
+  formatMissingSetupPrerequisites: vi.fn().mockReturnValue(null),
+  getSetupPrerequisitesStatus: vi.fn().mockReturnValue({
+    ok: true,
+    platform: 'darwin',
+    prerequisites: [],
+    missingRequired: [],
+  }),
+}))
+
 import { spawn as mockSpawn, spawnSync as mockSpawnSync } from 'child_process'
 import treeKill from 'tree-kill'
 import { existsSync, readdirSync, rmSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs'
@@ -278,13 +290,11 @@ describe('SetupManager', () => {
       expect(vi.mocked(mockSpawn)).not.toHaveBeenCalled()
     })
 
-    it('fails before spawn when Git is missing from PATH', () => {
-      vi.mocked(mockSpawnSync).mockImplementation((cmd: any, args: any) => {
-        if (cmd === 'which' && Array.isArray(args)) {
-          return { status: args[0] === 'git' ? 1 : 0, stdout: '', stderr: '' } as any
-        }
-        return { status: 0, stdout: `${cmd} 1.0.0\n`, stderr: '' } as any
-      })
+    it('fails before spawn when Git is missing from PATH', async () => {
+      const prereqs = await import('./setup-prerequisites')
+      vi.mocked(prereqs.formatMissingSetupPrerequisites).mockReturnValueOnce(
+        '- Git (git) is not on PATH. Install Git and restart SpecRails Hub.',
+      )
 
       sm.startInstall('p1', '/path/to/project')
 

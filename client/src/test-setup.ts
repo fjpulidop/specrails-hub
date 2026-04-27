@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { vi, afterEach, beforeEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
+import { setActiveProjectId } from './lib/api'
 
 // Cleanup after each test
 afterEach(() => {
@@ -8,12 +9,15 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-// Reset fetch mock before each test
+// Reset fetch mock and seed an active project before each test so that
+// `getApiBase()` (which throws when no project is active) works in component
+// tests that don't set up a HubProvider.
 beforeEach(() => {
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({}),
   })
+  setActiveProjectId('test-project')
 })
 
 // Mock window.matchMedia (required by some Radix components)

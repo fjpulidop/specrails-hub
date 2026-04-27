@@ -52,8 +52,6 @@ The server runs in **hub mode** by default — a single Express process manages 
 └─────────────────────────────────────────────────────┘
 ```
 
-Use `--legacy` at startup to run in single-project mode (mounts `/api` directly without the hub router).
-
 ### Per-project isolation
 
 Each project in the `ProjectRegistry` gets its own `ProjectContext`:

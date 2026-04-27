@@ -1,34 +1,27 @@
 /**
  * Returns the base URL prefix for project-scoped API calls.
  *
- * Single-project mode: '/api'
- * Hub mode with active project: '/api/projects/<id>'
- *
- * Components and hooks call useApiBase() to get this prefix, then append
- * resource paths (e.g., `${base}/jobs`).
+ * The hub server is the only supported runtime; this helper always returns
+ * `${API_ORIGIN}/api/projects/<activeProjectId>`. Callers must set the active
+ * project via `setActiveProjectId` before using the helper. Endpoints that are
+ * not project-scoped (e.g. `/api/hub/*`, `/api/health`) should reference
+ * `API_ORIGIN` directly instead of going through `getApiBase`.
  */
 
 import { API_ORIGIN } from './origin'
 
-// Module-level store for active project ID — set by HubProvider/App
 let _activeProjectId: string | null = null
-let _isHubMode = false
 
-export function setApiContext(isHub: boolean, projectId: string | null): void {
-  _isHubMode = isHub
+export function setActiveProjectId(projectId: string | null): void {
   _activeProjectId = projectId
 }
 
-/** Sets hub mode without touching the active project ID.
- * Use in the REST load to avoid racing with the WS handler that may have
- * already set _activeProjectId via setApiContext(true, projectId). */
-export function setHubMode(isHub: boolean): void {
-  _isHubMode = isHub
-}
+/** @deprecated alias kept for tests; prefer `setActiveProjectId`. */
+export const setApiContext = (projectId: string | null): void => setActiveProjectId(projectId)
 
 export function getApiBase(): string {
-  if (_isHubMode && _activeProjectId) {
-    return `${API_ORIGIN}/api/projects/${_activeProjectId}`
+  if (!_activeProjectId) {
+    throw new Error('getApiBase called with no active project — call setActiveProjectId first')
   }
-  return `${API_ORIGIN}/api`
+  return `${API_ORIGIN}/api/projects/${_activeProjectId}`
 }

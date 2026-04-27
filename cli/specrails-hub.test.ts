@@ -254,15 +254,6 @@ describe('handleStatus', () => {
     expect(o).toContain('running'); expect(o).toContain('v1.0.0'); expect(o).toContain('hub')
   })
 
-  it('prints running status for legacy mode with state', async () => {
-    ;({ server, port } = await createMockServer([
-      { path: '/api/health', status: 200, body: { status: 'ok', version: '1.0.0', mode: 'legacy' } },
-      { path: '/api/state', status: 200, body: { projectName: 'myproject', busy: false, phases: { architect: 'idle', developer: 'running' } } },
-    ]))
-    const o = await captureStdoutAsync(async () => { expect(await _internal.handleStatus(port)).toBe(0) })
-    expect(o).toContain('myproject'); expect(o).toContain('architect=idle')
-  })
-
   it('returns 1 when health returns non-200', async () => {
     ;({ server, port } = await createMockServer([{ path: '/api/health', status: 500, body: 'error' }]))
     const o = await captureStdoutAsync(async () => { expect(await _internal.handleStatus(port)).toBe(1) })

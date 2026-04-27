@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { _registerRouteForcer } from './lib/route-memory'
-import { RootLayout } from './components/RootLayout'
 import DashboardPage from './pages/DashboardPage'
 import SettingsPage from './pages/SettingsPage'
 import SettingsDialog from './pages/GlobalSettingsPage'
@@ -36,49 +35,8 @@ import { SpecGenTrackerProvider } from './hooks/useSpecGenTracker'
 import { useOsNotifications } from './hooks/useOsNotifications'
 import { useDesktopUpdateNotifier } from './hooks/useDesktopUpdateNotifier'
 import { WS_URL } from './lib/ws-url'
-import { API_ORIGIN } from './lib/origin'
 import { TerminalsProvider, useTerminals } from './context/TerminalsContext'
 import { FEATURE_AGENTS_SECTION, FEATURE_TERMINAL_PANEL } from './lib/feature-flags'
-
-// ─── Hub mode detection ───────────────────────────────────────────────────────
-
-// __TAURI_INTERNALS__ may not be present at module-load time under WebView2
-// on Windows ARM64 emulation; fall back to a protocol check.
-const IS_TAURI =
-  typeof window !== 'undefined' &&
-  ('__TAURI_INTERNALS__' in window ||
-    (window.location.protocol !== 'http:' && window.location.protocol !== 'https:'))
-
-function useHubMode(): boolean {
-  // In Tauri the server ALWAYS runs in hub mode — skip the network round-trip.
-  const [isHub, setIsHub] = useState(IS_TAURI)
-
-  useEffect(() => {
-    if (IS_TAURI) return  // already set to true
-
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 5000)
-
-    async function detect() {
-      try {
-        const res = await fetch(`${API_ORIGIN}/api/hub/state`, { signal: controller.signal })
-        setIsHub(res.ok)
-      } catch {
-        setIsHub(false)
-      } finally {
-        clearTimeout(timeout)
-      }
-    }
-
-    detect()
-    return () => {
-      controller.abort()
-      clearTimeout(timeout)
-    }
-  }, [])
-
-  return isHub
-}
 
 // ─── Per-project route memory (persisted to localStorage) ─────────────────────
 
@@ -316,25 +274,9 @@ function TerminalsProviderWithHub({ children }: { children: React.ReactNode }) {
   return <TerminalsProvider activeProjectId={activeProjectId}>{children}</TerminalsProvider>
 }
 
-// ─── Legacy mode OS notification hook ────────────────────────────────────────
-
-function LegacyOsNotifications() {
-  useOsNotifications()
-  return null
-}
-
-// ─── Legacy mode keyboard shortcuts ──────────────────────────────────────────
-
-function LegacyKeyboardShortcuts() {
-  const { cheatsheetOpen, setCheatsheetOpen, openCheatsheet } = useCheatsheetState()
-  useKeyboardShortcuts({ onOpenCheatsheet: openCheatsheet })
-  return <KeyboardShortcutsCheatsheet open={cheatsheetOpen} onOpenChange={setCheatsheetOpen} />
-}
-
 // ─── Root App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const isHub = useHubMode()
   useDesktopUpdateNotifier()
 
   return (
@@ -356,43 +298,17 @@ export default function App() {
         }}
       >
         <SharedWebSocketProvider url={WS_URL}>
-          {isHub ? (
-            <HubProvider>
-              {/* Custom frameless titlebar inside HubProvider so it can read active project */}
-              <TitleBar />
-              <SpecGenTrackerProvider>
-                <SidebarPinProvider>
-                  <TerminalsProviderWithHub>
-                    <HubApp />
-                  </TerminalsProviderWithHub>
-                </SidebarPinProvider>
-              </SpecGenTrackerProvider>
-            </HubProvider>
-          ) : (
-            /* Legacy mode: TitleBar uses LEGACY_FALLBACK from useHub (no project name) */
-            <>
-              <TitleBar />
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
-                <LegacyOsNotifications />
-                <LegacyKeyboardShortcuts />
-                <Routes>
-                  <Route path="/docs" element={<DocsPage />} />
-                  <Route path="/docs/:category/:slug" element={<DocsPage />} />
-                  <Route element={<RootLayout />}>
-                    <Route index element={<DashboardPage />} />
-                    <Route path="/jobs" element={<JobsPage />} />
-                    <Route path="/jobs/:id" element={<JobDetailPage />} />
-                    <Route path="/analytics" element={<AnalyticsPage />} />
-                    <Route path="/activity" element={<ActivityFeedPage />} />
-                    <Route path="/agents" element={<AgentsPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                  </Route>
-                </Routes>
-                <CommandPalette />
-              </Suspense>
-            </>
-          )}
+          <HubProvider>
+            {/* Custom frameless titlebar inside HubProvider so it can read active project */}
+            <TitleBar />
+            <SpecGenTrackerProvider>
+              <SidebarPinProvider>
+                <TerminalsProviderWithHub>
+                  <HubApp />
+                </TerminalsProviderWithHub>
+              </SidebarPinProvider>
+            </SpecGenTrackerProvider>
+          </HubProvider>
           <Toaster
             position="bottom-right"
             theme="dark"
