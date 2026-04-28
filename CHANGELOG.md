@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.44.0](https://github.com/fjpulidop/specrails-hub/compare/v1.43.1...v1.44.0) (2026-04-28)
+
+
+### Features
+
+* AI Edit unified overlay for custom agents and specs ([#278](https://github.com/fjpulidop/specrails-hub/issues/278)) ([ee1528d](https://github.com/fjpulidop/specrails-hub/commit/ee1528d0cb6194e652587a346169e3d53b8a685c))
+
 ## [1.43.1](https://github.com/fjpulidop/specrails-hub/compare/v1.43.0...v1.43.1) (2026-04-28)
 
 
