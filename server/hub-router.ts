@@ -12,6 +12,7 @@ import { createSpecrailsTechClient } from './specrails-tech-client'
 import { checkCoreCompat, getCLIStatus, detectAvailableCLIs } from './core-compat'
 import { getHubAnalytics, getHubTodayStats, getHubRecentJobs } from './hub-analytics'
 import { getSetupPrerequisitesStatus } from './setup-prerequisites'
+import { getPathDiagnostic } from './path-resolver'
 import type { AnalyticsOpts, AnalyticsPeriod } from './types'
 
 function slugify(name: string): string {
@@ -137,8 +138,28 @@ export function createHubRouter(
     res.json({ claude: providers.claude, codex: false, tiers })
   })
 
-  router.get('/setup-prerequisites', (_req, res) => {
-    res.json(getSetupPrerequisitesStatus())
+  router.get('/setup-prerequisites', (req, res) => {
+    const status = getSetupPrerequisitesStatus()
+    if (req.query.diagnostic === '1') {
+      const diag = getPathDiagnostic()
+      const whichResults: Record<string, string | null> = {}
+      for (const item of status.prerequisites) {
+        whichResults[item.command] = item.resolvedPath ?? null
+      }
+      res.json({
+        ...status,
+        diagnostic: {
+          pathSegments: diag.pathSegments,
+          pathSources: diag.pathSources,
+          loginShellStatus: diag.loginShellStatus,
+          whichResults,
+          nodeEnv: process.env.NODE_ENV ?? null,
+          platform: status.platform,
+        },
+      })
+      return
+    }
+    res.json(status)
   })
 
   // POST /api/hub/projects — register a new project by path

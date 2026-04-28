@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Check, Copy, RefreshCw, ExternalLink } from 'lucide-react'
+import { Check, Copy, RefreshCw, ExternalLink, ClipboardList } from 'lucide-react'
+import { API_ORIGIN } from '../lib/origin'
 import {
   Dialog,
   DialogContent,
@@ -178,6 +179,48 @@ function PlatformSection({ platform, primary }: { platform: Platform; primary: b
   )
 }
 
+function CopyDiagnosticsButton() {
+  const [state, setState] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle')
+
+  const onClick = async () => {
+    setState('copying')
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/hub/setup-prerequisites?diagnostic=1`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const json = await res.json()
+      await navigator.clipboard.writeText(JSON.stringify(json, null, 2))
+      setState('copied')
+      setTimeout(() => setState('idle'), 1800)
+    } catch {
+      setState('error')
+      setTimeout(() => setState('idle'), 2400)
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={onClick}
+      disabled={state === 'copying'}
+      className="gap-1.5 text-[11px]"
+      data-testid="copy-diagnostics-button"
+    >
+      {state === 'copied' ? (
+        <Check className="w-3 h-3 text-dracula-green" />
+      ) : (
+        <ClipboardList className="w-3 h-3" />
+      )}
+      {state === 'copied'
+        ? 'Diagnostics copied'
+        : state === 'error'
+          ? 'Copy failed'
+          : 'Copy diagnostics'}
+    </Button>
+  )
+}
+
 export function InstallInstructionsModal({ open, onClose, status, onRecheck, isRechecking }: Props) {
   const [showOthers, setShowOthers] = useState(false)
   const platform: Platform = status?.platform ?? 'darwin'
@@ -215,22 +258,25 @@ export function InstallInstructionsModal({ open, onClose, status, onRecheck, isR
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 mt-2">
-          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
-            Close
-          </Button>
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            onClick={onRecheck}
-            disabled={isRechecking}
-            className="gap-1.5"
-            data-testid="install-recheck-button"
-          >
-            <RefreshCw className={cn('w-3 h-3', isRechecking && 'animate-spin')} />
-            I installed it, recheck
-          </Button>
+        <div className="flex items-center justify-between gap-2 mt-2">
+          <CopyDiagnosticsButton />
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+              Close
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={onRecheck}
+              disabled={isRechecking}
+              className="gap-1.5"
+              data-testid="install-recheck-button"
+            >
+              <RefreshCw className={cn('w-3 h-3', isRechecking && 'animate-spin')} />
+              I installed it, recheck
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

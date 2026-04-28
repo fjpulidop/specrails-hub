@@ -13,6 +13,11 @@ interface Props {
 
 function formatVersionLabel(item: SetupPrerequisite): string {
   if (!item.installed) return 'not installed'
+  if (item.executable === false) {
+    const where = item.resolvedPath ? ` at ${item.resolvedPath}` : ''
+    const why = item.executionError ? ` (${item.executionError})` : ''
+    return `found${where} but failed to execute${why}`
+  }
   if (!item.meetsMinimum && item.minVersion) {
     return `${item.version ?? 'unknown'} found — needs ${item.minVersion}+`
   }

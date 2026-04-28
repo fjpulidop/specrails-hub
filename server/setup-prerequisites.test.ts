@@ -38,6 +38,7 @@ describe('setup prerequisites', () => {
     expect(status.prerequisites).toHaveLength(4)
     expect(status.prerequisites.map((item) => item.command)).toEqual(['node', 'npm', 'npx', 'git'])
     expect(status.prerequisites.every((item) => item.installed)).toBe(true)
+    expect(status.prerequisites.every((item) => item.executable)).toBe(true)
     expect(status.prerequisites.every((item) => item.meetsMinimum)).toBe(true)
     expect(status.prerequisites.find((item) => item.command === 'git')?.version).toBe('git version 2.42.1')
   })
@@ -105,28 +106,59 @@ describe('setup prerequisites', () => {
     expect(mockSpawnSync).not.toHaveBeenCalledWith('git', ['--version'], expect.anything())
   })
 
-  it('treats version-probe failures as not meeting the minimum (conservative)', () => {
+  it('treats version-probe failures as not executable (broken-symlink detection)', () => {
     mockSpawnSync.mockImplementation((cmd: any, args: any) => {
       if (cmd === 'which' || cmd === 'where') {
         if (args[0] === 'node') return { error: new Error('lookup failed') } as any
-        return { status: 0 } as any
+        return { status: 0, stdout: `/usr/local/bin/${args[0]}\n`, stderr: '' } as any
       }
-      if (cmd === 'npm') return { status: 1, stdout: '', stderr: 'npm failed' } as any
-      if (cmd === 'npx') return { error: new Error('version failed') } as any
-      return { status: 0, stdout: undefined, stderr: 'git version 2.50.0\n' } as any
+      if (cmd === '/usr/local/bin/npm') return { status: 1, stdout: '', stderr: 'npm failed' } as any
+      if (cmd === '/usr/local/bin/npx') return { error: new Error('version failed') } as any
+      if (cmd === '/usr/local/bin/git') return { status: 0, stdout: undefined, stderr: 'git version 2.50.0\n' } as any
+      return { status: 0, stdout: undefined, stderr: '' } as any
     })
 
     const status = getSetupPrerequisitesStatus()
 
     expect(status.ok).toBe(false)
-    // node not installed; npm installed but version probe failed → meetsMinimum=false → flagged.
-    // npx has no minVersion, so an undefined version is still treated as meeting the requirement.
-    expect(status.missingRequired.map((item) => item.command).sort()).toEqual(['node', 'npm'].sort())
+    // node: not installed (which failed). npm/npx: which found them, version probe failed → executable=false.
+    expect(status.missingRequired.map((item) => item.command).sort()).toEqual(['node', 'npm', 'npx'].sort())
+
+    const node = status.prerequisites.find((item) => item.command === 'node')
+    expect(node?.installed).toBe(false)
+    expect(node?.executable).toBe(false)
+
     const npm = status.prerequisites.find((item) => item.command === 'npm')
     expect(npm?.installed).toBe(true)
+    expect(npm?.executable).toBe(false)
     expect(npm?.version).toBeUndefined()
     expect(npm?.meetsMinimum).toBe(false)
-    expect(status.prerequisites.find((item) => item.command === 'git')?.version).toBe('git version 2.50.0')
+    expect(npm?.installHint).toMatch(/failed to execute/)
+
+    const git = status.prerequisites.find((item) => item.command === 'git')
+    expect(git?.executable).toBe(true)
+    expect(git?.version).toBe('git version 2.50.0')
+  })
+
+  it('flags installed-but-unexecutable Node distinctly from not-installed', () => {
+    mockSpawnSync.mockImplementation((cmd: any, args: any) => {
+      if (cmd === 'which' || cmd === 'where') {
+        return { status: 0, stdout: `/usr/local/bin/${args[0]}\n`, stderr: '' } as any
+      }
+      if (cmd === '/usr/local/bin/node') return { error: Object.assign(new Error('ENOENT'), { code: 'ENOENT' }) } as any
+      if (cmd === '/usr/local/bin/npm') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (cmd === '/usr/local/bin/npx') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (cmd === '/usr/local/bin/git') return { status: 0, stdout: 'git version 2.42.1\n', stderr: '' } as any
+      return { status: 0, stdout: '', stderr: '' } as any
+    })
+
+    const status = getSetupPrerequisitesStatus()
+    const node = status.prerequisites.find((item) => item.command === 'node')
+    expect(node?.installed).toBe(true)
+    expect(node?.executable).toBe(false)
+    expect(node?.meetsMinimum).toBe(false)
+    expect(node?.resolvedPath).toBe('/usr/local/bin/node')
+    expect(node?.installHint).toMatch(/broken symlink/)
   })
 
   it('formats missing prerequisite guidance and returns null when ready', () => {
@@ -146,6 +178,7 @@ describe('setup prerequisites', () => {
           command: 'git',
           required: true,
           installed: false,
+          executable: false,
           meetsMinimum: false,
           installUrl: 'https://git-scm.com/downloads',
           installHint: 'Install Git and restart SpecRails Hub.',

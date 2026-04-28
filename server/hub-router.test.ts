@@ -966,4 +966,27 @@ describe('hub-router', () => {
     })
   })
 
+  describe('GET /api/hub/setup-prerequisites', () => {
+    it('omits diagnostic field on default request', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/setup-prerequisites')
+      expect(res.status).toBe(200)
+      expect(res.body).toHaveProperty('prerequisites')
+      expect(res.body).not.toHaveProperty('diagnostic')
+    })
+
+    it('includes diagnostic field when ?diagnostic=1', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/setup-prerequisites?diagnostic=1')
+      expect(res.status).toBe(200)
+      expect(res.body).toHaveProperty('diagnostic')
+      expect(res.body.diagnostic).toHaveProperty('pathSegments')
+      expect(res.body.diagnostic).toHaveProperty('pathSources')
+      expect(res.body.diagnostic).toHaveProperty('loginShellStatus')
+      expect(res.body.diagnostic).toHaveProperty('whichResults')
+      expect(res.body.diagnostic).toHaveProperty('platform')
+      expect(Array.isArray(res.body.diagnostic.pathSegments)).toBe(true)
+    })
+  })
+
 })

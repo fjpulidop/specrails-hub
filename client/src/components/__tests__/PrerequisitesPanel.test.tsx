@@ -77,6 +77,41 @@ describe('PrerequisitesPanel', () => {
     expect(nodeRow.textContent).toMatch(/needs 18\.0\.0\+/)
   })
 
+  it('renders broken-symlink state (installed but not executable)', () => {
+    const brokenNode: SetupPrerequisitesStatus = {
+      ok: false,
+      platform: 'darwin',
+      prerequisites: [
+        {
+          ...okStatus.prerequisites[0],
+          installed: true,
+          executable: false,
+          meetsMinimum: false,
+          version: undefined,
+          resolvedPath: '/usr/local/bin/node',
+        },
+        okStatus.prerequisites[1],
+        okStatus.prerequisites[2],
+        okStatus.prerequisites[3],
+      ],
+      missingRequired: [
+        {
+          ...okStatus.prerequisites[0],
+          installed: true,
+          executable: false,
+          meetsMinimum: false,
+          version: undefined,
+          resolvedPath: '/usr/local/bin/node',
+        },
+      ],
+    }
+    render(<PrerequisitesPanel status={brokenNode} isLoading={false} error={null} />)
+    const nodeRow = screen.getByTestId('prereq-row-node')
+    expect(nodeRow).toHaveAttribute('data-ok', 'false')
+    expect(nodeRow.textContent).toMatch(/failed to execute/)
+    expect(nodeRow.textContent).toContain('/usr/local/bin/node')
+  })
+
   it('calls onRefresh when the refresh button is clicked', () => {
     const onRefresh = vi.fn()
     render(<PrerequisitesPanel status={okStatus} isLoading={false} error={null} onRefresh={onRefresh} />)
