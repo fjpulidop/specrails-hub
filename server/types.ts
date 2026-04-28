@@ -447,6 +447,72 @@ export interface ProposalErrorMessage {
   timestamp: string
 }
 
+// ─── Agent refine (AI Edit for custom agents) message types ─────────────────
+
+export type AgentRefinePhase =
+  | 'idle'
+  | 'reading'
+  | 'drafting'
+  | 'validating'
+  | 'testing'
+  | 'done'
+
+export interface AgentRefineStreamMessage {
+  type: 'agent_refine_stream'
+  projectId: string
+  refineId: string
+  delta: string
+  timestamp: string
+}
+
+export interface AgentRefinePhaseMessage {
+  type: 'agent_refine_phase'
+  projectId: string
+  refineId: string
+  phase: AgentRefinePhase
+  timestamp: string
+}
+
+export interface AgentRefineReadyMessage {
+  type: 'agent_refine_ready'
+  projectId: string
+  refineId: string
+  draftBody: string
+  timestamp: string
+}
+
+export interface AgentRefineTestMessage {
+  type: 'agent_refine_test'
+  projectId: string
+  refineId: string
+  result: { output: string; tokens: number; durationMs: number }
+  timestamp: string
+}
+
+export interface AgentRefineErrorMessage {
+  type: 'agent_refine_error'
+  projectId: string
+  refineId: string
+  error: string
+  timestamp: string
+}
+
+export interface AgentRefineCancelledMessage {
+  type: 'agent_refine_cancelled'
+  projectId: string
+  refineId: string
+  timestamp: string
+}
+
+export interface AgentRefineAppliedMessage {
+  type: 'agent_refine_applied'
+  projectId: string
+  refineId: string
+  agentId: string
+  version: number
+  timestamp: string
+}
+
 // ─── Job Templates ────────────────────────────────────────────────────────────
 
 export interface JobTemplate {
@@ -648,4 +714,7 @@ export type WsMessage =
   | TicketAiEditStreamMessage | TicketAiEditDoneMessage | TicketAiEditErrorMessage
   | SpecGenStreamMessage | SpecGenDoneMessage | SpecGenErrorMessage
   | RailJobStartedMessage | RailJobStoppedMessage | RailJobCompletedMessage
+  | AgentRefineStreamMessage | AgentRefinePhaseMessage | AgentRefineReadyMessage
+  | AgentRefineTestMessage | AgentRefineErrorMessage | AgentRefineCancelledMessage
+  | AgentRefineAppliedMessage
 

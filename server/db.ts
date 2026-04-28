@@ -302,6 +302,35 @@ const MIGRATIONS: Migration[] = [
       // Column may already exist (partially-migrated DB); no-op.
     }
   },
+
+  // Migration 13: agent_refine_sessions — in-flight AI Edit sessions for
+  // custom agents. Distinct from agent_versions (which is committed history);
+  // rows here are drafts in progress that may or may not be applied.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS agent_refine_sessions (
+        id              TEXT    PRIMARY KEY,
+        agent_id        TEXT    NOT NULL,
+        session_id      TEXT,
+        base_version    INTEGER NOT NULL,
+        base_body_hash  TEXT    NOT NULL,
+        draft_body      TEXT,
+        history_json    TEXT    NOT NULL DEFAULT '[]',
+        phase           TEXT    NOT NULL DEFAULT 'idle',
+        status          TEXT    NOT NULL DEFAULT 'idle',
+        auto_test       INTEGER NOT NULL DEFAULT 1,
+        last_test_at    INTEGER,
+        last_test_hash  TEXT,
+        created_at      INTEGER NOT NULL,
+        updated_at      INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_agent_refine_sessions_agent
+        ON agent_refine_sessions(agent_id, status);
+      CREATE INDEX IF NOT EXISTS idx_agent_refine_sessions_updated
+        ON agent_refine_sessions(updated_at);
+    `)
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {
