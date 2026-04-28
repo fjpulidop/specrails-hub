@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.43.1](https://github.com/fjpulidop/specrails-hub/compare/v1.43.0...v1.43.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* resolve PATH for GUI-launched server so brew node is detected ([#276](https://github.com/fjpulidop/specrails-hub/issues/276)) ([27b05e7](https://github.com/fjpulidop/specrails-hub/commit/27b05e7768fbaab26710d313ee1069f63502cf5b))
+
 ## [1.43.0](https://github.com/fjpulidop/specrails-hub/compare/v1.42.0...v1.43.0) (2026-04-27)
 
 
