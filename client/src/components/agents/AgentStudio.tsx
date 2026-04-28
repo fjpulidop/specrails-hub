@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Save, Trash2, History, ArrowLeft, AlertCircle, FlaskConical, Loader2 } from 'lucide-react'
+import { Save, Trash2, History, ArrowLeft, AlertCircle, FlaskConical, Loader2, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
@@ -19,8 +19,20 @@ interface Props {
   initialBody?: string
   /** Optional initial name for create mode (used by Generate flow). */
   initialName?: string
+  /**
+   * When set in edit mode, hydrate the editor from the matching AI Refine
+   * session's draft body instead of the on-disk file. Renders a "Resume AI
+   * Edit" pill in the header so the user can hand the draft back to the
+   * overlay.
+   */
+  draftFromRefine?: string
   onClose: () => void
   onSaved?: (id: string) => void
+  /**
+   * Called when the user clicks the "Resume AI Edit" pill. Receives
+   * (refineId, agentId, baseBody) so the parent can re-open the overlay.
+   */
+  onResumeRefine?: (refineId: string, agentId: string, baseBody: string) => void
 }
 
 // Template catalog lives in agentTemplates.ts (45+ entries across 13
@@ -83,11 +95,20 @@ You are ...
 - **focus_areas**: ...
 `
 
-export function AgentStudio({ agentId, initialBody, initialName, onClose, onSaved }: Props) {
+export function AgentStudio({
+  agentId,
+  initialBody,
+  initialName,
+  draftFromRefine,
+  onClose,
+  onSaved,
+  onResumeRefine,
+}: Props) {
   const isCreate = !agentId
   const [id, setId] = useState(agentId ?? initialName ?? '')
   const [body, setBody] = useState(initialBody ?? BLANK_TEMPLATE)
-  const [loading, setLoading] = useState(!isCreate && !initialBody)
+  const [loading, setLoading] = useState(!isCreate && !initialBody && !draftFromRefine)
+  const [refineDraftLoading, setRefineDraftLoading] = useState(!!draftFromRefine && !isCreate)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [versions, setVersions] = useState<AgentVersion[]>([])
@@ -104,6 +125,30 @@ export function AgentStudio({ agentId, initialBody, initialName, onClose, onSave
 
   useEffect(() => {
     if (isCreate || initialBody !== undefined) return
+    // Refine handoff path: load draft body from the in-flight session.
+    if (draftFromRefine) {
+      let cancelled = false
+      fetch(`${getApiBase()}/profiles/catalog/${encodeURIComponent(agentId!)}/refine/${draftFromRefine}`)
+        .then((r) => {
+          if (!r.ok) throw new Error(`Load draft failed: ${r.status}`)
+          return r.json() as Promise<{ draftBody: string | null }>
+        })
+        .then((data) => {
+          if (!cancelled && data.draftBody) {
+            setBody(data.draftBody)
+            setDirty(true)
+          }
+        })
+        .catch((e) => {
+          if (!cancelled) setError((e as Error).message)
+        })
+        .finally(() => {
+          if (!cancelled) setRefineDraftLoading(false)
+        })
+      return () => {
+        cancelled = true
+      }
+    }
     let cancelled = false
     fetch(`${getApiBase()}/profiles/catalog/${encodeURIComponent(agentId!)}`)
       .then((r) => {
@@ -122,7 +167,7 @@ export function AgentStudio({ agentId, initialBody, initialName, onClose, onSave
     return () => {
       cancelled = true
     }
-  }, [agentId, isCreate, initialBody])
+  }, [agentId, isCreate, initialBody, draftFromRefine])
 
   const loadVersions = useCallback(() => {
     if (isCreate) return
@@ -284,7 +329,34 @@ export function AgentStudio({ agentId, initialBody, initialName, onClose, onSave
               className="text-sm font-mono mt-1 max-w-sm"
             />
           ) : (
-            <div className="text-sm font-mono">{agentId}</div>
+            <div className="flex items-center gap-2">
+              <div className="text-sm font-mono">{agentId}</div>
+              {draftFromRefine && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!onResumeRefine || !agentId) return
+                    try {
+                      const r = await fetch(
+                        `${getApiBase()}/profiles/catalog/${encodeURIComponent(agentId)}`,
+                      )
+                      if (!r.ok) return
+                      const data = (await r.json()) as { body: string }
+                      onResumeRefine(draftFromRefine, agentId, data.body)
+                    } catch { /* ignore */ }
+                  }}
+                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-dracula-purple/40 bg-dracula-purple/15 text-dracula-purple hover:bg-dracula-purple/25 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                  title="Hand this draft back to the AI Edit overlay"
+                >
+                  <Wand2 className="w-3 h-3" /> Resume AI Edit
+                </button>
+              )}
+              {refineDraftLoading && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <Loader2 className="w-3 h-3 animate-spin" /> loading AI draft…
+                </span>
+              )}
+            </div>
           )}
         </div>
         <div className="flex items-center gap-2">

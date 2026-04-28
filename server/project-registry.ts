@@ -7,6 +7,8 @@ import { QueueManager } from './queue-manager'
 import { ChatManager } from './chat-manager'
 import { SetupManager } from './setup-manager'
 import { ProposalManager } from './proposal-manager'
+import { AgentRefineManager } from './agent-refine-manager'
+import { pruneStaleRefineSessions } from './agent-refine-db'
 import { SpecLauncherManager } from './spec-launcher-manager'
 import { WebhookManager } from './webhook-manager'
 import { TicketWatcher } from './ticket-watcher'
@@ -39,6 +41,7 @@ export interface ProjectContext {
   chatManager: ChatManager
   setupManager: SetupManager
   proposalManager: ProposalManager
+  agentRefineManager: AgentRefineManager
   specLauncherManager: SpecLauncherManager
   ticketWatcher: TicketWatcher
   broadcast: (msg: WsMessage) => void
@@ -279,6 +282,11 @@ export class ProjectRegistry {
       (pid) => clearProjectSetupSession(this._hubDb, pid)
     )
     const proposalManager = new ProposalManager(boundBroadcast, db, project.path)
+    const agentRefineManager = new AgentRefineManager(boundBroadcast, db, project.path)
+    // Retention prune: drop stale/abandoned refine sessions on project load.
+    try { pruneStaleRefineSessions(db) } catch (err) {
+      console.error('[project-registry] prune refine sessions failed:', err)
+    }
     const specLauncherManager = new SpecLauncherManager(boundBroadcast, project.path)
 
     // Load commands for this project
@@ -292,7 +300,7 @@ export class ProjectRegistry {
     const ticketWatcher = new TicketWatcher(project.path, project.id, boundBroadcast)
     ticketWatcher.start()
 
-    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, specLauncherManager, ticketWatcher, broadcast: boundBroadcast, railJobs }
+    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, agentRefineManager, specLauncherManager, ticketWatcher, broadcast: boundBroadcast, railJobs }
     this._contexts.set(project.id, ctx)
     return ctx
   }

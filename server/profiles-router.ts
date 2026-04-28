@@ -3,6 +3,8 @@ import path from 'path'
 import { Router, Request, Response } from 'express'
 import type { ProjectContext } from './project-registry'
 import { generateCustomAgent, testCustomAgent } from './agent-generator'
+import { getRefineSession, listRefineSessionsForAgent } from './agent-refine-db'
+import { refineSessionToJson } from './agent-refine-manager'
 import {
   createProfile,
   deleteProfile,
@@ -472,6 +474,167 @@ export function createProfilesRouter(): Router {
       }
       const draft = await generateCustomAgent(project.path, { name, description })
       res.json({ draft })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  // ── AI Refine: iterative AI editing for custom agents ───────────────────
+  // All routes scoped to /catalog/:agentId/refine[/:refineId][/...].
+
+  router.post('/catalog/:agentId/refine', async (req, res) => {
+    try {
+      const ctxObj = ctx(req)
+      const { agentRefineManager } = ctxObj
+      const agentId = req.params.agentId
+      if (!/^custom-[a-z0-9][a-z0-9-]*$/.test(agentId)) {
+        res.status(400).json({ error: 'not_a_custom_agent' })
+        return
+      }
+      const instruction = (req.body?.instruction ?? '').toString().trim()
+      if (!instruction) {
+        res.status(400).json({ error: 'instruction is required' })
+        return
+      }
+      const autoTest = req.body?.autoTest !== false
+      try {
+        const result = await agentRefineManager.startRefine({ agentId, instruction, autoTest })
+        res.status(201).json({ refineId: result.refineId })
+      } catch (err) {
+        const code = (err as Error).message
+        if (code === 'not_a_custom_agent') {
+          res.status(400).json({ error: 'not_a_custom_agent' })
+          return
+        }
+        if (code === 'agent_not_found') {
+          res.status(404).json({ error: 'agent not found' })
+          return
+        }
+        throw err
+      }
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  router.post('/catalog/:agentId/refine/:refineId/turn', async (req, res) => {
+    try {
+      const { agentRefineManager } = ctx(req)
+      const refineId = req.params.refineId
+      const instruction = (req.body?.instruction ?? '').toString().trim()
+      if (!instruction) {
+        res.status(400).json({ error: 'instruction is required' })
+        return
+      }
+      try {
+        await agentRefineManager.sendTurn({ refineId, instruction })
+        res.json({ ok: true })
+      } catch (err) {
+        const code = (err as Error).message
+        if (code === 'session_not_found') {
+          res.status(404).json({ error: 'refine session not found' })
+          return
+        }
+        if (code === 'turn_in_progress') {
+          res.status(409).json({ error: 'a turn is already in progress for this session' })
+          return
+        }
+        if (code === 'no_session_id') {
+          res.status(409).json({ error: 'first turn has not yet completed; cannot resume' })
+          return
+        }
+        throw err
+      }
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  router.get('/catalog/:agentId/refine', (req, res) => {
+    try {
+      const { db } = ctx(req)
+      const sessions = listRefineSessionsForAgent(db, req.params.agentId).map(refineSessionToJson)
+      res.json({ sessions })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  router.get('/catalog/:agentId/refine/:refineId', (req, res) => {
+    try {
+      const { db } = ctx(req)
+      const session = getRefineSession(db, req.params.refineId)
+      if (!session || session.agent_id !== req.params.agentId) {
+        res.status(404).json({ error: 'refine session not found' })
+        return
+      }
+      res.json(refineSessionToJson(session))
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  router.patch('/catalog/:agentId/refine/:refineId', (req, res) => {
+    try {
+      const { agentRefineManager, db } = ctx(req)
+      const session = getRefineSession(db, req.params.refineId)
+      if (!session || session.agent_id !== req.params.agentId) {
+        res.status(404).json({ error: 'refine session not found' })
+        return
+      }
+      if (typeof req.body?.autoTest === 'boolean') {
+        agentRefineManager.toggleAutoTest(req.params.refineId, req.body.autoTest)
+      }
+      const updated = getRefineSession(db, req.params.refineId)!
+      res.json(refineSessionToJson(updated))
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  router.delete('/catalog/:agentId/refine/:refineId', (req, res) => {
+    try {
+      const { agentRefineManager, db } = ctx(req)
+      const session = getRefineSession(db, req.params.refineId)
+      if (!session || session.agent_id !== req.params.agentId) {
+        res.status(404).json({ error: 'refine session not found' })
+        return
+      }
+      agentRefineManager.cancel(req.params.refineId)
+      res.json({ ok: true })
+    } catch (err) {
+      handleError(res, err)
+    }
+  })
+
+  router.post('/catalog/:agentId/refine/:refineId/apply', (req, res) => {
+    try {
+      const { agentRefineManager, db, project, broadcast } = ctx(req)
+      const session = getRefineSession(db, req.params.refineId)
+      if (!session || session.agent_id !== req.params.agentId) {
+        res.status(404).json({ error: 'refine session not found' })
+        return
+      }
+      const force = !!req.body?.force
+      const result = agentRefineManager.apply({ refineId: req.params.refineId, force })
+      if (!result.ok) {
+        if (result.reason === 'disk_changed' || result.reason === 'name_changed') {
+          res.status(409).json({ error: result.reason, reason: result.reason })
+          return
+        }
+        if (result.reason === 'agent_not_found') {
+          res.status(404).json({ error: 'agent not found' })
+          return
+        }
+        res.status(400).json({ error: result.reason ?? 'apply_failed' })
+        return
+      }
+      // Re-broadcast standard agent change with the proper projectId so the
+      // catalog UI updates (manager broadcasts an empty projectId; ProjectRegistry
+      // injects projectId via boundBroadcast, but the explicit emit below is
+      // belt-and-braces for any client filtering on `agent.changed`).
+      broadcast({ type: 'agent.changed', projectId: project.id, id: req.params.agentId } as never)
+      res.json({ ok: true, version: result.version, body: result.body })
     } catch (err) {
       handleError(res, err)
     }

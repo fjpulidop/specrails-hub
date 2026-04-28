@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Pencil, Copy, Sparkles, Loader2, FileText, Search, X, Tag } from 'lucide-react'
+import { Plus, Pencil, Copy, Sparkles, Loader2, FileText, Search, X, Tag, Wand2 } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { AgentStudio } from './AgentStudio'
+import { AiRefineOverlay } from './AiRefineOverlay'
 import { AGENT_TEMPLATES, ALL_TEMPLATE_CATEGORIES, type AgentTemplateCategory } from './agentTemplates'
 
 interface CatalogAgent {
@@ -17,8 +18,12 @@ interface CatalogAgent {
 type StudioMode =
   | { kind: 'closed' }
   | { kind: 'create'; initialBody?: string; initialName?: string }
-  | { kind: 'edit'; agentId: string }
+  | { kind: 'edit'; agentId: string; draftFromRefine?: string }
   | { kind: 'duplicate'; from: string; initialBody: string }
+
+type RefineMode =
+  | { kind: 'closed' }
+  | { kind: 'open'; agentId: string; baseBody: string; resumeRefineId?: string }
 
 export function AgentsCatalogTab() {
   const [agents, setAgents] = useState<CatalogAgent[]>([])
@@ -28,6 +33,7 @@ export function AgentsCatalogTab() {
   const [bodyLoading, setBodyLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [studio, setStudio] = useState<StudioMode>({ kind: 'closed' })
+  const [refine, setRefine] = useState<RefineMode>({ kind: 'closed' })
   const [templatesOpen, setTemplatesOpen] = useState(false)
   const [templateSearch, setTemplateSearch] = useState('')
   const [templateCategory, setTemplateCategory] = useState<AgentTemplateCategory | 'all'>('all')
@@ -117,11 +123,37 @@ export function AgentsCatalogTab() {
               : undefined
         }
         initialName={studio.kind === 'create' ? studio.initialName : undefined}
+        draftFromRefine={studio.kind === 'edit' ? studio.draftFromRefine : undefined}
         onClose={() => setStudio({ kind: 'closed' })}
         onSaved={(id) => {
           setSelectedId(id)
           setStudio({ kind: 'closed' })
           refresh()
+        }}
+        onResumeRefine={(refineId, agentId, baseBody) => {
+          setStudio({ kind: 'closed' })
+          setRefine({ kind: 'open', agentId, baseBody, resumeRefineId: refineId })
+        }}
+      />
+    )
+  }
+
+  // AI Refine overlay view
+  if (refine.kind === 'open') {
+    return (
+      <AiRefineOverlay
+        agentId={refine.agentId}
+        baseBody={refine.baseBody}
+        resumeRefineId={refine.resumeRefineId}
+        onClose={() => setRefine({ kind: 'closed' })}
+        onApplied={(id) => {
+          setRefine({ kind: 'closed' })
+          setSelectedId(id)
+          refresh()
+        }}
+        onOpenInStudio={(refineId, _draftBody) => {
+          setRefine({ kind: 'closed' })
+          setStudio({ kind: 'edit', agentId: refine.agentId, draftFromRefine: refineId })
         }}
       />
     )
@@ -585,9 +617,28 @@ export function AgentsCatalogTab() {
                   <Copy className="w-3.5 h-3.5 mr-1" /> Duplicate
                 </Button>
                 {selected.kind === 'custom' && (
-                  <Button size="sm" onClick={() => setStudio({ kind: 'edit', agentId: selected.id })}>
-                    <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
-                  </Button>
+                  <>
+                    <Button size="sm" variant="ghost" onClick={() => setStudio({ kind: 'edit', agentId: selected.id })}>
+                      <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        // Load fresh body from disk so the diff is accurate.
+                        try {
+                          const r = await fetch(`${getApiBase()}/profiles/catalog/${encodeURIComponent(selected.id)}`)
+                          if (!r.ok) throw new Error(`Load failed: ${r.status}`)
+                          const data = (await r.json()) as { body: string }
+                          setRefine({ kind: 'open', agentId: selected.id, baseBody: data.body })
+                        } catch (e) {
+                          setError((e as Error).message)
+                        }
+                      }}
+                      title="Iteratively refine this agent with AI"
+                    >
+                      <Wand2 className="w-3.5 h-3.5 mr-1" /> AI Edit
+                    </Button>
+                  </>
                 )}
               </div>
             </div>

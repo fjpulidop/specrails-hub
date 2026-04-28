@@ -1682,6 +1682,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     }
     const instructions = req.body?.instructions as string | undefined
     const currentDescription = req.body?.description as string | undefined
+    const currentTitle = typeof req.body?.title === 'string' ? (req.body.title as string) : ''
     if (!instructions?.trim()) {
       res.status(400).json({ error: 'instructions is required' }); return
     }
@@ -1705,8 +1706,16 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
     // Build the focused pre-prompt
     const baseRules =
-      `- Output ONLY the modified description in markdown. No preamble, no explanation, no wrapping.\n` +
-      `- Preserve the existing markdown structure and section headings.\n` +
+      `- Output format MUST be exactly:\n` +
+      `    TITLE: <one-line spec title>\n` +
+      `    \n` +
+      `    <markdown description body>\n` +
+      `  The first line MUST start with "TITLE: " followed by the refined title.\n` +
+      `  Then exactly one blank line. Then the markdown description.\n` +
+      `- Keep the title concise (under 80 characters) and reflective of the latest description.\n` +
+      `  If the user's refinement does not affect the title's intent, you may keep it unchanged — but always emit the TITLE line.\n` +
+      `- After the title line, output ONLY the modified description in markdown. No preamble, no explanation, no wrapping.\n` +
+      `- Preserve the existing markdown structure and section headings in the description.\n` +
       `- If the user asks to add technical details, briefly check CLAUDE.md and the project directory structure (ls, not deep reads) to ground your edits.\n` +
       `- Keep it concise and actionable.\n` +
       `- Do NOT create files, tickets, or issues. Only output text.`
@@ -1716,20 +1725,22 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       : ''
 
     let systemPrompt =
-      `You are a spec editor. You will receive a ticket description and user instructions for how to modify it. ` +
-      `Your job is to produce an improved version of the description.\n\n` +
+      `You are a spec editor. You will receive a ticket title and description plus user instructions for how to modify them. ` +
+      `Your job is to produce an improved version of BOTH the title and the description.\n\n` +
       `RULES:\n` +
       `${baseRules}${refinementRule}`
 
     let userPrompt = isRefinement
-      ? `## Current Description (saved baseline — do not rewrite)\n\n${currentDescription}\n\n` +
+      ? `## Current Title (saved baseline)\n\n${currentTitle}\n\n` +
+        `## Current Description (saved baseline — do not rewrite)\n\n${currentDescription}\n\n` +
         `## Prior Refinement Turns\n\n${priorInstructions.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n` +
-        `## Latest Draft (from previous turn — apply the new refinement to this)\n\n${priorProposal}\n\n` +
+        `## Latest Draft (from previous turn — apply the new refinement to this; the draft already includes a TITLE: line)\n\n${priorProposal}\n\n` +
         `## New Refinement\n\n${instructions.trim()}\n\n` +
-        `Output the updated description now.`
-      : `## Current Description\n\n${currentDescription}\n\n` +
+        `Output the updated TITLE line followed by the updated description now.`
+      : `## Current Title\n\n${currentTitle}\n\n` +
+        `## Current Description\n\n${currentDescription}\n\n` +
         `## User Instructions\n\n${instructions.trim()}\n\n` +
-        `Output the modified description now.`
+        `Output the modified TITLE line followed by the modified description now.`
 
     let imageFlags: string[] = []
     if (attachmentIds.length > 0) {
