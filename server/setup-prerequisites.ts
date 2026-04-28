@@ -10,10 +10,16 @@ export interface SetupPrerequisite {
   command: string
   required: boolean
   installed: boolean
+  /** True when `installed` AND `<command> --version` exits 0. */
+  executable: boolean
   version?: string
+  /** Absolute path returned by `which`, when found. Used for diagnostics. */
+  resolvedPath?: string
+  /** Raw failure detail when `installed && !executable`. Used for diagnostics. */
+  executionError?: string
   /** Semver `major.minor.patch` minimum. Undefined = no minimum (e.g. npx). */
   minVersion?: string
-  /** True when `installed` and (no minVersion OR parsed version >= minVersion). */
+  /** True when `installed` AND `executable` AND (no minVersion OR parsed version >= minVersion). */
   meetsMinimum: boolean
   installUrl: string
   installHint: string
@@ -32,25 +38,54 @@ export const MIN_VERSIONS: Record<'node' | 'npm' | 'git', string> = {
   git: '2.20.0',
 }
 
-function commandExists(command: string): boolean {
+interface CommandLookup {
+  found: boolean
+  resolvedPath?: string
+}
+
+function locateCommand(command: string): CommandLookup {
   const result = spawnSync(WHICH_CMD, [command], {
     env: process.env,
     shell: process.platform === 'win32',
-    stdio: 'ignore',
+    encoding: 'utf-8',
   })
-  return !result.error && (result.status ?? 1) === 0
+  if (result.error || (result.status ?? 1) !== 0) return { found: false }
+  const resolvedPath = `${result.stdout ?? ''}`.trim().split(/\r?\n/)[0]?.trim() || undefined
+  return { found: true, resolvedPath }
 }
 
-function commandVersion(command: string): string | undefined {
-  const result = spawnSync(command, ['--version'], {
+interface VersionProbe {
+  executed: boolean
+  version?: string
+  error?: string
+}
+
+function probeVersion(command: string, resolvedPath?: string): VersionProbe {
+  // IMPORTANT: prefer the absolute path returned by `which`. When the server is
+  // bundled with `pkg`, calling spawn with the bare command name `'node'` is
+  // intercepted by pkg's child_process patch and redirected to `process.execPath`
+  // (the server binary itself) — the child then crashes with
+  // `Cannot find module '/--version'` from pkg/prelude/bootstrap.js. Passing
+  // an absolute path bypasses this interception.
+  const target = resolvedPath || command
+  const result = spawnSync(target, ['--version'], {
     env: process.env,
     shell: process.platform === 'win32',
     encoding: 'utf-8',
     timeout: 5_000,
   })
-  if (result.error || (result.status ?? 1) !== 0) return undefined
+  if (result.error) {
+    const err = result.error as NodeJS.ErrnoException
+    return { executed: false, error: `${err.code ?? 'ERR'}: ${err.message}` }
+  }
+  if ((result.status ?? 1) !== 0) {
+    const stderr = `${result.stderr ?? ''}`.trim().slice(0, 400)
+    const signal = result.signal ? ` signal=${result.signal}` : ''
+    return { executed: false, error: `exit=${result.status ?? '?'}${signal}${stderr ? ` stderr=${stderr}` : ''}` }
+  }
   const output = `${result.stdout ?? result.stderr ?? ''}`.trim()
-  return output.split(/\r?\n/)[0]?.trim() || undefined
+  const version = output.split(/\r?\n/)[0]?.trim() || undefined
+  return { executed: true, version }
 }
 
 /** Extracts the first `major.minor.patch` triple from a version string.
@@ -78,6 +113,11 @@ function meetsMinimumVersion(version: string | undefined, minVersion: string | u
   return compareVersions(version, minVersion) >= 0
 }
 
+function brokenSymlinkHint(label: string, command: string, resolvedPath: string | undefined): string {
+  const where = resolvedPath ? ` at ${resolvedPath}` : ''
+  return `${label} found${where} but failed to execute — possibly a broken symlink or a stale install. Reinstall ${command} or remove the stale link${resolvedPath ? ` at ${resolvedPath}` : ''}.`
+}
+
 export function getSetupPrerequisitesStatus(): SetupPrerequisitesStatus {
   const platform: Platform = process.platform === 'darwin'
     ? 'darwin'
@@ -85,7 +125,7 @@ export function getSetupPrerequisitesStatus(): SetupPrerequisitesStatus {
       ? 'win32'
       : 'linux'
 
-  const definitions: Array<Omit<SetupPrerequisite, 'installed' | 'version' | 'meetsMinimum'>> = [
+  const definitions: Array<Omit<SetupPrerequisite, 'installed' | 'executable' | 'version' | 'resolvedPath' | 'meetsMinimum'>> = [
     {
       key: 'node',
       label: 'Node.js',
@@ -130,15 +170,36 @@ export function getSetupPrerequisitesStatus(): SetupPrerequisitesStatus {
   ]
 
   const prerequisites: SetupPrerequisite[] = definitions.map((definition) => {
-    const installed = commandExists(definition.command)
-    const version = installed ? commandVersion(definition.command) : undefined
-    const meetsMinimum = installed && meetsMinimumVersion(version, definition.minVersion)
-    return { ...definition, installed, version, meetsMinimum }
+    const lookup = locateCommand(definition.command)
+    const installed = lookup.found
+    let executable = false
+    let version: string | undefined
+    let executionError: string | undefined
+    if (installed) {
+      const probe = probeVersion(definition.command, lookup.resolvedPath)
+      executable = probe.executed
+      version = probe.version
+      executionError = probe.error
+    }
+    const meetsMinimum = installed && executable && meetsMinimumVersion(version, definition.minVersion)
+    const installHint = installed && !executable
+      ? brokenSymlinkHint(definition.label, definition.command, lookup.resolvedPath)
+      : definition.installHint
+    return {
+      ...definition,
+      installed,
+      executable,
+      version,
+      resolvedPath: lookup.resolvedPath,
+      executionError,
+      meetsMinimum,
+      installHint,
+    }
   })
 
-  // A required tool counts as missing if not installed OR below its minimum version.
+  // A required tool counts as missing if not installed, not executable, or below its minimum version.
   const missingRequired = prerequisites.filter(
-    (item) => item.required && (!item.installed || !item.meetsMinimum),
+    (item) => item.required && (!item.installed || !item.executable || !item.meetsMinimum),
   )
 
   return {
@@ -159,7 +220,10 @@ export function formatMissingSetupPrerequisites(status = getSetupPrerequisitesSt
       if (!item.installed) {
         return `- ${item.label} (${item.command}) is not on PATH. ${item.installHint}`
       }
-      // installed but below minimum version
+      if (!item.executable) {
+        return `- ${item.installHint}`
+      }
+      // installed and executable but below minimum version
       return `- ${item.label} ${item.version ?? '?'} found, but version ${item.minVersion}+ is required. ${item.installHint}`
     }),
     '',

@@ -19,6 +19,10 @@ import { requireAuth, loadOrGenerateToken, tokenFromUpgradeRequest } from './aut
 import { getTerminalManager } from './terminal-manager'
 import { createTelemetryRouter } from './telemetry-receiver'
 import { runCompactionForAll } from './telemetry-compactor'
+import { resolveStartupPath, augmentPathFromLoginShell, getPathDiagnostic } from './path-resolver'
+
+const inheritedPathBeforeResolve = (process.env.PATH ?? '').split(process.platform === 'win32' ? ';' : ':').filter(Boolean).length
+resolveStartupPath()
 
 const TERMINAL_PANEL_ENABLED = process.env.SPECRAILS_TERMINAL_PANEL !== 'false'
 
@@ -364,6 +368,12 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 server.listen(port, '127.0.0.1', () => {
   console.log(`specrails web manager running on http://127.0.0.1:${port}`)
   writePidFile()
+  void augmentPathFromLoginShell().then(() => {
+    const diag = getPathDiagnostic()
+    const augmented = diag.pathSegments.length - inheritedPathBeforeResolve
+    const source = process.stdin.isTTY ? 'terminal' : 'gui'
+    console.log(`[path-resolver] inherited=${inheritedPathBeforeResolve} augmented=${Math.max(0, augmented)} loginShell=${diag.loginShellStatus} source=${source}`)
+  })
 })
 
 // ─── Clean shutdown ───────────────────────────────────────────────────────────

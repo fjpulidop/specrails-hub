@@ -9,7 +9,13 @@ export interface SetupPrerequisite {
   command: string
   required: boolean
   installed: boolean
+  /** True when `installed` AND `<command> --version` exits 0. Server adds this in the broken-symlink fix. */
+  executable?: boolean
   version?: string
+  /** Absolute path returned by `which`, when found. Optional — server may omit. */
+  resolvedPath?: string
+  /** Raw spawn failure detail when `installed && !executable`. */
+  executionError?: string
   minVersion?: string
   meetsMinimum: boolean
   installUrl: string
