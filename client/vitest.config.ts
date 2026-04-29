@@ -46,7 +46,6 @@ export default defineConfig({
         'src/lib/tauri-drag-drop.ts',
         'src/lib/save-scrollback.ts',
         'src/lib/terminal-notifications.ts',
-        'src/lib/terminal-settings-types.ts',
         'src/components/terminal/PromptGutter.tsx',
         'src/components/terminal/CommandTimingBadge.tsx',
         'src/components/terminal/TerminalContextMenu.tsx',

@@ -120,6 +120,19 @@ Per-project bottom terminal panel (VSCode/Cursor style) gated by `FEATURE_TERMIN
 
 **Premium-panel features (post `add-premium-terminal-panel`)**: the panel layers WebGL rendering (with canvas fallback on context loss), Unicode 11 widths, ligatures, scrollback search (Cmd+F), font zoom (Cmd+= / -/0), Cmd+C/V/K clipboard keybindings, right-click context menu, drag-drop file path injection (Tauri only, POSIX/Windows shell-quoted), trailing-debounced resize + sidebar transitionend hook for jitter-free animation, and a shell-integration layer based on OSC 133 / OSC 1337 marks. The `TerminalManager` injects per-shell shims (`ZDOTDIR` for zsh, `--rcfile` for bash, `XDG_CONFIG_HOME` for fish, `-NoLogo -NoExit -File` for PowerShell) chmod-600 under `~/.specrails/projects/<slug>/terminals/<sessionId>/`, parses inbound OSC streams server-side via `OscParser`, broadcasts JSON `{type:"mark",kind,...}` control frames on the existing `/ws/terminal/:id` socket, persists completed commands to `terminal_command_marks` (FIFO-capped at 1000 per session), and cleans up shim dirs on session kill plus a 24h-stale sweep at startup. Settings live in `hub_settings` (key/value, hub-wide) and `terminal_settings_override` per-project; resolution order is project override → hub default → built-in. REST: `GET/PATCH /api/hub/terminal-settings`, `GET/PATCH /api/projects/:projectId/terminal-settings`, `GET /api/projects/:projectId/terminals/:id/marks`. Inline images via `@xterm/addon-image` (Sixel + iTerm2 protocol) and long-running command notifications via the Tauri notification plugin (with browser HTML5 `Notification` fallback) round out the differentiator surface. Disabled-by-default behaviours degrade silently when integrations fail (sentinel-not-seen toast informs the user).
 
+## Coverage policy (MANDATORY)
+
+CI enforces coverage thresholds: **70% global** (lines/functions/statements) and **80% server** (lines/functions/statements, 70% branches), plus **80% client** (lines/statements, 70% functions). If the local run fails any of these thresholds, you MUST iterate — write more tests — until every threshold passes locally before pushing or asking the user. Never lower the thresholds. Never propose lowering as a fix. The exact commands to mirror CI:
+
+```bash
+npm run typecheck
+npm test
+npm run test:coverage              # server, must pass 80% lines/functions/statements
+cd client && npm run test:coverage # client, must pass 80% lines/statements
+```
+
+Excluding files from coverage is allowed only when the file is structurally unreachable in the test environment (e.g. Tauri-only paths in jsdom) — never to mask missing tests. If you exclude, document the reason inline in `client/vitest.config.ts` / `vitest.config.ts` next to the entry.
+
 ## Conventions
 
 - **File naming**: kebab-case for server/CLI, PascalCase for React components
