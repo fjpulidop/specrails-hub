@@ -127,6 +127,9 @@ describe('SettingsPage - extended coverage', () => {
       if (String(url).endsWith('/budget')) {
         return Promise.resolve({ ok: true, json: async () => ({ dailyBudgetUsd: null, jobCostThresholdUsd: null }) })
       }
+      if (String(url).includes('/terminal-settings')) {
+        return Promise.resolve({ ok: true, json: async () => ({ resolved: { fontFamily: 'mono', fontSize: 12, renderMode: 'auto', copyOnSelect: false, shellIntegrationEnabled: true, notifyOnCompletion: true, imageRendering: true, longCommandThresholdMs: 60000 }, override: {}, hubDefaults: { fontFamily: 'mono', fontSize: 12, renderMode: 'auto', copyOnSelect: false, shellIntegrationEnabled: true, notifyOnCompletion: true, imageRendering: true, longCommandThresholdMs: 60000 } }) })
+      }
       return Promise.resolve({ ok: true, json: async () => mockConfig })
     })
 

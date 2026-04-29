@@ -38,6 +38,14 @@ import treeKill from 'tree-kill'
 import multer from 'multer'
 import { createRailsRouter } from './rails-router'
 import { createProfilesRouter } from './profiles-router'
+import {
+  getHubTerminalSettings,
+  getProjectOverride,
+  patchProjectOverride,
+  resolveTerminalSettings,
+  TerminalSettingsValidationError,
+} from './terminal-settings'
+import { listMarks } from './terminal-marks-store'
 import { attachmentManager, isSupportedUploadedFile, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
 import {
   getTerminalManager,
@@ -2068,13 +2076,18 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
   router.post('/:projectId/terminals', requireTerminalsEnabled, (req: Request, res: Response) => {
     const { cols, rows, name } = req.body ?? {}
-    const project = ctx(req).project
+    const projectCtx = ctx(req)
+    const project = projectCtx.project
+    const settings = resolveTerminalSettings(registry.hubDb, projectCtx.db)
     try {
       const meta = getTerminalManager().create(project.id, {
         cwd: project.path,
         cols: typeof cols === 'number' ? cols : undefined,
         rows: typeof rows === 'number' ? rows : undefined,
         name: typeof name === 'string' ? name : undefined,
+        projectSlug: project.slug,
+        projectDb: projectCtx.db,
+        settings,
       })
       res.status(201).json({ session: meta })
     } catch (err) {
@@ -2328,6 +2341,55 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         console.error('[project-router] diagnostic export error:', err)
         res.status(500).json({ error: 'Failed to create diagnostic export' })
       }
+    }
+  })
+
+  // ─── Terminal command marks ────────────────────────────────────────────────
+
+  // GET /api/projects/:projectId/terminals/:id/marks?limit=&before=
+  router.get('/:projectId/terminals/:id/marks', (req: Request, res: Response) => {
+    const projectCtx = ctx(req)
+    const sessionId = req.params.id as string
+    const limit = parseInt((req.query.limit as string | undefined) ?? '100', 10)
+    const before = req.query.before ? parseInt(req.query.before as string, 10) : undefined
+    const marks = listMarks(projectCtx.db, sessionId, {
+      limit: Number.isFinite(limit) ? limit : 100,
+      before: typeof before === 'number' && Number.isFinite(before) ? before : undefined,
+    })
+    res.json({ marks })
+  })
+
+  // ─── Terminal settings (per-project override layer) ────────────────────────
+
+  // GET /api/projects/:projectId/terminal-settings — returns { resolved, override, hubDefaults }
+  router.get('/:projectId/terminal-settings', (req: Request, res: Response) => {
+    const projectCtx = ctx(req)
+    const hubDefaults = getHubTerminalSettings(registry.hubDb)
+    const override = getProjectOverride(projectCtx.db)
+    const resolved = resolveTerminalSettings(registry.hubDb, projectCtx.db)
+    res.json({ resolved, override, hubDefaults })
+  })
+
+  // PATCH /api/projects/:projectId/terminal-settings — partial update of override
+  // (null value for a field clears that override)
+  router.patch('/:projectId/terminal-settings', (req: Request, res: Response) => {
+    const projectCtx = ctx(req)
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+      res.status(400).json({ error: 'invalid body' })
+      return
+    }
+    try {
+      patchProjectOverride(projectCtx.db, req.body as Record<string, unknown>)
+      const hubDefaults = getHubTerminalSettings(registry.hubDb)
+      const override = getProjectOverride(projectCtx.db)
+      const resolved = resolveTerminalSettings(registry.hubDb, projectCtx.db)
+      res.json({ resolved, override, hubDefaults })
+    } catch (err) {
+      if (err instanceof TerminalSettingsValidationError) {
+        res.status(400).json({ error: 'validation_failed', field: err.field, message: err.message })
+        return
+      }
+      throw err
     }
   })
 

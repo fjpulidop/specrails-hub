@@ -5,12 +5,21 @@ import { TerminalTopBar } from '../TerminalTopBar'
 
 function renderBar(overrides: Partial<Parameters<typeof TerminalTopBar>[0]> = {}) {
   const handlers = {
-    onCreate: vi.fn(), onKillActive: vi.fn(), onToggleMaximize: vi.fn(), onCollapse: vi.fn(),
+    onCreate: vi.fn(),
+    onOpenClaude: vi.fn(),
+    onOpenBrowser: vi.fn(),
+    onPasteScript: vi.fn(),
+    onConfigureBrowser: vi.fn(),
+    onConfigureScript: vi.fn(),
+    onKillActive: vi.fn(),
+    onToggleMaximize: vi.fn(),
+    onCollapse: vi.fn(),
   }
   const props = {
     visibility: 'restored' as const,
     canCreate: true,
     hasActive: true,
+    pasteScriptDisabled: false,
     ...handlers,
     ...overrides,
   }
@@ -26,14 +35,17 @@ describe('TerminalTopBar', () => {
 
   it('fires onCreate when + clicked', () => {
     const { getByLabelText, onCreate } = renderBar()
-    fireEvent.click(getByLabelText(/new terminal/i))
+    fireEvent.click(getByLabelText(/^new terminal$/i))
     expect(onCreate).toHaveBeenCalledTimes(1)
   })
 
   it('+ is disabled with tooltip when canCreate is false', () => {
-    const { getByLabelText } = renderBar({ canCreate: false })
-    const btn = getByLabelText(/max 10 terminals/i)
-    expect((btn as HTMLButtonElement).disabled).toBe(true)
+    const { getAllByLabelText } = renderBar({ canCreate: false })
+    // Both the Open Claude and the New Terminal share the "max 10" tooltip text;
+    // assert at least one is disabled.
+    const btns = getAllByLabelText(/max 10 terminals/i)
+    expect(btns.length).toBeGreaterThan(0)
+    expect(btns.every((b) => (b as HTMLButtonElement).disabled)).toBe(true)
   })
 
   it('fires onKillActive when trash clicked', () => {

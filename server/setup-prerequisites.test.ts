@@ -161,6 +161,34 @@ describe('setup prerequisites', () => {
     expect(node?.installHint).toMatch(/broken symlink/)
   })
 
+  it('quotes resolved paths containing whitespace on win32 (Program Files)', () => {
+    const originalPlatform = process.platform
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    try {
+      mockSpawnSync.mockImplementation((cmd: any, args: any) => {
+        if (cmd === 'where' || cmd === 'which') {
+          if (args[0] === 'git') return { status: 0, stdout: 'C:\\Program Files\\Git\\cmd\\git.exe\r\n', stderr: '' } as any
+          return { status: 0, stdout: `C:\\nodejs\\${args[0]}.cmd\r\n`, stderr: '' } as any
+        }
+        if (cmd === '"C:\\Program Files\\Git\\cmd\\git.exe"') {
+          return { status: 0, stdout: 'git version 2.42.1\n', stderr: '' } as any
+        }
+        if (cmd === 'C:\\nodejs\\node.cmd') return { status: 0, stdout: 'v20.11.0\n', stderr: '' } as any
+        if (cmd === 'C:\\nodejs\\npm.cmd') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+        if (cmd === 'C:\\nodejs\\npx.cmd') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+        return { status: 1, stdout: '', stderr: 'unquoted path' } as any
+      })
+
+      const status = getSetupPrerequisitesStatus()
+      const git = status.prerequisites.find((item) => item.command === 'git')
+      expect(git?.executable).toBe(true)
+      expect(git?.version).toBe('git version 2.42.1')
+      expect(status.ok).toBe(true)
+    } finally {
+      Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+    }
+  })
+
   it('formats missing prerequisite guidance and returns null when ready', () => {
     const ready: SetupPrerequisitesStatus = {
       ok: true,

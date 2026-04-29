@@ -54,8 +54,12 @@ export function ProposeSpecModal({ open, onClose, tickets }: ProposeSpecModalPro
       setHasText(false)
       setAttachmentCount(0)
       submittedRef.current = false
-      // defer to let dialog mount
-      setTimeout(() => editorRef.current?.focus(), 50)
+      // defer to let dialog mount; reset any user-resized height so the modal
+      // always opens at the configured minHeight, then focus the editor.
+      setTimeout(() => {
+        editorRef.current?.resetHeight()
+        editorRef.current?.focus()
+      }, 50)
     }
   }, [open])
 

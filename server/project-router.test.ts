@@ -2221,4 +2221,58 @@ describe('project-router', () => {
       expect(cross.status).toBe(404)
     })
   })
+
+  describe('terminal-settings (per-project override)', () => {
+    it('GET returns { resolved, override, hubDefaults } shape with empty override', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/terminal-settings')
+      expect(res.status).toBe(200)
+      expect(res.body.override).toEqual({})
+      expect(res.body.hubDefaults.fontSize).toBe(12)
+      expect(res.body.resolved.fontSize).toBe(12)
+    })
+
+    it('PATCH with field sets override and resolved reflects override', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .patch('/api/projects/proj-1/terminal-settings')
+        .send({ fontSize: 18, renderMode: 'webgl' })
+      expect(res.status).toBe(200)
+      expect(res.body.override).toEqual({ fontSize: 18, renderMode: 'webgl' })
+      expect(res.body.resolved.fontSize).toBe(18)
+      expect(res.body.resolved.renderMode).toBe('webgl')
+      expect(res.body.hubDefaults.fontSize).toBe(12)
+    })
+
+    it('PATCH with null clears that override field', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      await request(app).patch('/api/projects/proj-1/terminal-settings').send({ fontSize: 18 })
+      const res = await request(app)
+        .patch('/api/projects/proj-1/terminal-settings')
+        .send({ fontSize: null })
+      expect(res.status).toBe(200)
+      expect(res.body.override).toEqual({})
+      expect(res.body.resolved.fontSize).toBe(12)
+    })
+
+    it('PATCH with invalid value returns 400 validation_failed', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .patch('/api/projects/proj-1/terminal-settings')
+        .send({ fontSize: 4 })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toBe('validation_failed')
+      expect(res.body.field).toBe('fontSize')
+    })
+
+    it('GET unknown project returns 404 via middleware', async () => {
+      const { app } = createApp(new Map())
+      const res = await request(app).get('/api/projects/missing/terminal-settings')
+      expect(res.status).toBe(404)
+    })
+  })
 })

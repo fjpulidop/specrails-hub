@@ -1,4 +1,4 @@
-import { Plus, Trash2, Maximize2, Minimize2 } from 'lucide-react'
+import { Plus, Trash2, Maximize2, Minimize2, Sparkles, Globe, Code2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { PanelChevronButton } from './PanelChevronButton'
 import type { PanelVisibility } from '../../context/TerminalsContext'
@@ -8,13 +8,21 @@ interface TerminalTopBarProps {
   canCreate: boolean
   hasActive: boolean
   onCreate: () => void
+  onOpenClaude: () => void
+  onOpenBrowser: () => void
+  onPasteScript: () => void
+  pasteScriptDisabled: boolean
+  onConfigureBrowser: (anchor: { x: number; y: number }) => void
+  onConfigureScript: (anchor: { x: number; y: number }) => void
   onKillActive: () => void
   onToggleMaximize: () => void
   onCollapse: () => void
 }
 
 export function TerminalTopBar({
-  visibility, canCreate, hasActive, onCreate, onKillActive, onToggleMaximize, onCollapse,
+  visibility, canCreate, hasActive, onCreate, onOpenClaude, onOpenBrowser, onPasteScript, pasteScriptDisabled,
+  onConfigureBrowser, onConfigureScript,
+  onKillActive, onToggleMaximize, onCollapse,
 }: TerminalTopBarProps) {
   return (
     <div
@@ -29,6 +37,28 @@ export function TerminalTopBar({
         <span className="font-medium text-foreground">Terminal</span>
       </div>
       <div className="flex items-center gap-0.5">
+        <ActionButton
+          label={canCreate ? 'Open Claude in new terminal' : 'Max 10 terminals per project'}
+          disabled={!canCreate}
+          onClick={onOpenClaude}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+        </ActionButton>
+        <ActionButton
+          label="Open in browser"
+          onClick={onOpenBrowser}
+          onContextMenu={(ev) => { ev.preventDefault(); onConfigureBrowser({ x: ev.clientX, y: ev.clientY }) }}
+        >
+          <Globe className="h-3.5 w-3.5" />
+        </ActionButton>
+        <ActionButton
+          label={pasteScriptDisabled ? 'No active terminal to paste into' : 'Paste quick script into active terminal'}
+          disabled={pasteScriptDisabled}
+          onClick={onPasteScript}
+          onContextMenu={(ev) => { ev.preventDefault(); onConfigureScript({ x: ev.clientX, y: ev.clientY }) }}
+        >
+          <Code2 className="h-3.5 w-3.5" />
+        </ActionButton>
         <ActionButton
           label={canCreate ? 'New terminal' : 'Max 10 terminals per project'}
           disabled={!canCreate}
@@ -61,14 +91,16 @@ interface ActionButtonProps {
   label: string
   disabled?: boolean
   onClick: () => void
+  onContextMenu?: (ev: React.MouseEvent) => void
   children: React.ReactNode
 }
 
-function ActionButton({ label, disabled, onClick, children }: ActionButtonProps) {
+function ActionButton({ label, disabled, onClick, onContextMenu, children }: ActionButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
+      onContextMenu={onContextMenu}
       disabled={disabled}
       title={label}
       aria-label={label}

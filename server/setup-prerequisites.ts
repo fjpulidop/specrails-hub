@@ -68,9 +68,16 @@ function probeVersion(command: string, resolvedPath?: string): VersionProbe {
   // `Cannot find module '/--version'` from pkg/prelude/bootstrap.js. Passing
   // an absolute path bypasses this interception.
   const target = resolvedPath || command
-  const result = spawnSync(target, ['--version'], {
+  // On Windows we must use `shell: true` to execute `.cmd` shims (npm, npx) — Node
+  // refuses to spawn them directly since CVE-2024-27980. But cmd.exe splits the
+  // command line on whitespace, so an absolute path like
+  // `C:\Program Files\Git\cmd\git.exe` becomes `C:\Program` + arg `Files\Git\...`.
+  // Wrap the target in double quotes when it contains a space.
+  const isWin = process.platform === 'win32'
+  const quotedTarget = isWin && /\s/.test(target) ? `"${target}"` : target
+  const result = spawnSync(quotedTarget, ['--version'], {
     env: process.env,
-    shell: process.platform === 'win32',
+    shell: isWin,
     encoding: 'utf-8',
     timeout: 5_000,
   })

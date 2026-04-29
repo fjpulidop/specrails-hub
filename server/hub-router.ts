@@ -13,6 +13,11 @@ import { checkCoreCompat, getCLIStatus, detectAvailableCLIs } from './core-compa
 import { getHubAnalytics, getHubTodayStats, getHubRecentJobs } from './hub-analytics'
 import { getSetupPrerequisitesStatus } from './setup-prerequisites'
 import { getPathDiagnostic } from './path-resolver'
+import {
+  getHubTerminalSettings,
+  patchHubTerminalSettings,
+  TerminalSettingsValidationError,
+} from './terminal-settings'
 import type { AnalyticsOpts, AnalyticsPeriod } from './types'
 
 function slugify(name: string): string {
@@ -611,6 +616,29 @@ export function createHubRouter(
     }
     webhookManager.deliverTest(webhook)
     res.json({ ok: true, message: 'Test ping queued' })
+  })
+
+  // GET /api/hub/terminal-settings — hub-wide terminal defaults
+  router.get('/terminal-settings', (_req, res) => {
+    res.json(getHubTerminalSettings(registry.hubDb))
+  })
+
+  // PATCH /api/hub/terminal-settings — partial update of hub defaults
+  router.patch('/terminal-settings', (req, res) => {
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+      res.status(400).json({ error: 'invalid body' })
+      return
+    }
+    try {
+      const updated = patchHubTerminalSettings(registry.hubDb, req.body as Record<string, unknown>)
+      res.json(updated)
+    } catch (err) {
+      if (err instanceof TerminalSettingsValidationError) {
+        res.status(400).json({ error: 'validation_failed', field: err.field, message: err.message })
+        return
+      }
+      throw err
+    }
   })
 
   return router

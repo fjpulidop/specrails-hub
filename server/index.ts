@@ -17,6 +17,7 @@ import { createProjectRouter } from './project-router'
 import { createDocsRouter } from './docs-router'
 import { requireAuth, loadOrGenerateToken, tokenFromUpgradeRequest } from './auth'
 import { getTerminalManager } from './terminal-manager'
+import { cleanupStaleShimDirs } from './terminal-shell-integration'
 import { createTelemetryRouter } from './telemetry-receiver'
 import { runCompactionForAll } from './telemetry-compactor'
 import { resolveStartupPath, augmentPathFromLoginShell, getPathDiagnostic } from './path-resolver'
@@ -368,6 +369,11 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 server.listen(port, '127.0.0.1', () => {
   console.log(`specrails web manager running on http://127.0.0.1:${port}`)
   writePidFile()
+  // Sweep stale shell-integration shim directories left behind by previous runs.
+  try {
+    const removed = cleanupStaleShimDirs()
+    if (removed > 0) console.log(`[terminal-shell-integration] cleaned ${removed} stale shim dirs`)
+  } catch { /* best effort */ }
   void augmentPathFromLoginShell().then(() => {
     const diag = getPathDiagnostic()
     const augmented = diag.pathSegments.length - inheritedPathBeforeResolve

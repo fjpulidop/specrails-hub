@@ -119,6 +119,36 @@ function applyHubMigrations(db: DbInstance): void {
         CREATE INDEX IF NOT EXISTS idx_webhooks_project_id ON webhooks(project_id);
       `)
     },
+    // Migration 5: seed terminal-settings defaults under reserved hub_settings keys.
+    // Idempotent — uses INSERT OR IGNORE so re-running never overwrites a user's
+    // chosen value. See server/terminal-settings.ts for the typed access layer.
+    () => {
+      const seed = db.prepare('INSERT OR IGNORE INTO hub_settings (key, value) VALUES (?, ?)')
+      seed.run('terminal.fontFamily', "'DM Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace")
+      seed.run('terminal.fontSize', '12')
+      seed.run('terminal.renderMode', 'auto')
+      seed.run('terminal.copyOnSelect', 'false')
+      seed.run('terminal.shellIntegrationEnabled', 'true')
+      seed.run('terminal.notifyOnCompletion', 'true')
+      seed.run('terminal.imageRendering', 'true')
+      seed.run('terminal.longCommandThresholdMs', '60000')
+    },
+    // Migration 6: seed browserShortcutUrl default for the new Browser shortcut button.
+    () => {
+      db.prepare('INSERT OR IGNORE INTO hub_settings (key, value) VALUES (?, ?)').run(
+        'terminal.browserShortcutUrl', 'https://specrails.dev',
+      )
+    },
+    // Migration 7: seed quickScript default for the Quick Script shortcut button.
+    // Uses the OS username so the default greets you by name.
+    () => {
+      let username = 'friend'
+      try { username = os.userInfo().username || 'friend' } catch { /* keep fallback */ }
+      const value = `echo "Wake up, ${username} (edit this snippet in settings to help your local development)"`
+      db.prepare('INSERT OR IGNORE INTO hub_settings (key, value) VALUES (?, ?)').run(
+        'terminal.quickScript', value,
+      )
+    },
   ]
 
   for (let i = 0; i < migrations.length; i++) {

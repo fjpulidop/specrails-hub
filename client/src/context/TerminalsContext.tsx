@@ -19,7 +19,14 @@ import {
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
+import { SearchAddon } from '@xterm/addon-search'
+import { Unicode11Addon } from '@xterm/addon-unicode11'
 import '@xterm/xterm/css/xterm.css'
+import type { TerminalSettings } from '../lib/terminal-settings-types'
+import { DEFAULT_TERMINAL_SETTINGS, TERMINAL_FONT_SIZE_MAX, TERMINAL_FONT_SIZE_MIN, clampFontSize } from '../lib/terminal-settings-types'
+import { ingestMark, disposeSession as disposeMarksSession, getMarks } from '../lib/command-mark-store'
+import { notifyCommandFinished, shouldNotify } from '../lib/terminal-notifications'
+import { toast } from 'sonner'
 import { API_ORIGIN } from '../lib/origin'
 import { WS_URL } from '../lib/ws-url'
 import { getHubTokenProtocol } from '../lib/auth'
@@ -57,7 +64,13 @@ interface TerminalsContextValue {
   togglePanel: (projectId: string) => void
   setUserHeight: (projectId: string, h: number) => void
   setActive: (projectId: string, id: string) => void
-  create: (projectId: string, opts?: { cols?: number; rows?: number }) => Promise<TerminalRef | null>
+  create: (projectId: string, opts?: { cols?: number; rows?: number; name?: string }) => Promise<TerminalRef | null>
+  /** Create a new terminal and type the given text into it once the PTY is attached.
+   *  Used by the "Open Claude" shortcut and similar quick-launchers. */
+  createAndType: (projectId: string, text: string, opts?: { cols?: number; rows?: number; name?: string }) => Promise<TerminalRef | null>
+  /** Write text to a session's PTY without creating a new one. Used by the
+   *  Quick Script shortcut to paste-and-not-execute into the active terminal. */
+  writeToSession: (sessionId: string, text: string) => boolean
   rename: (projectId: string, id: string, name: string) => Promise<boolean>
   kill: (projectId: string, id: string) => Promise<void>
   focusActive: (projectId: string) => void
@@ -66,6 +79,18 @@ interface TerminalsContextValue {
   getContainer: (sessionId: string) => HTMLDivElement | null
   /** Called when the viewport slot has appended the container to its DOM. Triggers fit. */
   notifyAdopted: (sessionId: string) => void
+  /** Force an immediate fit + resize for the given session (used on transitionend). */
+  refitActive: (sessionId: string) => void
+  /** Subscribe to OSC mark events for a session; returns unsubscribe. */
+  subscribeMarks: (sessionId: string, fn: (m: MarkFrame) => void) => () => void
+  /** Last reported CWD for a session, when shell integration has emitted one. */
+  getCwd: (sessionId: string) => string | null
+  /** Returns the SearchAddon for a session, used by the search overlay. */
+  getSearchAddon: (sessionId: string) => SearchAddon | null
+  /** Returns the underlying Terminal instance for context-menu / scrollback save. */
+  getTerminalInstance: (sessionId: string) => Terminal | null
+  /** Subscribe to "open search overlay" requests for a session. Returns unsubscribe. */
+  subscribeOpenSearch: (sessionId: string, fn: () => void) => () => void
 }
 
 const TerminalsContext = createContext<TerminalsContextValue | null>(null)
@@ -76,10 +101,29 @@ interface XtermHandle {
   term: Terminal
   fit: FitAddon
   webLinks: WebLinksAddon
+  search: SearchAddon
+  /** WebGL renderer when active; null when running in canvas mode. */
+  webgl: { dispose: () => void } | null
+  /** Resolved settings snapshot at boot; may diverge from current UI state until next refresh. */
+  settings: TerminalSettings
   container: HTMLDivElement
   ws: WebSocket | null
   attached: boolean
   disposers: Array<() => void>
+  /** Latest CWD reported via OSC 1337 mark frame. */
+  currentCwd: string | null
+  /** Listeners attached to mark events (gutter, timing badge, notifications). */
+  markListeners: Set<(ev: MarkFrame) => void>
+  /** Listeners attached to "open search overlay" requests. */
+  openSearchListeners: Set<() => void>
+}
+
+export interface MarkFrame {
+  type: 'mark'
+  kind: 'prompt-start' | 'prompt-end' | 'pre-exec' | 'post-exec' | 'cwd'
+  payload?: { exitCode?: number; path?: string }
+  ts: number
+  sessionId: string
 }
 
 function storageKey(projectId: string): string {
@@ -256,7 +300,7 @@ export function TerminalsProvider({ children, activeProjectId }: ProviderProps) 
           for (const id of s.sessions.map((r) => r.id)) {
             if (!serverIds.has(id)) {
               const h = xtermHandles.current.get(id)
-              if (h) { disposeHandle(h); xtermHandles.current.delete(id); sessionOwners.current.delete(id) }
+              if (h) { disposeHandle(h); xtermHandles.current.delete(id); sessionOwners.current.delete(id); disposeMarksSession(id) }
             }
           }
           // Merge: server is authoritative for existence; keep client-side name if we have it
@@ -281,20 +325,25 @@ export function TerminalsProvider({ children, activeProjectId }: ProviderProps) 
 
   // ─── Actions: create/rename/kill ───────────────────────────────────────────
 
-  const create = useCallback(async (projectId: string, opts?: { cols?: number; rows?: number }): Promise<TerminalRef | null> => {
+  const create = useCallback(async (projectId: string, opts?: { cols?: number; rows?: number; name?: string }): Promise<TerminalRef | null> => {
     const cols = opts?.cols ?? 80
     const rows = opts?.rows ?? 24
     try {
       const res = await fetch(`${API_ORIGIN}/api/projects/${projectId}/terminals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cols, rows }),
+        body: JSON.stringify({ cols, rows, name: opts?.name }),
       })
       if (!res.ok) return null
       const body = await res.json() as { session: TerminalRef }
       const session = body.session
       // Bootstrap xterm + WS
-      ensureXtermForSession(projectId, session.id, session.cols, session.rows, xtermHandles.current, sessionOwners.current, hostRef.current)
+      ensureXtermForSession(
+        projectId, session.id, session.cols, session.rows,
+        xtermHandles.current, sessionOwners.current, hostRef.current,
+        DEFAULT_TERMINAL_SETTINGS, undefined, undefined,
+        true, // isFreshSpawn — eligible for sentinel-not-seen toast
+      )
       updateProject(projectId, (s) => ({
         ...s,
         sessions: [...s.sessions, session],
@@ -303,6 +352,36 @@ export function TerminalsProvider({ children, activeProjectId }: ProviderProps) 
       return session
     } catch { return null }
   }, [updateProject])
+
+  const createAndType = useCallback(async (projectId: string, text: string, opts?: { cols?: number; rows?: number; name?: string }): Promise<TerminalRef | null> => {
+    const session = await create(projectId, opts)
+    if (!session) return null
+    const handle = xtermHandles.current.get(session.id)
+    if (!handle) return session
+    const send = () => {
+      const ws = handle.ws
+      if (!ws) return
+      try { ws.send(new TextEncoder().encode(text)) } catch { /* ignore */ }
+    }
+    if (handle.ws && handle.ws.readyState === WebSocket.OPEN) {
+      // Defer one tick so xterm finishes its initial fit/render before the PTY
+      // sees input — otherwise the server may resize after we type.
+      setTimeout(send, 50)
+    } else if (handle.ws) {
+      handle.ws.addEventListener('open', () => setTimeout(send, 50), { once: true })
+    }
+    return session
+  }, [])
+
+  const writeToSession = useCallback((sessionId: string, text: string): boolean => {
+    const handle = xtermHandles.current.get(sessionId)
+    if (!handle?.ws || handle.ws.readyState !== WebSocket.OPEN) return false
+    try {
+      handle.ws.send(new TextEncoder().encode(text))
+      try { handle.term.focus() } catch { /* ignore */ }
+      return true
+    } catch { return false }
+  }, [])
 
   const rename = useCallback(async (projectId: string, id: string, name: string): Promise<boolean> => {
     try {
@@ -324,7 +403,7 @@ export function TerminalsProvider({ children, activeProjectId }: ProviderProps) 
   const kill = useCallback(async (projectId: string, id: string): Promise<void> => {
     // Optimistic: dispose xterm + remove ref
     const h = xtermHandles.current.get(id)
-    if (h) { disposeHandle(h); xtermHandles.current.delete(id); sessionOwners.current.delete(id) }
+    if (h) { disposeHandle(h); xtermHandles.current.delete(id); sessionOwners.current.delete(id); disposeMarksSession(id) }
     updateProject(projectId, (s) => {
       const remaining = s.sessions.filter((r) => r.id !== id)
       const activeId = s.activeId === id ? (remaining[0]?.id ?? null) : s.activeId
@@ -369,10 +448,18 @@ export function TerminalsProvider({ children, activeProjectId }: ProviderProps) 
   const notifyAdopted = useCallback((sessionId: string) => {
     const h = xtermHandles.current.get(sessionId)
     if (!h) return
+    const justOpened = !h.term.element || h.term.element.parentElement !== h.container
     h.attached = true
-    // Open xterm if not yet opened
-    if (!h.term.element || h.term.element.parentElement !== h.container) {
+    if (justOpened) {
       try { h.term.open(h.container) } catch { /* ignore */ }
+      // After xterm is opened, decide on renderer.
+      const mode = h.settings.renderMode
+      const wantWebgl = mode === 'webgl' || (mode === 'auto' && webgl2Available())
+      if (wantWebgl && !h.webgl) {
+        void tryLoadWebgl(h.term).then((addon) => {
+          if (addon) h.webgl = addon
+        })
+      }
     }
     try { h.fit.fit() } catch { /* ignore */ }
     try { h.term.focus() } catch { /* ignore */ }
@@ -383,12 +470,48 @@ export function TerminalsProvider({ children, activeProjectId }: ProviderProps) 
     }
   }, [])
 
+  const refitActive = useCallback((sessionId: string) => {
+    const h = xtermHandles.current.get(sessionId)
+    if (!h || !h.attached) return
+    try { h.fit.fit() } catch { /* ignore */ }
+    if (h.ws && h.ws.readyState === WebSocket.OPEN) {
+      try { h.ws.send(JSON.stringify({ type: 'resize', cols: h.term.cols, rows: h.term.rows })) } catch { /* ignore */ }
+    }
+  }, [])
+
+  const subscribeMarks = useCallback((sessionId: string, fn: (m: MarkFrame) => void) => {
+    const h = xtermHandles.current.get(sessionId)
+    if (!h) return () => {}
+    h.markListeners.add(fn)
+    return () => { h.markListeners.delete(fn) }
+  }, [])
+
+  const getCwd = useCallback((sessionId: string): string | null => {
+    return xtermHandles.current.get(sessionId)?.currentCwd ?? null
+  }, [])
+
+  const getSearchAddon = useCallback((sessionId: string): SearchAddon | null => {
+    return xtermHandles.current.get(sessionId)?.search ?? null
+  }, [])
+
+  const getTerminalInstance = useCallback((sessionId: string): Terminal | null => {
+    return xtermHandles.current.get(sessionId)?.term ?? null
+  }, [])
+
+  const subscribeOpenSearch = useCallback((sessionId: string, fn: () => void) => {
+    const h = xtermHandles.current.get(sessionId)
+    if (!h) return () => {}
+    h.openSearchListeners.add(fn)
+    return () => { h.openSearchListeners.delete(fn) }
+  }, [])
+
   const value = useMemo<TerminalsContextValue>(() => ({
     states,
     getState, ensureProject, setVisibility, togglePanel, setUserHeight,
-    setActive, create, rename, kill, focusActive, disposeProject,
-    getContainer, notifyAdopted,
-  }), [states, getState, ensureProject, setVisibility, togglePanel, setUserHeight, setActive, create, rename, kill, focusActive, disposeProject, getContainer, notifyAdopted])
+    setActive, create, createAndType, writeToSession, rename, kill, focusActive, disposeProject,
+    getContainer, notifyAdopted, refitActive, subscribeMarks, getCwd,
+    getSearchAddon, subscribeOpenSearch, getTerminalInstance,
+  }), [states, getState, ensureProject, setVisibility, togglePanel, setUserHeight, setActive, create, createAndType, writeToSession, rename, kill, focusActive, disposeProject, getContainer, notifyAdopted, refitActive, subscribeMarks, getCwd, getSearchAddon, subscribeOpenSearch, getTerminalInstance])
 
   return <TerminalsContext.Provider value={value}>{children}</TerminalsContext.Provider>
 }
@@ -404,12 +527,20 @@ const NOOP_CONTEXT: TerminalsContextValue = {
   setUserHeight: () => {},
   setActive: () => {},
   create: async () => null,
+  createAndType: async () => null,
+  writeToSession: () => false,
   rename: async () => false,
   kill: async () => {},
   focusActive: () => {},
   disposeProject: () => {},
   getContainer: () => null,
   notifyAdopted: () => {},
+  refitActive: () => {},
+  subscribeMarks: () => () => {},
+  getCwd: () => null,
+  getSearchAddon: () => null,
+  subscribeOpenSearch: () => () => {},
+  getTerminalInstance: () => null,
 }
 
 /**
@@ -430,6 +561,58 @@ export function useProjectTerminals(projectId: string | null | undefined): Proje
 
 // ─── xterm + WS bootstrap (exported for tests) ────────────────────────────────
 
+type SettingsPersistFn = (projectId: string, patch: { fontSize?: number | null }) => void
+
+function adjustFontSize(
+  handles: Map<string, XtermHandle>,
+  sessionId: string,
+  projectId: string,
+  delta: number | 'reset',
+  onSettingsPersist?: SettingsPersistFn,
+): void {
+  const h = handles.get(sessionId)
+  if (!h) return
+  const current = h.term.options.fontSize ?? DEFAULT_TERMINAL_SETTINGS.fontSize
+  let next: number
+  if (delta === 'reset') {
+    next = h.settings.fontSize
+    if (onSettingsPersist) onSettingsPersist(projectId, { fontSize: null })
+  } else {
+    const candidate = current + delta
+    if (candidate < TERMINAL_FONT_SIZE_MIN || candidate > TERMINAL_FONT_SIZE_MAX) return
+    next = clampFontSize(candidate)
+    if (onSettingsPersist) onSettingsPersist(projectId, { fontSize: next })
+  }
+  if (next === current) return
+  try {
+    h.term.options.fontSize = next
+    h.fit.fit()
+  } catch { /* ignore */ }
+}
+
+function jumpToPrompt(handles: Map<string, XtermHandle>, sessionId: string, dir: 'prev' | 'next'): void {
+  const h = handles.get(sessionId)
+  if (!h) return
+  const { promptRows } = getMarks(sessionId)
+  if (promptRows.length === 0) return
+  const buffer = h.term.buffer.active
+  const currentTop = buffer.viewportY
+  let targetRow: number | null = null
+  if (dir === 'prev') {
+    for (let i = promptRows.length - 1; i >= 0; i--) {
+      const r = promptRows[i].row
+      if (r != null && r < currentTop) { targetRow = r; break }
+    }
+  } else {
+    for (const p of promptRows) {
+      const r = p.row
+      if (r != null && r > currentTop) { targetRow = r; break }
+    }
+  }
+  if (targetRow == null) return
+  try { h.term.scrollToLine(targetRow) } catch { /* ignore */ }
+}
+
 function ensureXtermForSession(
   projectId: string,
   sessionId: string,
@@ -438,6 +621,14 @@ function ensureXtermForSession(
   handles: Map<string, XtermHandle>,
   owners: Map<string, string>,
   host: HTMLDivElement | null,
+  settings: TerminalSettings = DEFAULT_TERMINAL_SETTINGS,
+  onMark?: (m: MarkFrame) => void,
+  onSettingsPersist?: SettingsPersistFn,
+  /** True when this session was just spawned via POST /terminals (vs. reconciled
+   *  from a server-side list during reattach). The sentinel-not-seen toast only
+   *  fires for fresh spawns; reconnecting to a pre-existing PTY (e.g. server
+   *  restart, project switch) must not produce a false alarm. */
+  isFreshSpawn = false,
 ): XtermHandle {
   const existing = handles.get(sessionId)
   if (existing) return existing
@@ -449,8 +640,8 @@ function ensureXtermForSession(
 
   const term = new Terminal({
     cols, rows,
-    fontFamily: "'DM Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace",
-    fontSize: 12,
+    fontFamily: settings.fontFamily,
+    fontSize: settings.fontSize,
     theme: XTERM_THEME,
     cursorBlink: true,
     scrollback: 10_000,
@@ -458,8 +649,97 @@ function ensureXtermForSession(
   })
   const fit = new FitAddon()
   const webLinks = new WebLinksAddon()
+  const search = new SearchAddon()
   term.loadAddon(fit)
   term.loadAddon(webLinks)
+  term.loadAddon(search)
+
+  // Custom keybindings: returns false to consume, true to let xterm pass through.
+  term.attachCustomKeyEventHandler((event) => {
+    // Only react on keydown; let keyup events pass.
+    if (event.type !== 'keydown') return true
+    const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform || '')
+    const cmd = isMac ? event.metaKey : event.ctrlKey
+    if (!cmd) return true
+    const key = event.key
+
+    // Cmd+C — copy if there is a selection; otherwise let xterm pass it (so Ctrl+C reaches PTY).
+    if (key === 'c' || key === 'C') {
+      const sel = term.getSelection()
+      if (sel.length === 0) return true
+      try {
+        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+          void navigator.clipboard.writeText(sel)
+        }
+      } catch { /* ignore */ }
+      event.preventDefault()
+      return false
+    }
+    // Cmd+V — paste from clipboard via term.paste so bracketed-paste mode is honoured.
+    if (key === 'v' || key === 'V') {
+      try {
+        if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
+          void navigator.clipboard.readText().then((text) => { try { term.paste(text) } catch { /* ignore */ } })
+        }
+      } catch { /* ignore */ }
+      event.preventDefault()
+      return false
+    }
+    // Cmd+K — clear scrollback.
+    if (key === 'k' || key === 'K') {
+      try { term.clear() } catch { /* ignore */ }
+      event.preventDefault()
+      return false
+    }
+    // Cmd+F — open search overlay (subscribers in TerminalViewport handle UI state).
+    if (key === 'f' || key === 'F') {
+      event.preventDefault()
+      const handle = handles.get(sessionId)
+      if (handle) {
+        for (const fn of handle.openSearchListeners) { try { fn() } catch { /* ignore */ } }
+      }
+      return false
+    }
+    // Cmd+= / Cmd++ / Cmd+- zoom font.
+    if (key === '=' || key === '+') {
+      event.preventDefault()
+      adjustFontSize(handles, sessionId, projectId, +1, onSettingsPersist)
+      return false
+    }
+    if (key === '-' || key === '_') {
+      event.preventDefault()
+      adjustFontSize(handles, sessionId, projectId, -1, onSettingsPersist)
+      return false
+    }
+    // Cmd+0 — reset to resolved default.
+    if (key === '0') {
+      event.preventDefault()
+      adjustFontSize(handles, sessionId, projectId, 'reset', onSettingsPersist)
+      return false
+    }
+    // Cmd+ArrowUp / Cmd+ArrowDown — jump to previous/next prompt mark.
+    if (key === 'ArrowUp' || key === 'ArrowDown') {
+      event.preventDefault()
+      jumpToPrompt(handles, sessionId, key === 'ArrowUp' ? 'prev' : 'next')
+      return false
+    }
+    return true
+  })
+
+  // Unicode 11 widths — load unconditionally (silent no-op if font lacks the glyphs).
+  try {
+    const u11 = new Unicode11Addon()
+    term.loadAddon(u11)
+    term.unicode.activeVersion = '11'
+  } catch { /* addon not available — degrade silently */ }
+
+  // Image addon — load only when imageRendering is enabled in settings.
+  if (settings.imageRendering) {
+    void loadImageAddon(term)
+  }
+
+  // Ligatures — silent no-op when the font has no ligature features.
+  void loadLigaturesAddon(term)
 
   if (host) host.appendChild(container)
 
@@ -481,11 +761,47 @@ function ensureXtermForSession(
     if (typeof ev.data === 'string') {
       // Control frame
       try {
-        const msg = JSON.parse(ev.data) as { type?: string; name?: string }
+        const msg = JSON.parse(ev.data) as { type?: string; name?: string; kind?: string; ts?: number; payload?: { exitCode?: number; path?: string } }
         if (msg?.type === 'ready') {
           // nothing to do — we already allocated xterm
+          return
         }
-        // Rename broadcasts handled by server; client listener could wire into state
+        if (msg?.type === 'mark' && typeof msg.kind === 'string' && typeof msg.ts === 'number') {
+          const handle = handles.get(sessionId)
+          if (handle) {
+            if (msg.kind === 'cwd' && msg.payload?.path) handle.currentCwd = msg.payload.path
+            const frame: MarkFrame = {
+              type: 'mark',
+              kind: msg.kind as MarkFrame['kind'],
+              payload: msg.payload,
+              ts: msg.ts,
+              sessionId,
+            }
+            // Persist into the module-level mark store so React subscribers re-render.
+            const buffer = handle.term.buffer.active
+            const row = msg.kind === 'prompt-start' ? buffer.cursorY + buffer.viewportY : null
+            const beforeIngest = msg.kind === 'post-exec' ? getMarks(sessionId).openPreExec?.startedAt ?? null : null
+            ingestMark(sessionId, msg as { kind: string; ts: number; payload?: { exitCode?: number; path?: string } }, { row })
+            // Long-running command notification: fire when a post-exec arrives,
+            // window is unfocused, and threshold is exceeded.
+            if (msg.kind === 'post-exec' && beforeIngest != null && shouldNotify()) {
+              const elapsed = msg.ts - beforeIngest
+              const longThreshold = handle.settings.longCommandThresholdMs
+              const notifyEnabled = handle.settings.notifyOnCompletion
+              if (notifyEnabled && elapsed >= longThreshold) {
+                void notifyCommandFinished(sessionId, {
+                  command: null, // we don't capture the user's command on the client
+                  exitCode: msg.payload?.exitCode ?? null,
+                  elapsedMs: elapsed,
+                })
+              }
+            }
+            for (const fn of handle.markListeners) {
+              try { fn(frame) } catch { /* listener error must not break stream */ }
+            }
+            if (onMark) onMark(frame)
+          }
+        }
       } catch { /* ignore */ }
       return
     }
@@ -507,34 +823,99 @@ function ensureXtermForSession(
   })
   disposers.push(() => onDataSub.dispose())
 
-  // Propagate container resizes to the PTY (throttled ~50ms via rAF-ish)
-  let resizeScheduled = false
-  const ro = new ResizeObserver(() => {
-    if (resizeScheduled) return
-    resizeScheduled = true
-    requestAnimationFrame(() => {
-      resizeScheduled = false
-      if (!container.isConnected) return
-      try { fit.fit() } catch { return }
-      if (ws.readyState === WebSocket.OPEN) {
-        try { ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows })) } catch { /* ignore */ }
-      }
-    })
-  })
+  // Propagate container resizes to the PTY with a trailing 120ms debounce so
+  // sidebar-transition tick-storms coalesce into a single resize.
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  const RESIZE_DEBOUNCE_MS = 120
+  const fitAndSend = () => {
+    if (!container.isConnected) return
+    try { fit.fit() } catch { return }
+    if (ws.readyState === WebSocket.OPEN) {
+      try { ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows })) } catch { /* ignore */ }
+    }
+  }
+  const scheduleFit = () => {
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => { debounceTimer = null; fitAndSend() }, RESIZE_DEBOUNCE_MS)
+  }
+  const ro = new ResizeObserver(scheduleFit)
   ro.observe(container)
-  disposers.push(() => ro.disconnect())
+  disposers.push(() => {
+    if (debounceTimer) clearTimeout(debounceTimer)
+    ro.disconnect()
+  })
 
-  const handle: XtermHandle = { term, fit, webLinks, container, ws, attached: false, disposers }
+  const handle: XtermHandle = {
+    term, fit, webLinks, search, webgl: null, settings,
+    container, ws, attached: false, disposers,
+    currentCwd: null,
+    markListeners: new Set<(ev: MarkFrame) => void>(),
+    openSearchListeners: new Set<() => void>(),
+  }
+  // Sentinel-not-seen detection: if shell integration was requested but no
+  // prompt-start mark arrives within 5s, the shim probably didn't bootstrap
+  // (user's rc clobbered the hooks, or the shell is unsupported). We track this
+  // silently — the gutter / timing badge / notifications just won't appear and
+  // the user can read about it in the docs. No toast; the false positives in
+  // tmux + restart scenarios were too noisy.
+  void isFreshSpawn
+  void toast
   handles.set(sessionId, handle)
   owners.set(sessionId, projectId)
   return handle
 }
 
+// ─── Optional addon loaders (lazy import keeps initial bundle small) ──────────
+
+async function loadImageAddon(term: Terminal): Promise<void> {
+  try {
+    const mod = await import('@xterm/addon-image')
+    const ImageAddon = mod.ImageAddon
+    const addon = new ImageAddon({ pixelLimit: 8_000_000 })
+    term.loadAddon(addon)
+  } catch { /* image addon optional */ }
+}
+
+async function loadLigaturesAddon(term: Terminal): Promise<void> {
+  try {
+    const mod = await import('@xterm/addon-ligatures')
+    const LigaturesAddon = mod.LigaturesAddon
+    term.loadAddon(new LigaturesAddon())
+  } catch { /* font may lack ligature features */ }
+}
+
+/** Attach WebGL renderer to a Terminal. Caller has already confirmed renderMode allows it. */
+export async function tryLoadWebgl(term: Terminal): Promise<{ dispose: () => void } | null> {
+  try {
+    const mod = await import('@xterm/addon-webgl')
+    const WebglAddon = mod.WebglAddon
+    const addon = new WebglAddon()
+    addon.onContextLoss(() => { try { addon.dispose() } catch { /* ignore */ } })
+    term.loadAddon(addon)
+    return addon
+  } catch {
+    return null
+  }
+}
+
+export function webgl2Available(): boolean {
+  try {
+    const c = document.createElement('canvas')
+    return !!(c.getContext('webgl2') || c.getContext('experimental-webgl2'))
+  } catch { return false }
+}
+
 function disposeHandle(handle: XtermHandle): void {
   for (const d of handle.disposers) { try { d() } catch { /* ignore */ } }
   handle.disposers = []
+  handle.markListeners.clear()
+  handle.openSearchListeners.clear()
   try { handle.ws?.close(1000, 'client_dispose') } catch { /* ignore */ }
   handle.ws = null
+  try { handle.webgl?.dispose() } catch { /* ignore */ }
+  handle.webgl = null
   try { handle.term.dispose() } catch { /* ignore */ }
   try { handle.container.remove() } catch { /* ignore */ }
+  // Mark store cleanup happens at the call site (we don't have sessionId here),
+  // but we expose the helper for consumers.
 }
