@@ -31,19 +31,19 @@ export async function revealItemInDir(p: string): Promise<void> {
 export { dynImport as _tauriDynImport }
 
 /** Open a URL in the user's default external browser. In Tauri this goes
- *  through the opener plugin so it leaves the WebView; in plain browsers it
+ *  through the shell plugin so it leaves the WebView; in plain browsers it
  *  falls back to window.open which opens a new tab in the same browser. */
 export async function openExternalUrl(url: string): Promise<void> {
   if (isTauri()) {
     try {
-      const opener = await dynImport('@tauri-apps/plugin-opener') as { openUrl?: (u: string) => Promise<void>; open?: (u: string) => Promise<void> } | null
-      if (opener?.openUrl) { await opener.openUrl(url); return }
-      if (opener?.open) { await opener.open(url); return }
-    } catch { /* ignore */ }
-    try {
-      const shell = await dynImport('@tauri-apps/api/shell') as { open?: (u: string) => Promise<void> } | null
-      if (shell?.open) { await shell.open(url); return }
-    } catch { /* ignore */ }
+      const shell = await import('@tauri-apps/plugin-shell')
+      if (typeof shell.open === 'function') {
+        await shell.open(url)
+        return
+      }
+    } catch (err) {
+      console.warn('[openExternalUrl] tauri shell open failed:', err)
+    }
   }
   try { window.open(url, '_blank', 'noopener,noreferrer') } catch { /* ignore */ }
 }
