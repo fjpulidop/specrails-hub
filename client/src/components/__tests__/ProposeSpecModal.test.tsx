@@ -8,7 +8,7 @@ import type { LocalTicket } from '../../types'
 vi.mock('../RichAttachmentEditor', () => ({
   RichAttachmentEditor: React.forwardRef(function MockEditor(
     props: { placeholder?: string; ariaLabel?: string; onChange?: () => void; onSubmit?: () => void },
-    ref: React.Ref<{ getPlainText: () => string; getAttachmentIds: () => string[]; insertPill: () => void; focus: () => void; clear: () => void }>,
+    ref: React.Ref<{ getPlainText: () => string; getAttachmentIds: () => string[]; insertPill: () => void; focus: () => void; resetHeight: () => void; clear: () => void }>,
   ) {
     const inputRef = React.useRef<HTMLTextAreaElement>(null)
     React.useImperativeHandle(ref, () => ({
@@ -16,6 +16,7 @@ vi.mock('../RichAttachmentEditor', () => ({
       getAttachmentIds: () => [],
       insertPill: () => {},
       focus: () => inputRef.current?.focus(),
+      resetHeight: () => { if (inputRef.current) inputRef.current.style.height = '' },
       clear: () => { if (inputRef.current) inputRef.current.value = '' },
     }))
     return (
