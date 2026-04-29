@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.45.0](https://github.com/fjpulidop/specrails-hub/compare/v1.44.0...v1.45.0) (2026-04-29)
+
+
+### Features
+
+* premium terminal panel (shell integration, addons, shortcuts) ([#280](https://github.com/fjpulidop/specrails-hub/issues/280)) ([be7e127](https://github.com/fjpulidop/specrails-hub/commit/be7e127a6c6d2bf63fdc31f4e8be73062d705517))
+
 ## [1.44.0](https://github.com/fjpulidop/specrails-hub/compare/v1.43.1...v1.44.0) (2026-04-28)
 
 
