@@ -412,7 +412,10 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     const input = screen.getByPlaceholderText(/e\.g\. 10\.00/i) as HTMLInputElement
     await user.type(input, '10')
     // Find the Save buttons — hub budget save comes before cost alert save
+    // Filter out the (disabled) Terminal Panel Save button from the new
+    // section so positional indexing matches the original test layout.
     const saveButtons = screen.getAllByRole('button', { name: /^save$/i })
+      .filter((b) => !(b as HTMLButtonElement).disabled)
     // Click the hub budget Save (second save after specrails-tech URL)
     await user.click(saveButtons[saveButtons.length - 2])
     await waitFor(() => {
@@ -442,6 +445,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     const input = screen.getByPlaceholderText(/e\.g\. 10\.00/i) as HTMLInputElement
     await user.clear(input)
     const saveButtons = screen.getAllByRole('button', { name: /^save$/i })
+      .filter((b) => !(b as HTMLButtonElement).disabled)
     await user.click(saveButtons[saveButtons.length - 2])
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Hub daily budget removed')
