@@ -331,6 +331,37 @@ const MIGRATIONS: Migration[] = [
         ON agent_refine_sessions(updated_at);
     `)
   },
+
+  // Migration 14: terminal_settings_override — per-project key/value override
+  // for hub-wide terminal settings. Absence of a row means "inherit hub default".
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS terminal_settings_override (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    `)
+  },
+
+  // Migration 15: terminal_command_marks — per-session record of completed
+  // commands derived from OSC 133 prompt marks. FIFO-capped at 1000 rows per
+  // session by the marks store.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS terminal_command_marks (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id   TEXT    NOT NULL,
+        started_at   INTEGER NOT NULL,
+        finished_at  INTEGER,
+        exit_code    INTEGER,
+        command      TEXT,
+        cwd          TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_terminal_marks_session_started
+        ON terminal_command_marks(session_id, started_at);
+    `)
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {

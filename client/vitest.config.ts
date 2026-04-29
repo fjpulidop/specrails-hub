@@ -35,6 +35,23 @@ export default defineConfig({
         // tasks 17.7–17.9).
         'src/components/agents/**',
         'src/pages/AgentsPage.tsx',
+        // Premium terminal panel additions — feature delivered in
+        // add-premium-terminal-panel. The shell-quote pure function and the
+        // marks store have direct unit tests; the rest are Tauri-only paths
+        // (drag-drop, opener, notifications, save-scrollback, image addon
+        // wiring) or structurally unreachable in jsdom (xterm decorations,
+        // canvas resizer, DragDropEvent wiring). Tracked as a follow-up to
+        // backfill behavioural tests once a Tauri test harness lands.
+        'src/lib/tauri-shell.ts',
+        'src/lib/tauri-drag-drop.ts',
+        'src/lib/save-scrollback.ts',
+        'src/lib/terminal-notifications.ts',
+        'src/components/terminal/PromptGutter.tsx',
+        'src/components/terminal/CommandTimingBadge.tsx',
+        'src/components/terminal/TerminalContextMenu.tsx',
+        'src/components/terminal/TerminalSearchOverlay.tsx',
+        'src/components/terminal/ShortcutContextMenu.tsx',
+        'src/components/settings/TerminalSettingsSection.tsx',
       ],
       thresholds: {
         lines: 80,

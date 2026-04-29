@@ -17,3 +17,7 @@ src-tauri/binaries/specrails-server-*
 src-tauri/binaries/better_sqlite3.node
 src-tauri/binaries/pty.node
 src-tauri/binaries/node-pty/
+src-tauri/binaries/shell-integration/
+
+# Sidecar build intermediates (esbuild output + sqlite prebuild cache)
+build/

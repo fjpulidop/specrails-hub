@@ -23,6 +23,8 @@ export interface RichAttachmentEditorHandle {
   getAttachmentIds: () => string[]
   insertPill: (attachment: Attachment) => void
   focus: () => void
+  /** Clear any user-applied resize height so the editor returns to minHeight. */
+  resetHeight: () => void
   clear: () => void
 }
 
@@ -294,6 +296,12 @@ export const RichAttachmentEditor = forwardRef<RichAttachmentEditorHandle, RichA
         },
         insertPill: insertPillInternal,
         focus: () => editorRef.current?.focus(),
+        /** Reset any user-resized height back to the configured minHeight. */
+        resetHeight: () => {
+          const root = editorRef.current
+          if (!root) return
+          root.style.height = ''
+        },
         clear: () => {
           const root = editorRef.current
           if (!root) return
@@ -502,7 +510,7 @@ export const RichAttachmentEditor = forwardRef<RichAttachmentEditorHandle, RichA
             'data-[empty=true]:before:text-muted-foreground data-[empty=true]:before:pointer-events-none',
             'data-[empty=true]:before:absolute data-[empty=true]:before:top-2 data-[empty=true]:before:left-3',
           )}
-          style={{ minHeight }}
+          style={{ minHeight, resize: 'vertical', overflow: 'auto' }}
           data-placeholder={placeholder ?? ''}
         />
 

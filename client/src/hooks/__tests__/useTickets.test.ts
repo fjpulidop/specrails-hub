@@ -346,4 +346,69 @@ describe('useTickets', () => {
       expect(result.current.newTicketIds.has(3)).toBe(true)
     })
   })
+
+  describe('createTicket', () => {
+    it('POSTs the new ticket and returns true on success', async () => {
+      ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        json: async () => ({ tickets: [] }),
+      })
+      const { result } = renderHook(() => useTickets())
+      let ok = false
+      await act(async () => { ok = await result.current.createTicket({ title: 'X', description: 'Y' }) })
+      expect(ok).toBe(true)
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/projects/proj-1/tickets',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'X', description: 'Y' }),
+        }),
+      )
+    })
+
+    it('returns false when server rejects', async () => {
+      ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true, json: async () => ({ tickets: [] }),
+      }).mockResolvedValueOnce({
+        ok: false, json: async () => ({}),
+      })
+      const { result } = renderHook(() => useTickets())
+      let ok: boolean | null = null
+      await act(async () => { ok = await result.current.createTicket({ title: 'fail' }) })
+      expect(ok).toBe(false)
+    })
+  })
+
+  describe('updateTicket', () => {
+    it('PATCHes the changed fields and returns true on success', async () => {
+      ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true, json: async () => ({ tickets: [] }),
+      })
+      const { result } = renderHook(() => useTickets())
+      let ok = false
+      await act(async () => { ok = await result.current.updateTicket(42, { title: 'new title' }) })
+      expect(ok).toBe(true)
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/projects/proj-1/tickets/42',
+        expect.objectContaining({
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'new title' }),
+        }),
+      )
+    })
+
+    it('returns false when server rejects update', async () => {
+      ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true, json: async () => ({ tickets: [] }),
+      }).mockResolvedValueOnce({
+        ok: false, json: async () => ({}),
+      })
+      const { result } = renderHook(() => useTickets())
+      let ok: boolean | null = null
+      await act(async () => { ok = await result.current.updateTicket(7, { status: 'done' }) })
+      expect(ok).toBe(false)
+    })
+  })
 })

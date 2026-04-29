@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, fireEvent } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { BottomPanel } from '../BottomPanel'
 import { TerminalsProvider } from '../../../context/TerminalsContext'
 import type { ProjectPanelState, TerminalRef } from '../../../context/TerminalsContext'
@@ -8,8 +9,16 @@ import type { ProjectPanelState, TerminalRef } from '../../../context/TerminalsC
 vi.mock('@xterm/xterm', () => {
   class Terminal {
     cols = 80; rows = 24; element: HTMLElement | null = null
+    options = { fontSize: 12 }
+    unicode = { activeVersion: '6' }
+    buffer = { active: { cursorY: 0, viewportY: 0, length: 0, getLine: () => null } }
+    modes = { mouseTrackingMode: 'none' }
     loadAddon = vi.fn(); open = (el: HTMLElement) => { this.element = el }
     focus = vi.fn(); write = vi.fn(); dispose = vi.fn()
+    clear = vi.fn(); paste = vi.fn(); selectAll = vi.fn()
+    getSelection = () => ''
+    scrollToLine = vi.fn()
+    attachCustomKeyEventHandler = vi.fn()
     onData = () => ({ dispose: vi.fn() })
     onResize = () => ({ dispose: vi.fn() })
   }
@@ -17,6 +26,16 @@ vi.mock('@xterm/xterm', () => {
 })
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit = vi.fn() } }))
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }))
+vi.mock('@xterm/addon-search', () => ({
+  SearchAddon: class {
+    findNext = vi.fn(); findPrevious = vi.fn(); clearDecorations = vi.fn()
+    onDidChangeResults = () => ({ dispose: vi.fn() })
+  },
+}))
+vi.mock('@xterm/addon-unicode11', () => ({ Unicode11Addon: class {} }))
+vi.mock('@xterm/addon-image', () => ({ ImageAddon: class {} }))
+vi.mock('@xterm/addon-ligatures', () => ({ LigaturesAddon: class {} }))
+vi.mock('@xterm/addon-webgl', () => ({ WebglAddon: class { onContextLoss = vi.fn(); dispose = vi.fn() } }))
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}))
 class MockWebSocket extends EventTarget {
   readyState = 0; binaryType = 'arraybuffer'
@@ -27,7 +46,11 @@ class MockWebSocket extends EventTarget {
 ;(globalThis as any).WebSocket = MockWebSocket
 
 function wrap(node: React.ReactNode) {
-  return render(<TerminalsProvider activeProjectId="p">{node}</TerminalsProvider>)
+  return render(
+    <MemoryRouter>
+      <TerminalsProvider activeProjectId="p">{node}</TerminalsProvider>
+    </MemoryRouter>,
+  )
 }
 
 function makeState(overrides: Partial<ProjectPanelState> = {}): ProjectPanelState {
@@ -110,7 +133,7 @@ describe('BottomPanel', () => {
     const { getByLabelText } = wrap(
       <BottomPanel projectId="p" state={makeState({ sessions: [s], activeId: 's1' })} viewportHeight={800} statusBarHeight={28} />,
     )
-    fireEvent.click(getByLabelText(/new terminal/i))
+    fireEvent.click(getByLabelText(/^new terminal$/i))
     expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThanOrEqual(1)
   })
 
@@ -144,9 +167,11 @@ describe('BottomPanel', () => {
     let stored = JSON.parse(localStorage.getItem('specrails-hub:terminal-panel:p')!) as { visibility: string }
     expect(stored.visibility).toBe('maximized')
     rerender(
-      <TerminalsProvider activeProjectId="p">
-        <BottomPanel projectId="p" state={makeState({ visibility: 'maximized', sessions: [s], activeId: 's1' })} viewportHeight={800} statusBarHeight={28} />
-      </TerminalsProvider>,
+      <MemoryRouter>
+        <TerminalsProvider activeProjectId="p">
+          <BottomPanel projectId="p" state={makeState({ visibility: 'maximized', sessions: [s], activeId: 's1' })} viewportHeight={800} statusBarHeight={28} />
+        </TerminalsProvider>
+      </MemoryRouter>,
     )
     fireEvent.click(getByLabelText(/restore panel/i))
     stored = JSON.parse(localStorage.getItem('specrails-hub:terminal-panel:p')!) as { visibility: string }

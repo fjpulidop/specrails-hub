@@ -344,6 +344,15 @@ async function main() {
   fs.copyFileSync(sqliteAddon, addonDest)
   console.log(`  ${sqliteAddon} → ${addonDest}`)
 
+  // Step 3a: Copy shell-integration shims so the packaged sidecar can locate
+  // them at runtime via path.resolve(process.execPath, '..', 'shell-integration', name).
+  const shellSrc = path.join(ROOT, 'server', 'shell-integration')
+  const shellDest = path.join(BINARIES_DIR, 'shell-integration')
+  if (fs.existsSync(shellSrc)) {
+    copyDirSync(shellSrc, shellDest)
+    console.log(`  ${shellSrc} → ${shellDest}`)
+  }
+
   // Step 3b: Copy node-pty package externally so its spawn-helper resolves on real fs.
   // We load node-pty via createRequire from this location at runtime (see server/index.ts).
   console.log('\n[3b] Copying node-pty package and native addon...')

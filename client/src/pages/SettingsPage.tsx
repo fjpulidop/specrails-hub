@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
@@ -6,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import type { ProjectConfig } from '../types'
+import { TerminalSettingsSection } from '../components/settings/TerminalSettingsSection'
 
 interface ProjectSettings {
   pipelineTelemetryEnabled: boolean
@@ -15,8 +17,38 @@ interface ProjectSettings {
 
 export default function SettingsPage() {
   const { activeProjectId } = useHub()
+  const location = useLocation()
   // SettingsPage is only mounted in hub mode; telemetry toggle is hub-only
   const isHubMode = activeProjectId !== null
+
+  // Scroll-to-hash + brief highlight when the page is opened with a hash anchor
+  // (e.g. /settings#terminal-browser-shortcut-url from the topbar context menu).
+  // The TerminalSettingsSection mounts in a loading state and only renders the
+  // anchored field after its fetch resolves, so we poll for the element with a
+  // 3s budget instead of trying once.
+  useEffect(() => {
+    if (!location.hash) return
+    const id = location.hash.slice(1)
+    let cancelled = false
+    const deadline = Date.now() + 3000
+    const tryScroll = (): void => {
+      if (cancelled) return
+      const el = document.getElementById(id)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.add('ring-2', 'ring-dracula-purple/60', 'rounded')
+        window.setTimeout(() => {
+          el.classList.remove('ring-2', 'ring-dracula-purple/60', 'rounded')
+        }, 1800)
+        return
+      }
+      if (Date.now() < deadline) {
+        window.setTimeout(tryScroll, 80)
+      }
+    }
+    tryScroll()
+    return () => { cancelled = true }
+  }, [location.hash, location.key])
   const [config, setConfig] = useState<ProjectConfig | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [dailyBudget, setDailyBudget] = useState('')
@@ -346,6 +378,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      <TerminalSettingsSection mode="project" />
 
     </div>
   )

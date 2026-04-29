@@ -1,19 +1,31 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, act } from '@testing-library/react'
-import { TerminalsProvider, useTerminals } from '../TerminalsContext'
+import { TerminalsProvider, useTerminals, tryLoadWebgl, webgl2Available, DEFAULT_USER_HEIGHT, PANEL_MIN_HEIGHT, TERMINAL_MAX_PER_PROJECT } from '../TerminalsContext'
 
 // Stub xterm so we don't need a DOM renderer
+// Mock the @xterm/xterm Terminal class with the surface area
+// `ensureXtermForSession` expects: addons, custom key handler, buffer, etc.
 vi.mock('@xterm/xterm', () => {
   class Terminal {
     cols = 80
     rows = 24
     element: HTMLElement | null = null
+    options: { fontSize: number } = { fontSize: 12 }
+    unicode = { activeVersion: '6' }
+    buffer = { active: { cursorY: 0, viewportY: 0, length: 0, getLine: () => null } }
+    modes = { mouseTrackingMode: 'none' }
     loadAddon = vi.fn()
     open = (el: HTMLElement) => { this.element = el }
     focus = vi.fn()
     write = vi.fn()
     dispose = vi.fn()
+    clear = vi.fn()
+    paste = vi.fn()
+    selectAll = vi.fn()
+    getSelection = () => ''
+    scrollToLine = vi.fn()
+    attachCustomKeyEventHandler = vi.fn()
     onData = (_: (data: string) => void) => ({ dispose: vi.fn() })
     onResize = (_: (d: { cols: number; rows: number }) => void) => ({ dispose: vi.fn() })
   }
@@ -21,6 +33,16 @@ vi.mock('@xterm/xterm', () => {
 })
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit = vi.fn() } }))
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }))
+vi.mock('@xterm/addon-search', () => ({
+  SearchAddon: class {
+    findNext = vi.fn(); findPrevious = vi.fn(); clearDecorations = vi.fn()
+    onDidChangeResults = () => ({ dispose: vi.fn() })
+  },
+}))
+vi.mock('@xterm/addon-unicode11', () => ({ Unicode11Addon: class {} }))
+vi.mock('@xterm/addon-image', () => ({ ImageAddon: class {} }))
+vi.mock('@xterm/addon-ligatures', () => ({ LigaturesAddon: class {} }))
+vi.mock('@xterm/addon-webgl', () => ({ WebglAddon: class { onContextLoss = vi.fn(); dispose = vi.fn() } }))
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}))
 
 // Stub WebSocket globally
@@ -232,6 +254,68 @@ describe('TerminalsContext', () => {
     let result: unknown = 'unset'
     await act(async () => { result = await captured.ctx!.create('proj-A') })
     expect(result).toBeNull()
+  })
+
+  it('exposes panel sizing constants', () => {
+    expect(DEFAULT_USER_HEIGHT).toBeGreaterThan(0)
+    expect(PANEL_MIN_HEIGHT).toBeGreaterThan(0)
+    expect(TERMINAL_MAX_PER_PROJECT).toBeGreaterThan(0)
+  })
+
+  it('tryLoadWebgl returns an addon-like object when import succeeds', async () => {
+    const fakeTerm = { loadAddon: vi.fn() } as unknown as Parameters<typeof tryLoadWebgl>[0]
+    const result = await tryLoadWebgl(fakeTerm)
+    expect(result).not.toBeNull()
+    expect(result).toHaveProperty('dispose')
+  })
+
+  it('webgl2Available returns a boolean without throwing', () => {
+    expect(typeof webgl2Available()).toBe('boolean')
+  })
+
+  it('setVisibility persists hidden state to localStorage', () => {
+    const captured = mountProvider('proj-A')
+    act(() => { captured.ctx!.ensureProject('proj-A') })
+    act(() => { captured.ctx!.setVisibility('proj-A', 'maximized') })
+    const stored = JSON.parse(localStorage.getItem('specrails-hub:terminal-panel:proj-A')!)
+    expect(stored.visibility).toBe('maximized')
+  })
+
+  it('togglePanel from maximized restores to restored visibility', () => {
+    const captured = mountProvider('proj-A')
+    act(() => { captured.ctx!.ensureProject('proj-A') })
+    act(() => { captured.ctx!.setVisibility('proj-A', 'maximized') })
+    act(() => { captured.ctx!.togglePanel('proj-A') })
+    expect(captured.ctx!.getState('proj-A').visibility).toBe('hidden')
+  })
+
+  it('getState for unknown project returns default panel state', () => {
+    const captured = mountProvider('proj-A')
+    const state = captured.ctx!.getState('does-not-exist')
+    expect(state.visibility).toBe('hidden')
+    expect(state.sessions).toEqual([])
+  })
+
+  it('hydrates malformed localStorage gracefully', () => {
+    localStorage.setItem('specrails-hub:terminal-panel:proj-bad', '{not json')
+    const captured = mountProvider('proj-bad')
+    act(() => { captured.ctx!.ensureProject('proj-bad') })
+    const state = captured.ctx!.getState('proj-bad')
+    expect(state.visibility).toBe('hidden')
+    expect(state.userHeight).toBe(DEFAULT_USER_HEIGHT)
+  })
+
+  it('disposeProject for unknown project is a no-op', () => {
+    const captured = mountProvider('proj-A')
+    expect(() => captured.ctx!.disposeProject('ghost')).not.toThrow()
+  })
+
+  it('rename for unknown session returns false', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) })
+    const captured = mountProvider('proj-A')
+    let result: boolean | null = null
+    await act(async () => { result = await captured.ctx!.rename('proj-A', 'no-such', 'new') })
+    expect(result).toBe(false)
   })
 
   it('kill removes session and advances active', async () => {

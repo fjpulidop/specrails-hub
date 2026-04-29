@@ -3,6 +3,20 @@ import path from 'path'
 import { spawn as ptySpawn, type IPty } from 'node-pty'
 import { newId as uuidv4 } from './ids'
 import type { WebSocket } from 'ws'
+import type { DbInstance } from './db'
+import { OscParser, type OscMarkEvent } from './terminal-osc-parser'
+import {
+  appendMark,
+  closeOpenMark,
+  markOpenAsKilled,
+  getOpenMark,
+} from './terminal-marks-store'
+import {
+  composeShellIntegrationSpawn,
+  cleanupSessionShim,
+  type ShellIntegrationSpawn,
+} from './terminal-shell-integration'
+import type { TerminalSettings } from './terminal-settings'
 
 export const TERMINAL_SCROLLBACK_BYTES = 262_144
 export const TERMINAL_KILL_GRACE_MS = 2_000
@@ -107,6 +121,16 @@ interface TerminalSession extends TerminalSessionMeta {
   clients: Set<WebSocket>
   killTimer?: NodeJS.Timeout
   exited: boolean
+  /** Per-session OSC parser; only present when shell integration is enabled. */
+  oscParser: OscParser | null
+  /** Latest CWD reported by OSC 1337 (used for "Open this directory" UI). */
+  currentCwd: string | null
+  /** Project slug for shim cleanup. */
+  projectSlug: string
+  /** Project DB for command-mark persistence. Optional — when null, marks only broadcast. */
+  projectDb: DbInstance | null
+  /** Shell-integration spawn metadata (for cleanup). */
+  shellIntegration: ShellIntegrationSpawn
 }
 
 export class TerminalLimitExceededError extends Error {
@@ -150,12 +174,26 @@ export class TerminalManager {
     return this.sessions.get(sessionId)
   }
 
-  create(projectId: string, opts: { cwd: string; cols?: number; rows?: number; name?: string }): TerminalSessionMeta {
+  create(
+    projectId: string,
+    opts: {
+      cwd: string
+      cols?: number
+      rows?: number
+      name?: string
+      /** Project slug — used to scope shell-integration shim files. */
+      projectSlug?: string
+      /** Project DB — when provided, completed command marks are persisted here. */
+      projectDb?: DbInstance | null
+      /** Resolved terminal settings (shell-integration toggle is the only field consumed today). */
+      settings?: Pick<TerminalSettings, 'shellIntegrationEnabled'>
+    },
+  ): TerminalSessionMeta {
     const currentCount = this.byProject.get(projectId)?.size ?? 0
     if (currentCount >= TERMINAL_MAX_PER_PROJECT) throw new TerminalLimitExceededError()
 
     const shell = resolveShell()
-    const args = shellArgs(shell)
+    const baseArgs = shellArgs(shell)
     const cols = clampDim(opts.cols ?? TERMINAL_DEFAULT_COLS, 2, 1000)
     const rows = clampDim(opts.rows ?? TERMINAL_DEFAULT_ROWS, 2, 1000)
     const env: Record<string, string> = {}
@@ -165,6 +203,21 @@ export class TerminalManager {
     env.TERM = 'xterm-256color'
     env.COLORTERM = 'truecolor'
 
+    const id = uuidv4()
+    const projectSlug = opts.projectSlug ?? projectId
+
+    // Shell-integration: compose extra args/env when the resolved settings allow it.
+    const shellIntegration = composeShellIntegrationSpawn(
+      shell,
+      id,
+      projectSlug,
+      opts.settings ?? { shellIntegrationEnabled: false },
+    )
+    for (const [k, v] of Object.entries(shellIntegration.env)) env[k] = v
+    const args = shellIntegration.args.length > 0
+      ? [...shellIntegration.args, ...baseArgs]
+      : baseArgs
+
     const pty = ptySpawn(shell, args, {
       cwd: opts.cwd,
       cols, rows,
@@ -172,7 +225,6 @@ export class TerminalManager {
       name: 'xterm-256color',
     })
 
-    const id = uuidv4()
     const name = validateName(opts.name) ?? this.autoName(projectId, shell)
 
     const session: TerminalSession = {
@@ -181,22 +233,38 @@ export class TerminalManager {
       pty, buffer: new RingBuffer(TERMINAL_SCROLLBACK_BYTES),
       clients: new Set<WebSocket>(),
       exited: false,
+      oscParser: shellIntegration.shimPath ? new OscParser() : null,
+      currentCwd: null,
+      projectSlug,
+      projectDb: opts.projectDb ?? null,
+      shellIntegration,
     }
 
     pty.onData((chunk: string) => {
       const buf = Buffer.from(chunk, 'utf8')
       session.buffer.append(buf)
+      // Forward bytes to attached clients (binary, untouched).
       for (const ws of session.clients) {
         if (ws.readyState === WS_OPEN) {
           try { ws.send(buf, { binary: true }) } catch { /* ignore */ }
         }
       }
+      // Then optionally parse for OSC marks and broadcast structured frames.
+      if (session.oscParser) {
+        const events = session.oscParser.feed(buf)
+        if (events.length > 0) this.handleMarkEvents(session, events)
+      }
     })
     pty.onExit(() => {
       session.exited = true
+      // Any open mark gets recorded as killed.
+      if (session.projectDb) {
+        try { markOpenAsKilled(session.projectDb, session.id, Date.now()) } catch { /* ignore */ }
+      }
       for (const ws of session.clients) {
         try { ws.close(1000, 'pty_exit') } catch { /* ignore */ }
       }
+      cleanupSessionShim(session.projectSlug, session.id)
       this.removeFromRegistry(session)
     })
 
@@ -299,6 +367,60 @@ export class TerminalManager {
   // ─── Private ────────────────────────────────────────────────────────────────
 
   /**
+   * Process an OSC parser event: persist command marks where appropriate and
+   * broadcast a JSON control frame `{type:"mark",kind,...}` on every attached
+   * WebSocket. Bytes are forwarded to xterm separately.
+   */
+  private handleMarkEvents(session: TerminalSession, events: OscMarkEvent[]): void {
+    const ts = Date.now()
+    for (const ev of events) {
+      // Persist where applicable.
+      if (session.projectDb) {
+        try {
+          if (ev.kind === 'pre-exec') {
+            // Open a new mark; if a previous one is still open (no D before next C),
+            // close it as killed-by-prompt.
+            const dangling = getOpenMark(session.projectDb, session.id)
+            if (dangling) {
+              closeOpenMark(session.projectDb, session.id, ts, null, null, session.currentCwd ?? null)
+            }
+            appendMark(session.projectDb, {
+              sessionId: session.id,
+              startedAt: ts,
+              cwd: session.currentCwd ?? null,
+            })
+          } else if (ev.kind === 'post-exec') {
+            closeOpenMark(
+              session.projectDb,
+              session.id,
+              ts,
+              ev.exitCode ?? null,
+              null,
+              session.currentCwd ?? null,
+            )
+          } else if (ev.kind === 'cwd') {
+            session.currentCwd = ev.payload ?? null
+          }
+        } catch { /* persistence is best-effort */ }
+      } else if (ev.kind === 'cwd') {
+        session.currentCwd = ev.payload ?? null
+      }
+
+      // Broadcast control frame.
+      const payload: Record<string, unknown> = { type: 'mark', kind: ev.kind, ts }
+      if (ev.exitCode !== undefined) payload.payload = { exitCode: ev.exitCode }
+      if (ev.kind === 'cwd' && ev.payload) payload.payload = { path: ev.payload }
+      const json = JSON.stringify(payload)
+      for (const ws of session.clients) {
+        if (ws.readyState === WS_OPEN) {
+          try { ws.send(json) } catch { /* ignore */ }
+        }
+      }
+    }
+  }
+
+
+  /**
    * Kill semantics: remove the session from the public registry immediately so
    * subsequent lookups (REST, WS attach) return 404, then SIGTERM in the
    * background, then SIGKILL after a grace period if needed. The onExit handler
@@ -316,6 +438,11 @@ export class TerminalManager {
         }
       }, TERMINAL_KILL_GRACE_MS)
     }
+    // Close any open command mark with the session's death timestamp.
+    if (s.projectDb) {
+      try { markOpenAsKilled(s.projectDb, s.id, Date.now()) } catch { /* ignore */ }
+    }
+    cleanupSessionShim(s.projectSlug, s.id)
     // Close clients so the WS upgrade handlers detach cleanly
     for (const ws of s.clients) {
       try { ws.close(1000, 'session_closed') } catch { /* ignore */ }

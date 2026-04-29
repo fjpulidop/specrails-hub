@@ -989,4 +989,59 @@ describe('hub-router', () => {
     })
   })
 
+  describe('GET /api/hub/terminal-settings', () => {
+    it('returns documented defaults seeded by migration', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/terminal-settings')
+      expect(res.status).toBe(200)
+      expect(res.body.fontSize).toBe(12)
+      expect(res.body.renderMode).toBe('auto')
+      expect(res.body.shellIntegrationEnabled).toBe(true)
+      expect(res.body.imageRendering).toBe(true)
+      expect(res.body.longCommandThresholdMs).toBe(60000)
+    })
+  })
+
+  describe('PATCH /api/hub/terminal-settings', () => {
+    it('updates valid fields and returns the merged settings', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .patch('/api/hub/terminal-settings')
+        .send({ fontSize: 16, renderMode: 'canvas', copyOnSelect: true })
+      expect(res.status).toBe(200)
+      expect(res.body.fontSize).toBe(16)
+      expect(res.body.renderMode).toBe('canvas')
+      expect(res.body.copyOnSelect).toBe(true)
+      // Untouched defaults preserved.
+      expect(res.body.shellIntegrationEnabled).toBe(true)
+    })
+
+    it('rejects out-of-range fontSize with 400', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .patch('/api/hub/terminal-settings')
+        .send({ fontSize: 4 })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toBe('validation_failed')
+      expect(res.body.field).toBe('fontSize')
+    })
+
+    it('rejects unknown setting key with 400', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .patch('/api/hub/terminal-settings')
+        .send({ fontWeight: 700 })
+      expect(res.status).toBe(400)
+      expect(res.body.field).toBe('fontWeight')
+    })
+
+    it('rejects non-object body with 400', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .patch('/api/hub/terminal-settings')
+        .send([1, 2])
+      expect(res.status).toBe(400)
+    })
+  })
+
 })

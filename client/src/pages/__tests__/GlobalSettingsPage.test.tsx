@@ -37,12 +37,26 @@ const hubSettings = {
 
 const budgetResponse = { hubDailyBudgetUsd: null, costToday: 0, budgetUtilizationPct: null }
 
+const defaultTerminalSettings = {
+  fontFamily: "'DM Mono', monospace",
+  fontSize: 12,
+  renderMode: 'auto',
+  copyOnSelect: false,
+  shellIntegrationEnabled: true,
+  notifyOnCompletion: true,
+  imageRendering: true,
+  longCommandThresholdMs: 60_000,
+}
+
 function defaultFetchMock(url: string) {
   if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
     return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
   }
   if (typeof url === 'string' && url.includes('/api/hub/budget')) {
     return Promise.resolve({ ok: true, json: async () => budgetResponse })
+  }
+  if (typeof url === 'string' && url.includes('/api/hub/terminal-settings')) {
+    return Promise.resolve({ ok: true, json: async () => defaultTerminalSettings })
   }
   return Promise.resolve({ ok: true, json: async () => hubSettings })
 }
@@ -218,7 +232,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
       .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })       // GET budget
-      .mockResolvedValueOnce({ ok: true, json: async () => ({}) })                 // PUT settings
+      .mockResolvedValue({ ok: true, json: async () => defaultTerminalSettings }) // catch-all (terminal-settings + PUT settings)
 
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
 
@@ -322,7 +336,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
       .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })       // GET budget
-      .mockResolvedValueOnce({ ok: true })                                          // PUT threshold
+      .mockResolvedValue({ ok: true, json: async () => defaultTerminalSettings })  // catch-all
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/e\.g\. 0\.50/i)).toBeInTheDocument()
@@ -342,7 +356,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
       .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })       // GET budget
-      .mockResolvedValueOnce({ ok: true })                                          // PUT threshold
+      .mockResolvedValue({ ok: true, json: async () => defaultTerminalSettings })  // catch-all
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/e\.g\. 0\.50/i)).toBeInTheDocument()
@@ -398,7 +412,10 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     const input = screen.getByPlaceholderText(/e\.g\. 10\.00/i) as HTMLInputElement
     await user.type(input, '10')
     // Find the Save buttons — hub budget save comes before cost alert save
+    // Filter out the (disabled) Terminal Panel Save button from the new
+    // section so positional indexing matches the original test layout.
     const saveButtons = screen.getAllByRole('button', { name: /^save$/i })
+      .filter((b) => !(b as HTMLButtonElement).disabled)
     // Click the hub budget Save (second save after specrails-tech URL)
     await user.click(saveButtons[saveButtons.length - 2])
     await waitFor(() => {
@@ -428,6 +445,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     const input = screen.getByPlaceholderText(/e\.g\. 10\.00/i) as HTMLInputElement
     await user.clear(input)
     const saveButtons = screen.getAllByRole('button', { name: /^save$/i })
+      .filter((b) => !(b as HTMLButtonElement).disabled)
     await user.click(saveButtons[saveButtons.length - 2])
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Hub daily budget removed')
@@ -517,6 +535,7 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })
       .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })
+      .mockResolvedValueOnce({ ok: true, json: async () => defaultTerminalSettings })
       .mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'Invalid URL' }) })
 
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
