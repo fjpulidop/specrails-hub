@@ -143,8 +143,8 @@ function KanbanCard({
         'transition-all duration-150',
         'hover:border-border/50 hover:bg-card',
         'hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-dracula-purple/50',
-        isDragOverlay && 'shadow-xl border-dracula-purple/40 rotate-[2deg] scale-105',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/50',
+        isDragOverlay && 'shadow-xl border-accent-primary/40 rotate-[2deg] scale-105',
         ticket.status === 'cancelled' && 'opacity-60',
       )}
     >

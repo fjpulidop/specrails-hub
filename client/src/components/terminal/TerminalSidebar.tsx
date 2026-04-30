@@ -89,7 +89,7 @@ function SidebarItem({ session, active, onActivate, onRename, onKill }: SidebarI
           'flex items-center gap-2 px-2 py-1.5 rounded-md text-xs cursor-pointer select-none',
           'transition-colors duration-120',
           active
-            ? 'bg-border/40 text-foreground border-l-2 border-dracula-purple/70 pl-[calc(0.5rem-2px)]'
+            ? 'bg-border/40 text-foreground border-l-2 border-accent-primary/70 pl-[calc(0.5rem-2px)]'
             : 'text-muted-foreground hover:bg-border/20 hover:text-foreground',
         )}
       >
@@ -108,7 +108,7 @@ function SidebarItem({ session, active, onActivate, onRename, onKill }: SidebarI
             maxLength={64}
             className={cn(
               'flex-1 min-w-0 bg-background/60 border border-border/40 rounded px-1',
-              'text-xs text-foreground outline-none focus:ring-1 focus:ring-dracula-purple/60',
+              'text-xs text-foreground outline-none focus:ring-1 focus:ring-accent-primary/60',
             )}
           />
         ) : (

@@ -159,12 +159,12 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
                 value={project.name}
                 keywords={[project.slug]}
                 onSelect={() => handleSelectProject(project.id)}
-                className={cn(navItemClass, project.id === activeProjectId && 'text-dracula-purple')}
+                className={cn(navItemClass, project.id === activeProjectId && 'text-accent-primary')}
               >
                 <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
                 <span className="flex-1 truncate">{project.name}</span>
                 {project.id === activeProjectId && (
-                  <span className="text-[10px] text-dracula-purple font-medium">active</span>
+                  <span className="text-[10px] text-accent-primary font-medium">active</span>
                 )}
               </Command.Item>
             ))}
@@ -182,7 +182,7 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
                 onSelect={() => handleSelectCommand(cmd.slug)}
                 className={navItemClass}
               >
-                <Zap className="w-4 h-4 text-dracula-cyan shrink-0" />
+                <Zap className="w-4 h-4 text-accent-info shrink-0" />
                 <div className="flex-1 min-w-0">
                   <span className="truncate">{cmd.name}</span>
                   {cmd.description && (
@@ -209,9 +209,9 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
                 <span className="flex-1 truncate">{job.command}</span>
                 <span className={cn(
                   'text-[10px] font-medium',
-                  job.status === 'completed' && 'text-dracula-green',
-                  job.status === 'failed' && 'text-dracula-red',
-                  job.status === 'running' && 'text-dracula-cyan',
+                  job.status === 'completed' && 'text-accent-success',
+                  job.status === 'failed' && 'text-destructive',
+                  job.status === 'running' && 'text-accent-info',
                   job.status === 'queued' && 'text-muted-foreground',
                 )}>
                   {job.status}

@@ -27,8 +27,8 @@ function CheckpointNode({ checkpoint, index }: { checkpoint: CheckpointState; in
         <div
           className={cn(
             'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all',
-            isDone && 'bg-dracula-green/20 border-dracula-green text-dracula-green',
-            isRunning && 'bg-dracula-purple/20 border-dracula-purple text-dracula-purple animate-pulse',
+            isDone && 'bg-accent-success/20 border-accent-success text-accent-success',
+            isRunning && 'bg-accent-primary/20 border-accent-primary text-accent-primary animate-pulse',
             isPending && 'bg-muted/30 border-border text-muted-foreground'
           )}
         >
@@ -50,7 +50,7 @@ function CheckpointNode({ checkpoint, index }: { checkpoint: CheckpointState; in
             className={cn(
               'text-xs font-medium',
               isDone && 'text-foreground',
-              isRunning && 'text-dracula-purple',
+              isRunning && 'text-accent-primary',
               isPending && 'text-muted-foreground'
             )}
           >
@@ -83,7 +83,7 @@ export function CheckpointTracker({ checkpoints, logLines }: CheckpointTrackerPr
         {/* Progress bar */}
         <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
           <div
-            className="h-full bg-dracula-green rounded-full transition-all duration-500"
+            className="h-full bg-accent-success rounded-full transition-all duration-500"
             style={{ width: `${progressPct}%` }}
           />
         </div>
@@ -105,7 +105,7 @@ export function CheckpointTracker({ checkpoints, logLines }: CheckpointTrackerPr
               <div
                 className={cn(
                   'absolute left-[11px] top-6 w-0.5 h-4',
-                  checkpoint.status === 'done' ? 'bg-dracula-green/40' : 'bg-border/40'
+                  checkpoint.status === 'done' ? 'bg-accent-success/40' : 'bg-border/40'
                 )}
               />
             )}

@@ -1,5 +1,5 @@
 import { ResponsiveContainer, Treemap, Tooltip } from 'recharts'
-import { CHART_PALETTE } from '../../lib/dracula-colors'
+import { useActiveTheme } from '../../context/ThemeContext'
 import type { AnalyticsResponse } from '../../types'
 
 interface CostTreemapProps {
@@ -23,8 +23,10 @@ interface ContentProps {
   size?: number
 }
 
-function CustomContent({ x = 0, y = 0, width = 0, height = 0, name = '', size = 0, colorIndex = 0 }: ContentProps & { colorIndex?: number }) {
-  const color = CHART_PALETTE[colorIndex % CHART_PALETTE.length]
+function CustomContent({ x = 0, y = 0, width = 0, height = 0, name = '', size = 0, colorIndex = 0, palette }: ContentProps & { colorIndex?: number; palette?: readonly string[] }) {
+  const fallback = ['var(--color-accent-primary)']
+  const colors = palette && palette.length > 0 ? palette : fallback
+  const color = colors[colorIndex % colors.length]
   const showLabel = width > 50 && height > 30
 
   return (
@@ -88,6 +90,7 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
 }
 
 export function CostTreemap({ data }: CostTreemapProps) {
+  const theme = useActiveTheme()
   const filtered = data.filter((d) => d.totalCostUsd > 0)
 
   if (filtered.length === 0) {
@@ -115,7 +118,7 @@ export function CostTreemap({ data }: CostTreemapProps) {
         <Treemap
           data={chartData}
           dataKey="size"
-          content={<CustomContent />}
+          content={<CustomContent palette={theme.chart} />}
         >
           <Tooltip content={<CustomTooltip />} />
         </Treemap>

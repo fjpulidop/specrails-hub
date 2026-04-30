@@ -26,7 +26,7 @@ export const PanelChevronButton = forwardRef<HTMLButtonElement, PanelChevronButt
           'h-5 w-6 mr-1.5',
           'rounded text-muted-foreground',
           'hover:bg-border/40 hover:text-foreground',
-          'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-dracula-purple/60',
+          'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-primary/60',
           'transition-colors duration-120',
           className,
         )}

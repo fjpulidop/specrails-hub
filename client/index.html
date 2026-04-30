@@ -5,14 +5,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>specrails — Hub</title>
     <!--
+      Anti-FOUC: read the cached theme synchronously and apply it to <html>
+      BEFORE Vite's module bundle loads. Without this, every boot would flash
+      the default Dracula palette for one frame before the chosen theme
+      paints. Allow-list matches THEME_IDS in client/src/lib/themes.ts.
+    -->
+    <script>
+      (function () {
+        try {
+          var k = 'specrails-hub:ui-theme'
+          var allowed = ['dracula', 'aurora-light', 'obsidian-dark']
+          var v = localStorage.getItem(k)
+          document.documentElement.dataset.theme =
+            v && allowed.indexOf(v) !== -1 ? v : 'dracula'
+        } catch (_) {
+          document.documentElement.dataset.theme = 'dracula'
+        }
+      })()
+    </script>
+    <!--
       Inline splash: renders instantly while the JS bundle parses + initAuth()
       polls the sidecar. Faded out as soon as React mounts (see main.tsx).
     -->
     <style>
+      /* Theme-aware splash. Three CSS variables set at <html> level by the
+         anti-FOUC boot script via [data-theme="..."]; the splash reads them
+         so the loading screen always matches the user's chosen theme. */
+      html[data-theme="dracula"] {
+        --splash-bg: #282a36;
+        --splash-fg: #f8f8f2;
+        --splash-primary: #bd93f9;
+        --splash-secondary: #ff79c6;
+        --splash-muted: #6272a4;
+      }
+      html[data-theme="aurora-light"] {
+        --splash-bg: #fafbfd;
+        --splash-fg: #1a1d2b;
+        --splash-primary: #5733e0;
+        --splash-secondary: #d62a85;
+        --splash-muted: #5b6178;
+      }
+      html[data-theme="obsidian-dark"] {
+        --splash-bg: #10121a;
+        --splash-fg: #e3e6f0;
+        --splash-primary: #b78cf5;
+        --splash-secondary: #f48fc7;
+        --splash-muted: #8b8fa3;
+      }
       html, body {
         margin: 0;
-        background: #282a36;
-        color: #f8f8f2;
+        background: var(--splash-bg);
+        color: var(--splash-fg);
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
       }
       #specrails-splash {
@@ -24,9 +67,9 @@
         flex-direction: column;
         gap: 18px;
         background:
-          radial-gradient(1200px 600px at 50% 40%, rgba(189,147,249,0.10), transparent 60%),
-          radial-gradient(900px 500px at 80% 80%, rgba(255,121,198,0.08), transparent 60%),
-          #282a36;
+          radial-gradient(1200px 600px at 50% 40%, color-mix(in srgb, var(--splash-primary) 10%, transparent), transparent 60%),
+          radial-gradient(900px 500px at 80% 80%, color-mix(in srgb, var(--splash-secondary) 8%, transparent), transparent 60%),
+          var(--splash-bg);
         z-index: 9999;
         opacity: 1;
         transition: opacity 220ms ease-out, visibility 0s linear 220ms;
@@ -44,10 +87,10 @@
         display: flex;
         gap: 0;
       }
-      .specrails-splash__brand .part-a { color: #bd93f9; }
-      .specrails-splash__brand .part-b { color: #ff79c6; }
+      .specrails-splash__brand .part-a { color: var(--splash-primary); }
+      .specrails-splash__brand .part-b { color: var(--splash-secondary); }
       .specrails-splash__brand .part-c {
-        color: #6272a4;
+        color: var(--splash-muted);
         font-weight: 400;
         margin-left: 8px;
       }
@@ -55,13 +98,13 @@
         width: 22px;
         height: 22px;
         border-radius: 50%;
-        border: 2px solid rgba(248, 248, 242, 0.12);
-        border-top-color: #bd93f9;
+        border: 2px solid color-mix(in srgb, var(--splash-fg) 12%, transparent);
+        border-top-color: var(--splash-primary);
         animation: specrails-spin 720ms linear infinite;
       }
       .specrails-splash__hint {
         font-size: 11px;
-        color: #6272a4;
+        color: var(--splash-muted);
         letter-spacing: 0.04em;
         text-transform: uppercase;
       }

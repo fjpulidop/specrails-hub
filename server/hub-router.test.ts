@@ -1044,4 +1044,83 @@ describe('hub-router', () => {
     })
   })
 
+  // ─── Theme ──────────────────────────────────────────────────────────────────
+
+  describe('GET /api/hub/theme', () => {
+    it('returns dracula by default (seeded by migration)', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/theme')
+      expect(res.status).toBe(200)
+      expect(res.body.theme).toBe('dracula')
+    })
+
+    it('returns the persisted theme', async () => {
+      setHubSetting(hubDb, 'ui_theme', 'aurora-light')
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/theme')
+      expect(res.status).toBe(200)
+      expect(res.body.theme).toBe('aurora-light')
+    })
+
+    it('falls back to dracula when persisted value is outside the allow-list', async () => {
+      setHubSetting(hubDb, 'ui_theme', 'totally-bogus-theme')
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/theme')
+      expect(res.status).toBe(200)
+      expect(res.body.theme).toBe('dracula')
+    })
+  })
+
+  describe('PATCH /api/hub/theme', () => {
+    it('persists a valid theme', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .patch('/api/hub/theme')
+        .send({ theme: 'obsidian-dark' })
+      expect(res.status).toBe(200)
+      expect(res.body.theme).toBe('obsidian-dark')
+      expect(getHubSetting(hubDb, 'ui_theme')).toBe('obsidian-dark')
+    })
+
+    it('rejects unknown theme with 400', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .patch('/api/hub/theme')
+        .send({ theme: 'midnight-blue' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toBe('invalid_theme')
+      expect(getHubSetting(hubDb, 'ui_theme')).toBe('dracula')
+    })
+
+    it('rejects non-string theme with 400', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .patch('/api/hub/theme')
+        .send({ theme: 123 })
+      expect(res.status).toBe(400)
+    })
+
+    it('rejects missing theme field with 400', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .patch('/api/hub/theme')
+        .send({})
+      expect(res.status).toBe(400)
+    })
+
+    it('round-trip GET reflects PATCH', async () => {
+      const { app } = createApp()
+      await request(app).patch('/api/hub/theme').send({ theme: 'aurora-light' })
+      const res = await request(app).get('/api/hub/theme')
+      expect(res.body.theme).toBe('aurora-light')
+    })
+
+    it.each(['dracula', 'aurora-light', 'obsidian-dark'])('accepts %s', async (theme) => {
+      const { app } = createApp()
+      const res = await request(app).patch('/api/hub/theme').send({ theme })
+      expect(res.status).toBe(200)
+      expect(res.body.theme).toBe(theme)
+    })
+  })
+
 })

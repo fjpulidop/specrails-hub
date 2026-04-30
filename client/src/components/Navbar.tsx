@@ -65,7 +65,7 @@ export function Navbar() {
         to="/"
         className="flex items-center gap-2 text-foreground hover:text-foreground/80 transition-colors"
       >
-        <span className="font-mono text-sm font-bold"><span className="text-dracula-purple">spec</span><span className="text-dracula-pink">rails</span></span>
+        <span className="font-mono text-sm font-bold"><span className="text-accent-primary">spec</span><span className="text-accent-secondary">rails</span></span>
         <span className="text-muted-foreground text-xs font-normal">/ manager</span>
       </NavLink>
 

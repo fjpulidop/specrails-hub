@@ -199,11 +199,11 @@ function DocView({ category, slug }: { category: string; slug: string }) {
         className="prose prose-sm max-w-none
           prose-headings:text-foreground prose-headings:font-bold
           prose-p:text-foreground/90
-          prose-a:text-dracula-purple prose-a:no-underline hover:prose-a:underline
+          prose-a:text-accent-primary prose-a:no-underline hover:prose-a:underline
           prose-strong:text-foreground
-          prose-code:text-dracula-cyan prose-code:bg-card prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs
+          prose-code:text-accent-info prose-code:bg-card prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs
           prose-pre:bg-card prose-pre:border prose-pre:border-border prose-pre:rounded-md prose-pre:p-0 prose-pre:overflow-x-auto
-          prose-blockquote:border-l-dracula-purple prose-blockquote:text-muted-foreground
+          prose-blockquote:border-l-accent-primary prose-blockquote:text-muted-foreground
           prose-hr:border-border
           prose-th:text-foreground prose-td:text-foreground/90
           prose-li:text-foreground/90"

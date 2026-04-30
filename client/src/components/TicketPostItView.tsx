@@ -194,7 +194,7 @@ function PostItCard({ ticket, onClick }: PostItCardProps) {
         'transition-all duration-200 ease-out',
         'hover:scale-[1.03] hover:-translate-y-0.5',
         'active:scale-[0.98]',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-dracula-purple/50',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/50',
         ticket.status === 'cancelled' && 'opacity-60',
       )}
       style={{ transform: `rotate(${rotation})` }}

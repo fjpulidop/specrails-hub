@@ -36,7 +36,7 @@ export function ProjectRightSidebar() {
         expanded ? 'px-3 justify-between' : 'justify-center'
       )}>
         {expanded && (
-          <span className="font-mono text-sm font-bold whitespace-nowrap overflow-hidden text-dracula-pink">
+          <span className="font-mono text-sm font-bold whitespace-nowrap overflow-hidden text-accent-secondary">
             Project
           </span>
         )}

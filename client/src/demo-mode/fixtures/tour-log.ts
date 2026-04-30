@@ -2,11 +2,11 @@
  * Canonical log lines displayed during tour Beat 14.
  *
  * Colour tokens (see design.md §Decision 5):
- *   ✓ → dracula-green
- *   → → dracula-purple
+ *   ✓ → accent-success
+ *   → → accent-primary
  *   timestamps → muted-foreground
- *   trailing numbers/counts → dracula-cyan
- *   SHIPPED / PASS → dracula-green, bold
+ *   trailing numbers/counts → accent-info
+ *   SHIPPED / PASS → accent-success, bold
  *
  * openspec: hub-demo-scripted-tour (design.md §Decision 5)
  */

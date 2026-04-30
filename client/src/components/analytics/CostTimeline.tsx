@@ -1,6 +1,6 @@
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { format } from 'date-fns'
-import { DRACULA } from '../../lib/dracula-colors'
+import { useActiveTheme } from '../../context/ThemeContext'
 import type { AnalyticsResponse } from '../../types'
 
 interface CostTimelineProps {
@@ -36,6 +36,8 @@ function formatXAxis(dateStr: string): string {
 }
 
 export function CostTimeline({ data }: CostTimelineProps) {
+  const theme = useActiveTheme()
+  const lineColor = theme.chart[0]
   const hasData = data.length > 0 && data.some((d) => d.costUsd > 0)
 
   if (!hasData) {
@@ -80,10 +82,10 @@ export function CostTimeline({ data }: CostTimelineProps) {
           <Line
             type="monotone"
             dataKey="costUsd"
-            stroke={DRACULA.purple}
+            stroke={lineColor}
             strokeWidth={2}
             dot={false}
-            activeDot={{ r: 3, fill: DRACULA.purple }}
+            activeDot={{ r: 3, fill: lineColor }}
           />
         </LineChart>
       </ResponsiveContainer>

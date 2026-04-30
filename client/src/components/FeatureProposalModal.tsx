@@ -38,9 +38,9 @@ function StreamingIndicator({ toolCount }: { toolCount: number }) {
   return (
     <div className="rounded-lg px-3 py-2 bg-muted/40 space-y-1.5">
       <div className="flex items-center gap-1.5">
-        <span className="w-1.5 h-1.5 rounded-full bg-dracula-purple animate-bounce [animation-delay:0ms]" />
-        <span className="w-1.5 h-1.5 rounded-full bg-dracula-purple animate-bounce [animation-delay:150ms]" />
-        <span className="w-1.5 h-1.5 rounded-full bg-dracula-purple animate-bounce [animation-delay:300ms]" />
+        <span className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-bounce [animation-delay:0ms]" />
+        <span className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-bounce [animation-delay:150ms]" />
+        <span className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-bounce [animation-delay:300ms]" />
       </div>
       {toolCount > 0 && (
         <p className="text-[10px] text-muted-foreground animate-pulse">
@@ -136,7 +136,7 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
                 className={cn(
                   'w-full resize-none rounded-md border border-border/50 bg-background/50',
                   'px-3 py-2 text-sm placeholder:text-muted-foreground',
-                  'focus:outline-none focus:ring-1 focus:ring-dracula-purple/50',
+                  'focus:outline-none focus:ring-1 focus:ring-accent-primary/50',
                   'min-h-[120px] max-h-64'
                 )}
                 placeholder="e.g. I want users to be able to set a budget alert so they get notified when API costs exceed a threshold..."
@@ -172,7 +172,7 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
             <div className="flex-1 overflow-y-auto space-y-3 min-h-0 max-h-[50vh] pr-1">
               {/* Original idea */}
               <div className="flex justify-end">
-                <div className="max-w-[85%] rounded-lg px-3 py-2 text-xs bg-dracula-purple/20 border border-dracula-purple/30">
+                <div className="max-w-[85%] rounded-lg px-3 py-2 text-xs bg-accent-primary/20 border border-accent-primary/30">
                   {idea}
                 </div>
               </div>
@@ -181,7 +181,7 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
               {state.history.map((turn, i) => (
                 <div key={i} className={cn('flex', turn.role === 'user' ? 'justify-end' : 'justify-start')}>
                   {turn.role === 'user' ? (
-                    <div className="max-w-[85%] rounded-lg px-3 py-2 text-xs bg-dracula-purple/20 border border-dracula-purple/30">
+                    <div className="max-w-[85%] rounded-lg px-3 py-2 text-xs bg-accent-primary/20 border border-accent-primary/30">
                       {turn.content}
                     </div>
                   ) : (
@@ -201,7 +201,7 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
                     <div className={MD_CLASSES}>
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayStreamingText}</ReactMarkdown>
                     </div>
-                    <span className="inline-block w-1.5 h-3 bg-dracula-purple ml-0.5 animate-pulse" />
+                    <span className="inline-block w-1.5 h-3 bg-accent-primary ml-0.5 animate-pulse" />
                   </div>
                 ) : (
                   <StreamingIndicator toolCount={toolCount} />
@@ -221,7 +221,7 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
                     className={cn(
                       'flex-1 resize-none rounded-md border border-border/50 bg-background/50',
                       'px-3 py-2 text-xs placeholder:text-muted-foreground',
-                      'focus:outline-none focus:ring-1 focus:ring-dracula-purple/50',
+                      'focus:outline-none focus:ring-1 focus:ring-accent-primary/50',
                       'min-h-[48px] max-h-24'
                     )}
                     placeholder="Ask for changes, add constraints, refine scope..."
@@ -316,7 +316,7 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
                   href={state.issueUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-dracula-purple hover:underline break-all"
+                  className="text-xs text-accent-primary hover:underline break-all"
                 >
                   {state.issueUrl}
                 </a>

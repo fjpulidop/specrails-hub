@@ -121,6 +121,6 @@ describe('CollapsibleSection', () => {
       </DndContext>
     )
     const pinnedBtn = screen.getByTestId('pin-health')
-    expect(pinnedBtn.className).toContain('text-dracula-cyan')
+    expect(pinnedBtn.className).toContain('text-accent-info')
   })
 })

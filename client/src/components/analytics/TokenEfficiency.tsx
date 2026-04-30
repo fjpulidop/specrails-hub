@@ -1,5 +1,5 @@
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts'
-import { DRACULA } from '../../lib/dracula-colors'
+import { useActiveTheme } from '../../context/ThemeContext'
 import type { AnalyticsResponse } from '../../types'
 
 interface TokenEfficiencyProps {
@@ -33,6 +33,7 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
 }
 
 export function TokenEfficiency({ data }: TokenEfficiencyProps) {
+  const theme = useActiveTheme()
   if (data.length === 0) {
     return (
       <div className="rounded-lg border border-border/40 bg-card/50 p-4">
@@ -81,8 +82,8 @@ export function TokenEfficiency({ data }: TokenEfficiencyProps) {
               <span className="text-xs">{value}</span>
             )}
           />
-          <Bar dataKey="tokensOut" name="Output tokens" fill={DRACULA.purple} stackId="a" radius={[0, 3, 3, 0]} />
-          <Bar dataKey="tokensCacheRead" name="Cached tokens" fill={DRACULA.cyan} stackId="a" radius={[0, 3, 3, 0]} />
+          <Bar dataKey="tokensOut" name="Output tokens" fill={theme.chart[0]} stackId="a" radius={[0, 3, 3, 0]} />
+          <Bar dataKey="tokensCacheRead" name="Cached tokens" fill={theme.chart[1]} stackId="a" radius={[0, 3, 3, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
