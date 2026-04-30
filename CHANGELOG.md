@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.46.0](https://github.com/fjpulidop/specrails-hub/compare/v1.45.0...v1.46.0) (2026-04-30)
+
+
+### Features
+
+* add explore spec mode ([#282](https://github.com/fjpulidop/specrails-hub/issues/282)) ([cf2a200](https://github.com/fjpulidop/specrails-hub/commit/cf2a200f2ea6a483b48c29394fecf3972ca958ec))
+
 ## [1.45.0](https://github.com/fjpulidop/specrails-hub/compare/v1.44.0...v1.45.0) (2026-04-29)
 
 
