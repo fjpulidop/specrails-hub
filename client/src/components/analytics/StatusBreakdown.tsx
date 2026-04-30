@@ -1,5 +1,5 @@
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts'
-import { STATUS_COLORS } from '../../lib/dracula-colors'
+import { useActiveTheme } from '../../context/ThemeContext'
 import type { AnalyticsResponse } from '../../types'
 
 interface StatusBreakdownProps {
@@ -28,6 +28,8 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
 }
 
 export function StatusBreakdown({ data }: StatusBreakdownProps) {
+  const theme = useActiveTheme()
+  const statusColors = theme.status as unknown as Record<string, string>
   if (data.length === 0) {
     return (
       <div className="rounded-lg border border-border/40 bg-card/50 p-4">
@@ -59,7 +61,7 @@ export function StatusBreakdown({ data }: StatusBreakdownProps) {
             {data.map((entry) => (
               <Cell
                 key={entry.status}
-                fill={STATUS_COLORS[entry.status] ?? 'var(--color-muted-foreground)'}
+                fill={statusColors[entry.status] ?? 'var(--color-muted-foreground)'}
               />
             ))}
           </Pie>

@@ -232,7 +232,7 @@ export function TicketDetailModal({
                   if (e.key === 'Enter') setEditingTitle(false)
                   if (e.key === 'Escape') { setTitle(ticket.title); setEditingTitle(false) }
                 }}
-                className="w-full bg-transparent border-b border-dracula-purple/50 text-sm font-semibold text-foreground outline-none pb-0.5"
+                className="w-full bg-transparent border-b border-accent-primary/50 text-sm font-semibold text-foreground outline-none pb-0.5"
               />
             ) : (
               <button
@@ -251,7 +251,7 @@ export function TicketDetailModal({
 
           <button
             onClick={onClose}
-            className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-dracula-current/50 transition-colors cursor-pointer shrink-0"
+            className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-surface/50 transition-colors cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
           </button>

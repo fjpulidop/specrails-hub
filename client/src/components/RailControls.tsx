@@ -24,7 +24,7 @@ export function RailControls({ mode, status, activeJobId, ticketCount, onModeCha
         <Button
           size="sm"
           variant="ghost"
-          className="group h-6 px-2 gap-1 rounded-md border border-dracula-cyan/20 bg-dracula-cyan/5 text-[10px] font-semibold text-dracula-cyan transition-all duration-200 hover:-translate-y-px hover:border-dracula-cyan/50 hover:bg-dracula-cyan/15 hover:text-dracula-cyan hover:shadow-[0_0_14px_hsl(191_97%_77%/0.22)] active:translate-y-0 active:scale-[0.98]"
+          className="group h-6 px-2 gap-1 rounded-md border border-accent-info/20 bg-accent-info/5 text-[10px] font-semibold text-accent-info transition-all duration-200 hover:-translate-y-px hover:border-accent-info/50 hover:bg-accent-info/15 hover:text-accent-info hover:shadow-[0_0_14px_hsl(191_97%_77%/0.22)] active:translate-y-0 active:scale-[0.98]"
           onClick={() => navigate(`/jobs/${activeJobId}`)}
           title="View job log"
         >

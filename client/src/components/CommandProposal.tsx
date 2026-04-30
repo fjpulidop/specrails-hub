@@ -17,14 +17,14 @@ export function CommandProposal({ command, onRun, onDismiss }: CommandProposalPr
   }
 
   return (
-    <div className="my-2 rounded-md border border-dracula-purple/30 bg-dracula-purple/10 p-2.5 text-xs">
-      <div className="mb-2 font-medium text-dracula-purple">Suggested command</div>
-      <pre className="mb-2 overflow-x-auto rounded bg-background/60 px-2 py-1 font-mono text-dracula-cyan">
+    <div className="my-2 rounded-md border border-accent-primary/30 bg-accent-primary/10 p-2.5 text-xs">
+      <div className="mb-2 font-medium text-accent-primary">Suggested command</div>
+      <pre className="mb-2 overflow-x-auto rounded bg-background/60 px-2 py-1 font-mono text-accent-info">
         {command}
       </pre>
       <div className="flex items-center gap-2">
         {ran ? (
-          <span className="rounded bg-dracula-green/20 px-2 py-0.5 text-dracula-green">Queued</span>
+          <span className="rounded bg-accent-success/20 px-2 py-0.5 text-accent-success">Queued</span>
         ) : (
           <>
             <Button

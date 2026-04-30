@@ -4,7 +4,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianG
 import { format } from 'date-fns'
 import type { HubAnalyticsResponse, AnalyticsPeriod } from '../types'
 import { PeriodSelector } from '../components/analytics/PeriodSelector'
-import { DRACULA, CHART_PALETTE } from '../lib/dracula-colors'
+import { useActiveTheme } from '../context/ThemeContext'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 
 // ─── KPI Cards ────────────────────────────────────────────────────────────────
@@ -49,6 +49,7 @@ function HubKpiCards({ kpi }: { kpi: HubAnalyticsResponse['kpi'] }) {
 // ─── Cost Timeline ────────────────────────────────────────────────────────────
 
 function HubCostTimeline({ data }: { data: HubAnalyticsResponse['costTimeline'] }) {
+  const theme = useActiveTheme()
   const hasData = data.length > 0 && data.some((d) => d.costUsd > 0)
   const tickStep = Math.max(1, Math.floor(data.length / 7))
   const ticks = data.filter((_, i) => i % tickStep === 0).map((d) => d.date)
@@ -92,10 +93,10 @@ function HubCostTimeline({ data }: { data: HubAnalyticsResponse['costTimeline'] 
             <Line
               type="monotone"
               dataKey="costUsd"
-              stroke={DRACULA.purple}
+              stroke={theme.chart[0]}
               strokeWidth={2}
               dot={false}
-              activeDot={{ r: 3, fill: DRACULA.purple }}
+              activeDot={{ r: 3, fill: theme.chart[0] }}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -107,6 +108,7 @@ function HubCostTimeline({ data }: { data: HubAnalyticsResponse['costTimeline'] 
 // ─── Project Breakdown Table ──────────────────────────────────────────────────
 
 function ProjectBreakdown({ projects }: { projects: HubAnalyticsResponse['projectBreakdown'] }) {
+  const theme = useActiveTheme()
   if (projects.length === 0) {
     return (
       <div className="rounded-lg border border-border/40 bg-card/50 p-4">
@@ -139,7 +141,7 @@ function ProjectBreakdown({ projects }: { projects: HubAnalyticsResponse['projec
                 className="h-full rounded-full transition-all duration-500"
                 style={{
                   width: `${(p.totalCostUsd / maxCost) * 100}%`,
-                  backgroundColor: CHART_PALETTE[idx % CHART_PALETTE.length],
+                  backgroundColor: theme.chart[idx % theme.chart.length],
                 }}
               />
             </div>
@@ -153,6 +155,7 @@ function ProjectBreakdown({ projects }: { projects: HubAnalyticsResponse['projec
 // ─── Per-Project Bar Chart ────────────────────────────────────────────────────
 
 function ProjectCostBar({ projects }: { projects: HubAnalyticsResponse['projectBreakdown'] }) {
+  const theme = useActiveTheme()
   if (projects.length === 0) return null
   const data = projects.map((p) => ({ name: p.projectName.slice(0, 12), costUsd: p.totalCostUsd }))
 
@@ -185,7 +188,7 @@ function ProjectCostBar({ projects }: { projects: HubAnalyticsResponse['projectB
               ) : null
             }
           />
-          <Bar dataKey="costUsd" fill={DRACULA.cyan} radius={[3, 3, 0, 0]} />
+          <Bar dataKey="costUsd" fill={theme.chart[1]} radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

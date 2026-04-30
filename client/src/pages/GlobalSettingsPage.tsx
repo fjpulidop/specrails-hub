@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import { TerminalSettingsSection } from '../components/settings/TerminalSettingsSection'
+import { AppearanceSection } from '../components/settings/AppearanceSection'
 import { Settings, Trash2, Zap, Plus, Bell, GraduationCap } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -325,6 +326,8 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
           </div>
         ) : (
           <div className="space-y-5 py-2">
+            <AppearanceSection />
+
             {/* Projects section */}
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">

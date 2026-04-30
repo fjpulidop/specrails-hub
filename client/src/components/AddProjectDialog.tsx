@@ -205,7 +205,7 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
                   'flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-left transition-colors text-xs',
                   'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
                   selectedProvider === 'claude' && availableProviders.claude
-                    ? 'border-dracula-purple/60 bg-dracula-purple/10 text-foreground'
+                    ? 'border-accent-primary/60 bg-accent-primary/10 text-foreground'
                     : 'border-border/30 text-muted-foreground hover:border-border/60',
                   !availableProviders.claude && 'opacity-40 cursor-not-allowed'
                 )}
@@ -230,7 +230,7 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
               >
                 <span>⚡</span>
                 <span className="font-medium">Codex</span>
-                <span className="text-[9px] font-semibold uppercase tracking-wider text-dracula-orange/80">
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-accent-warning/80">
                   Coming Soon
                 </span>
               </button>

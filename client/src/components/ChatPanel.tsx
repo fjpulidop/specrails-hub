@@ -79,9 +79,9 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
         title="Open chat"
       >
         <div className="relative">
-          <MessageSquare className="w-4 h-4 text-dracula-purple" />
+          <MessageSquare className="w-4 h-4 text-accent-primary" />
           {activeStreamCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-dracula-pink text-[8px] font-bold text-white">
+            <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-accent-secondary text-[8px] font-bold text-white">
               {activeStreamCount}
             </span>
           )}
@@ -117,7 +117,7 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
                 'group flex min-w-0 flex-1 cursor-pointer items-center gap-1 px-2.5 py-1.5',
                 'text-[10px] transition-colors',
                 i === activeTabIndex
-                  ? 'border-b-2 border-dracula-purple text-foreground'
+                  ? 'border-b-2 border-accent-primary text-foreground'
                   : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent'
               )}
               onClick={() => setActiveTabIndex(i)}
@@ -126,7 +126,7 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
                 {conv.title ?? `Chat ${i + 1}`}
               </span>
               {conv.isStreaming && (
-                <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-dracula-purple" />
+                <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-accent-primary" />
               )}
               <button
                 className="ml-auto shrink-0 hidden group-hover:block text-muted-foreground hover:text-foreground"
@@ -181,7 +181,7 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
               {['What\'s the project status?', 'Show recent job failures', 'What commands should I run?', 'Explain the codebase'].map((suggestion) => (
                 <button
                   key={suggestion}
-                  className="rounded-md border border-border/30 px-2.5 py-1.5 text-left text-[11px] text-muted-foreground hover:border-dracula-purple/40 hover:text-foreground transition-colors"
+                  className="rounded-md border border-border/30 px-2.5 py-1.5 text-left text-[11px] text-muted-foreground hover:border-accent-primary/40 hover:text-foreground transition-colors"
                   onClick={() => startWithMessage(suggestion)}
                 >
                   {suggestion}
@@ -190,7 +190,7 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
             </div>
           )}
           <button
-            className="mt-1 rounded-md bg-dracula-purple/20 px-3 py-1.5 text-xs text-dracula-purple hover:bg-dracula-purple/30 transition-colors"
+            className="mt-1 rounded-md bg-accent-primary/20 px-3 py-1.5 text-xs text-accent-primary hover:bg-accent-primary/30 transition-colors"
             onClick={() => createConversation()}
           >
             New conversation
@@ -217,7 +217,7 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
     >
       {/* Drag handle — left border */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-10 hover:bg-dracula-purple/30 transition-colors"
+        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-10 hover:bg-accent-primary/30 transition-colors"
         onMouseDown={handleDragStart}
         title="Drag to resize"
         role="separator"

@@ -24,6 +24,10 @@ function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
+// Theme allow-list. Mirror of THEME_IDS in `client/src/lib/themes.ts` —
+// kept duplicated to avoid pulling client code into the server bundle.
+const THEME_ID_ALLOWLIST = new Set<string>(['dracula', 'aurora-light', 'obsidian-dark'])
+
 // LOW-04: Deny registration of system-critical directory paths.
 const DENIED_PATH_PREFIXES = [
   '/etc', '/usr', '/bin', '/sbin', '/lib', '/lib64',
@@ -639,6 +643,28 @@ export function createHubRouter(
       }
       throw err
     }
+  })
+
+  // ─── Theme (hub-wide UI theme) ────────────────────────────────────────────
+  // Allow-list synchronized with `client/src/lib/themes.ts THEME_IDS`.
+  // Persisted under hub_settings key `ui_theme`. Default seeded by migration 8.
+  router.get('/theme', (_req, res) => {
+    const stored = getHubSetting(registry.hubDb, 'ui_theme')
+    const theme = stored && THEME_ID_ALLOWLIST.has(stored) ? stored : 'dracula'
+    res.json({ theme })
+  })
+
+  router.patch('/theme', (req, res) => {
+    const next = (req.body as { theme?: unknown } | undefined)?.theme
+    if (typeof next !== 'string' || !THEME_ID_ALLOWLIST.has(next)) {
+      res.status(400).json({
+        error: 'invalid_theme',
+        message: `theme must be one of: ${[...THEME_ID_ALLOWLIST].join(', ')}`,
+      })
+      return
+    }
+    setHubSetting(registry.hubDb, 'ui_theme', next)
+    res.json({ theme: next })
   })
 
   return router

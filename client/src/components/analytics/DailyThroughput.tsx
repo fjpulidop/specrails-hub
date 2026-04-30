@@ -1,6 +1,6 @@
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts'
 import { format } from 'date-fns'
-import { DRACULA } from '../../lib/dracula-colors'
+import { useActiveTheme } from '../../context/ThemeContext'
 import type { AnalyticsResponse } from '../../types'
 
 interface DailyThroughputProps {
@@ -42,6 +42,7 @@ function formatXAxis(dateStr: string): string {
 }
 
 export function DailyThroughput({ data }: DailyThroughputProps) {
+  const theme = useActiveTheme()
   const hasData = data.length > 0 && data.some((d) => d.completed + d.failed + d.canceled > 0)
 
   if (!hasData) {
@@ -81,9 +82,9 @@ export function DailyThroughput({ data }: DailyThroughputProps) {
           />
           <Tooltip content={<CustomTooltip />} />
           <Legend formatter={(v: string) => <span className="text-xs capitalize">{v}</span>} />
-          <Bar dataKey="completed" name="Completed" stackId="a" fill={DRACULA.purple} />
-          <Bar dataKey="failed"    name="Failed"    stackId="a" fill={DRACULA.pink} />
-          <Bar dataKey="canceled"  name="Canceled"  stackId="a" fill={DRACULA.orange} radius={[3, 3, 0, 0]} />
+          <Bar dataKey="completed" name="Completed" stackId="a" fill={theme.status.completed} />
+          <Bar dataKey="failed"    name="Failed"    stackId="a" fill={theme.status.failed} />
+          <Bar dataKey="canceled"  name="Canceled"  stackId="a" fill={theme.status.canceled} radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

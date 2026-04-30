@@ -117,7 +117,7 @@ export function ProfileAnalyticsCard() {
             <div className="w-32 text-xs font-mono truncate">{row.profileName}</div>
             <div className="flex-1 h-4 bg-muted/50 rounded overflow-hidden">
               <div
-                className="h-full bg-dracula-purple/70"
+                className="h-full bg-accent-primary/70"
                 style={{ width: `${Math.max(6, Math.round((row.jobs / maxJobs) * 100))}%` }}
               />
             </div>

@@ -173,8 +173,8 @@ function AgentSelectionStep({
       {/* Header */}
       <div className="flex-shrink-0 px-6 pt-6 pb-4 space-y-4">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-dracula-purple/20 flex items-center justify-center flex-shrink-0">
-            <Bot className="w-5 h-5 text-dracula-purple" />
+          <div className="w-10 h-10 rounded-xl bg-accent-primary/20 flex items-center justify-center flex-shrink-0">
+            <Bot className="w-5 h-5 text-accent-primary" />
           </div>
           <div>
             <h2 className="text-sm font-semibold">Configure your agents</h2>
@@ -206,7 +206,7 @@ function AgentSelectionStep({
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors',
                 activeTab === tab
-                  ? 'border-dracula-purple text-foreground'
+                  ? 'border-accent-primary text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               )}
             >
@@ -292,8 +292,8 @@ function InstallingStep({
     <div className="flex flex-col h-full max-w-lg mx-auto px-6 py-8 gap-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-dracula-purple/20 flex items-center justify-center flex-shrink-0">
-            <Package className="w-4 h-4 text-dracula-purple animate-pulse" />
+          <div className="w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center flex-shrink-0">
+            <Package className="w-4 h-4 text-accent-primary animate-pulse" />
           </div>
           <div>
             <h2 className="text-sm font-semibold">Installing specrails...</h2>
@@ -395,13 +395,13 @@ function CompleteStep({
 
   return (
     <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto px-6 gap-8">
-      <div className="w-16 h-16 rounded-2xl bg-dracula-green/20 flex items-center justify-center">
-        <Check className="w-8 h-8 text-dracula-green" />
+      <div className="w-16 h-16 rounded-2xl bg-accent-success/20 flex items-center justify-center">
+        <Check className="w-8 h-8 text-accent-success" />
       </div>
 
       <div className="text-center space-y-3">
         <h2 className="text-lg font-semibold">
-          Welcome to <span className="text-dracula-purple">spec</span><span className="text-dracula-pink">rails</span>
+          Welcome to <span className="text-accent-primary">spec</span><span className="text-accent-secondary">rails</span>
         </h2>
         <p className="text-sm text-muted-foreground max-w-sm">
           <strong className="text-foreground">{projectName}</strong> is now configured with
@@ -415,20 +415,20 @@ function CompleteStep({
       <div className="w-full rounded-lg border border-border/50 bg-muted/20 p-4">
         <div className={cn('grid gap-4 text-center', tileCount === 4 ? 'grid-cols-4' : 'grid-cols-3')}>
           <div>
-            <div className="text-2xl font-bold text-dracula-purple">{summary.agents}</div>
+            <div className="text-2xl font-bold text-accent-primary">{summary.agents}</div>
             <div className="text-[10px] text-muted-foreground">Agents</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-dracula-green">{summary.specrailsCommands}</div>
+            <div className="text-2xl font-bold text-accent-success">{summary.specrailsCommands}</div>
             <div className="text-[10px] text-muted-foreground">/specrails:*</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-dracula-cyan">{summary.opsxCommands}</div>
+            <div className="text-2xl font-bold text-accent-info">{summary.opsxCommands}</div>
             <div className="text-[10px] text-muted-foreground">/opsx:*</div>
           </div>
           {showPersonas && (
             <div>
-              <div className="text-2xl font-bold text-dracula-pink">{summary.personas}</div>
+              <div className="text-2xl font-bold text-accent-secondary">{summary.personas}</div>
               <div className="text-[10px] text-muted-foreground">Personas</div>
             </div>
           )}
@@ -449,7 +449,7 @@ function CompleteStep({
           href="https://specrails.dev/docs"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs text-dracula-purple hover:underline"
+          className="text-xs text-accent-primary hover:underline"
         >
           specrails.dev/docs
         </a>
@@ -528,8 +528,8 @@ function StepIndicator({ wizardStep, tier }: { wizardStep: WizardStep; tier: Ins
               <div
                 className={cn(
                   'w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold',
-                  isDone && 'bg-dracula-green text-background',
-                  isCurrent && 'bg-dracula-purple text-background',
+                  isDone && 'bg-accent-success text-background',
+                  isCurrent && 'bg-accent-primary text-background',
                   !isDone && !isCurrent && 'bg-muted/50 text-muted-foreground'
                 )}
               >
@@ -544,7 +544,7 @@ function StepIndicator({ wizardStep, tier }: { wizardStep: WizardStep; tier: Ins
               </span>
             </div>
             {i < steps.length - 1 && (
-              <div className={cn('w-6 h-px', isDone ? 'bg-dracula-green/50' : 'bg-border/50')} />
+              <div className={cn('w-6 h-px', isDone ? 'bg-accent-success/50' : 'bg-border/50')} />
             )}
           </div>
         )

@@ -357,7 +357,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
               {job.profile_name && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border border-dracula-purple/40 bg-dracula-purple/10 text-dracula-purple/90">
+                    <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border border-accent-primary/40 bg-accent-primary/10 text-accent-primary/90">
                       {job.profile_name}
                     </span>
                   </TooltipTrigger>
@@ -370,7 +370,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                 {job.pipeline_id && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Link2 className="w-3 h-3 text-dracula-purple/60 shrink-0" />
+                      <Link2 className="w-3 h-3 text-accent-primary/60 shrink-0" />
                     </TooltipTrigger>
                     <TooltipContent>
                       Part of a pipeline

@@ -77,8 +77,8 @@ export function SetupChat({
         {!hasContent && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-2">
-              <div className="w-8 h-8 rounded-full bg-dracula-purple/20 flex items-center justify-center mx-auto">
-                <Loader2 className="w-4 h-4 text-dracula-purple animate-spin" />
+              <div className="w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center mx-auto">
+                <Loader2 className="w-4 h-4 text-accent-primary animate-spin" />
               </div>
               <p className="text-xs text-muted-foreground">Setting up your project...</p>
             </div>
@@ -97,7 +97,7 @@ export function SetupChat({
               className={cn(
                 'max-w-[85%] rounded-lg px-3 py-2 text-xs',
                 msg.role === 'user'
-                  ? 'bg-dracula-purple/20 text-foreground'
+                  ? 'bg-accent-primary/20 text-foreground'
                   : 'bg-muted/40 text-foreground'
               )}
             >
@@ -119,7 +119,7 @@ export function SetupChat({
               <div className={MD_CLASSES}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingText}</ReactMarkdown>
               </div>
-              <span className="inline-block w-1.5 h-3 bg-dracula-purple ml-0.5 animate-pulse" />
+              <span className="inline-block w-1.5 h-3 bg-accent-primary ml-0.5 animate-pulse" />
             </div>
           </div>
         )}
@@ -128,9 +128,9 @@ export function SetupChat({
         {isStreaming && !streamingText && (
           <div className="flex justify-start">
             <div className="rounded-lg px-3 py-2 bg-muted/40 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-dracula-purple animate-bounce [animation-delay:0ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-dracula-purple animate-bounce [animation-delay:150ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-dracula-purple animate-bounce [animation-delay:300ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-bounce [animation-delay:0ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-bounce [animation-delay:150ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-bounce [animation-delay:300ms]" />
             </div>
           </div>
         )}
@@ -145,7 +145,7 @@ export function SetupChat({
             className={cn(
               'flex-1 resize-none rounded-md border border-border/50 bg-background/50',
               'px-3 py-2 text-xs placeholder:text-muted-foreground',
-              'focus:outline-none focus:ring-1 focus:ring-dracula-purple/50',
+              'focus:outline-none focus:ring-1 focus:ring-accent-primary/50',
               'min-h-[36px] max-h-24'
             )}
             placeholder="Type a response..."

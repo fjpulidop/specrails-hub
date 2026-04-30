@@ -132,7 +132,7 @@ export default function JobsPage() {
               {detailProposal.issue_url && (
                 <div className="text-xs">
                   GitHub Issue:{' '}
-                  <a href={detailProposal.issue_url} target="_blank" rel="noopener noreferrer" className="text-dracula-purple hover:underline">
+                  <a href={detailProposal.issue_url} target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:underline">
                     {detailProposal.issue_url}
                   </a>
                 </div>

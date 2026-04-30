@@ -77,7 +77,7 @@ export function RailsBoard({ rails, ticketMap, onModeChange, onProfileChange, on
       <div className="flex items-center justify-between px-4 h-12 border-b border-border/40 shrink-0">
         <div className="flex items-center gap-2">
           <Layers className="w-4 h-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-dracula-pink">Rails</h2>
+          <h2 className="text-sm font-semibold text-accent-secondary">Rails</h2>
           {activeRails > 0 && (
             <span className="text-[10px] text-emerald-400 bg-emerald-400/10 rounded-full px-1.5 py-0.5 font-medium">
               {activeRails} running

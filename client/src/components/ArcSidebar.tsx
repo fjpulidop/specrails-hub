@@ -74,7 +74,7 @@ function ProjectItem({
       <FolderOpen
         className={cn(
           'flex-shrink-0 w-4 h-4',
-          isActive && 'text-dracula-purple'
+          isActive && 'text-accent-primary'
         )}
       />
       {expanded && (
@@ -143,7 +143,7 @@ export function ArcSidebar({
         )}
       >
         {expanded && (
-          <span className="font-mono text-sm font-bold whitespace-nowrap overflow-hidden text-dracula-purple">
+          <span className="font-mono text-sm font-bold whitespace-nowrap overflow-hidden text-accent-primary">
             Hub
           </span>
         )}

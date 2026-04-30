@@ -36,6 +36,7 @@ import { useOsNotifications } from './hooks/useOsNotifications'
 import { useDesktopUpdateNotifier } from './hooks/useDesktopUpdateNotifier'
 import { WS_URL } from './lib/ws-url'
 import { TerminalsProvider, useTerminals } from './context/TerminalsContext'
+import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { FEATURE_AGENTS_SECTION, FEATURE_TERMINAL_PANEL } from './lib/feature-flags'
 
 // ─── Per-project route memory (in-memory only — resets on app restart) ───────
@@ -191,7 +192,7 @@ function HubApp() {
         {/* Project switching progress bar */}
         {isSwitchingProject && (
           <div
-            className="h-0.5 w-full bg-dracula-purple/70 animate-pulse shrink-0"
+            className="h-0.5 w-full bg-accent-primary/70 animate-pulse shrink-0"
             data-testid="project-switching-bar"
           />
         )}
@@ -275,6 +276,50 @@ function TerminalsProviderWithHub({ children }: { children: React.ReactNode }) {
   return <TerminalsProvider activeProjectId={activeProjectId}>{children}</TerminalsProvider>
 }
 
+// ─── Themed Toaster — Sonner palette derived from active theme ───────────────
+// Sonner injects its own stylesheet AFTER globals.css, so its built-in tokens
+// can't be overridden via plain CSS variables; we have to pass them inline.
+// We do this once per theme change by reading the descriptor.
+
+function ThemedToaster() {
+  const { theme } = useTheme()
+  const accent = theme.previewSwatches.accents[0]
+  const success = theme.status.completed
+  const danger = theme.status.failed
+  const warning = theme.status.canceled
+  const info = theme.status.running
+  return (
+    <Toaster
+      position="bottom-right"
+      theme={theme.scheme}
+      gap={8}
+      closeButton
+      richColors
+      style={{
+        '--normal-bg':           'var(--color-card)',
+        '--normal-bg-hover':     'var(--color-surface)',
+        '--normal-border':       `color-mix(in srgb, ${accent} 18%, transparent)`,
+        '--normal-border-hover': `color-mix(in srgb, ${accent} 28%, transparent)`,
+        '--normal-text':         'var(--color-foreground)',
+        '--success-bg':          `color-mix(in srgb, ${success} 14%, var(--color-card))`,
+        '--success-border':      `color-mix(in srgb, ${success} 30%, transparent)`,
+        '--success-text':        success,
+        '--error-bg':            `color-mix(in srgb, ${danger} 14%, var(--color-card))`,
+        '--error-border':        `color-mix(in srgb, ${danger} 30%, transparent)`,
+        '--error-text':          danger,
+        '--warning-bg':          `color-mix(in srgb, ${warning} 14%, var(--color-card))`,
+        '--warning-border':      `color-mix(in srgb, ${warning} 30%, transparent)`,
+        '--warning-text':        warning,
+        '--info-bg':             `color-mix(in srgb, ${info} 14%, var(--color-card))`,
+        '--info-border':         `color-mix(in srgb, ${info} 30%, transparent)`,
+        '--info-text':           info,
+        '--border-radius':       '0.75rem',
+        'fontFamily':            "'DM Mono', 'JetBrains Mono', ui-monospace, monospace",
+      } as React.CSSProperties}
+    />
+  )
+}
+
 // ─── Root App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -299,45 +344,20 @@ export default function App() {
         }}
       >
         <SharedWebSocketProvider url={WS_URL}>
-          <HubProvider>
-            {/* Custom frameless titlebar inside HubProvider so it can read active project */}
-            <TitleBar />
-            <SpecGenTrackerProvider>
-              <SidebarPinProvider>
-                <TerminalsProviderWithHub>
-                  <HubApp />
-                </TerminalsProviderWithHub>
-              </SidebarPinProvider>
-            </SpecGenTrackerProvider>
-          </HubProvider>
-          <Toaster
-            position="bottom-right"
-            theme="dark"
-            gap={8}
-            closeButton
-            richColors
-            style={{
-              '--normal-bg':           'hsl(232 14% 26%)',
-              '--normal-bg-hover':     'hsl(232 14% 31%)',
-              '--normal-border':       'hsl(265 89% 78% / 0.18)',
-              '--normal-border-hover': 'hsl(265 89% 78% / 0.28)',
-              '--normal-text':         'hsl(60 30% 96%)',
-              '--success-bg':          'hsl(135 50% 16%)',
-              '--success-border':      'hsl(135 94% 65% / 0.3)',
-              '--success-text':        'hsl(135 94% 82%)',
-              '--error-bg':            'hsl(0 40% 20%)',
-              '--error-border':        'hsl(0 100% 67% / 0.3)',
-              '--error-text':          'hsl(0 100% 85%)',
-              '--warning-bg':          'hsl(31 40% 20%)',
-              '--warning-border':      'hsl(31 100% 71% / 0.3)',
-              '--warning-text':        'hsl(31 100% 82%)',
-              '--info-bg':             'hsl(191 35% 18%)',
-              '--info-border':         'hsl(191 97% 77% / 0.3)',
-              '--info-text':           'hsl(191 97% 85%)',
-              '--border-radius':       '0.75rem',
-              'fontFamily':            "'DM Mono', 'JetBrains Mono', ui-monospace, monospace",
-            } as React.CSSProperties}
-          />
+          <ThemeProvider>
+            <HubProvider>
+              {/* Custom frameless titlebar inside HubProvider so it can read active project */}
+              <TitleBar />
+              <SpecGenTrackerProvider>
+                <SidebarPinProvider>
+                  <TerminalsProviderWithHub>
+                    <HubApp />
+                  </TerminalsProviderWithHub>
+                </SidebarPinProvider>
+              </SpecGenTrackerProvider>
+            </HubProvider>
+            <ThemedToaster />
+          </ThemeProvider>
         </SharedWebSocketProvider>
       </div>
     </div>

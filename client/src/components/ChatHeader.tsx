@@ -32,7 +32,7 @@ export function ChatHeader({
           {title ?? 'Chat'}
         </span>
         {projectName && (
-          <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-medium bg-dracula-purple/15 text-dracula-purple/80 leading-none">
+          <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-medium bg-accent-primary/15 text-accent-primary/80 leading-none">
             {projectName}
           </span>
         )}
@@ -53,7 +53,7 @@ export function ChatHeader({
             size="icon"
             variant="ghost"
             title="Delete conversation"
-            className="h-6 w-6 text-muted-foreground hover:text-dracula-red"
+            className="h-6 w-6 text-muted-foreground hover:text-destructive"
             onClick={onDeleteConversation}
           >
             <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5" stroke="currentColor" strokeWidth="1.5">

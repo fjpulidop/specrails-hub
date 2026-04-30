@@ -163,7 +163,7 @@ function PlatformSection({ platform, primary }: { platform: Platform; primary: b
                 href={link.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[11px] text-dracula-cyan hover:underline"
+                className="inline-flex items-center gap-1 text-[11px] text-accent-info hover:underline"
               >
                 {link.label}
                 <ExternalLink className="w-3 h-3" />
@@ -173,7 +173,7 @@ function PlatformSection({ platform, primary }: { platform: Platform; primary: b
         </ul>
       )}
       {instr.note && (
-        <p className="mt-2 text-[11px] text-dracula-yellow">{instr.note}</p>
+        <p className="mt-2 text-[11px] text-accent-highlight">{instr.note}</p>
       )}
     </section>
   )
@@ -208,7 +208,7 @@ function CopyDiagnosticsButton() {
       data-testid="copy-diagnostics-button"
     >
       {state === 'copied' ? (
-        <Check className="w-3 h-3 text-dracula-green" />
+        <Check className="w-3 h-3 text-accent-success" />
       ) : (
         <ClipboardList className="w-3 h-3" />
       )}

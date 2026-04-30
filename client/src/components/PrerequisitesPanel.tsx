@@ -61,11 +61,11 @@ export function PrerequisitesPanel({ status, isLoading, error, onRefresh, onMore
       <div
         data-testid="prerequisites-panel"
         data-state="ok"
-        className="rounded-lg border border-dracula-green/25 bg-dracula-green/5 px-3 py-2"
+        className="rounded-lg border border-accent-success/25 bg-accent-success/5 px-3 py-2"
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
-            <CheckCircle2 className="w-4 h-4 text-dracula-green flex-shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-accent-success flex-shrink-0" />
             <p className="text-xs font-medium text-foreground">All required tools detected</p>
           </div>
           {onRefresh && (
@@ -93,11 +93,11 @@ export function PrerequisitesPanel({ status, isLoading, error, onRefresh, onMore
     <div
       data-testid="prerequisites-panel"
       data-state="missing"
-      className="rounded-lg border border-dracula-purple/40 bg-dracula-purple/10 px-3 py-2"
+      className="rounded-lg border border-accent-primary/40 bg-accent-primary/10 px-3 py-2"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <AlertTriangle className="w-4 h-4 text-dracula-purple flex-shrink-0" />
+          <AlertTriangle className="w-4 h-4 text-accent-primary flex-shrink-0" />
           <div className="min-w-0">
             <p className="text-xs font-medium text-foreground">
               {missingCount} developer tool{missingCount === 1 ? '' : 's'} required
@@ -148,13 +148,13 @@ export function PrerequisitesPanel({ status, isLoading, error, onRefresh, onMore
                 'flex items-center gap-2 rounded-md border px-2 py-1.5 text-[11px]',
                 ok
                   ? 'border-border/30 bg-background/30 text-muted-foreground'
-                  : 'border-dracula-purple/30 bg-background/50 text-foreground',
+                  : 'border-accent-primary/30 bg-background/50 text-foreground',
               )}
             >
               {ok ? (
-                <CheckCircle2 className="w-3.5 h-3.5 text-dracula-green flex-shrink-0" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-accent-success flex-shrink-0" />
               ) : (
-                <XCircle className="w-3.5 h-3.5 text-dracula-purple flex-shrink-0" />
+                <XCircle className="w-3.5 h-3.5 text-accent-primary flex-shrink-0" />
               )}
               <span className="font-medium">{item.label}</span>
               <span className="text-muted-foreground">— {formatVersionLabel(item)}</span>

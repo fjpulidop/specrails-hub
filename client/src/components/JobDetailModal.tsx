@@ -232,7 +232,7 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
                   href={`/jobs/${jobId}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-dracula-current/50 transition-colors"
+                  className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-surface/50 transition-colors"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
@@ -242,7 +242,7 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
 
             <button
               onClick={onClose}
-              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-dracula-current/50 transition-colors cursor-pointer"
+              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-surface/50 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>

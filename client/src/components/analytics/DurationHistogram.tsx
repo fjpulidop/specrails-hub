@@ -1,5 +1,5 @@
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
-import { DRACULA } from '../../lib/dracula-colors'
+import { useActiveTheme } from '../../context/ThemeContext'
 import type { AnalyticsResponse } from '../../types'
 
 interface DurationHistogramProps {
@@ -39,6 +39,8 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
 }
 
 export function DurationHistogram({ data, percentiles }: DurationHistogramProps) {
+  const theme = useActiveTheme()
+  const barColor = theme.chart[1]
   // Enforce fixed bucket order regardless of SQL return order
   const sorted = BUCKET_ORDER.map((bucket) => {
     const found = data.find((d) => d.bucket === bucket)
@@ -78,7 +80,7 @@ export function DurationHistogram({ data, percentiles }: DurationHistogramProps)
             width={30}
           />
           <Tooltip content={<CustomTooltip />} />
-          <Bar dataKey="count" fill={DRACULA.cyan} radius={[3, 3, 0, 0]} />
+          <Bar dataKey="count" fill={barColor} radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
 

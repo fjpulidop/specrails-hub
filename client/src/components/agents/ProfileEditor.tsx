@@ -565,7 +565,7 @@ function AgentRow({
       <span className="text-sm font-mono flex-1 truncate">{agent.id}</span>
       {pinnedFirst && (
         <span
-          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-dracula-purple/15 text-dracula-purple"
+          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-accent-primary/15 text-accent-primary"
           title="Pinned to first position — pipeline always starts with sr-architect"
         >
           <Pin className="w-2.5 h-2.5 rotate-[135deg]" /> first
@@ -573,7 +573,7 @@ function AgentRow({
       )}
       {pinnedLast && (
         <span
-          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-dracula-purple/15 text-dracula-purple"
+          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-accent-primary/15 text-accent-primary"
           title="Pinned to last position — merge phase always runs last"
         >
           <Pin className="w-2.5 h-2.5 rotate-45" /> last
