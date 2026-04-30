@@ -126,32 +126,37 @@ describe('ProposeSpecModal', () => {
     expect(button).not.toBeDisabled()
   })
 
-  it('sends message with /specrails:propose-spec and user text on submit', async () => {
-    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} onTicketCreated={onTicketCreatedMock} />)
-    // Explore codebase is off by default — opt in for the ChatManager path.
-    fireEvent.click(screen.getByRole('checkbox'))
-    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
-    fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
-    fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
-
-    await waitFor(() => {
-      expect(mockStartWithMessage).toHaveBeenCalledTimes(1)
-      const arg = mockStartWithMessage.mock.calls[0][0] as string
-      expect(arg).toContain('/specrails:propose-spec')
-      expect(arg).toContain('Add dark mode')
-    })
+  it('exposes a Quick / Explore segmented control with Quick selected by default', () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs).toHaveLength(2)
+    const quickTab = tabs.find((t) => t.textContent?.toLowerCase().includes('quick'))
+    expect(quickTab).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('registers explore spec with tracker after submit', async () => {
+  it('renames the action button to Continue in Explore mode', () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
-    fireEvent.click(screen.getByRole('checkbox'))
-    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
-    fireEvent.change(textarea, { target: { value: 'Add dark mode' } })
-    fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
+    const exploreTab = screen.getAllByRole('tab').find((t) => t.textContent?.toLowerCase().includes('explore'))!
+    fireEvent.click(exploreTab)
+    expect(screen.getByRole('button', { name: /continue/i })).toBeInTheDocument()
+  })
 
+  it('hands off to ExploreSpecShell when Continue is clicked in Explore mode', async () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} onTicketCreated={onTicketCreatedMock} />)
+    const exploreTab = screen.getAllByRole('tab').find((t) => t.textContent?.toLowerCase().includes('explore'))!
+    fireEvent.click(exploreTab)
+    const textarea = screen.getByPlaceholderText(/dark mode/i)
+    fireEvent.change(textarea, { target: { value: 'dark mode rough idea' } })
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }))
+
+    // The Quick path's /generate-spec must NOT be invoked in Explore mode.
     await waitFor(() => {
-      expect(mockRegisterExploreSpec).toHaveBeenCalledWith('conv-1', expect.objectContaining({ projectId: 'proj-1' }))
+      expect(onCloseMock).toHaveBeenCalled()
     })
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/tickets/generate-spec'),
+      expect.anything(),
+    )
   })
 
   it('resets state when reopened', async () => {
@@ -166,16 +171,21 @@ describe('ProposeSpecModal', () => {
     expect(newTextarea).toHaveValue('')
   })
 
-  it('submits via Cmd+Enter keyboard shortcut', async () => {
+  it('submits via Cmd+Enter keyboard shortcut (Quick mode → /generate-spec)', async () => {
+    ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ requestId: 'req-kbd' }),
+    })
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
-    fireEvent.click(screen.getByRole('checkbox'))
     const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
     fireEvent.change(textarea, { target: { value: 'Keyboard test' } })
     fireEvent.keyDown(textarea, { key: 'Enter', metaKey: true })
 
     await waitFor(() => {
-      expect(mockStartWithMessage).toHaveBeenCalledTimes(1)
-      expect((mockStartWithMessage.mock.calls[0][0] as string)).toContain('Keyboard test')
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/tickets/generate-spec'),
+        expect.objectContaining({ method: 'POST' }),
+      )
     })
   })
 

@@ -1,21 +1,29 @@
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
-import { Sparkles, Send, Search } from 'lucide-react'
+import { Sparkles, Send, Zap, MessagesSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
-import { useChatContext } from '../hooks/useChat'
 import { useHub } from '../hooks/useHub'
 import { useSpecGenTracker } from '../hooks/useSpecGenTracker'
 import { API_ORIGIN } from '../lib/origin'
 import { deleteAllAttachments } from '../lib/attachments'
 import { RichAttachmentEditor, type RichAttachmentEditorHandle } from './RichAttachmentEditor'
+import { ExploreSpecShell } from './explore-spec/ExploreSpecShell'
 import type { LocalTicket } from '../types'
+
+type SpecMode = 'quick' | 'explore'
 
 interface ProposeSpecModalProps {
   open: boolean
   onClose: () => void
   tickets: LocalTicket[]
   onTicketCreated?: (ticket: LocalTicket) => void
+}
+
+interface ExploreState {
+  idea: string
+  pendingSpecId: string
+  initialAttachmentIds: string[]
 }
 
 function genPendingId(): string {
@@ -28,11 +36,11 @@ function genPendingId(): string {
   })
 }
 
-export function ProposeSpecModal({ open, onClose, tickets }: ProposeSpecModalProps) {
-  const chat = useChatContext()
+export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: ProposeSpecModalProps) {
   const { activeProjectId, projects } = useHub()
   const tracker = useSpecGenTracker()
-  const [exploreCodebase, setExploreCodebase] = useState(false)
+  const [mode, setMode] = useState<SpecMode>('quick')
+  const [explore, setExplore] = useState<ExploreState | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [hasText, setHasText] = useState(false)
   const [attachmentCount, setAttachmentCount] = useState(0)
@@ -50,6 +58,7 @@ export function ProposeSpecModal({ open, onClose, tickets }: ProposeSpecModalPro
   useEffect(() => {
     if (open) {
       setPendingSpecId(genPendingId())
+      setMode('quick')
       setIsSubmitting(false)
       setHasText(false)
       setAttachmentCount(0)
@@ -77,10 +86,20 @@ export function ProposeSpecModal({ open, onClose, tickets }: ProposeSpecModalPro
     const idea = editorRef.current?.getPlainText().trim() ?? ''
     if (!idea) return
     const attachmentIds = editorRef.current?.getAttachmentIds() ?? []
-    if (exploreCodebase && !chat) return
 
     const projectId = activeProjectIdRef.current
     if (!projectId) return
+
+    // Explore mode: hand off to the conversational overlay; the modal closes,
+    // the overlay takes over, and the ticket is committed via /from-draft when
+    // the user clicks Create Spec. Attachments uploaded into pendingSpecId are
+    // carried through and folded into Claude's context for the first turn.
+    if (mode === 'explore') {
+      submittedRef.current = true // suppress attachment cleanup on close
+      setExplore({ idea, pendingSpecId, initialAttachmentIds: attachmentIds })
+      onClose()
+      return
+    }
 
     const projectName = projectsRef.current.find(p => p.id === projectId)?.name ?? 'Project'
     const toastId = `spec-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
@@ -99,119 +118,142 @@ export function ProposeSpecModal({ open, onClose, tickets }: ProposeSpecModalPro
     const reg = { toastId, truncated, knownTicketIds, projectId, projectName, startTime, persistId: toastId }
 
     try {
-      if (exploreCodebase && chat) {
-        // Attachments not wired into explore-codebase path in v1 — drop them
-        if (attachmentIds.length > 0) {
-          await deleteAllAttachments(pendingSpecId).catch(() => {})
-        }
-        const prompt = [
-          '/specrails:propose-spec',
-          '',
-          'Here is the spec idea from the user:',
-          '',
-          idea,
-          '',
-          'IMPORTANT INSTRUCTIONS:',
-          '- Generate the spec based on the above description.',
-          '- Create the local ticket automatically when done.',
-          '- Do NOT ask any questions — accept all defaults and proceed directly.',
-          '- Complete the entire flow without user interaction.',
-          '- Be FAST: skip broad codebase exploration. Only read 1-2 files if strictly necessary to understand the relevant area. Prefer writing the spec from your knowledge of the project.',
-        ].join('\n')
-
-        const conversationId = await chat.startWithMessage(prompt, { lightweight: true, maxTurns: 8 })
-        if (conversationId) tracker.registerExploreSpec(conversationId, reg)
-        else toast.error(`${projectName} · Failed to start`, { id: toastId })
-      } else {
-        let res: Response
-        try {
-          res = await fetch(`${API_ORIGIN}/api/projects/${projectId}/tickets/generate-spec`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idea, attachmentIds, pendingSpecId }),
-          })
-        } catch (err) {
-          console.error('[ProposeSpec] generate-spec fetch threw:', err)
-          toast.error(`${projectName} · Failed to start`, { id: toastId })
-          return
-        }
-        if (!res.ok) {
-          toast.error(`${projectName} · Failed to start`, { id: toastId })
-          return
-        }
-        const data = await res.json() as { requestId: string }
-        tracker.registerFastSpec(data.requestId, reg)
+      let res: Response
+      try {
+        res = await fetch(`${API_ORIGIN}/api/projects/${projectId}/tickets/generate-spec`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idea, attachmentIds, pendingSpecId }),
+        })
+      } catch (err) {
+        console.error('[ProposeSpec] generate-spec fetch threw:', err)
+        toast.error(`${projectName} · Failed to start`, { id: toastId })
+        return
       }
+      if (!res.ok) {
+        toast.error(`${projectName} · Failed to start`, { id: toastId })
+        return
+      }
+      const data = await res.json() as { requestId: string }
+      tracker.registerFastSpec(data.requestId, reg)
     } finally {
       setIsSubmitting(false)
     }
-  }, [chat, tickets, exploreCodebase, tracker, pendingSpecId])
+  }, [mode, tickets, tracker, pendingSpecId, onClose])
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-4xl flex flex-col gap-0 p-0 overflow-hidden">
-        <DialogHeader className="px-5 py-4 border-b border-border/40 shrink-0">
-          <DialogTitle className="text-sm flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary/70" />
-            Add Spec
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="max-w-4xl flex flex-col gap-0 p-0 overflow-hidden">
+          <DialogHeader className="px-5 py-4 border-b border-border/40 shrink-0">
+            <DialogTitle className="text-sm flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary/70" />
+              Add Spec
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="flex flex-col p-5 gap-4">
-          <p className="text-sm text-muted-foreground">
-            Describe the feature or change you want to propose. Attach mockups, briefs, or data to give Claude more context.
-          </p>
-          <RichAttachmentEditor
-            ref={editorRef}
-            ticketKey={pendingSpecId}
-            placeholder="e.g. Add a dark mode toggle to the settings page that persists the user's preference..."
-            minHeight={160}
-            autoFocus
-            ariaLabel="Spec idea"
-            onChange={() => setHasText((editorRef.current?.getPlainText().length ?? 0) > 0)}
-            onAttachmentAdded={() => setAttachmentCount((c) => c + 1)}
-            onAttachmentRemoved={(a) => {
-              setAttachmentCount((c) => Math.max(0, c - 1))
-              // fire-and-forget server delete; editor only removed pill
-              fetch(`${API_ORIGIN}/api/projects/${activeProjectIdRef.current}/tickets/${pendingSpecId}/attachments/${a.id}`, { method: 'DELETE' }).catch(() => {})
-            }}
-            onUnsupportedFile={(f) => toast.error(`Unsupported file type: ${f.name}`)}
-            onUploadError={(err, f) => toast.error(`Upload failed for ${f.name}: ${err.message}`)}
-            onSubmit={handleSubmit}
-          />
-          {exploreCodebase && attachmentCount > 0 && (
-            <p className="text-[11px] text-amber-500">
-              ⚠ Attachments are ignored in Explore mode. Uncheck “Explore codebase” to include them.
+          <div className="flex flex-col p-5 gap-4">
+            <ModeSegmented value={mode} onChange={setMode} />
+
+            <p className="text-sm text-muted-foreground">
+              {mode === 'quick'
+                ? 'Describe the feature or change. Attach mockups, briefs, or data for more context.'
+                : 'Describe a rough idea. Claude will help you shape it through conversation — you decide when to commit.'}
             </p>
-          )}
-          <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2 cursor-pointer select-none group">
-              <input
-                type="checkbox"
-                checked={exploreCodebase}
-                onChange={(e) => setExploreCodebase(e.target.checked)}
-                className="rounded border-border/60 bg-background text-primary focus:ring-primary/30 w-3.5 h-3.5 cursor-pointer"
-              />
-              <span className="text-[11px] text-muted-foreground group-hover:text-foreground transition-colors flex items-center gap-1">
-                <Search className="w-3 h-3" />
-                Explore codebase
-              </span>
-              <span className="text-[10px] text-muted-foreground/40">
-                {exploreCodebase ? '~1 min' : '~15s'}
-              </span>
-            </label>
-            <Button
-              size="sm"
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              className="gap-1.5"
-            >
-              <Send className="w-3.5 h-3.5" />
-              Generate Spec
-            </Button>
+            <RichAttachmentEditor
+              ref={editorRef}
+              ticketKey={pendingSpecId}
+              placeholder={mode === 'quick'
+                ? "e.g. Add a dark mode toggle to the settings page that persists the user's preference..."
+                : "e.g. dark mode — not sure where the toggle should live or how to persist it…"}
+              minHeight={160}
+              autoFocus
+              ariaLabel="Spec idea"
+              onChange={() => setHasText((editorRef.current?.getPlainText().length ?? 0) > 0)}
+              onAttachmentAdded={() => setAttachmentCount((c) => c + 1)}
+              onAttachmentRemoved={(a) => {
+                setAttachmentCount((c) => Math.max(0, c - 1))
+                fetch(`${API_ORIGIN}/api/projects/${activeProjectIdRef.current}/tickets/${pendingSpecId}/attachments/${a.id}`, { method: 'DELETE' }).catch(() => {})
+              }}
+              onUnsupportedFile={(f) => toast.error(`Unsupported file type: ${f.name}`)}
+              onUploadError={(err, f) => toast.error(`Upload failed for ${f.name}: ${err.message}`)}
+              onSubmit={handleSubmit}
+            />
+            <div className="flex items-center justify-end">
+              <Button
+                size="sm"
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className="gap-1.5"
+              >
+                <Send className="w-3.5 h-3.5" />
+                {mode === 'quick' ? 'Generate Spec' : 'Continue'}
+              </Button>
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {explore && (
+        <ExploreSpecShell
+          initialIdea={explore.idea}
+          pendingSpecId={explore.pendingSpecId}
+          initialAttachmentIds={explore.initialAttachmentIds}
+          onClose={() => {
+            // Discarding the overlay → wipe any attachments uploaded during the
+            // session (matches Quick path's close-without-submit behaviour).
+            deleteAllAttachments(explore.pendingSpecId).catch(() => {})
+            setExplore(null)
+          }}
+          onTicketCreated={(ticket) => {
+            // Migration of attachments to the real ticket id is handled by
+            // POST /tickets/from-draft, which receives pendingSpecId.
+            setExplore(null)
+            onTicketCreated?.(ticket)
+          }}
+        />
+      )}
+    </>
+  )
+}
+
+function ModeSegmented({ value, onChange }: { value: SpecMode; onChange: (v: SpecMode) => void }) {
+  return (
+    <div role="tablist" aria-label="Spec creation mode" className="inline-flex items-center gap-1 p-1 rounded-lg border border-border/50 bg-card/40 self-start">
+      <ModeOption
+        active={value === 'quick'}
+        icon={<Zap className="w-3.5 h-3.5" />}
+        label="Quick"
+        hint="~15s"
+        onClick={() => onChange('quick')}
+      />
+      <ModeOption
+        active={value === 'explore'}
+        icon={<MessagesSquare className="w-3.5 h-3.5" />}
+        label="Explore"
+        hint="interactive"
+        onClick={() => onChange('explore')}
+      />
+    </div>
+  )
+}
+
+function ModeOption({
+  active, icon, label, hint, onClick,
+}: { active: boolean; icon: React.ReactNode; label: string; hint: string; onClick: () => void }) {
+  return (
+    <button
+      role="tab"
+      type="button"
+      aria-selected={active}
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+        active ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-card/60'
+      }`}
+    >
+      {icon}
+      {label}
+      <span className={`text-[10px] ${active ? 'text-primary/60' : 'text-muted-foreground/60'}`}>{hint}</span>
+    </button>
   )
 }

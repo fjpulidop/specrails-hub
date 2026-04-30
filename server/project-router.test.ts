@@ -75,11 +75,13 @@ function makeChatManager(overrides: Partial<{
   isActive: (id: string) => boolean
   sendMessage: () => Promise<void>
   abort: () => void
+  forgetSpecDraft: (id: string) => void
 }> = {}) {
   return {
     isActive: overrides.isActive ?? vi.fn(() => false),
     sendMessage: overrides.sendMessage ?? vi.fn(async () => {}),
     abort: overrides.abort ?? vi.fn(),
+    forgetSpecDraft: overrides.forgetSpecDraft ?? vi.fn(),
   }
 }
 

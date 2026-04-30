@@ -325,6 +325,24 @@ export interface ChatTitleUpdateMessage {
   projectId?: string
 }
 
+/** Live structured-draft update broadcast during an Explore Spec conversation. */
+export interface SpecDraftUpdateMessage {
+  type: 'spec_draft.update'
+  conversationId: string
+  draft: {
+    title?: string
+    description?: string
+    labels?: string[]
+    priority?: 'low' | 'medium' | 'high' | 'critical'
+    acceptanceCriteria?: string[]
+  }
+  ready: boolean
+  chips: string[]
+  changedFields: string[]
+  timestamp: string
+  projectId?: string
+}
+
 // ─── Hub-level message types ──────────────────────────────────────────────────
 
 export interface HubProjectsMessage {
@@ -701,6 +719,7 @@ export type WsMessage =
   | LogMessage | PhaseMessage | InitMessage | QueueMessage | EventMessage
   | ChatStreamMessage | ChatDoneMessage | ChatErrorMessage
   | ChatCommandProposalMessage | ChatTitleUpdateMessage
+  | SpecDraftUpdateMessage
   | HubProjectsMessage | HubProjectAddedMessage | HubProjectRemovedMessage
   | SetupLogMessage | SetupCheckpointMessage | SetupChatMessage
   | SetupInstallDoneMessage | SetupCompleteMessage | SetupErrorMessage
