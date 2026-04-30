@@ -22,6 +22,8 @@ export interface ChatSendOptions {
   lightweight?: boolean
   /** Limit Claude's agentic tool-use turns */
   maxTurns?: number
+  /** Optional attachments folded into the prompt as <user-attachment> blocks. */
+  attachments?: { ticketKey: string; ids: string[] }
 }
 
 export interface UseChatReturn {
@@ -276,6 +278,9 @@ export function useChat(): UseChatReturn {
       const body: Record<string, unknown> = { text }
       if (options?.lightweight) body.lightweight = true
       if (options?.maxTurns != null) body.maxTurns = options.maxTurns
+      if (options?.attachments && options.attachments.ids.length > 0) {
+        body.attachments = options.attachments
+      }
       await fetch(`${getApiBase()}/chat/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

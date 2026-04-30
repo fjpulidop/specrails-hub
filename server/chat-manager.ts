@@ -6,6 +6,8 @@ import type { DbInstance } from './db'
 import { getConversation, addMessage, updateConversation, getStats, listJobs } from './db'
 import { resolveCommand } from './command-resolver'
 import { spawnAiCli, spawnClaude, spawnCodex } from './util/cli-prompt'
+import { parseSpecDraftBlocks, applyBlocks, type ConversationDraftState } from './spec-draft-parser'
+import { attachmentManager, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
 
 const COMMAND_INSTRUCTION =
   'When you want to suggest a SpecRails command for the user to execute, wrap it in a command block like this: ' +
@@ -62,6 +64,20 @@ export interface SendMessageOptions {
   lightweight?: boolean
   /** Limit Claude's agentic tool-use turns (maps to --max-turns) */
   maxTurns?: number
+  /**
+   * Optional file attachments to fold into the prompt. Resolves to
+   * `<user-attachment>` text blocks (image refs / extracted text) appended
+   * under "## Attached Resources" and adds the USER_ATTACHMENT_SYSTEM_NOTE
+   * to the system prompt so the model treats them as untrusted input.
+   */
+  attachments?: {
+    /** Project slug used by AttachmentManager for path resolution */
+    slug: string
+    /** Pending spec id (or real ticket id) the attachments are stored under */
+    ticketKey: string
+    /** Attachment ids to include with this turn */
+    ids: string[]
+  }
 }
 
 // ─── ChatManager ──────────────────────────────────────────────────────────────
@@ -73,6 +89,9 @@ export class ChatManager {
   private _buffers: Map<string, string>
   private _emittedProposals: Map<string, Set<string>>
   private _abortingConversations: Set<string>
+  private _specDraftStates: Map<string, ConversationDraftState>
+  /** Per-conversation live-strip state for `\`\`\`spec-draft` fenced blocks. */
+  private _streamFilters: Map<string, StreamFilterState>
 
   private _cwd: string | undefined
   private _projectName: string | undefined
@@ -88,6 +107,13 @@ export class ChatManager {
     this._buffers = new Map()
     this._emittedProposals = new Map()
     this._abortingConversations = new Set()
+    this._specDraftStates = new Map()
+    this._streamFilters = new Map()
+  }
+
+  /** Drop the per-conversation draft state (used on conversation deletion). */
+  forgetSpecDraft(conversationId: string): void {
+    this._specDraftStates.delete(conversationId)
   }
 
   private _buildSystemPrompt(): string {
@@ -204,7 +230,28 @@ export class ChatManager {
     addMessage(this._db, { conversation_id: conversationId, role: 'user', content: userText })
 
     // Resolve slash commands (e.g. /specrails:propose-spec → prompt content)
-    const resolvedText = resolveCommand(userText, this._cwd ?? process.cwd())
+    let resolvedText = resolveCommand(userText, this._cwd ?? process.cwd())
+
+    // Fold attachments into the prompt as <user-attachment> text blocks under
+    // an "## Attached Resources" section, mirroring how /generate-spec wires
+    // them. Errors during extraction are logged and skipped — the chat turn
+    // proceeds without that attachment rather than failing.
+    let hasAttachments = false
+    if (options?.attachments && options.attachments.ids.length > 0) {
+      try {
+        const { textBlocks } = await attachmentManager.getClaudeArgs(
+          options.attachments.slug,
+          options.attachments.ticketKey,
+          options.attachments.ids,
+        )
+        if (textBlocks.length > 0) {
+          resolvedText = `${resolvedText}\n\n## Attached Resources\n\n${textBlocks.join('\n\n')}`
+          hasAttachments = true
+        }
+      } catch (err) {
+        console.error(`[chat-manager] attachment extraction failed (${conversationId}):`, err)
+      }
+    }
 
     // Build spawn args based on provider
     let binary: string
@@ -219,17 +266,19 @@ export class ChatManager {
       // This ensures project context, local-tickets permission, and COMMAND_INSTRUCTION
       // are honoured on every codex chat turn.
       const lightweight = options?.lightweight ?? false
-      const systemPrompt = lightweight
+      let systemPrompt = lightweight
         ? this._buildLightweightSystemPrompt()
         : this._buildSystemPrompt()
+      if (hasAttachments) systemPrompt = `${systemPrompt}\n\n${USER_ATTACHMENT_SYSTEM_NOTE}`
       const fullPrompt = `${systemPrompt}\n\n---\n\n${resolvedText}`
       args = ['exec', fullPrompt, '--model', model]
     } else {
       binary = 'claude'
       const lightweight = options?.lightweight ?? false
-      const systemPrompt = lightweight
+      let systemPrompt = lightweight
         ? this._buildLightweightSystemPrompt()
         : this._buildSystemPrompt()
+      if (hasAttachments) systemPrompt = `${systemPrompt}\n\n${USER_ATTACHMENT_SYSTEM_NOTE}`
       args = [
         '--model', conversation.model,
         '--dangerously-skip-permissions',
@@ -266,6 +315,7 @@ export class ChatManager {
     this._activeProcesses.set(conversationId, child)
     this._buffers.set(conversationId, '')
     this._emittedProposals.set(conversationId, new Set())
+    this._streamFilters.set(conversationId, { inBlock: false, pendingTail: '' })
 
     // Surface ENOENT (e.g. claude not on PATH) instead of crashing the hub.
     /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
@@ -292,12 +342,19 @@ export class ChatManager {
       const updated = prev + newText
       this._buffers.set(conversationId, updated)
 
-      this._broadcast({
-        type: 'chat_stream',
-        conversationId,
-        delta: newText,
-        timestamp: new Date().toISOString(),
-      })
+      // Live-strip any `​```spec-draft` fenced JSON from the broadcast so the
+      // user never sees the raw protocol payload mid-stream. The filter holds
+      // back partial fence markers and emits only the user-visible prose.
+      const filter = this._streamFilters.get(conversationId)
+      const visibleDelta = filter ? filterDraftBlocksLive(filter, newText) : newText
+      if (visibleDelta) {
+        this._broadcast({
+          type: 'chat_stream',
+          conversationId,
+          delta: visibleDelta,
+          timestamp: new Date().toISOString(),
+        })
+      }
 
       // Check for new command proposals
       const proposals = extractCommandProposals(updated)
@@ -350,6 +407,7 @@ export class ChatManager {
         this._buffers.delete(conversationId)
         this._emittedProposals.delete(conversationId)
         this._abortingConversations.delete(conversationId)
+        this._streamFilters.delete(conversationId)
 
         if (wasAborting) {
           // abort already emitted chat_error
@@ -358,9 +416,29 @@ export class ChatManager {
         }
 
         if (code === 0) {
-          // Persist assistant message
-          if (fullText) {
-            addMessage(this._db, { conversation_id: conversationId, role: 'assistant', content: fullText })
+          // Parse out any spec-draft fenced blocks (Explore Spec protocol).
+          // No-op for non-Explore conversations (parser pre-checks for the fence
+          // marker and returns the original text unchanged).
+          const parsed = parseSpecDraftBlocks(fullText)
+          const persistedText = parsed.blocks.length > 0 ? parsed.stripped : fullText
+          if (parsed.blocks.length > 0) {
+            const prev = this._specDraftStates.get(conversationId)
+            const nextState = applyBlocks(prev, parsed.blocks)
+            this._specDraftStates.set(conversationId, nextState)
+            this._broadcast({
+              type: 'spec_draft.update',
+              conversationId,
+              draft: nextState.draft,
+              ready: nextState.ready,
+              chips: nextState.chips,
+              changedFields: nextState.lastChangedFields as string[],
+              timestamp: new Date().toISOString(),
+            })
+          }
+
+          // Persist assistant message (stripped of draft blocks for non-noisy DB).
+          if (persistedText) {
+            addMessage(this._db, { conversation_id: conversationId, role: 'assistant', content: persistedText })
           }
 
           // Update session_id.
@@ -376,7 +454,7 @@ export class ChatManager {
           this._broadcast({
             type: 'chat_done',
             conversationId,
-            fullText,
+            fullText: persistedText,
             timestamp: new Date().toISOString(),
           })
 
@@ -496,4 +574,112 @@ export class ChatManager {
       // auto-title is fire-and-forget; failure is silent
     }
   }
+}
+
+// ─── Live spec-draft fence stripper ──────────────────────────────────────────
+
+interface StreamFilterState {
+  /** True when we are currently inside a ```spec-draft fenced block. */
+  inBlock: boolean
+  /**
+   * Last few characters of the incoming stream not yet emitted because they
+   * could be the prefix of an unfinished fence marker (open or close).
+   * Always empty when `inBlock` is true (there is nothing to emit while
+   * inside a block — bytes are dropped).
+   */
+  pendingTail: string
+}
+
+const FENCE_OPEN = '```spec-draft'
+const FENCE_CLOSE = '```'
+// Hold back up to this many trailing chars in the pre-block state so we never
+// emit a partial open fence. -1 because we know the user-visible prefix is at
+// least 1 char shorter than the full marker on every step.
+const PRE_BLOCK_TAIL = FENCE_OPEN.length - 1
+
+/**
+ * Stateful, side-effect-free filter that consumes `newText` and returns the
+ * substring that is safe to broadcast to the chat stream. Holds back partial
+ * fence markers in `state.pendingTail` so the next call can resolve them.
+ *
+ * Behaviour:
+ *  - While outside a block: emit text up to (but not including) the start of
+ *    a `\`\`\`spec-draft` marker. If no marker is present, hold back the
+ *    trailing few chars so a marker starting on a chunk boundary is not
+ *    leaked.
+ *  - While inside a block: emit nothing. Look for the closing `\`\`\``.
+ *    When found, consume it (plus an optional trailing newline) and resume
+ *    emitting from the bytes that follow.
+ *
+ * The filter intentionally does NOT validate the JSON payload — that is
+ * server-side concern of `parseSpecDraftBlocks`. It only strips the fenced
+ * span.
+ */
+export function filterDraftBlocksLive(state: StreamFilterState, newText: string): string {
+  let buf = state.pendingTail + newText
+  let out = ''
+  state.pendingTail = ''
+
+  // Iterate in case a single delta contains multiple transitions
+  // (e.g. close + open + close again — pathological but cheap to support).
+  while (buf.length > 0) {
+    if (state.inBlock) {
+      const closeIdx = buf.indexOf(FENCE_CLOSE)
+      if (closeIdx === -1) {
+        // No close yet — but the close could span the chunk boundary.
+        // Hold back up to 2 trailing chars (closing fence is 3 chars; we keep
+        // any trailing run of `\`` so the next call resolves it).
+        const tailLen = trailingBacktickRun(buf, 2)
+        state.pendingTail = buf.slice(buf.length - tailLen)
+        return out
+      }
+      // Consume the close fence + an optional trailing newline.
+      let after = closeIdx + FENCE_CLOSE.length
+      if (buf[after] === '\n') after += 1
+      buf = buf.slice(after)
+      state.inBlock = false
+      continue
+    }
+
+    // Not in block: look for the open marker.
+    const openIdx = buf.indexOf(FENCE_OPEN)
+    if (openIdx !== -1) {
+      out += buf.slice(0, openIdx)
+      buf = buf.slice(openIdx + FENCE_OPEN.length)
+      // Drop an optional newline immediately after the open marker so the
+      // user never sees `\n` belonging to the fence.
+      if (buf[0] === '\n') buf = buf.slice(1)
+      state.inBlock = true
+      continue
+    }
+
+    // No open marker — hold back only the trailing run that could become a
+    // prefix of FENCE_OPEN (i.e. the longest suffix of `buf` that is also a
+    // prefix of FENCE_OPEN). Anything past that is safe to emit.
+    const holdBack = longestSuffixThatIsPrefixOf(buf, FENCE_OPEN)
+    const safeEnd = buf.length - holdBack
+    out += buf.slice(0, safeEnd)
+    state.pendingTail = buf.slice(safeEnd)
+    return out
+  }
+
+  return out
+}
+
+/** Length of the longest suffix of `s` that is a prefix of `target`. */
+function longestSuffixThatIsPrefixOf(s: string, target: string): number {
+  const max = Math.min(s.length, target.length - 1)
+  for (let len = max; len > 0; len--) {
+    if (target.startsWith(s.slice(s.length - len))) return len
+  }
+  return 0
+}
+
+function trailingBacktickRun(s: string, max: number): number {
+  let n = 0
+  for (let i = s.length - 1; i >= 0 && n < max; i--) {
+    if (s[i] === '`') n++
+    else break
+  }
+  return n
 }

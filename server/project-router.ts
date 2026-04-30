@@ -818,10 +818,11 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   router.delete('/:projectId/chat/conversations/:id', (req: Request, res: Response) => {
-    const { db } = ctx(req)
+    const { db, chatManager } = ctx(req)
     const conversation = getConversation(db, req.params.id as string)
     if (!conversation) { res.status(404).json({ error: 'Conversation not found' }); return }
     deleteConversation(db, req.params.id as string)
+    chatManager?.forgetSpecDraft(req.params.id as string)
     res.json({ ok: true })
   })
 
@@ -847,7 +848,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   router.post('/:projectId/chat/conversations/:id/messages', async (req: Request, res: Response) => {
-    const { db, chatManager } = ctx(req)
+    const { db, chatManager, project } = ctx(req)
     const conversation = getConversation(db, req.params.id as string)
     if (!conversation) { res.status(404).json({ error: 'Conversation not found' }); return }
     const text = req.body?.text as string | undefined
@@ -857,8 +858,17 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     }
     const lightweight = req.body?.lightweight === true
     const maxTurns = typeof req.body?.maxTurns === 'number' ? req.body.maxTurns : undefined
+    let attachments: { slug: string; ticketKey: string; ids: string[] } | undefined
+    const rawAtt = req.body?.attachments
+    if (rawAtt && typeof rawAtt === 'object' && typeof rawAtt.ticketKey === 'string'
+        && Array.isArray(rawAtt.ids)) {
+      const ids = (rawAtt.ids as unknown[]).filter((x): x is string => typeof x === 'string')
+      if (ids.length > 0) {
+        attachments = { slug: project.slug, ticketKey: rawAtt.ticketKey, ids }
+      }
+    }
     res.status(202).json({ ok: true })
-    chatManager.sendMessage(req.params.id as string, text.trim(), { lightweight, maxTurns }).catch((err) => {
+    chatManager.sendMessage(req.params.id as string, text.trim(), { lightweight, maxTurns, attachments }).catch((err) => {
       console.error('[project-router] chat sendMessage error:', err)
     })
   })
@@ -1581,6 +1591,100 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         broadcast(msg)
       }
     })
+  })
+
+  // POST /:projectId/tickets/from-draft — Commit an Explore Spec draft as a real ticket
+  router.post('/:projectId/tickets/from-draft', async (req: Request, res: Response) => {
+    const body = req.body ?? {}
+    const rawTitle = typeof body.title === 'string' ? body.title.trim() : ''
+    if (!rawTitle) {
+      res.status(400).json({ error: 'title is required' }); return
+    }
+    const pendingSpecId = typeof body.pendingSpecId === 'string' ? body.pendingSpecId : null
+    const baseDescription = typeof body.description === 'string' ? body.description.trim() : ''
+    const labels = Array.isArray(body.labels)
+      ? (body.labels as unknown[]).filter((l): l is string => typeof l === 'string')
+      : []
+    const acceptanceCriteria = Array.isArray(body.acceptanceCriteria)
+      ? (body.acceptanceCriteria as unknown[])
+          .filter((c): c is string => typeof c === 'string')
+          .map((c) => c.trim())
+          .filter((c) => c.length > 0)
+      : []
+    const priority = isValidPriority(body.priority) ? body.priority : 'medium'
+
+    // Compose the final ticket body. The title is already its own ticket
+    // field, so we deliberately do NOT echo it as a `## Spec Title` heading
+    // inside the description. The body is just the structured sections from
+    // Claude (Problem Statement / Proposed Solution / Out of Scope /
+    // Technical Considerations / Estimated Complexity) followed by the
+    // Acceptance Criteria bullets.
+    const parts: string[] = []
+    if (baseDescription) parts.push(baseDescription)
+    if (acceptanceCriteria.length > 0) {
+      parts.push(`## Acceptance Criteria\n\n${acceptanceCriteria.map((c) => `- ${c}`).join('\n')}`)
+    }
+    const description = parts.join('\n\n')
+
+    try {
+      const filePath = ticketPath(req)
+      const now = new Date().toISOString()
+      let created: Ticket | undefined
+      const store = mutateStore(filePath, (s) => {
+        const id = s.next_id++
+        const ticket: Ticket = {
+          id,
+          title: rawTitle,
+          description,
+          status: 'todo',
+          priority,
+          labels,
+          assignee: null,
+          prerequisites: [],
+          metadata: {},
+          comments: [],
+          created_at: now,
+          updated_at: now,
+          created_by: 'sr-explore-spec',
+          source: 'propose-spec',
+        }
+        s.tickets[String(id)] = ticket
+        created = ticket
+      })
+      const { broadcast, ticketWatcher, project } = ctx(req)
+      ticketWatcher.notifyHubWrite(store.revision)
+
+      // Migrate attachments from pendingSpecId → real ticket id (mirrors the
+      // generate-spec flow). Must complete before broadcasting ticket_created
+      // so listeners see the populated attachments[].
+      if (pendingSpecId && created) {
+        try {
+          const migrated = await attachmentManager.renameTicketDir({
+            slug: project.slug,
+            pendingId: pendingSpecId,
+            realTicketId: created.id,
+            projectPath: project.path,
+          })
+          if (migrated.length > 0) {
+            created.attachments = migrated
+          }
+        } catch (err) {
+          console.error('[project-router] from-draft attachment migration error:', err)
+        }
+      }
+
+      const msg: TicketCreatedMessage = {
+        type: 'ticket_created',
+        ticket: created! as unknown as LocalTicket,
+        projectId: project.id,
+        timestamp: new Date().toISOString(),
+      }
+      broadcast(msg)
+      res.status(201).json({ ticket: created!, revision: store.revision })
+    } catch (err) {
+      console.error('[project-router] from-draft create error:', err)
+      res.status(500).json({ error: 'Failed to create ticket' })
+    }
   })
 
   // POST /:projectId/tickets — Create new ticket

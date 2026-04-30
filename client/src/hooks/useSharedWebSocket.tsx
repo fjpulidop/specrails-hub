@@ -22,7 +22,7 @@ interface SharedWebSocketContextValue {
   // msg.projectId to ignore cross-project messages.
 }
 
-const SharedWebSocketContext = createContext<SharedWebSocketContextValue | null>(null)
+export const SharedWebSocketContext = createContext<SharedWebSocketContextValue | null>(null)
 
 export function SharedWebSocketProvider({ url, children }: { url: string; children: ReactNode }) {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting')
