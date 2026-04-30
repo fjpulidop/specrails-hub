@@ -110,7 +110,7 @@ function ActionButton({ label, disabled, onClick, onContextMenu, children }: Act
         disabled
           ? 'opacity-40 cursor-not-allowed'
           : 'hover:bg-border/40 hover:text-foreground',
-        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-dracula-purple/60',
+        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-primary/60',
       )}
     >
       {children}

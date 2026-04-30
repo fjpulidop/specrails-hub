@@ -107,13 +107,13 @@ export function ModelSelector({
                 'flex flex-col items-center gap-1 rounded-md border px-3 py-2.5 text-left transition-colors',
                 'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
                 preset === p
-                  ? 'border-dracula-purple bg-dracula-purple/10'
+                  ? 'border-accent-primary bg-accent-primary/10'
                   : 'border-border/30 hover:border-border/60'
               )}
             >
               <span className={cn(
                 'text-xs font-semibold',
-                preset === p ? 'text-dracula-purple' : 'text-foreground/80'
+                preset === p ? 'text-accent-primary' : 'text-foreground/80'
               )}>
                 {PRESET_LABELS[p].label}
               </span>
@@ -149,7 +149,7 @@ export function ModelSelector({
                     {agent.name}
                   </span>
                   {overridden && (
-                    <span className="ml-1 text-[9px] text-dracula-orange">custom</span>
+                    <span className="ml-1 text-[9px] text-accent-warning">custom</span>
                   )}
                 </div>
                 <div className="flex items-center gap-1">

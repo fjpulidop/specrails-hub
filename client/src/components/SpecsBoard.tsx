@@ -64,7 +64,7 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
       <div className="flex items-center justify-between px-4 h-12 border-b border-border/40 shrink-0">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-dracula-purple">Spec</h2>
+          <h2 className="text-sm font-semibold text-accent-primary">Spec</h2>
           {tickets.length > 0 && (
             <span className="text-[10px] text-muted-foreground bg-muted/30 rounded-full px-1.5 py-0.5">
               {tickets.length}

@@ -54,11 +54,11 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Architecture: 'text-dracula-green',
-  Development: 'text-dracula-purple',
-  Review: 'text-dracula-cyan',
-  Product: 'text-dracula-pink',
-  Utilities: 'text-dracula-orange',
+  Architecture: 'text-accent-success',
+  Development: 'text-accent-primary',
+  Review: 'text-accent-info',
+  Product: 'text-accent-secondary',
+  Utilities: 'text-accent-warning',
 }
 
 // ─── AgentSelector ────────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ export function AgentSelector({ selected, onChange }: AgentSelectorProps) {
         <div className="flex gap-2">
           <button
             onClick={selectAll}
-            className="text-[10px] text-dracula-purple hover:underline"
+            className="text-[10px] text-accent-primary hover:underline"
           >
             Select all
           </button>
@@ -143,13 +143,13 @@ export function AgentSelector({ selected, onChange }: AgentSelectorProps) {
                 <div className={cn(
                   'w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-colors',
                   allSelected
-                    ? 'bg-dracula-purple border-dracula-purple'
+                    ? 'bg-accent-primary border-accent-primary'
                     : someSelected
-                    ? 'bg-dracula-purple/40 border-dracula-purple/60'
-                    : 'border-border/60 group-hover:border-dracula-purple/40'
+                    ? 'bg-accent-primary/40 border-accent-primary/60'
+                    : 'border-border/60 group-hover:border-accent-primary/40'
                 )}>
                   {(allSelected || someSelected) && (
-                    <Check className={cn('w-2.5 h-2.5', allSelected ? 'text-background' : 'text-dracula-purple')} />
+                    <Check className={cn('w-2.5 h-2.5', allSelected ? 'text-background' : 'text-accent-primary')} />
                   )}
                 </div>
                 <span className={cn('text-[10px] font-semibold uppercase tracking-wider', CATEGORY_COLORS[category])}>
@@ -170,17 +170,17 @@ export function AgentSelector({ selected, onChange }: AgentSelectorProps) {
                       className={cn(
                         'flex items-start gap-2.5 w-full text-left rounded-md px-2 py-1.5 transition-colors',
                         isCore
-                          ? 'bg-dracula-purple/10 cursor-default'
+                          ? 'bg-accent-primary/10 cursor-default'
                           : isSelected
-                          ? 'bg-dracula-purple/10 hover:bg-dracula-purple/15'
+                          ? 'bg-accent-primary/10 hover:bg-accent-primary/15'
                           : 'hover:bg-muted/30'
                       )}
                     >
                       <div className={cn(
                         'w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors',
                         isSelected
-                          ? 'bg-dracula-purple border-dracula-purple'
-                          : 'border-border/60 hover:border-dracula-purple/40'
+                          ? 'bg-accent-primary border-accent-primary'
+                          : 'border-border/60 hover:border-accent-primary/40'
                       )}>
                         {isSelected && <Check className="w-2.5 h-2.5 text-background" />}
                       </div>
@@ -193,7 +193,7 @@ export function AgentSelector({ selected, onChange }: AgentSelectorProps) {
                             {agent.id}
                           </span>
                           {isCore && (
-                            <span className="flex items-center gap-0.5 text-[9px] text-dracula-orange/80">
+                            <span className="flex items-center gap-0.5 text-[9px] text-accent-warning/80">
                               <Lock className="w-2.5 h-2.5" />
                               core
                             </span>

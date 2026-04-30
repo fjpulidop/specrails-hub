@@ -69,19 +69,19 @@ export function StatusBar({ connectionStatus, rightSlot }: StatusBarProps) {
         <span
           className={cn(
             'w-1.5 h-1.5 rounded-full transition-colors',
-            connectionStatus === 'connected' && !isSyncing && 'bg-dracula-green',
-            connectionStatus === 'connected' && isSyncing && 'bg-dracula-cyan animate-pulse',
-            connectionStatus === 'connecting' && 'bg-dracula-orange animate-[pulse_0.75s_ease-in-out_infinite]',
-            connectionStatus === 'disconnected' && 'bg-dracula-red'
+            connectionStatus === 'connected' && !isSyncing && 'bg-accent-success',
+            connectionStatus === 'connected' && isSyncing && 'bg-accent-info animate-pulse',
+            connectionStatus === 'connecting' && 'bg-accent-warning animate-[pulse_0.75s_ease-in-out_infinite]',
+            connectionStatus === 'disconnected' && 'bg-destructive'
           )}
         />
         <span
           className={cn(
             'transition-colors',
-            connectionStatus === 'connected' && !isSyncing && 'text-dracula-green',
-            connectionStatus === 'connected' && isSyncing && 'text-dracula-cyan',
-            connectionStatus === 'connecting' && 'text-dracula-orange',
-            connectionStatus === 'disconnected' && 'text-dracula-red'
+            connectionStatus === 'connected' && !isSyncing && 'text-accent-success',
+            connectionStatus === 'connected' && isSyncing && 'text-accent-info',
+            connectionStatus === 'connecting' && 'text-accent-warning',
+            connectionStatus === 'disconnected' && 'text-destructive'
           )}
         >
           {connectionStatus === 'connected' && !isSyncing && 'connected'}

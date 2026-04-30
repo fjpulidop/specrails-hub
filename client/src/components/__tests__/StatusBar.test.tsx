@@ -35,21 +35,21 @@ describe('StatusBar', () => {
   it('green indicator is present when connected', () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false })
     render(<StatusBar connectionStatus="connected" />)
-    const indicator = document.querySelector('.bg-dracula-green')
+    const indicator = document.querySelector('.bg-accent-success')
     expect(indicator).toBeInTheDocument()
   })
 
   it('orange indicator is present when connecting', () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false })
     render(<StatusBar connectionStatus="connecting" />)
-    const indicator = document.querySelector('.bg-dracula-orange')
+    const indicator = document.querySelector('.bg-accent-warning')
     expect(indicator).toBeInTheDocument()
   })
 
   it('red indicator is present when disconnected', () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false })
     render(<StatusBar connectionStatus="disconnected" />)
-    const indicator = document.querySelector('.bg-dracula-red')
+    const indicator = document.querySelector('.bg-destructive')
     expect(indicator).toBeInTheDocument()
   })
 

@@ -36,9 +36,9 @@ export default function SettingsPage() {
       const el = document.getElementById(id)
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        el.classList.add('ring-2', 'ring-dracula-purple/60', 'rounded')
+        el.classList.add('ring-2', 'ring-accent-primary/60', 'rounded')
         window.setTimeout(() => {
-          el.classList.remove('ring-2', 'ring-dracula-purple/60', 'rounded')
+          el.classList.remove('ring-2', 'ring-accent-primary/60', 'rounded')
         }, 1800)
         return
       }

@@ -101,7 +101,7 @@ export function ChatInput({
           <Button
             size="sm"
             variant="ghost"
-            className="h-5 px-1.5 text-[10px] text-dracula-red hover:text-dracula-red"
+            className="h-5 px-1.5 text-[10px] text-destructive hover:text-destructive"
             onClick={() => onAbort(conversationId)}
           >
             Stop
@@ -120,7 +120,7 @@ export function ChatInput({
           className={cn(
             'flex-1 resize-none rounded-md border border-border/30 bg-background/60',
             'px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground',
-            'focus:outline-none focus:ring-1 focus:ring-dracula-purple/50',
+            'focus:outline-none focus:ring-1 focus:ring-accent-primary/50',
             'disabled:opacity-50',
             'max-h-[80px] overflow-y-auto'
           )}

@@ -14,7 +14,7 @@ export function WelcomeScreen({ onAddProject }: WelcomeScreenProps) {
 
       <div className="space-y-2">
         <h2 className="text-base font-semibold">
-          Welcome to <span className="text-dracula-purple">spec</span><span className="text-dracula-pink">rails</span> hub
+          Welcome to <span className="text-accent-primary">spec</span><span className="text-accent-secondary">rails</span> hub
         </h2>
         <p className="text-sm text-muted-foreground max-w-sm">
           The hub manages multiple projects from a single interface. Add your first project to get started.

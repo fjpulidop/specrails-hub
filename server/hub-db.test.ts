@@ -69,17 +69,17 @@ describe('hub-db', () => {
       expect(names).toContain('idx_projects_path')
     })
 
-    it('applies migrations 1 through 7 and records them', () => {
+    it('applies migrations 1 through 8 and records them', () => {
       const versions = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as { version: number }[]
-      expect(versions).toHaveLength(7)
-      expect(versions.map((v) => v.version)).toEqual([1, 2, 3, 4, 5, 6, 7])
+      expect(versions).toHaveLength(8)
+      expect(versions.map((v) => v.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
     })
 
     it('is idempotent — calling initHubDb again does not fail', () => {
       // Re-init on same DB (in-memory so we just call again)
       const db2 = makeDb()
       const versions = db2.prepare('SELECT version FROM schema_migrations').all() as { version: number }[]
-      expect(versions).toHaveLength(7)
+      expect(versions).toHaveLength(8)
     })
   })
 

@@ -67,7 +67,7 @@ export function MessageList({
                 {SUGGESTIONS.map((s) => (
                   <button
                     key={s}
-                    className="rounded border border-border/30 px-2.5 py-1.5 text-left text-[11px] text-muted-foreground hover:border-dracula-purple/40 hover:text-foreground transition-colors"
+                    className="rounded border border-border/30 px-2.5 py-1.5 text-left text-[11px] text-muted-foreground hover:border-accent-primary/40 hover:text-foreground transition-colors"
                     onClick={() => onSuggestion?.(s)}
                   >
                     {s}
@@ -97,7 +97,7 @@ export function MessageList({
 
       {isStreaming && streamingText && (
         <div className="flex justify-start px-3 py-1">
-          <div className="max-w-[95%] rounded-2xl rounded-bl-sm bg-dracula-current/30 px-3 py-2 text-xs text-foreground whitespace-pre-wrap">
+          <div className="max-w-[95%] rounded-2xl rounded-bl-sm bg-surface/30 px-3 py-2 text-xs text-foreground whitespace-pre-wrap">
             {streamingText}
           </div>
         </div>
@@ -105,7 +105,7 @@ export function MessageList({
 
       {isStreaming && !streamingText && (
         <div className="flex justify-start px-3 py-1" data-testid="thinking-indicator">
-          <div className="rounded-2xl rounded-bl-sm bg-dracula-current/30 px-3 py-2 flex items-center gap-1">
+          <div className="rounded-2xl rounded-bl-sm bg-surface/30 px-3 py-2 flex items-center gap-1">
             <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0ms]" />
             <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
             <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />

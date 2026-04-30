@@ -74,8 +74,8 @@ const STEPS: StepConfig[] = [
   // Step 1: Welcome
   {
     icon: <Sparkles className="w-6 h-6" />,
-    accent: 'text-dracula-purple',
-    glowClass: 'glow-purple',
+    accent: 'text-accent-primary',
+    glowClass: 'glow-primary',
     title: 'Welcome to specrails-hub',
     subtitle: 'Your AI-powered development control center',
     content: (
@@ -85,15 +85,15 @@ const STEPS: StepConfig[] = [
           AI handles architecture, implementation, review, and the PR.
         </p>
         <div className="rounded-lg border border-border/30 bg-card/20 p-3 space-y-2">
-          <p className="text-[10px] font-semibold text-dracula-purple uppercase tracking-wider">The workflow</p>
+          <p className="text-[10px] font-semibold text-accent-primary uppercase tracking-wider">The workflow</p>
           <div className="flex items-center gap-2 text-xs flex-wrap">
-            <span className="text-dracula-cyan">Add Spec</span>
+            <span className="text-accent-info">Add Spec</span>
             <ArrowRight className="w-3 h-3 text-muted-foreground" />
-            <span className="text-dracula-green">Drop in Rail</span>
+            <span className="text-accent-success">Drop in Rail</span>
             <ArrowRight className="w-3 h-3 text-muted-foreground" />
-            <span className="text-dracula-orange">Hit Play</span>
+            <span className="text-accent-warning">Hit Play</span>
             <ArrowRight className="w-3 h-3 text-muted-foreground" />
-            <span className="text-dracula-pink">Ship</span>
+            <span className="text-accent-secondary">Ship</span>
           </div>
           <p className="text-[10px] text-muted-foreground">
             Each spec flows through Architect → Developer → Reviewer automatically, with live log streaming at every step.
@@ -109,8 +109,8 @@ const STEPS: StepConfig[] = [
   // Step 2: Agents
   {
     icon: <Bot className="w-6 h-6" />,
-    accent: 'text-dracula-cyan',
-    glowClass: 'glow-cyan',
+    accent: 'text-accent-info',
+    glowClass: 'glow-info',
     title: 'Specialized Agents',
     subtitle: 'The pipeline runs itself — you stay in control',
     content: (
@@ -119,12 +119,12 @@ const STEPS: StepConfig[] = [
           Every spec runs through a pipeline of AI agents, each with a focused role. The default pipeline includes four core agents that are always present.
         </p>
         <div className="rounded-lg border border-border/30 bg-card/20 p-3 space-y-1.5">
-          <p className="text-[10px] font-semibold text-dracula-cyan uppercase tracking-wider mb-2">Core agents (always installed)</p>
+          <p className="text-[10px] font-semibold text-accent-info uppercase tracking-wider mb-2">Core agents (always installed)</p>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
-            <div><span className="text-dracula-cyan font-medium">Architect</span><span className="text-muted-foreground"> — designs the solution</span></div>
-            <div><span className="text-dracula-green font-medium">Developer</span><span className="text-muted-foreground"> — writes the code</span></div>
-            <div><span className="text-dracula-orange font-medium">Reviewer</span><span className="text-muted-foreground"> — runs CI, fixes failures</span></div>
-            <div><span className="text-dracula-pink font-medium">Merge Resolver</span><span className="text-muted-foreground"> — handles conflicts</span></div>
+            <div><span className="text-accent-info font-medium">Architect</span><span className="text-muted-foreground"> — designs the solution</span></div>
+            <div><span className="text-accent-success font-medium">Developer</span><span className="text-muted-foreground"> — writes the code</span></div>
+            <div><span className="text-accent-warning font-medium">Reviewer</span><span className="text-muted-foreground"> — runs CI, fixes failures</span></div>
+            <div><span className="text-accent-secondary font-medium">Merge Resolver</span><span className="text-muted-foreground"> — handles conflicts</span></div>
           </div>
         </div>
         <FeatureRow
@@ -134,7 +134,7 @@ const STEPS: StepConfig[] = [
         />
         <div className="rounded-lg border border-border/30 bg-card/20 p-2.5">
           <p className="text-[10px] text-muted-foreground">
-            <span className="text-dracula-cyan font-medium">Optional agents:</span> Test Writer, Doc Sync, Security Reviewer, Frontend/Backend Reviewers — installed during setup.
+            <span className="text-accent-info font-medium">Optional agents:</span> Test Writer, Doc Sync, Security Reviewer, Frontend/Backend Reviewers — installed during setup.
           </p>
         </div>
       </div>
@@ -144,8 +144,8 @@ const STEPS: StepConfig[] = [
   // Step 3: Multi-project
   {
     icon: <FolderOpen className="w-6 h-6" />,
-    accent: 'text-dracula-green',
-    glowClass: 'glow-green',
+    accent: 'text-accent-success',
+    glowClass: 'glow-success',
     title: 'Multi-Project Hub',
     subtitle: 'All your projects, one place',
     content: (
@@ -173,8 +173,8 @@ const STEPS: StepConfig[] = [
   // Step 4: Command Palette
   {
     icon: <Search className="w-6 h-6" />,
-    accent: 'text-dracula-orange',
-    glowClass: 'glow-orange',
+    accent: 'text-accent-warning',
+    glowClass: 'glow-warning',
     title: 'Command Palette',
     subtitle: 'Your fastest way to navigate',
     content: (
@@ -199,9 +199,9 @@ const STEPS: StepConfig[] = [
             description="Search recent jobs, navigate to any page, or switch projects — all with fuzzy matching."
           />
         </div>
-        <div className="rounded-lg border border-dracula-orange/30 bg-dracula-orange/5 p-2.5">
+        <div className="rounded-lg border border-accent-warning/30 bg-accent-warning/5 p-2.5">
           <p className="text-[10px] text-foreground">
-            <span className="text-dracula-orange font-medium">Pro tip:</span> Press <Kbd>?</Kbd> to see all keyboard shortcuts. You&apos;re all set — start shipping.
+            <span className="text-accent-warning font-medium">Pro tip:</span> Press <Kbd>?</Kbd> to see all keyboard shortcuts. You&apos;re all set — start shipping.
           </p>
         </div>
       </div>
@@ -262,10 +262,10 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
         >
           {/* Accent glow bar at the top */}
           <div className={cn('h-1 w-full rounded-t-xl transition-all duration-500', {
-            'bg-dracula-purple': step === 0,
-            'bg-dracula-cyan': step === 1,
-            'bg-dracula-green': step === 2,
-            'bg-dracula-orange': step === 3,
+            'bg-accent-primary': step === 0,
+            'bg-accent-info': step === 1,
+            'bg-accent-success': step === 2,
+            'bg-accent-warning': step === 3,
           })} />
           {/* colors: 0=purple, 1=cyan(agents), 2=green(hub), 3=orange(cmd palette) */}
 
@@ -303,11 +303,11 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
                     'h-1.5 rounded-full transition-all duration-300',
                     i === step
                       ? cn('w-6', {
-                          'bg-dracula-purple': step === 0,
-                          'bg-dracula-cyan': step === 1,
-                          'bg-dracula-green': step === 2,
-                          'bg-dracula-pink': step === 3,
-                          'bg-dracula-orange': step === 4,
+                          'bg-accent-primary': step === 0,
+                          'bg-accent-info': step === 1,
+                          'bg-accent-success': step === 2,
+                          'bg-accent-secondary': step === 3,
+                          'bg-accent-warning': step === 4,
                         })
                       : 'w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/50'
                   )}
@@ -365,10 +365,10 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
                   size="sm"
                   onClick={handleNext}
                   className={cn('text-xs', {
-                    'bg-dracula-purple hover:bg-dracula-purple/90 text-primary-foreground': step === 0,
-                    'bg-dracula-cyan hover:bg-dracula-cyan/90 text-primary-foreground': step === 1,
-                    'bg-dracula-green hover:bg-dracula-green/90 text-primary-foreground': step === 2,
-                    'bg-dracula-orange hover:bg-dracula-orange/90 text-primary-foreground': step === 3,
+                    'bg-accent-primary hover:bg-accent-primary/90 text-primary-foreground': step === 0,
+                    'bg-accent-info hover:bg-accent-info/90 text-primary-foreground': step === 1,
+                    'bg-accent-success hover:bg-accent-success/90 text-primary-foreground': step === 2,
+                    'bg-accent-warning hover:bg-accent-warning/90 text-primary-foreground': step === 3,
                   })}
                   data-testid="onboarding-next"
                 >

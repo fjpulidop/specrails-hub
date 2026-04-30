@@ -171,6 +171,16 @@ Releases are automated via release-please + GitHub Actions:
 
 Commit message prefixes that affect versioning: `feat:` → minor, `fix:` → patch, `feat!:` → major. Commits without a conventional prefix are ignored by release-please.
 
+### Theme system
+
+Hub-wide UI theme selectable from `GlobalSettingsPage > Appearance`. Three built-ins: `dracula` (default), `aurora-light`, `obsidian-dark`. Persisted hub-wide as `hub_settings.ui_theme` (server) and mirrored to `localStorage['specrails-hub:ui-theme']` (client) with an inline anti-FOUC script in `client/index.html` that applies `data-theme` on `<html>` before React hydrates.
+
+**Token contract**: components MUST use semantic Tailwind tokens (`accent-primary`, `accent-info`, `accent-success`, `accent-secondary`, `accent-warning`, `accent-highlight`, `surface`, `background-deep`, plus the shadcn-style `background`/`foreground`/`card`/`muted`/`destructive`). Brand-named tokens (`dracula-*`) are forbidden — a regression guard greps for them. Adding a fourth theme requires only (a) appending a descriptor to `client/src/lib/themes.ts`, (b) a new `[data-theme="<id>"] { ... }` block in `client/src/globals.css`, and (c) extending the allow-list in both `THEME_IDS` and `server/hub-router.ts`. No component-code changes.
+
+**Non-CSS surfaces** (xterm, Recharts, syntax highlighting) read the active theme via `useActiveTheme()` (gracefully falls back to `getActiveTheme()` when no `<ThemeProvider>` is mounted, so unit tests don't need provider wrapping). xterm instances reconfigure live (`term.options.theme = ...`) without losing scrollback or shell-integration state.
+
+**REST**: `GET /api/hub/theme` returns `{ theme }`; `PATCH /api/hub/theme` validates the body against the allow-list and returns 400 on rejection.
+
 ### Pipeline telemetry
 
 Per-project opt-in feature that injects OpenTelemetry env vars into `claude` CLI spawns so the process emits OTLP/JSON signals to the hub.

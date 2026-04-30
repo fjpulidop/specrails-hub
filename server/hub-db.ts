@@ -149,6 +149,14 @@ function applyHubMigrations(db: DbInstance): void {
         'terminal.quickScript', value,
       )
     },
+    // Migration 8: seed default ui_theme for the new hub-wide theme system.
+    // Allow-list enforced at the route layer (server/hub-router.ts) and the
+    // client (client/src/lib/themes.ts).
+    () => {
+      db.prepare('INSERT OR IGNORE INTO hub_settings (key, value) VALUES (?, ?)').run(
+        'ui_theme', 'dracula',
+      )
+    },
   ]
 
   for (let i = 0; i < migrations.length; i++) {

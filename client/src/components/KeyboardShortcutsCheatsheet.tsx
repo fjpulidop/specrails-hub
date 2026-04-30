@@ -62,7 +62,7 @@ export function KeyboardShortcutsCheatsheet({ open, onOpenChange }: KeyboardShor
         <div className="space-y-4 mt-2">
           {grouped.map((group) => (
             <div key={group.category}>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-dracula-purple mb-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-accent-primary mb-2">
                 {group.label}
               </h3>
               <div className="divide-y divide-border/30">

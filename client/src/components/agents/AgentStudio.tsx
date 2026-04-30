@@ -345,7 +345,7 @@ export function AgentStudio({
                       onResumeRefine(draftFromRefine, agentId, data.body)
                     } catch { /* ignore */ }
                   }}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-dracula-purple/40 bg-dracula-purple/15 text-dracula-purple hover:bg-dracula-purple/25 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-accent-primary/40 bg-accent-primary/15 text-accent-primary hover:bg-accent-primary/25 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
                   title="Hand this draft back to the AI Edit overlay"
                 >
                   <Wand2 className="w-3 h-3" /> Resume AI Edit

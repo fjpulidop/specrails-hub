@@ -415,8 +415,8 @@ const LogLine = memo(function LogLine({ line, even }: { line: FormattedLine; eve
         line.type === 'result' && 'bg-emerald-500/5 border-l-2 border-emerald-500/40 mt-2 py-2',
         isDiffAdd    && 'bg-emerald-500/8 border-l-2 border-emerald-500/50',
         isDiffRemove && 'bg-red-500/8 border-l-2 border-red-500/50',
-        isDiffMeta   && 'bg-dracula-purple/5 border-l-2 border-dracula-purple/30',
-        isDiffHunk   && 'bg-dracula-cyan/5 border-l-2 border-dracula-cyan/30',
+        isDiffMeta   && 'bg-accent-primary/5 border-l-2 border-accent-primary/30',
+        isDiffHunk   && 'bg-accent-info/5 border-l-2 border-accent-info/30',
       )}
     >
       {line.timestamp && (
@@ -463,8 +463,8 @@ const LogLine = memo(function LogLine({ line, even }: { line: FormattedLine; eve
             line.type === 'tool-result' && 'text-muted-foreground/50',
             isDiffAdd    && 'text-emerald-400',
             isDiffRemove && 'text-red-400',
-            isDiffMeta   && 'text-dracula-purple/80',
-            isDiffHunk   && 'text-dracula-cyan/80',
+            isDiffMeta   && 'text-accent-primary/80',
+            isDiffHunk   && 'text-accent-info/80',
           )}
         >
           {line.content}

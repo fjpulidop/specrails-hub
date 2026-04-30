@@ -205,7 +205,7 @@ function PathCard({ icon, title, description, onClick }: PathCardProps) {
       onClick={onClick}
       className={cn(
         'flex flex-col gap-2 p-4 rounded-lg border border-border/30 text-left glass-card',
-        'hover:border-dracula-purple/40 hover:bg-dracula-current/30 transition-all active:scale-[0.98]'
+        'hover:border-accent-primary/40 hover:bg-surface/30 transition-all active:scale-[0.98]'
       )}
     >
       <span className="text-xl">{icon}</span>

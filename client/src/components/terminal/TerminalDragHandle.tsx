@@ -80,7 +80,7 @@ export function TerminalDragHandle({ height, maxHeight, onHeightCommit, onHeight
       className={cn(
         'absolute top-0 left-0 right-0 h-1',
         'cursor-row-resize',
-        'bg-transparent hover:bg-dracula-purple/40',
+        'bg-transparent hover:bg-accent-primary/40',
         'transition-colors duration-120',
         'z-10',
       )}

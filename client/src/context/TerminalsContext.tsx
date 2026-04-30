@@ -30,6 +30,8 @@ import { toast } from 'sonner'
 import { API_ORIGIN } from '../lib/origin'
 import { WS_URL } from '../lib/ws-url'
 import { getHubTokenProtocol } from '../lib/auth'
+import { useThemeOptional } from './ThemeContext'
+import { getActiveTheme } from '../lib/theme-palette'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -179,31 +181,10 @@ function ensureTerminalHost(): HTMLDivElement {
   return host
 }
 
-// ─── xterm theme (Dracula-ish to match app) ────────────────────────────────────
-
-const XTERM_THEME = {
-  background: '#282a36',
-  foreground: '#f8f8f2',
-  cursor: '#f8f8f2',
-  cursorAccent: '#282a36',
-  selectionBackground: '#44475a',
-  black: '#21222c',
-  red: '#ff5555',
-  green: '#50fa7b',
-  yellow: '#f1fa8c',
-  blue: '#bd93f9',
-  magenta: '#ff79c6',
-  cyan: '#8be9fd',
-  white: '#f8f8f2',
-  brightBlack: '#6272a4',
-  brightRed: '#ff6e6e',
-  brightGreen: '#69ff94',
-  brightYellow: '#ffffa5',
-  brightBlue: '#d6acff',
-  brightMagenta: '#ff92df',
-  brightCyan: '#a4ffff',
-  brightWhite: '#ffffff',
-}
+// ─── xterm theme — driven by the active hub theme ─────────────────────────────
+// `getActiveTheme()` reads `<html data-theme>` and returns the matching xterm
+// palette from `themes.ts`. Existing terminal instances are reconfigured live
+// by the TerminalsProvider effect that subscribes to ThemeContext.
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
@@ -234,6 +215,23 @@ export function TerminalsProvider({ children, activeProjectId }: ProviderProps) 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ─── Live theme reconciliation ────────────────────────────────────────────
+  // When the hub theme changes, update every existing terminal in place. xterm
+  // supports live `options.theme` swaps without recreating the instance, so
+  // scrollback, marks, and shell-integration state are preserved. Uses the
+  // optional theme hook so unit tests that mount TerminalsProvider in
+  // isolation still render — production always has ThemeProvider above.
+  const themeCtx = useThemeOptional()
+  const activeTheme = themeCtx?.theme ?? null
+  useEffect(() => {
+    if (!activeTheme) return
+    for (const handle of xtermHandles.current.values()) {
+      try {
+        handle.term.options.theme = activeTheme.xterm
+      } catch { /* ignore — terminal may be mid-disposal */ }
+    }
+  }, [activeTheme])
 
   // ─── Mutators ─────────────────────────────────────────────────────────────
 
@@ -642,7 +640,7 @@ function ensureXtermForSession(
     cols, rows,
     fontFamily: settings.fontFamily,
     fontSize: settings.fontSize,
-    theme: XTERM_THEME,
+    theme: getActiveTheme().xterm,
     cursorBlink: true,
     scrollback: 10_000,
     allowProposedApi: true,

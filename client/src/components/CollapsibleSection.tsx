@@ -52,7 +52,7 @@ export function CollapsibleSection({
       className={cn(
         'rounded-xl border border-border/30 bg-card/20 overflow-hidden',
         'transition-shadow duration-200',
-        isDragging && 'shadow-lg shadow-dracula-purple/10 border-dracula-purple/30 z-50 opacity-90',
+        isDragging && 'shadow-lg shadow-accent-primary/10 border-accent-primary/30 z-50 opacity-90',
       )}
       data-testid={`section-${id}`}
     >
@@ -102,7 +102,7 @@ export function CollapsibleSection({
               className={cn(
                 'flex items-center justify-center w-6 h-6 rounded transition-all duration-150 shrink-0',
                 pinned
-                  ? 'text-dracula-cyan bg-dracula-cyan/10 hover:bg-dracula-cyan/20'
+                  ? 'text-accent-info bg-accent-info/10 hover:bg-accent-info/20'
                   : 'text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/30',
               )}
               aria-label={pinned ? 'Unpin section (will collapse by default)' : 'Pin section (will stay expanded)'}

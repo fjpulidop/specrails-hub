@@ -3,7 +3,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts'
 import { format } from 'date-fns'
-import { DRACULA } from '../../lib/dracula-colors'
+import { useActiveTheme } from '../../context/ThemeContext'
 import type { TrendPoint } from '../../types'
 
 interface TrendsChartProps {
@@ -11,12 +11,6 @@ interface TrendsChartProps {
 }
 
 type Metric = 'cost' | 'duration' | 'successRate'
-
-const METRICS: { key: Metric; label: string; color: string }[] = [
-  { key: 'cost', label: 'Avg Cost ($)', color: DRACULA.purple },
-  { key: 'duration', label: 'Avg Duration (min)', color: DRACULA.cyan },
-  { key: 'successRate', label: 'Success Rate (%)', color: DRACULA.green },
-]
 
 interface TooltipPayload {
   name: string
@@ -53,6 +47,12 @@ function formatXAxis(dateStr: string): string {
 }
 
 export function TrendsChart({ points }: TrendsChartProps) {
+  const theme = useActiveTheme()
+  const METRICS: { key: Metric; label: string; color: string }[] = [
+    { key: 'cost',        label: 'Avg Cost ($)',        color: theme.chart[0] },
+    { key: 'duration',    label: 'Avg Duration (min)',  color: theme.chart[1] },
+    { key: 'successRate', label: 'Success Rate (%)',    color: theme.chart[2] },
+  ]
   const [activeMetrics, setActiveMetrics] = useState<Set<Metric>>(new Set(['cost', 'successRate']))
 
   const hasData = points.some((p) => p.jobCount > 0)
@@ -136,10 +136,10 @@ export function TrendsChart({ points }: TrendsChartProps) {
                 type="monotone"
                 dataKey="cost"
                 name="Avg Cost ($)"
-                stroke={DRACULA.purple}
+                stroke={theme.chart[0]}
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 3, fill: DRACULA.purple }}
+                activeDot={{ r: 3, fill: theme.chart[0] }}
               />
             )}
             {activeMetrics.has('duration') && (
@@ -147,10 +147,10 @@ export function TrendsChart({ points }: TrendsChartProps) {
                 type="monotone"
                 dataKey="duration"
                 name="Avg Duration (min)"
-                stroke={DRACULA.cyan}
+                stroke={theme.chart[1]}
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 3, fill: DRACULA.cyan }}
+                activeDot={{ r: 3, fill: theme.chart[1] }}
               />
             )}
             {activeMetrics.has('successRate') && (
@@ -158,10 +158,10 @@ export function TrendsChart({ points }: TrendsChartProps) {
                 type="monotone"
                 dataKey="successRate"
                 name="Success Rate (%)"
-                stroke={DRACULA.green}
+                stroke={theme.chart[2]}
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 3, fill: DRACULA.green }}
+                activeDot={{ r: 3, fill: theme.chart[2] }}
               />
             )}
           </LineChart>

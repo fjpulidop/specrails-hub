@@ -192,7 +192,7 @@ export function AgentsCatalogTab() {
         <div className="flex-shrink-0 px-6 pt-5 pb-3 border-b border-border">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
-              <FileText className="w-4 h-4 text-dracula-purple" /> Agent template library
+              <FileText className="w-4 h-4 text-accent-primary" /> Agent template library
               <span className="text-[11px] font-normal text-muted-foreground ml-1">
                 {templateResults.length} of {AGENT_TEMPLATES.length}
               </span>
@@ -250,7 +250,7 @@ export function AgentsCatalogTab() {
               <button
                 type="button"
                 onClick={() => setTemplateTag(null)}
-                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-dracula-purple/20 text-dracula-purple hover:bg-dracula-purple/30"
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-accent-primary/20 text-accent-primary hover:bg-accent-primary/30"
               >
                 <Tag className="w-3 h-3" /> {templateTag}
                 <X className="w-3 h-3" />
@@ -272,7 +272,7 @@ export function AgentsCatalogTab() {
                     setTemplateCategory('all')
                     setTemplateTag(null)
                   }}
-                  className="text-xs text-dracula-purple hover:underline mt-2"
+                  className="text-xs text-accent-primary hover:underline mt-2"
                 >
                   Clear filters
                 </button>
@@ -288,12 +288,12 @@ export function AgentsCatalogTab() {
                     closeTemplates()
                     setStudio({ kind: 'create', initialBody: t.body, initialName: t.nameHint })
                   }}
-                  className="group text-left p-4 rounded-lg border border-border bg-card/40 hover:border-dracula-purple/50 hover:bg-accent/40 hover:shadow-sm transition-all"
+                  className="group text-left p-4 rounded-lg border border-border bg-card/40 hover:border-accent-primary/50 hover:bg-accent/40 hover:shadow-sm transition-all"
                 >
                   <div className="flex items-start gap-3 mb-2">
                     <span className="text-2xl leading-none mt-0.5">{t.emoji}</span>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold text-foreground group-hover:text-dracula-purple truncate">
+                      <div className="text-sm font-semibold text-foreground group-hover:text-accent-primary truncate">
                         {t.label}
                       </div>
                       <div className="text-[10px] text-muted-foreground mt-0.5">{t.category}</div>
@@ -320,8 +320,8 @@ export function AgentsCatalogTab() {
                           }
                         }}
                         className={
-                          'text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground hover:bg-dracula-purple/20 hover:text-dracula-purple cursor-pointer transition-colors ' +
-                          (templateTag === tag ? 'bg-dracula-purple/20 text-dracula-purple' : '')
+                          'text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground hover:bg-accent-primary/20 hover:text-accent-primary cursor-pointer transition-colors ' +
+                          (templateTag === tag ? 'bg-accent-primary/20 text-accent-primary' : '')
                         }
                       >
                         {tag}
@@ -332,7 +332,7 @@ export function AgentsCatalogTab() {
                     <code className="text-[10px] font-mono text-muted-foreground/70 truncate">
                       {t.nameHint}
                     </code>
-                    <span className="text-[10px] text-dracula-purple opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-[10px] text-accent-primary opacity-0 group-hover:opacity-100 transition-opacity">
                       Open in Studio →
                     </span>
                   </div>
@@ -368,7 +368,7 @@ export function AgentsCatalogTab() {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-dracula-purple" /> Generate a custom agent
+            <Sparkles className="w-4 h-4 text-accent-primary" /> Generate a custom agent
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3 py-2">
@@ -681,7 +681,7 @@ function CategoryChip({
       className={
         'flex-shrink-0 inline-flex items-center gap-1 h-7 px-2.5 text-[11px] rounded-full border transition-colors whitespace-nowrap ' +
         (active
-          ? 'bg-dracula-purple/20 border-dracula-purple/50 text-dracula-purple'
+          ? 'bg-accent-primary/20 border-accent-primary/50 text-accent-primary'
           : 'bg-transparent border-border text-muted-foreground hover:bg-accent/50 hover:text-foreground')
       }
     >
@@ -689,7 +689,7 @@ function CategoryChip({
       <span
         className={
           'text-[9px] px-1 rounded ' +
-          (active ? 'bg-dracula-purple/30' : 'bg-muted/60')
+          (active ? 'bg-accent-primary/30' : 'bg-muted/60')
         }
       >
         {count}
