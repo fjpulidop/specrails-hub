@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.47.0](https://github.com/fjpulidop/specrails-hub/compare/v1.46.0...v1.47.0) (2026-04-30)
+
+
+### Features
+
+* hub-wide theme system with three premium themes ([#284](https://github.com/fjpulidop/specrails-hub/issues/284)) ([8e59380](https://github.com/fjpulidop/specrails-hub/commit/8e5938033996eb7e40ec6da9ba866245a0d28aae))
+
 ## [1.46.0](https://github.com/fjpulidop/specrails-hub/compare/v1.45.0...v1.46.0) (2026-04-30)
 
 
