@@ -72,6 +72,7 @@ function makeFakeWs() {
     registerHandler: (id: string, fn: (m: unknown) => void) => handlers.set(id, fn),
     unregisterHandler: (id: string) => handlers.delete(id),
     connectionStatus: 'connected' as const,
+    handlerCount: () => handlers.size,
     emit: (msg: unknown) => handlers.forEach((h) => h(msg)),
   }
 }
@@ -171,6 +172,7 @@ describe('ExploreSpecShell', () => {
     }]
     render(<ExploreSpecShell initialIdea="hi" pendingSpecId="pending-1" initialAttachmentIds={[]} onClose={onClose} />, { wrapper: wrap(ws) })
     await screen.findByText('ok')
+    await waitFor(() => expect(ws.handlerCount()).toBeGreaterThan(0))
 
     // Inject a draft update with chips via the WS
     ws.emit({
@@ -218,6 +220,7 @@ describe('ExploreSpecShell', () => {
 
     render(<ExploreSpecShell initialIdea="hi" pendingSpecId="pending-1" initialAttachmentIds={[]} onClose={onClose} onTicketCreated={onTicketCreated} />, { wrapper: wrap(ws) })
     await screen.findByText('ok')
+    await waitFor(() => expect(ws.handlerCount()).toBeGreaterThan(0))
 
     ws.emit({
       type: 'spec_draft.update',
