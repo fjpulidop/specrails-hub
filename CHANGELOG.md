@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.48.0](https://github.com/fjpulidop/specrails-hub/compare/v1.47.0...v1.48.0) (2026-05-03)
+
+
+### Features
+
+* minimize chat windows to a unified toast stack ([#286](https://github.com/fjpulidop/specrails-hub/issues/286)) ([737f949](https://github.com/fjpulidop/specrails-hub/commit/737f949447d47217d290129b6788575dcdf3f2c6))
+
 ## [1.47.0](https://github.com/fjpulidop/specrails-hub/compare/v1.46.0...v1.47.0) (2026-04-30)
 
 
