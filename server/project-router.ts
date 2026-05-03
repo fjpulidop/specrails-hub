@@ -1413,6 +1413,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       `- Output ONLY the structured markdown below. No preamble, no explanation.\n\n` +
       `REQUIRED FORMAT:\n` +
       `## Spec Title\n[Concise, action-oriented title]\n\n` +
+      `## Labels\n[2-4 short kebab-case tags categorising the spec — comma-separated on one line, e.g. "ui, settings, dark-mode". Lowercase, no spaces inside a tag.]\n\n` +
       `## Problem Statement\n[2-3 sentences]\n\n` +
       `## Proposed Solution\n[3-5 sentences]\n\n` +
       `## Out of Scope\n[Bullet list]\n\n` +
@@ -1529,6 +1530,20 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         const complexity = complexityMatch ? complexityMatch[1].toLowerCase() : 'medium'
         const priority = complexity === 'low' ? 'low' : complexity === 'high' || complexity === 'very' ? 'high' : 'medium'
 
+        // Extract labels from the `## Labels` section. Comma- or
+        // newline-separated tags, normalised to lowercase kebab-case.
+        // `spec-proposal` is always retained as the marker label.
+        const labelsMatch = buffer.match(/##\s*Labels\s*\n+([^\n]+(?:\n(?!##)[^\n]+)*)/)
+        const claudeLabels: string[] = labelsMatch
+          ? labelsMatch[1]
+              .replace(/[\[\]]/g, '')
+              .split(/[,\n]/)
+              .map((s) => s.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''))
+              .filter((s) => s.length > 0 && s.length <= 32)
+              .slice(0, 6)
+          : []
+        const finalLabels = Array.from(new Set(['spec-proposal', ...claudeLabels]))
+
         // Create ticket directly
         try {
           const now = new Date().toISOString()
@@ -1541,7 +1556,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
               description: buffer.trim(),
               status: 'todo',
               priority: priority as 'low' | 'medium' | 'high',
-              labels: ['spec-proposal'],
+              labels: finalLabels,
               assignee: null,
               prerequisites: [],
               metadata: {},
