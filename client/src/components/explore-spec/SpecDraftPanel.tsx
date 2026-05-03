@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Sparkles, X, Plus, Loader2, FileText, Image as ImageIcon } from 'lucide-react'
-import { Button } from '../ui/button'
+import { Sparkles, X, Plus, FileText, Image as ImageIcon } from 'lucide-react'
 import {
   type SpecDraft,
   type SpecDraftField,
@@ -15,10 +14,6 @@ interface SpecDraftPanelProps {
   flashFields: SpecDraftField[]
   /** Update a single field manually (records as user override). */
   onFieldChange: <K extends SpecDraftField>(key: K, value: SpecDraft[K]) => void
-  /** Submitting commit. */
-  isCreating: boolean
-  /** Called when the user clicks Create Spec. */
-  onCreate: () => void
   /** Files accumulated across the conversation; migrated to the new ticket on Create. */
   attachments?: Attachment[]
   /** Detach a file from the pending spec (deletes server-side). */
@@ -32,13 +27,9 @@ export function SpecDraftPanel({
   ready,
   flashFields,
   onFieldChange,
-  isCreating,
-  onCreate,
   attachments = [],
   onRemoveAttachment,
 }: SpecDraftPanelProps) {
-  const canCreate = draft.title.trim().length > 0 && !isCreating
-
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex-shrink-0 px-5 py-3 border-b border-border/40 flex items-center justify-between">
@@ -58,7 +49,7 @@ export function SpecDraftPanel({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-5 py-4 pb-32 space-y-4">
         <Field label="Title" flash={flashFields.includes('title')}>
           <input
             type="text"
@@ -126,24 +117,7 @@ export function SpecDraftPanel({
         </div>
       )}
 
-      <div className="flex-shrink-0 px-5 py-3 border-t border-border/40 bg-card/30">
-        <Button
-          size="default"
-          className={`w-full gap-2 ${ready ? 'animate-pulse' : ''}`}
-          variant={ready ? 'default' : 'outline'}
-          disabled={!canCreate}
-          onClick={onCreate}
-          aria-label="Create spec from current draft"
-        >
-          {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-          Create Spec
-        </Button>
-        {!canCreate && !isCreating && (
-          <p className="text-[10px] text-muted-foreground text-center mt-1.5">
-            A title is needed to create
-          </p>
-        )}
-      </div>
+      {/* Create Spec affordance lives in the shell header — see ExploreSpecShell. */}
     </div>
   )
 }

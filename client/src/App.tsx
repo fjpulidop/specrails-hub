@@ -36,6 +36,7 @@ import { useOsNotifications } from './hooks/useOsNotifications'
 import { useDesktopUpdateNotifier } from './hooks/useDesktopUpdateNotifier'
 import { WS_URL } from './lib/ws-url'
 import { TerminalsProvider, useTerminals } from './context/TerminalsContext'
+import { MinimizedChatsProvider } from './context/MinimizedChatsContext'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { FEATURE_AGENTS_SECTION, FEATURE_TERMINAL_PANEL } from './lib/feature-flags'
 
@@ -276,10 +277,12 @@ function TerminalsProviderWithHub({ children }: { children: React.ReactNode }) {
   return <TerminalsProvider activeProjectId={activeProjectId}>{children}</TerminalsProvider>
 }
 
-// ─── Themed Toaster — Sonner palette derived from active theme ───────────────
-// Sonner injects its own stylesheet AFTER globals.css, so its built-in tokens
-// can't be overridden via plain CSS variables; we have to pass them inline.
-// We do this once per theme change by reading the descriptor.
+// ─── Themed Toaster — single global instance, glass-card chrome ──────────────
+// Unified across the app so every toast looks the same and stacks together.
+// `unstyled: true` strips sonner's defaults; classNames apply our glass-card
+// look. Type-variant classes (success / error / warning / info / loading)
+// add a subtle status-coloured left border so the type still reads at a
+// glance without breaking visual harmony.
 
 function ThemedToaster() {
   const { theme } = useTheme()
@@ -294,28 +297,34 @@ function ThemedToaster() {
       theme={theme.scheme}
       gap={8}
       closeButton
-      richColors
+      visibleToasts={6}
       style={{
-        '--normal-bg':           'var(--color-card)',
-        '--normal-bg-hover':     'var(--color-surface)',
-        '--normal-border':       `color-mix(in srgb, ${accent} 18%, transparent)`,
-        '--normal-border-hover': `color-mix(in srgb, ${accent} 28%, transparent)`,
-        '--normal-text':         'var(--color-foreground)',
-        '--success-bg':          `color-mix(in srgb, ${success} 14%, var(--color-card))`,
-        '--success-border':      `color-mix(in srgb, ${success} 30%, transparent)`,
-        '--success-text':        success,
-        '--error-bg':            `color-mix(in srgb, ${danger} 14%, var(--color-card))`,
-        '--error-border':        `color-mix(in srgb, ${danger} 30%, transparent)`,
-        '--error-text':          danger,
-        '--warning-bg':          `color-mix(in srgb, ${warning} 14%, var(--color-card))`,
-        '--warning-border':      `color-mix(in srgb, ${warning} 30%, transparent)`,
-        '--warning-text':        warning,
-        '--info-bg':             `color-mix(in srgb, ${info} 14%, var(--color-card))`,
-        '--info-border':         `color-mix(in srgb, ${info} 30%, transparent)`,
-        '--info-text':           info,
-        '--border-radius':       '0.75rem',
-        'fontFamily':            "'DM Mono', 'JetBrains Mono', ui-monospace, monospace",
+        '--accent':                accent,
+        '--toast-success-border': `color-mix(in srgb, ${success} 38%, transparent)`,
+        '--toast-error-border':   `color-mix(in srgb, ${danger}  38%, transparent)`,
+        '--toast-warning-border': `color-mix(in srgb, ${warning} 38%, transparent)`,
+        '--toast-info-border':    `color-mix(in srgb, ${info}    38%, transparent)`,
       } as React.CSSProperties}
+      toastOptions={{
+        unstyled: true,
+        classNames: {
+          toast:
+            'glass-card border border-border/30 text-foreground text-xs p-3 rounded-lg flex items-start gap-2 w-[356px] max-w-[356px] overflow-hidden shadow-lg',
+          title: 'font-medium text-sm',
+          description: 'text-muted-foreground mt-0.5',
+          actionButton:
+            'text-[11px] px-2.5 py-1 rounded-md bg-accent-primary text-white hover:bg-accent-primary/90 whitespace-nowrap shrink-0 self-start',
+          cancelButton:
+            'text-[11px] px-2.5 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50 whitespace-nowrap shrink-0 self-start',
+          closeButton:
+            'text-muted-foreground hover:text-foreground rounded-md p-0.5',
+          success: 'border-l-4 border-l-[var(--toast-success-border)]',
+          error: 'border-l-4 border-l-[var(--toast-error-border)]',
+          warning: 'border-l-4 border-l-[var(--toast-warning-border)]',
+          info: 'border-l-4 border-l-[var(--toast-info-border)]',
+          loading: 'border-l-4 border-l-[var(--accent)]',
+        },
+      }}
     />
   )
 }
@@ -351,12 +360,14 @@ export default function App() {
               <SpecGenTrackerProvider>
                 <SidebarPinProvider>
                   <TerminalsProviderWithHub>
-                    <HubApp />
+                    <MinimizedChatsProvider>
+                      <HubApp />
+                      <ThemedToaster />
+                    </MinimizedChatsProvider>
                   </TerminalsProviderWithHub>
                 </SidebarPinProvider>
               </SpecGenTrackerProvider>
             </HubProvider>
-            <ThemedToaster />
           </ThemeProvider>
         </SharedWebSocketProvider>
       </div>

@@ -76,12 +76,14 @@ function makeChatManager(overrides: Partial<{
   sendMessage: () => Promise<void>
   abort: () => void
   forgetSpecDraft: (id: string) => void
+  getSpecDraftState: (id: string) => unknown
 }> = {}) {
   return {
     isActive: overrides.isActive ?? vi.fn(() => false),
     sendMessage: overrides.sendMessage ?? vi.fn(async () => {}),
     abort: overrides.abort ?? vi.fn(),
     forgetSpecDraft: overrides.forgetSpecDraft ?? vi.fn(),
+    getSpecDraftState: overrides.getSpecDraftState ?? vi.fn(() => null),
   }
 }
 
@@ -364,6 +366,37 @@ describe('project-router', () => {
       const res = await request(app).post(`/api/projects/proj-1/chat/conversations/${convId}/messages`).send({})
       expect(res.status).toBe(400)
       expect(res.body.error).toContain('text is required')
+    })
+
+    it('GET /conversations/:id/spec-draft returns 404 when conversation missing', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/chat/conversations/missing/spec-draft')
+      expect(res.status).toBe(404)
+    })
+
+    it('GET /conversations/:id/spec-draft returns null draft when no state accumulated', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const createRes = await request(app).post('/api/projects/proj-1/chat/conversations').send({})
+      const convId = createRes.body.conversation.id
+      const res = await request(app).get(`/api/projects/proj-1/chat/conversations/${convId}/spec-draft`)
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ draft: null, ready: false, chips: [] })
+    })
+
+    it('GET /conversations/:id/spec-draft returns the accumulated draft state', async () => {
+      const sampleDraft = { title: 'Hello', description: 'world', priority: 'high', labels: ['x'], acceptanceCriteria: ['a'] }
+      const chatManager = makeChatManager({
+        getSpecDraftState: vi.fn(() => ({ draft: sampleDraft, ready: true, chips: ['Refine', 'Discard'] })),
+      })
+      const ctx = makeContext(db, { chatManager: chatManager as any })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const createRes = await request(app).post('/api/projects/proj-1/chat/conversations').send({})
+      const convId = createRes.body.conversation.id
+      const res = await request(app).get(`/api/projects/proj-1/chat/conversations/${convId}/spec-draft`)
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ draft: sampleDraft, ready: true, chips: ['Refine', 'Discard'] })
     })
 
     it('POST /conversations/:id/messages returns 409 when conversation is busy', async () => {

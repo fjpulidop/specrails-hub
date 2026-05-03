@@ -847,6 +847,23 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     res.json({ messages })
   })
 
+  // Returns the in-memory spec-draft state Claude has accumulated for this
+  // conversation. Used by useSpecDraftStream on mount to rehydrate updates
+  // that were broadcast while the client wasn't subscribed (refresh /
+  // minimize-and-restore). Returns 200 with `null` draft when no state yet.
+  router.get('/:projectId/chat/conversations/:id/spec-draft', (req: Request, res: Response) => {
+    const { db, chatManager } = ctx(req)
+    const conversation = getConversation(db, req.params.id as string)
+    if (!conversation) { res.status(404).json({ error: 'Conversation not found' }); return }
+    const state = chatManager.getSpecDraftState(req.params.id as string)
+    if (!state) { res.json({ draft: null, ready: false, chips: [] }); return }
+    res.json({
+      draft: state.draft,
+      ready: state.ready,
+      chips: state.chips,
+    })
+  })
+
   router.post('/:projectId/chat/conversations/:id/messages', async (req: Request, res: Response) => {
     const { db, chatManager, project } = ctx(req)
     const conversation = getConversation(db, req.params.id as string)

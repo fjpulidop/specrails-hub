@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSharedWebSocket } from './useSharedWebSocket'
+import { getApiBase } from '../lib/api'
 import {
   SPEC_DRAFT_DEFAULTS,
   SPEC_DRAFT_FIELDS,
@@ -31,7 +32,13 @@ export function useSpecDraftStream(conversationId: string | null): UseSpecDraftS
   const manualFieldsRef = useRef<Set<SpecDraftField>>(new Set())
   const [hasManualOverrides, setHasManualOverrides] = useState(false)
 
-  // Reset state when conversation changes
+  // Reset state when conversation changes, then hydrate any draft state
+  // the server has accumulated for this conversation. Covers the case
+  // where Claude pushed `spec_draft.update` events while no shell was
+  // subscribed (refresh during streaming, restored from a minimized chip).
+  // Manual overrides from the user (replayed via setField after this
+  // mount) win over server values — the merge guard checks `manual`
+  // before overwriting, mirroring the WS handler logic below.
   useEffect(() => {
     setDraft(SPEC_DRAFT_DEFAULTS)
     setReady(false)
@@ -39,6 +46,33 @@ export function useSpecDraftStream(conversationId: string | null): UseSpecDraftS
     setLastChangedFields([])
     manualFieldsRef.current = new Set()
     setHasManualOverrides(false)
+    if (!conversationId) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(`${getApiBase()}/chat/conversations/${conversationId}/spec-draft`)
+        if (!res.ok) return
+        const data = (await res.json()) as { draft: Partial<SpecDraft> | null; ready: boolean; chips: string[] }
+        if (cancelled) return
+        if (!data.draft) return
+        const manual = manualFieldsRef.current
+        setDraft((prev) => {
+          const next: SpecDraft = { ...prev }
+          for (const key of SPEC_DRAFT_FIELDS) {
+            if (manual.has(key)) continue
+            const incoming = (data.draft as Partial<SpecDraft>)[key]
+            if (incoming === undefined) continue
+            ;(next as unknown as Record<SpecDraftField, unknown>)[key] = incoming
+          }
+          return next
+        })
+        setReady(data.ready)
+        setChips(data.chips.slice(0, 3))
+      } catch {
+        /* network errors are non-fatal — WS will catch up on next turn */
+      }
+    })()
+    return () => { cancelled = true }
   }, [conversationId])
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Send, Loader2, X } from 'lucide-react'
+import { ArrowLeft, Check, Send, Loader2, Minus, Sparkles, X } from 'lucide-react'
 import { toast } from 'sonner'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -10,6 +10,7 @@ import { useSpecDraftStream } from '../../hooks/useSpecDraftStream'
 import { useHub } from '../../hooks/useHub'
 import { getApiBase } from '../../lib/api'
 import { API_ORIGIN } from '../../lib/origin'
+import { markSpecGenInFlight, unmarkSpecGenInFlight } from '../../lib/spec-gen-suppression'
 import { RichAttachmentEditor, type RichAttachmentEditorHandle } from '../RichAttachmentEditor'
 import { SpecDraftPanel } from './SpecDraftPanel'
 import type { LocalTicket, Attachment } from '../../types'
@@ -29,7 +30,47 @@ export interface ExploreSpecShellProps {
   pendingSpecId: string
   /** Attachment ids that were already uploaded in the Add Spec modal. */
   initialAttachmentIds: string[]
+  /** When set, skip the `/specrails:explore-spec` bootstrap turn and resume
+   *  from an existing conversation id. Used by the minimize-to-dock restore
+   *  path so the user picks up where they left off. */
+  resumeConversationId?: string
+  /** Last-known draft title from the chip — surfaced in the header before
+   *  the WS-driven `useSpecDraftStream` catches up on remount, so the
+   *  shell never visibly forgets the title across minimize cycles. */
+  seedDraftTitle?: string
+  /** Last-known composer text — repopulates the textarea on remount so a
+   *  half-typed reply isn't lost across minimize/restore cycles. */
+  seedComposerText?: string
+  /** Manual draft field overrides accumulated before minimize (title,
+   *  description, labels, priority, acceptanceCriteria). Replayed via
+   *  setField on remount so user edits survive across cycles. */
+  seedDraftOverrides?: Partial<{
+    title: string
+    description: string
+    priority: 'low' | 'medium' | 'high' | 'critical'
+    labels: string[]
+    acceptanceCriteria: string[]
+  }>
   onClose: () => void
+  /** Optional minimize affordance — when present a `—` button in the header
+   *  fires this callback. Receives the current conversation id so the caller
+   *  can park it in the dock and resume later. */
+  onMinimize?: (conversationId: string | null, draftTitle: string) => void
+  /** Push live shell state up to the parent so it can drive programmatic
+   *  auto-minimize (e.g. when another minimized spec is restored and this
+   *  one needs to be parked instead of unmounted). Fires on changes only. */
+  onStateChange?: (state: {
+    conversationId: string | null
+    draftTitle: string
+    composerText: string
+    draftOverrides: Partial<{
+      title: string
+      description: string
+      priority: 'low' | 'medium' | 'high' | 'critical'
+      labels: string[]
+      acceptanceCriteria: string[]
+    }>
+  }) => void
   onTicketCreated?: (ticket: LocalTicket) => void
 }
 
@@ -37,12 +78,20 @@ export function ExploreSpecShell({
   initialIdea,
   pendingSpecId,
   initialAttachmentIds,
+  resumeConversationId,
+  seedDraftTitle,
+  seedComposerText,
+  seedDraftOverrides,
   onClose,
+  onMinimize,
+  onStateChange,
   onTicketCreated,
 }: ExploreSpecShellProps) {
   const chat = useChatContext()
   const { activeProjectId } = useHub()
-  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [conversationId, setConversationId] = useState<string | null>(
+    resumeConversationId ?? null,
+  )
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [hasComposerText, setHasComposerText] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
@@ -79,9 +128,14 @@ export function ExploreSpecShell({
 
   // Bootstrap: start the conversation with the slash-command prefix + idea +
   // initial attachments (folded into Claude's first turn as <user-attachment>
-  // text blocks by the server).
+  // text blocks by the server). Skipped when resuming a previously-minimized
+  // session — the conversationId is already set from props.
   useEffect(() => {
     if (startedRef.current) return
+    if (resumeConversationId) {
+      startedRef.current = true
+      return
+    }
     if (!chat) return
     startedRef.current = true
     const prompt = `/specrails:explore-spec\n\n${initialIdea.trim()}`
@@ -91,7 +145,7 @@ export function ExploreSpecShell({
     void chat.startWithMessage(prompt, { lightweight: true, maxTurns: 20, attachments }).then((id) => {
       if (id) setConversationId(id)
     })
-  }, [chat, initialIdea, pendingSpecId, initialAttachmentIds])
+  }, [chat, initialIdea, pendingSpecId, initialAttachmentIds, resumeConversationId])
 
   // Focus restoration on unmount
   useEffect(() => {
@@ -101,6 +155,20 @@ export function ExploreSpecShell({
       if (el && el instanceof HTMLElement) el.focus()
     }
   }, [])
+
+  // Rehydrate composer text from a parked session, once on mount.
+  const composerSeededRef = useRef(false)
+  useEffect(() => {
+    if (composerSeededRef.current) return
+    if (!seedComposerText) return
+    // Defer one tick so RichAttachmentEditor's contenteditable is ready.
+    const t = setTimeout(() => {
+      composerRef.current?.setPlainText(seedComposerText)
+      setHasComposerText(seedComposerText.trim().length > 0)
+      composerSeededRef.current = true
+    }, 0)
+    return () => clearTimeout(t)
+  }, [seedComposerText])
 
   // Active conversation snapshot (live messages + streaming state)
   const conversation: ChatConversation | undefined = useMemo(() => {
@@ -118,6 +186,28 @@ export function ExploreSpecShell({
     setField,
     clearManualOverrides,
   } = useSpecDraftStream(conversationId)
+
+  // Replay parked draft overrides into the stream so user manual edits
+  // survive minimize/restore. CRITICAL: only replay fields with meaningful
+  // (non-default) values — `setField` marks each replayed field as a
+  // manual override, which blocks Claude's WS pushes and the hydration
+  // fetch from filling them. Replaying empty defaults would cause
+  // description / labels / acceptanceCriteria to permanently appear blank
+  // even when the server has the real values from Claude. One-shot per
+  // shell instance.
+  const draftSeededRef = useRef(false)
+  useEffect(() => {
+    if (draftSeededRef.current) return
+    if (!seedDraftOverrides) return
+    draftSeededRef.current = true
+    const o = seedDraftOverrides
+    if (o.title && o.title.trim()) setField('title', o.title)
+    if (o.description && o.description.trim()) setField('description', o.description)
+    if (o.priority && o.priority !== 'medium') setField('priority', o.priority)
+    if (o.labels && o.labels.length > 0) setField('labels', o.labels)
+    const criteria = o.acceptanceCriteria?.filter((c) => c.trim().length > 0) ?? []
+    if (criteria.length > 0) setField('acceptanceCriteria', criteria)
+  }, [seedDraftOverrides, setField])
 
   const requestClose = useCallback(() => {
     // Only confirm when the conversation has progressed beyond the initial user idea
@@ -137,6 +227,7 @@ export function ExploreSpecShell({
     const attIds = composerRef.current?.getAttachmentIds() ?? []
     composerRef.current?.clear()
     setHasComposerText(false)
+    setComposerText('')
     clearManualOverrides()
     if (attIds.length > 0) {
       // New uploads went into pendingSpecId/, so refresh the accumulated list
@@ -159,6 +250,10 @@ export function ExploreSpecShell({
     if (isCreating) return
     if (!draft.title.trim() || !activeProjectId) return
     setIsCreating(true)
+    // Suppress useTickets' generic "New ticket: ..." toast so only this
+    // shell's richer "Spec created — #N TITLE" toast surfaces. Mirrors the
+    // Quick-mode flow's behaviour (handled by useSpecGenTracker).
+    markSpecGenInFlight(activeProjectId)
     try {
       const res = await fetch(`${getApiBase()}/tickets/from-draft`, {
         method: 'POST',
@@ -188,6 +283,7 @@ export function ExploreSpecShell({
       toast.error('Network error creating spec')
     } finally {
       setIsCreating(false)
+      unmarkSpecGenInFlight(activeProjectId)
     }
   }, [isCreating, draft, activeProjectId, onTicketCreated, onClose, pendingSpecId])
 
@@ -203,15 +299,40 @@ export function ExploreSpecShell({
     return () => window.removeEventListener('keydown', onKey)
   }, [requestClose])
 
+  // Push live state up so the parent can auto-minimize this shell when
+  // another minimized session is restored (mutual-exclusion rule), and so
+  // composer text + draft overrides survive minimize/restore cycles.
+  const onStateChangeRef = useRef(onStateChange)
+  onStateChangeRef.current = onStateChange
+  const [composerText, setComposerText] = useState(seedComposerText ?? '')
+  useEffect(() => {
+    onStateChangeRef.current?.({
+      conversationId,
+      draftTitle: draft.title,
+      composerText,
+      draftOverrides: {
+        title: draft.title,
+        description: draft.description,
+        priority: draft.priority,
+        labels: draft.labels,
+        acceptanceCriteria: draft.acceptanceCriteria,
+      },
+    })
+  }, [conversationId, draft.title, draft.description, draft.priority, draft.labels, draft.acceptanceCriteria, composerText])
+
   const macPadLeft = isMacTauriOverlay() ? 'pl-[88px]' : 'pl-4'
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Explore Spec · interactive"
-      className="fixed inset-0 z-50 flex flex-col bg-background"
+      className="fixed inset-0 z-50 flex p-3 pt-10 sm:p-6 sm:pt-12 bg-black/40 backdrop-blur-sm animate-in fade-in duration-150"
+      data-testid="explore-spec-backdrop"
     >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Explore Spec · interactive"
+        className="m-auto w-full h-full max-w-[1600px] flex flex-col bg-background rounded-xl border border-border/40 shadow-2xl overflow-hidden"
+      >
       {/* Header */}
       <div className={`flex-shrink-0 flex items-center justify-between ${macPadLeft} pr-4 h-14 border-b border-border bg-card/60 backdrop-blur-sm`}>
         <button
@@ -226,20 +347,51 @@ export function ExploreSpecShell({
               EXPLORE SPEC · interactive
             </div>
             <span className="text-sm font-medium text-foreground truncate block">
-              {draft.title || 'New spec…'}
+              {draft.title || seedDraftTitle || 'New spec…'}
             </span>
           </div>
         </button>
-        <Button variant="ghost" size="sm" onClick={requestClose} aria-label="Close">
-          <X className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={handleCreate}
+            disabled={!draft.title.trim() || isCreating}
+            className="gap-1.5"
+            aria-label="Create spec from current draft"
+            data-testid="explore-spec-create"
+            title={!draft.title.trim() ? 'A title is needed to create' : undefined}
+          >
+            {isCreating ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : ready ? (
+              <Sparkles className="w-3.5 h-3.5" />
+            ) : (
+              <Check className="w-3.5 h-3.5" />
+            )}
+            Create Spec
+          </Button>
+          {onMinimize && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onMinimize(conversationId, draft.title || seedDraftTitle || '')}
+              aria-label="Minimize"
+              data-testid="explore-spec-minimize"
+            >
+              <Minus className="w-4 h-4" />
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={requestClose} aria-label="Close">
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Body: conversation left, draft right */}
       <div className="flex-1 min-h-0 grid grid-cols-[1fr_360px] divide-x divide-border/40">
         {/* Conversation column */}
         <div className="flex flex-col min-h-0">
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3" data-testid="explore-conversation">
+          <div className="flex-1 overflow-y-auto px-5 py-4 pb-24 space-y-3" data-testid="explore-conversation">
             {!conversation && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -284,7 +436,11 @@ export function ExploreSpecShell({
               placeholder={conversation?.isStreaming ? 'Claude is thinking…' : 'Type your reply… drag files to attach'}
               minHeight={72}
               ariaLabel="Spec idea"
-              onChange={() => setHasComposerText((composerRef.current?.getPlainText().length ?? 0) > 0)}
+              onChange={() => {
+                const text = composerRef.current?.getPlainText() ?? ''
+                setHasComposerText(text.length > 0)
+                setComposerText(text)
+              }}
               onUnsupportedFile={(f) => toast.error(`Unsupported file type: ${f.name}`)}
               onUploadError={(err, f) => toast.error(`Upload failed for ${f.name}: ${err.message}`)}
               onAttachmentRemoved={(a) => {
@@ -329,9 +485,9 @@ export function ExploreSpecShell({
 
         {/* Draft column — breathes subtly while assistant is thinking so the
             user knows the panel will update once the turn settles. */}
-        <div className={`min-h-0 transition-opacity duration-500 ${conversation?.isStreaming ? 'opacity-90' : 'opacity-100'}`}>
+        <div className={`relative min-h-0 transition-opacity duration-500 ${conversation?.isStreaming ? 'opacity-90' : 'opacity-100'}`}>
           {conversation?.isStreaming && (
-            <div className="absolute top-14 right-0 w-[360px] h-0.5 overflow-hidden pointer-events-none">
+            <div className="absolute top-0 inset-x-0 h-0.5 overflow-hidden pointer-events-none z-10">
               <div className="h-full bg-primary/40 animate-pulse" />
             </div>
           )}
@@ -340,8 +496,6 @@ export function ExploreSpecShell({
             ready={ready}
             flashFields={lastChangedFields}
             onFieldChange={setField}
-            isCreating={isCreating}
-            onCreate={handleCreate}
             attachments={accumulatedAttachments}
             onRemoveAttachment={async (id) => {
               try {
@@ -372,6 +526,7 @@ export function ExploreSpecShell({
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   )
 }

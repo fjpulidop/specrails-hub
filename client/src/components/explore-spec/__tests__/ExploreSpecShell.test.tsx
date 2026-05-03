@@ -240,4 +240,135 @@ describe('ExploreSpecShell', () => {
       expect(onClose).toHaveBeenCalled()
     })
   })
+
+  it('renders a minimize button only when onMinimize is provided', () => {
+    const ws = makeFakeWs()
+    const { rerender } = render(
+      <ExploreSpecShell
+        initialIdea="dark mode"
+        pendingSpecId="pending-1"
+        initialAttachmentIds={[]}
+        onClose={onClose}
+      />,
+      { wrapper: wrap(ws) },
+    )
+    expect(screen.queryByTestId('explore-spec-minimize')).toBeNull()
+
+    rerender(
+      <ExploreSpecShell
+        initialIdea="dark mode"
+        pendingSpecId="pending-1"
+        initialAttachmentIds={[]}
+        onClose={onClose}
+        onMinimize={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('explore-spec-minimize')).toBeTruthy()
+  })
+
+  it('clicking minimize fires onMinimize with the conversation id and never confirms', async () => {
+    const ws = makeFakeWs()
+    const onMinimize = vi.fn()
+    render(
+      <ExploreSpecShell
+        initialIdea="dark mode"
+        pendingSpecId="pending-1"
+        initialAttachmentIds={[]}
+        onClose={onClose}
+        onMinimize={onMinimize}
+      />,
+      { wrapper: wrap(ws) },
+    )
+    await waitFor(() => expect(mockStartWithMessage).toHaveBeenCalled())
+
+    // Even with multiple turns (would normally trigger discard-confirm on close),
+    // minimize never confirms.
+    conversationsRef.value = [
+      {
+        id: 'conv-1',
+        title: 'foo',
+        model: 'm',
+        messages: [
+          { role: 'user', content: 'a' },
+          { role: 'assistant', content: 'b' },
+        ],
+        isStreaming: false,
+        streamingText: '',
+        commandProposals: [],
+      },
+    ]
+
+    fireEvent.click(screen.getByTestId('explore-spec-minimize'))
+    expect(onMinimize).toHaveBeenCalledWith('conv-1', expect.any(String))
+    expect(screen.queryByText(/Discard conversation/i)).toBeNull()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('skips bootstrap when resumeConversationId is provided', async () => {
+    const ws = makeFakeWs()
+    render(
+      <ExploreSpecShell
+        initialIdea="resumed idea"
+        pendingSpecId="pending-1"
+        initialAttachmentIds={[]}
+        resumeConversationId="conv-existing"
+        onClose={onClose}
+      />,
+      { wrapper: wrap(ws) },
+    )
+    // No bootstrap turn fired
+    await new Promise((r) => setTimeout(r, 20))
+    expect(mockStartWithMessage).not.toHaveBeenCalled()
+  })
+
+  it('renders seedDraftTitle in the header when draft is empty (post-restore)', () => {
+    const ws = makeFakeWs()
+    render(
+      <ExploreSpecShell
+        initialIdea="dark mode"
+        pendingSpecId="pending-1"
+        initialAttachmentIds={[]}
+        resumeConversationId="conv-prev"
+        seedDraftTitle="Carry-over title"
+        onClose={onClose}
+      />,
+      { wrapper: wrap(ws) },
+    )
+    expect(screen.getByText('Carry-over title')).toBeTruthy()
+  })
+
+  it('renders the Create Spec button in the header, disabled until a title exists', () => {
+    const ws = makeFakeWs()
+    render(
+      <ExploreSpecShell
+        initialIdea="dark mode"
+        pendingSpecId="pending-1"
+        initialAttachmentIds={[]}
+        onClose={onClose}
+      />,
+      { wrapper: wrap(ws) },
+    )
+    const btn = screen.getByTestId('explore-spec-create')
+    expect(btn).toBeTruthy()
+    expect(btn).toBeDisabled()
+  })
+
+  it('minimize sends seedDraftTitle when draft.title is empty', () => {
+    const ws = makeFakeWs()
+    const onMinimize = vi.fn()
+    render(
+      <ExploreSpecShell
+        initialIdea="dark mode"
+        pendingSpecId="pending-1"
+        initialAttachmentIds={[]}
+        resumeConversationId="conv-prev"
+        seedDraftTitle="Carry-over title"
+        onClose={onClose}
+        onMinimize={onMinimize}
+      />,
+      { wrapper: wrap(ws) },
+    )
+    fireEvent.click(screen.getByTestId('explore-spec-minimize'))
+    expect(onMinimize).toHaveBeenCalledWith('conv-prev', 'Carry-over title')
+  })
 })

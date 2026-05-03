@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, Pencil, Copy, Sparkles, Loader2, FileText, Search, X, Tag, Wand2 } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AgentStudio } from './AgentStudio'
 import { AiRefineOverlay } from './AiRefineOverlay'
 import { AGENT_TEMPLATES, ALL_TEMPLATE_CATEGORIES, type AgentTemplateCategory } from './agentTemplates'
+import { useMinimizedChats, usePendingRestore } from '../../context/MinimizedChatsContext'
+import { useHub } from '../../hooks/useHub'
 
 interface CatalogAgent {
   id: string
@@ -43,6 +45,46 @@ export function AgentsCatalogTab() {
   const [genDescription, setGenDescription] = useState('')
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
+
+  const { activeProjectId } = useHub()
+  const { minimize } = useMinimizedChats()
+
+  // Snapshot of the live AiEdit shell so we can auto-minimize the current
+  // session before launching/restoring another (mutual-exclusion).
+  const liveRefineRef = useRef<{ refineId: string | null }>({ refineId: null })
+  const refineRef = useRef(refine)
+  refineRef.current = refine
+
+  const parkCurrentRefine = useCallback(() => {
+    const cur = refineRef.current
+    if (cur.kind !== 'open' || !activeProjectId) return
+    minimize({
+      kind: 'ai-edit',
+      projectId: activeProjectId,
+      label: `AI Edit · ${cur.agentId}`,
+      restoreRoute: '/agents',
+      params: {
+        agentId: cur.agentId,
+        baseBody: cur.baseBody,
+        resumeRefineId: liveRefineRef.current.refineId ?? cur.resumeRefineId,
+      },
+    })
+  }, [activeProjectId, minimize])
+
+  // Restore from a chip click → re-open the AI Refine overlay with the
+  // previously parked refine session id. If a different refine is currently
+  // visible, park it as a chip first instead of dropping it.
+  usePendingRestore('ai-edit', activeProjectId, (chat) => {
+    if (chat.kind !== 'ai-edit') return
+    parkCurrentRefine()
+    liveRefineRef.current = { refineId: chat.params.resumeRefineId ?? null }
+    setRefine({
+      kind: 'open',
+      agentId: chat.params.agentId,
+      baseBody: chat.params.baseBody,
+      resumeRefineId: chat.params.resumeRefineId,
+    })
+  })
 
   const refresh = useCallback(() => {
     let cancelled = false
@@ -132,6 +174,8 @@ export function AgentsCatalogTab() {
         }}
         onResumeRefine={(refineId, agentId, baseBody) => {
           setStudio({ kind: 'closed' })
+          parkCurrentRefine()
+          liveRefineRef.current = { refineId }
           setRefine({ kind: 'open', agentId, baseBody, resumeRefineId: refineId })
         }}
       />
@@ -142,10 +186,34 @@ export function AgentsCatalogTab() {
   if (refine.kind === 'open') {
     return (
       <AiRefineOverlay
+        // Per-session key — switching to a different refine session must
+        // remount so useAgentRefine state and the composer don't leak.
+        key={`${refine.agentId}:${refine.resumeRefineId ?? 'fresh'}`}
         agentId={refine.agentId}
         baseBody={refine.baseBody}
         resumeRefineId={refine.resumeRefineId}
+        onStateChange={(s) => { liveRefineRef.current = s }}
         onClose={() => setRefine({ kind: 'closed' })}
+        onMinimize={(refineId) => {
+          if (!activeProjectId) {
+            setRefine({ kind: 'closed' })
+            return
+          }
+          const agentId = refine.kind === 'open' ? refine.agentId : ''
+          const baseBody = refine.kind === 'open' ? refine.baseBody : ''
+          minimize({
+            kind: 'ai-edit',
+            projectId: activeProjectId,
+            label: `AI Edit · ${agentId}`,
+            restoreRoute: '/agents',
+            params: {
+              agentId,
+              baseBody,
+              resumeRefineId: refineId ?? undefined,
+            },
+          })
+          setRefine({ kind: 'closed' })
+        }}
         onApplied={(id) => {
           setRefine({ kind: 'closed' })
           setSelectedId(id)
@@ -629,6 +697,9 @@ export function AgentsCatalogTab() {
                           const r = await fetch(`${getApiBase()}/profiles/catalog/${encodeURIComponent(selected.id)}`)
                           if (!r.ok) throw new Error(`Load failed: ${r.status}`)
                           const data = (await r.json()) as { body: string }
+                          // Mutual exclusion — opening a new AiEdit parks any current one.
+                          parkCurrentRefine()
+                          liveRefineRef.current = { refineId: null }
                           setRefine({ kind: 'open', agentId: selected.id, baseBody: data.body })
                         } catch (e) {
                           setError((e as Error).message)

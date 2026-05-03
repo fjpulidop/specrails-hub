@@ -13,8 +13,6 @@ function defaultProps(over: Partial<React.ComponentProps<typeof SpecDraftPanel>>
     ready: false,
     flashFields: [],
     onFieldChange: vi.fn(),
-    isCreating: false,
-    onCreate: vi.fn(),
     ...over,
   } as React.ComponentProps<typeof SpecDraftPanel>
 }
@@ -27,15 +25,9 @@ describe('SpecDraftPanel', () => {
     expect(screen.getByLabelText('Spec description')).toBeInTheDocument()
   })
 
-  it('disables Create button when title is empty or whitespace', () => {
-    render(<SpecDraftPanel {...defaultProps({ draft: makeDraft({ title: '   ' }) })} />)
-    expect(screen.getByRole('button', { name: /create spec from current draft/i })).toBeDisabled()
-  })
-
-  it('enables Create when title is present', () => {
-    render(<SpecDraftPanel {...defaultProps({ draft: makeDraft({ title: 'X' }) })} />)
-    expect(screen.getByRole('button', { name: /create spec from current draft/i })).toBeEnabled()
-  })
+  // The Create Spec button now lives in the ExploreSpecShell header
+  // (covered by ExploreSpecShell tests). The draft panel no longer renders
+  // a Create affordance — those tests moved with the button.
 
   it('shows Draft ready banner when ready is true', () => {
     render(<SpecDraftPanel {...defaultProps({ draft: makeDraft({ title: 'X' }), ready: true })} />)
@@ -96,18 +88,6 @@ describe('SpecDraftPanel', () => {
     render(<SpecDraftPanel {...defaultProps({ draft: makeDraft({ acceptanceCriteria: ['a', 'b'] }), onFieldChange })} />)
     fireEvent.click(screen.getByLabelText('Remove criterion 1'))
     expect(onFieldChange).toHaveBeenCalledWith('acceptanceCriteria', ['b'])
-  })
-
-  it('clicking Create invokes onCreate', () => {
-    const onCreate = vi.fn()
-    render(<SpecDraftPanel {...defaultProps({ draft: makeDraft({ title: 'X' }), onCreate })} />)
-    fireEvent.click(screen.getByRole('button', { name: /create spec from current draft/i }))
-    expect(onCreate).toHaveBeenCalled()
-  })
-
-  it('shows loader while creating', () => {
-    const { container } = render(<SpecDraftPanel {...defaultProps({ draft: makeDraft({ title: 'X' }), isCreating: true })} />)
-    expect(container.querySelector('.animate-spin')).toBeTruthy()
   })
 
   it('flashFields triggers visual highlight on the changed field', () => {

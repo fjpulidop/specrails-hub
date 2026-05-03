@@ -6,6 +6,7 @@ import {
   Loader2,
   ExternalLink,
   AlertTriangle,
+  Minus,
   RefreshCw,
   ChevronDown,
   ChevronRight,
@@ -95,6 +96,10 @@ export interface AiEditShellProps {
   onDiscard: () => void
   /** Hard close: header X + back arrow. */
   onClose: () => void
+  /** Optional minimize affordance — when provided, a `—` button appears in
+   *  the header. Non-destructive: does NOT cancel the refine spawn or write
+   *  to disk. Caller is expected to park the session in the dock. */
+  onMinimize?: () => void
   /** Optional secondary action — agents use it for "Open in Studio". */
   secondaryAction?: { label: string; onClick: () => void; icon?: ReactNode }
 
@@ -167,11 +172,15 @@ export function AiEditShell(props: AiEditShellProps) {
 
   return (
     <div
+      className="fixed inset-0 z-50 flex p-3 pt-10 sm:p-6 sm:pt-12 bg-black/40 backdrop-blur-sm animate-in fade-in duration-150"
+      data-testid="ai-edit-backdrop"
+    >
+    <div
       ref={containerRef}
       role="dialog"
       aria-modal="true"
       aria-label={`${props.eyebrow} · ${props.targetLabel}`}
-      className="fixed inset-0 z-50 flex flex-col bg-background"
+      className="m-auto w-full h-full max-w-[1600px] flex flex-col bg-background rounded-xl border border-border/40 shadow-2xl overflow-hidden"
     >
       <Header
         eyebrow={props.eyebrow}
@@ -181,6 +190,7 @@ export function AiEditShell(props: AiEditShellProps) {
         showDiscard={props.uiPhase !== 'applied'}
         onApply={props.onApply}
         onDiscard={requestDiscard}
+        onMinimize={props.onMinimize}
       />
 
       {isFocused && (
@@ -214,6 +224,7 @@ export function AiEditShell(props: AiEditShellProps) {
         />
       )}
     </div>
+    </div>
   )
 }
 
@@ -227,6 +238,7 @@ function Header({
   showDiscard,
   onApply,
   onDiscard,
+  onMinimize,
 }: {
   eyebrow: string
   targetLabel: string
@@ -235,6 +247,7 @@ function Header({
   showDiscard: boolean
   onApply: () => void
   onDiscard: () => void
+  onMinimize?: () => void
 }) {
   // On Mac (Tauri overlay titlebar), traffic lights occupy ~80px at the
   // top-left. Pad the header so the back-arrow doesn't collide with them.
@@ -266,6 +279,17 @@ function Header({
         </div>
       </button>
       <div className="flex items-center gap-2">
+        {onMinimize && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onMinimize}
+            aria-label="Minimize"
+            data-testid="ai-edit-minimize"
+          >
+            <Minus className="w-4 h-4" />
+          </Button>
+        )}
         {showDiscard && (
           <Button variant="ghost" size="sm" onClick={onDiscard}>
             Discard
@@ -319,7 +343,7 @@ function FocusedColumn({
   )
   return (
     <div className="flex-1 min-h-0 overflow-y-auto">
-      <div className="mx-auto max-w-2xl px-6 py-12 flex flex-col gap-6">
+      <div className="mx-auto max-w-2xl px-6 py-12 pb-32 flex flex-col gap-6">
         <header className="text-center space-y-2">
           <div
             className={
@@ -510,7 +534,7 @@ function ChatColumn({
       aria-label="Conversation"
       className="flex flex-col min-h-0 border-r border-border bg-card/20"
     >
-      <div className="flex-1 overflow-y-auto p-4 space-y-3" aria-live="polite">
+      <div className="flex-1 overflow-y-auto p-4 pb-32 space-y-3" aria-live="polite">
         {history.map((turn, i) => (
           <ChatTurn key={i} turn={turn} />
         ))}
@@ -611,7 +635,7 @@ function DiffPane({
         />
       )}
       {applyConflict === 'name_changed' && <ConflictBanner kind="name_changed" />}
-      <div className="flex-1 overflow-auto p-4">{diff}</div>
+      <div className="flex-1 overflow-auto p-4 pb-32">{diff}</div>
     </section>
   )
 }

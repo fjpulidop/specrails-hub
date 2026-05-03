@@ -141,18 +141,22 @@ describe('ProposeSpecModal', () => {
     expect(screen.getByRole('button', { name: /continue/i })).toBeInTheDocument()
   })
 
-  it('hands off to ExploreSpecShell when Continue is clicked in Explore mode', async () => {
-    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} onTicketCreated={onTicketCreatedMock} />)
+  it('hands off to onExploreLaunch when Continue is clicked in Explore mode', async () => {
+    const onExploreLaunch = vi.fn()
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} onExploreLaunch={onExploreLaunch} />)
     const exploreTab = screen.getAllByRole('tab').find((t) => t.textContent?.toLowerCase().includes('explore'))!
     fireEvent.click(exploreTab)
     const textarea = screen.getByPlaceholderText(/dark mode/i)
     fireEvent.change(textarea, { target: { value: 'dark mode rough idea' } })
     fireEvent.click(screen.getByRole('button', { name: /continue/i }))
 
-    // The Quick path's /generate-spec must NOT be invoked in Explore mode.
     await waitFor(() => {
-      expect(onCloseMock).toHaveBeenCalled()
+      expect(onExploreLaunch).toHaveBeenCalledWith(
+        expect.objectContaining({ idea: 'dark mode rough idea' }),
+      )
     })
+    expect(onCloseMock).toHaveBeenCalled()
+    // The Quick path's /generate-spec must NOT be invoked in Explore mode.
     expect(global.fetch).not.toHaveBeenCalledWith(
       expect.stringContaining('/tickets/generate-spec'),
       expect.anything(),
