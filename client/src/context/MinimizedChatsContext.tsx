@@ -73,6 +73,15 @@ interface MinimizedChatsContextValue {
    *  conversation gets a fresh draft title from Claude). No-op if id
    *  is not in the minimized list. */
   updateLabel: (id: string, label: string) => void
+  /** Merge live spec-draft fields (description, labels, priority,
+   *  acceptanceCriteria) into a parked explore-spec chat's params so that
+   *  values Claude pushes WHILE the shell is minimized survive even if
+   *  the server's in-memory `_specDraftStates` is later wiped (e.g. dev
+   *  server restart). No-op for non-explore-spec chats. */
+  patchExploreSpecDraft: (
+    id: string,
+    patch: Partial<NonNullable<ExploreSpecParams['draftOverrides']>>,
+  ) => void
   /** Drop a chip silently. */
   close: (id: string) => void
   /** Switch project, navigate to restore route, and queue a pending-restore
@@ -169,25 +178,47 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
     saveToStorage(chats)
   }, [chats])
 
-  // Live-update chip labels for parked explore-spec sessions when Claude
-  // pushes a new draft title via the global `spec_draft.update` WS event.
-  // We use chatsRef so the handler always reads the latest list without
-  // re-registering on every chats change.
+  // Live-update parked explore-spec chats when Claude pushes
+  // `spec_draft.update` — title hits the chip's label, the rest of the
+  // fields land in the chip's `params.draftOverrides`. The latter matters
+  // because it survives a server-restart-while-minimized: the restored
+  // shell can fall back on the chip's own draft snapshot when the
+  // server's in-memory `_specDraftStates` has been wiped. We use chatsRef
+  // so the handler always reads the latest list without re-registering.
   const updateLabelRef = useRef<(id: string, label: string) => void>(() => {})
+  const patchExploreSpecDraftRef = useRef<
+    (id: string, patch: Partial<NonNullable<ExploreSpecParams['draftOverrides']>>) => void
+  >(() => {})
   useEffect(() => {
     const handlerId = 'minimized-chats:spec-draft'
     registerHandler(handlerId, (msg) => {
       if (!isSpecDraftUpdate(msg)) return
       const conversationId = msg.conversationId
-      const incomingTitle = (msg.draft as { title?: string }).title?.trim()
-      if (!incomingTitle) return
       const match = chatsRef.current.find(
         (c) =>
           c.kind === 'explore-spec' &&
           c.params.resumeConversationId === conversationId,
       )
       if (!match) return
-      updateLabelRef.current(match.id, incomingTitle)
+      const incoming = msg.draft as Partial<{
+        title: string
+        description: string
+        priority: 'low' | 'medium' | 'high' | 'critical'
+        labels: string[]
+        acceptanceCriteria: string[]
+      }>
+      if (incoming.title?.trim()) {
+        updateLabelRef.current(match.id, incoming.title)
+      }
+      const patch: Partial<NonNullable<ExploreSpecParams['draftOverrides']>> = {}
+      if (incoming.title !== undefined) patch.title = incoming.title
+      if (incoming.description !== undefined) patch.description = incoming.description
+      if (incoming.priority !== undefined) patch.priority = incoming.priority
+      if (incoming.labels !== undefined) patch.labels = incoming.labels
+      if (incoming.acceptanceCriteria !== undefined) patch.acceptanceCriteria = incoming.acceptanceCriteria
+      if (Object.keys(patch).length > 0) {
+        patchExploreSpecDraftRef.current(match.id, patch)
+      }
     })
     return () => unregisterHandler(handlerId)
   }, [registerHandler, unregisterHandler])
@@ -282,6 +313,22 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
     )
   }, [])
 
+  const patchExploreSpecDraft = useCallback(
+    (id: string, patch: Partial<NonNullable<ExploreSpecParams['draftOverrides']>>) => {
+      setChats((prev) =>
+        prev.map((c) => {
+          if (c.id !== id || c.kind !== 'explore-spec') return c
+          const merged: NonNullable<ExploreSpecParams['draftOverrides']> = {
+            ...(c.params.draftOverrides ?? {}),
+            ...patch,
+          }
+          return { ...c, params: { ...c.params, draftOverrides: merged } }
+        }),
+      )
+    },
+    [],
+  )
+
   // Synchronous snapshots — setState updaters can run asynchronously, so
   // we read latest state via refs when consumers need a synchronous answer.
   const chatsRef = useRef(chats)
@@ -308,6 +355,7 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
   restoreRef.current = restore
   closeRef.current = close
   updateLabelRef.current = updateLabel
+  patchExploreSpecDraftRef.current = patchExploreSpecDraft
 
   const takePendingRestore = useCallback(
     (kind: MinimizedChatKind, projectId: string): MinimizedChat | null => {
@@ -331,11 +379,12 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
       pendingRestores,
       minimize,
       updateLabel,
+      patchExploreSpecDraft,
       close,
       restore,
       takePendingRestore,
     }),
-    [chats, pendingRestores, minimize, updateLabel, close, restore, takePendingRestore],
+    [chats, pendingRestores, minimize, updateLabel, patchExploreSpecDraft, close, restore, takePendingRestore],
   )
 
   return (
@@ -355,6 +404,7 @@ export function useMinimizedChats(): MinimizedChatsContextValue {
       pendingRestores: [],
       minimize: () => '',
       updateLabel: () => {},
+      patchExploreSpecDraft: () => {},
       close: () => {},
       restore: () => {},
       takePendingRestore: () => null,
