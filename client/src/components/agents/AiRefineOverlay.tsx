@@ -23,6 +23,13 @@ interface Props {
   baseBody: string
   resumeRefineId?: string
   onClose: () => void
+  /** Optional minimize affordance — fires with the current refine session id
+   *  (or null when no session has started yet) so the parent can park the
+   *  session in the dock and resume later via `rehydrate(refineId)`. */
+  onMinimize?: (refineId: string | null) => void
+  /** Push the current refineId up so the parent can drive programmatic
+   *  auto-minimize (mutual-exclusion when another AiEdit is restored). */
+  onStateChange?: (state: { refineId: string | null }) => void
   onOpenInStudio?: (refineId: string, draftBody: string) => void
   onApplied?: (agentId: string, version: number) => void
 }
@@ -32,6 +39,8 @@ export function AiRefineOverlay({
   baseBody,
   resumeRefineId,
   onClose,
+  onMinimize,
+  onStateChange,
   onOpenInStudio,
   onApplied,
 }: Props) {
@@ -55,6 +64,13 @@ export function AiRefineOverlay({
     const t = setTimeout(() => inputRef.current?.focus(), 50)
     return () => clearTimeout(t)
   }, [])
+
+  // Push refineId up so the parent can auto-minimize on mutual-exclusion.
+  const onStateChangeRef = useRef(onStateChange)
+  onStateChangeRef.current = onStateChange
+  useEffect(() => {
+    onStateChangeRef.current?.({ refineId: r.state.refineId ?? null })
+  }, [r.state.refineId])
 
   const lastAppliedRef = useRef<number | null>(null)
   useEffect(() => {
@@ -151,6 +167,9 @@ export function AiRefineOverlay({
       onForceApply={() => void r.apply(true)}
       onDiscard={() => void handleDiscard()}
       onClose={() => void handleDiscard()}
+      onMinimize={
+        onMinimize ? () => onMinimize(r.state.refineId ?? null) : undefined
+      }
       secondaryAction={
         onOpenInStudio && r.state.draftBody && r.state.refineId
           ? {

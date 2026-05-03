@@ -26,6 +26,9 @@ export interface RichAttachmentEditorHandle {
   /** Clear any user-applied resize height so the editor returns to minHeight. */
   resetHeight: () => void
   clear: () => void
+  /** Replace the editor's plain-text content. Used to rehydrate a parked
+   *  composer draft on shell remount. Does not restore attachment pills. */
+  setPlainText: (text: string) => void
 }
 
 interface RichAttachmentEditorProps {
@@ -308,6 +311,13 @@ export const RichAttachmentEditor = forwardRef<RichAttachmentEditorHandle, RichA
           root.innerHTML = ''
           savedRangeRef.current = null
           setAttached([])
+          notifyChange()
+        },
+        setPlainText: (text: string) => {
+          const root = editorRef.current
+          if (!root) return
+          root.textContent = text
+          savedRangeRef.current = null
           notifyChange()
         },
       }),

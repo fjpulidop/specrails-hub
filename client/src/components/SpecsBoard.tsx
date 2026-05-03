@@ -4,7 +4,16 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { FileText, Plus, CheckCircle2 } from 'lucide-react'
 import { Button } from './ui/button'
 import { SpecCard } from './SpecCard'
-import { ProposeSpecModal } from './ProposeSpecModal'
+import { ProposeSpecModal, type ExploreLaunchPayload } from './ProposeSpecModal'
+import { ExploreSpecShell } from './explore-spec/ExploreSpecShell'
+import { useMinimizedChats, usePendingRestore } from '../context/MinimizedChatsContext'
+import { useHub } from '../hooks/useHub'
+import { deleteAllAttachments } from '../lib/attachments'
+import {
+  loadActiveExploreSpec,
+  saveActiveExploreSpec,
+  clearActiveExploreSpec,
+} from '../lib/active-explore-spec'
 import type { LocalTicket } from '../types'
 
 interface SpecsBoardProps {
@@ -19,8 +28,196 @@ interface SpecsBoardProps {
   onTicketCreated?: (ticket: LocalTicket) => void
 }
 
+interface DraftOverrides {
+  title?: string
+  description?: string
+  priority?: 'low' | 'medium' | 'high' | 'critical'
+  labels?: string[]
+  acceptanceCriteria?: string[]
+}
+
+interface ExploreState {
+  idea: string
+  pendingSpecId: string
+  initialAttachmentIds: string[]
+  resumeConversationId?: string
+  /** Last-known draft title, surfaced as the shell's initial header label
+   *  on restore so the title doesn't blank out across minimize/maximize
+   *  cycles before WS catches up with a fresh `spec_draft.update`. */
+  seedDraftTitle?: string
+  /** Composer text the user was mid-typing before minimize. */
+  seedComposerText?: string
+  /** Manual draft field overrides (title/description/labels/etc) the user
+   *  applied before minimize — replayed on remount so edits survive. */
+  seedDraftOverrides?: DraftOverrides
+}
+
+/** Returns true when at least one draft field carries a meaningful value. */
+function hasOverrides(o: DraftOverrides): boolean {
+  if (o.title?.trim()) return true
+  if (o.description?.trim()) return true
+  if (o.priority && o.priority !== 'medium') return true
+  if (o.labels && o.labels.length > 0) return true
+  if (o.acceptanceCriteria && o.acceptanceCriteria.some((c) => c.trim())) return true
+  return false
+}
+
+/** Compose a stable, human-readable label for the chip from the most
+ *  meaningful source available. The `Untitled spec` fallback is reserved
+ *  for true empty cases (no idea, no draft yet). */
+function deriveExploreLabel(
+  draftTitle: string | undefined | null,
+  seedDraftTitle: string | undefined | null,
+  ideaText: string,
+): string {
+  const live = draftTitle?.trim()
+  if (live) return live
+  const seed = seedDraftTitle?.trim()
+  if (seed) return seed
+  const idea = ideaText.trim()
+  if (idea) return idea.length > 60 ? idea.slice(0, 57) + '…' : idea
+  return 'Untitled spec'
+}
+
 export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, onTicketClick, onTicketCreated }: SpecsBoardProps) {
   const [proposeOpen, setProposeOpen] = useState(false)
+  const [explore, setExplore] = useState<ExploreState | null>(null)
+  const { activeProjectId } = useHub()
+  const { minimize } = useMinimizedChats()
+
+  // Snapshot of the live shell so we can auto-minimize the current session
+  // before restoring another (mutual-exclusion: only one shell visible at
+  // a time per project). ExploreSpecShell calls onStateChange to keep this
+  // up to date with its conversationId, draft title, in-progress composer
+  // text, and manual draft overrides. We mirror it as state too (not just
+  // a ref) so the persistence effect can re-fire when these change.
+  interface LiveShellSnapshot {
+    conversationId: string | null
+    draftTitle: string
+    composerText: string
+    draftOverrides: DraftOverrides
+  }
+  const [liveShell, setLiveShell] = useState<LiveShellSnapshot>({
+    conversationId: null,
+    draftTitle: '',
+    composerText: '',
+    draftOverrides: {},
+  })
+  const liveShellRef = useRef(liveShell)
+  liveShellRef.current = liveShell
+  const exploreRef = useRef(explore)
+  exploreRef.current = explore
+
+  const parkCurrentExplore = useCallback(() => {
+    const cur = exploreRef.current
+    if (!cur || !activeProjectId) return
+    minimize({
+      kind: 'explore-spec',
+      projectId: activeProjectId,
+      label: deriveExploreLabel(
+        liveShellRef.current.draftTitle,
+        cur.seedDraftTitle,
+        cur.idea,
+      ),
+      restoreRoute: '/',
+      params: {
+        initialIdea: cur.idea,
+        pendingSpecId: cur.pendingSpecId,
+        initialAttachmentIds: cur.initialAttachmentIds,
+        resumeConversationId:
+          liveShellRef.current.conversationId ?? cur.resumeConversationId,
+        composerText: liveShellRef.current.composerText || undefined,
+        draftOverrides: hasOverrides(liveShellRef.current.draftOverrides)
+          ? liveShellRef.current.draftOverrides
+          : undefined,
+      },
+    })
+    // The chip's persistence takes over from here.
+    clearActiveExploreSpec()
+  }, [activeProjectId, minimize])
+
+  // Restore live session on mount if one was open at refresh time. Scoped
+  // to the active project so refreshing while on a different project
+  // doesn't bring back the wrong session.
+  useEffect(() => {
+    if (!activeProjectId) return
+    const persisted = loadActiveExploreSpec()
+    if (!persisted || persisted.projectId !== activeProjectId) return
+    setLiveShell({
+      conversationId: persisted.resumeConversationId ?? null,
+      draftTitle: persisted.seedDraftTitle ?? '',
+      composerText: persisted.composerText ?? '',
+      draftOverrides: persisted.draftOverrides ?? {},
+    })
+    setExplore({
+      idea: persisted.idea,
+      pendingSpecId: persisted.pendingSpecId,
+      initialAttachmentIds: persisted.initialAttachmentIds,
+      resumeConversationId: persisted.resumeConversationId,
+      seedDraftTitle: persisted.seedDraftTitle,
+      seedComposerText: persisted.composerText,
+      seedDraftOverrides: persisted.draftOverrides,
+    })
+    // Eslint: only run on activeProjectId change. We deliberately don't
+    // depend on `explore` — this is a one-shot restore on (re)mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProjectId])
+
+  // Mirror the live session to localStorage so a refresh-while-open lands
+  // the user back in the same conversation, with composer + draft edits.
+  useEffect(() => {
+    if (!explore || !activeProjectId) return
+    saveActiveExploreSpec({
+      projectId: activeProjectId,
+      idea: explore.idea,
+      pendingSpecId: explore.pendingSpecId,
+      initialAttachmentIds: explore.initialAttachmentIds,
+      resumeConversationId:
+        liveShell.conversationId ?? explore.resumeConversationId,
+      seedDraftTitle:
+        liveShell.draftTitle || explore.seedDraftTitle,
+      composerText: liveShell.composerText || undefined,
+      draftOverrides: hasOverrides(liveShell.draftOverrides)
+        ? liveShell.draftOverrides
+        : undefined,
+    })
+  }, [explore, activeProjectId, liveShell])
+
+  const handleExploreLaunch = useCallback((payload: ExploreLaunchPayload) => {
+    // Mutual exclusion — opening a new explore session parks any current one.
+    parkCurrentExplore()
+    setLiveShell({ conversationId: null, draftTitle: '', composerText: '', draftOverrides: {} })
+    setExplore({
+      idea: payload.idea,
+      pendingSpecId: payload.pendingSpecId,
+      initialAttachmentIds: payload.initialAttachmentIds,
+    })
+  }, [parkCurrentExplore])
+
+  // Restore from a chip click → re-open the shell with the resumed
+  // conversation. Carry forward the chip's label as `seedDraftTitle` so the
+  // shell renders a meaningful header immediately, even before the
+  // `spec_draft.update` WS event refreshes the draft. If a different
+  // session is currently visible, park it as a chip first.
+  usePendingRestore('explore-spec', activeProjectId, (chat) => {
+    if (chat.kind !== 'explore-spec') return
+    parkCurrentExplore()
+    setLiveShell({
+      conversationId: chat.params.resumeConversationId ?? null,
+      draftTitle: chat.label,
+      composerText: chat.params.composerText ?? '',
+      draftOverrides: chat.params.draftOverrides ?? {},
+    })
+    setExplore({
+      idea: chat.params.initialIdea,
+      pendingSpecId: chat.params.pendingSpecId,
+      initialAttachmentIds: chat.params.initialAttachmentIds,
+      resumeConversationId: chat.params.resumeConversationId,
+      seedDraftTitle: chat.label,
+      seedComposerText: chat.params.composerText,
+      seedDraftOverrides: chat.params.draftOverrides,
+    })
+  })
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -153,7 +350,62 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
         </div>
       </div>
 
-      <ProposeSpecModal open={proposeOpen} onClose={() => setProposeOpen(false)} tickets={allTickets ?? tickets} onTicketCreated={onTicketCreated} />
+      <ProposeSpecModal
+        open={proposeOpen}
+        onClose={() => setProposeOpen(false)}
+        tickets={allTickets ?? tickets}
+        onExploreLaunch={handleExploreLaunch}
+      />
+
+      {explore && activeProjectId && (
+        <ExploreSpecShell
+          // Bind component identity to the session so restoring a different
+          // chip remounts the shell from scratch — without this, internal
+          // state (conversationId, useSpecDraftStream subscription, composer
+          // refs) leaks across sessions.
+          key={`${explore.pendingSpecId}:${explore.resumeConversationId ?? 'fresh'}`}
+          initialIdea={explore.idea}
+          pendingSpecId={explore.pendingSpecId}
+          initialAttachmentIds={explore.initialAttachmentIds}
+          resumeConversationId={explore.resumeConversationId}
+          seedDraftTitle={explore.seedDraftTitle}
+          seedComposerText={explore.seedComposerText}
+          seedDraftOverrides={explore.seedDraftOverrides}
+          onStateChange={(s) => setLiveShell(s)}
+          onClose={() => {
+            // Discarding the overlay → wipe any attachments uploaded during
+            // the session (matches Quick path's close-without-submit behaviour).
+            deleteAllAttachments(explore.pendingSpecId).catch(() => {})
+            setExplore(null)
+            clearActiveExploreSpec()
+          }}
+          onMinimize={(conversationId, draftTitle) => {
+            const live = liveShellRef.current
+            minimize({
+              kind: 'explore-spec',
+              projectId: activeProjectId,
+              label: deriveExploreLabel(draftTitle, explore.seedDraftTitle, explore.idea),
+              restoreRoute: '/',
+              params: {
+                initialIdea: explore.idea,
+                pendingSpecId: explore.pendingSpecId,
+                initialAttachmentIds: explore.initialAttachmentIds,
+                resumeConversationId: conversationId ?? undefined,
+                composerText: live.composerText || undefined,
+                draftOverrides: hasOverrides(live.draftOverrides) ? live.draftOverrides : undefined,
+              },
+            })
+            setExplore(null)
+            // Chip persistence takes over from here.
+            clearActiveExploreSpec()
+          }}
+          onTicketCreated={(ticket) => {
+            setExplore(null)
+            clearActiveExploreSpec()
+            onTicketCreated?.(ticket)
+          }}
+        />
+      )}
     </div>
   )
 }

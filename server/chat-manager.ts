@@ -116,6 +116,14 @@ export class ChatManager {
     this._specDraftStates.delete(conversationId)
   }
 
+  /** Snapshot of the current spec-draft state for a conversation, or null
+   *  if no draft has accumulated yet. Used by the client to rehydrate after
+   *  a refresh / minimize cycle so updates Claude pushed while no shell
+   *  was subscribed don't get lost. */
+  getSpecDraftState(conversationId: string): ConversationDraftState | null {
+    return this._specDraftStates.get(conversationId) ?? null
+  }
+
   private _buildSystemPrompt(): string {
     const name = this._projectName ?? 'this project'
 

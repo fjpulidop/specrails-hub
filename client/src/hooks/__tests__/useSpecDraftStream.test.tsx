@@ -33,6 +33,12 @@ describe('useSpecDraftStream', () => {
 
   beforeEach(() => {
     ws = makeFakeWs()
+    // Default fetch mock — returns null draft so the hydration step is a
+    // no-op for tests that don't care about it.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => ({ draft: null, ready: false, chips: [] }) })),
+    )
   })
 
   it('returns defaults before any update', () => {
@@ -161,6 +167,37 @@ describe('useSpecDraftStream', () => {
     expect(result.current.draft.title).toBe('')
     expect(result.current.ready).toBe(false)
     expect(result.current.chips).toEqual([])
+  })
+
+  it('hydrates draft from server on mount when conversationId is set', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          draft: { title: 'Server title', description: 'desc', priority: 'high', labels: ['srv'], acceptanceCriteria: ['ok'] },
+          ready: true,
+          chips: ['Refine'],
+        }),
+      })),
+    )
+    const { result } = renderHook(() => useSpecDraftStream('conv-hydrate'), { wrapper: wrapper(ws) })
+    // Wait for the async hydration effect to flush.
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(result.current.draft.title).toBe('Server title')
+    expect(result.current.draft.priority).toBe('high')
+    expect(result.current.ready).toBe(true)
+    expect(result.current.chips).toEqual(['Refine'])
+  })
+
+  it('skips hydration when conversationId is null', () => {
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    renderHook(() => useSpecDraftStream(null), { wrapper: wrapper(ws) })
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 
   it('ignores unrelated WS messages', () => {

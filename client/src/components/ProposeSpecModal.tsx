@@ -8,22 +8,24 @@ import { useSpecGenTracker } from '../hooks/useSpecGenTracker'
 import { API_ORIGIN } from '../lib/origin'
 import { deleteAllAttachments } from '../lib/attachments'
 import { RichAttachmentEditor, type RichAttachmentEditorHandle } from './RichAttachmentEditor'
-import { ExploreSpecShell } from './explore-spec/ExploreSpecShell'
 import type { LocalTicket } from '../types'
 
 type SpecMode = 'quick' | 'explore'
+
+export interface ExploreLaunchPayload {
+  idea: string
+  pendingSpecId: string
+  initialAttachmentIds: string[]
+}
 
 interface ProposeSpecModalProps {
   open: boolean
   onClose: () => void
   tickets: LocalTicket[]
-  onTicketCreated?: (ticket: LocalTicket) => void
-}
-
-interface ExploreState {
-  idea: string
-  pendingSpecId: string
-  initialAttachmentIds: string[]
+  /** Required when explore mode should be wired. Parent owns the
+   *  ExploreSpecShell lifecycle so it can keep the chat alive across
+   *  modal close events (used by the minimize-to-dock flow). */
+  onExploreLaunch?: (payload: ExploreLaunchPayload) => void
 }
 
 function genPendingId(): string {
@@ -36,11 +38,10 @@ function genPendingId(): string {
   })
 }
 
-export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: ProposeSpecModalProps) {
+export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: ProposeSpecModalProps) {
   const { activeProjectId, projects } = useHub()
   const tracker = useSpecGenTracker()
   const [mode, setMode] = useState<SpecMode>('quick')
-  const [explore, setExplore] = useState<ExploreState | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [hasText, setHasText] = useState(false)
   const [attachmentCount, setAttachmentCount] = useState(0)
@@ -90,13 +91,17 @@ export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: Pr
     const projectId = activeProjectIdRef.current
     if (!projectId) return
 
-    // Explore mode: hand off to the conversational overlay; the modal closes,
-    // the overlay takes over, and the ticket is committed via /from-draft when
-    // the user clicks Create Spec. Attachments uploaded into pendingSpecId are
-    // carried through and folded into Claude's context for the first turn.
+    // Explore mode: hand off to the parent (which owns the overlay
+    // lifecycle so the conversation can survive modal close — i.e. minimize
+    // to dock). Attachments uploaded into pendingSpecId are carried through
+    // and folded into Claude's context for the first turn.
     if (mode === 'explore') {
+      if (!onExploreLaunch) {
+        toast.error('Explore mode is not wired in this view')
+        return
+      }
       submittedRef.current = true // suppress attachment cleanup on close
-      setExplore({ idea, pendingSpecId, initialAttachmentIds: attachmentIds })
+      onExploreLaunch({ idea, pendingSpecId, initialAttachmentIds: attachmentIds })
       onClose()
       return
     }
@@ -139,7 +144,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: Pr
     } finally {
       setIsSubmitting(false)
     }
-  }, [mode, tickets, tracker, pendingSpecId, onClose])
+  }, [mode, tickets, tracker, pendingSpecId, onClose, onExploreLaunch])
 
   return (
     <>
@@ -194,25 +199,6 @@ export function ProposeSpecModal({ open, onClose, tickets, onTicketCreated }: Pr
         </DialogContent>
       </Dialog>
 
-      {explore && (
-        <ExploreSpecShell
-          initialIdea={explore.idea}
-          pendingSpecId={explore.pendingSpecId}
-          initialAttachmentIds={explore.initialAttachmentIds}
-          onClose={() => {
-            // Discarding the overlay → wipe any attachments uploaded during the
-            // session (matches Quick path's close-without-submit behaviour).
-            deleteAllAttachments(explore.pendingSpecId).catch(() => {})
-            setExplore(null)
-          }}
-          onTicketCreated={(ticket) => {
-            // Migration of attachments to the real ticket id is handled by
-            // POST /tickets/from-draft, which receives pendingSpecId.
-            setExplore(null)
-            onTicketCreated?.(ticket)
-          }}
-        />
-      )}
     </>
   )
 }
