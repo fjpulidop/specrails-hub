@@ -45,11 +45,7 @@ export async function registerTauriDragDrop(
       const rect = active.viewportEl.getBoundingClientRect()
       const pos = payload.position
       if (!pos) return
-      // Tauri reports positions in physical pixels; convert assuming the same
-      // device pixel ratio as the rect (which is in CSS px).
-      const x = pos.x / window.devicePixelRatio
-      const y = pos.y / window.devicePixelRatio
-      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return
+      if (!isDropPositionInsideRect(pos, rect, window.devicePixelRatio || 1)) return
       const text = quotePathList(paths, isWindows)
       try { active.term.paste(text) } catch { /* ignore */ }
     }
@@ -58,4 +54,22 @@ export async function registerTauriDragDrop(
   } catch {
     return { dispose: () => {} }
   }
+}
+
+export function isDropPositionInsideRect(
+  pos: { x: number; y: number },
+  rect: Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom'>,
+  scaleFactor: number,
+): boolean {
+  if (pointInsideRect(pos.x, pos.y, rect)) return true
+  const factor = Number.isFinite(scaleFactor) && scaleFactor > 0 ? scaleFactor : 1
+  return pointInsideRect(pos.x / factor, pos.y / factor, rect)
+}
+
+function pointInsideRect(
+  x: number,
+  y: number,
+  rect: Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom'>,
+): boolean {
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
 }
