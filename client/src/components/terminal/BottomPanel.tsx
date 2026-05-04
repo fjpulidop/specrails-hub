@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/utils'
 import {
@@ -9,6 +9,7 @@ import {
 import { openExternalUrl } from '../../lib/tauri-shell'
 import { DEFAULT_TERMINAL_SETTINGS, type TerminalSettings } from '../../lib/terminal-settings-types'
 import { TERMINAL_SETTINGS_UPDATED_EVENT, type TerminalSettingsUpdatedEventDetail } from '../../lib/terminal-settings-events'
+import { registerTauriDragDrop } from '../../lib/tauri-drag-drop'
 import { ShortcutContextMenu } from './ShortcutContextMenu'
 import { TerminalTopBar } from './TerminalTopBar'
 import { TerminalSidebar } from './TerminalSidebar'
@@ -27,6 +28,7 @@ interface BottomPanelProps {
 export function BottomPanel({ projectId, state, viewportHeight, statusBarHeight }: BottomPanelProps) {
   const t = useTerminals()
   const navigate = useNavigate()
+  const panelRef = useRef<HTMLDivElement | null>(null)
   const [livePreviewHeight, setLivePreviewHeight] = useState<number | null>(null)
   const [settings, setSettings] = useState<TerminalSettings>(DEFAULT_TERMINAL_SETTINGS)
   const [shortcutMenu, setShortcutMenu] = useState<{ x: number; y: number; kind: 'browser' | 'script' } | null>(null)
@@ -66,6 +68,36 @@ export function BottomPanel({ projectId, state, viewportHeight, statusBarHeight 
 
   const canCreate = state.sessions.length < TERMINAL_MAX_PER_PROJECT
   const hasActive = state.activeId !== null
+
+  useEffect(() => {
+    let disposed = false
+    let controller: { dispose: () => void } | null = null
+    void registerTauriDragDrop(() => {
+      const panel = panelRef.current
+      const activeId = state.activeId
+      if (!panel || !activeId || state.visibility === 'hidden') return null
+      return {
+        viewportEl: panel,
+        writeText: (text: string) => {
+          if (t.writeToSession(activeId, text)) return true
+          const term = t.getTerminalInstance(activeId)
+          try {
+            term?.paste(text)
+            return Boolean(term)
+          } catch {
+            return false
+          }
+        },
+      }
+    }).then((c) => {
+      if (disposed) c.dispose()
+      else controller = c
+    })
+    return () => {
+      disposed = true
+      controller?.dispose()
+    }
+  }, [state.activeId, state.visibility, t])
 
   const handleCreate = useCallback(() => {
     if (!canCreate) return
@@ -124,6 +156,7 @@ export function BottomPanel({ projectId, state, viewportHeight, statusBarHeight 
 
   return (
     <div
+      ref={panelRef}
       className={cn(
         'relative flex flex-col shrink-0 bg-background/95',
         'border-t border-border/40',

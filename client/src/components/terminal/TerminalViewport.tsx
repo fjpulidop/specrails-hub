@@ -4,7 +4,6 @@ import { TerminalSearchOverlay } from './TerminalSearchOverlay'
 import { TerminalContextMenu } from './TerminalContextMenu'
 import { revealItemInDir, isTauri } from '../../lib/tauri-shell'
 import { saveScrollbackToFile } from '../../lib/save-scrollback'
-import { registerTauriDragDrop } from '../../lib/tauri-drag-drop'
 import { quotePathList } from '../../lib/shell-quote'
 import { PromptGutter } from './PromptGutter'
 import { CommandTimingBadge } from './CommandTimingBadge'
@@ -122,28 +121,6 @@ export function TerminalViewport({ activeId }: TerminalViewportProps) {
       try { void navigator.clipboard?.writeText(selection) } catch { /* ignore */ }
     }
   }, [term])
-
-  // Register Tauri drag-drop listener. Returns active session/viewport on demand.
-  useEffect(() => {
-    let disposed = false
-    let controller: { dispose: () => void } | null = null
-    void registerTauriDragDrop(() => {
-      const slot = slotRef.current
-      const t = activeId ? terminals.getTerminalInstance(activeId) : null
-      if (!slot || !t) return null
-      return {
-        viewportEl: slot,
-        writeText: (text: string) => writeToActiveTerminal(text),
-      }
-    }).then((c) => {
-      if (disposed) c.dispose()
-      else controller = c
-    })
-    return () => {
-      disposed = true
-      controller?.dispose()
-    }
-  }, [activeId, terminals, writeToActiveTerminal])
 
   useEffect(() => {
     const slot = slotRef.current
