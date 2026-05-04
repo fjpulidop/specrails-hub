@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.48.1](https://github.com/fjpulidop/specrails-hub/compare/v1.48.0...v1.48.1) (2026-05-04)
+
+
+### Bug Fixes
+
+* terminal file drop, paste, and clipboard ([#291](https://github.com/fjpulidop/specrails-hub/issues/291)) ([b8cea6c](https://github.com/fjpulidop/specrails-hub/commit/b8cea6c40253adeca223bff0571ee87031bc13dd))
+
 ## [1.48.0](https://github.com/fjpulidop/specrails-hub/compare/v1.47.0...v1.48.0) (2026-05-03)
 
 
