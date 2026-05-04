@@ -39,11 +39,12 @@ interface FakeTerminal {
   modes: { mouseTrackingMode: string }
 }
 
-function mockTerminals(term: FakeTerminal | null = null) {
+function mockTerminals(term: FakeTerminal | null = null, writeToSession = vi.fn(() => false)) {
   mocks.useTerminals.mockReturnValue({
     subscribeOpenSearch: vi.fn(() => undefined),
     getSearchAddon: vi.fn(() => null),
     getTerminalInstance: vi.fn(() => term),
+    writeToSession,
     getCwd: vi.fn(() => null),
     getContainer: vi.fn(() => null),
     notifyAdopted: vi.fn(),
@@ -69,7 +70,8 @@ describe('TerminalViewport', () => {
 
   it('pastes native file paths instead of allowing file previews on drop', () => {
     const term = makeTerm()
-    mockTerminals(term)
+    const writeToSession = vi.fn(() => true)
+    mockTerminals(term, writeToSession)
     const { container } = render(<TerminalViewport activeId="s1" />)
     const slot = container.querySelector('[data-terminal-viewport]') as HTMLElement
     const file = new File(['hello'], 'hello.txt', { type: 'text/plain' })
@@ -87,7 +89,8 @@ describe('TerminalViewport', () => {
 
     expect(event.defaultPrevented).toBe(true)
     expect(event.stopPropagation).toHaveBeenCalled()
-    expect(term.paste).toHaveBeenCalledWith("'/Users/javi/Desktop/hello.txt'")
+    expect(writeToSession).toHaveBeenCalledWith('s1', "'/Users/javi/Desktop/hello.txt'")
+    expect(term.paste).not.toHaveBeenCalled()
   })
 
   it('prevents file drops without native paths so the WebView does not render previews', () => {
@@ -114,7 +117,8 @@ describe('TerminalViewport', () => {
 
   it('captures native paste events and writes text to the terminal', () => {
     const term = makeTerm()
-    mockTerminals(term)
+    const writeToSession = vi.fn(() => true)
+    mockTerminals(term, writeToSession)
     const { container } = render(<TerminalViewport activeId="s1" />)
     const slot = container.querySelector('[data-terminal-viewport]') as HTMLElement
 
@@ -124,12 +128,14 @@ describe('TerminalViewport', () => {
       },
     })
 
-    expect(term.paste).toHaveBeenCalledWith('npm test')
+    expect(writeToSession).toHaveBeenCalledWith('s1', 'npm test')
+    expect(term.paste).not.toHaveBeenCalled()
   })
 
   it('uses navigator clipboard as a Cmd+V fallback', async () => {
     const term = makeTerm()
-    mockTerminals(term)
+    const writeToSession = vi.fn(() => true)
+    mockTerminals(term, writeToSession)
     Object.defineProperty(navigator, 'platform', { value: 'MacIntel', configurable: true })
     Object.defineProperty(navigator, 'clipboard', {
       value: { readText: vi.fn().mockResolvedValue('echo hi') },
@@ -141,8 +147,9 @@ describe('TerminalViewport', () => {
     fireEvent.keyDown(slot, { key: 'v', metaKey: true })
 
     await waitFor(() => {
-      expect(term.paste).toHaveBeenCalledWith('echo hi')
+      expect(writeToSession).toHaveBeenCalledWith('s1', 'echo hi')
     })
+    expect(term.paste).not.toHaveBeenCalled()
   })
 
   it('captures native copy events when the terminal has a selection', () => {

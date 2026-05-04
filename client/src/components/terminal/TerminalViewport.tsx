@@ -44,6 +44,18 @@ export function TerminalViewport({ activeId }: TerminalViewportProps) {
   const cwd = activeId ? terminals.getCwd(activeId) : null
   const [dragOver, setDragOver] = useState(false)
 
+  const writeToActiveTerminal = useCallback((text: string): boolean => {
+    if (!text) return false
+    if (activeId && terminals.writeToSession(activeId, text)) return true
+    if (!term) return false
+    try {
+      term.paste(text)
+      return true
+    } catch {
+      return false
+    }
+  }, [activeId, terminals, term])
+
   const pasteDroppedFiles = useCallback((files: FileList | null | undefined): boolean => {
     if (!term || !files || files.length === 0) return false
     const paths = Array.from(files)
@@ -51,9 +63,8 @@ export function TerminalViewport({ activeId }: TerminalViewportProps) {
       .filter((path): path is string => Boolean(path))
     if (paths.length === 0) return false
     const isWindows = typeof navigator !== 'undefined' && /Win/i.test(navigator.platform || '')
-    try { term.paste(quotePathList(paths, isWindows)) } catch { return false }
-    return true
-  }, [term])
+    return writeToActiveTerminal(quotePathList(paths, isWindows))
+  }, [term, writeToActiveTerminal])
 
   const handleContextMenu = useCallback((ev: React.MouseEvent) => {
     // Always preventDefault so the WebView's native contextmenu does not show.
@@ -74,8 +85,8 @@ export function TerminalViewport({ activeId }: TerminalViewportProps) {
     if (!text) return
     ev.preventDefault()
     ev.stopPropagation()
-    try { term.paste(text) } catch { /* ignore */ }
-  }, [term])
+    writeToActiveTerminal(text)
+  }, [term, writeToActiveTerminal])
 
   const handleCopy = useCallback((ev: React.ClipboardEvent<HTMLDivElement>) => {
     if (!term) return
@@ -97,7 +108,7 @@ export function TerminalViewport({ activeId }: TerminalViewportProps) {
       try {
         void navigator.clipboard?.readText().then((text) => {
           if (text) {
-            try { term.paste(text) } catch { /* ignore */ }
+            writeToActiveTerminal(text)
           }
         })
       } catch { /* ignore */ }
@@ -120,7 +131,10 @@ export function TerminalViewport({ activeId }: TerminalViewportProps) {
       const slot = slotRef.current
       const t = activeId ? terminals.getTerminalInstance(activeId) : null
       if (!slot || !t) return null
-      return { term: t, viewportEl: slot }
+      return {
+        viewportEl: slot,
+        writeText: (text: string) => writeToActiveTerminal(text),
+      }
     }).then((c) => {
       if (disposed) c.dispose()
       else controller = c
@@ -129,7 +143,7 @@ export function TerminalViewport({ activeId }: TerminalViewportProps) {
       disposed = true
       controller?.dispose()
     }
-  }, [activeId, terminals])
+  }, [activeId, terminals, writeToActiveTerminal])
 
   useEffect(() => {
     const slot = slotRef.current
