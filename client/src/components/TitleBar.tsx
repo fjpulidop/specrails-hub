@@ -20,12 +20,18 @@ function isMacOverlay(): boolean {
 interface WinButtonProps {
   onClick: () => void
   icon: React.ReactNode
-  hoverColor: string
+  hoverColor?: string
   hoverTextColor?: string
   ariaLabel: string
 }
 
-function WinButton({ onClick, icon, hoverColor, hoverTextColor = '#f8f8f2', ariaLabel }: WinButtonProps) {
+function WinButton({
+  onClick,
+  icon,
+  hoverColor = 'var(--color-accent)',
+  hoverTextColor = 'var(--color-accent-foreground)',
+  ariaLabel,
+}: WinButtonProps) {
   const [hovered, setHovered] = useState(false)
 
   return (
@@ -44,7 +50,7 @@ function WinButton({ onClick, icon, hoverColor, hoverTextColor = '#f8f8f2', aria
         border: 'none',
         cursor: 'pointer',
         background: hovered ? hoverColor : 'transparent',
-        color: hovered ? hoverTextColor : 'rgba(248,248,242,0.62)',
+        color: hovered ? hoverTextColor : 'var(--color-muted-foreground)',
         transition: 'background 0.12s ease, color 0.12s ease',
         WebkitAppRegion: 'no-drag',
       } as React.CSSProperties}
@@ -87,10 +93,12 @@ function SearchPill({ projectName }: { projectName: string | null }) {
         paddingLeft: 8,
         paddingRight: 8,
         borderRadius: 9999,
-        border: 'none',
+        border: '1px solid color-mix(in srgb, var(--color-border) 70%, transparent)',
         cursor: 'pointer',
-        background: hovered ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)',
-        color: projectName ? '#f8f8f2' : 'rgba(248,248,242,0.45)',
+        background: hovered
+          ? 'color-mix(in srgb, var(--color-accent) 82%, transparent)'
+          : 'color-mix(in srgb, var(--color-surface) 72%, transparent)',
+        color: projectName ? 'var(--color-foreground)' : 'var(--color-muted-foreground)',
         fontSize: 12,
         fontWeight: 400,
         letterSpacing: 0,
@@ -103,7 +111,7 @@ function SearchPill({ projectName }: { projectName: string | null }) {
     >
       <Search
         size={11}
-        style={{ flexShrink: 0, opacity: projectName ? 0.7 : 0.45 }}
+        style={{ flexShrink: 0, opacity: projectName ? 0.72 : 0.48 }}
       />
       <span
         style={{
@@ -154,12 +162,12 @@ function MacTitleBar() {
         position: 'relative',
         height: 28,
         minHeight: 28,
-        background: '#282a36',
+        background: 'var(--color-background-deep)',
         display: 'flex',
         alignItems: 'center',
         userSelect: 'none',
         flexShrink: 0,
-        borderBottom: '1px solid #44475a',
+        borderBottom: '1px solid var(--color-border)',
       }}
     >
       <SearchPill projectName={activeProject?.name ?? null} />
@@ -191,14 +199,14 @@ function DefaultTitleBar() {
         position: 'relative',
         height: 36,
         minHeight: 36,
-        background: '#282a36',
+        background: 'var(--color-background-deep)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 10px',
         userSelect: 'none',
         flexShrink: 0,
-        borderBottom: '1px solid #44475a',
+        borderBottom: '1px solid var(--color-border)',
       }}
     >
       <SearchPill projectName={activeProject?.name ?? null} />
@@ -219,20 +227,18 @@ function DefaultTitleBar() {
         <WinButton
           onClick={handleMinimize}
           icon={<Minus size={14} strokeWidth={1.8} />}
-          hoverColor="rgba(68,71,90,0.8)"
           ariaLabel="Minimize window"
         />
         <WinButton
           onClick={handleMaximize}
           icon={<Square size={12} strokeWidth={1.8} />}
-          hoverColor="rgba(68,71,90,0.8)"
           ariaLabel="Maximize window"
         />
         <WinButton
           onClick={handleClose}
           icon={<X size={15} strokeWidth={1.8} />}
-          hoverColor="rgba(255,85,85,0.92)"
-          hoverTextColor="#282a36"
+          hoverColor="var(--color-destructive)"
+          hoverTextColor="var(--color-destructive-foreground)"
           ariaLabel="Close window"
         />
       </div>
