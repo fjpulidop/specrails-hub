@@ -12,6 +12,7 @@ import {
   type TerminalSettings,
   type TerminalRenderMode,
 } from '../../lib/terminal-settings-types'
+import { dispatchTerminalSettingsUpdated } from '../../lib/terminal-settings-events'
 
 interface Props {
   /** Hub mode edits hub_settings; project mode edits a per-project override layer. */
@@ -128,6 +129,7 @@ export function TerminalSettingsSection({ mode }: Props) {
         if (!res.ok) throw new Error((await res.text()) || 'patch failed')
         const updated = (await res.json()) as TerminalSettings
         setHub(updated); setSavedResolved(updated); setDraft(updated); setClearedFields(new Set())
+        dispatchTerminalSettingsUpdated({ mode: 'hub', projectId: null })
         toast.success('Terminal settings saved')
       } else if (activeProjectId) {
         const res = await fetch(`/api/projects/${activeProjectId}/terminal-settings`, {
@@ -139,6 +141,7 @@ export function TerminalSettingsSection({ mode }: Props) {
         const updated = (await res.json()) as ProjectResponse
         setHub(updated.hubDefaults); setOverride(updated.override); setSavedResolved(updated.resolved); setDraft(updated.resolved)
         setClearedFields(new Set())
+        dispatchTerminalSettingsUpdated({ mode: 'project', projectId: activeProjectId })
         toast.success('Terminal settings saved')
       }
     } catch (err) {

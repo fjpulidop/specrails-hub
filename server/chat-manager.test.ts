@@ -112,6 +112,24 @@ describe('ChatManager', () => {
     expect(doneMsgs[0].fullText).toBe('Hello back!')
   })
 
+  it('normalizes legacy Claude model ids to Claude Code aliases before spawning', async () => {
+    const convId = setupConversation('claude-sonnet-4-6')
+    const child = createMockChildProcess()
+    vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+    const sendPromise = cm.sendMessage(convId, 'Hello world')
+
+    const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+    const modelIdx = spawnArgs.indexOf('--model')
+    expect(modelIdx).toBeGreaterThan(-1)
+    expect(spawnArgs[modelIdx + 1]).toBe('sonnet')
+
+    pushLine(child, assistantEvent('Hello'))
+    pushLine(child, resultEvent('sess-abc'))
+    await finishProcess(child, 0)
+    await sendPromise
+  })
+
   // ─── Test 2: abort triggers chat_error { error: 'aborted' } ───────────────
 
   it('abort triggers chat_error with aborted reason', async () => {
@@ -251,6 +269,21 @@ describe('ChatManager', () => {
     const errors = getBroadcastedByType(broadcast, 'chat_error')
     expect(errors).toHaveLength(1)
     expect(errors[0].error).toContain('code 1')
+  })
+
+  it('includes stderr in chat_error when process exits with non-zero code', async () => {
+    const convId = setupConversation()
+    const child = createMockChildProcess()
+    vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+    const sendPromise = cm.sendMessage(convId, 'Fail with stderr')
+    child.stderr.push('Authentication failed\n')
+    await finishProcess(child, 1)
+    await sendPromise
+
+    const errors = getBroadcastedByType(broadcast, 'chat_error')
+    expect(errors).toHaveLength(1)
+    expect(errors[0].error).toContain('Authentication failed')
   })
 
   // ─── Test 10: already active conversation ──────────────────────────────────

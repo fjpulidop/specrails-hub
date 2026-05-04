@@ -11,27 +11,27 @@ const SAMPLE_AGENTS: AgentDef[] = [
 
 describe('getDefaultModel', () => {
   it('returns sonnet for non-special agents in balanced preset (claude)', () => {
-    expect(getDefaultModel('sr-developer', 'balanced', 'claude')).toBe('claude-sonnet-4-6')
+    expect(getDefaultModel('sr-developer', 'balanced', 'claude')).toBe('sonnet')
   })
 
   it('returns sonnet for architect in balanced preset (claude)', () => {
-    expect(getDefaultModel('sr-architect', 'balanced', 'claude')).toBe('claude-sonnet-4-6')
+    expect(getDefaultModel('sr-architect', 'balanced', 'claude')).toBe('sonnet')
   })
 
   it('returns sonnet for product-manager in balanced preset (claude)', () => {
-    expect(getDefaultModel('sr-product-manager', 'balanced', 'claude')).toBe('claude-sonnet-4-6')
+    expect(getDefaultModel('sr-product-manager', 'balanced', 'claude')).toBe('sonnet')
   })
 
   it('returns haiku for budget preset (claude)', () => {
-    expect(getDefaultModel('sr-developer', 'budget', 'claude')).toBe('claude-haiku-4-5-20251001')
+    expect(getDefaultModel('sr-developer', 'budget', 'claude')).toBe('haiku')
   })
 
   it('returns sonnet for non-special agents in max preset (claude)', () => {
-    expect(getDefaultModel('sr-developer', 'max', 'claude')).toBe('claude-sonnet-4-6')
+    expect(getDefaultModel('sr-developer', 'max', 'claude')).toBe('sonnet')
   })
 
   it('returns opus for architect in max preset (claude)', () => {
-    expect(getDefaultModel('sr-architect', 'max', 'claude')).toBe('claude-opus-4-7')
+    expect(getDefaultModel('sr-architect', 'max', 'claude')).toBe('opus')
   })
 
   it('returns gpt-5.4-mini for budget preset (codex)', () => {
@@ -114,7 +114,7 @@ describe('ModelSelector', () => {
         agents={SAMPLE_AGENTS}
         provider="claude"
         preset="balanced"
-        overrides={{ 'sr-developer': 'claude-opus-4-7' }}
+        overrides={{ 'sr-developer': 'opus' }}
         onPresetChange={vi.fn()}
         onOverrideChange={vi.fn()}
       />
@@ -129,7 +129,7 @@ describe('ModelSelector', () => {
         agents={SAMPLE_AGENTS}
         provider="claude"
         preset="balanced"
-        overrides={{ 'sr-developer': 'claude-opus-4-7' }}
+        overrides={{ 'sr-developer': 'opus' }}
         onPresetChange={vi.fn()}
         onOverrideChange={onOverrideChange}
       />
@@ -145,7 +145,7 @@ describe('ModelSelector', () => {
         agents={SAMPLE_AGENTS}
         provider="claude"
         preset="balanced"
-        overrides={{ 'sr-developer': 'claude-opus-4-7', 'sr-architect': 'claude-haiku-4-5-20251001' }}
+        overrides={{ 'sr-developer': 'opus', 'sr-architect': 'haiku' }}
         onPresetChange={vi.fn()}
         onOverrideChange={vi.fn()}
       />

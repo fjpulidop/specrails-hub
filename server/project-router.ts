@@ -802,7 +802,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
   router.post('/:projectId/chat/conversations', (req: Request, res: Response) => {
     const { db } = ctx(req)
-    const model = (req.body?.model as string | undefined) ?? 'claude-sonnet-4-5'
+    const model = (req.body?.model as string | undefined) ?? 'sonnet'
     const id = uuidv4()
     createConversation(db, { id, model })
     const conversation = getConversation(db, id) as ChatConversationRow

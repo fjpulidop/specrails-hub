@@ -1,4 +1,3 @@
-import type { Terminal } from '@xterm/xterm'
 import { isTauri } from './tauri-shell'
 import { quotePathList } from './shell-quote'
 
@@ -6,33 +5,28 @@ export interface DragDropController {
   dispose: () => void
 }
 
+interface ActiveDropTarget {
+  viewportEl: HTMLElement
+  writeText: (text: string) => boolean
+}
+
 /**
  * Register a Tauri webview drag-drop listener. On drop, hit-test the drop
  * coordinates against the active viewport's bounding rect; if inside, pass the
- * shell-quoted paths to the active terminal via `term.paste`. Outside Tauri,
- * this function is a silent no-op.
+ * shell-quoted paths to the active terminal's PTY writer. Outside Tauri, this
+ * function is a silent no-op.
  *
- * `getActive` returns the active session's `{ term, viewportEl }` or null when
- * no session is active.
+ * `getActive` returns the active session's drop target or null when no session
+ * is active.
  */
 export async function registerTauriDragDrop(
-  getActive: () => { term: Terminal; viewportEl: HTMLElement } | null,
+  getActive: () => ActiveDropTarget | null,
 ): Promise<DragDropController> {
   if (!isTauri()) return { dispose: () => {} }
-  let unlisten: (() => void) | null = null
   try {
-    // Use indirected dynamic import so Vite's static analyser doesn't try to
-    // resolve a path that may not exist in plain-browser dev bundles.
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-    const mod = await ((new Function('s', 'return import(s)') as (s: string) => Promise<unknown>)('@tauri-apps/api/webview').catch(() => null))
-    const getCurrentWebview = (mod as unknown as { getCurrentWebview?: () => unknown })?.getCurrentWebview
-    const wv = getCurrentWebview ? getCurrentWebview() : null
-    if (!wv) return { dispose: () => {} }
-    const onDragDropEvent = (wv as unknown as {
-      onDragDropEvent?: (cb: (ev: { payload: { type: string; paths?: string[]; position?: { x: number; y: number } } }) => void) => Promise<() => void>
-    }).onDragDropEvent
-    if (typeof onDragDropEvent !== 'function') return { dispose: () => {} }
-
+    const unlisteners: Array<() => void> = []
+    let lastDropKey = ''
+    let lastDropAt = 0
     const isWindows = typeof navigator !== 'undefined' && /Win/i.test(navigator.platform || '')
 
     const cb = (ev: { payload: { type: string; paths?: string[]; position?: { x: number; y: number } } }) => {
@@ -40,22 +34,69 @@ export async function registerTauriDragDrop(
       if (!payload || payload.type !== 'drop') return
       const paths = payload.paths
       if (!paths || paths.length === 0) return
+      const pos = payload.position
+      if (!pos) return
+      const dropKey = `${paths.join('\0')}@${pos.x},${pos.y}`
+      const now = Date.now()
+      if (dropKey === lastDropKey && now - lastDropAt < 250) return
+      lastDropKey = dropKey
+      lastDropAt = now
+
       const active = getActive()
       if (!active) return
       const rect = active.viewportEl.getBoundingClientRect()
-      const pos = payload.position
-      if (!pos) return
-      // Tauri reports positions in physical pixels; convert assuming the same
-      // device pixel ratio as the rect (which is in CSS px).
-      const x = pos.x / window.devicePixelRatio
-      const y = pos.y / window.devicePixelRatio
-      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return
+      if (!isDropPositionInsideRect(pos, rect, window.devicePixelRatio || 1)) return
       const text = quotePathList(paths, isWindows)
-      try { active.term.paste(text) } catch { /* ignore */ }
+      try { active.writeText(text) } catch { /* ignore */ }
     }
-    unlisten = await onDragDropEvent(cb)
-    return { dispose: () => { try { unlisten?.() } catch { /* ignore */ } } }
+
+    // Use indirected dynamic import so Vite's static analyser doesn't try to
+    // resolve a path that may not exist in plain-browser dev bundles.
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+    const importTauri = new Function('s', 'return import(s)') as (s: string) => Promise<unknown>
+
+    const webviewMod = await importTauri('@tauri-apps/api/webview').catch(() => null)
+    const getCurrentWebview = (webviewMod as { getCurrentWebview?: () => unknown } | null)?.getCurrentWebview
+    const webview = getCurrentWebview ? getCurrentWebview() : null
+    const onWebviewDragDropEvent = getDragDropListener(webview)
+    if (onWebviewDragDropEvent) unlisteners.push(await onWebviewDragDropEvent(cb))
+
+    const windowMod = await importTauri('@tauri-apps/api/window').catch(() => null)
+    const getCurrentWindow = (windowMod as { getCurrentWindow?: () => unknown } | null)?.getCurrentWindow
+    const appWindow = getCurrentWindow ? getCurrentWindow() : null
+    const onWindowDragDropEvent = getDragDropListener(appWindow)
+    if (onWindowDragDropEvent) unlisteners.push(await onWindowDragDropEvent(cb))
+
+    if (unlisteners.length === 0) return { dispose: () => {} }
+    return { dispose: () => { for (const unlisten of unlisteners) { try { unlisten() } catch { /* ignore */ } } } }
   } catch {
     return { dispose: () => {} }
   }
+}
+
+function getDragDropListener(target: unknown):
+  | ((cb: (ev: { payload: { type: string; paths?: string[]; position?: { x: number; y: number } } }) => void) => Promise<() => void>)
+  | null {
+  const listener = (target as {
+    onDragDropEvent?: (cb: (ev: { payload: { type: string; paths?: string[]; position?: { x: number; y: number } } }) => void) => Promise<() => void>
+  } | null)?.onDragDropEvent
+  return typeof listener === 'function' ? listener.bind(target) : null
+}
+
+export function isDropPositionInsideRect(
+  pos: { x: number; y: number },
+  rect: Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom'>,
+  scaleFactor: number,
+): boolean {
+  if (pointInsideRect(pos.x, pos.y, rect)) return true
+  const factor = Number.isFinite(scaleFactor) && scaleFactor > 0 ? scaleFactor : 1
+  return pointInsideRect(pos.x / factor, pos.y / factor, rect)
+}
+
+function pointInsideRect(
+  x: number,
+  y: number,
+  rect: Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom'>,
+): boolean {
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
 }

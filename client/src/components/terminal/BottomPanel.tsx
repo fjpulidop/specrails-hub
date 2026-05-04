@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/utils'
 import {
@@ -8,6 +8,8 @@ import {
 } from '../../context/TerminalsContext'
 import { openExternalUrl } from '../../lib/tauri-shell'
 import { DEFAULT_TERMINAL_SETTINGS, type TerminalSettings } from '../../lib/terminal-settings-types'
+import { TERMINAL_SETTINGS_UPDATED_EVENT, type TerminalSettingsUpdatedEventDetail } from '../../lib/terminal-settings-events'
+import { registerTauriDragDrop } from '../../lib/tauri-drag-drop'
 import { ShortcutContextMenu } from './ShortcutContextMenu'
 import { TerminalTopBar } from './TerminalTopBar'
 import { TerminalSidebar } from './TerminalSidebar'
@@ -26,24 +28,37 @@ interface BottomPanelProps {
 export function BottomPanel({ projectId, state, viewportHeight, statusBarHeight }: BottomPanelProps) {
   const t = useTerminals()
   const navigate = useNavigate()
+  const panelRef = useRef<HTMLDivElement | null>(null)
   const [livePreviewHeight, setLivePreviewHeight] = useState<number | null>(null)
   const [settings, setSettings] = useState<TerminalSettings>(DEFAULT_TERMINAL_SETTINGS)
   const [shortcutMenu, setShortcutMenu] = useState<{ x: number; y: number; kind: 'browser' | 'script' } | null>(null)
 
+  const loadSettings = useCallback(async (cancelled: () => boolean = () => false) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/terminal-settings`)
+      if (!res.ok) return
+      const body = await res.json() as { resolved?: TerminalSettings }
+      if (!cancelled() && body?.resolved) setSettings(body.resolved)
+    } catch { /* ignore — keep current settings */ }
+  }, [projectId])
+
   // Resolve terminal settings (project override → hub default) for this project,
-  // so the Browser shortcut button uses the configured URL.
+  // so the shortcut buttons use the configured values.
   useEffect(() => {
     let cancelled = false
-    void (async () => {
-      try {
-        const res = await fetch(`/api/projects/${projectId}/terminal-settings`)
-        if (!res.ok) return
-        const body = await res.json() as { resolved?: TerminalSettings }
-        if (!cancelled && body?.resolved) setSettings(body.resolved)
-      } catch { /* ignore — keep defaults */ }
-    })()
+    void loadSettings(() => cancelled)
     return () => { cancelled = true }
-  }, [projectId])
+  }, [loadSettings])
+
+  useEffect(() => {
+    const onSettingsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<TerminalSettingsUpdatedEventDetail>).detail
+      if (detail?.mode === 'project' && detail.projectId !== projectId) return
+      void loadSettings()
+    }
+    window.addEventListener(TERMINAL_SETTINGS_UPDATED_EVENT, onSettingsUpdated)
+    return () => window.removeEventListener(TERMINAL_SETTINGS_UPDATED_EVENT, onSettingsUpdated)
+  }, [loadSettings, projectId])
 
   const maxHeight = Math.max(PANEL_MIN_HEIGHT, viewportHeight - statusBarHeight - 40)
   const userHeight = Math.min(Math.max(state.userHeight || DEFAULT_USER_HEIGHT, PANEL_MIN_HEIGHT), maxHeight)
@@ -53,6 +68,36 @@ export function BottomPanel({ projectId, state, viewportHeight, statusBarHeight 
 
   const canCreate = state.sessions.length < TERMINAL_MAX_PER_PROJECT
   const hasActive = state.activeId !== null
+
+  useEffect(() => {
+    let disposed = false
+    let controller: { dispose: () => void } | null = null
+    void registerTauriDragDrop(() => {
+      const panel = panelRef.current
+      const activeId = state.activeId
+      if (!panel || !activeId || state.visibility === 'hidden') return null
+      return {
+        viewportEl: panel,
+        writeText: (text: string) => {
+          if (t.writeToSession(activeId, text)) return true
+          const term = t.getTerminalInstance(activeId)
+          try {
+            term?.paste(text)
+            return Boolean(term)
+          } catch {
+            return false
+          }
+        },
+      }
+    }).then((c) => {
+      if (disposed) c.dispose()
+      else controller = c
+    })
+    return () => {
+      disposed = true
+      controller?.dispose()
+    }
+  }, [state.activeId, state.visibility, t])
 
   const handleCreate = useCallback(() => {
     if (!canCreate) return
@@ -111,6 +156,7 @@ export function BottomPanel({ projectId, state, viewportHeight, statusBarHeight 
 
   return (
     <div
+      ref={panelRef}
       className={cn(
         'relative flex flex-col shrink-0 bg-background/95',
         'border-t border-border/40',
