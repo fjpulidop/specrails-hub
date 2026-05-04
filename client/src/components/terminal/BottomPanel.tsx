@@ -8,6 +8,7 @@ import {
 } from '../../context/TerminalsContext'
 import { openExternalUrl } from '../../lib/tauri-shell'
 import { DEFAULT_TERMINAL_SETTINGS, type TerminalSettings } from '../../lib/terminal-settings-types'
+import { TERMINAL_SETTINGS_UPDATED_EVENT, type TerminalSettingsUpdatedEventDetail } from '../../lib/terminal-settings-events'
 import { ShortcutContextMenu } from './ShortcutContextMenu'
 import { TerminalTopBar } from './TerminalTopBar'
 import { TerminalSidebar } from './TerminalSidebar'
@@ -30,20 +31,32 @@ export function BottomPanel({ projectId, state, viewportHeight, statusBarHeight 
   const [settings, setSettings] = useState<TerminalSettings>(DEFAULT_TERMINAL_SETTINGS)
   const [shortcutMenu, setShortcutMenu] = useState<{ x: number; y: number; kind: 'browser' | 'script' } | null>(null)
 
+  const loadSettings = useCallback(async (cancelled: () => boolean = () => false) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/terminal-settings`)
+      if (!res.ok) return
+      const body = await res.json() as { resolved?: TerminalSettings }
+      if (!cancelled() && body?.resolved) setSettings(body.resolved)
+    } catch { /* ignore — keep current settings */ }
+  }, [projectId])
+
   // Resolve terminal settings (project override → hub default) for this project,
-  // so the Browser shortcut button uses the configured URL.
+  // so the shortcut buttons use the configured values.
   useEffect(() => {
     let cancelled = false
-    void (async () => {
-      try {
-        const res = await fetch(`/api/projects/${projectId}/terminal-settings`)
-        if (!res.ok) return
-        const body = await res.json() as { resolved?: TerminalSettings }
-        if (!cancelled && body?.resolved) setSettings(body.resolved)
-      } catch { /* ignore — keep defaults */ }
-    })()
+    void loadSettings(() => cancelled)
     return () => { cancelled = true }
-  }, [projectId])
+  }, [loadSettings])
+
+  useEffect(() => {
+    const onSettingsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<TerminalSettingsUpdatedEventDetail>).detail
+      if (detail?.mode === 'project' && detail.projectId !== projectId) return
+      void loadSettings()
+    }
+    window.addEventListener(TERMINAL_SETTINGS_UPDATED_EVENT, onSettingsUpdated)
+    return () => window.removeEventListener(TERMINAL_SETTINGS_UPDATED_EVENT, onSettingsUpdated)
+  }, [loadSettings, projectId])
 
   const maxHeight = Math.max(PANEL_MIN_HEIGHT, viewportHeight - statusBarHeight - 40)
   const userHeight = Math.min(Math.max(state.userHeight || DEFAULT_USER_HEIGHT, PANEL_MIN_HEIGHT), maxHeight)

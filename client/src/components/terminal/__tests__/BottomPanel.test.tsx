@@ -1,10 +1,19 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { render, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { BottomPanel } from '../BottomPanel'
 import { TerminalsProvider } from '../../../context/TerminalsContext'
 import type { ProjectPanelState, TerminalRef } from '../../../context/TerminalsContext'
+import { DEFAULT_TERMINAL_SETTINGS, type TerminalSettings } from '../../../lib/terminal-settings-types'
+import { TERMINAL_SETTINGS_UPDATED_EVENT } from '../../../lib/terminal-settings-events'
+import { openExternalUrl } from '../../../lib/tauri-shell'
+
+vi.mock('../../../lib/tauri-shell', () => ({
+  isTauri: () => false,
+  revealItemInDir: vi.fn(),
+  openExternalUrl: vi.fn(),
+}))
 
 vi.mock('@xterm/xterm', () => {
   class Terminal {
@@ -66,6 +75,7 @@ function makeState(overrides: Partial<ProjectPanelState> = {}): ProjectPanelStat
 describe('BottomPanel', () => {
   beforeEach(() => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+    vi.mocked(openExternalUrl).mockClear()
     localStorage.clear()
   })
 
@@ -135,6 +145,55 @@ describe('BottomPanel', () => {
     )
     fireEvent.click(getByLabelText(/^new terminal$/i))
     expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('refreshes shortcut settings when terminal settings are saved', async () => {
+    const oldSettings: TerminalSettings = {
+      ...DEFAULT_TERMINAL_SETTINGS,
+      browserShortcutUrl: 'https://old.example',
+      quickScript: '',
+    }
+    const newSettings: TerminalSettings = {
+      ...oldSettings,
+      browserShortcutUrl: 'https://new.example',
+      quickScript: 'npm test',
+    }
+    let resolved = oldSettings
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (String(url).endsWith('/terminal-settings')) {
+        return Promise.resolve({ ok: true, json: async () => ({ resolved }) })
+      }
+      if (String(url).endsWith('/terminals')) {
+        return Promise.resolve({ ok: true, json: async () => ({ sessions: [] }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) })
+    })
+    global.fetch = fetchMock
+
+    const s: TerminalRef = { id: 's1', projectId: 'p', name: 'zsh', cols: 80, rows: 24, createdAt: 1 }
+    const { getByLabelText } = wrap(
+      <BottomPanel projectId="p" state={makeState({ sessions: [s], activeId: 's1' })} viewportHeight={800} statusBarHeight={28} />,
+    )
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/terminal-settings'))).toBe(true)
+    })
+    fireEvent.click(getByLabelText('Open in browser'))
+    expect(openExternalUrl).toHaveBeenLastCalledWith('https://old.example')
+    expect(getByLabelText('No active terminal to paste into')).toBeDisabled()
+
+    resolved = newSettings
+    window.dispatchEvent(new CustomEvent(TERMINAL_SETTINGS_UPDATED_EVENT, {
+      detail: { mode: 'project', projectId: 'p' },
+    }))
+
+    await waitFor(() => {
+      const terminalSettingsCalls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/terminal-settings'))
+      expect(terminalSettingsCalls).toHaveLength(2)
+    })
+    fireEvent.click(getByLabelText('Open in browser'))
+    expect(openExternalUrl).toHaveBeenLastCalledWith('https://new.example')
+    expect(getByLabelText('Paste quick script into active terminal')).not.toBeDisabled()
   })
 
   it('kill-active button fires DELETE', () => {
