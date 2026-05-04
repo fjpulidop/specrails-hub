@@ -1,44 +1,163 @@
 /** @vitest-environment jsdom */
-import { describe, it, expect, vi } from 'vitest'
-import { render } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, waitFor } from '@testing-library/react'
 import { TerminalViewport } from '../TerminalViewport'
-import { TerminalsProvider } from '../../../context/TerminalsContext'
 
-vi.mock('@xterm/xterm', () => {
-  class Terminal {
-    cols = 80; rows = 24; element: HTMLElement | null = null
-    loadAddon = vi.fn(); open = vi.fn(); focus = vi.fn(); dispose = vi.fn()
-    write = vi.fn(); onData = () => ({ dispose: vi.fn() }); onResize = () => ({ dispose: vi.fn() })
+const mocks = vi.hoisted(() => ({
+  useTerminals: vi.fn(),
+}))
+
+vi.mock('../../../context/TerminalsContext', () => ({
+  useTerminals: () => mocks.useTerminals(),
+}))
+
+vi.mock('../../../lib/tauri-shell', () => ({
+  isTauri: () => false,
+  revealItemInDir: vi.fn(),
+}))
+
+vi.mock('../PromptGutter', () => ({
+  PromptGutter: () => null,
+}))
+
+vi.mock('../CommandTimingBadge', () => ({
+  CommandTimingBadge: () => null,
+}))
+
+function makeTerm(overrides: Partial<FakeTerminal> = {}): FakeTerminal {
+  return {
+    paste: vi.fn(),
+    getSelection: vi.fn(() => ''),
+    modes: { mouseTrackingMode: 'none' },
+    ...overrides,
   }
-  return { Terminal }
-})
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit = vi.fn() } }))
-vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }))
-vi.mock('@xterm/xterm/css/xterm.css', () => ({}))
-class MockWebSocket extends EventTarget {
-  readyState = 0; binaryType = 'arraybuffer'
-  constructor(_: string) { super() }
-  send() {} close() { this.readyState = 3 }
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-;(globalThis as any).WebSocket = MockWebSocket
+
+interface FakeTerminal {
+  paste: ReturnType<typeof vi.fn>
+  getSelection: ReturnType<typeof vi.fn>
+  modes: { mouseTrackingMode: string }
+}
+
+function mockTerminals(term: FakeTerminal | null = null) {
+  mocks.useTerminals.mockReturnValue({
+    subscribeOpenSearch: vi.fn(() => undefined),
+    getSearchAddon: vi.fn(() => null),
+    getTerminalInstance: vi.fn(() => term),
+    getCwd: vi.fn(() => null),
+    getContainer: vi.fn(() => null),
+    notifyAdopted: vi.fn(),
+    refitActive: vi.fn(),
+  })
+}
 
 describe('TerminalViewport', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockTerminals(null)
+  })
+
   it('renders a slot element', () => {
-    const { container } = render(
-      <TerminalsProvider activeProjectId="p">
-        <TerminalViewport activeId={null} />
-      </TerminalsProvider>,
-    )
+    const { container } = render(<TerminalViewport activeId={null} />)
     expect(container.querySelector('[data-terminal-viewport]')).toBeTruthy()
   })
 
   it('returns without error when activeId has no container yet', () => {
-    const { container } = render(
-      <TerminalsProvider activeProjectId="p">
-        <TerminalViewport activeId="missing-id" />
-      </TerminalsProvider>,
-    )
+    const { container } = render(<TerminalViewport activeId="missing-id" />)
     expect(container.querySelector('[data-terminal-viewport]')).toBeTruthy()
+  })
+
+  it('pastes native file paths instead of allowing file previews on drop', () => {
+    const term = makeTerm()
+    mockTerminals(term)
+    const { container } = render(<TerminalViewport activeId="s1" />)
+    const slot = container.querySelector('[data-terminal-viewport]') as HTMLElement
+    const file = new File(['hello'], 'hello.txt', { type: 'text/plain' })
+    Object.defineProperty(file, 'path', { value: '/Users/javi/Desktop/hello.txt' })
+
+    const event = new Event('drop', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', {
+      value: {
+        types: ['Files'],
+        files: [file],
+      },
+    })
+    event.stopPropagation = vi.fn()
+    fireEvent(slot, event)
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(event.stopPropagation).toHaveBeenCalled()
+    expect(term.paste).toHaveBeenCalledWith("'/Users/javi/Desktop/hello.txt'")
+  })
+
+  it('prevents file drops without native paths so the WebView does not render previews', () => {
+    const term = makeTerm()
+    mockTerminals(term)
+    const { container } = render(<TerminalViewport activeId="s1" />)
+    const slot = container.querySelector('[data-terminal-viewport]') as HTMLElement
+    const file = new File(['hello'], 'hello.txt', { type: 'text/plain' })
+
+    const event = new Event('drop', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', {
+      value: {
+        types: ['Files'],
+        files: [file],
+      },
+    })
+    event.stopPropagation = vi.fn()
+    fireEvent(slot, event)
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(event.stopPropagation).toHaveBeenCalled()
+    expect(term.paste).not.toHaveBeenCalled()
+  })
+
+  it('captures native paste events and writes text to the terminal', () => {
+    const term = makeTerm()
+    mockTerminals(term)
+    const { container } = render(<TerminalViewport activeId="s1" />)
+    const slot = container.querySelector('[data-terminal-viewport]') as HTMLElement
+
+    fireEvent.paste(slot, {
+      clipboardData: {
+        getData: (format: string) => format === 'text/plain' ? 'npm test' : '',
+      },
+    })
+
+    expect(term.paste).toHaveBeenCalledWith('npm test')
+  })
+
+  it('uses navigator clipboard as a Cmd+V fallback', async () => {
+    const term = makeTerm()
+    mockTerminals(term)
+    Object.defineProperty(navigator, 'platform', { value: 'MacIntel', configurable: true })
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { readText: vi.fn().mockResolvedValue('echo hi') },
+      configurable: true,
+    })
+    const { container } = render(<TerminalViewport activeId="s1" />)
+    const slot = container.querySelector('[data-terminal-viewport]') as HTMLElement
+
+    fireEvent.keyDown(slot, { key: 'v', metaKey: true })
+
+    await waitFor(() => {
+      expect(term.paste).toHaveBeenCalledWith('echo hi')
+    })
+  })
+
+  it('captures native copy events when the terminal has a selection', () => {
+    const term = makeTerm({ getSelection: vi.fn(() => 'selected text') })
+    mockTerminals(term)
+    const { container } = render(<TerminalViewport activeId="s1" />)
+    const slot = container.querySelector('[data-terminal-viewport]') as HTMLElement
+    const setData = vi.fn()
+
+    fireEvent.copy(slot, {
+      clipboardData: {
+        setData,
+      },
+    })
+
+    expect(setData).toHaveBeenCalledWith('text/plain', 'selected text')
   })
 })

@@ -5,6 +5,7 @@ import { TerminalContextMenu } from './TerminalContextMenu'
 import { revealItemInDir, isTauri } from '../../lib/tauri-shell'
 import { saveScrollbackToFile } from '../../lib/save-scrollback'
 import { registerTauriDragDrop } from '../../lib/tauri-drag-drop'
+import { quotePathList } from '../../lib/shell-quote'
 import { PromptGutter } from './PromptGutter'
 import { CommandTimingBadge } from './CommandTimingBadge'
 
@@ -43,6 +44,17 @@ export function TerminalViewport({ activeId }: TerminalViewportProps) {
   const cwd = activeId ? terminals.getCwd(activeId) : null
   const [dragOver, setDragOver] = useState(false)
 
+  const pasteDroppedFiles = useCallback((files: FileList | null | undefined): boolean => {
+    if (!term || !files || files.length === 0) return false
+    const paths = Array.from(files)
+      .map((file) => getNativeFilePath(file))
+      .filter((path): path is string => Boolean(path))
+    if (paths.length === 0) return false
+    const isWindows = typeof navigator !== 'undefined' && /Win/i.test(navigator.platform || '')
+    try { term.paste(quotePathList(paths, isWindows)) } catch { return false }
+    return true
+  }, [term])
+
   const handleContextMenu = useCallback((ev: React.MouseEvent) => {
     // Always preventDefault so the WebView's native contextmenu does not show.
     ev.preventDefault()
@@ -54,6 +66,50 @@ export function TerminalViewport({ activeId }: TerminalViewportProps) {
       if (mode && mode !== 'none') return
     }
     setMenu({ x: ev.clientX, y: ev.clientY })
+  }, [term])
+
+  const handlePaste = useCallback((ev: React.ClipboardEvent<HTMLDivElement>) => {
+    if (!term) return
+    const text = ev.clipboardData.getData('text/plain')
+    if (!text) return
+    ev.preventDefault()
+    ev.stopPropagation()
+    try { term.paste(text) } catch { /* ignore */ }
+  }, [term])
+
+  const handleCopy = useCallback((ev: React.ClipboardEvent<HTMLDivElement>) => {
+    if (!term) return
+    const selection = term.getSelection()
+    if (!selection) return
+    ev.clipboardData.setData('text/plain', selection)
+    ev.preventDefault()
+    ev.stopPropagation()
+  }, [term])
+
+  const handleKeyDownCapture = useCallback((ev: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!term) return
+    const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform || '')
+    const cmd = isMac ? ev.metaKey : ev.ctrlKey
+    if (!cmd) return
+    if (ev.key === 'v' || ev.key === 'V') {
+      ev.preventDefault()
+      ev.stopPropagation()
+      try {
+        void navigator.clipboard?.readText().then((text) => {
+          if (text) {
+            try { term.paste(text) } catch { /* ignore */ }
+          }
+        })
+      } catch { /* ignore */ }
+      return
+    }
+    if (ev.key === 'c' || ev.key === 'C') {
+      const selection = term.getSelection()
+      if (!selection) return
+      ev.preventDefault()
+      ev.stopPropagation()
+      try { void navigator.clipboard?.writeText(selection) } catch { /* ignore */ }
+    }
   }, [term])
 
   // Register Tauri drag-drop listener. Returns active session/viewport on demand.
@@ -122,13 +178,31 @@ export function TerminalViewport({ activeId }: TerminalViewportProps) {
       role="presentation"
       data-terminal-viewport
       onContextMenu={handleContextMenu}
-      onDragEnter={(e) => { if (e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); setDragOver(true) } }}
-      onDragOver={(e) => { if (e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); setDragOver(true) } }}
+      onPasteCapture={handlePaste}
+      onCopyCapture={handleCopy}
+      onKeyDownCapture={handleKeyDownCapture}
+      tabIndex={-1}
+      onDragEnter={(e) => {
+        if (hasFileTransfer(e.dataTransfer)) {
+          e.preventDefault()
+          e.stopPropagation()
+          setDragOver(true)
+        }
+      }}
+      onDragOver={(e) => {
+        if (hasFileTransfer(e.dataTransfer)) {
+          e.preventDefault()
+          e.stopPropagation()
+          setDragOver(true)
+        }
+      }}
       onDragLeave={() => setDragOver(false)}
       onDrop={(e) => {
-        // Browser drop has no path; we render highlight only and let Tauri's
-        // native event handle the actual paste in the desktop app.
-        if (e.dataTransfer?.types?.includes('Files')) e.preventDefault()
+        if (hasFileTransfer(e.dataTransfer)) {
+          e.preventDefault()
+          e.stopPropagation()
+          pasteDroppedFiles(e.dataTransfer.files)
+        }
         setDragOver(false)
       }}
     >
@@ -152,4 +226,15 @@ export function TerminalViewport({ activeId }: TerminalViewportProps) {
       )}
     </div>
   )
+}
+
+function getNativeFilePath(file: File): string | null {
+  const path = (file as File & { path?: unknown }).path
+  if (typeof path === 'string' && path.length > 0) return path
+  return null
+}
+
+function hasFileTransfer(dataTransfer: DataTransfer | null): boolean {
+  if (!dataTransfer) return false
+  return Array.from(dataTransfer.types).includes('Files')
 }
