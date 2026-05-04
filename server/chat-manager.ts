@@ -35,6 +35,27 @@ function codexOnPath(): boolean {
   }
 }
 
+function normalizeClaudeCodeModel(model: string | null | undefined): string {
+  switch (model) {
+    case 'claude-sonnet-4-6':
+    case 'claude-sonnet-4-5':
+    case 'claude-sonnet-4-0':
+    case 'claude-sonnet-4-20250514':
+      return 'sonnet'
+    case 'claude-opus-4-7':
+    case 'claude-opus-4-5':
+    case 'claude-opus-4-1-20250805':
+    case 'claude-opus-4-20250514':
+      return 'opus'
+    case 'claude-haiku-4-5-20251001':
+    case 'claude-3-5-haiku-20241022':
+    case 'claude-3-5-haiku-latest':
+      return 'haiku'
+    default:
+      return model || 'sonnet'
+  }
+}
+
 function extractTextFromEvent(event: Record<string, unknown>): string | null {
   const type = event.type as string
   if (type === 'assistant') {
@@ -288,7 +309,7 @@ export class ChatManager {
         : this._buildSystemPrompt()
       if (hasAttachments) systemPrompt = `${systemPrompt}\n\n${USER_ATTACHMENT_SYSTEM_NOTE}`
       args = [
-        '--model', conversation.model,
+        '--model', normalizeClaudeCodeModel(conversation.model),
         '--dangerously-skip-permissions',
         '--tools', 'default',
         '--output-format', 'stream-json',
@@ -314,10 +335,12 @@ export class ChatManager {
       cwd: this._cwd,
     })
 
+    let stderrBuf = ''
     // Drain stderr so the pipe buffer never fills up (child process would block otherwise)
-    child.stderr?.resume()
     child.stderr?.on('data', (chunk: Buffer) => {
-      console.error(`[chat-manager] claude stderr (${conversationId}):`, chunk.toString().trim())
+      const text = chunk.toString()
+      stderrBuf += text
+      console.error(`[chat-manager] ${binary} stderr (${conversationId}):`, text.trim())
     })
 
     this._activeProcesses.set(conversationId, child)
@@ -471,10 +494,13 @@ export class ChatManager {
             this._autoTitle(conversationId, userText, fullText)
           }
         } else {
+          const stderrTail = stderrBuf.trim().slice(-500)
           this._broadcast({
             type: 'chat_error',
             conversationId,
-            error: `Process exited with code ${code ?? 'unknown'}`,
+            error: stderrTail
+              ? `${binary} exited with code ${code ?? 'unknown'}: ${stderrTail}`
+              : `Process exited with code ${code ?? 'unknown'}`,
             timestamp: new Date().toISOString(),
           })
         }

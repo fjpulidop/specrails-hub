@@ -14,9 +14,9 @@ interface ModelOption {
 }
 
 export const MODEL_OPTIONS: ModelOption[] = [
-  { alias: 'sonnet', label: 'Sonnet', fullId: 'claude-sonnet-4-6',          tier: 'Balanced',     tierColor: 'neutral' },
-  { alias: 'opus',   label: 'Opus',   fullId: 'claude-opus-4-7',            tier: 'Most capable', tierColor: 'accent'  },
-  { alias: 'haiku',  label: 'Haiku',  fullId: 'claude-haiku-4-5-20251001',  tier: 'Fastest',      tierColor: 'green'   },
+  { alias: 'sonnet', label: 'Sonnet', fullId: 'Claude Code alias: sonnet', tier: 'Balanced',     tierColor: 'neutral' },
+  { alias: 'opus',   label: 'Opus',   fullId: 'Claude Code alias: opus',   tier: 'Most capable', tierColor: 'accent'  },
+  { alias: 'haiku',  label: 'Haiku',  fullId: 'Claude Code alias: haiku',  tier: 'Fastest',      tierColor: 'green'   },
 ]
 
 function tierBadgeClass(color: ModelOption['tierColor']): string {

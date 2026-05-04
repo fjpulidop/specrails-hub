@@ -140,7 +140,7 @@ const MIGRATIONS: Migration[] = [
       CREATE TABLE IF NOT EXISTS chat_conversations (
         id           TEXT PRIMARY KEY,
         title        TEXT,
-        model        TEXT NOT NULL DEFAULT 'claude-sonnet-4-5',
+        model        TEXT NOT NULL DEFAULT 'sonnet',
         session_id   TEXT,
         created_at   TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
