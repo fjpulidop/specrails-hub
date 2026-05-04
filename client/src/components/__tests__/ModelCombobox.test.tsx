@@ -6,10 +6,10 @@ import { ModelCombobox } from '../ModelCombobox'
 
 // ─── ModelCombobox ────────────────────────────────────────────────────────────
 //
-// ModelCombobox is a Radix Select wrapping the three Claude model aliases:
-//   sonnet  → label "Sonnet", tier badge "Balanced", full ID "claude-sonnet-4-6"
-//   opus    → label "Opus",   tier badge "Most capable", full ID "claude-opus-4-7"
-//   haiku   → label "Haiku",  tier badge "Fastest",     full ID "claude-haiku-4-5-20251001"
+// ModelCombobox is a Radix Select wrapping the three Claude Code model aliases:
+//   sonnet  → label "Sonnet", tier badge "Balanced"
+//   opus    → label "Opus",   tier badge "Most capable"
+//   haiku   → label "Haiku",  tier badge "Fastest"
 //
 // Tests verify: static render, option display, onChange callback, disabled state.
 // Radix Select portals render in document.body — queried via screen.getByRole.
@@ -78,21 +78,21 @@ describe('ModelCombobox', () => {
     const user = userEvent.setup()
     render(<ModelCombobox value="sonnet" onChange={vi.fn()} />)
     await user.click(screen.getByRole('combobox'))
-    expect(screen.getByText(/claude-sonnet-4-6/i)).toBeInTheDocument()
+    expect(screen.getByText(/alias: sonnet/i)).toBeInTheDocument()
   })
 
   it('shows full model ID for opus option', async () => {
     const user = userEvent.setup()
     render(<ModelCombobox value="sonnet" onChange={vi.fn()} />)
     await user.click(screen.getByRole('combobox'))
-    expect(screen.getByText(/claude-opus-4-7/i)).toBeInTheDocument()
+    expect(screen.getByText(/alias: opus/i)).toBeInTheDocument()
   })
 
   it('shows full model ID for haiku option', async () => {
     const user = userEvent.setup()
     render(<ModelCombobox value="sonnet" onChange={vi.fn()} />)
     await user.click(screen.getByRole('combobox'))
-    expect(screen.getByText(/claude-haiku-4-5-20251001/i)).toBeInTheDocument()
+    expect(screen.getByText(/alias: haiku/i)).toBeInTheDocument()
   })
 
   it('calls onChange with "opus" when opus option is selected', async () => {

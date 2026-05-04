@@ -6,7 +6,7 @@ import { ChatInput } from '../ChatInput'
 
 const defaultProps = {
   conversationId: 'conv-1',
-  model: 'claude-sonnet-4-6',
+  model: 'sonnet',
   hasMessages: false,
   isStreaming: false,
   onSend: vi.fn(),
@@ -114,9 +114,9 @@ describe('ChatInput', () => {
   })
 
   it('model selector shows current model', () => {
-    render(<ChatInput {...defaultProps} model="claude-sonnet-4-6" />)
+    render(<ChatInput {...defaultProps} model="sonnet" />)
     const select = screen.getByRole('combobox') as HTMLSelectElement
-    expect(select.value).toBe('claude-sonnet-4-6')
+    expect(select.value).toBe('sonnet')
   })
 
   it('model selector is disabled when hasMessages is true', () => {
@@ -136,8 +136,8 @@ describe('ChatInput', () => {
     const onModelChange = vi.fn()
     render(<ChatInput {...defaultProps} onModelChange={onModelChange} />)
     const select = screen.getByRole('combobox')
-    await user.selectOptions(select, 'claude-opus-4-7')
-    expect(onModelChange).toHaveBeenCalledWith('claude-opus-4-7')
+    await user.selectOptions(select, 'opus')
+    expect(onModelChange).toHaveBeenCalledWith('opus')
   })
 
   it('when provider=codex, dropdown lists gpt-5.4-mini as the first option', () => {
