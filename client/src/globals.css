@@ -69,6 +69,7 @@
   --color-prose-table-stripe:     hsl(232 14% 31% / 0.2);
   --color-prose-table-header:     hsl(232 14% 31% / 0.5);
   --color-toast-shadow:           hsl(231 15% 6% / 0.5);
+  --glass-card-opacity:           30%;
 }
 
 /* ─── Aurora Light (premium light theme) ─── */
@@ -107,6 +108,7 @@
   --color-prose-table-stripe:    hsl(220 18% 96% / 0.6);
   --color-prose-table-header:    hsl(220 18% 92% / 0.8);
   --color-toast-shadow:          hsl(225 30% 30% / 0.18);
+  --glass-card-opacity:          92%;
 }
 
 /* ─── Obsidian Dark (premium dark theme — distinct from Dracula) ─── */
@@ -145,6 +147,7 @@
   --color-prose-table-stripe:    hsl(222 14% 16% / 0.5);
   --color-prose-table-header:    hsl(222 14% 16% / 0.8);
   --color-toast-shadow:          hsl(222 30% 2% / 0.6);
+  --glass-card-opacity:          30%;
 }
 
 @layer base {
@@ -186,7 +189,7 @@
 
 /* Glassmorphism card */
 @utility glass-card {
-  background: color-mix(in srgb, var(--color-surface) 30%, transparent);
+  background: color-mix(in srgb, var(--color-surface) var(--glass-card-opacity, 30%), transparent);
   border-radius: 0.5rem;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);

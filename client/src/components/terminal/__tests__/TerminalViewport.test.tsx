@@ -132,23 +132,25 @@ describe('TerminalViewport', () => {
     expect(term.paste).not.toHaveBeenCalled()
   })
 
-  it('uses navigator clipboard as a Cmd+V fallback', async () => {
+  it('writes shell-quoted file paths when files are pasted', () => {
     const term = makeTerm()
     const writeToSession = vi.fn(() => true)
     mockTerminals(term, writeToSession)
     Object.defineProperty(navigator, 'platform', { value: 'MacIntel', configurable: true })
-    Object.defineProperty(navigator, 'clipboard', {
-      value: { readText: vi.fn().mockResolvedValue('echo hi') },
-      configurable: true,
-    })
     const { container } = render(<TerminalViewport activeId="s1" />)
     const slot = container.querySelector('[data-terminal-viewport]') as HTMLElement
 
-    fireEvent.keyDown(slot, { key: 'v', metaKey: true })
+    const fileA = Object.assign(new File([''], 'a.txt'), { path: '/Users/me/a.txt' })
+    const fileB = Object.assign(new File([''], 'with space.txt'), { path: '/Users/me/with space.txt' })
 
-    await waitFor(() => {
-      expect(writeToSession).toHaveBeenCalledWith('s1', 'echo hi')
+    fireEvent.paste(slot, {
+      clipboardData: {
+        files: [fileA, fileB],
+        getData: () => '',
+      },
     })
+
+    expect(writeToSession).toHaveBeenCalledWith('s1', "'/Users/me/a.txt' '/Users/me/with space.txt'")
     expect(term.paste).not.toHaveBeenCalled()
   })
 

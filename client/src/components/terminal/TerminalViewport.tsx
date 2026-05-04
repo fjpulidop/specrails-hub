@@ -5,6 +5,7 @@ import { TerminalContextMenu } from './TerminalContextMenu'
 import { revealItemInDir, isTauri } from '../../lib/tauri-shell'
 import { saveScrollbackToFile } from '../../lib/save-scrollback'
 import { quotePathList } from '../../lib/shell-quote'
+import { writeClipboardText } from '../../lib/tauri-clipboard'
 import { PromptGutter } from './PromptGutter'
 import { CommandTimingBadge } from './CommandTimingBadge'
 
@@ -80,6 +81,18 @@ export function TerminalViewport({ activeId }: TerminalViewportProps) {
 
   const handlePaste = useCallback((ev: React.ClipboardEvent<HTMLDivElement>) => {
     if (!term) return
+    if (ev.clipboardData.files && ev.clipboardData.files.length > 0) {
+      const paths = Array.from(ev.clipboardData.files)
+        .map((file) => getNativeFilePath(file))
+        .filter((path): path is string => Boolean(path))
+      if (paths.length > 0) {
+        ev.preventDefault()
+        ev.stopPropagation()
+        const isWindows = typeof navigator !== 'undefined' && /Win/i.test(navigator.platform || '')
+        writeToActiveTerminal(quotePathList(paths, isWindows))
+        return
+      }
+    }
     const text = ev.clipboardData.getData('text/plain')
     if (!text) return
     ev.preventDefault()
@@ -101,24 +114,12 @@ export function TerminalViewport({ activeId }: TerminalViewportProps) {
     const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform || '')
     const cmd = isMac ? ev.metaKey : ev.ctrlKey
     if (!cmd) return
-    if (ev.key === 'v' || ev.key === 'V') {
-      ev.preventDefault()
-      ev.stopPropagation()
-      try {
-        void navigator.clipboard?.readText().then((text) => {
-          if (text) {
-            writeToActiveTerminal(text)
-          }
-        })
-      } catch { /* ignore */ }
-      return
-    }
     if (ev.key === 'c' || ev.key === 'C') {
       const selection = term.getSelection()
       if (!selection) return
       ev.preventDefault()
       ev.stopPropagation()
-      try { void navigator.clipboard?.writeText(selection) } catch { /* ignore */ }
+      void writeClipboardText(selection)
     }
   }, [term])
 
@@ -165,7 +166,7 @@ export function TerminalViewport({ activeId }: TerminalViewportProps) {
   return (
     <div
       ref={slotRef}
-      className={`flex-1 min-w-0 bg-[#282a36] px-2 py-1 relative ${dragOver ? 'outline outline-2 outline-[#bd93f9] outline-offset-[-2px]' : ''}`}
+      className={`flex-1 min-w-0 bg-background px-2 py-1 relative ${dragOver ? 'outline outline-2 outline-accent-primary outline-offset-[-2px]' : ''}`}
       role="presentation"
       data-terminal-viewport
       onContextMenu={handleContextMenu}
