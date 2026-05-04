@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { Terminal } from '@xterm/xterm'
+import { readClipboardText, writeClipboardText } from '../../lib/tauri-clipboard'
 
 interface Props {
   /** Anchor coordinates (clientX/Y) where the menu should appear. */
@@ -46,13 +47,13 @@ export function TerminalContextMenu({ x, y, term, cwd, hasReveal, onClose, onOpe
 
   function copy() {
     if (!hasSelection) return
-    try { void navigator.clipboard?.writeText(selection) } catch { /* ignore */ }
+    void writeClipboardText(selection)
     onClose()
   }
   function paste() {
-    try {
-      void navigator.clipboard?.readText().then((t) => { try { term.paste(t) } catch { /* ignore */ } })
-    } catch { /* ignore */ }
+    void readClipboardText().then((t) => {
+      if (t) { try { term.paste(t) } catch { /* ignore */ } }
+    })
     onClose()
   }
   function selectAll() {

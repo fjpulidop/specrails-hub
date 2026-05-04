@@ -32,6 +32,7 @@ import { WS_URL } from '../lib/ws-url'
 import { getHubTokenProtocol } from '../lib/auth'
 import { useThemeOptional } from './ThemeContext'
 import { getActiveTheme } from '../lib/theme-palette'
+import { readClipboardText, writeClipboardText } from '../lib/tauri-clipboard'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -665,21 +666,17 @@ function ensureXtermForSession(
     if (key === 'c' || key === 'C') {
       const sel = term.getSelection()
       if (sel.length === 0) return true
-      try {
-        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-          void navigator.clipboard.writeText(sel)
-        }
-      } catch { /* ignore */ }
+      void writeClipboardText(sel)
       event.preventDefault()
       return false
     }
     // Cmd+V — paste from clipboard via term.paste so bracketed-paste mode is honoured.
+    // Use the Tauri clipboard plugin so macOS WebKit does not show the system
+    // "Paste" permission popup that navigator.clipboard.readText() triggers.
     if (key === 'v' || key === 'V') {
-      try {
-        if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
-          void navigator.clipboard.readText().then((text) => { try { term.paste(text) } catch { /* ignore */ } })
-        }
-      } catch { /* ignore */ }
+      void readClipboardText().then((text) => {
+        if (text) { try { term.paste(text) } catch { /* ignore */ } }
+      })
       event.preventDefault()
       return false
     }

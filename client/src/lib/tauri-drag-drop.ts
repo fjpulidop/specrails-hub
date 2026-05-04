@@ -1,3 +1,5 @@
+import { getCurrentWebview } from '@tauri-apps/api/webview'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { isTauri } from './tauri-shell'
 import { quotePathList } from './shell-quote'
 
@@ -50,20 +52,11 @@ export async function registerTauriDragDrop(
       try { active.writeText(text) } catch { /* ignore */ }
     }
 
-    // Use indirected dynamic import so Vite's static analyser doesn't try to
-    // resolve a path that may not exist in plain-browser dev bundles.
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-    const importTauri = new Function('s', 'return import(s)') as (s: string) => Promise<unknown>
-
-    const webviewMod = await importTauri('@tauri-apps/api/webview').catch(() => null)
-    const getCurrentWebview = (webviewMod as { getCurrentWebview?: () => unknown } | null)?.getCurrentWebview
-    const webview = getCurrentWebview ? getCurrentWebview() : null
+    const webview = (() => { try { return getCurrentWebview() } catch { return null } })()
     const onWebviewDragDropEvent = getDragDropListener(webview)
     if (onWebviewDragDropEvent) unlisteners.push(await onWebviewDragDropEvent(cb))
 
-    const windowMod = await importTauri('@tauri-apps/api/window').catch(() => null)
-    const getCurrentWindow = (windowMod as { getCurrentWindow?: () => unknown } | null)?.getCurrentWindow
-    const appWindow = getCurrentWindow ? getCurrentWindow() : null
+    const appWindow = (() => { try { return getCurrentWindow() } catch { return null } })()
     const onWindowDragDropEvent = getDragDropListener(appWindow)
     if (onWindowDragDropEvent) unlisteners.push(await onWindowDragDropEvent(cb))
 
