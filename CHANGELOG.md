@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.51.0](https://github.com/fjpulidop/specrails-hub/compare/v1.50.0...v1.51.0) (2026-05-05)
+
+
+### Features
+
+* **job-detail:** live status panel + ticket identity card ([#298](https://github.com/fjpulidop/specrails-hub/issues/298)) ([48548b8](https://github.com/fjpulidop/specrails-hub/commit/48548b854e849c18b83fba72b3abb9f35891a3e2))
+
 ## [1.50.0](https://github.com/fjpulidop/specrails-hub/compare/v1.49.0...v1.50.0) (2026-05-05)
 
 
