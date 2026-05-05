@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.50.0](https://github.com/fjpulidop/specrails-hub/compare/v1.49.0...v1.50.0) (2026-05-05)
+
+
+### Features
+
+* **add-spec:** model picker in Add Spec modal, inherited by Quick + Explore ([#296](https://github.com/fjpulidop/specrails-hub/issues/296)) ([9526374](https://github.com/fjpulidop/specrails-hub/commit/9526374bb20a9400b33f67c092ad6488546351e4))
+
 ## [1.49.0](https://github.com/fjpulidop/specrails-hub/compare/v1.48.1...v1.49.0) (2026-05-05)
 
 
