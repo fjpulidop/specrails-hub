@@ -191,9 +191,14 @@ describe('BottomPanel', () => {
       const terminalSettingsCalls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/terminal-settings'))
       expect(terminalSettingsCalls).toHaveLength(2)
     })
+    // Wait for the refetch's state update to flush before asserting on
+    // click side-effects — the fetch resolving and React updating state
+    // are separate microtasks, and CI is slow enough to expose the race.
+    await waitFor(() => {
+      expect(getByLabelText('Paste quick script into active terminal')).not.toBeDisabled()
+    })
     fireEvent.click(getByLabelText('Open in browser'))
     expect(openExternalUrl).toHaveBeenLastCalledWith('https://new.example')
-    expect(getByLabelText('Paste quick script into active terminal')).not.toBeDisabled()
   })
 
   it('kill-active button fires DELETE', () => {
