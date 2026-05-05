@@ -5,7 +5,7 @@ import path from 'path'
 import express from 'express'
 import request from 'supertest'
 
-import { createProjectRouter } from './project-router'
+import { createProjectRouter, stripSpecMetadataSections } from './project-router'
 import { initDb } from './db'
 import { initHubDb } from './hub-db'
 import { ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
@@ -360,7 +360,7 @@ describe('project-router', () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
       // Create a conversation first
-      const createRes = await request(app).post('/api/projects/proj-1/chat/conversations').send({ model: 'claude-sonnet-4-5' })
+      const createRes = await request(app).post('/api/projects/proj-1/chat/conversations').send({ model: 'sonnet' })
       expect(createRes.status).toBe(201)
       const convId = createRes.body.conversation.id
       const res = await request(app).post(`/api/projects/proj-1/chat/conversations/${convId}/messages`).send({})
@@ -929,7 +929,7 @@ describe('project-router', () => {
       // Create
       const createRes = await request(app)
         .post('/api/projects/proj-1/chat/conversations')
-        .send({ model: 'claude-sonnet-4-5' })
+        .send({ model: 'sonnet' })
       expect(createRes.status).toBe(201)
       const convId = createRes.body.conversation.id
 
@@ -2057,7 +2057,7 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const createRes = await request(app)
         .post('/api/projects/proj-1/chat/conversations')
-        .send({ model: 'claude-sonnet-4-5' })
+        .send({ model: 'sonnet' })
       const convId = createRes.body.conversation.id
       const res = await request(app)
         .patch(`/api/projects/proj-1/chat/conversations/${convId}`)
@@ -2143,7 +2143,7 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const createRes = await request(app)
         .post('/api/projects/proj-1/chat/conversations')
-        .send({ model: 'claude-sonnet-4-5' })
+        .send({ model: 'sonnet' })
       const convId = createRes.body.conversation.id
       const res = await request(app)
         .post(`/api/projects/proj-1/chat/conversations/${convId}/messages`)
@@ -2308,6 +2308,183 @@ describe('project-router', () => {
       const { app } = createApp(new Map())
       const res = await request(app).get('/api/projects/missing/terminal-settings')
       expect(res.status).toBe(404)
+    })
+  })
+
+  // ─── Add Spec model picker — default + validation ───────────────────────────
+  describe('stripSpecMetadataSections', () => {
+    it('removes the Spec Title, Labels, and Estimated Complexity sections', () => {
+      const input = [
+        '## Spec Title',
+        'Add SpecRails logo',
+        '',
+        '## Labels',
+        'ui, branding',
+        '',
+        '## Problem Statement',
+        'Splash screen lacks logo.',
+        '',
+        '## Estimated Complexity',
+        'Low — single asset swap.',
+      ].join('\n')
+      const out = stripSpecMetadataSections(input)
+      expect(out).not.toMatch(/Spec Title/)
+      expect(out).not.toMatch(/^## Labels/m)
+      expect(out).not.toMatch(/Estimated Complexity/)
+      expect(out).toContain('Problem Statement')
+      expect(out).toContain('Splash screen lacks logo.')
+    })
+
+    it('leaves a buffer with no metadata sections unchanged (modulo trim)', () => {
+      const input = '## Problem Statement\n\nNo logo.\n'
+      expect(stripSpecMetadataSections(input)).toBe('## Problem Statement\n\nNo logo.')
+    })
+
+    it('handles a multi-line Labels block', () => {
+      const input = '## Labels\nui\nbranding\nsplash\n\n## Problem Statement\nfoo'
+      const out = stripSpecMetadataSections(input)
+      expect(out).not.toMatch(/^## Labels/m)
+      expect(out).toContain('Problem Statement')
+      expect(out).toContain('foo')
+    })
+  })
+
+  describe('GET /default-spec-model', () => {
+    let tmpDir: string
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'specmodels-'))
+    })
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    })
+
+    function ctxWithProject(provider: 'claude' | 'codex' | undefined, configBody?: string): ProjectContext {
+      const ctx = makeContext(db, {
+        project: {
+          id: 'proj-1', slug: 'proj', name: 'P', path: tmpDir,
+          db_path: ':memory:', added_at: '', last_seen_at: '',
+          ...(provider ? { provider } : {}),
+        } as any,
+      })
+      if (configBody !== undefined) {
+        const dir = path.join(tmpDir, '.specrails')
+        fs.mkdirSync(dir, { recursive: true })
+        fs.writeFileSync(path.join(dir, 'install-config.yaml'), configBody)
+      }
+      return ctx
+    }
+
+    it('returns claude default when no install-config and provider is claude', async () => {
+      const ctx = ctxWithProject('claude')
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/default-spec-model')
+      expect(res.status).toBe(200)
+      expect(res.body.provider).toBe('claude')
+      expect(res.body.model).toBe('sonnet')
+      expect(res.body.allowed.map((m: { value: string }) => m.value)).toEqual(['sonnet', 'opus', 'haiku'])
+    })
+
+    it('returns codex default when provider is codex', async () => {
+      const ctx = ctxWithProject('codex')
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/default-spec-model')
+      expect(res.status).toBe(200)
+      expect(res.body.provider).toBe('codex')
+      expect(res.body.model).toBe('gpt-5.4-mini')
+      expect(res.body.allowed.map((m: { value: string }) => m.value)).toEqual(['gpt-5.4-mini', 'gpt-5.4', 'gpt-5.3-codex'])
+    })
+
+    it('honors install-config defaults.model when valid', async () => {
+      const ctx = ctxWithProject('claude', 'models:\n  defaults: { model: opus }\n')
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/default-spec-model')
+      expect(res.body.model).toBe('opus')
+    })
+
+    it('falls back to provider default when configured model is not in allow-list', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const ctx = ctxWithProject('claude', 'models:\n  defaults: { model: bogus-model }\n')
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/default-spec-model')
+      expect(res.body.model).toBe('sonnet')
+      expect(warn).toHaveBeenCalled()
+      warn.mockRestore()
+    })
+
+    it('defaults provider to claude when undefined on the project row', async () => {
+      const ctx = ctxWithProject(undefined)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/default-spec-model')
+      expect(res.body.provider).toBe('claude')
+      expect(res.body.model).toBe('sonnet')
+    })
+  })
+
+  describe('POST /tickets/generate-spec — model validation', () => {
+    function ctxFor(provider: 'claude' | 'codex'): ProjectContext {
+      return makeContext(db, {
+        project: {
+          id: 'proj-1', slug: 'proj', name: 'P', path: '/tmp', db_path: ':memory:',
+          added_at: '', last_seen_at: '', provider,
+        } as any,
+        // Stub the spawn — generate-spec spawns a subprocess that we don't
+        // want to actually start. The router fires it after validation, so
+        // a 200/400 distinction is enough here.
+        queueManager: makeQueueManager() as any,
+      })
+    }
+
+    it('rejects an invalid model with 400 + allowed list', async () => {
+      const ctx = ctxFor('claude')
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/tickets/generate-spec')
+        .send({ idea: 'do a thing', model: 'not-a-real-model' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toMatch(/Invalid model/)
+      expect(res.body.allowed).toEqual(['sonnet', 'opus', 'haiku'])
+    })
+
+    it('rejects a cross-provider model with 400', async () => {
+      const ctx = ctxFor('claude')
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/tickets/generate-spec')
+        .send({ idea: 'idea', model: 'gpt-5.4-mini' })
+      expect(res.status).toBe(400)
+    })
+  })
+
+  describe('POST /chat/conversations — model validation', () => {
+    it('rejects an invalid model with 400 + allowed list', async () => {
+      const ctx = makeContext(db, {
+        project: {
+          id: 'proj-1', slug: 'proj', name: 'P', path: '/tmp', db_path: ':memory:',
+          added_at: '', last_seen_at: '', provider: 'claude',
+        } as any,
+      })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/chat/conversations')
+        .send({ model: 'not-real' })
+      expect(res.status).toBe(400)
+      expect(res.body.allowed).toEqual(['sonnet', 'opus', 'haiku'])
+    })
+
+    it('falls back to provider default when no model is sent', async () => {
+      const ctx = makeContext(db, {
+        project: {
+          id: 'proj-1', slug: 'proj', name: 'P', path: '/tmp', db_path: ':memory:',
+          added_at: '', last_seen_at: '', provider: 'claude',
+        } as any,
+      })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/chat/conversations')
+        .send({})
+      expect(res.status).toBe(201)
+      expect(res.body.conversation.model).toBe('sonnet')
     })
   })
 })
