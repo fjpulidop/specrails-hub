@@ -79,6 +79,12 @@ describe('removeBlock', () => {
     expect(text).toContain('foo content')
   })
 
+  it('deletes the file when removing the block leaves it empty', async () => {
+    await upsertBlock(projectPath, 'serena', 'only managed content')
+    await removeBlock(projectPath, 'serena')
+    expect(fs.existsSync(claudeMdFile())).toBe(false)
+  })
+
   it('preserves user content when removing block', async () => {
     fs.writeFileSync(claudeMdFile(), '# project\n\nUser line.\n')
     await upsertBlock(projectPath, 'serena', 'plugin content')

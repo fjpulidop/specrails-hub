@@ -93,6 +93,10 @@ export async function upsertBlock(
 /**
  * Remove the managed block for `pluginName`. No-op when CLAUDE.md is missing
  * or the block is absent. Surrounding user content is preserved byte-identical.
+ *
+ * If removing the block leaves the file empty (the managed block was the
+ * only content), the file is deleted — this restores the pre-install state
+ * for projects that didn't have a CLAUDE.md before any plugin install.
  */
 export async function removeBlock(projectPath: string, pluginName: string): Promise<void> {
   const file = claudeMdPath(projectPath)
@@ -105,6 +109,10 @@ export async function removeBlock(projectPath: string, pluginName: string): Prom
     // leave a stray blank line behind.
     let next = cur.slice(0, match.start) + cur.slice(match.end)
     next = next.replace(/\n{3,}$/, '\n').replace(/^\n+/, '')
+    if (next.trim() === '') {
+      fs.unlinkSync(file)
+      return
+    }
     atomicWriteFileSync(file, next)
   })
 }
