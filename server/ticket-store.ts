@@ -193,6 +193,41 @@ export function mutateStore(filePath: string, fn: (store: TicketStore) => void):
 
 // ─── Query helpers ───────────────────────────────────────────────────────────
 
+/**
+ * Extract unique ticket ids referenced via `#<digits>` tokens in a command
+ * string, preserving first-occurrence order.
+ */
+export function extractTicketIdsFromCommand(command: string): number[] {
+  const ids: number[] = []
+  const seen = new Set<number>()
+  for (const match of command.matchAll(/#(\d+)/g)) {
+    const id = Number.parseInt(match[1], 10)
+    if (Number.isNaN(id) || seen.has(id)) continue
+    seen.add(id)
+    ids.push(id)
+  }
+  return ids
+}
+
+/**
+ * Resolve `#<digits>` ticket references in a command to `{ id, title }` pairs
+ * by reading the project's local ticket store. Tickets that no longer exist
+ * resolve to `title: null`. Returns `[]` when the command has no ticket
+ * references.
+ */
+export function resolveTicketsFromCommand(
+  projectPath: string,
+  command: string,
+): Array<{ id: number; title: string | null }> {
+  const ids = extractTicketIdsFromCommand(command)
+  if (ids.length === 0) return []
+  const store = readStore(resolveTicketStoragePath(projectPath))
+  return ids.map((id) => ({
+    id,
+    title: store.tickets[String(id)]?.title ?? null,
+  }))
+}
+
 export interface TicketFilters {
   status?: string
   label?: string

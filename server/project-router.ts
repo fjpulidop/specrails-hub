@@ -35,6 +35,7 @@ import { getProjectMetrics } from './metrics'
 import {
   resolveTicketStoragePath, readStore, mutateStore, filterTickets,
   isValidStatus, isValidPriority,
+  resolveTicketsFromCommand,
   type Ticket,
 } from './ticket-store'
 import type { TicketCreatedMessage, TicketUpdatedMessage, TicketDeletedMessage, TicketAiEditStreamMessage, TicketAiEditDoneMessage, TicketAiEditErrorMessage, SpecGenStreamMessage, SpecGenDoneMessage, SpecGenErrorMessage, LocalTicket } from './types'
@@ -561,7 +562,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   router.get('/:projectId/jobs/:id', (req: Request, res: Response) => {
-    const { db, queueManager } = ctx(req)
+    const { db, queueManager, project } = ctx(req)
     const jobId = req.params.id as string
     const job = getJob(db, jobId)
     if (!job) {
@@ -595,12 +596,14 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         skip_reason: inMemory.skipReason,
       }
       const phaseDefinitions = queueManager.phasesForCommand(synthetic.command)
-      res.json({ job: { ...synthetic, hasTelemetry: false }, events: [], phaseDefinitions })
+      const tickets = resolveTicketsFromCommand(project.path, synthetic.command)
+      res.json({ job: { ...synthetic, hasTelemetry: false, tickets }, events: [], phaseDefinitions })
       return
     }
     const events = getJobEvents(db, jobId)
     const phaseDefinitions = queueManager.phasesForCommand(job.command)
-    const annotated = { ...job, hasTelemetry: hasJobTelemetry(db, jobId) }
+    const tickets = resolveTicketsFromCommand(project.path, job.command)
+    const annotated = { ...job, hasTelemetry: hasJobTelemetry(db, jobId), tickets }
     res.json({ job: annotated, events, phaseDefinitions })
   })
 

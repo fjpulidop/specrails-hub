@@ -389,4 +389,95 @@ describe('JobDetailPage', () => {
     })
   })
 
+  describe('Status panel gate', () => {
+    it('renders the status panel for running jobs (no completion gate)', async () => {
+      const runningJob = { ...mockJob, status: 'running' as const, finished_at: null, total_cost_usd: null }
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ job: runningJob, events: [] }),
+      })
+      render(<JobDetailPage />)
+      await waitFor(() => {
+        expect(screen.getByText('Job in progress')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('Ticket identity card', () => {
+    const baseJob = { ...mockJob, command: '/specrails:implement #24 --yes' }
+
+    it('renders the ticket card when job has tickets', async () => {
+      const jobWithTickets = {
+        ...baseJob,
+        tickets: [{ id: 24, title: 'Add live job status' }],
+      } as JobSummary
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ job: jobWithTickets, events: [] }),
+      })
+      render(<JobDetailPage />)
+      await waitFor(() => {
+        expect(screen.getByText('Add live job status')).toBeInTheDocument()
+      })
+      expect(screen.getByText('#24')).toBeInTheDocument()
+    })
+
+    it('falls back to legacy header when job has no tickets', async () => {
+      const noTickets = { ...mockJob, tickets: [] } as JobSummary
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ job: noTickets, events: [] }),
+      })
+      render(<JobDetailPage />)
+      await waitFor(() => {
+        expect(screen.getByText('/specrails:implement')).toBeInTheDocument()
+      })
+      expect(screen.queryByText(/(deleted)/)).not.toBeInTheDocument()
+    })
+
+    it('renders deleted ticket as muted chip without title', async () => {
+      const deletedTicket = {
+        ...baseJob,
+        tickets: [{ id: 24, title: null }],
+      } as JobSummary
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ job: deletedTicket, events: [] }),
+      })
+      render(<JobDetailPage />)
+      await waitFor(() => {
+        expect(screen.getByText('#24 (deleted)')).toBeInTheDocument()
+      })
+    })
+
+    it('renders compact mode with "+ N more" when 4+ tickets, expand reveals all', async () => {
+      const user = userEvent.setup()
+      const manyTickets = {
+        ...baseJob,
+        tickets: [
+          { id: 1, title: 'First ticket' },
+          { id: 2, title: 'Second ticket' },
+          { id: 3, title: 'Third ticket' },
+          { id: 4, title: 'Fourth ticket' },
+          { id: 5, title: 'Fifth ticket' },
+        ],
+      } as JobSummary
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ job: manyTickets, events: [] }),
+      })
+      render(<JobDetailPage />)
+      await waitFor(() => {
+        expect(screen.getByText('First ticket')).toBeInTheDocument()
+      })
+      // Initially compact: only first title visible.
+      expect(screen.queryByText('Second ticket')).not.toBeInTheDocument()
+      expect(screen.getByText(/\+ 4 more/i)).toBeInTheDocument()
+
+      await user.click(screen.getByText(/\+ 4 more/i))
+      expect(screen.getByText('Second ticket')).toBeInTheDocument()
+      expect(screen.getByText('Fifth ticket')).toBeInTheDocument()
+    })
+  })
+
 })

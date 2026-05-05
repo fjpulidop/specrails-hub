@@ -280,6 +280,124 @@ describe('project-router', () => {
       expect(res.status).toBe(200)
       expect(res.body.job.id).toBe('j1')
       expect(res.body.events).toBeDefined()
+      // Backwards-compat: existing consumers continue to receive the original
+      // job fields. tickets[] is additive.
+      expect(res.body.job.command).toBe('sr:implement')
+      expect(res.body.job.tickets).toEqual([])
+    })
+
+    describe('tickets field', () => {
+      function withProjectDir(): string {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shub-jobtickets-'))
+        fs.mkdirSync(path.join(dir, '.specrails'), { recursive: true })
+        return dir
+      }
+
+      function writeTickets(dir: string, tickets: Record<string, { id: number; title: string }>) {
+        const store = {
+          schema_version: '1',
+          revision: 1,
+          last_updated: new Date().toISOString(),
+          next_id: 1000,
+          tickets: Object.fromEntries(
+            Object.entries(tickets).map(([id, t]) => [id, {
+              id: t.id, title: t.title, description: '', status: 'todo',
+              priority: 'medium', labels: [], assignee: null, prerequisites: [],
+              metadata: {}, created_at: '', updated_at: '', created_by: 'test',
+              source: 'manual',
+            }]),
+          ),
+        }
+        fs.writeFileSync(
+          path.join(dir, '.specrails', 'local-tickets.json'),
+          JSON.stringify(store),
+          'utf-8',
+        )
+      }
+
+      function makeCtxAt(projectPath: string): ProjectContext {
+        return makeContext(db, {
+          project: { id: 'proj-1', slug: 'proj', name: 'P', path: projectPath, db_path: ':memory:', added_at: '', last_seen_at: '' },
+        } as any)
+      }
+
+      let projectDirs: string[] = []
+      afterEach(() => {
+        for (const d of projectDirs) {
+          try { fs.rmSync(d, { recursive: true, force: true }) } catch { /* noop */ }
+        }
+        projectDirs = []
+      })
+
+      function newProjectDir(): string {
+        const d = withProjectDir()
+        projectDirs.push(d)
+        return d
+      }
+
+      it('resolves a single live ticket title', async () => {
+        const dir = newProjectDir()
+        writeTickets(dir, { '24': { id: 24, title: 'Add live job status' } })
+        db.prepare(`INSERT INTO jobs (id, command, started_at, status)
+          VALUES ('j1', '/specrails:implement #24 --yes', '2026-05-05T10:00:00.000Z', 'running')`).run()
+        const { app } = createApp(new Map([['proj-1', makeCtxAt(dir)]]))
+        const res = await request(app).get('/api/projects/proj-1/jobs/j1')
+        expect(res.status).toBe(200)
+        expect(res.body.job.tickets).toEqual([{ id: 24, title: 'Add live job status' }])
+      })
+
+      it('returns null title for deleted ticket', async () => {
+        const dir = newProjectDir()
+        writeTickets(dir, {}) // no tickets in store
+        db.prepare(`INSERT INTO jobs (id, command, started_at, status)
+          VALUES ('j2', '/specrails:implement #99', '2026-05-05T10:00:00.000Z', 'completed')`).run()
+        const { app } = createApp(new Map([['proj-1', makeCtxAt(dir)]]))
+        const res = await request(app).get('/api/projects/proj-1/jobs/j2')
+        expect(res.body.job.tickets).toEqual([{ id: 99, title: null }])
+      })
+
+      it('mixes live and deleted tickets, preserves order', async () => {
+        const dir = newProjectDir()
+        writeTickets(dir, {
+          '24': { id: 24, title: 'Live one' },
+          '47': { id: 47, title: 'Live two' },
+        })
+        db.prepare(`INSERT INTO jobs (id, command, started_at, status)
+          VALUES ('j3', '/specrails:implement #24 #99 #47 --yes', '2026-05-05T10:00:00.000Z', 'running')`).run()
+        const { app } = createApp(new Map([['proj-1', makeCtxAt(dir)]]))
+        const res = await request(app).get('/api/projects/proj-1/jobs/j3')
+        expect(res.body.job.tickets).toEqual([
+          { id: 24, title: 'Live one' },
+          { id: 99, title: null },
+          { id: 47, title: 'Live two' },
+        ])
+      })
+
+      it('returns empty array when command has no #<id>', async () => {
+        const dir = newProjectDir()
+        writeTickets(dir, {})
+        db.prepare(`INSERT INTO jobs (id, command, started_at, status)
+          VALUES ('j4', '/setup', '2026-05-05T10:00:00.000Z', 'completed')`).run()
+        const { app } = createApp(new Map([['proj-1', makeCtxAt(dir)]]))
+        const res = await request(app).get('/api/projects/proj-1/jobs/j4')
+        expect(res.body.job.tickets).toEqual([])
+      })
+
+      it('deduplicates duplicate ticket references in first-occurrence order', async () => {
+        const dir = newProjectDir()
+        writeTickets(dir, {
+          '24': { id: 24, title: 'A' },
+          '47': { id: 47, title: 'B' },
+        })
+        db.prepare(`INSERT INTO jobs (id, command, started_at, status)
+          VALUES ('j5', '/specrails:implement #24 #47 #24 #24', '2026-05-05T10:00:00.000Z', 'running')`).run()
+        const { app } = createApp(new Map([['proj-1', makeCtxAt(dir)]]))
+        const res = await request(app).get('/api/projects/proj-1/jobs/j5')
+        expect(res.body.job.tickets).toEqual([
+          { id: 24, title: 'A' },
+          { id: 47, title: 'B' },
+        ])
+      })
     })
   })
 
