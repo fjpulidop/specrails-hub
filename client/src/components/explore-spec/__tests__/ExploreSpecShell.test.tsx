@@ -233,6 +233,10 @@ describe('ExploreSpecShell', () => {
     })
 
     const createBtn = await screen.findByRole('button', { name: /create spec from current draft/i })
+    // Wait for the spec_draft.update to propagate through useSpecDraftStream
+    // and unset disabled — otherwise on slower CI runners the click fires
+    // while `!draft.title.trim()` still holds and the click is a no-op.
+    await waitFor(() => expect(createBtn).not.toBeDisabled())
     fireEvent.click(createBtn)
     await waitFor(() => {
       expect(fakeFetch).toHaveBeenCalledWith(
