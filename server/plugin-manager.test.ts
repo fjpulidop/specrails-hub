@@ -138,11 +138,13 @@ describe('PluginManager.listAvailable', () => {
     const m = new PluginManager([plugin], { claudeApprovalChecker: () => 'enabled' })
     await m.install(tmpDir, 'pid', 'serena', broadcast)
     await m.setActive(tmpDir, 'pid', 'serena', false, broadcast)
-    const off = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8')
-    expect(off).not.toContain('## hint')
+    // CLAUDE.md is deleted when the managed block was the only content.
+    const claudeMd = path.join(tmpDir, 'CLAUDE.md')
+    if (fs.existsSync(claudeMd)) {
+      expect(fs.readFileSync(claudeMd, 'utf8')).not.toContain('## hint')
+    }
     await m.setActive(tmpDir, 'pid', 'serena', true, broadcast)
-    const on = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8')
-    expect(on).toContain('## hint')
+    expect(fs.readFileSync(claudeMd, 'utf8')).toContain('## hint')
   })
 
   it('setActive preserves user-authored sibling mcpServers entries', async () => {

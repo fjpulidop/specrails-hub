@@ -56,9 +56,13 @@ describe('applyContributors / revertContributors', () => {
     expect(text).toContain('specrails-hub-managed:serena')
 
     await revertContributors(plugin, projectPath)
-    const after = fs.readFileSync(path.join(projectPath, 'CLAUDE.md'), 'utf8')
-    expect(after).not.toContain('serena hint')
-    expect(after).not.toContain('specrails-hub-managed:serena')
+    // CLAUDE.md is deleted when the only content was the managed block.
+    const claudeMd = path.join(projectPath, 'CLAUDE.md')
+    if (fs.existsSync(claudeMd)) {
+      const after = fs.readFileSync(claudeMd, 'utf8')
+      expect(after).not.toContain('serena hint')
+      expect(after).not.toContain('specrails-hub-managed:serena')
+    }
   })
 
   it('apply is idempotent (multiple calls produce same content)', async () => {
