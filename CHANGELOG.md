@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.52.0](https://github.com/fjpulidop/specrails-hub/compare/v1.51.0...v1.52.0) (2026-05-05)
+
+
+### Features
+
+* **specs-board:** label-pill filter row + fix mac update toast chrome ([#300](https://github.com/fjpulidop/specrails-hub/issues/300)) ([8f31aeb](https://github.com/fjpulidop/specrails-hub/commit/8f31aeb8a9a7fddefba0e4ae250599a99468ddba))
+
 ## [1.51.0](https://github.com/fjpulidop/specrails-hub/compare/v1.50.0...v1.51.0) (2026-05-05)
 
 
