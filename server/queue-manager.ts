@@ -13,7 +13,7 @@ import { createJob, finishJob, appendEvent, skipJob, getProjectSettings } from '
 import type { JobResult } from './db'
 import type { CommandInfo } from './config'
 import { attachmentManager, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
-import { readStore, resolveTicketStoragePath } from './ticket-store'
+import { extractTicketIdsFromCommand, readStore, resolveTicketStoragePath } from './ticket-store'
 
 // ─── Telemetry env helpers ────────────────────────────────────────────────────
 
@@ -455,12 +455,7 @@ export class QueueManager {
   }
 
   private _extractTicketIds(command: string): number[] {
-    const ids = new Set<number>()
-    for (const match of command.matchAll(/#(\d+)/g)) {
-      const id = Number.parseInt(match[1], 10)
-      if (!Number.isNaN(id)) ids.add(id)
-    }
-    return Array.from(ids)
+    return extractTicketIdsFromCommand(command)
   }
 
   private _buildImplementAttachmentContext(command: string): string {

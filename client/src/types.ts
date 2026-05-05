@@ -30,6 +30,12 @@ export interface JobSummary {
   hasTelemetry?: boolean
   /** Profile the job ran under (null/undefined = legacy mode) */
   profile_name?: string | null
+  /**
+   * Tickets referenced by the job's command, resolved against the project's
+   * local ticket store at request time. Only populated by GET /jobs/:id;
+   * undefined elsewhere. `title === null` means the ticket no longer exists.
+   */
+  tickets?: Array<{ id: number; title: string | null }>
 }
 
 export interface EventRow {

@@ -8,7 +8,10 @@ import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip'
 import { PipelineProgress } from '../components/PipelineProgress'
-import { JobCompletionSummary } from '../components/JobCompletionSummary'
+import { JobStatusPanel } from '../components/JobStatusPanel'
+import { JobTicketHeader } from '../components/JobTicketHeader'
+import { useTicketDetailModal } from '../context/TicketDetailModalContext'
+import { cn } from '../lib/utils'
 import { LogViewer } from '../components/LogViewer'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import type { JobSummary, EventRow, PhaseDefinition } from '../types'
@@ -29,6 +32,7 @@ export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { activeProjectId } = useHub()
   const navigate = useNavigate()
+  const { openTicketDetail } = useTicketDetailModal()
   const [job, setJob] = useState<JobSummary | null>(null)
   const [events, setEvents] = useState<EventRow[]>([])
   const [phaseDefinitions, setPhaseDefinitions] = useState<PhaseDefinition[]>([])
@@ -272,6 +276,7 @@ export default function JobDetailPage() {
   const statusInfo = STATUS_BADGE[job.status] ?? STATUS_BADGE.queued
   const isRunning = job.status === 'running'
   const isFinished = job.status === 'completed' || job.status === 'failed'
+  const hasTicketHeader = (job.tickets?.length ?? 0) > 0
 
   const pipelineTotals = pipelineJobs.length > 1 ? {
     totalCostUsd: pipelineJobs.reduce((s, j) => s + (j.total_cost_usd ?? 0), 0),
@@ -294,6 +299,14 @@ export default function JobDetailPage() {
           <span className="text-foreground font-mono">Job #{id?.slice(0, 8)}</span>
         </div>
 
+        {/* Ticket identity card — premium header when the job references tickets */}
+        {hasTicketHeader && (
+          <JobTicketHeader
+            tickets={job.tickets ?? []}
+            onTicketClick={openTicketDetail}
+          />
+        )}
+
         {/* Job info */}
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1 min-w-0">
@@ -306,7 +319,14 @@ export default function JobDetailPage() {
                 </TooltipTrigger>
                 <TooltipContent>{statusInfo.tooltip}</TooltipContent>
               </Tooltip>
-              <code className="text-sm font-mono text-foreground/90 truncate">{job.command}</code>
+              <code
+                className={cn(
+                  'font-mono text-foreground/90 truncate',
+                  hasTicketHeader ? 'text-xs text-muted-foreground' : 'text-sm',
+                )}
+              >
+                {job.command}
+              </code>
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
               <span>
@@ -381,12 +401,14 @@ export default function JobDetailPage() {
         <PipelineProgress phases={phases} phaseDefinitions={phaseDefinitions} />
       </div>
 
-      {/* Completion summary — only shown when job has finished */}
-      {(job.status === 'completed' || job.status === 'failed') && (
-        <JobCompletionSummary
+      {/* Status panel — running, completed, or failed */}
+      {(job.status === 'running' ||
+        job.status === 'completed' ||
+        job.status === 'failed') && (
+        <JobStatusPanel
           job={job}
           events={events}
-          defaultOpen={job.status === 'completed'}
+          defaultOpen={job.status === 'completed' || job.status === 'running'}
           pipelineTotals={pipelineTotals ?? undefined}
         />
       )}
