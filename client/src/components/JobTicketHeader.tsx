@@ -27,30 +27,10 @@ export function JobTicketHeader({ tickets, onTicketClick }: JobTicketHeaderProps
   const hiddenCount = tickets.length - visible.length
 
   return (
-    <div className="rounded-xl border border-border/40 bg-card/40 px-4 py-3 space-y-2">
-      <div className="flex flex-wrap items-center gap-1.5">
-        {tickets.map((t) => (
-          <TicketChip
-            key={t.id}
-            ticket={t}
-            onClick={t.title != null ? () => onTicketClick(t.id) : undefined}
-          />
-        ))}
-      </div>
-
-      {visible.map((t) =>
-        t.title != null ? (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => onTicketClick(t.id)}
-            className="block w-full text-left text-lg font-semibold text-foreground truncate hover:text-accent-primary transition-colors"
-            title={t.title}
-          >
-            {t.title}
-          </button>
-        ) : null,
-      )}
+    <div className="rounded-xl border border-border/40 bg-card/40 px-4 py-3 space-y-1.5">
+      {visible.map((t) => (
+        <TicketRow key={t.id} ticket={t} onClick={() => onTicketClick(t.id)} />
+      ))}
 
       {hiddenCount > 0 && (
         <button
@@ -77,22 +57,21 @@ export function JobTicketHeader({ tickets, onTicketClick }: JobTicketHeaderProps
   )
 }
 
-function TicketChip({ ticket, onClick }: { ticket: TicketRef; onClick?: () => void }) {
+function TicketRow({ ticket, onClick }: { ticket: TicketRef; onClick: () => void }) {
   const isDeleted = ticket.title == null
-  const baseClass =
-    'inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-mono tabular-nums'
+  const chipBase =
+    'inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-mono tabular-nums shrink-0'
 
   if (isDeleted) {
     return (
-      <span
-        className={cn(
-          baseClass,
-          'text-muted-foreground bg-muted/20 cursor-default select-none',
-        )}
-        title="Ticket no longer exists"
-      >
-        #{ticket.id} (deleted)
-      </span>
+      <div className="flex items-center gap-2 min-w-0">
+        <span
+          className={cn(chipBase, 'text-muted-foreground bg-muted/20 select-none')}
+          title="Ticket no longer exists"
+        >
+          #{ticket.id} (deleted)
+        </span>
+      </div>
     )
   }
 
@@ -100,12 +79,20 @@ function TicketChip({ ticket, onClick }: { ticket: TicketRef; onClick?: () => vo
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        baseClass,
-        'text-accent-primary bg-accent-primary/10 hover:bg-accent-primary/20 transition-colors cursor-pointer',
-      )}
+      className="flex items-center gap-2 min-w-0 w-full text-left group"
+      title={ticket.title ?? undefined}
     >
-      #{ticket.id}
+      <span
+        className={cn(
+          chipBase,
+          'text-accent-primary bg-accent-primary/10 group-hover:bg-accent-primary/20 transition-colors',
+        )}
+      >
+        #{ticket.id}
+      </span>
+      <span className="text-lg font-semibold text-foreground truncate group-hover:text-accent-primary transition-colors">
+        {ticket.title}
+      </span>
     </button>
   )
 }
