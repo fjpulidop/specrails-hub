@@ -191,6 +191,7 @@ export function useDesktopUpdateNotifier() {
           id: UPDATE_TOAST_ID,
           duration: Infinity,
           dismissible: false,
+          unstyled: true,
         })
       } catch (err) {
         console.warn('[desktop-update] update check failed:', err)
