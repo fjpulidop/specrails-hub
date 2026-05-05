@@ -34,5 +34,10 @@ export const SERENA_MCP_ENTRY = {
     'ide-assistant',
     '--project',
     '.',
+    // Suppress the auto-opened web dashboard. Serena defaults to launching a
+    // local browser tab on start; users running rail jobs find the popup
+    // disruptive.
+    '--enable-web-dashboard',
+    'false',
   ],
 }
