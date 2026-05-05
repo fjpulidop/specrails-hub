@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Briefcase, BarChart3, Bot, Settings, PanelRight } from 'lucide-react'
+import { LayoutDashboard, Briefcase, BarChart3, Bot, Puzzle, Settings, PanelRight } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useSidebarPin } from '../context/SidebarPinContext'
 import { FEATURE_AGENTS_SECTION } from '../lib/feature-flags'
@@ -12,6 +12,7 @@ const navItems = [
   ...(FEATURE_AGENTS_SECTION
     ? [{ to: '/agents', end: false, icon: Bot, label: 'Agents' }]
     : []),
+  { to: '/integrations', end: false, icon: Puzzle, label: 'Integrations' },
   { to: '/settings', end: false, icon: Settings, label: 'Settings' },
 ]
 

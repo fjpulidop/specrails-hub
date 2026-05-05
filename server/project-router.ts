@@ -38,6 +38,7 @@ import treeKill from 'tree-kill'
 import multer from 'multer'
 import { createRailsRouter } from './rails-router'
 import { createProfilesRouter } from './profiles-router'
+import { createPluginsRouter } from './plugins-router'
 import {
   getHubTerminalSettings,
   getProjectOverride,
@@ -253,6 +254,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   // Mount profiles router under each project (agent profiles)
   const profilesRouter = createProfilesRouter()
   router.use('/:projectId/profiles', profilesRouter)
+
+  // Mount plugins router under each project (per-project marketplace)
+  const pluginsRouter = createPluginsRouter()
+  router.use('/:projectId/plugins', pluginsRouter)
 
   // ─── Queue / Spawn routes ────────────────────────────────────────────────────
 
@@ -2465,12 +2470,15 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         .prepare(`SELECT profile_name, profile_json FROM job_profiles WHERE job_id = ?`)
         .get(jobId) as { profile_name: string; profile_json: string } | undefined
 
+      const { homeJobSnapshotPath } = require('./plugins/paths') as typeof import('./plugins/paths')
+      const pluginSnap = homeJobSnapshotPath(req.projectCtx!.project.slug, jobId)
       await createDiagnosticZip(res, {
         job,
         blob,
         summaries,
         events,
         profile: profileRow ? { name: profileRow.profile_name, json: profileRow.profile_json } : null,
+        pluginSnapshotPath: pluginSnap,
       })
     } catch (err) {
       if (!res.headersSent) {

@@ -16,6 +16,7 @@ const JobsPage = lazy(() => import('./pages/JobsPage'))
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'))
 const ActivityFeedPage = lazy(() => import('./pages/ActivityFeedPage'))
 const AgentsPage = lazy(() => import('./pages/AgentsPage'))
+const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage'))
 const HubAnalyticsPage = lazy(() => import('./pages/HubAnalyticsPage'))
 const DocsPage = lazy(() => import('./pages/DocsPage'))
 const DocsDialog = lazy(() => import('./components/DocsDialog'))
@@ -129,8 +130,8 @@ function HubApp() {
   // Keyboard shortcuts
   const { cheatsheetOpen, setCheatsheetOpen, openCheatsheet } = useCheatsheetState()
   const PROJECT_PAGES = FEATURE_AGENTS_SECTION
-    ? ['/', '/jobs', '/analytics', '/agents', '/settings']
-    : ['/', '/jobs', '/analytics', '/settings']
+    ? ['/', '/jobs', '/analytics', '/agents', '/integrations', '/settings']
+    : ['/', '/jobs', '/analytics', '/integrations', '/settings']
   useKeyboardShortcuts({
     onOpenCheatsheet: openCheatsheet,
     onToggleLeftSidebar: () => setLeftPinned((p) => !p),
@@ -227,6 +228,7 @@ function HubApp() {
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/activity" element={<ActivityFeedPage />} />
                     <Route path="/agents" element={<AgentsPage />} />
+                    <Route path="/integrations" element={<IntegrationsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>

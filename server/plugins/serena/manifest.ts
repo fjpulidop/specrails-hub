@@ -1,0 +1,38 @@
+import type { PluginManifest } from '../../types'
+
+export const serenaManifest: PluginManifest = {
+  name: 'serena',
+  version: '1.0.0',
+  description: 'Semantic code navigation via Language Server Protocol. Lets agents look up symbols, references, and definitions instead of grepping or reading whole files — typically cutting input tokens 40–60% on real workloads.',
+  whatItDoes: [
+    'Adds a Serena MCP server backed by uvx (Python).',
+    'Exposes find_symbol, get_references, get_definition, and replace_symbol_body to all agents.',
+    'Auto-detects project language; supports TS/JS, Python, Go, Rust, Java, and more.',
+    'Runs locally — your code never leaves your machine.',
+  ],
+  platformNotes: {
+    'darwin-arm64': 'On Apple Silicon, macOS may prompt to install Rosetta the first time Serena runs. Some Python language-server dependencies ship x86_64 only; click "Install" on the Apple prompt — it is safe and only happens once.',
+  },
+  category: 'code-navigation',
+  requirements: [
+    { name: 'uv', minVersion: '0.1.0' },
+  ],
+  owns: {
+    mcpServers: ['serena'],
+    agentFragments: ['.claude/agents/custom-serena.md'],
+  },
+}
+
+export const SERENA_MCP_ENTRY = {
+  command: 'uvx',
+  args: [
+    '--from',
+    'git+https://github.com/oraios/serena',
+    'serena',
+    'start-mcp-server',
+    '--context',
+    'ide-assistant',
+    '--project',
+    '.',
+  ],
+}

@@ -5,7 +5,7 @@ const WHICH_CMD = process.platform === 'win32' ? 'where' : 'which'
 export type Platform = 'darwin' | 'win32' | 'linux'
 
 export interface SetupPrerequisite {
-  key: 'node' | 'npm' | 'npx' | 'git'
+  key: 'node' | 'npm' | 'npx' | 'git' | 'uv'
   label: string
   command: string
   required: boolean
@@ -32,10 +32,11 @@ export interface SetupPrerequisitesStatus {
   missingRequired: SetupPrerequisite[]
 }
 
-export const MIN_VERSIONS: Record<'node' | 'npm' | 'git', string> = {
+export const MIN_VERSIONS: Record<'node' | 'npm' | 'git' | 'uv', string> = {
   node: '18.0.0',
   npm: '9.0.0',
   git: '2.20.0',
+  uv: '0.1.0',
 }
 
 interface CommandLookup {
@@ -125,7 +126,13 @@ function brokenSymlinkHint(label: string, command: string, resolvedPath: string 
   return `${label} found${where} but failed to execute — possibly a broken symlink or a stale install. Reinstall ${command} or remove the stale link${resolvedPath ? ` at ${resolvedPath}` : ''}.`
 }
 
-export function getSetupPrerequisitesStatus(): SetupPrerequisitesStatus {
+export interface PrerequisiteOptions {
+  /** Optional: include `uv` (used by plugins like Serena). When false the
+   *  setup wizard's `missingRequired` is not affected by uv's absence. */
+  includeUv?: boolean
+}
+
+export function getSetupPrerequisitesStatus(options: PrerequisiteOptions = {}): SetupPrerequisitesStatus {
   const platform: Platform = process.platform === 'darwin'
     ? 'darwin'
     : process.platform === 'win32'
@@ -175,6 +182,22 @@ export function getSetupPrerequisitesStatus(): SetupPrerequisitesStatus {
         : 'Install Git and restart SpecRails Hub if PATH changed.',
     },
   ]
+
+  if (options.includeUv) {
+    definitions.push({
+      key: 'uv',
+      label: 'uv',
+      command: 'uv',
+      required: false,
+      minVersion: MIN_VERSIONS.uv,
+      installUrl: 'https://docs.astral.sh/uv/getting-started/installation/',
+      installHint: process.platform === 'win32'
+        ? 'Install uv via winget (`winget install astral-sh.uv`) or PowerShell installer, then restart SpecRails Hub.'
+        : process.platform === 'darwin'
+          ? 'Install uv via Homebrew (`brew install uv`) or the curl installer, then restart SpecRails Hub.'
+          : 'Install uv via the curl installer (`curl -LsSf https://astral.sh/uv/install.sh | sh`), then restart SpecRails Hub.',
+    })
+  }
 
   const prerequisites: SetupPrerequisite[] = definitions.map((definition) => {
     const lookup = locateCommand(definition.command)

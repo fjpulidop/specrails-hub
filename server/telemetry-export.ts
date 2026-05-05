@@ -236,14 +236,28 @@ export interface DiagnosticZipOpts {
   events: EventRow[]
   /** Optional profile snapshot the job ran with (from job_profiles). */
   profile?: { name: string; json: string } | null
+  /** Optional plugin snapshot path (`~/.specrails/.../plugins.json`). */
+  pluginSnapshotPath?: string | null
 }
 
 export async function createDiagnosticZip(
   res: ServerResponse,
   opts: DiagnosticZipOpts
 ): Promise<void> {
-  const { job, blob, summaries, events, profile } = opts
+  const { job, blob, summaries, events, profile, pluginSnapshotPath } = opts
   const entries: ZipEntry[] = []
+
+  // plugins.json — per-job plugin snapshot, if present.
+  let pluginsSummary: { active: Array<{ name: string; version: string }>; degraded: Array<{ name: string; reason: string }> } | null = null
+  if (pluginSnapshotPath && fs.existsSync(pluginSnapshotPath)) {
+    try {
+      const raw = fs.readFileSync(pluginSnapshotPath, 'utf8')
+      pluginsSummary = JSON.parse(raw)
+      entries.push({ name: 'plugins.json', data: Buffer.from(raw, 'utf-8') })
+    } catch {
+      // ignore malformed snapshot — diagnostic still useful without it
+    }
+  }
 
   // job-metadata.json
   const metadata = {
@@ -306,6 +320,16 @@ export async function createDiagnosticZip(
     summaryContent = buildSummaryFromRaw(blob.path, job, truncated)
   } else {
     summaryContent = buildSummaryFromRows(summaries, job)
+  }
+  if (pluginsSummary) {
+    const lines = ['', '## Plugins']
+    if (pluginsSummary.active.length > 0) {
+      lines.push('', '### Active', ...pluginsSummary.active.map((p) => `- ${p.name}@${p.version}`))
+    }
+    if (pluginsSummary.degraded.length > 0) {
+      lines.push('', '### Degraded', ...pluginsSummary.degraded.map((p) => `- ${p.name} (${p.reason})`))
+    }
+    summaryContent += '\n' + lines.join('\n') + '\n'
   }
   entries.push({
     name: 'summary.md',
