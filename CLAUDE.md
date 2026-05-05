@@ -173,6 +173,26 @@ Releases are automated via release-please + GitHub Actions:
 
 Commit message prefixes that affect versioning: `feat:` → minor, `fix:` → patch, `feat!:` → major. Commits without a conventional prefix are ignored by release-please.
 
+### Plugin system (Integrations)
+
+Per-project marketplace of MCP-based integrations. Each project independently decides which plugins to install. v1 ships **bundled-only**: every plugin available is compiled into the hub binary; there is no remote registry, no user-installable plugins, and no third-party loading. **Zero changes are required in `specrails-core`** — plugins only contribute MCP server entries (via `.mcp.json`) and optionally a fragment in the already-protected `.claude/agents/custom-*.md` namespace.
+
+**Additivity is the central invariant.** Adding plugin N+1 must never mutate any artifact owned by plugin N or by the user. Each plugin's manifest declares `owns.mcpServers` / `owns.agentFragments`; ownership conflicts are detected at hub startup (`buildOwnershipMap`) and fail fast. All file mutations (`.mcp.json`, `state.json`) are surgical (read → modify only owned keys → atomic temp+rename) and serialised by an in-process file mutex.
+
+**Server (`server/plugin-manager.ts` + `server/plugins/`)**: `PluginManager` owns the lifecycle: `listAvailable`, `previewInstall`, `install` (with rollback on verify failure), `uninstall`, `verify` (timeout-bounded, default 2000ms), `removeOrphan`. State lives at `<project>/.specrails/plugins/state.json` (`{ schemaVersion: 1, plugins: { [name]: { version, installedAt, installedFiles, health, healthReason } } }`). `BUNDLED_PLUGINS` is a typed array in `server/plugins/index.ts` — registering a new plugin requires only appending an import. Helpers `PluginManager.mergeMcpServers` / `removeMcpServers` are the only sanctioned way to mutate `.mcp.json`.
+
+**REST (`server/plugins-router.ts`)** mounted at `/api/projects/:projectId/plugins`, gated by `SPECRAILS_PLUGINS_SECTION !== 'false'`: `GET /` (catalog with status `installed | not-installed | orphan | degraded`), `GET /:name/preview-install` (diff before mutation), `POST /:name/install` (with WS streaming progress via `plugin.install_progress`), `DELETE /:name` (uninstall or orphan removal), `GET /:name/health` (on-demand verify).
+
+**WS events**: `plugin.installed`, `plugin.uninstalled`, `plugin.health_changed`, `plugin.degraded`, `plugin.install_progress` — all `projectId`-scoped.
+
+**Rail integration (`server/queue-manager.ts` + `server/plugins/rail-integration.ts`)**: before spawning a `claude` rail process, `QueueManager` resolves installed plugins (parallel verify with per-plugin timeout), classifies into `active` and `degraded`, and writes a per-job snapshot to `~/.specrails/projects/<slug>/jobs/<jobId>/plugins.json` (chmod 400). It injects env vars `SPECRAILS_PLUGINS_ACTIVE` (CSV) and `SPECRAILS_PLUGINS_SNAPSHOT` (path). When pipeline telemetry is enabled, OTEL resource attrs include `specrails.plugins.active`, `specrails.plugins.degraded`, and `specrails.plugins.versions`. **Healthcheck failure is non-blocking** — degraded plugins emit `plugin.degraded` but the rail spawns normally. `ChatManager` inherits MCP config via `cwd` (no snapshot, no env injection); `SetupManager` ignores plugins entirely (project under construction).
+
+**Diagnostic export (`server/telemetry-export.ts`)**: includes `plugins.json` in the ZIP and a "Plugins" section in `summary.md` whenever a per-job plugin snapshot exists.
+
+**Bundled today**: `serena` (semantic code navigation via LSP+MCP). Manifest in `server/plugins/serena/manifest.ts`; install adds `mcpServers.serena` running `uvx --from git+https://github.com/oraios/serena ...`; verify probes `uvx serena --version`. The optional `templates/instructions.md` fragment lands at `<project>/.claude/agents/custom-serena.md`. Requires `uv` on PATH (auto-detected by an extended `setup-prerequisites.ts` with `includeUv: true`).
+
+**Reserved paths (per-project, hub-managed)**: `<project>/.mcp.json` (surgical merge), `<project>/.specrails/plugins/state.json`, `<project>/.specrails/plugins/snapshots/<jobId>.json`, `<project>/.claude/agents/custom-<plugin>.md`. Hub never wholesale rewrites any of these.
+
 ### Theme system
 
 Hub-wide UI theme selectable from `GlobalSettingsPage > Appearance`. Three built-ins: `dracula` (default), `aurora-light`, `obsidian-dark`. Persisted hub-wide as `hub_settings.ui_theme` (server) and mirrored to `localStorage['specrails-hub:ui-theme']` (client) with an inline anti-FOUC script in `client/index.html` that applies `data-theme` on `<html>` before React hydrates.

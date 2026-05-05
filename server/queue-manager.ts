@@ -520,7 +520,7 @@ export class QueueManager {
     this._startJob(nextJobId)
   }
 
-  private _startJob(jobId: string): void {
+  private async _startJob(jobId: string): Promise<void> {
     const job = this._jobs.get(jobId)
     if (!job) return
 
@@ -678,6 +678,67 @@ export class QueueManager {
     // Inject the profile path for claude even when telemetry is off.
     if (profileSnapshotPath) {
       spawnEnv = { ...spawnEnv, SPECRAILS_PROFILE_PATH: profileSnapshotPath }
+    }
+
+    // ─── Plugin resolution + snapshot ──────────────────────────────────────
+    // Active = installed + verify ok; degraded = installed but verify failed
+    // or timed out. Degraded does NOT block spawn — rail proceeds, UI gets
+    // a `plugin.degraded` event so the user can reinstall.
+    let pluginActive: Array<{ name: string; version: string }> = []
+    let pluginDegraded: Array<{ name: string; reason: string }> = []
+    let pluginSnapshotPath: string | null = null
+    if (this._provider === 'claude' && this._projectId && this._projectSlug && this._cwd) {
+      try {
+        const { resolvePluginsForSpawn, snapshotPluginsForJob } =
+          require('./plugins/rail-integration') as typeof import('./plugins/rail-integration')
+        const resolution = await resolvePluginsForSpawn(this._cwd, this._projectId, jobId)
+        pluginActive = resolution.active
+        pluginDegraded = resolution.degraded
+        if (pluginActive.length > 0 || pluginDegraded.length > 0) {
+          pluginSnapshotPath = snapshotPluginsForJob(
+            this._projectSlug, jobId, this._projectId, pluginActive, pluginDegraded,
+          )
+        }
+        for (const d of pluginDegraded) {
+          this._broadcast({
+            type: 'plugin.degraded',
+            projectId: this._projectId,
+            name: d.name,
+            reason: d.reason,
+            jobId,
+            timestamp: new Date().toISOString(),
+          })
+        }
+      } catch (err) {
+        console.warn(`[queue-manager] plugin resolution failed for job ${jobId}: ${(err as Error).message}`)
+      }
+    }
+    if (pluginActive.length > 0 && pluginSnapshotPath) {
+      spawnEnv = {
+        ...spawnEnv,
+        SPECRAILS_PLUGINS_ACTIVE: pluginActive.map((p) => p.name).join(','),
+        SPECRAILS_PLUGINS_SNAPSHOT: pluginSnapshotPath,
+      }
+    }
+    // Add OTEL attrs when telemetry already on.
+    if (this._provider === 'claude' && this._projectId && this._db) {
+      const settings = getProjectSettings(this._db)
+      if (settings.pipelineTelemetryEnabled && (pluginActive.length > 0 || pluginDegraded.length > 0)) {
+        const extra: Record<string, string> = {}
+        if (pluginActive.length > 0) {
+          extra['specrails.plugins.active'] = JSON.stringify(pluginActive.map((p) => p.name))
+          extra['specrails.plugins.versions'] = JSON.stringify(
+            Object.fromEntries(pluginActive.map((p) => [p.name, p.version])),
+          )
+        }
+        if (pluginDegraded.length > 0) {
+          extra['specrails.plugins.degraded'] = JSON.stringify(pluginDegraded.map((d) => d.name))
+        }
+        spawnEnv = {
+          ...spawnEnv,
+          ...buildTelemetryEnv(jobId, this._projectId, this._hubPort, extra),
+        }
+      }
     }
 
     // spawnAiCli reroutes multi-line argv values through stdin on Windows.

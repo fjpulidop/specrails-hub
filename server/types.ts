@@ -715,6 +715,217 @@ export interface RailJobCompletedMessage {
   ticketIds: number[]
 }
 
+// ─── Plugin system ──────────────────────────────────────────────────────────
+
+export interface PluginRequirement {
+  /** Tool name as the prerequisites detector recognizes it (e.g., "uv"). */
+  name: string
+  /** Optional minimum semver. */
+  minVersion?: string
+}
+
+export interface PluginOwnership {
+  /** Keys claimed under `mcpServers` in `<project>/.mcp.json`. */
+  mcpServers?: string[]
+  /** Project-relative paths the plugin is exclusively allowed to write. */
+  agentFragments?: string[]
+  /** Reserved for future per-plugin config keys (not used in v1). */
+  configKeys?: string[]
+}
+
+export interface PluginManifest {
+  /** kebab-case unique id. */
+  name: string
+  version: string
+  description: string
+  /** Bullets shown on the marketplace card. */
+  whatItDoes: string[]
+  /** Optional category tag for grouping in the UI. */
+  category?: string
+  /** Executable prerequisites (e.g., uv >= 0.1). */
+  requirements?: PluginRequirement[]
+  /** Files / keys the plugin is allowed to mutate. Used for conflict detection. */
+  owns: PluginOwnership
+  /** Optional override for the verify-timeout (ms). Default 2000ms. */
+  verifyTimeoutMs?: number
+  /** Optional per-platform notes shown in the install dialog. Keys are
+   *  `<platform>-<arch>` (e.g., `darwin-arm64`, `win32-x64`, `linux-x64`). */
+  platformNotes?: Partial<Record<string, string>>
+  /** Optional Markdown block appended (under marker comments) to
+   *  `<project>/CLAUDE.md` when the plugin is active. Lets a plugin teach
+   *  the global agent context to prefer its tools over generic ones. The
+   *  block is removed on uninstall and on deactivate; any user content
+   *  outside the markers is preserved byte-identical. */
+  claudeMdInstructions?: string
+}
+
+/**
+ * Provided to a plugin's lifecycle methods. The plugin is expected to record
+ * every file it creates or modifies via `recordInstalledFile` so uninstall can
+ * clean up surgically and so install rollback is deterministic.
+ */
+export interface PluginLifecycleContext {
+  projectPath: string
+  projectId: string
+  /** Append a project-relative path that this install created/modified. */
+  recordInstalledFile(relativePath: string): void
+  /** Append a log line — surfaced to the install dialog over the WS. */
+  log(line: string): void
+}
+
+export interface PluginVerifyResult {
+  ok: boolean
+  reason?: string
+  /** ISO-8601 timestamp when this verify ran. */
+  checkedAt: string
+}
+
+export interface PluginPreviewFileEntry {
+  path: string
+  op: 'create' | 'modify'
+  /** Optional human-readable summary of the change (e.g., "+ mcpServers.serena"). */
+  summary?: string
+}
+
+export interface PluginPreviewResult {
+  pluginName: string
+  files: PluginPreviewFileEntry[]
+  /** Prerequisites status at preview time, mirroring setup-prerequisites shape. */
+  requirements: Array<{
+    name: string
+    installed: boolean
+    executable: boolean
+    version?: string
+    meetsMinimum: boolean
+  }>
+  /** Platform-specific note for the user's host (resolved server-side). */
+  platformNote?: string
+}
+
+/** Plugin module value: manifest + lifecycle implementations. */
+export interface Plugin {
+  manifest: PluginManifest
+  install(ctx: PluginLifecycleContext): Promise<void>
+  uninstall(ctx: PluginLifecycleContext): Promise<void>
+  verify(ctx: Pick<PluginLifecycleContext, 'projectPath' | 'projectId'>): Promise<PluginVerifyResult>
+  /** Optional. Drives the diff preview UI; falls back to a derived preview. */
+  previewInstall?(ctx: Pick<PluginLifecycleContext, 'projectPath' | 'projectId'>): Promise<PluginPreviewFileEntry[]>
+  /** Optional. Returns the canonical mcpServers entry value the plugin would
+   *  write today. Used for drift detection (manifest vs. on-disk). When the
+   *  plugin owns multiple mcpServers, callers may use the same entry for all
+   *  or supply a richer keyed structure in a future revision. */
+  expectedMcpEntry?(): Record<string, unknown>
+}
+
+export interface PluginStateEntry {
+  version: string
+  installedAt: string
+  installedFiles: string[]
+  /** Last verify result captured by the manager (cache). */
+  health?: 'ok' | 'degraded' | 'unknown'
+  healthReason?: string
+}
+
+export interface PluginState {
+  schemaVersion: 1
+  plugins: Record<string, PluginStateEntry>
+}
+
+export type PluginCardStatus =
+  | 'installed'           // installed + activated (hub-managed Claude approval)
+  | 'deactivated'         // installed but user toggled off → Claude no longer loads
+  | 'not-installed'
+  | 'orphan'              // state.json entry but no plugin in registry
+  | 'degraded'            // installed but verify failed
+
+export interface PluginCatalogEntry {
+  name: string
+  version: string
+  description: string
+  whatItDoes: string[]
+  category?: string
+  requirements: PluginRequirement[]
+  owns: PluginOwnership
+  status: PluginCardStatus
+  installedAt?: string
+  health?: 'ok' | 'degraded' | 'unknown'
+  healthReason?: string
+  /** Claude marketplace plugin keys (e.g., `serena@claude-plugins-official`)
+   *  currently enabled that shadow this plugin's MCP server. When non-empty,
+   *  the user has the plugin globally and the hub's project-scoped install
+   *  is redundant; UI surfaces a "Disable global" affordance. */
+  marketplaceConflicts?: string[]
+  /** Marketplace keys that are physically installed in Claude's plugin cache
+   *  but NOT enabled. Claude may still resolve the server from the cached
+   *  `.mcp.json`, masking the project-scoped install. UI surfaces a hint to
+   *  uninstall the marketplace plugin via Claude's own command. */
+  marketplaceCachedButDisabled?: string[]
+  /** True when the project's `.mcp.json` entry for this plugin no longer
+   *  matches the bundled manifest (e.g., upstream renamed the binary). UI
+   *  surfaces an "Update" affordance. */
+  updateAvailable?: boolean
+}
+
+// ─── Plugin WS messages ─────────────────────────────────────────────────────
+
+export interface PluginInstalledMessage {
+  type: 'plugin.installed'
+  projectId: string
+  name: string
+  version: string
+  timestamp: string
+}
+
+export interface PluginUninstalledMessage {
+  type: 'plugin.uninstalled'
+  projectId: string
+  name: string
+  timestamp: string
+}
+
+export interface PluginHealthChangedMessage {
+  type: 'plugin.health_changed'
+  projectId: string
+  name: string
+  status: 'ok' | 'degraded' | 'unknown'
+  reason?: string
+  timestamp: string
+}
+
+export interface PluginDegradedMessage {
+  type: 'plugin.degraded'
+  projectId: string
+  name: string
+  reason: string
+  jobId?: string
+  timestamp: string
+}
+
+export interface PluginInstallProgressMessage {
+  type: 'plugin.install_progress'
+  projectId: string
+  name: string
+  line: string
+  timestamp: string
+}
+
+export interface PluginPrereqInstallProgressMessage {
+  type: 'plugin.prereq_install_progress'
+  projectId: string
+  prereq: string
+  line: string
+  timestamp: string
+}
+
+export interface PluginPrereqInstalledMessage {
+  type: 'plugin.prereq_installed'
+  projectId: string
+  prereq: string
+  ok: boolean
+  reason?: string
+  timestamp: string
+}
+
 export type WsMessage =
   | LogMessage | PhaseMessage | InitMessage | QueueMessage | EventMessage
   | ChatStreamMessage | ChatDoneMessage | ChatErrorMessage
@@ -736,4 +947,8 @@ export type WsMessage =
   | AgentRefineStreamMessage | AgentRefinePhaseMessage | AgentRefineReadyMessage
   | AgentRefineTestMessage | AgentRefineErrorMessage | AgentRefineCancelledMessage
   | AgentRefineAppliedMessage
+  | PluginInstalledMessage | PluginUninstalledMessage
+  | PluginHealthChangedMessage | PluginDegradedMessage
+  | PluginInstallProgressMessage
+  | PluginPrereqInstallProgressMessage | PluginPrereqInstalledMessage
 
