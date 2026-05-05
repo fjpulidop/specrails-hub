@@ -46,6 +46,7 @@ import {
   surgicalRemoveKeys,
   withFileLock,
 } from './plugins/json-mutation'
+import { applyContributors, contributorPaths, revertContributors } from './plugins/contributors'
 
 export type PluginBroadcast = (msg: WsMessage) => void
 
@@ -268,6 +269,16 @@ export class PluginManager {
       out.push({ path: frag, op: exists ? 'modify' : 'create' })
     }
 
+    // Shared-file contributors (CLAUDE.md today, more in the future).
+    for (const rel of contributorPaths(plugin)) {
+      const exists = fs.existsSync(path.join(projectPath, rel))
+      out.push({
+        path: rel,
+        op: exists ? 'modify' : 'create',
+        summary: `+ <!-- specrails-hub-managed:${m.name} --> block`,
+      })
+    }
+
     // State file
     const stateExists = fs.existsSync(stateFilePath(projectPath))
     out.push({
@@ -362,6 +373,18 @@ export class PluginManager {
       await this._writeProjectState(projectPath, stateNow)
       // No additional approval write needed: any server in `.mcp.json` loads
       // automatically when Claude opens the project. Install IS active.
+
+      // Apply shared-file contributors (CLAUDE.md block today, more in the
+      // future). Each contributor is per-plugin and idempotent.
+      const sharedTouched = await applyContributors(plugin, projectPath)
+      if (sharedTouched.length > 0) {
+        for (const p of sharedTouched) {
+          if (!installedFiles.includes(p)) installedFiles.push(p)
+        }
+        const stateNow2 = this.getProjectState(projectPath)
+        if (stateNow2.plugins[name]) stateNow2.plugins[name].installedFiles = installedFiles
+        await this._writeProjectState(projectPath, stateNow2)
+      }
     } catch (err) {
       // Roll back every file we snapshotted. Byte-identical restore.
       for (const [p, bytes] of preState.entries()) {
@@ -416,6 +439,9 @@ export class PluginManager {
     }
 
     if (plugin) {
+      // Revert shared-file contributors first so a partial uninstall doesn't
+      // leave dangling instructions referencing missing tools.
+      await revertContributors(plugin, projectPath)
       await plugin.uninstall({
         projectPath,
         projectId,
@@ -468,6 +494,9 @@ export class PluginManager {
     const entries: Record<string, unknown> = {}
     for (const key of owned) entries[key] = expected
     await PluginManager.mergeMcpServers(projectPath, entries)
+    // Refresh shared-file contributions too: a drift may exist in CLAUDE.md
+    // even when the .mcp.json entry matches.
+    await applyContributors(plugin, projectPath)
     broadcast({
       type: 'plugin.health_changed',
       projectId,
@@ -517,8 +546,10 @@ export class PluginManager {
       const entries: Record<string, unknown> = {}
       for (const k of owned) entries[k] = expected
       await PluginManager.mergeMcpServers(projectPath, entries)
+      await applyContributors(plugin, projectPath)
     } else {
       await PluginManager.removeMcpServers(projectPath, owned)
+      await revertContributors(plugin, projectPath)
     }
 
     broadcast({

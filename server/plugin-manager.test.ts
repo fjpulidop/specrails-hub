@@ -109,6 +109,42 @@ describe('PluginManager.listAvailable', () => {
     expect((await m.listAvailable(tmpDir))[0].status).toBe('installed')
   })
 
+  it('install writes CLAUDE.md block when manifest declares claudeMdInstructions', async () => {
+    const plugin = makeSerena()
+    plugin.manifest.claudeMdInstructions = '## serena hint'
+    const m = new PluginManager([plugin], { claudeApprovalChecker: () => 'enabled' })
+    await m.install(tmpDir, 'pid', 'serena', broadcast)
+    const md = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8')
+    expect(md).toContain('## serena hint')
+    expect(md).toContain('specrails-hub-managed:serena')
+  })
+
+  it('uninstall removes CLAUDE.md block but preserves user content', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'CLAUDE.md'), '# Project\n\nMy notes.\n')
+    const plugin = makeSerena()
+    plugin.manifest.claudeMdInstructions = '## serena hint'
+    const m = new PluginManager([plugin], { claudeApprovalChecker: () => 'enabled' })
+    await m.install(tmpDir, 'pid', 'serena', broadcast)
+    await m.uninstall(tmpDir, 'pid', 'serena', broadcast)
+    const md = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8')
+    expect(md).toContain('My notes.')
+    expect(md).not.toContain('serena hint')
+    expect(md).not.toContain('specrails-hub-managed:serena')
+  })
+
+  it('setActive(false) removes CLAUDE.md block; setActive(true) restores it', async () => {
+    const plugin = makeSerena()
+    plugin.manifest.claudeMdInstructions = '## hint'
+    const m = new PluginManager([plugin], { claudeApprovalChecker: () => 'enabled' })
+    await m.install(tmpDir, 'pid', 'serena', broadcast)
+    await m.setActive(tmpDir, 'pid', 'serena', false, broadcast)
+    const off = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8')
+    expect(off).not.toContain('## hint')
+    await m.setActive(tmpDir, 'pid', 'serena', true, broadcast)
+    const on = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8')
+    expect(on).toContain('## hint')
+  })
+
   it('setActive preserves user-authored sibling mcpServers entries', async () => {
     fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify({ mcpServers: { myown: { command: 'me' } } }))
     const m = new PluginManager([makeSerena()], { claudeApprovalChecker: () => 'enabled' })

@@ -751,6 +751,12 @@ export interface PluginManifest {
   /** Optional per-platform notes shown in the install dialog. Keys are
    *  `<platform>-<arch>` (e.g., `darwin-arm64`, `win32-x64`, `linux-x64`). */
   platformNotes?: Partial<Record<string, string>>
+  /** Optional Markdown block appended (under marker comments) to
+   *  `<project>/CLAUDE.md` when the plugin is active. Lets a plugin teach
+   *  the global agent context to prefer its tools over generic ones. The
+   *  block is removed on uninstall and on deactivate; any user content
+   *  outside the markers is preserved byte-identical. */
+  claudeMdInstructions?: string
 }
 
 /**

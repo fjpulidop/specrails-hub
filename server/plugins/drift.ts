@@ -1,5 +1,6 @@
 import fs from 'fs'
 import { mcpJsonPath } from './paths'
+import { getBlockContent } from './claude-md-mutation'
 import type { Plugin } from '../types'
 
 /**
@@ -37,5 +38,15 @@ export function detectMcpDrift(projectPath: string, plugin: Plugin): boolean {
     if (current === undefined) continue
     if (JSON.stringify(current) !== JSON.stringify(expected)) return true
   }
+
+  // Shared-file contributor drift. Today only CLAUDE.md is contributed to;
+  // we hardcode the comparison here. If/when more shared-file contributors
+  // land we move this to a `compareDrift` hook on the contributor type.
+  if (plugin.manifest.claudeMdInstructions) {
+    const expectedMd = plugin.manifest.claudeMdInstructions.trim()
+    const actualMd = (getBlockContent(projectPath, plugin.manifest.name) ?? '').trim()
+    if (actualMd !== expectedMd) return true
+  }
+
   return false
 }

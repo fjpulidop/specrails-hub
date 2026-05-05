@@ -21,6 +21,22 @@ export const serenaManifest: PluginManifest = {
     mcpServers: ['serena'],
     agentFragments: ['.claude/agents/custom-serena.md'],
   },
+  claudeMdInstructions: `## Serena MCP — semantic code navigation
+
+This project has Serena installed via specrails-hub. When locating code, prefer
+Serena's MCP tools over raw \`Read\`/\`Grep\`:
+
+- \`mcp__serena__find_symbol\` — find a class, function, or method by name path
+- \`mcp__serena__get_references\` — list all callers of a symbol
+- \`mcp__serena__get_definition\` — jump to a symbol's definition
+- \`mcp__serena__get_symbols_overview\` — file-level symbol skeleton
+- \`mcp__serena__replace_symbol_body\` — edit one function without rewriting the file
+
+Fall back to \`Read\`/\`Grep\` only for binary files, free-form prose, or content
+without semantic structure (e.g., logs, JSON without schema).
+
+Subagents inherit MCP access from the parent Claude session — pass these tool
+names through when delegating via the \`Task\` tool.`,
 }
 
 export const SERENA_MCP_ENTRY = {
