@@ -8,6 +8,7 @@ import { useSpecGenTracker } from '../hooks/useSpecGenTracker'
 import { API_ORIGIN } from '../lib/origin'
 import { deleteAllAttachments } from '../lib/attachments'
 import { RichAttachmentEditor, type RichAttachmentEditorHandle } from './RichAttachmentEditor'
+import { SpecModelPicker, useDefaultSpecModel } from './explore-spec/SpecModelPicker'
 import type { LocalTicket } from '../types'
 
 type SpecMode = 'quick' | 'explore'
@@ -16,6 +17,9 @@ export interface ExploreLaunchPayload {
   idea: string
   pendingSpecId: string
   initialAttachmentIds: string[]
+  /** Model picked at Add Spec — locked for the lifetime of the explore flow.
+   *  No downstream UI changes it. */
+  model: string
 }
 
 interface ProposeSpecModalProps {
@@ -48,6 +52,11 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
   const [pendingSpecId, setPendingSpecId] = useState<string>(() => genPendingId())
   const editorRef = useRef<RichAttachmentEditorHandle | null>(null)
   const submittedRef = useRef(false)
+
+  // Model picker — fetched on each open. Locked for the whole flow once the
+  // user submits; no downstream surface changes it. See spec
+  // `add-spec-model-selection`.
+  const { model, setModel, allowed, loading: modelLoading } = useDefaultSpecModel(activeProjectId, open)
 
   const activeProjectIdRef = useRef(activeProjectId)
   useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
@@ -101,7 +110,10 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
         return
       }
       submittedRef.current = true // suppress attachment cleanup on close
-      onExploreLaunch({ idea, pendingSpecId, initialAttachmentIds: attachmentIds })
+      // If the picker is still resolving, fall back to 'sonnet' as a safe
+      // claude default — server re-validates and will resolve the project's
+      // configured default if this doesn't fit.
+      onExploreLaunch({ idea, pendingSpecId, initialAttachmentIds: attachmentIds, model: model ?? 'sonnet' })
       onClose()
       return
     }
@@ -128,7 +140,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
         res = await fetch(`${API_ORIGIN}/api/projects/${projectId}/tickets/generate-spec`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idea, attachmentIds, pendingSpecId }),
+          body: JSON.stringify({ idea, attachmentIds, pendingSpecId, model: model ?? undefined }),
         })
       } catch (err) {
         console.error('[ProposeSpec] generate-spec fetch threw:', err)
@@ -144,7 +156,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     } finally {
       setIsSubmitting(false)
     }
-  }, [mode, tickets, tracker, pendingSpecId, onClose, onExploreLaunch])
+  }, [mode, tickets, tracker, pendingSpecId, onClose, onExploreLaunch, model])
 
   return (
     <>
@@ -158,7 +170,15 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
           </DialogHeader>
 
           <div className="flex flex-col p-5 gap-4">
-            <ModeSegmented value={mode} onChange={setMode} />
+            <div className="flex items-center justify-between gap-3">
+              <ModeSegmented value={mode} onChange={setMode} />
+              <SpecModelPicker
+                value={model}
+                allowed={allowed}
+                loading={modelLoading}
+                onChange={setModel}
+              />
+            </div>
 
             <p className="text-sm text-muted-foreground">
               {mode === 'quick'

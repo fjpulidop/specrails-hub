@@ -93,6 +93,26 @@ describe('ProposeSpecModal', () => {
     mockStartWithMessage.mockResolvedValue('conv-1')
     mockRegisterExploreSpec.mockReset()
     mockRegisterFastSpec.mockReset()
+    // Route the modal's default-spec-model fetch transparently so individual
+    // tests can keep using mockResolvedValueOnce for the actual generate-spec
+    // request without their first mock being consumed by the picker.
+    ;(global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/default-spec-model')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            model: 'sonnet',
+            provider: 'claude',
+            allowed: [
+              { value: 'sonnet', label: 'Claude Sonnet' },
+              { value: 'opus', label: 'Claude Opus' },
+              { value: 'haiku', label: 'Claude Haiku' },
+            ],
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) })
+    })
   })
 
   it('does not render dialog when open=false', () => {
@@ -194,9 +214,14 @@ describe('ProposeSpecModal', () => {
   })
 
   it('uses fast mode when explore codebase is unchecked', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ requestId: 'req-1' }),
+    ;(global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/default-spec-model')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ model: 'sonnet', provider: 'claude', allowed: [{ value: 'sonnet', label: 'Claude Sonnet' }] }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ requestId: 'req-1' }) })
     })
 
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
@@ -215,10 +240,93 @@ describe('ProposeSpecModal', () => {
     expect(mockStartWithMessage).not.toHaveBeenCalled()
   })
 
+  it('sends the resolved model in the generate-spec body (Quick mode)', async () => {
+    ;(global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/default-spec-model')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            model: 'opus',
+            provider: 'claude',
+            allowed: [
+              { value: 'sonnet', label: 'Claude Sonnet' },
+              { value: 'opus', label: 'Claude Opus' },
+            ],
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ requestId: 'req-model' }) })
+    })
+
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
+    fireEvent.change(textarea, { target: { value: 'idea with explicit model' } })
+
+    // Wait for the picker to resolve before submitting so the body carries
+    // the project default rather than the in-flight `null`.
+    await waitFor(() => {
+      expect(screen.getByText('Claude Opus')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
+
+    await waitFor(() => {
+      const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
+      const generateCall = calls.find((c) => typeof c[0] === 'string' && c[0].includes('/tickets/generate-spec'))
+      expect(generateCall).toBeTruthy()
+      const body = JSON.parse((generateCall![1] as { body: string }).body)
+      expect(body.model).toBe('opus')
+      expect(body.idea).toBe('idea with explicit model')
+    })
+  })
+
+  it('passes the resolved model to onExploreLaunch (Explore mode)', async () => {
+    const onExploreLaunch = vi.fn()
+    ;(global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/default-spec-model')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            model: 'haiku',
+            provider: 'claude',
+            allowed: [
+              { value: 'sonnet', label: 'Claude Sonnet' },
+              { value: 'haiku', label: 'Claude Haiku' },
+            ],
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) })
+    })
+
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} onExploreLaunch={onExploreLaunch} />)
+    const exploreTab = screen.getAllByRole('tab').find((t) => t.textContent?.toLowerCase().includes('explore'))!
+    fireEvent.click(exploreTab)
+    const textarea = screen.getByPlaceholderText(/dark mode/i)
+    fireEvent.change(textarea, { target: { value: 'rough idea' } })
+
+    await waitFor(() => {
+      expect(screen.getByText('Claude Haiku')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }))
+
+    await waitFor(() => {
+      expect(onExploreLaunch).toHaveBeenCalledWith(
+        expect.objectContaining({ idea: 'rough idea', model: 'haiku' }),
+      )
+    })
+  })
+
   it('registers fast spec with tracker when explore codebase is unchecked', async () => {
-    ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ requestId: 'req-fast' }),
+    ;(global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/default-spec-model')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ model: 'sonnet', provider: 'claude', allowed: [{ value: 'sonnet', label: 'Claude Sonnet' }] }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ requestId: 'req-fast' }) })
     })
 
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)

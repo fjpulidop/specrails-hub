@@ -30,6 +30,11 @@ export interface ExploreSpecShellProps {
   pendingSpecId: string
   /** Attachment ids that were already uploaded in the Add Spec modal. */
   initialAttachmentIds: string[]
+  /** Model picked at Add Spec. Used to seed the conversation's `model`
+   *  column on first turn. Locked for the conversation lifetime — no UI
+   *  in this shell mutates it. Ignored when `resumeConversationId` is
+   *  set (the persisted conversation already carries its own model). */
+  initialModel?: string
   /** When set, skip the `/specrails:explore-spec` bootstrap turn and resume
    *  from an existing conversation id. Used by the minimize-to-dock restore
    *  path so the user picks up where they left off. */
@@ -78,6 +83,7 @@ export function ExploreSpecShell({
   initialIdea,
   pendingSpecId,
   initialAttachmentIds,
+  initialModel,
   resumeConversationId,
   seedDraftTitle,
   seedComposerText,
@@ -142,10 +148,10 @@ export function ExploreSpecShell({
     const attachments = initialAttachmentIds.length > 0
       ? { ticketKey: pendingSpecId, ids: initialAttachmentIds }
       : undefined
-    void chat.startWithMessage(prompt, { lightweight: true, maxTurns: 20, attachments }).then((id) => {
+    void chat.startWithMessage(prompt, { lightweight: true, maxTurns: 20, attachments }, initialModel).then((id) => {
       if (id) setConversationId(id)
     })
-  }, [chat, initialIdea, pendingSpecId, initialAttachmentIds, resumeConversationId])
+  }, [chat, initialIdea, pendingSpecId, initialAttachmentIds, resumeConversationId, initialModel])
 
   // Focus restoration on unmount
   useEffect(() => {

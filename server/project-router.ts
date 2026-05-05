@@ -23,6 +23,12 @@ import { resolveCommand } from './command-resolver'
 import { createHooksRouter, getPhaseStates } from './hooks'
 import { getConfig, fetchIssues } from './config'
 import { getAnalytics, getTrends } from './analytics'
+import {
+  getModelsForProvider,
+  getProviderDefault,
+  isValidModelForProvider,
+  type SpecProvider,
+} from './spec-models'
 import type { ChatConversationRow, TrendsPeriod, JobTemplate, JobRow } from './types'
 import { readChanges } from './changes-reader'
 import { getProjectMetrics } from './metrics'
@@ -203,6 +209,60 @@ function applyModelConfig(projectPath: string): void {
   }
 }
 
+/**
+ * Strip the metadata sections (Spec Title, Labels, Estimated Complexity)
+ * from a generate-spec LLM response so they don't end up duplicated inside
+ * the ticket's description — they're already parsed into dedicated fields
+ * and re-rendered by the UI.
+ */
+export function stripSpecMetadataSections(buffer: string): string {
+  return buffer
+    .replace(/##\s*Spec Title\s*\n+[^\n]*\n*/i, '')
+    .replace(/##\s*Labels\s*\n+(?:[^\n]+(?:\n(?!##)[^\n]+)*)\n*/i, '')
+    .replace(/##\s*Estimated Complexity\s*\n+(?:[^\n]+(?:\n(?!##)[^\n]+)*)\n*/i, '')
+    .trim()
+}
+
+/**
+ * Resolve the default model used by Add Spec for a project.
+ *
+ * Order:
+ *   1. `models.defaults.model` from `<project>/.specrails/install-config.yaml`,
+ *      if it parses AND is in the provider allow-list.
+ *   2. Provider default from `PROVIDER_DEFAULT_MODEL` (`sonnet` / `gpt-5.4-mini`).
+ *
+ * Logs a warning when the configured value exists but is not valid for the
+ * project's provider.
+ */
+export function resolveDefaultSpecModel(args: {
+  projectPath: string
+  provider: SpecProvider
+}): string {
+  const { projectPath, provider } = args
+  const configPath = path.join(projectPath, '.specrails', 'install-config.yaml')
+  if (!fs.existsSync(configPath)) return getProviderDefault(provider)
+
+  let configText: string
+  try {
+    configText = fs.readFileSync(configPath, 'utf-8')
+  } catch {
+    return getProviderDefault(provider)
+  }
+
+  const defaultsMatch = configText.match(/defaults:\s*\{\s*model:\s*(\S+?)\s*\}/)
+  const configured = defaultsMatch ? defaultsMatch[1] : null
+  if (!configured) return getProviderDefault(provider)
+
+  if (!isValidModelForProvider(configured, provider)) {
+    console.warn(
+      `[project-router] resolveDefaultSpecModel: configured model "${configured}" is not valid for provider "${provider}" — falling back to provider default`,
+    )
+    return getProviderDefault(provider)
+  }
+
+  return configured
+}
+
 // Extend Express Request to carry resolved ProjectContext
 declare module 'express-serve-static-core' {
   interface Request {
@@ -321,6 +381,17 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       busy: queueManager.getActiveJobId() !== null,
       currentJobId: queueManager.getActiveJobId(),
     })
+  })
+
+  // Returns the resolved default model for Add Spec + the full provider
+  // allow-list so the modal can render its picker without maintaining its
+  // own copy of the model lists. Source of truth is `server/spec-models.ts`.
+  router.get('/:projectId/default-spec-model', (req: Request, res: Response) => {
+    const { project } = ctx(req)
+    const provider: SpecProvider = (project.provider ?? 'claude') as SpecProvider
+    const model = resolveDefaultSpecModel({ projectPath: project.path, provider })
+    const allowed = getModelsForProvider(provider)
+    res.json({ model, provider, allowed })
   })
 
   router.delete('/:projectId/jobs/:id', (req: Request, res: Response) => {
@@ -806,8 +877,21 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   router.post('/:projectId/chat/conversations', (req: Request, res: Response) => {
-    const { db } = ctx(req)
-    const model = (req.body?.model as string | undefined) ?? 'sonnet'
+    const { db, project } = ctx(req)
+    const provider: SpecProvider = (project.provider ?? 'claude') as SpecProvider
+    const rawModel = req.body?.model
+    let model: string
+    if (rawModel === undefined || rawModel === null || rawModel === '') {
+      model = resolveDefaultSpecModel({ projectPath: project.path, provider })
+    } else if (isValidModelForProvider(rawModel, provider)) {
+      model = rawModel
+    } else {
+      res.status(400).json({
+        error: `Invalid model "${String(rawModel)}" for provider "${provider}"`,
+        allowed: getModelsForProvider(provider).map((m) => m.value),
+      })
+      return
+    }
     const id = uuidv4()
     createConversation(db, { id, model })
     const conversation = getConversation(db, id) as ChatConversationRow
@@ -1385,7 +1469,26 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     }
 
     const { project, broadcast, ticketWatcher } = ctx(req)
-    const provider = project.provider ?? 'claude'
+    const provider: SpecProvider = (project.provider ?? 'claude') as SpecProvider
+
+    // Resolve and validate the model. Order:
+    //   - Body had a `model` and it's valid → use it.
+    //   - Body had a `model` and it's invalid → 400 with the allow-list.
+    //   - Body had no `model` → fall back to project default.
+    const rawModel = req.body?.model
+    let resolvedModel: string
+    if (rawModel === undefined || rawModel === null || rawModel === '') {
+      resolvedModel = resolveDefaultSpecModel({ projectPath: project.path, provider })
+    } else if (isValidModelForProvider(rawModel, provider)) {
+      resolvedModel = rawModel
+    } else {
+      res.status(400).json({
+        error: `Invalid model "${String(rawModel)}" for provider "${provider}"`,
+        allowed: getModelsForProvider(provider).map((m) => m.value),
+      })
+      return
+    }
+
     const requestId = uuidv4()
     const projectId = project.id
     const filePath = ticketPath(req)
@@ -1436,8 +1539,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
     if (provider === 'codex') {
       binary = 'codex'
-      // Use gpt-5.4-mini (balanced preset default for Codex per CODEX_MODELS/PRESET_DEFAULTS in ModelSelector); never hardcode o4-mini
-      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'gpt-5.4-mini']
+      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', resolvedModel]
     } else {
       binary = 'claude'
       args = [
@@ -1446,6 +1548,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         '--output-format', 'stream-json',
         '--verbose',
         '--max-turns', hasAttachments ? '3' : '1',
+        '--model', resolvedModel,
         ...imageFlags,
         '--system-prompt', systemPrompt,
         '-p', userPrompt,
@@ -1549,6 +1652,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
           : []
         const finalLabels = Array.from(new Set(['spec-proposal', ...claudeLabels]))
 
+        const description = stripSpecMetadataSections(buffer)
+
         // Create ticket directly
         try {
           const now = new Date().toISOString()
@@ -1558,7 +1663,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
             const ticket: import('./ticket-store').Ticket = {
               id,
               title: specTitle,
-              description: buffer.trim(),
+              description,
               status: 'todo',
               priority: priority as 'low' | 'medium' | 'high',
               labels: finalLabels,
