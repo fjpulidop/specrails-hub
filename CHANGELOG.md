@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.49.0](https://github.com/fjpulidop/specrails-hub/compare/v1.48.1...v1.49.0) (2026-05-05)
+
+
+### Features
+
+* per-project plugin system with Serena integration ([#293](https://github.com/fjpulidop/specrails-hub/issues/293)) ([9949b59](https://github.com/fjpulidop/specrails-hub/commit/9949b59ecd37550a97a80167f084015321248024))
+
 ## [1.48.1](https://github.com/fjpulidop/specrails-hub/compare/v1.48.0...v1.48.1) (2026-05-04)
 
 
