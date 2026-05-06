@@ -1,9 +1,7 @@
-import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, act } from '../../test-utils'
+import { render, screen, waitFor } from '../../test-utils'
 import userEvent from '@testing-library/user-event'
 import AnalyticsPage from '../AnalyticsPage'
-import type { AnalyticsResponse } from '../../types'
 
 vi.mock('../../lib/api', () => ({
   getApiBase: () => '/api',
@@ -23,166 +21,113 @@ vi.mock('../../hooks/useHub', () => ({
   }),
 }))
 
-// Mock all chart components to avoid recharts DOM issues
-vi.mock('../../components/analytics/KpiCards', () => ({
-  KpiCards: ({ kpi }: { kpi: AnalyticsResponse['kpi'] }) => (
-    <div data-testid="kpi-cards">KPI: {kpi.totalJobs} jobs</div>
+vi.mock('../../hooks/useSharedWebSocket', () => ({
+  useSharedWebSocket: () => ({
+    registerHandler: vi.fn(),
+    unregisterHandler: vi.fn(),
+    connectionStatus: 'connected',
+  }),
+}))
+
+vi.mock('sonner', () => ({
+  toast: { error: vi.fn(), success: vi.fn() },
+}))
+
+// Stub all dashboard child components to keep test focus on the page wiring.
+vi.mock('../../components/analytics/SpendingHero', () => ({
+  SpendingHero: ({ data }: { data: unknown }) => (
+    <div data-testid="hero">{data ? 'hero-loaded' : 'hero-loading'}</div>
   ),
 }))
-vi.mock('../../components/analytics/CostTimeline', () => ({
-  CostTimeline: () => <div data-testid="cost-timeline">CostTimeline</div>,
+vi.mock('../../components/analytics/SpendingTimeline', () => ({
+  SpendingTimeline: () => <div data-testid="timeline">timeline</div>,
 }))
-vi.mock('../../components/analytics/StatusBreakdown', () => ({
-  StatusBreakdown: () => <div data-testid="status-breakdown">StatusBreakdown</div>,
+vi.mock('../../components/analytics/QuickVsExploreCard', () => ({
+  QuickVsExploreCard: () => <div data-testid="qvse">qvse</div>,
 }))
-vi.mock('../../components/analytics/DurationHistogram', () => ({
-  DurationHistogram: () => <div data-testid="duration-histogram">DurationHistogram</div>,
+vi.mock('../../components/analytics/ModelBreakdown', () => ({
+  ModelBreakdown: () => <div data-testid="models">models</div>,
 }))
-vi.mock('../../components/analytics/TokenEfficiency', () => ({
-  TokenEfficiency: () => <div data-testid="token-efficiency">TokenEfficiency</div>,
+vi.mock('../../components/analytics/CostScatter', () => ({
+  CostScatter: () => <div data-testid="scatter">scatter</div>,
 }))
-vi.mock('../../components/analytics/CommandPerformance', () => ({
-  CommandPerformance: () => <div data-testid="command-performance">CommandPerformance</div>,
+vi.mock('../../components/analytics/TopTicketsCrossSurface', () => ({
+  TopTicketsCrossSurface: () => <div data-testid="top">top</div>,
 }))
-vi.mock('../../components/analytics/DailyThroughput', () => ({
-  DailyThroughput: () => <div data-testid="daily-throughput">DailyThroughput</div>,
+vi.mock('../../components/analytics/InvocationsTable', () => ({
+  InvocationsTable: () => <div data-testid="table">table</div>,
 }))
-vi.mock('../../components/analytics/CostTreemap', () => ({
-  CostTreemap: () => <div data-testid="cost-treemap">CostTreemap</div>,
-}))
-vi.mock('../../components/analytics/BonusMetrics', () => ({
-  BonusMetrics: () => <div data-testid="bonus-metrics">BonusMetrics</div>,
-}))
-vi.mock('../../components/analytics/TrendsChart', () => ({
-  TrendsChart: () => <div data-testid="trends-chart">TrendsChart</div>,
-}))
-vi.mock('../../components/analytics/PeriodSelector', () => ({
-  PeriodSelector: ({ period, onChange }: { period: string; onChange: (p: string) => void }) => (
-    <div data-testid="period-selector">
-      <button onClick={() => onChange('30d')}>30d</button>
-      <button onClick={() => onChange('7d')}>7d</button>
-      <span data-testid="current-period">{period}</span>
-    </div>
+vi.mock('../../components/ExportDropdown', () => ({
+  ExportDropdown: ({ disabled }: { disabled?: boolean }) => (
+    <button data-testid="export" disabled={disabled}>Export</button>
   ),
 }))
 
-const mockAnalyticsData: AnalyticsResponse = {
-  period: { label: 'Last 7 days', from: null, to: null },
-  kpi: {
-    totalCostUsd: 1.5,
-    totalJobs: 10,
-    successRate: 0.9,
-    avgDurationMs: 5000,
-    costDelta: null,
-    jobsDelta: null,
-    successRateDelta: null,
-    avgDurationDelta: null,
-  },
-  costTimeline: [],
-  statusBreakdown: [],
-  durationHistogram: [],
-  durationPercentiles: { p50: null, p75: null, p95: null },
-  tokenEfficiency: [],
-  commandPerformance: [],
-  dailyThroughput: [],
-  costPerCommand: [],
-  bonusMetrics: {
-    costPerSuccess: null,
-    apiEfficiencyPct: null,
-    failureCostUsd: 0,
-    modelBreakdown: [],
-  },
+const emptySpending = {
+  summary: { totalCostUsd: 0, totalRuns: 0, failureRate: 0, prevTotalCostUsd: 0, deltaPct: null, avgCostPerRun: null },
+  bySurface: [], byModel: [], byMode: [], dailyTimeline: [], scatter: [], topTickets: [],
+  trackingStartedAt: null, rangeFrom: '', rangeTo: '',
+}
+const emptyInvocations = { rows: [], total: 0, truncated: false, totalAvailable: 0 }
+
+function mockFetch() {
+  global.fetch = vi.fn().mockImplementation((url: string) => {
+    if (url.includes('/spending')) return Promise.resolve({ ok: true, json: async () => emptySpending })
+    if (url.includes('/invocations')) return Promise.resolve({ ok: true, json: async () => emptyInvocations })
+    return Promise.resolve({ ok: true, json: async () => ({}) })
+  })
+}
+
+function renderPage() {
+  return render(<AnalyticsPage />)
 }
 
 describe('AnalyticsPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
+  beforeEach(() => { vi.clearAllMocks(); mockFetch() })
+
+  it('renders the seven dashboard blocks once data loads', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByTestId('hero').textContent).toBe('hero-loaded'))
+    expect(screen.getByTestId('timeline')).toBeInTheDocument()
+    expect(screen.getByTestId('qvse')).toBeInTheDocument()
+    expect(screen.getByTestId('models')).toBeInTheDocument()
+    expect(screen.getByTestId('scatter')).toBeInTheDocument()
+    expect(screen.getByTestId('top')).toBeInTheDocument()
+    expect(screen.getByTestId('table')).toBeInTheDocument()
   })
 
-  it('shows loading skeleton initially', () => {
-    global.fetch = vi.fn().mockImplementation(() => new Promise(() => {})) // never resolves
-    const { container } = render(<AnalyticsPage />)
-    const pulseElements = container.querySelectorAll('.animate-pulse')
-    expect(pulseElements.length).toBeGreaterThan(0)
+  it('disables export when there are no invocations', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByTestId('hero').textContent).toBe('hero-loaded'))
+    expect(screen.getByTestId('export')).toBeDisabled()
   })
 
-  it('renders Analytics heading', () => {
-    global.fetch = vi.fn().mockImplementation(() => new Promise(() => {}))
-    render(<AnalyticsPage />)
-    expect(screen.getByText('Project Analytics')).toBeInTheDocument()
-  })
-
-  it('fetches analytics data on mount', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => mockAnalyticsData,
-    })
-    render(<AnalyticsPage />)
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/analytics'),
-        expect.any(Object)
-      )
-    })
-  })
-
-  it('renders charts when data is loaded', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => mockAnalyticsData,
-    })
-    render(<AnalyticsPage />)
-    await waitFor(() => {
-      expect(screen.getByTestId('kpi-cards')).toBeInTheDocument()
-    })
-    expect(screen.getByTestId('cost-timeline')).toBeInTheDocument()
-    expect(screen.getByTestId('status-breakdown')).toBeInTheDocument()
-  })
-
-  it('shows error state with retry button when fetch fails', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-    })
-    render(<AnalyticsPage />)
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Retry/i })).toBeInTheDocument()
-    })
-    expect(screen.getByText(/Failed to load analytics/i)).toBeInTheDocument()
-  })
-
-  it('retry button triggers re-fetch', async () => {
+  it('changing the period triggers a refetch', async () => {
     const user = userEvent.setup()
-    // First call fails, second succeeds
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: false, status: 500 })
-      .mockResolvedValue({ ok: true, json: async () => mockAnalyticsData })
-
-    render(<AnalyticsPage />)
+    renderPage()
+    await waitFor(() => expect(screen.getByTestId('hero').textContent).toBe('hero-loaded'))
+    const callsBefore = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length
+    await user.click(screen.getByRole('button', { name: '7d' }))
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Retry/i })).toBeInTheDocument()
+      const callsAfter = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length
+      expect(callsAfter).toBeGreaterThan(callsBefore)
     })
-
-    await user.click(screen.getByRole('button', { name: /Retry/i }))
-    await waitFor(() => {
-      expect(screen.getByTestId('kpi-cards')).toBeInTheDocument()
-    })
+    const lastSpendingCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
+      .map((c) => c[0] as string)
+      .filter((u) => u.includes('/spending')).at(-1)
+    expect(lastSpendingCall).toContain('period=7d')
   })
 
-  it('shows period label when data is loaded', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => mockAnalyticsData,
-    })
-    render(<AnalyticsPage />)
+  it('toggling a surface chip updates the URL filter', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(screen.getByTestId('hero').textContent).toBe('hero-loaded'))
+    await user.click(screen.getByRole('button', { name: 'Jobs' }))
     await waitFor(() => {
-      expect(screen.getByText('Last 7 days')).toBeInTheDocument()
+      const lastSpendingCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
+        .map((c) => c[0] as string)
+        .filter((u) => u.includes('/spending')).at(-1)
+      expect(lastSpendingCall).toContain('surface=job')
     })
-  })
-
-  it('period selector is rendered', () => {
-    global.fetch = vi.fn().mockImplementation(() => new Promise(() => {}))
-    render(<AnalyticsPage />)
-    expect(screen.getByTestId('period-selector')).toBeInTheDocument()
   })
 })

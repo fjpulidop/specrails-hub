@@ -403,32 +403,6 @@ describe('project-router', () => {
 
   // ─── GET /analytics ────────────────────────────────────────────────────────
 
-  describe('GET /analytics', () => {
-    it('returns 400 for invalid period', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/analytics?period=bad')
-      expect(res.status).toBe(400)
-      expect(res.body.error).toContain('Invalid period')
-    })
-
-    it('returns 400 for custom period without from/to', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/analytics?period=custom')
-      expect(res.status).toBe(400)
-      expect(res.body.error).toContain('from and to are required')
-    })
-
-    it('returns analytics for valid period', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/analytics?period=7d')
-      expect(res.status).toBe(200)
-      expect(res.body.kpi).toBeDefined()
-    })
-  })
-
   // ─── GET /state ────────────────────────────────────────────────────────────
 
   describe('GET /state', () => {
@@ -472,6 +446,30 @@ describe('project-router', () => {
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const res = await request(app).patch('/api/projects/proj-1/chat/conversations/no-id').send({ title: 'x' })
       expect(res.status).toBe(404)
+    })
+
+    it('POST /conversations creates with default kind=sidebar', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).post('/api/projects/proj-1/chat/conversations').send({ model: 'sonnet' })
+      expect(res.status).toBe(201)
+      expect(res.body.conversation.kind).toBe('sidebar')
+    })
+
+    it('POST /conversations accepts kind=explore', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).post('/api/projects/proj-1/chat/conversations').send({ model: 'sonnet', kind: 'explore' })
+      expect(res.status).toBe(201)
+      expect(res.body.conversation.kind).toBe('explore')
+    })
+
+    it('POST /conversations rejects unknown kind by falling back to sidebar', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).post('/api/projects/proj-1/chat/conversations').send({ model: 'sonnet', kind: 'whatever' })
+      expect(res.status).toBe(201)
+      expect(res.body.conversation.kind).toBe('sidebar')
     })
 
     it('POST /conversations/:id/messages returns 400 when text is missing', async () => {
@@ -923,39 +921,6 @@ describe('project-router', () => {
       const res = await request(app).get('/api/projects/proj-1/changes/old-change/artifacts/design.md')
       expect(res.status).toBe(200)
       expect(res.body.content).toBe('# Design')
-    })
-  })
-
-  // ─── Trends endpoint ────────────────────────────────────────────────────────
-
-  describe('GET /:projectId/trends', () => {
-    it('returns 400 for invalid period', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/trends?period=invalid')
-      expect(res.status).toBe(400)
-      expect(res.body.error).toContain('Invalid period')
-    })
-
-    it('returns trends data for valid period 7d', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/trends?period=7d')
-      expect(res.status).toBe(200)
-    })
-
-    it('uses 7d as default period', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/trends')
-      expect(res.status).toBe(200)
-    })
-
-    it('accepts 1d and 30d periods', async () => {
-      const ctx = makeContext(db)
-      const { app } = createApp(new Map([['proj-1', ctx]]))
-      expect((await request(app).get('/api/projects/proj-1/trends?period=1d')).status).toBe(200)
-      expect((await request(app).get('/api/projects/proj-1/trends?period=30d')).status).toBe(200)
     })
   })
 
@@ -1620,21 +1585,230 @@ describe('project-router', () => {
       expect(res.body.error).toContain('from and to are required')
     })
 
-    it('exports analytics as JSON', async () => {
+    it('exports analytics summary as JSON', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const res = await request(app).get('/api/projects/proj-1/analytics/export?format=json&period=7d')
       expect(res.status).toBe(200)
-      expect(res.body).toHaveProperty('kpi')
+      expect(res.body).toHaveProperty('summary')
+      expect(res.body).toHaveProperty('bySurface')
+      expect(res.body).toHaveProperty('dailyTimeline')
     })
 
-    it('exports analytics as CSV', async () => {
+    it('exports analytics summary as multi-section CSV', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const res = await request(app).get('/api/projects/proj-1/analytics/export?format=csv&period=7d')
       expect(res.status).toBe(200)
       expect(res.headers['content-type']).toContain('text/csv')
-      expect(res.text).toContain('command')
+      expect(res.text).toContain('# Totals')
+      expect(res.text).toContain('# By surface')
+      expect(res.text).toContain('# By model')
+    })
+
+    it('exports raw invocations as CSV with truncation marker when capped', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/analytics/export?format=csv&mode=raw&period=all')
+      expect(res.status).toBe(200)
+      expect(res.headers['content-type']).toContain('text/csv')
+      expect(res.text.split('\n')[0]).toContain('id,surface,surface_ref_id')
+    })
+
+    it('returns 400 for invalid mode', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/analytics/export?mode=bogus')
+      expect(res.status).toBe(400)
+    })
+
+    it('exports summary as JSON with explicit filename header', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/analytics/export?format=json&mode=summary&period=30d')
+      expect(res.status).toBe(200)
+      expect(res.headers['content-disposition']).toContain('analytics-30d')
+      expect(res.headers['content-disposition']).toContain('.json')
+    })
+
+    it('exports raw as JSON', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/analytics/export?format=json&mode=raw&period=all')
+      expect(res.status).toBe(200)
+      expect(res.body).toHaveProperty('rows')
+      expect(res.body).toHaveProperty('truncated')
+      expect(res.body).toHaveProperty('totalAvailable')
+    })
+
+    it('uses surface tag in filename when single surface filter is active', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/analytics/export?format=csv&mode=raw&period=7d&surface=explore-spec')
+      expect(res.status).toBe(200)
+      expect(res.headers['content-disposition']).toContain('-explore-')
+    })
+
+    it('returns 400 for custom period without from/to', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/analytics/export?period=custom')
+      expect(res.status).toBe(400)
+    })
+  })
+
+  // ─── Spending dashboard endpoints ────────────────────────────────────────────
+
+  describe('GET /:projectId/spending', () => {
+    it('returns the dashboard payload shape', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/spending?period=30d')
+      expect(res.status).toBe(200)
+      expect(res.body).toHaveProperty('summary')
+      expect(res.body).toHaveProperty('bySurface')
+      expect(res.body).toHaveProperty('byModel')
+      expect(res.body).toHaveProperty('byMode')
+      expect(res.body).toHaveProperty('dailyTimeline')
+      expect(res.body).toHaveProperty('scatter')
+      expect(res.body).toHaveProperty('topTickets')
+    })
+
+    it('honours the surface filter', async () => {
+      db.prepare(
+        `INSERT INTO ai_invocations (id, project_id, surface, status, started_at, total_cost_usd)
+         VALUES ('a', 'proj-1', 'job', 'success', datetime('now'), 1.0),
+                ('b', 'proj-1', 'quick-spec', 'success', datetime('now'), 5.0)`
+      ).run()
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/spending?period=all&surface=quick-spec')
+      expect(res.status).toBe(200)
+      expect(res.body.summary.totalCostUsd).toBeCloseTo(5.0)
+    })
+
+    it('returns 400 for custom period without from/to', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/spending?period=custom')
+      expect(res.status).toBe(400)
+    })
+  })
+
+  describe('GET /:projectId/invocations', () => {
+    it('returns paginated rows', async () => {
+      for (let i = 0; i < 3; i++) {
+        db.prepare(
+          `INSERT INTO ai_invocations (id, project_id, surface, status, started_at) VALUES (?, 'proj-1', 'job', 'success', datetime('now', ?))`
+        ).run(`r${i}`, `-${i} seconds`)
+      }
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/invocations?period=all&limit=2')
+      expect(res.status).toBe(200)
+      expect(res.body.rows).toHaveLength(2)
+      expect(res.body.totalAvailable).toBe(3)
+    })
+  })
+
+  describe('GET /:projectId/tickets/:id/spending-summary', () => {
+    it('returns aggregate when ticket has invocations', async () => {
+      db.prepare(
+        `INSERT INTO ai_invocations (id, project_id, surface, status, started_at, ticket_id, total_cost_usd, num_turns, duration_ms)
+         VALUES ('x', 'proj-1', 'job', 'success', datetime('now'), 42, 1.5, 3, 2000)`
+      ).run()
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/tickets/42/spending-summary')
+      expect(res.status).toBe(200)
+      expect(res.body.totalCostUsd).toBeCloseTo(1.5)
+      expect(res.body.totalRuns).toBe(1)
+      expect(res.body.totalTurns).toBe(3)
+    })
+
+    it('returns 400 for non-numeric ticket id', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/tickets/abc/spending-summary')
+      expect(res.status).toBe(400)
+    })
+
+    it('returns zeroed summary when ticket has no invocations', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/tickets/999/spending-summary')
+      expect(res.status).toBe(200)
+      expect(res.body.totalRuns).toBe(0)
+      expect(res.body.totalCostUsd).toBe(0)
+    })
+  })
+
+  // ─── Additional spending/invocations branch coverage ────────────────────────
+
+  describe('spending endpoints branch coverage', () => {
+    beforeEach(() => {
+      const now = new Date().toISOString()
+      db.prepare(
+        `INSERT INTO ai_invocations (id, project_id, surface, status, started_at, model, total_cost_usd, num_turns, duration_ms, ticket_id)
+         VALUES
+           ('a', 'proj-1', 'job', 'success', ?, 'sonnet', 1.0, 2, 1000, NULL),
+           ('b', 'proj-1', 'quick-spec', 'failed', ?, NULL, NULL, NULL, NULL, NULL),
+           ('c', 'proj-1', 'explore-spec', 'aborted', ?, 'opus', 0.5, 1, 500, 7),
+           ('d', 'proj-1', 'ai-edit', 'success', ?, 'sonnet', 0.2, 1, 300, 7)`
+      ).run(now, now, now, now)
+    })
+
+    it('/spending honours model and status filters together', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/spending?period=all&model=sonnet&status=success')
+      expect(res.status).toBe(200)
+      expect(res.body.summary.totalRuns).toBe(2)
+    })
+
+    it('/spending custom period with explicit from/to', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const from = new Date(Date.now() - 86_400_000).toISOString()
+      const to = new Date(Date.now() + 86_400_000).toISOString()
+      const res = await request(app).get(`/api/projects/proj-1/spending?period=custom&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+      expect(res.status).toBe(200)
+      expect(res.body.summary.totalRuns).toBe(4)
+    })
+
+    it('/invocations honours minCostUsd filter', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/invocations?period=all&minCostUsd=0.4')
+      expect(res.status).toBe(200)
+      expect(res.body.rows.length).toBeGreaterThan(0)
+      for (const r of res.body.rows) {
+        expect(r.total_cost_usd).toBeGreaterThanOrEqual(0.4)
+      }
+    })
+
+    it('/invocations honours offset', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/invocations?period=all&limit=2&offset=2')
+      expect(res.status).toBe(200)
+      expect(res.body.rows.length).toBeLessThanOrEqual(2)
+    })
+
+    it('export raw with status filter narrows rows', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/analytics/export?format=json&mode=raw&period=all&status=success')
+      expect(res.status).toBe(200)
+      for (const r of res.body.rows) expect(r.status).toBe('success')
+    })
+
+    it('export summary with surface filter restricts breakdown', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/analytics/export?format=json&mode=summary&period=all&surface=explore-spec')
+      expect(res.status).toBe(200)
+      expect(res.body.summary.totalRuns).toBe(1)
     })
   })
 
@@ -2572,6 +2746,16 @@ describe('project-router', () => {
         .send({ idea: 'idea', model: 'gpt-5.4-mini' })
       expect(res.status).toBe(400)
     })
+
+    it('rejects an empty idea with 400', async () => {
+      const ctx = ctxFor('claude')
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/tickets/generate-spec')
+        .send({ idea: '   ' })
+      expect(res.status).toBe(400)
+    })
+
   })
 
   describe('POST /chat/conversations — model validation', () => {

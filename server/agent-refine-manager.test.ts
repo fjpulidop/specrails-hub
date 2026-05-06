@@ -402,6 +402,63 @@ memory: project
       expect(mgr.isActive(refineId)).toBe(false)
     })
   })
+
+  // ─── ai_invocations capture (surface='ai-edit') ────────────────────────────
+
+  describe('ai_invocations capture', () => {
+    it('writes a success row when projectId is set and result event arrives', async () => {
+      const projectId = 'proj-refine-1'
+      const mgrCap = new AgentRefineManager(broadcast, db, projectPath, projectId)
+      const child = createMockChild()
+      vi.mocked(mockSpawnClaude).mockReturnValue(child as never)
+      const { refineId } = await mgrCap.startRefine({ agentId: 'custom-foo', instruction: 'go', autoTest: false })
+      pushLine(child, systemInit('sess-r'))
+      pushLine(child, assistantText(VALID_BODY))
+      pushLine(child, JSON.stringify({
+        type: 'result',
+        session_id: 'sess-r',
+        total_cost_usd: 0.25,
+        num_turns: 1,
+        model: 'sonnet',
+        duration_ms: 1000,
+        usage: { input_tokens: 50, output_tokens: 30 },
+      }))
+      await close(child, 0)
+      const rows = db.prepare(`SELECT * FROM ai_invocations WHERE project_id = ?`).all(projectId) as Array<Record<string, unknown>>
+      expect(rows).toHaveLength(1)
+      expect(rows[0].surface).toBe('ai-edit')
+      expect(rows[0].surface_ref_id).toBe(refineId)
+      expect(rows[0].status).toBe('success')
+      expect(rows[0].total_cost_usd).toBeCloseTo(0.25)
+      const inv = broadcast.mock.calls.find(([m]) => (m as { type?: string }).type === 'spending.invalidated')
+      expect(inv).toBeDefined()
+    })
+
+    it('writes a failed row when refine exits with empty draft', async () => {
+      const projectId = 'proj-refine-2'
+      const mgrCap = new AgentRefineManager(broadcast, db, projectPath, projectId)
+      const child = createMockChild()
+      vi.mocked(mockSpawnClaude).mockReturnValue(child as never)
+      await mgrCap.startRefine({ agentId: 'custom-foo', instruction: 'go', autoTest: false })
+      await close(child, 0)
+      const rows = db.prepare(`SELECT * FROM ai_invocations WHERE project_id = ?`).all(projectId) as Array<Record<string, unknown>>
+      expect(rows).toHaveLength(1)
+      expect(rows[0].status).toBe('failed')
+    })
+
+    it('skips capture when projectId is not provided', async () => {
+      const projectId = 'proj-refine-3'
+      const mgrNo = new AgentRefineManager(broadcast, db, projectPath)
+      const child = createMockChild()
+      vi.mocked(mockSpawnClaude).mockReturnValue(child as never)
+      await mgrNo.startRefine({ agentId: 'custom-foo', instruction: 'go', autoTest: false })
+      pushLine(child, systemInit('sess'))
+      pushLine(child, assistantText(VALID_BODY))
+      await close(child, 0)
+      const rows = db.prepare(`SELECT * FROM ai_invocations WHERE project_id = ?`).all(projectId) as Array<Record<string, unknown>>
+      expect(rows).toHaveLength(0)
+    })
+  })
 })
 
 // ─── Pure helper unit tests ─────────────────────────────────────────────────

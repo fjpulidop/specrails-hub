@@ -6,6 +6,8 @@ import { createHash, randomUUID } from 'crypto'
 import treeKill from 'tree-kill'
 import { spawnClaude } from './util/cli-prompt'
 import { testCustomAgent } from './agent-generator'
+import { recordInvocation } from './ai-invocations'
+import { normaliseResultEvent } from './result-event'
 import type { DbInstance } from './db'
 import type {
   WsMessage,
@@ -57,13 +59,20 @@ export class AgentRefineManager {
   private _broadcast: (msg: WsMessage) => void
   private _db: DbInstance
   private _projectPath: string
+  private _projectId: string | undefined
   private _activeProcesses = new Map<string, ChildProcess>()
   private _bodyBuffers = new Map<string, string>()
 
-  constructor(broadcast: (msg: WsMessage) => void, db: DbInstance, projectPath: string) {
+  constructor(
+    broadcast: (msg: WsMessage) => void,
+    db: DbInstance,
+    projectPath: string,
+    projectId?: string,
+  ) {
     this._broadcast = broadcast
     this._db = db
     this._projectPath = projectPath
+    this._projectId = projectId
   }
 
   isActive(refineId: string): boolean {
@@ -236,6 +245,8 @@ export class AgentRefineManager {
     this._bodyBuffers.set(refineId, '')
 
     let capturedSessionId: string | null = null
+    let lastResultEvent: Record<string, unknown> | null = null
+    const turnStartedAt = new Date().toISOString()
     const reader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
 
     reader.on('line', (line) => {
@@ -249,6 +260,7 @@ export class AgentRefineManager {
         if (sid && !capturedSessionId) capturedSessionId = sid
       }
       if (eventType === 'result') {
+        lastResultEvent = parsed
         const sid = parsed.session_id as string | undefined
         if (sid && !capturedSessionId) capturedSessionId = sid
       }
@@ -312,6 +324,27 @@ export class AgentRefineManager {
         this._activeProcesses.delete(refineId)
         const fullDraft = this._bodyBuffers.get(refineId) ?? ''
         this._bodyBuffers.delete(refineId)
+
+        // ai_invocations capture (surface='ai-edit'). One row per refine turn.
+        if (this._projectId) {
+          try {
+            const invStatus = code === 0 && fullDraft.trim() ? 'success' : 'failed'
+            const normalised = lastResultEvent ? normaliseResultEvent(lastResultEvent, 'claude') : {}
+            recordInvocation(this._db, {
+              id: randomUUID(),
+              project_id: this._projectId,
+              surface: 'ai-edit',
+              surface_ref_id: refineId,
+              status: invStatus,
+              started_at: turnStartedAt,
+              finished_at: new Date().toISOString(),
+              ...normalised,
+            })
+            this._broadcast({ type: 'spending.invalidated', projectId: this._projectId })
+          } catch (err) {
+            console.error('[agent-refine-manager] recordInvocation failed:', err)
+          }
+        }
 
         if (code !== 0 || !fullDraft.trim()) {
           this._emitError(

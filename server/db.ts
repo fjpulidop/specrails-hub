@@ -362,6 +362,51 @@ const MIGRATIONS: Migration[] = [
         ON terminal_command_marks(session_id, started_at);
     `)
   },
+
+  // Migration 16: ai_invocations — unified per-project AI CLI invocation
+  // tracking across surfaces (job, quick-spec, explore-spec, ai-edit).
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ai_invocations (
+        id                   TEXT    PRIMARY KEY,
+        project_id           TEXT    NOT NULL,
+        surface              TEXT    NOT NULL,
+        surface_ref_id       TEXT,
+        ticket_id            INTEGER,
+        conversation_id      TEXT,
+        model                TEXT,
+        status               TEXT    NOT NULL,
+        started_at           TEXT    NOT NULL,
+        finished_at          TEXT,
+        duration_ms          INTEGER,
+        duration_api_ms      INTEGER,
+        tokens_in            INTEGER,
+        tokens_out           INTEGER,
+        tokens_cache_read    INTEGER,
+        tokens_cache_create  INTEGER,
+        total_cost_usd       REAL,
+        num_turns            INTEGER,
+        session_id           TEXT,
+        created_at           TEXT    NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ai_inv_project_started
+        ON ai_invocations(project_id, started_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_ai_inv_project_surface
+        ON ai_invocations(project_id, surface);
+      CREATE INDEX IF NOT EXISTS idx_ai_inv_project_ticket
+        ON ai_invocations(project_id, ticket_id) WHERE ticket_id IS NOT NULL;
+    `)
+  },
+
+  // Migration 17: chat_conversations.kind — distinguishes Explore conversations
+  // (kind='explore') from sidebar chat (kind='sidebar'). Capture for ai_invocations
+  // is gated on kind='explore'.
+  (db) => {
+    db.exec(`
+      ALTER TABLE chat_conversations ADD COLUMN kind TEXT NOT NULL DEFAULT 'sidebar';
+    `)
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {
@@ -628,10 +673,13 @@ export function getProjectActivity(db: DbInstance, opts: ActivityQueryOpts): Act
 
 // ─── Chat DB functions ────────────────────────────────────────────────────────
 
-export function createConversation(db: DbInstance, opts: { id: string; model: string }): void {
+export function createConversation(
+  db: DbInstance,
+  opts: { id: string; model: string; kind?: 'sidebar' | 'explore' }
+): void {
   db.prepare(
-    'INSERT INTO chat_conversations (id, model) VALUES (?, ?)'
-  ).run(opts.id, opts.model)
+    'INSERT INTO chat_conversations (id, model, kind) VALUES (?, ?, ?)'
+  ).run(opts.id, opts.model, opts.kind ?? 'sidebar')
 }
 
 export function listConversations(db: DbInstance): ChatConversationRow[] {

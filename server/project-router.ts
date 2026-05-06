@@ -2,7 +2,6 @@ import fs from 'fs'
 import path from 'path'
 import { Router, Request, Response, NextFunction } from 'express'
 import { newId as uuidv4 } from './ids'
-import type { AnalyticsOpts } from './types'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import {
   listJobs, getJob, getJobEvents, purgeJobs, deleteJob, getProjectActivity,
@@ -22,14 +21,17 @@ import { VALID_PRIORITIES } from './types'
 import { resolveCommand } from './command-resolver'
 import { createHooksRouter, getPhaseStates } from './hooks'
 import { getConfig, fetchIssues } from './config'
-import { getAnalytics, getTrends } from './analytics'
+import { recordInvocation, updateTicketIdForConversation, getTicketSpendingSummary } from './ai-invocations'
+import { normaliseResultEvent } from './result-event'
+import { getSpending, getInvocations, parseSpendingFilters } from './spending'
+import { randomUUID } from 'crypto'
 import {
   getModelsForProvider,
   getProviderDefault,
   isValidModelForProvider,
   type SpecProvider,
 } from './spec-models'
-import type { ChatConversationRow, TrendsPeriod, JobTemplate, JobRow } from './types'
+import type { ChatConversationRow, JobTemplate, JobRow } from './types'
 import { readChanges } from './changes-reader'
 import { getProjectMetrics } from './metrics'
 import {
@@ -641,77 +643,189 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     }
   })
 
-  router.get('/:projectId/analytics', (req: Request, res: Response) => {
-    const period = (req.query.period as string) || '7d'
-    const from = req.query.from as string | undefined
-    const to = req.query.to as string | undefined
-    const validPeriods = ['7d', '30d', '90d', 'all', 'custom']
-    if (!validPeriods.includes(period)) {
-      res.status(400).json({ error: 'Invalid period. Must be one of: 7d, 30d, 90d, all, custom' })
-      return
-    }
-    if (period === 'custom' && (!from || !to)) {
+  // ─── Spending dashboard ──────────────────────────────────────────────────────
+  router.get('/:projectId/spending', (req: Request, res: Response) => {
+    const filters = parseSpendingFilters(req.query as Record<string, unknown>)
+    if (filters.period === 'custom' && (!filters.from || !filters.to)) {
       res.status(400).json({ error: 'from and to are required for custom period' })
       return
     }
     try {
-      res.json(getAnalytics(ctx(req).db, { period: period as AnalyticsOpts['period'], from, to }))
+      res.json(getSpending(ctx(req).db, ctx(req).project.id, filters))
     } catch (err) {
-      console.error('[project-router] analytics error:', err)
-      res.status(500).json({ error: 'Failed to compute analytics' })
+      console.error('[project-router] spending error:', err)
+      res.status(500).json({ error: 'Failed to compute spending' })
     }
   })
 
-  // ─── Analytics export ────────────────────────────────────────────────────────
-  router.get('/:projectId/analytics/export', (req: Request, res: Response) => {
+  // ─── Raw invocations table ───────────────────────────────────────────────────
+  router.get('/:projectId/invocations', (req: Request, res: Response) => {
+    const filters = parseSpendingFilters(req.query as Record<string, unknown>)
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined
+    const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : undefined
+    try {
+      const result = getInvocations(ctx(req).db, ctx(req).project.id, {
+        ...filters,
+        ...(limit ? { limit } : {}),
+        ...(offset ? { offset } : {}),
+      })
+      // Enrich with ticket titles from YAML store.
+      try {
+        const store = readStore(ticketPath(req))
+        for (const r of result.rows) {
+          if (r.ticket_id != null) {
+            const t = store.tickets[String(r.ticket_id)]
+            r.ticket_title = t?.title ?? null
+          }
+        }
+      } catch { /* tickets store may not exist yet */ }
+      res.json(result)
+    } catch (err) {
+      console.error('[project-router] invocations error:', err)
+      res.status(500).json({ error: 'Failed to list invocations' })
+    }
+  })
+
+  // ─── Per-ticket spending summary (used by TicketDetailModal) ─────────────────
+  router.get('/:projectId/tickets/:id/spending-summary', (req: Request, res: Response) => {
+    const ticketId = parseInt(req.params.id as string, 10)
+    if (Number.isNaN(ticketId)) {
+      res.status(400).json({ error: 'Invalid ticket id' }); return
+    }
+    try {
+      res.json(getTicketSpendingSummary(ctx(req).db, ticketId))
+    } catch (err) {
+      console.error('[project-router] ticket spending summary error:', err)
+      res.status(500).json({ error: 'Failed to compute ticket spending' })
+    }
+  })
+
+  // ─── Spending / analytics export (Summary + Raw, CSV or JSON) ────────────────
+  router.get('/:projectId/analytics/export', async (req: Request, res: Response) => {
     const format = (req.query.format as string) || 'json'
+    const mode = (req.query.mode as string) || 'summary'
     if (format !== 'json' && format !== 'csv') {
       res.status(400).json({ error: 'Invalid format. Must be json or csv' })
       return
     }
-    const period = (req.query.period as string) || '7d'
-    const from = req.query.from as string | undefined
-    const to = req.query.to as string | undefined
+    if (mode !== 'summary' && mode !== 'raw') {
+      res.status(400).json({ error: 'Invalid mode. Must be summary or raw' })
+      return
+    }
+    const periodRaw = (req.query.period as string | undefined) ?? '30d'
     const validPeriods = ['7d', '30d', '90d', 'all', 'custom']
-    if (!validPeriods.includes(period)) {
+    if (!validPeriods.includes(periodRaw)) {
       res.status(400).json({ error: 'Invalid period. Must be one of: 7d, 30d, 90d, all, custom' })
       return
     }
-    if (period === 'custom' && (!from || !to)) {
+    const filters = parseSpendingFilters(req.query as Record<string, unknown>)
+    if (filters.period === 'custom' && (!filters.from || !filters.to)) {
       res.status(400).json({ error: 'from and to are required for custom period' })
       return
     }
+    const { project } = ctx(req)
+    const projectId = project.id
+    const dateStamp = new Date().toISOString().slice(0, 10)
+    const periodTag = filters.period ?? '30d'
+    const surfaceTag = (filters.surface && filters.surface.length === 1)
+      ? `-${filters.surface[0].replace('-spec', '').replace('-', '')}`
+      : ''
+
     try {
-      const analytics = getAnalytics(ctx(req).db, { period: period as AnalyticsOpts['period'], from, to })
-      if (format === 'csv') {
-        const headers = ['command', 'totalRuns', 'successRate', 'avgCostUsd', 'avgDurationMs', 'totalCostUsd']
-        const csv = toCsv(headers, analytics.commandPerformance as unknown as Record<string, unknown>[])
+      if (mode === 'summary') {
+        const data = getSpending(ctx(req).db, projectId, filters)
+        if (format === 'json') {
+          res.setHeader('Content-Disposition', `attachment; filename="${project.slug}-analytics-${periodTag}-${dateStamp}.json"`)
+          res.json(data)
+          return
+        }
+        // CSV summary: multi-section composite
+        const lines: string[] = []
+        lines.push('# Totals')
+        lines.push('totalCostUsd,totalRuns,prevTotalCostUsd,deltaPct,avgCostPerRun,failureRate')
+        lines.push([
+          data.summary.totalCostUsd,
+          data.summary.totalRuns,
+          data.summary.prevTotalCostUsd,
+          data.summary.deltaPct ?? '',
+          data.summary.avgCostPerRun ?? '',
+          data.summary.failureRate,
+        ].join(','))
+        lines.push('')
+        lines.push('# Daily timeline')
+        lines.push('date,jobsCostUsd,quickCostUsd,exploreCostUsd,aiEditCostUsd,totalCostUsd')
+        for (const d of data.dailyTimeline) {
+          lines.push(`${d.date},${d.jobsCostUsd},${d.quickCostUsd},${d.exploreCostUsd},${d.aiEditCostUsd},${d.totalCostUsd}`)
+        }
+        lines.push('')
+        lines.push('# By surface')
+        lines.push('surface,count,costUsd')
+        for (const s of data.bySurface) lines.push(`${s.surface},${s.count},${s.costUsd}`)
+        lines.push('')
+        lines.push('# By model')
+        lines.push('model,count,costUsd')
+        for (const m of data.byModel) lines.push(`${csvEscape(m.model)},${m.count},${m.costUsd}`)
+        lines.push('')
+        lines.push('# Top tickets')
+        lines.push('ticketId,totalCostUsd,totalRuns,jobCost,quickCost,exploreCost,aiEditCost')
+        for (const t of data.topTickets) {
+          lines.push([
+            t.ticketId ?? '(unattributed)',
+            t.totalCostUsd,
+            t.totalRuns,
+            t.bySurface.job.costUsd,
+            t.bySurface['quick-spec'].costUsd,
+            t.bySurface['explore-spec'].costUsd,
+            t.bySurface['ai-edit'].costUsd,
+          ].join(','))
+        }
         res.setHeader('Content-Type', 'text/csv')
-        res.setHeader('Content-Disposition', 'attachment; filename="analytics-export.csv"')
-        res.send(csv)
+        res.setHeader('Content-Disposition', `attachment; filename="${project.slug}-analytics-${periodTag}-${dateStamp}.csv"`)
+        res.send(lines.join('\n'))
       } else {
-        res.json(analytics)
+        // raw mode: capped invocations
+        const result = getInvocations(ctx(req).db, projectId, { ...filters, cap: 10000 })
+        // Enrich titles
+        try {
+          const store = readStore(ticketPath(req))
+          for (const r of result.rows) {
+            if (r.ticket_id != null) r.ticket_title = store.tickets[String(r.ticket_id)]?.title ?? null
+          }
+        } catch { /* no tickets yet */ }
+        if (format === 'json') {
+          res.setHeader('Content-Disposition', `attachment; filename="${project.slug}-invocations-${periodTag}${surfaceTag}-${dateStamp}.json"`)
+          res.json(result)
+          return
+        }
+        const headers = [
+          'id','surface','surface_ref_id','ticket_id','ticket_title','conversation_id',
+          'model','status','started_at','finished_at','duration_ms','duration_api_ms',
+          'tokens_in','tokens_out','tokens_cache_read','tokens_cache_create',
+          'total_cost_usd','num_turns','session_id'
+        ]
+        const lines = [headers.join(',')]
+        for (const r of result.rows) {
+          lines.push(headers.map((h) => csvEscape((r as unknown as Record<string, unknown>)[h])).join(','))
+        }
+        if (result.truncated) {
+          lines.push(`# truncated_at=${result.rows.length} of ${result.totalAvailable}`)
+        }
+        res.setHeader('Content-Type', 'text/csv')
+        res.setHeader('Content-Disposition', `attachment; filename="${project.slug}-invocations-${periodTag}${surfaceTag}-${dateStamp}.csv"`)
+        res.send(lines.join('\n'))
       }
     } catch (err) {
-      console.error('[project-router] analytics export error:', err)
-      res.status(500).json({ error: 'Failed to compute analytics' })
+      console.error('[project-router] export error:', err)
+      res.status(500).json({ error: 'Failed to export' })
     }
   })
 
-  router.get('/:projectId/trends', (req: Request, res: Response) => {
-    const period = (req.query.period as string) || '7d'
-    const validPeriods: TrendsPeriod[] = ['1d', '7d', '30d']
-    if (!validPeriods.includes(period as TrendsPeriod)) {
-      res.status(400).json({ error: 'Invalid period. Must be one of: 1d, 7d, 30d' })
-      return
-    }
-    try {
-      res.json(getTrends(ctx(req).db, period as TrendsPeriod))
-    } catch (err) {
-      console.error('[project-router] trends error:', err)
-      res.status(500).json({ error: 'Failed to compute trends' })
-    }
-  })
+  function csvEscape(v: unknown): string {
+    const s = v == null ? '' : String(v)
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g, '""')}"`
+      : s
+  }
 
   router.get('/:projectId/jobs/compare', (req: Request, res: Response) => {
     const raw = req.query.jobIds as string | undefined
@@ -895,8 +1009,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       })
       return
     }
+    const rawKind = req.body?.kind
+    const kind: 'sidebar' | 'explore' = rawKind === 'explore' ? 'explore' : 'sidebar'
     const id = uuidv4()
-    createConversation(db, { id, model })
+    createConversation(db, { id, model, kind })
     const conversation = getConversation(db, id) as ChatConversationRow
     res.status(201).json({ conversation })
   })
@@ -1595,6 +1711,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     res.status(202).json({ requestId })
 
     let buffer = ''
+    let lastResultEvent: Record<string, unknown> | null = null
+    const turnStartedAt = new Date().toISOString()
     const stdoutReader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
 
     stdoutReader.on('line', (line) => {
@@ -1611,6 +1729,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         let parsed: Record<string, unknown> | null = null
         try { parsed = JSON.parse(line) } catch { /* skip */ }
         if (!parsed) return
+
+        if ((parsed.type as string) === 'result') {
+          lastResultEvent = parsed
+        }
 
         if ((parsed.type as string) === 'assistant') {
           const msg = parsed.message as { content?: Array<{ type: string; text?: string }> } | undefined
@@ -1631,6 +1753,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     })
 
     child.on('close', async (code) => {
+      let createdTicketId: number | null = null
+
       if (code === 0 && buffer.trim()) {
         // Extract title from generated spec
         const titleMatch = buffer.match(/##\s*Spec Title\s*\n+(.+)/)
@@ -1683,6 +1807,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
             created = ticket
           })
           ticketWatcher.notifyHubWrite(store.revision)
+          if (created) createdTicketId = created.id
 
           // Migrate attachments from pendingSpecId → real ticket id (if any were uploaded).
           // Must complete BEFORE broadcasting ticket_created so WS listeners see the populated attachments[].
@@ -1735,6 +1860,38 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         }
         broadcast(msg)
       }
+
+      // ai_invocations capture (surface='quick-spec'). Always emit a row, success or fail.
+      try {
+        const cliProvider: 'claude' | 'codex' = provider === 'codex' ? 'codex' : 'claude'
+        const synthCodexResult = (cliProvider === 'codex' && code === 0)
+          ? {
+              type: 'result',
+              total_cost_usd: 0,
+              model: resolvedModel,
+              num_turns: 1,
+              duration_ms: Date.now() - new Date(turnStartedAt).getTime(),
+            }
+          : null
+        const eventForParse = lastResultEvent ?? synthCodexResult
+        const normalised = eventForParse
+          ? normaliseResultEvent(eventForParse as Record<string, unknown>, cliProvider)
+          : {}
+        recordInvocation(ctx(req).db, {
+          id: randomUUID(),
+          project_id: projectId,
+          surface: 'quick-spec',
+          surface_ref_id: requestId,
+          ticket_id: createdTicketId,
+          status: code === 0 && buffer.trim() ? 'success' : 'failed',
+          started_at: turnStartedAt,
+          finished_at: new Date().toISOString(),
+          ...normalised,
+        })
+        broadcast({ type: 'spending.invalidated', projectId })
+      } catch (err) {
+        console.error('[project-router] generate-spec recordInvocation failed:', err)
+      }
     })
   })
 
@@ -1746,6 +1903,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       res.status(400).json({ error: 'title is required' }); return
     }
     const pendingSpecId = typeof body.pendingSpecId === 'string' ? body.pendingSpecId : null
+    const conversationId = typeof body.conversationId === 'string' ? body.conversationId : null
     const baseDescription = typeof body.description === 'string' ? body.description.trim() : ''
     const labels = Array.isArray(body.labels)
       ? (body.labels as unknown[]).filter((l): l is string => typeof l === 'string')
@@ -1825,6 +1983,19 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         timestamp: new Date().toISOString(),
       }
       broadcast(msg)
+
+      // Back-fill ticket_id on the conversation's prior ai_invocations rows.
+      if (conversationId && created) {
+        try {
+          const changes = updateTicketIdForConversation(ctx(req).db, conversationId, created.id)
+          if (changes > 0) {
+            broadcast({ type: 'spending.invalidated', projectId: project.id })
+          }
+        } catch (err) {
+          console.error('[project-router] from-draft ai_invocations back-fill failed:', err)
+        }
+      }
+
       res.status(201).json({ ticket: created!, revision: store.revision })
     } catch (err) {
       console.error('[project-router] from-draft create error:', err)

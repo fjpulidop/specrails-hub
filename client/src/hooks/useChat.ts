@@ -35,7 +35,7 @@ export interface UseChatReturn {
   createConversation: (model?: string) => Promise<void>
   deleteConversation: (id: string) => Promise<void>
   sendMessage: (conversationId: string, text: string, options?: ChatSendOptions) => Promise<void>
-  startWithMessage: (text: string, options?: ChatSendOptions, model?: string) => Promise<string | null>
+  startWithMessage: (text: string, options?: ChatSendOptions, model?: string, kind?: 'sidebar' | 'explore') => Promise<string | null>
   abortStream: (conversationId: string) => Promise<void>
   confirmCommand: (command: string) => Promise<void>
   dismissCommandProposal: (conversationId: string, command: string) => void
@@ -340,12 +340,12 @@ export function useChat(): UseChatReturn {
   }, [])
 
   // Create a conversation and immediately send the first message
-  const startWithMessage = useCallback(async (text: string, options?: ChatSendOptions, model?: string): Promise<string | null> => {
+  const startWithMessage = useCallback(async (text: string, options?: ChatSendOptions, model?: string, kind?: 'sidebar' | 'explore'): Promise<string | null> => {
     try {
       const res = await fetch(`${getApiBase()}/chat/conversations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: model ?? undefined }),
+        body: JSON.stringify({ model: model ?? undefined, kind: kind ?? undefined }),
       })
       if (!res.ok) return null
       const data = await res.json() as { conversation: ChatConversationSummary }
