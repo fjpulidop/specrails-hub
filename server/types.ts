@@ -207,6 +207,7 @@ export interface ChatConversationRow {
   session_id: string | null
   created_at: string
   updated_at: string
+  kind: 'sidebar' | 'explore'
 }
 
 export interface ChatMessageRow {
@@ -951,4 +952,10 @@ export type WsMessage =
   | PluginHealthChangedMessage | PluginDegradedMessage
   | PluginInstallProgressMessage
   | PluginPrereqInstallProgressMessage | PluginPrereqInstalledMessage
+  | SpendingInvalidatedMessage
+
+export interface SpendingInvalidatedMessage {
+  type: 'spending.invalidated'
+  projectId: string
+}
 

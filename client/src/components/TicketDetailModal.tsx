@@ -8,6 +8,7 @@ import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
 import { AttachmentsSection } from './AttachmentsSection'
 import { TicketAiEditOverlay } from './tickets/TicketAiEditOverlay'
+import { TicketSpendingLine } from './TicketSpendingLine'
 import type { Attachment, LocalTicket, TicketPriority } from '../types'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -247,6 +248,7 @@ export function TicketDetailModal({
             <div className="flex items-center gap-2 mt-1.5">
               <span className="text-[10px] text-foreground font-mono">#{ticket.id}</span>
             </div>
+            <TicketSpendingLine ticketId={ticket.id} />
           </div>
 
           <button

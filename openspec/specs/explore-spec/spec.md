@@ -21,18 +21,22 @@ The `Add Spec` modal SHALL render a segmented control with exactly two modes —
 - **THEN** the modal opens in Quick mode again
 
 ### Requirement: Quick mode preserves existing fast-path behaviour
-The `Quick` mode SHALL behave identically to the current default `Generate Spec` flow: the user's idea and any attachments are sent to `POST /api/projects/:projectId/tickets/generate-spec`, the modal closes, and a toast tracks generation progress until the new ticket appears.
+The `Quick` mode SHALL behave identically to the current default `Generate Spec` flow: the user's idea, any attachments, and the model selected in the Add Spec model picker are sent to `POST /api/projects/:projectId/tickets/generate-spec`, the modal closes, and a toast tracks generation progress until the new ticket appears.
 
 #### Scenario: Quick submits to generate-spec
 - **WHEN** the user types an idea in Quick mode and clicks `Generate Spec`
 - **THEN** the modal closes
-- **AND** a `POST /api/projects/<id>/tickets/generate-spec` is sent with `{ idea, attachmentIds, pendingSpecId }`
+- **AND** a `POST /api/projects/<id>/tickets/generate-spec` is sent with `{ idea, attachmentIds, pendingSpecId, model }`
 - **AND** a loading toast is shown until the ticket is generated
 
 #### Scenario: Quick supports attachments
 - **WHEN** the user attaches a file in Quick mode and submits
 - **THEN** the attachment ids are included in the request payload
 - **AND** the attachments are bound to the new ticket on success
+
+#### Scenario: Quick forwards selected model
+- **WHEN** the user picks a non-default model in the Add Spec picker and submits in Quick mode
+- **THEN** the request body's `model` field equals the picker's selected value
 
 ### Requirement: Explore mode opens a full-screen overlay shell
 Selecting `Explore` and submitting the initial idea SHALL replace the modal with a full-screen overlay using the same visual language as `AI Edit`: eyebrow `EXPLORE SPEC · interactive`, headline copy, two-column layout (conversation left, draft right), composer at the bottom with optional chip row, header back-arrow and close button.
@@ -201,4 +205,43 @@ While an assistant turn is streaming the draft pane SHALL NOT update mid-stream.
 - **WHEN** the streaming turn completes with a fully formed `spec-draft` block
 - **THEN** the draft updates and any changed fields animate
 - **AND** the "updating…" hint disappears
+
+### Requirement: Explore launch payload carries the selected model
+
+The Explore launch handoff (the `onExploreLaunch` payload from the Add Spec modal to the parent that owns `ExploreSpecShell`) SHALL include the model selected in the Add Spec picker as `model: string`. The Explore conversation MUST be created with that model as its `model` field, and the model MUST remain fixed for every assistant turn in that conversation for the lifetime of the conversation.
+
+#### Scenario: Payload includes model
+- **WHEN** the user picks `opus` and clicks `Continue` in Explore mode
+- **THEN** the `ExploreLaunchPayload` passed to `onExploreLaunch` includes `model: "opus"`
+
+#### Scenario: Conversation seeded with chosen model
+- **WHEN** the Explore conversation is created from the launch payload
+- **THEN** the persisted conversation row's `model` equals the launch payload's `model`
+
+#### Scenario: Subsequent turns reuse the seeded model
+- **GIVEN** an Explore conversation seeded with `model: "haiku"`
+- **WHEN** the user sends additional messages
+- **THEN** every assistant turn is generated using `haiku`
+- **AND** no UI surface changes the conversation's model mid-flow
+
+### Requirement: ExploreSpec shell can be minimized to the dock
+
+The ExploreSpec full-screen overlay SHALL expose a minimize control in its header, distinct from the existing back arrow and close (`×`) buttons. Activating the minimize control MUST hide the overlay without unmounting it, register a chip in the global minimized chats dock, and never trigger the discard-confirm dialog.
+
+#### Scenario: Minimize hides overlay and adds chip
+- **WHEN** the user clicks the minimize control on an ExploreSpec overlay with a non-empty composer
+- **THEN** the overlay is hidden from the viewport
+- **AND** a chip appears in the global minimized chats dock with the current draft title (or "Untitled spec" when empty) as its label
+- **AND** no discard-confirm dialog is shown
+
+#### Scenario: Restore from chip preserves all state
+- **WHEN** the user clicks the chip for a previously minimized ExploreSpec session
+- **THEN** the active project switches to the session's owning project (if different)
+- **AND** the application navigates to the spec proposal entry route
+- **AND** the overlay is shown with the same conversation history, draft fields, composer text, attachments, streaming state, and discard-confirm pending state as before minimize
+
+#### Scenario: ExploreSpec shell hoisted out of ProposeSpecModal
+- **WHEN** an ExploreSpec session is active and the user closes `ProposeSpecModal`
+- **THEN** the ExploreSpec shell remains mounted (in the global minimized chats provider's hidden host)
+- **AND** the session is added to the dock as a chip if it wasn't already visible there
 

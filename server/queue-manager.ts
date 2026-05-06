@@ -9,6 +9,9 @@ import { PRIORITY_WEIGHT, VALID_PRIORITIES } from './types'
 import { resolveCommand } from './command-resolver'
 import { spawnAiCli } from './util/cli-prompt'
 import { resetPhases, setActivePhases } from './hooks'
+import { recordInvocation } from './ai-invocations'
+import { normaliseResultEvent } from './result-event'
+import { randomUUID } from 'crypto'
 import { createJob, finishJob, appendEvent, skipJob, getProjectSettings } from './db'
 import type { JobResult } from './db'
 import type { CommandInfo } from './config'
@@ -969,6 +972,37 @@ export class QueueManager {
         status: finalStatus,
         ...tokenData,
       })
+
+      // ai_invocations capture (surface='job'). One row per job exit.
+      if (this._projectId) {
+        try {
+          const invStatus = finalStatus === 'completed'
+            ? 'success'
+            : (finalStatus === 'canceled' || finalStatus === 'zombie_terminated')
+              ? 'aborted'
+              : 'failed'
+          const ticketIds = this._extractTicketIds(job.command)
+          const provider: 'claude' | 'codex' = this._provider === 'codex' ? 'codex' : 'claude'
+          const normalised = lastResultEvent
+            ? normaliseResultEvent(lastResultEvent as Record<string, unknown>, provider)
+            : {}
+          recordInvocation(this._db, {
+            id: randomUUID(),
+            project_id: this._projectId,
+            surface: 'job',
+            surface_ref_id: jobId,
+            ticket_id: ticketIds[0] ?? null,
+            status: invStatus,
+            started_at: job.startedAt ?? new Date().toISOString(),
+            finished_at: job.finishedAt,
+            ...normalised,
+          })
+          this._broadcast({ type: 'spending.invalidated', projectId: this._projectId })
+        } catch (err) {
+          console.error('[queue-manager] recordInvocation failed:', err)
+        }
+      }
+
       const jobCost = lastResultEvent?.total_cost_usd as number | undefined
       const costStr = jobCost != null ? ` | cost: $${jobCost.toFixed(4)}` : ''
       emitLine('stdout', `[process exited with code ${code ?? 'unknown'}${costStr}]`)

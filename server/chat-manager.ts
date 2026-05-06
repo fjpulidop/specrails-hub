@@ -6,6 +6,9 @@ import type { DbInstance } from './db'
 import { getConversation, addMessage, updateConversation, getStats, listJobs } from './db'
 import { resolveCommand } from './command-resolver'
 import { spawnAiCli, spawnClaude, spawnCodex } from './util/cli-prompt'
+import { recordInvocation } from './ai-invocations'
+import { normaliseResultEvent } from './result-event'
+import { randomUUID } from 'crypto'
 import { parseSpecDraftBlocks, applyBlocks, type ConversationDraftState } from './spec-draft-parser'
 import { attachmentManager, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
 
@@ -117,13 +120,22 @@ export class ChatManager {
   private _cwd: string | undefined
   private _projectName: string | undefined
   private _provider: 'claude' | 'codex'
+  private _projectId: string | undefined
 
-  constructor(broadcast: (msg: WsMessage) => void, db: DbInstance, cwd?: string, projectName?: string, provider?: 'claude' | 'codex') {
+  constructor(
+    broadcast: (msg: WsMessage) => void,
+    db: DbInstance,
+    cwd?: string,
+    projectName?: string,
+    provider?: 'claude' | 'codex',
+    projectId?: string,
+  ) {
     this._broadcast = broadcast
     this._db = db
     this._cwd = cwd
     this._projectName = projectName
     this._provider = provider ?? 'claude'
+    this._projectId = projectId
     this._activeProcesses = new Map()
     this._buffers = new Map()
     this._emittedProposals = new Map()
@@ -365,6 +377,8 @@ export class ChatManager {
     /* c8 ignore stop */
 
     let capturedSessionId: string | null = null
+    let lastResultEvent: Record<string, unknown> | null = null
+    const turnStartedAt = new Date().toISOString()
 
     const stdoutReader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
 
@@ -418,6 +432,7 @@ export class ChatManager {
         const eventType = parsed.type as string
 
         if (eventType === 'result') {
+          lastResultEvent = parsed
           const sid = parsed.session_id as string | undefined
           if (sid) capturedSessionId = sid
         }
@@ -439,6 +454,35 @@ export class ChatManager {
         this._emittedProposals.delete(conversationId)
         this._abortingConversations.delete(conversationId)
         this._streamFilters.delete(conversationId)
+
+        // ai_invocations capture (surface='explore-spec'). Gated on conversation kind.
+        if (this._projectId && conversation.kind === 'explore') {
+          try {
+            const invStatus = wasAborting
+              ? 'aborted'
+              : code === 0
+                ? 'success'
+                : 'failed'
+            const provider: 'claude' | 'codex' = this._provider === 'codex' ? 'codex' : 'claude'
+            const normalised = lastResultEvent
+              ? normaliseResultEvent(lastResultEvent, provider)
+              : {}
+            recordInvocation(this._db, {
+              id: randomUUID(),
+              project_id: this._projectId,
+              surface: 'explore-spec',
+              surface_ref_id: conversationId,
+              conversation_id: conversationId,
+              status: invStatus,
+              started_at: turnStartedAt,
+              finished_at: new Date().toISOString(),
+              ...normalised,
+            })
+            this._broadcast({ type: 'spending.invalidated', projectId: this._projectId })
+          } catch (err) {
+            console.error('[chat-manager] recordInvocation failed:', err)
+          }
+        }
 
         if (wasAborting) {
           // abort already emitted chat_error

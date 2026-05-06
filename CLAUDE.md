@@ -205,6 +205,40 @@ Hub-wide UI theme selectable from `GlobalSettingsPage > Appearance`. Three built
 
 **REST**: `GET /api/hub/theme` returns `{ theme }`; `PATCH /api/hub/theme` validates the body against the allow-list and returns 400 on rejection.
 
+### Project spending analytics
+
+Per-project unified tracking of every billable AI CLI invocation (model, tokens, cost USD, turns, duration), powering the redesigned `/analytics` page (route name unchanged; right-sidebar entry still labelled "Analytics").
+
+**Schema (`ai_invocations` table, per-project SQLite, migration 16):** `id, project_id, surface, surface_ref_id, ticket_id, conversation_id, model, status, started_at, finished_at, duration_ms, duration_api_ms, tokens_in/out/cache_read/cache_create, total_cost_usd, num_turns, session_id`. Indexed by `(project_id, started_at DESC)`, `(project_id, surface)`, partial `(project_id, ticket_id)`.
+
+**Capture sites (in scope):** four spawners write a row at process exit via `recordInvocation` from `server/ai-invocations.ts`:
+- `server/queue-manager.ts` — `surface='job'`, `surface_ref_id=<jobId>`, ticket id extracted from command.
+- `server/project-router.ts` `POST /tickets/generate-spec` — `surface='quick-spec'`, ticket id set when ticket creation succeeds.
+- `server/chat-manager.ts` — `surface='explore-spec'`, gated on `chat_conversations.kind === 'explore'` (sidebar chat is uninstrumented). One row per turn with `conversation_id`. `POST /tickets/from-draft` calls `updateTicketIdForConversation` to back-fill `ticket_id` on prior rows once the ticket is created.
+- `server/agent-refine-manager.ts` — `surface='ai-edit'`, one row per refine turn.
+
+**Out of scope:** chat sidebar (`kind='sidebar'`), setup wizard. Both spawn AI CLIs but never write to `ai_invocations`.
+
+**Conversation kind (migration 17):** `chat_conversations.kind TEXT NOT NULL DEFAULT 'sidebar'`. `POST /chat/conversations` accepts an optional `{ kind: 'sidebar' | 'explore' }` field. The Explore client (`ExploreSpecShell`) sends `kind: 'explore'` via `useChat.startWithMessage(text, opts, model, 'explore')`.
+
+**Aggregation (`server/spending.ts`):** single source of truth. `getSpending(db, projectId, filters)` returns `summary` (totals + prev-period delta), `bySurface`, `byModel` (top 10), `byMode` (Quick vs Explore), `dailyTimeline` (zero-filled, stacked by surface), `scatter` (last 500 points), `topTickets` (top 10 cross-surface, with deleted-ticket and unattributed buckets). `getInvocations` powers the raw table block and exports, with `cap` for the 10k row export limit. Aggregations exclude `failed`/`aborted` rows from cost averages but include them in `totalRuns`/`failureRate`.
+
+**REST endpoints:**
+- `GET /api/projects/:projectId/spending?period&surface&model&status&minCostUsd&ticketId` — dashboard data.
+- `GET /api/projects/:projectId/invocations?...&limit&offset` — paginated raw rows.
+- `GET /api/projects/:projectId/tickets/:id/spending-summary` — per-ticket aggregate used by `TicketDetailModal`.
+- `GET /api/projects/:projectId/analytics/export?format=csv|json&mode=summary|raw&...` — Summary CSV is a multi-section composite (`# Totals`, `# Daily timeline`, `# By surface`, `# By model`, `# Top tickets`); Raw exports up to 10 000 rows, appending `# truncated_at=N of M` when truncated. Filename pattern: `<slug>-analytics-<period>[-<surface>]-<YYYY-MM-DD>.{csv,json}`.
+
+**WebSocket:** `recordInvocation` callsites broadcast `spending.invalidated` (project-scoped, no payload). Open dashboards debounce 500 ms then refetch.
+
+**Client (`client/src/pages/AnalyticsPage.tsx`):** seven blocks — sticky filter header (period + surface chips, both URL-synced), Hero burn meter (with `vs prev` delta), daily stacked timeline, Quick vs Explore card (sparse-data CTA when Explore < 5 runs), top-N model breakdown (click-to-filter), cost-vs-turns scatter, top tickets cross-surface, raw invocations table with secondary filters scoped to that block only. Surface colour mapping: `job=accent-info`, `quick-spec=accent-secondary`, `explore-spec=accent-highlight`, `ai-edit=accent-success`. Lives in `client/src/components/analytics/`.
+
+**Ticket → Analytics deep link:** `client/src/components/TicketSpendingLine.tsx` renders a single line under the modal title (`$X · N turns · Tm Ts active · breakdown`) when the ticket has any invocations, linking to `/analytics?ticketId=<id>`.
+
+**Export (`client/src/components/ExportDropdown.tsx`):** uses `fetch → Blob → URL.createObjectURL → anchor.click()` (works in Tauri webview; previous `window.open` path is gone). Four entries: Summary CSV/JSON, Raw CSV/JSON. Disabled when there's no data; sonner `toast.error('Export failed')` on failure. Filenames preserved from `Content-Disposition` when present.
+
+**Tracking start:** no historical backfill. `summary.trackingStartedAt` reflects the first `started_at` in the project, surfaced in the Hero empty state ("Tracking started YYYY-MM-DD").
+
 ### Pipeline telemetry
 
 Per-project opt-in feature that injects OpenTelemetry env vars into `claude` CLI spawns so the process emits OTLP/JSON signals to the hub.

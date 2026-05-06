@@ -625,4 +625,96 @@ describe('ChatManager', () => {
       expect(titleUpdates[0].title).toBe('SpecRails Pipeline Framework')
     })
   })
+
+  // ─── ai_invocations capture (surface='explore-spec') ───────────────────────
+
+  describe('ai_invocations capture', () => {
+    it('writes a row when conversation kind=explore and result event arrives', async () => {
+      const projectId = 'proj-cap-1'
+      const cmCap = new ChatManager(broadcast, db, undefined, undefined, 'claude', projectId)
+      const convId = 'conv-explore-1'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const sendPromise = cmCap.sendMessage(convId, 'Hello')
+
+      pushLine(child, assistantEvent('Hi back'))
+      pushLine(child, JSON.stringify({
+        type: 'result',
+        session_id: 'sess-1',
+        total_cost_usd: 0.42,
+        num_turns: 2,
+        model: 'sonnet',
+        duration_ms: 1500,
+        usage: { input_tokens: 10, output_tokens: 5 },
+      }))
+      await finishProcess(child, 0)
+      await sendPromise
+
+      const rows = db.prepare(`SELECT * FROM ai_invocations WHERE project_id = ?`).all(projectId) as any[]
+      expect(rows).toHaveLength(1)
+      expect(rows[0].surface).toBe('explore-spec')
+      expect(rows[0].conversation_id).toBe(convId)
+      expect(rows[0].status).toBe('success')
+      expect(rows[0].total_cost_usd).toBeCloseTo(0.42)
+      expect(rows[0].num_turns).toBe(2)
+
+      const inv = broadcast.mock.calls.find(([m]) => (m as { type?: string }).type === 'spending.invalidated')
+      expect(inv).toBeDefined()
+    })
+
+    it('does NOT write a row when conversation kind=sidebar', async () => {
+      const projectId = 'proj-cap-2'
+      const cmCap = new ChatManager(broadcast, db, undefined, undefined, 'claude', projectId)
+      const convId = 'conv-sidebar-1'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'sidebar' })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const sendPromise = cmCap.sendMessage(convId, 'Hello')
+
+      pushLine(child, assistantEvent('Hi'))
+      pushLine(child, resultEvent('sess'))
+      await finishProcess(child, 0)
+      await sendPromise
+
+      const rows = db.prepare(`SELECT * FROM ai_invocations WHERE project_id = ?`).all(projectId) as any[]
+      expect(rows).toHaveLength(0)
+    })
+
+    it('writes a failed row when explore process exits non-zero before result event', async () => {
+      const projectId = 'proj-cap-3'
+      const cmCap = new ChatManager(broadcast, db, undefined, undefined, 'claude', projectId)
+      const convId = 'conv-explore-fail'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const sendPromise = cmCap.sendMessage(convId, 'Hello')
+
+      await finishProcess(child, 1)
+      await sendPromise
+
+      const rows = db.prepare(`SELECT * FROM ai_invocations WHERE project_id = ?`).all(projectId) as any[]
+      expect(rows).toHaveLength(1)
+      expect(rows[0].status).toBe('failed')
+      expect(rows[0].total_cost_usd).toBeNull()
+    })
+
+    it('skips capture when projectId is not provided', async () => {
+      const projectId = 'proj-cap-4'
+      const cmNoProject = new ChatManager(broadcast, db, undefined, undefined, 'claude')
+      const convId = 'conv-no-proj'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const sendPromise = cmNoProject.sendMessage(convId, 'Hello')
+
+      pushLine(child, assistantEvent('Hi'))
+      pushLine(child, resultEvent('sess'))
+      await finishProcess(child, 0)
+      await sendPromise
+
+      const rows = db.prepare(`SELECT * FROM ai_invocations WHERE project_id = ?`).all(projectId) as any[]
+      expect(rows).toHaveLength(0)
+    })
+  })
 })

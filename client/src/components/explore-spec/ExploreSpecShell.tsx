@@ -148,7 +148,7 @@ export function ExploreSpecShell({
     const attachments = initialAttachmentIds.length > 0
       ? { ticketKey: pendingSpecId, ids: initialAttachmentIds }
       : undefined
-    void chat.startWithMessage(prompt, { lightweight: true, maxTurns: 20, attachments }, initialModel).then((id) => {
+    void chat.startWithMessage(prompt, { lightweight: true, maxTurns: 20, attachments }, initialModel, 'explore').then((id) => {
       if (id) setConversationId(id)
     })
   }, [chat, initialIdea, pendingSpecId, initialAttachmentIds, resumeConversationId, initialModel])
@@ -274,6 +274,9 @@ export function ExploreSpecShell({
           // attachments uploaded during the conversation end up bound to the
           // freshly-created ticket.
           pendingSpecId,
+          // Lets the server back-fill ticket_id on prior ai_invocations rows
+          // for this conversation, attributing all Explore turns to this ticket.
+          conversationId,
         }),
       })
       if (!res.ok) {
