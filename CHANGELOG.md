@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.53.0](https://github.com/fjpulidop/specrails-hub/compare/v1.52.0...v1.53.0) (2026-05-06)
+
+
+### Features
+
+* **analytics:** unified project spending dashboard + working CSV export ([#302](https://github.com/fjpulidop/specrails-hub/issues/302)) ([e815048](https://github.com/fjpulidop/specrails-hub/commit/e8150487afab01a2500afc76979e5021a4fa7329))
+
 ## [1.52.0](https://github.com/fjpulidop/specrails-hub/compare/v1.51.0...v1.52.0) (2026-05-05)
 
 
