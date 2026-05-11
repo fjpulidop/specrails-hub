@@ -36,6 +36,7 @@ function makeTicket(overrides: Partial<LocalTicket> = {}): LocalTicket {
     assignee: null,
     prerequisites: [],
     metadata: {},
+    origin_conversation_id: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     created_by: 'user',
@@ -103,5 +104,56 @@ describe('SpecCard', () => {
     const card = screen.getByText('Build the feature').closest('[role="button"]')!
     expect(card).toHaveAttribute('role', 'button')
     expect(card).toHaveAttribute('tabIndex', '0')
+  })
+
+  describe('draft variant', () => {
+    it('renders a Draft pill in place of the priority pill when status=draft', () => {
+      render(
+        <SpecCard
+          ticket={makeTicket({ status: 'draft', priority: null })}
+          onClick={onClickMock}
+        />,
+      )
+      expect(screen.getByText('Draft')).toBeInTheDocument()
+      expect(screen.queryByText('medium')).not.toBeInTheDocument()
+      expect(screen.queryByText('high')).not.toBeInTheDocument()
+    })
+
+    it('marks the card with data-draft attribute', () => {
+      render(
+        <SpecCard
+          ticket={makeTicket({ status: 'draft', priority: null })}
+          onClick={onClickMock}
+        />,
+      )
+      const card = screen.getByText('Build the feature').closest('[role="button"]')!
+      expect(card).toHaveAttribute('data-draft', 'true')
+    })
+
+    it('uses semantic theme tokens (no brand-named colours like dracula-*)', () => {
+      render(
+        <SpecCard
+          ticket={makeTicket({ status: 'draft', priority: null })}
+          onClick={onClickMock}
+        />,
+      )
+      const card = screen.getByText('Build the feature').closest('[role="button"]')!
+      const html = card.outerHTML
+      // Sanity: regression guard against hardcoded brand tokens
+      expect(html).not.toMatch(/dracula-/)
+      // Positive: at least one accent-* token applied
+      expect(html).toMatch(/accent-secondary/)
+    })
+
+    it('hides priority pill when ticket.priority is null but status is not draft', () => {
+      render(
+        <SpecCard
+          ticket={makeTicket({ status: 'todo', priority: null })}
+          onClick={onClickMock}
+        />,
+      )
+      expect(screen.queryByText('Draft')).not.toBeInTheDocument()
+      expect(screen.queryByText('medium')).not.toBeInTheDocument()
+    })
   })
 })

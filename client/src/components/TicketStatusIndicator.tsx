@@ -13,6 +13,13 @@ interface StatusConfig {
 }
 
 const STATUS_CONFIG: Record<TicketStatus, StatusConfig> = {
+  draft: {
+    dotClass: 'bg-accent-secondary/60',
+    textClass: 'text-accent-secondary',
+    borderClass: 'border-l-[3px] border-dashed border-accent-secondary/50 pl-3',
+    label: 'Draft',
+    pulsing: false,
+  },
   todo: {
     dotClass: 'bg-slate-500/70',
     textClass: 'text-muted-foreground',

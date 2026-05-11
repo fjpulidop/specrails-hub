@@ -12,9 +12,10 @@ const PRIORITY_STYLES: Record<TicketPriority, { className: string; label: string
   low: { className: 'bg-gray-500/15 text-gray-400 border-gray-500/30', label: 'low' },
 }
 
-const ALL_STATUSES: TicketStatus[] = ['todo', 'in_progress', 'done', 'cancelled']
+const ALL_STATUSES: TicketStatus[] = ['draft', 'todo', 'in_progress', 'done', 'cancelled']
 
 const STATUS_LABEL: Record<TicketStatus, string> = {
+  draft: 'draft',
   todo: 'todo',
   in_progress: 'in progress',
   done: 'done',
@@ -24,7 +25,7 @@ const STATUS_LABEL: Record<TicketStatus, string> = {
 type SortField = 'status' | 'priority' | 'updated_at'
 type SortDir = 'asc' | 'desc'
 
-const STATUS_ORDER: Record<TicketStatus, number> = { todo: 0, in_progress: 1, done: 2, cancelled: 3 }
+const STATUS_ORDER: Record<TicketStatus, number> = { draft: -1, todo: 0, in_progress: 1, done: 2, cancelled: 3 }
 const PRIORITY_ORDER: Record<TicketPriority, number> = { critical: 0, high: 1, medium: 2, low: 3 }
 
 function formatRelTime(dateStr: string): string {
@@ -106,9 +107,12 @@ export function TicketListView({
         case 'status':
           cmp = STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
           break
-        case 'priority':
-          cmp = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
+        case 'priority': {
+          const ap = a.priority === null ? Number.MAX_SAFE_INTEGER : PRIORITY_ORDER[a.priority]
+          const bp = b.priority === null ? Number.MAX_SAFE_INTEGER : PRIORITY_ORDER[b.priority]
+          cmp = ap - bp
           break
+        }
         case 'updated_at':
           cmp = new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()
           break
@@ -297,9 +301,10 @@ export function TicketListView({
             onKeyDown={handleListKeyDown}
           >
             {filteredAndSorted.slice(0, displayLimit).map((ticket) => {
-              const priorityInfo = PRIORITY_STYLES[ticket.priority]
+              const priorityInfo = ticket.priority ? PRIORITY_STYLES[ticket.priority] : null
               const isDone = ticket.status === 'done'
               const isCancelled = ticket.status === 'cancelled'
+              const isDraft = ticket.status === 'draft'
 
               return (
                 <TicketContextMenu
@@ -339,9 +344,13 @@ export function TicketListView({
                       </span>
                     </div>
 
-                    {/* Priority */}
+                    {/* Priority / Draft pill */}
                     <div className="w-14 text-right shrink-0">
-                      {ticket.priority !== 'medium' && priorityInfo.label && (
+                      {isDraft ? (
+                        <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border border-accent-secondary/60 text-accent-secondary bg-accent-secondary/10">
+                          Draft
+                        </span>
+                      ) : priorityInfo && ticket.priority !== 'medium' && priorityInfo.label && (
                         <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border ${priorityInfo.className}`}>
                           {priorityInfo.label}
                         </span>

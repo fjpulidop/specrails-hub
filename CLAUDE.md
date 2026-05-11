@@ -205,6 +205,50 @@ Hub-wide UI theme selectable from `GlobalSettingsPage > Appearance`. Three built
 
 **REST**: `GET /api/hub/theme` returns `{ theme }`; `PATCH /api/hub/theme` validates the body against the allow-list and returns 400 on rejection.
 
+### Draft tickets (Save as Draft)
+
+In-progress Explore Spec sessions can be persisted as **draft tickets** so the user can resume an exploration later from the SpecsBoard.
+
+**Schema (`server/ticket-store.ts`)**: `TicketStatus` includes `'draft'`; `Ticket.priority` is widened to `TicketPriority | null`; `Ticket.origin_conversation_id: string | null` links the Explore conversation. The JSON store's `schema_version` bumps from `'1.0'` to `'1.1'` on first write under this code; old stores remain readable (the read path normalizes missing `origin_conversation_id` to `null`). `validatePriorityForStatus(status, priority)` is the single source of truth: priority MAY be null only when `status === 'draft'`.
+
+**Server endpoints (`server/project-router.ts`)**:
+- `POST /tickets/save-as-draft` — persists an Explore session as a draft. Body: `{ conversationId, title?, description?, labels? }`. Rejects when the conversation has no user-submitted turn. Idempotent on `conversationId`: a second save updates the existing draft instead of inserting a duplicate. Auto-title via `server/explore-draft-title.ts` when no title is provided (deterministic single-line summary; LLM enrichment is the documented extension point).
+- `POST /tickets/from-draft` — extended with a flip-in-place path: when the body carries `draftTicketId` (or just `conversationId` matching an existing draft's `origin_conversation_id`), the server flips the existing row (`status: 'draft' → 'todo'`, sets `priority`, replaces title/description, preserves `origin_conversation_id`) and broadcasts `ticket_updated`. Legacy non-draft path (no draft match) still inserts a new row and broadcasts `ticket_created`.
+- `DELETE /tickets/:id` — when the deleted ticket is a draft and is the only ticket referencing its `origin_conversation_id`, the linked `chat_conversations` row (kind `'explore'`) is cascade-deleted.
+- `DELETE /chat/conversations/:id` — sweeps tickets whose `origin_conversation_id` matches and clears the field to `null` (application-level "ON DELETE SET NULL").
+
+**Client surfaces**:
+- `ExploreSpecShell` exposes a `Save as Draft` button (disabled until at least one user-submitted turn) and replaces the destructive close confirm with a three-way `Save as Draft / Discard / Cancel` prompt (Save is default-focused). The minimize-to-toast path is unchanged.
+- `SpecCard`, `TicketListView`, `TicketGridView`, `TicketPostItView`, and `TicketStatusIndicator` render a draft visual variant: subtle `accent-secondary` background/border (semantic theme tokens, no brand-named colours) and a `Draft` pill in the priority pill's DOM slot. Drafts live in the existing Backlog column — no new column, no filter chip, no collapsible section.
+- `TicketDetailModal` shows a `Continue Explore` action when `status === 'draft'` and `origin_conversation_id` is non-null. Activating it calls `MinimizedChatsContext.triggerResume(...)` to navigate + queue a pending-restore that `ExploreSpecShell` consumes via `usePendingRestore`. The ticket stays `status='draft'` during the resumed session.
+
+**Lifecycle**: drafts are never auto-deleted. They disappear only on explicit Discard or when committed to a non-draft status. `from-draft` flip preserves `origin_conversation_id` permanently for future "View origin conversation" UI.
+
+**Out of scope** (deferred): concurrency lock when two tabs edit the same draft (last-write-wins for now), and surfacing `origin_conversation_id` on committed tickets as a UI affordance.
+
+### Explore Spec acceleration
+
+The Explore Spec chat ships a multi-pronged latency optimisation so that first-token feels electric without compromising spec quality.
+
+**Hub-managed cwd (`server/explore-cwd-manager.ts`):** Explore turns spawn `claude` from `~/.specrails/projects/<slug>/explore-cwd/` rather than the project path, so the project's `CLAUDE.md` (often huge) is not auto-loaded by the CLI. The dir contains a hub-owned embedded `CLAUDE.md` (~50 lines, focused on the Explore-Spec stance) and a `./project` symlink (junction on Windows; `project-path.txt` fallback if both fail) pointing at `<project.path>`. Tools (`Read`, `Grep`, `Glob`) keep working against the user's repo via that link. The user's `<project>/CLAUDE.md` is never modified, moved, or referenced — only the link target is.
+
+**Per-project toggle (`config.explore_mcp_enabled`, default OFF):** Stored in the existing `queue_state` key/value table. Exposed via `GET/PATCH /api/projects/:projectId/explore-mcp-enabled`. When ON, Explore turns spawn from `<project.path>` (legacy behaviour) so `.mcp.json` MCP servers load; when OFF (default), spawn from the explore-cwd and skip MCP. UI lives in `SettingsPage` under an `Explore Spec` card.
+
+**Byte-stable system prompt:** `ChatManager._buildLightweightSystemPrompt()` is deterministic — no timestamps, costs, or live aggregates — so Anthropic prompt cache hits on turns 2+ within the 5-minute TTL window. The non-Explore `_buildSystemPrompt()` retains its live dashboard context unchanged.
+
+**Lifecycle (`ChatManager._exploreLifecycle`):** Per-Explore-conversation state with three policies:
+- **Idle-kill on minimize:** `POST /api/projects/:projectId/chat/conversations/:id/minimize` arms a 2-minute idle timer; if no message and no restore in that window, any active spawn is `treeKill`ed (SIGTERM). The conversation row's `session_id` is preserved; the next message respawns with `--resume`. `POST .../restore` cancels the timer. The timer only arms when the conversation is not currently streaming.
+- **Crash auto-respawn:** if the child exits non-zero before emitting a `result` event and the user did not interrupt, the same turn respawns once with `--resume`. The crash counter resets on any successful turn. A second crash surfaces `chat_error`.
+- **Concurrency cap of 5 per project:** the sixth Explore turn evicts the oldest idle Explore spawn; if all five are streaming, the new turn queues with a 30-second timeout and then emits `chat_error reason='busy'` if no slot opens.
+
+**Premium UX (`client/src/components/explore-spec/ExploreStatusPills.tsx`):** Status pills `Conectando… → Pensando… → Consultando código…` are rendered above the streaming assistant bubble for the first few hundred ms of every turn, gated by `VITE_FEATURE_EXPLORE_PREMIUM_UX !== 'false'` for an emergency disable. Each pill displays for at least 150 ms to avoid flicker. The pill area unmounts as soon as the first text delta arrives.
+
+**Escape hatches:** `SPECRAILS_EXPLORE_LEGACY_CWD=1` (server env) forces every Explore spawn to use `<project.path>` and skips materialising the explore-cwd entirely. `VITE_FEATURE_EXPLORE_PREMIUM_UX=false` (client build flag) reverts the status pills to a pre-change rendering. Both keep Explore functional and lose no data.
+
+**Cleanup:** `ProjectRegistry.removeProject` calls `removeExploreCwd(slug)` which recursively rms the explore-cwd directory (the `./project` symlink is `unlink`ed explicitly, never followed). Any active Explore spawns are independently torn down.
+
+**Out of scope** (deferred): true persistent stdin multi-turn (`claude --input-format stream-json` keeping a single child alive across turns), char-by-char client-side rendering buffer, skeleton-on-submit assistant bubble, per-project user-customizable `<project>/.specrails/explore-instructions.md` override, sidebar-chat (`kind='sidebar'`) cache-busting fix, and Quick-mode acceleration. These remain future-change candidates.
+
 ### Project spending analytics
 
 Per-project unified tracking of every billable AI CLI invocation (model, tokens, cost USD, turns, duration), powering the redesigned `/analytics` page (route name unchanged; right-sidebar entry still labelled "Analytics").

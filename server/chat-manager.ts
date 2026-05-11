@@ -3,9 +3,10 @@ import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
 import type { DbInstance } from './db'
-import { getConversation, addMessage, updateConversation, getStats, listJobs } from './db'
+import { getConversation, addMessage, updateConversation, getStats, listJobs, getExploreMcpEnabled } from './db'
 import { resolveCommand } from './command-resolver'
 import { spawnAiCli, spawnClaude, spawnCodex } from './util/cli-prompt'
+import { ensureExploreCwd } from './explore-cwd-manager'
 import { recordInvocation } from './ai-invocations'
 import { normaliseResultEvent } from './result-event'
 import { randomUUID } from 'crypto'
@@ -104,6 +105,23 @@ export interface SendMessageOptions {
   }
 }
 
+// ─── Explore lifecycle ────────────────────────────────────────────────────────
+
+/** Tunables for Explore-spec acceleration lifecycle. Module-level constants
+ *  rather than ChatManager statics so tests can override via vi.spyOn or
+ *  redefine in fixtures. */
+export const EXPLORE_IDLE_KILL_MS = 2 * 60 * 1000
+export const EXPLORE_MAX_CONCURRENCY = 5
+export const EXPLORE_QUEUE_TIMEOUT_MS = 30 * 1000
+
+interface ExploreLifecycle {
+  isMinimized: boolean
+  isStreaming: boolean
+  idleTimer: ReturnType<typeof setTimeout> | null
+  crashCount: number
+  lastActivityAt: number
+}
+
 // ─── ChatManager ──────────────────────────────────────────────────────────────
 
 export class ChatManager {
@@ -116,11 +134,23 @@ export class ChatManager {
   private _specDraftStates: Map<string, ConversationDraftState>
   /** Per-conversation live-strip state for `\`\`\`spec-draft` fenced blocks. */
   private _streamFilters: Map<string, StreamFilterState>
+  /** Per-Explore-conversation lifecycle state (idle timer, crash counter,
+   *  streaming flag). See design.md D7. */
+  private _exploreLifecycle: Map<string, ExploreLifecycle>
+  /** FIFO queue of Explore turns waiting for a concurrency slot. */
+  private _exploreQueue: Array<{
+    conversationId: string
+    enqueuedAt: number
+    timeoutTimer: ReturnType<typeof setTimeout>
+    onSlot: () => void
+    onTimeout: () => void
+  }>
 
   private _cwd: string | undefined
   private _projectName: string | undefined
   private _provider: 'claude' | 'codex'
   private _projectId: string | undefined
+  private _projectSlug: string | undefined
 
   constructor(
     broadcast: (msg: WsMessage) => void,
@@ -129,6 +159,7 @@ export class ChatManager {
     projectName?: string,
     provider?: 'claude' | 'codex',
     projectId?: string,
+    projectSlug?: string,
   ) {
     this._broadcast = broadcast
     this._db = db
@@ -136,12 +167,164 @@ export class ChatManager {
     this._projectName = projectName
     this._provider = provider ?? 'claude'
     this._projectId = projectId
+    this._projectSlug = projectSlug
     this._activeProcesses = new Map()
     this._buffers = new Map()
     this._emittedProposals = new Map()
     this._abortingConversations = new Set()
     this._specDraftStates = new Map()
     this._streamFilters = new Map()
+    this._exploreLifecycle = new Map()
+    this._exploreQueue = []
+  }
+
+  // ─── Explore lifecycle helpers ──────────────────────────────────────────────
+
+  private _getOrCreateExploreLifecycle(conversationId: string): ExploreLifecycle {
+    let life = this._exploreLifecycle.get(conversationId)
+    if (!life) {
+      life = {
+        isMinimized: false,
+        isStreaming: false,
+        idleTimer: null,
+        crashCount: 0,
+        lastActivityAt: Date.now(),
+      }
+      this._exploreLifecycle.set(conversationId, life)
+    }
+    return life
+  }
+
+  private _clearIdleTimer(conversationId: string): void {
+    const life = this._exploreLifecycle.get(conversationId)
+    if (life?.idleTimer) {
+      clearTimeout(life.idleTimer)
+      life.idleTimer = null
+    }
+  }
+
+  private _startIdleTimer(conversationId: string): void {
+    const life = this._exploreLifecycle.get(conversationId)
+    if (!life) return
+    if (life.isStreaming) return
+    if (!life.isMinimized) return
+    this._clearIdleTimer(conversationId)
+    life.idleTimer = setTimeout(() => {
+      const child = this._activeProcesses.get(conversationId)
+      if (child?.pid) {
+        try { treeKill(child.pid, 'SIGTERM') } catch { /* best-effort */ }
+      }
+    }, EXPLORE_IDLE_KILL_MS)
+  }
+
+  /**
+   * Mark an Explore conversation as minimized. Starts the idle-kill timer
+   * iff the conversation is not currently streaming. If a turn is in flight,
+   * the timer starts when the turn completes.
+   */
+  notifyMinimized(conversationId: string): void {
+    const life = this._getOrCreateExploreLifecycle(conversationId)
+    life.isMinimized = true
+    life.lastActivityAt = Date.now()
+    this._startIdleTimer(conversationId)
+  }
+
+  /** Mark an Explore conversation as restored (un-minimized). Cancels the
+   *  pending idle-kill timer if any. */
+  notifyRestored(conversationId: string): void {
+    const life = this._exploreLifecycle.get(conversationId)
+    if (!life) return
+    life.isMinimized = false
+    life.lastActivityAt = Date.now()
+    this._clearIdleTimer(conversationId)
+  }
+
+  private _countStreamingExplore(): number {
+    let n = 0
+    for (const life of this._exploreLifecycle.values()) {
+      if (life.isStreaming) n++
+    }
+    return n
+  }
+
+  private _findIdleExploreVictim(excludeConvId: string): string | null {
+    let oldest: { id: string; t: number } | null = null
+    for (const [id, life] of this._exploreLifecycle.entries()) {
+      if (id === excludeConvId) continue
+      if (life.isStreaming) continue
+      if (life.idleTimer == null && !life.isMinimized) continue
+      if (!oldest || life.lastActivityAt < oldest.t) {
+        oldest = { id, t: life.lastActivityAt }
+      }
+    }
+    return oldest?.id ?? null
+  }
+
+  private _drainExploreQueue(): void {
+    while (this._exploreQueue.length > 0 && this._countStreamingExplore() < EXPLORE_MAX_CONCURRENCY) {
+      const next = this._exploreQueue.shift()!
+      clearTimeout(next.timeoutTimer)
+      next.onSlot()
+    }
+  }
+
+  private async _waitForExploreSlot(conversationId: string): Promise<'ok' | 'busy'> {
+    if (this._countStreamingExplore() < EXPLORE_MAX_CONCURRENCY) return 'ok'
+    // Try to evict an idle victim first.
+    const victim = this._findIdleExploreVictim(conversationId)
+    if (victim) {
+      const child = this._activeProcesses.get(victim)
+      if (child?.pid) {
+        try { treeKill(child.pid, 'SIGTERM') } catch { /* best-effort */ }
+      }
+      this._clearIdleTimer(victim)
+      this._exploreLifecycle.delete(victim)
+      return 'ok'
+    }
+    // No idle victim — queue with timeout.
+    return new Promise<'ok' | 'busy'>((resolve) => {
+      const timeoutTimer = setTimeout(() => {
+        const idx = this._exploreQueue.findIndex((q) => q.conversationId === conversationId)
+        if (idx >= 0) this._exploreQueue.splice(idx, 1)
+        resolve('busy')
+      }, EXPLORE_QUEUE_TIMEOUT_MS)
+      this._exploreQueue.push({
+        conversationId,
+        enqueuedAt: Date.now(),
+        timeoutTimer,
+        onSlot: () => resolve('ok'),
+        onTimeout: () => resolve('busy'),
+      })
+    })
+  }
+
+  /**
+   * Resolve the spawn cwd for a chat turn. Explore conversations spawn from
+   * a hub-managed directory by default to skip auto-loading the project's
+   * `CLAUDE.md` (the dominant first-token cost); when the per-project MCP
+   * toggle is on, fall back to the project path so `.mcp.json` is honoured.
+   * Non-Explore conversations always use the project path.
+   *
+   * See openspec/changes/accelerate-spec-chat-first-token/design.md D1+D4.
+   */
+  private _resolveSpawnCwd(kind: string | null | undefined): string | undefined {
+    if (kind !== 'explore') return this._cwd
+    if (!this._projectSlug || !this._cwd || !this._projectName) return this._cwd
+    let mcpEnabled = false
+    try { mcpEnabled = getExploreMcpEnabled(this._db) } catch { /* default false */ }
+    if (mcpEnabled) return this._cwd
+    try {
+      const cwd = ensureExploreCwd({
+        slug: this._projectSlug,
+        projectPath: this._cwd,
+        projectName: this._projectName,
+      })
+      console.log(`[chat-manager] explore spawn cwd=${cwd} (mcp=off)`)
+      return cwd
+    } catch (err) {
+      console.error('[chat-manager] ensureExploreCwd failed, falling back to project path:', err)
+      return this._cwd
+    }
   }
 
   /** Drop the per-conversation draft state (used on conversation deletion). */
@@ -214,6 +397,17 @@ export class ChatManager {
     )
   }
 
+  /**
+   * Lightweight system prompt for Explore Spec turns. MUST stay byte-stable
+   * across consecutive invocations for the same project name so Anthropic's
+   * automatic prompt cache hits across turns within the 5-minute TTL window.
+   *
+   * DO NOT inject timestamps, live job stats, recent-job summaries, costs, or
+   * any per-invocation data here. Adding non-deterministic content silently
+   * breaks the cache and reverts the first-token-latency win.
+   *
+   * See openspec/changes/accelerate-spec-chat-first-token/design.md D5.
+   */
   private _buildLightweightSystemPrompt(): string {
     const name = this._projectName ?? 'this project'
     return (
@@ -262,6 +456,24 @@ export class ChatManager {
     if (!conversation) {
       console.warn(`[ChatManager] conversation ${conversationId} not found`)
       return
+    }
+
+    // Explore: enforce per-project concurrency cap before doing any work.
+    if (conversation.kind === 'explore') {
+      const slot = await this._waitForExploreSlot(conversationId)
+      if (slot === 'busy') {
+        this._broadcast({
+          type: 'chat_error',
+          conversationId,
+          error: 'busy',
+          timestamp: new Date().toISOString(),
+        })
+        return
+      }
+      const life = this._getOrCreateExploreLifecycle(conversationId)
+      life.isStreaming = true
+      life.lastActivityAt = Date.now()
+      this._clearIdleTimer(conversationId)
     }
 
     // Check if this is turn 1 (session_id was null before this message)
@@ -341,10 +553,11 @@ export class ChatManager {
     // No OTEL env injection here — ChatManager spawns are interactive user sessions,
     // not pipeline jobs. Telemetry is scoped to QueueManager pipeline runs only.
     // spawnAiCli reroutes multi-line argv values through stdin on Windows.
+    const spawnCwd = this._resolveSpawnCwd(conversation.kind)
     const child = spawnAiCli(binary, args, {
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
-      cwd: this._cwd,
+      cwd: spawnCwd,
     })
 
     let stderrBuf = ''
@@ -419,7 +632,7 @@ export class ChatManager {
       }
     }
 
-    stdoutReader.on('line', (line) => {
+    const readerHandler = (line: string) => {
       if (this._provider === 'codex') {
         // Codex outputs plain text
         if (line) emitDelta(line + '\n')
@@ -440,13 +653,58 @@ export class ChatManager {
         const newText = extractTextFromEvent(parsed)
         if (newText) emitDelta(newText)
       }
-    })
+    }
+    stdoutReader.on('line', readerHandler)
 
+    let currentChild = child
+    void currentChild // keep reference live for crash respawn
     return new Promise<void>((resolve) => {
-      child.on('close', (code) => {
+      const onClose = (code: number | null) => {
         console.log(`[chat-manager] claude exited code=${code} conv=${conversationId}`)
         const fullText = this._buffers.get(conversationId) ?? ''
         const wasAborting = this._abortingConversations.has(conversationId)
+
+        // Crash auto-respawn for Explore: if the child exited non-zero before
+        // emitting a `result` event, the user did not explicitly abort, and
+        // we have not yet retried, respawn the same turn once with --resume.
+        // See design.md D7.
+        if (
+          conversation.kind === 'explore' &&
+          !wasAborting &&
+          code !== 0 &&
+          !lastResultEvent
+        ) {
+          const life = this._exploreLifecycle.get(conversationId)
+          if (life && life.crashCount === 0) {
+            life.crashCount = 1
+            // Refresh --resume from any session id captured before the crash.
+            if (capturedSessionId && this._provider !== 'codex' && !args.includes('--resume')) {
+              args.push('--resume', capturedSessionId)
+            }
+            console.warn(`[chat-manager] explore crash respawn for ${conversationId}`)
+            try {
+              const newChild = spawnAiCli(binary, args, {
+                env: process.env,
+                stdio: ['ignore', 'pipe', 'pipe'],
+                cwd: spawnCwd,
+              })
+              currentChild = newChild
+              this._activeProcesses.set(conversationId, newChild)
+              newChild.stderr?.on('data', (chunk: Buffer) => {
+                const text = chunk.toString()
+                stderrBuf += text
+                console.error(`[chat-manager] ${binary} stderr (${conversationId}):`, text.trim())
+              })
+              const newReader = createInterface({ input: newChild.stdout!, crlfDelay: Infinity })
+              newReader.on('line', readerHandler)
+              newChild.on('close', onClose)
+              return
+            } catch (err) {
+              console.error('[chat-manager] crash respawn failed:', err)
+              /* fall through to normal close handling */
+            }
+          }
+        }
 
         // Clean up tracking state
         this._activeProcesses.delete(conversationId)
@@ -454,6 +712,19 @@ export class ChatManager {
         this._emittedProposals.delete(conversationId)
         this._abortingConversations.delete(conversationId)
         this._streamFilters.delete(conversationId)
+
+        // Mark Explore turn as no longer streaming and drain any waiters.
+        if (conversation.kind === 'explore') {
+          const life = this._exploreLifecycle.get(conversationId)
+          if (life) {
+            life.isStreaming = false
+            life.lastActivityAt = Date.now()
+            // Reset crash counter on a successful turn.
+            if (code === 0) life.crashCount = 0
+            if (life.isMinimized) this._startIdleTimer(conversationId)
+          }
+          this._drainExploreQueue()
+        }
 
         // ai_invocations capture (surface='explore-spec'). Gated on conversation kind.
         if (this._projectId && conversation.kind === 'explore') {
@@ -550,7 +821,8 @@ export class ChatManager {
         }
 
         resolve()
-      })
+      }
+      child.on('close', onClose)
     })
   }
 

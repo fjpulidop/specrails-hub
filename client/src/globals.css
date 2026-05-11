@@ -344,3 +344,79 @@
   background-repeat: no-repeat;
   background-size: 100% 100%;
 }
+
+/* Diff highlights for Explore Review overlay — colours follow the active
+ * theme via the semantic `accent-success` / `destructive` tokens, ensuring
+ * readable contrast in both light and dark themes. `dark:` Tailwind
+ * variants would react to `prefers-color-scheme` (OS-level) which is
+ * decoupled from the app's `data-theme` switcher, so we cannot rely on
+ * them here. */
+.diff-added {
+  color: var(--color-accent-success);
+  background-color: color-mix(in srgb, var(--color-accent-success) 20%, transparent);
+  border-radius: 0.125rem;
+  padding-left: 0.125rem;
+  padding-right: 0.125rem;
+}
+.diff-removed {
+  color: var(--color-destructive);
+  background-color: color-mix(in srgb, var(--color-destructive) 15%, transparent);
+  border-radius: 0.125rem;
+  padding-left: 0.125rem;
+  padding-right: 0.125rem;
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--color-destructive) 60%, transparent);
+  opacity: 0.85;
+}
+.diff-chip-added {
+  color: var(--color-accent-success);
+  background-color: color-mix(in srgb, var(--color-accent-success) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent-success) 35%, transparent);
+}
+.diff-chip-removed {
+  color: var(--color-destructive);
+  background-color: color-mix(in srgb, var(--color-destructive) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-destructive) 35%, transparent);
+  text-decoration: line-through;
+  opacity: 0.85;
+}
+.diff-bullet-added {
+  color: var(--color-accent-success);
+  background-color: color-mix(in srgb, var(--color-accent-success) 12%, transparent);
+}
+.diff-bullet-removed {
+  color: var(--color-destructive);
+  background-color: color-mix(in srgb, var(--color-destructive) 12%, transparent);
+  text-decoration: line-through;
+  opacity: 0.85;
+}
+
+/* ─── Portfolio PDF print layer ─────────────────────────────────────────────
+ * When the user invokes Export PDF (Tauri webview print-to-pdf), we hide hub
+ * chrome (left/right sidebar, top bar, terminal panel, toolbar buttons) and
+ * force a page break before each major Portfolio section so the result reads
+ * as a structured document, not a single long page.
+ */
+@media print {
+  body, html { background: white !important; }
+  /* Hide hub chrome */
+  .portfolio-toolbar,
+  nav,
+  [role='navigation'],
+  aside,
+  [data-terminal-panel],
+  .titlebar,
+  header.titlebar { display: none !important; }
+  /* Page breaks before each Portfolio section heading */
+  .portfolio-page section { break-inside: avoid; page-break-inside: avoid; }
+  .portfolio-page section + section { break-before: page; page-break-before: always; }
+  /* Constrain width to a nice print column */
+  .portfolio-page { max-width: 100% !important; padding: 1cm 1.5cm !important; }
+  /* Force black text on white for print legibility regardless of theme */
+  .portfolio-page * {
+    color: black !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  .portfolio-page .text-accent-primary { color: #1f4ed8 !important; }
+}

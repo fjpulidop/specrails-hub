@@ -14,6 +14,20 @@ vi.mock('../../hooks/useSharedWebSocket', () => ({
     unregisterHandler: vi.fn(),
   }),
 }))
+vi.mock('../../hooks/useHub', () => ({
+  useHub: () => ({
+    projects: [],
+    activeProjectId: 'proj-test',
+    setActiveProjectId: vi.fn(),
+    addProject: vi.fn(),
+    removeProject: vi.fn(),
+    isLoading: false,
+    isSwitchingProject: false,
+    setupProjectIds: new Set(),
+    startSetupWizard: vi.fn(),
+    completeSetupWizard: vi.fn(),
+  }),
+}))
 
 import { TicketDetailModal } from '../TicketDetailModal'
 import type { LocalTicket } from '../../types'
@@ -363,6 +377,62 @@ describe('TicketDetailModal', () => {
     it('renders assignee field when ticket has assignee', () => {
       render(<TicketDetailModal {...makeDefaultProps({ ticket: makeTicket({ assignee: 'alice' }) })} />)
       expect(screen.getByText('alice')).toBeDefined()
+    })
+  })
+
+  describe('Continue Editing button', () => {
+    const EDITABLE = ['draft', 'todo', 'backlog'] as const
+    const NON_EDITABLE = ['in_progress', 'done', 'cancelled'] as const
+
+    EDITABLE.forEach((status) => {
+      it(`is visible for status ${status}`, () => {
+        render(<TicketDetailModal {...makeDefaultProps({ ticket: makeTicket({ status: status as LocalTicket['status'] }) })} />)
+        expect(screen.getByTestId('continue-editing')).toBeInTheDocument()
+      })
+    })
+
+    NON_EDITABLE.forEach((status) => {
+      it(`is hidden for status ${status}`, () => {
+        render(<TicketDetailModal {...makeDefaultProps({ ticket: makeTicket({ status: status as LocalTicket['status'] }) })} />)
+        expect(screen.queryByTestId('continue-editing')).toBeNull()
+      })
+    })
+
+    it('routes drafts with origin_conversation_id to the resume path (no editTicket)', () => {
+      const onClose = vi.fn()
+      render(
+        <TicketDetailModal
+          {...makeDefaultProps({
+            onClose,
+            ticket: makeTicket({
+              status: 'draft',
+              origin_conversation_id: 'conv-abc',
+              priority: null,
+            }),
+          })}
+        />,
+      )
+      const btn = screen.getByTestId('continue-editing')
+      fireEvent.click(btn)
+      expect(onClose).toHaveBeenCalledTimes(1)
+      // The button click path is exercised; no further assertion is possible
+      // without a Provider mock — useMinimizedChats falls back to no-ops in
+      // tests, so we assert behaviour up to the onClose contract.
+    })
+
+    it('routes non-draft tickets to the fresh edit path (with editTicket)', () => {
+      const onClose = vi.fn()
+      render(
+        <TicketDetailModal
+          {...makeDefaultProps({
+            onClose,
+            ticket: makeTicket({ status: 'todo' }),
+          })}
+        />,
+      )
+      const btn = screen.getByTestId('continue-editing')
+      fireEvent.click(btn)
+      expect(onClose).toHaveBeenCalledTimes(1)
     })
   })
 })

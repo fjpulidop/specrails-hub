@@ -278,10 +278,17 @@ export default function DashboardPage() {
     return ids
   }, [rails])
 
-  // All spec-source tickets not in rails
+  // All spec-source tickets not in rails. `explore-draft` is the source of
+  // tickets persisted via "Save as Draft" in ExploreSpecShell; they live on
+  // the spec board until the user commits or discards them.
   const allSpecTickets = useMemo(() => {
     return tickets.filter(
-      (t) => (t.source === 'propose-spec' || t.source === 'product-backlog' || t.source === 'get-backlog-specs') && !railTicketIds.has(t.id),
+      (t) =>
+        (t.source === 'propose-spec' ||
+          t.source === 'product-backlog' ||
+          t.source === 'get-backlog-specs' ||
+          t.source === 'explore-draft') &&
+        !railTicketIds.has(t.id),
     )
   }, [tickets, railTicketIds])
 

@@ -19,6 +19,15 @@ interface PostItPalette {
 }
 
 const STATUS_PALETTE: Record<TicketStatus, PostItPalette> = {
+  draft: {
+    bg: 'bg-accent-secondary/10',
+    border: 'border-dashed border-accent-secondary/40',
+    shadow: 'shadow-[0_2px_8px_rgba(0,0,0,0.05)]',
+    hoverShadow: 'hover:shadow-[0_4px_20px_rgba(0,0,0,0.1)]',
+    titleText: 'text-accent-secondary',
+    metaText: 'text-accent-secondary/60',
+    cornerBg: 'bg-accent-secondary/20',
+  },
   todo: {
     bg: 'bg-slate-700/40',
     border: 'border-slate-600/40',
@@ -97,7 +106,7 @@ export function TicketPostItView({
   onCreateClick,
 }: TicketPostItViewProps) {
   const sorted = useMemo(() => {
-    const order: Record<TicketStatus, number> = { in_progress: 0, todo: 1, done: 2, cancelled: 3 }
+    const order: Record<TicketStatus, number> = { in_progress: 0, draft: 1, todo: 2, done: 3, cancelled: 4 }
     return [...tickets].sort((a, b) => order[a.status] - order[b.status])
   }, [tickets])
 
@@ -177,7 +186,7 @@ interface PostItCardProps {
 
 function PostItCard({ ticket, onClick }: PostItCardProps) {
   const palette = STATUS_PALETTE[ticket.status]
-  const priority = PRIORITY_INDICATOR[ticket.priority]
+  const priority = ticket.priority ? PRIORITY_INDICATOR[ticket.priority] : null
   const rotation = getRotation(ticket.id)
 
   return (
@@ -211,12 +220,16 @@ function PostItCard({ ticket, onClick }: PostItCardProps) {
         aria-hidden
       />
 
-      {/* Priority indicator */}
-      {priority.icon && (
+      {/* Priority indicator (or Draft pill) */}
+      {ticket.status === 'draft' ? (
+        <div className="absolute top-1.5 left-2 inline-flex items-center rounded px-1 py-0.5 text-[8px] font-semibold border border-accent-secondary/60 text-accent-secondary bg-accent-secondary/10">
+          Draft
+        </div>
+      ) : priority?.icon ? (
         <div className="absolute top-1.5 left-2">
           <priority.icon className={cn('w-3 h-3', priority.className)} />
         </div>
-      )}
+      ) : null}
 
       {/* Title */}
       <p
