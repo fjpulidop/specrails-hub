@@ -11,6 +11,7 @@ import {
   createProposal, getProposal, listProposals, deleteProposal,
   createTemplate, listTemplates, getTemplate, updateTemplate, deleteTemplate,
   getProjectSettings, updateProjectSettings,
+  getExploreMcpEnabled, setExploreMcpEnabled,
   getTelemetryBlob, getTelemetrySummaries, getJobsWithTelemetry, hasJobTelemetry,
 } from './db'
 import { createDiagnosticZip } from './telemetry-export'
@@ -36,10 +37,11 @@ import { readChanges } from './changes-reader'
 import { getProjectMetrics } from './metrics'
 import {
   resolveTicketStoragePath, readStore, mutateStore, filterTickets,
-  isValidStatus, isValidPriority,
+  isValidStatus, isValidPriority, validatePriorityForStatus,
   resolveTicketsFromCommand,
   type Ticket,
 } from './ticket-store'
+import { generateAutoTitle } from './explore-draft-title'
 import type { TicketCreatedMessage, TicketUpdatedMessage, TicketDeletedMessage, TicketAiEditStreamMessage, TicketAiEditDoneMessage, TicketAiEditErrorMessage, SpecGenStreamMessage, SpecGenDoneMessage, SpecGenErrorMessage, LocalTicket } from './types'
 import { spawnAiCli } from './util/cli-prompt'
 import { createInterface } from 'readline'
@@ -224,6 +226,28 @@ export function stripSpecMetadataSections(buffer: string): string {
     .replace(/##\s*Labels\s*\n+(?:[^\n]+(?:\n(?!##)[^\n]+)*)\n*/i, '')
     .replace(/##\s*Estimated Complexity\s*\n+(?:[^\n]+(?:\n(?!##)[^\n]+)*)\n*/i, '')
     .trim()
+}
+
+/**
+ * Fold an `acceptanceCriteria` array into a ticket description body, writing
+ * (or replacing) a `## Acceptance Criteria` section.
+ *
+ * - `criteria.length > 0` → append/replace the section with one `- bullet` per item
+ * - `criteria.length === 0` → strip any existing `## Acceptance Criteria` section
+ *
+ * The match is case-insensitive on the heading text but requires `##` exactly
+ * to avoid matching other heading levels.
+ *
+ * Shared by `POST /tickets/from-draft` and `PATCH /tickets/:id`. See
+ * openspec/changes/replace-ai-edit-with-continue-editing/design.md D3+D4.
+ */
+export function formatDescriptionWithCriteria(body: string, criteria: string[]): string {
+  const sectionRegex = /\n*##\s*Acceptance Criteria\s*\n[\s\S]*?(?=\n##\s|\n*$)/i
+  const withoutExisting = body.replace(sectionRegex, '').replace(/\s+$/, '')
+  if (criteria.length === 0) return withoutExisting
+  const section = `## Acceptance Criteria\n\n${criteria.map((c) => `- ${c}`).join('\n')}`
+  if (withoutExisting === '') return section
+  return `${withoutExisting}\n\n${section}`
 }
 
 /**
@@ -1026,11 +1050,30 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   router.delete('/:projectId/chat/conversations/:id', (req: Request, res: Response) => {
-    const { db, chatManager } = ctx(req)
-    const conversation = getConversation(db, req.params.id as string)
+    const { db, chatManager, broadcast, project, ticketWatcher } = ctx(req)
+    const convId = req.params.id as string
+    const conversation = getConversation(db, convId)
     if (!conversation) { res.status(404).json({ error: 'Conversation not found' }); return }
-    deleteConversation(db, req.params.id as string)
-    chatManager?.forgetSpecDraft(req.params.id as string)
+    deleteConversation(db, convId)
+    chatManager?.forgetSpecDraft(convId)
+    // Cascade-clear origin_conversation_id on any ticket that referenced this
+    // conversation (application-level "ON DELETE SET NULL").
+    try {
+      const filePath = ticketPath(req)
+      const store = mutateStore(filePath, (s) => {
+        for (const id of Object.keys(s.tickets)) {
+          if (s.tickets[id].origin_conversation_id === convId) {
+            s.tickets[id].origin_conversation_id = null
+            s.tickets[id].updated_at = new Date().toISOString()
+          }
+        }
+      })
+      ticketWatcher.notifyHubWrite(store.revision)
+      // No per-ticket broadcast: the cleared field is metadata-only and the
+      // board card visual treatment doesn't depend on it.
+    } catch (err) {
+      console.error('[project-router] conversation-cascade ticket update error:', err)
+    }
     res.json({ ok: true })
   })
 
@@ -1104,6 +1147,17 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       res.status(404).json({ error: 'No active stream for this conversation' }); return
     }
     chatManager.abort(req.params.id as string)
+    res.json({ ok: true })
+  })
+
+  // Explore Spec lifecycle: minimize-to-toast hint and restore-from-toast hint.
+  // Idempotent; does not mutate persistent state. See design.md D7.
+  router.post('/:projectId/chat/conversations/:id/minimize', (req: Request, res: Response) => {
+    ctx(req).chatManager.notifyMinimized(req.params.id as string)
+    res.json({ ok: true })
+  })
+  router.post('/:projectId/chat/conversations/:id/restore', (req: Request, res: Response) => {
+    ctx(req).chatManager.notifyRestored(req.params.id as string)
     res.json({ ok: true })
   })
 
@@ -1798,6 +1852,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
               prerequisites: [],
               metadata: {},
               comments: [],
+              origin_conversation_id: null,
               created_at: now,
               updated_at: now,
               created_by: 'sr-product-engineer',
@@ -1895,13 +1950,94 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     })
   })
 
+  // POST /:projectId/tickets/save-as-draft — Persist an in-progress Explore session as a draft ticket
+  router.post('/:projectId/tickets/save-as-draft', (req: Request, res: Response) => {
+    const body = req.body ?? {}
+    const conversationId = typeof body.conversationId === 'string' ? body.conversationId.trim() : ''
+    if (!conversationId) {
+      res.status(400).json({ error: 'conversationId is required' }); return
+    }
+    const providedTitle = typeof body.title === 'string' ? body.title.trim() : ''
+    const labels = Array.isArray(body.labels)
+      ? (body.labels as unknown[]).filter((l): l is string => typeof l === 'string')
+      : []
+    const description = typeof body.description === 'string' ? body.description : ''
+
+    try {
+      const { db, project, broadcast, ticketWatcher } = ctx(req)
+      // Require at least one user-submitted turn before accepting a save
+      const messages = getMessages(db, conversationId)
+      const hasUserTurn = messages.some((m) => m.role === 'user' && (m.content ?? '').trim().length > 0)
+      if (!hasUserTurn) {
+        res.status(400).json({ error: 'conversation has no user-submitted turn yet' }); return
+      }
+
+      const filePath = ticketPath(req)
+      const now = new Date().toISOString()
+
+      // Idempotent on conversationId: if a draft ticket already references this
+      // conversation, update in place rather than create a second one.
+      let saved: Ticket | undefined
+      const store = mutateStore(filePath, (s) => {
+        const existing = Object.values(s.tickets).find(
+          (t) => t.origin_conversation_id === conversationId && t.status === 'draft',
+        )
+        const title = providedTitle || existing?.title || generateAutoTitle(messages.map((m) => ({ role: m.role, content: m.content ?? '' })))
+        if (existing) {
+          existing.title = title
+          if (description) existing.description = description
+          if (labels.length > 0) existing.labels = labels
+          existing.updated_at = now
+          saved = existing
+          return
+        }
+        const id = s.next_id++
+        const ticket: Ticket = {
+          id,
+          title,
+          description,
+          status: 'draft',
+          priority: null,
+          labels,
+          assignee: null,
+          prerequisites: [],
+          metadata: {},
+          comments: [],
+          origin_conversation_id: conversationId,
+          created_at: now,
+          updated_at: now,
+          created_by: 'sr-explore-spec',
+          source: 'explore-draft',
+        }
+        s.tickets[String(id)] = ticket
+        saved = ticket
+      })
+
+      ticketWatcher.notifyHubWrite(store.revision)
+      const msg: TicketCreatedMessage | TicketUpdatedMessage = saved!.created_at === saved!.updated_at
+        ? { type: 'ticket_created', ticket: saved! as unknown as LocalTicket, projectId: project.id, timestamp: now }
+        : { type: 'ticket_updated', ticket: saved! as unknown as LocalTicket, projectId: project.id, timestamp: now }
+      broadcast(msg)
+      res.status(201).json({ ticket: saved!, revision: store.revision })
+    } catch (err) {
+      console.error('[project-router] save-as-draft error:', err)
+      res.status(500).json({ error: 'Failed to save draft' })
+    }
+  })
+
   // POST /:projectId/tickets/from-draft — Commit an Explore Spec draft as a real ticket
+  // Two paths:
+  //   (1) Legacy: payload has no `draftTicketId` → create a brand-new ticket (status='todo').
+  //   (2) Flip in place: payload has `draftTicketId` referencing an existing
+  //       status='draft' ticket → update that ticket in place to status='todo',
+  //       set priority, replace title/description, preserve origin_conversation_id.
   router.post('/:projectId/tickets/from-draft', async (req: Request, res: Response) => {
     const body = req.body ?? {}
     const rawTitle = typeof body.title === 'string' ? body.title.trim() : ''
     if (!rawTitle) {
       res.status(400).json({ error: 'title is required' }); return
     }
+    const draftTicketId = typeof body.draftTicketId === 'number' ? body.draftTicketId : null
     const pendingSpecId = typeof body.pendingSpecId === 'string' ? body.pendingSpecId : null
     const conversationId = typeof body.conversationId === 'string' ? body.conversationId : null
     const baseDescription = typeof body.description === 'string' ? body.description.trim() : ''
@@ -1922,18 +2058,44 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     // Claude (Problem Statement / Proposed Solution / Out of Scope /
     // Technical Considerations / Estimated Complexity) followed by the
     // Acceptance Criteria bullets.
-    const parts: string[] = []
-    if (baseDescription) parts.push(baseDescription)
-    if (acceptanceCriteria.length > 0) {
-      parts.push(`## Acceptance Criteria\n\n${acceptanceCriteria.map((c) => `- ${c}`).join('\n')}`)
-    }
-    const description = parts.join('\n\n')
+    const description = formatDescriptionWithCriteria(baseDescription, acceptanceCriteria)
 
     try {
       const filePath = ticketPath(req)
       const now = new Date().toISOString()
       let created: Ticket | undefined
+      let wasFlip = false
+      let explicitDraftMissing = false
       const store = mutateStore(filePath, (s) => {
+        // Resolve flip target: explicit `draftTicketId` wins; otherwise look up
+        // an existing draft ticket whose origin_conversation_id matches the
+        // current conversation so a resumed session commits in place even when
+        // the client doesn't track the draft id explicitly.
+        let flipTarget: Ticket | undefined
+        if (draftTicketId !== null) {
+          flipTarget = s.tickets[String(draftTicketId)]
+          if (!flipTarget || flipTarget.status !== 'draft') {
+            explicitDraftMissing = true
+            return
+          }
+        } else if (conversationId) {
+          flipTarget = Object.values(s.tickets).find(
+            (t) => t.origin_conversation_id === conversationId && t.status === 'draft',
+          )
+        }
+        if (flipTarget) {
+          flipTarget.status = 'todo'
+          flipTarget.priority = priority
+          flipTarget.title = rawTitle
+          flipTarget.description = description
+          if (labels.length > 0) flipTarget.labels = labels
+          flipTarget.updated_at = now
+          // origin_conversation_id is intentionally preserved
+          created = flipTarget
+          wasFlip = true
+          return
+        }
+        // Legacy: insert new ticket
         const id = s.next_id++
         const ticket: Ticket = {
           id,
@@ -1946,6 +2108,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
           prerequisites: [],
           metadata: {},
           comments: [],
+          origin_conversation_id: conversationId,
           created_at: now,
           updated_at: now,
           created_by: 'sr-explore-spec',
@@ -1954,6 +2117,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         s.tickets[String(id)] = ticket
         created = ticket
       })
+      if (explicitDraftMissing) {
+        res.status(404).json({ error: 'Draft ticket not found or not in draft status' }); return
+      }
       const { broadcast, ticketWatcher, project } = ctx(req)
       ticketWatcher.notifyHubWrite(store.revision)
 
@@ -1976,12 +2142,19 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         }
       }
 
-      const msg: TicketCreatedMessage = {
-        type: 'ticket_created',
-        ticket: created! as unknown as LocalTicket,
-        projectId: project.id,
-        timestamp: new Date().toISOString(),
-      }
+      const msg: TicketCreatedMessage | TicketUpdatedMessage = wasFlip
+        ? {
+            type: 'ticket_updated',
+            ticket: created! as unknown as LocalTicket,
+            projectId: project.id,
+            timestamp: new Date().toISOString(),
+          }
+        : {
+            type: 'ticket_created',
+            ticket: created! as unknown as LocalTicket,
+            projectId: project.id,
+            timestamp: new Date().toISOString(),
+          }
       broadcast(msg)
 
       // Back-fill ticket_id on the conversation's prior ai_invocations rows.
@@ -2010,10 +2183,13 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       res.status(400).json({ error: 'title is required' }); return
     }
     if (status !== undefined && !isValidStatus(status)) {
-      res.status(400).json({ error: 'status must be one of: todo, in_progress, done, cancelled' }); return
+      res.status(400).json({ error: 'status must be one of: draft, todo, in_progress, done, cancelled' }); return
     }
-    if (priority !== undefined && !isValidPriority(priority)) {
-      res.status(400).json({ error: 'priority must be one of: critical, high, medium, low' }); return
+    const finalStatus = (status ?? 'todo') as import('./ticket-store').TicketStatus
+    const finalPriority = priority === undefined ? (finalStatus === 'draft' ? null : 'medium') : (priority === null ? null : priority)
+    const priorityError = validatePriorityForStatus(finalStatus, finalPriority as never)
+    if (priorityError) {
+      res.status(400).json({ error: priorityError }); return
     }
     try {
       const filePath = ticketPath(req)
@@ -2025,13 +2201,14 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
           id,
           title: title.trim(),
           description: typeof description === 'string' ? description : '',
-          status: status ?? 'todo',
-          priority: priority ?? 'medium',
+          status: finalStatus,
+          priority: finalPriority as Ticket['priority'],
           labels: Array.isArray(labels) ? labels.filter((l: unknown) => typeof l === 'string') : [],
           assignee: typeof assignee === 'string' ? assignee : null,
           prerequisites: Array.isArray(prerequisites) ? prerequisites.filter((p: unknown) => typeof p === 'number') : [],
           metadata: typeof metadata === 'object' && metadata !== null ? metadata : {},
           comments: [],
+          origin_conversation_id: null,
           created_at: now,
           updated_at: now,
           created_by: 'hub',
@@ -2057,26 +2234,42 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     if (!/^\d+$/.test(ticketId)) {
       res.status(400).json({ error: 'Invalid ticket ID' }); return
     }
-    const { title, description, status, priority, labels, assignee, prerequisites, metadata } = req.body ?? {}
+    const { title, description, status, priority, labels, assignee, prerequisites, metadata, acceptanceCriteria } = req.body ?? {}
     if (status !== undefined && !isValidStatus(status)) {
-      res.status(400).json({ error: 'status must be one of: todo, in_progress, done, cancelled' }); return
+      res.status(400).json({ error: 'status must be one of: draft, todo, in_progress, done, cancelled' }); return
     }
-    if (priority !== undefined && !isValidPriority(priority)) {
+    if (priority !== undefined && priority !== null && !isValidPriority(priority)) {
       res.status(400).json({ error: 'priority must be one of: critical, high, medium, low' }); return
     }
     if (title !== undefined && (typeof title !== 'string' || !title.trim())) {
       res.status(400).json({ error: 'title cannot be empty' }); return
     }
+    if (acceptanceCriteria !== undefined) {
+      if (!Array.isArray(acceptanceCriteria) || !acceptanceCriteria.every((c) => typeof c === 'string')) {
+        res.status(400).json({ error: 'acceptanceCriteria must be an array of strings' }); return
+      }
+    }
     try {
       const filePath = ticketPath(req)
       let updated: Ticket | undefined
+      let validationError: string | null = null
       const store = mutateStore(filePath, (s) => {
         const ticket = s.tickets[ticketId]
         if (!ticket) return
+        const nextStatus = (status ?? ticket.status) as import('./ticket-store').TicketStatus
+        const nextPriority = priority === undefined ? ticket.priority : (priority === null ? null : priority)
+        const err = validatePriorityForStatus(nextStatus, nextPriority as never)
+        if (err) { validationError = err; return }
         if (title !== undefined) ticket.title = title.trim()
         if (description !== undefined) ticket.description = description
+        if (acceptanceCriteria !== undefined) {
+          // Fold criteria into the description body under a `## Acceptance Criteria`
+          // section, replacing any existing one. Use the just-set description if
+          // present, otherwise the ticket's current description.
+          ticket.description = formatDescriptionWithCriteria(ticket.description ?? '', acceptanceCriteria as string[])
+        }
         if (status !== undefined) ticket.status = status
-        if (priority !== undefined) ticket.priority = priority
+        if (priority !== undefined) ticket.priority = nextPriority as Ticket['priority']
         if (labels !== undefined && Array.isArray(labels)) ticket.labels = labels.filter((l: unknown) => typeof l === 'string')
         if (assignee !== undefined) ticket.assignee = typeof assignee === 'string' ? assignee : null
         if (prerequisites !== undefined && Array.isArray(prerequisites)) ticket.prerequisites = prerequisites.filter((p: unknown) => typeof p === 'number')
@@ -2086,6 +2279,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         ticket.updated_at = new Date().toISOString()
         updated = ticket
       })
+      if (validationError) {
+        res.status(400).json({ error: validationError }); return
+      }
       if (!updated) {
         res.status(404).json({ error: 'Ticket not found' }); return
       }
@@ -2322,21 +2518,42 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     try {
       const filePath = ticketPath(req)
       let found = false
+      let orphanedConversationId: string | null = null
       const store = mutateStore(filePath, (s) => {
-        if (s.tickets[ticketId]) {
-          delete s.tickets[ticketId]
-          found = true
+        const t = s.tickets[ticketId]
+        if (!t) return
+        // If this is a draft and no other ticket references the same
+        // origin_conversation_id, mark it for cascade delete.
+        if (t.status === 'draft' && t.origin_conversation_id) {
+          const otherRefs = Object.values(s.tickets).some(
+            (other) => other.id !== t.id && other.origin_conversation_id === t.origin_conversation_id,
+          )
+          if (!otherRefs) orphanedConversationId = t.origin_conversation_id
         }
+        delete s.tickets[ticketId]
+        found = true
       })
       if (!found) {
         res.status(404).json({ error: 'Ticket not found' }); return
       }
-      const { broadcast, ticketWatcher } = ctx(req)
+      const { broadcast, ticketWatcher, db, chatManager } = ctx(req)
       ticketWatcher.notifyHubWrite(store.revision)
       // Cascade-delete attachments for this ticket
       attachmentManager.deleteAll(ctx(req).project.slug, ticketId).catch((e) => {
         console.error('[project-router] attachment cascade delete failed:', e)
       })
+      // Cascade-delete the orphaned Explore conversation, if any.
+      if (orphanedConversationId) {
+        try {
+          const conv = getConversation(db, orphanedConversationId)
+          if (conv && (conv as { kind?: string }).kind === 'explore') {
+            deleteConversation(db, orphanedConversationId)
+            chatManager?.forgetSpecDraft(orphanedConversationId)
+          }
+        } catch (err) {
+          console.error('[project-router] orphan conversation cleanup failed:', err)
+        }
+      }
       const msg: TicketDeletedMessage = { type: 'ticket_deleted', ticketId: Number(ticketId), projectId: ctx(req).project.id, timestamp: new Date().toISOString() }
       broadcast(msg)
       res.json({ ok: true, revision: store.revision })
@@ -2563,6 +2780,22 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   router.get('/:projectId/settings', (req: Request, res: Response) => {
     const settings = getProjectSettings(ctx(req).db)
     res.json(settings)
+  })
+
+  // ─── Explore Spec acceleration: per-project MCP toggle ───────────────────────
+
+  router.get('/:projectId/explore-mcp-enabled', (req: Request, res: Response) => {
+    res.json({ enabled: getExploreMcpEnabled(ctx(req).db) })
+  })
+
+  router.patch('/:projectId/explore-mcp-enabled', (req: Request, res: Response) => {
+    const enabled = req.body?.enabled
+    if (typeof enabled !== 'boolean') {
+      res.status(400).json({ error: 'enabled must be a boolean' })
+      return
+    }
+    setExploreMcpEnabled(ctx(req).db, enabled)
+    res.json({ enabled: getExploreMcpEnabled(ctx(req).db) })
   })
 
   router.patch('/:projectId/settings', (req: Request, res: Response) => {

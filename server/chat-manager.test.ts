@@ -15,7 +15,7 @@ vi.mock('tree-kill', () => ({
 import { spawn as mockSpawn, execSync as mockExecSync } from 'child_process'
 import treeKill from 'tree-kill'
 import { ChatManager } from './chat-manager'
-import { initDb, createConversation, getConversation, createJob, finishJob } from './db'
+import { initDb, createConversation, getConversation, createJob, finishJob, setExploreMcpEnabled } from './db'
 import type { DbInstance } from './db'
 
 function createMockChildProcess() {
@@ -686,11 +686,16 @@ describe('ChatManager', () => {
       const cmCap = new ChatManager(broadcast, db, undefined, undefined, 'claude', projectId)
       const convId = 'conv-explore-fail'
       createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      // Explore turns now auto-respawn ONCE on crash before result. Provide
+      // two crashing children so the lifecycle exhausts the retry and writes
+      // the failed invocation row.
+      const first = createMockChildProcess()
+      const second = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValueOnce(first as any).mockReturnValueOnce(second as any)
       const sendPromise = cmCap.sendMessage(convId, 'Hello')
 
-      await finishProcess(child, 1)
+      await finishProcess(first, 1)
+      await finishProcess(second, 1)
       await sendPromise
 
       const rows = db.prepare(`SELECT * FROM ai_invocations WHERE project_id = ?`).all(projectId) as any[]
@@ -715,6 +720,239 @@ describe('ChatManager', () => {
 
       const rows = db.prepare(`SELECT * FROM ai_invocations WHERE project_id = ?`).all(projectId) as any[]
       expect(rows).toHaveLength(0)
+    })
+  })
+
+  // ─── Explore Spec acceleration: spawn cwd resolution ──────────────────────
+
+  describe('Explore spawn cwd', () => {
+    let baseTmp: string
+    let projectPath: string
+
+    beforeEach(() => {
+      const fsMod = require('fs') as typeof import('fs')
+      const osMod = require('os') as typeof import('os')
+      const pathMod = require('path') as typeof import('path')
+      baseTmp = fsMod.mkdtempSync(pathMod.join(osMod.tmpdir(), 'cm-explore-'))
+      projectPath = fsMod.mkdtempSync(pathMod.join(osMod.tmpdir(), 'cm-explore-proj-'))
+    })
+
+    afterEach(() => {
+      const fsMod = require('fs') as typeof import('fs')
+      try { fsMod.rmSync(baseTmp, { recursive: true, force: true }) } catch {}
+      try { fsMod.rmSync(projectPath, { recursive: true, force: true }) } catch {}
+      delete process.env.SPECRAILS_EXPLORE_LEGACY_CWD
+    })
+
+    it('uses the hub-managed explore-cwd for kind=explore by default', async () => {
+      const cmExplore = new ChatManager(
+        broadcast, db, projectPath, 'P', 'claude', 'proj-x', 'slug-x',
+      )
+      const convId = 'conv-explore-cwd'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const sendPromise = cmExplore.sendMessage(convId, 'hi', { lightweight: true })
+      await Promise.resolve(); await Promise.resolve()
+
+      const opts = vi.mocked(mockSpawn).mock.calls[0][2] as { cwd?: string }
+      expect(opts.cwd).toBeDefined()
+      // Default cwd resolves under ~/.specrails/projects/<slug>/explore-cwd or
+      // wherever exploreCwdPathFor lands; what we assert is that it is NOT the
+      // raw project path.
+      expect(opts.cwd).not.toBe(projectPath)
+      expect(opts.cwd!.endsWith('/explore-cwd')).toBe(true)
+
+      pushLine(child, assistantEvent('hi'))
+      pushLine(child, resultEvent('sess'))
+      await finishProcess(child, 0)
+      await sendPromise
+    })
+
+    it('falls back to project path when MCP toggle is enabled', async () => {
+      setExploreMcpEnabled(db, true)
+      const cmExplore = new ChatManager(
+        broadcast, db, projectPath, 'P', 'claude', 'proj-x', 'slug-x',
+      )
+      const convId = 'conv-explore-mcp-on'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const sendPromise = cmExplore.sendMessage(convId, 'hi', { lightweight: true })
+      await Promise.resolve(); await Promise.resolve()
+
+      const opts = vi.mocked(mockSpawn).mock.calls[0][2] as { cwd?: string }
+      expect(opts.cwd).toBe(projectPath)
+
+      pushLine(child, assistantEvent('hi'))
+      pushLine(child, resultEvent('sess'))
+      await finishProcess(child, 0)
+      await sendPromise
+    })
+
+    it('falls back to project path when SPECRAILS_EXPLORE_LEGACY_CWD=1', async () => {
+      process.env.SPECRAILS_EXPLORE_LEGACY_CWD = '1'
+      const cmExplore = new ChatManager(
+        broadcast, db, projectPath, 'P', 'claude', 'proj-x', 'slug-x',
+      )
+      const convId = 'conv-explore-legacy-env'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const sendPromise = cmExplore.sendMessage(convId, 'hi', { lightweight: true })
+      await Promise.resolve(); await Promise.resolve()
+
+      const opts = vi.mocked(mockSpawn).mock.calls[0][2] as { cwd?: string }
+      expect(opts.cwd).toBe(projectPath)
+
+      pushLine(child, assistantEvent('hi'))
+      pushLine(child, resultEvent('sess'))
+      await finishProcess(child, 0)
+      await sendPromise
+    })
+
+    it('uses the project path for non-explore (sidebar) conversations', async () => {
+      const cmSidebar = new ChatManager(
+        broadcast, db, projectPath, 'P', 'claude', 'proj-x', 'slug-x',
+      )
+      const convId = 'conv-sidebar-cwd'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'sidebar' })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const sendPromise = cmSidebar.sendMessage(convId, 'hi')
+      await Promise.resolve(); await Promise.resolve()
+
+      const opts = vi.mocked(mockSpawn).mock.calls[0][2] as { cwd?: string }
+      expect(opts.cwd).toBe(projectPath)
+
+      pushLine(child, assistantEvent('hi'))
+      pushLine(child, resultEvent('sess'))
+      await finishProcess(child, 0)
+      await sendPromise
+    })
+  })
+
+  // ─── Explore lifecycle: idle, crash, concurrency ─────────────────────────
+
+  describe('Explore lifecycle', () => {
+    it('notifyMinimized + 2 min idle schedules a kill', async () => {
+      const cmL = new ChatManager(broadcast, db, '/tmp/proj', 'P', 'claude', 'pid-l', 'sl-l')
+      const convId = 'conv-life-1'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      // Minimize without an active spawn: the timer arms, fires, and treeKill
+      // is a no-op since no child is registered. Assertion: no throw.
+      vi.useFakeTimers()
+      cmL.notifyMinimized(convId)
+      vi.advanceTimersByTime(2 * 60 * 1000 + 100)
+      vi.useRealTimers()
+    })
+
+    it('notifyRestored cancels a pending idle timer', async () => {
+      vi.useFakeTimers()
+      const cmL = new ChatManager(broadcast, db, '/tmp/proj', 'P', 'claude', 'pid-l2', 'sl-l2')
+      const convId = 'conv-life-2'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      cmL.notifyMinimized(convId)
+      vi.advanceTimersByTime(60 * 1000) // 1 minute
+      cmL.notifyRestored(convId)
+      vi.advanceTimersByTime(2 * 60 * 1000) // crossing original 2-min mark
+      // No throws → timer was cancelled.
+      vi.useRealTimers()
+    })
+
+    it('busy when 5 explore turns are streaming and queue times out', async () => {
+      const cmL = new ChatManager(broadcast, db, '/tmp/proj', 'P', 'claude', 'pid-l3', 'sl-l3')
+      setExploreMcpEnabled(db, true) // skip filesystem IO
+      const fiveChildren: any[] = []
+      // Spawn 5 streaming explore turns (no result, never closes)
+      for (let i = 0; i < 5; i++) {
+        const cid = `conv-life-busy-${i}`
+        createConversation(db, { id: cid, model: 'sonnet', kind: 'explore' })
+        const c = createMockChildProcess()
+        fiveChildren.push(c)
+        vi.mocked(mockSpawn).mockReturnValueOnce(c as any)
+        void cmL.sendMessage(cid, 'hi', { lightweight: true })
+        await Promise.resolve(); await Promise.resolve()
+      }
+      // 6th attempt — should queue, then time out at 30s with chat_error busy.
+      vi.useFakeTimers()
+      const cid6 = 'conv-life-busy-6'
+      createConversation(db, { id: cid6, model: 'sonnet', kind: 'explore' })
+      const sixthPromise = cmL.sendMessage(cid6, 'hi', { lightweight: true })
+      // Flush microtask + advance the 30 s queue timeout.
+      await vi.advanceTimersByTimeAsync(30 * 1000 + 100)
+      vi.useRealTimers()
+      await sixthPromise
+      const errs = getBroadcastedByType(broadcast, 'chat_error')
+      expect(errs.some((e) => e.conversationId === cid6 && e.error === 'busy')).toBe(true)
+      // Cleanup: close the 5 dangling spawns to settle promises
+      for (const c of fiveChildren) {
+        await finishProcess(c, 0)
+      }
+    })
+
+    it('crash before result auto-respawns once', async () => {
+      const cmL = new ChatManager(broadcast, db, '/tmp/proj', 'P', 'claude', 'pid-l4', 'sl-l4')
+      setExploreMcpEnabled(db, true)
+      const convId = 'conv-life-crash'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const first = createMockChildProcess()
+      const second = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValueOnce(first as any).mockReturnValueOnce(second as any)
+      const sendPromise = cmL.sendMessage(convId, 'hi', { lightweight: true })
+      await Promise.resolve(); await Promise.resolve()
+      await finishProcess(first, 1)
+      await Promise.resolve(); await Promise.resolve()
+      pushLine(second, assistantEvent('recovered'))
+      pushLine(second, resultEvent('sess-after-crash'))
+      await finishProcess(second, 0)
+      await sendPromise
+      const errs = getBroadcastedByType(broadcast, 'chat_error')
+      const errsForConv = errs.filter((e) => e.conversationId === convId)
+      expect(errsForConv).toHaveLength(0)
+      expect(vi.mocked(mockSpawn)).toHaveBeenCalledTimes(2)
+    })
+
+    it('second crash surfaces chat_error', async () => {
+      const cmL = new ChatManager(broadcast, db, '/tmp/proj', 'P', 'claude', 'pid-l5', 'sl-l5')
+      setExploreMcpEnabled(db, true)
+      const convId = 'conv-life-doublecrash'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const first = createMockChildProcess()
+      const second = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValueOnce(first as any).mockReturnValueOnce(second as any)
+      const sendPromise = cmL.sendMessage(convId, 'hi', { lightweight: true })
+      await Promise.resolve(); await Promise.resolve()
+      await finishProcess(first, 1)
+      await Promise.resolve(); await Promise.resolve()
+      await finishProcess(second, 1)
+      await sendPromise
+      const errs = getBroadcastedByType(broadcast, 'chat_error')
+      expect(errs.some((e) => e.conversationId === convId)).toBe(true)
+    })
+  })
+
+  // ─── Lightweight system prompt byte stability ─────────────────────────────
+
+  describe('Lightweight system prompt', () => {
+    it('is byte-stable across consecutive invocations for the same project', () => {
+      const cmA = new ChatManager(broadcast, db, undefined, 'StableProject')
+      // Access via prototype since the method is private at the TS level
+      const build = (cmA as unknown as { _buildLightweightSystemPrompt: () => string })._buildLightweightSystemPrompt.bind(cmA)
+      const a = build()
+      const b = build()
+      expect(a).toBe(b)
+    })
+
+    it('contains no timestamps, dates, costs or job ids', () => {
+      const cmA = new ChatManager(broadcast, db, undefined, 'StableProject')
+      const build = (cmA as unknown as { _buildLightweightSystemPrompt: () => string })._buildLightweightSystemPrompt.bind(cmA)
+      const out = build()
+      // ISO-8601 fragments / decimal cost / Unix epoch / `jobs today`-style content must NOT leak in
+      expect(out).not.toMatch(/\d{4}-\d{2}-\d{2}/)
+      expect(out).not.toMatch(/\$\d+\.\d{3}/)
+      expect(out).not.toMatch(/Total jobs:/)
+      expect(out).not.toMatch(/Jobs today:/)
     })
   })
 })

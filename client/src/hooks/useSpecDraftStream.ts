@@ -23,14 +23,32 @@ export interface UseSpecDraftStreamResult {
   clearManualOverrides: () => void
 }
 
-export function useSpecDraftStream(conversationId: string | null): UseSpecDraftStreamResult {
+export function useSpecDraftStream(
+  conversationId: string | null,
+  /** Optional initial draft used both as `useState` init AND as the value the
+   *  conversation-change reset effect restores to. When provided, the keys
+   *  carried in the initial draft are marked as manual overrides so server
+   *  hydration / WS pushes don't blow them away. Used by edit-existing-ticket
+   *  mode to pre-fill the draft pane from the ticket. */
+  initialDraft?: Partial<SpecDraft>,
+): UseSpecDraftStreamResult {
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
-  const [draft, setDraft] = useState<SpecDraft>(SPEC_DRAFT_DEFAULTS)
+  // Build the effective initial state once: defaults + overrides from
+  // initialDraft. Keys present in initialDraft mark as manual on init.
+  const initialKeysRef = useRef<SpecDraftField[]>(
+    initialDraft
+      ? (Object.keys(initialDraft) as SpecDraftField[]).filter(
+          (k) => (initialDraft as Partial<SpecDraft>)[k] !== undefined,
+        )
+      : [],
+  )
+  const initialMergedRef = useRef<SpecDraft>({ ...SPEC_DRAFT_DEFAULTS, ...(initialDraft ?? {}) })
+  const [draft, setDraft] = useState<SpecDraft>(initialMergedRef.current)
   const [ready, setReady] = useState(false)
   const [chips, setChips] = useState<string[]>([])
   const [lastChangedFields, setLastChangedFields] = useState<SpecDraftField[]>([])
-  const manualFieldsRef = useRef<Set<SpecDraftField>>(new Set())
-  const [hasManualOverrides, setHasManualOverrides] = useState(false)
+  const manualFieldsRef = useRef<Set<SpecDraftField>>(new Set(initialKeysRef.current))
+  const [hasManualOverrides, setHasManualOverrides] = useState(initialKeysRef.current.length > 0)
 
   // Reset state when conversation changes, then hydrate any draft state
   // the server has accumulated for this conversation. Covers the case
@@ -40,12 +58,12 @@ export function useSpecDraftStream(conversationId: string | null): UseSpecDraftS
   // mount) win over server values — the merge guard checks `manual`
   // before overwriting, mirroring the WS handler logic below.
   useEffect(() => {
-    setDraft(SPEC_DRAFT_DEFAULTS)
+    setDraft(initialMergedRef.current)
     setReady(false)
     setChips([])
     setLastChangedFields([])
-    manualFieldsRef.current = new Set()
-    setHasManualOverrides(false)
+    manualFieldsRef.current = new Set(initialKeysRef.current)
+    setHasManualOverrides(initialKeysRef.current.length > 0)
     if (!conversationId) return
     let cancelled = false
     void (async () => {

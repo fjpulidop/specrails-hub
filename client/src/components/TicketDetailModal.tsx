@@ -2,13 +2,15 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { formatDistanceToNow } from 'date-fns'
-import { X, Pencil, Trash2, Save, Plus, XCircle, Sparkles, Undo2 } from 'lucide-react'
+import { X, Pencil, Trash2, Save, Plus, XCircle, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
 import { AttachmentsSection } from './AttachmentsSection'
-import { TicketAiEditOverlay } from './tickets/TicketAiEditOverlay'
 import { TicketSpendingLine } from './TicketSpendingLine'
+import { useMinimizedChats } from '../context/MinimizedChatsContext'
+import { parseAcceptanceCriteria } from './explore-spec/acceptance-criteria'
+import { useHub } from '../hooks/useHub'
 import type { Attachment, LocalTicket, TicketPriority } from '../types'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -49,7 +51,7 @@ export function TicketDetailModal({
   // Editable state
   const [title, setTitle] = useState(ticket.title)
   const [description, setDescription] = useState(ticket.description)
-  const [priority, setPriority] = useState<TicketPriority>(ticket.priority)
+  const [priority, setPriority] = useState<TicketPriority>(ticket.priority ?? 'medium')
   const [labels, setLabels] = useState<string[]>([...(ticket.labels ?? [])])
 
   // Edit mode toggles
@@ -61,13 +63,6 @@ export function TicketDetailModal({
   // Confirmation dialog
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
-
-  // AI Edit state — overlay owns streaming/draft state internally; the modal
-  // only tracks whether the overlay is open and the snapshots for Revert
-  // (one snapshot per session — captured on first Apply).
-  const [aiEditOpen, setAiEditOpen] = useState(false)
-  const [descriptionSnapshot, setDescriptionSnapshot] = useState<string | null>(null)
-  const [titleSnapshot, setTitleSnapshot] = useState<string | null>(null)
 
   // Attachments (synced from ticket prop)
   const [attachments, setAttachments] = useState<Attachment[]>(ticket.attachments ?? [])
@@ -109,13 +104,13 @@ export function TicketDetailModal({
   // Close on Escape (unless editing or AI overlay is open — overlay owns Esc).
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !editingTitle && !editingDescription && !showDeleteConfirm && !aiEditOpen) {
+      if (e.key === 'Escape' && !editingTitle && !editingDescription && !showDeleteConfirm) {
         onClose()
       }
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [onClose, editingTitle, editingDescription, showDeleteConfirm, aiEditOpen])
+  }, [onClose, editingTitle, editingDescription, showDeleteConfirm])
 
   // Label autocomplete suggestions
   const labelSuggestions = useMemo(() => {
@@ -137,35 +132,6 @@ export function TicketDetailModal({
   const removeLabel = useCallback((label: string) => {
     setLabels((prev) => prev.filter((l) => l !== label))
   }, [])
-
-  // ─── AI Edit (overlay-owned) ─────────────────────────────────────────────
-
-  const handleApplyDraft = useCallback(
-    (draft: { title: string; description: string }) => {
-      // Capture snapshots only on the first Apply of this modal session
-      if (descriptionSnapshot === null) setDescriptionSnapshot(description)
-      if (titleSnapshot === null) setTitleSnapshot(title)
-      setDescription(draft.description)
-      if (draft.title && draft.title !== title) setTitle(draft.title)
-      setAiEditOpen(false)
-    },
-    [description, descriptionSnapshot, title, titleSnapshot],
-  )
-
-  const handleAiRevert = useCallback(() => {
-    let reverted = false
-    if (descriptionSnapshot !== null) {
-      setDescription(descriptionSnapshot)
-      setDescriptionSnapshot(null)
-      reverted = true
-    }
-    if (titleSnapshot !== null) {
-      setTitle(titleSnapshot)
-      setTitleSnapshot(null)
-      reverted = true
-    }
-    if (reverted) toast.success('Reverted to original')
-  }, [descriptionSnapshot, titleSnapshot])
 
   const handleSave = useCallback(async () => {
     const changes: Partial<Pick<LocalTicket, 'title' | 'description' | 'priority' | 'labels'>> = {}
@@ -199,19 +165,6 @@ export function TicketDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* AI Edit overlay (full-screen, layers above this modal). */}
-      {aiEditOpen && (
-        <TicketAiEditOverlay
-          ticket={ticket}
-          title={title}
-          description={description}
-          attachments={attachments}
-          onAttachmentsChange={setAttachments}
-          onApply={handleApplyDraft}
-          onClose={() => setAiEditOpen(false)}
-        />
-      )}
-
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -250,6 +203,9 @@ export function TicketDetailModal({
             </div>
             <TicketSpendingLine ticketId={ticket.id} />
           </div>
+
+          <ContinueEditingButton ticket={ticket} title={title} description={description} priority={priority} labels={labels} onClose={onClose} />
+
 
           <button
             onClick={onClose}
@@ -447,31 +403,7 @@ export function TicketDetailModal({
                 )}
               </div>
 
-              {/* AI Edit trigger — full experience lives in the main content column */}
-              <div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-7 text-[10px] gap-1.5"
-                  onClick={() => setAiEditOpen(true)}
-                  disabled={aiEditOpen}
-                >
-                  <Sparkles className="w-3 h-3" />
-                  AI Edit
-                </Button>
-
-                {(descriptionSnapshot !== null || titleSnapshot !== null) && !aiEditOpen && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full h-6 text-[10px] gap-1 mt-1.5 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
-                    onClick={handleAiRevert}
-                  >
-                    <Undo2 className="w-2.5 h-2.5" />
-                    Revert to original
-                  </Button>
-                )}
-              </div>
+              {/* Continue Editing lives in the modal header — see top of component. */}
 
               {/* Metadata */}
               {ticket.metadata?.effort_level && (
@@ -565,3 +497,77 @@ function formatRelTime(dateStr: string): string {
   }
 }
 
+
+// ─── ContinueEditingButton ─────────────────────────────────────────────────
+
+interface ContinueEditingButtonProps {
+  ticket: LocalTicket
+  /** Current modal-edited values, in case the user has unsaved tweaks. */
+  title: string
+  description: string
+  priority: TicketPriority
+  labels: string[]
+  onClose: () => void
+}
+
+const EDITABLE_STATUSES = new Set(['draft', 'todo', 'backlog'])
+
+/**
+ * Single entry point for "open this ticket in Explore Spec to refine it".
+ *
+ * - draft + `origin_conversation_id`: resume the existing Explore conversation
+ *   (preserves prior chat history). Same behaviour as the legacy `Continue
+ *   Explore` button this component replaces.
+ * - draft (no conv) / todo / backlog: launch a fresh Explore session in
+ *   edit-existing-ticket mode (commits via PATCH; Review baseline = ticket).
+ *
+ * Hidden for `in_progress`, `done`, `cancelled`.
+ * See openspec/changes/replace-ai-edit-with-continue-editing/design.md D1+D8.
+ */
+function ContinueEditingButton({ ticket, title, description, priority, labels, onClose }: ContinueEditingButtonProps) {
+  const { triggerResume } = useMinimizedChats()
+  const { activeProjectId } = useHub()
+  if (!EDITABLE_STATUSES.has(ticket.status)) return null
+  const handleClick = () => {
+    if (!activeProjectId) return
+    // Unified Continue Editing: ALL editable tickets get the editTicket
+    // payload (draft pane pre-seeded + Review with real diff + PATCH commit).
+    // If the ticket carries origin_conversation_id, also resume that
+    // conversation so prior chat history is visible. The shell does NOT
+    // auto-send a turn — the user types the first refinement.
+    const { body, criteria } = parseAcceptanceCriteria(description)
+    triggerResume({
+      kind: 'explore-spec',
+      projectId: activeProjectId,
+      label: title || ticket.title || `Ticket #${ticket.id}`,
+      restoreRoute: '/',
+      params: {
+        initialIdea: '',
+        pendingSpecId: '',
+        initialAttachmentIds: [],
+        resumeConversationId: ticket.origin_conversation_id ?? undefined,
+        editTicket: {
+          id: ticket.id,
+          title,
+          description: body,
+          labels,
+          priority,
+          acceptanceCriteria: criteria,
+        },
+      },
+    })
+    onClose()
+  }
+  return (
+    <Button
+      variant="default"
+      size="sm"
+      onClick={handleClick}
+      className="shrink-0 mr-2"
+      data-testid="continue-editing"
+    >
+      <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
+      Continue Editing
+    </Button>
+  )
+}

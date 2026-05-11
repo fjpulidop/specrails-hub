@@ -131,7 +131,8 @@ function KanbanCard({
   isDragOverlay,
   dragHandleProps,
 }: KanbanCardProps & { dragHandleProps?: Record<string, unknown> }) {
-  const priorityInfo = PRIORITY_STYLES[ticket.priority]
+  const priorityInfo = ticket.priority ? PRIORITY_STYLES[ticket.priority] : null
+  const isDraft = ticket.status === 'draft'
 
   return (
     <button
@@ -181,7 +182,11 @@ function KanbanCard({
               #{ticket.id}
             </span>
 
-            {ticket.priority !== 'medium' && priorityInfo.label && (
+            {isDraft ? (
+              <span className="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium border border-accent-secondary/60 text-accent-secondary bg-accent-secondary/10">
+                Draft
+              </span>
+            ) : priorityInfo && ticket.priority !== 'medium' && priorityInfo.label && (
               <span
                 className={cn(
                   'inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium border',
@@ -313,6 +318,7 @@ export function TicketGridView({
   // Group tickets by status column (exclude cancelled from kanban columns)
   const columnTickets = useMemo(() => {
     const grouped: Record<TicketStatus, LocalTicket[]> = {
+      draft: [],
       todo: [],
       in_progress: [],
       done: [],
@@ -321,11 +327,18 @@ export function TicketGridView({
     for (const ticket of tickets) {
       grouped[ticket.status].push(ticket)
     }
-    // Sort within columns by priority
+    // Sort within columns by priority. Drafts (priority=null) sort last.
     const priorityOrder: Record<TicketPriority, number> = { critical: 0, high: 1, medium: 2, low: 3 }
     for (const status of Object.keys(grouped) as TicketStatus[]) {
-      grouped[status].sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
+      grouped[status].sort((a, b) => {
+        const ap = a.priority === null ? Number.MAX_SAFE_INTEGER : priorityOrder[a.priority]
+        const bp = b.priority === null ? Number.MAX_SAFE_INTEGER : priorityOrder[b.priority]
+        return ap - bp
+      })
     }
+    // Drafts visually live in the Backlog (Todo) column per spec
+    grouped.todo = [...grouped.draft, ...grouped.todo]
+    grouped.draft = []
     return grouped
   }, [tickets])
 

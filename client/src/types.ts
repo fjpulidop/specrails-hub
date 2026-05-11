@@ -237,7 +237,7 @@ export interface JobTemplate {
 
 // ─── Local Tickets ───────────────────────────────────────────────────────────
 
-export type TicketStatus = 'todo' | 'in_progress' | 'done' | 'cancelled'
+export type TicketStatus = 'draft' | 'todo' | 'in_progress' | 'done' | 'cancelled'
 export type TicketPriority = 'critical' | 'high' | 'medium' | 'low'
 
 export interface Attachment {
@@ -254,7 +254,7 @@ export interface LocalTicket {
   title: string
   description: string
   status: TicketStatus
-  priority: TicketPriority
+  priority: TicketPriority | null
   labels: string[]
   assignee: string | null
   prerequisites: number[]
@@ -265,9 +265,10 @@ export interface LocalTicket {
     area?: string
   }
   attachments?: Attachment[]
+  origin_conversation_id?: string | null
   created_at: string
   updated_at: string
   created_by: string
-  source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs'
+  source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'explore-draft'
 }
 

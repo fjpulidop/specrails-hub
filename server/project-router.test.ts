@@ -5,7 +5,8 @@ import path from 'path'
 import express from 'express'
 import request from 'supertest'
 
-import { createProjectRouter, stripSpecMetadataSections } from './project-router'
+import { createProjectRouter, stripSpecMetadataSections, formatDescriptionWithCriteria } from './project-router'
+import { resolveTicketStoragePath, mutateStore, readStore } from './ticket-store'
 import { initDb } from './db'
 import { initHubDb } from './hub-db'
 import { ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
@@ -1902,6 +1903,53 @@ describe('project-router', () => {
     })
   })
 
+  // ─── GET/PATCH /:projectId/explore-mcp-enabled ───────────────────────────
+
+  describe('GET /:projectId/explore-mcp-enabled', () => {
+    it('returns false by default', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/explore-mcp-enabled')
+      expect(res.status).toBe(200)
+      expect(res.body.enabled).toBe(false)
+    })
+  })
+
+  describe('PATCH /:projectId/explore-mcp-enabled', () => {
+    it('round-trips the toggle', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const on = await request(app)
+        .patch('/api/projects/proj-1/explore-mcp-enabled')
+        .send({ enabled: true })
+      expect(on.status).toBe(200)
+      expect(on.body.enabled).toBe(true)
+      const verify = await request(app).get('/api/projects/proj-1/explore-mcp-enabled')
+      expect(verify.body.enabled).toBe(true)
+      const off = await request(app)
+        .patch('/api/projects/proj-1/explore-mcp-enabled')
+        .send({ enabled: false })
+      expect(off.body.enabled).toBe(false)
+    })
+
+    it('rejects non-boolean payloads', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .patch('/api/projects/proj-1/explore-mcp-enabled')
+        .send({ enabled: 'yes' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('boolean')
+    })
+
+    it('rejects missing payload', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).patch('/api/projects/proj-1/explore-mcp-enabled').send({})
+      expect(res.status).toBe(400)
+    })
+  })
+
   // ─── GET/PATCH /:projectId/settings ──────────────────────────────────────
 
   describe('GET /:projectId/settings', () => {
@@ -2638,6 +2686,139 @@ describe('project-router', () => {
       expect(out).not.toMatch(/^## Labels/m)
       expect(out).toContain('Problem Statement')
       expect(out).toContain('foo')
+    })
+  })
+
+  describe('formatDescriptionWithCriteria', () => {
+    it('appends a new Acceptance Criteria section to a body without one', () => {
+      const out = formatDescriptionWithCriteria('## Problem Statement\n\nThing.', ['A', 'B'])
+      expect(out).toBe('## Problem Statement\n\nThing.\n\n## Acceptance Criteria\n\n- A\n- B')
+    })
+
+    it('replaces an existing Acceptance Criteria section', () => {
+      const body = '## Problem Statement\n\nThing.\n\n## Acceptance Criteria\n\n- old\n- old2'
+      const out = formatDescriptionWithCriteria(body, ['fresh'])
+      expect(out).toBe('## Problem Statement\n\nThing.\n\n## Acceptance Criteria\n\n- fresh')
+    })
+
+    it('removes the section when criteria is empty', () => {
+      const body = '## Problem Statement\n\nThing.\n\n## Acceptance Criteria\n\n- a'
+      expect(formatDescriptionWithCriteria(body, [])).toBe('## Problem Statement\n\nThing.')
+    })
+
+    it('returns just the section when body is empty', () => {
+      expect(formatDescriptionWithCriteria('', ['solo'])).toBe('## Acceptance Criteria\n\n- solo')
+    })
+
+    it('preserves trailing sections after Acceptance Criteria when replacing', () => {
+      const body = '## A\n\nfoo\n\n## Acceptance Criteria\n\n- old\n\n## B\n\nbar'
+      const out = formatDescriptionWithCriteria(body, ['new'])
+      // The old section is replaced; the new one is appended at the end.
+      expect(out).toContain('## A\n\nfoo')
+      expect(out).toContain('## B\n\nbar')
+      expect(out).toContain('## Acceptance Criteria\n\n- new')
+      expect(out).not.toContain('- old')
+    })
+
+    it('is case-insensitive on the heading', () => {
+      const body = '## acceptance criteria\n\n- x'
+      expect(formatDescriptionWithCriteria(body, ['y'])).toBe('## Acceptance Criteria\n\n- y')
+    })
+  })
+
+  describe('PATCH /:projectId/tickets/:id with acceptanceCriteria', () => {
+    function makeAppWithTicket() {
+      const ctx = makeContext(db)
+      const fp = resolveTicketStoragePath(ctx.project.path)
+      mutateStore(fp, (s) => {
+        s.next_id = 42
+        s.tickets['41'] = {
+          id: 41,
+          title: 'Sample',
+          description: '## Problem Statement\n\nIssue.',
+          status: 'todo',
+          priority: 'medium',
+          labels: [],
+          source: 'manual',
+          assignee: null,
+          prerequisites: [],
+          metadata: {},
+          attachments: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          origin_conversation_id: null,
+        } as never
+      })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      return { app, fp }
+    }
+
+    it('writes a new Acceptance Criteria section when missing', async () => {
+      const { app, fp } = makeAppWithTicket()
+      const res = await request(app)
+        .patch('/api/projects/proj-1/tickets/41')
+        .send({ acceptanceCriteria: ['A', 'B'] })
+      expect(res.status).toBe(200)
+      const stored = readStore(fp).tickets['41']!
+      expect(stored.description).toContain('## Acceptance Criteria\n\n- A\n- B')
+    })
+
+    it('replaces an existing Acceptance Criteria section', async () => {
+      const { app, fp } = makeAppWithTicket()
+      mutateStore(fp, (s) => {
+        s.tickets['41'].description = '## Problem Statement\n\nx\n\n## Acceptance Criteria\n\n- old'
+      })
+      const res = await request(app)
+        .patch('/api/projects/proj-1/tickets/41')
+        .send({ acceptanceCriteria: ['fresh'] })
+      expect(res.status).toBe(200)
+      const stored = readStore(fp).tickets['41']!
+      expect(stored.description).toContain('- fresh')
+      expect(stored.description).not.toContain('- old')
+    })
+
+    it('removes the section when acceptanceCriteria is an empty array', async () => {
+      const { app, fp } = makeAppWithTicket()
+      mutateStore(fp, (s) => {
+        s.tickets['41'].description = '## Problem Statement\n\nx\n\n## Acceptance Criteria\n\n- a'
+      })
+      const res = await request(app)
+        .patch('/api/projects/proj-1/tickets/41')
+        .send({ acceptanceCriteria: [] })
+      expect(res.status).toBe(200)
+      const stored = readStore(fp).tickets['41']!
+      expect(stored.description).not.toContain('Acceptance Criteria')
+    })
+
+    it('preserves any existing section when acceptanceCriteria is omitted', async () => {
+      const { app, fp } = makeAppWithTicket()
+      mutateStore(fp, (s) => {
+        s.tickets['41'].description = '## Problem Statement\n\nx\n\n## Acceptance Criteria\n\n- keep'
+      })
+      const res = await request(app)
+        .patch('/api/projects/proj-1/tickets/41')
+        .send({ title: 'Sample renamed' })
+      expect(res.status).toBe(200)
+      const stored = readStore(fp).tickets['41']!
+      expect(stored.title).toBe('Sample renamed')
+      expect(stored.description).toContain('- keep')
+    })
+
+    it('rejects a non-array acceptanceCriteria payload', async () => {
+      const { app } = makeAppWithTicket()
+      const res = await request(app)
+        .patch('/api/projects/proj-1/tickets/41')
+        .send({ acceptanceCriteria: 'A, B' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('acceptanceCriteria')
+    })
+
+    it('rejects an array containing non-strings', async () => {
+      const { app } = makeAppWithTicket()
+      const res = await request(app)
+        .patch('/api/projects/proj-1/tickets/41')
+        .send({ acceptanceCriteria: ['ok', 123] })
+      expect(res.status).toBe(400)
     })
   })
 

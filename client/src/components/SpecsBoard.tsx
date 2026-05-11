@@ -54,6 +54,16 @@ interface ExploreState {
   /** Manual draft field overrides (title/description/labels/etc) the user
    *  applied before minimize — replayed on remount so edits survive. */
   seedDraftOverrides?: DraftOverrides
+  /** Edit-existing-ticket payload. When present the shell runs in edit mode
+   *  (PATCH commit, ticket as Review baseline, edit-mode header). */
+  editTicket?: {
+    id: number
+    title: string
+    description: string
+    labels: string[]
+    priority: 'low' | 'medium' | 'high' | 'critical' | null
+    acceptanceCriteria: string[]
+  }
 }
 
 /** Returns true when at least one draft field carries a meaningful value. */
@@ -162,6 +172,7 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
         draftOverrides: hasOverrides(liveShellRef.current.draftOverrides)
           ? liveShellRef.current.draftOverrides
           : undefined,
+        editTicket: cur.editTicket,
       },
     })
     // The chip's persistence takes over from here.
@@ -249,6 +260,7 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
       seedDraftTitle: chat.label,
       seedComposerText: chat.params.composerText,
       seedDraftOverrides: chat.params.draftOverrides,
+      editTicket: chat.params.editTicket,
     })
   })
 
@@ -419,6 +431,7 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
           seedDraftTitle={explore.seedDraftTitle}
           seedComposerText={explore.seedComposerText}
           seedDraftOverrides={explore.seedDraftOverrides}
+          editTicket={explore.editTicket}
           onStateChange={(s) => setLiveShell(s)}
           onClose={() => {
             // Discarding the overlay → wipe any attachments uploaded during

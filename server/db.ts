@@ -915,6 +915,29 @@ export function updateProjectSettings(db: DbInstance, patch: Partial<ProjectSett
   }
 }
 
+// ─── Explore Spec acceleration ────────────────────────────────────────────────
+
+/**
+ * Per-project toggle controlling whether Explore Spec turns spawn from the
+ * project path (so `.mcp.json` is honoured) or from the hub-managed
+ * explore-cwd (faster first-token, no project MCP servers loaded). Stored in
+ * the existing `queue_state` key/value table; default `false`.
+ *
+ * See openspec/changes/accelerate-spec-chat-first-token/design.md decision D4.
+ */
+export function getExploreMcpEnabled(db: DbInstance): boolean {
+  const row = db.prepare(
+    `SELECT value FROM queue_state WHERE key = 'config.explore_mcp_enabled'`
+  ).get() as { value: string } | undefined
+  return row?.value === 'true'
+}
+
+export function setExploreMcpEnabled(db: DbInstance, enabled: boolean): void {
+  db.prepare(
+    `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.explore_mcp_enabled', ?)`
+  ).run(enabled ? 'true' : 'false')
+}
+
 // ─── Telemetry DB functions ───────────────────────────────────────────────────
 
 export interface TelemetryBlobRow {

@@ -13,6 +13,9 @@ import { API_ORIGIN } from '../../lib/origin'
 import { markSpecGenInFlight, unmarkSpecGenInFlight } from '../../lib/spec-gen-suppression'
 import { RichAttachmentEditor, type RichAttachmentEditorHandle } from '../RichAttachmentEditor'
 import { SpecDraftPanel } from './SpecDraftPanel'
+import { ExploreStatusPills } from './ExploreStatusPills'
+import { useSmoothStream } from './useSmoothStream'
+import { ExploreReviewOverlay, EMPTY_REVIEW_BASELINE, type ReviewProposed } from './ExploreReviewOverlay'
 import type { LocalTicket, Attachment } from '../../types'
 
 function isMacTauriOverlay(): boolean {
@@ -77,6 +80,24 @@ export interface ExploreSpecShellProps {
     }>
   }) => void
   onTicketCreated?: (ticket: LocalTicket) => void
+  /**
+   * When set, the shell runs in "edit existing ticket" mode:
+   *   - the draft pane is seeded from this ticket
+   *   - the Review overlay receives this ticket as its baseline (real diffs)
+   *   - the commit dispatches `PATCH /tickets/:id` instead of POST from-draft
+   *   - the header eyebrow reads `EDITING SPEC · #{id}`
+   * See openspec/changes/replace-ai-edit-with-continue-editing/design.md D2.
+   */
+  editTicket?: EditTicketSeed
+}
+
+export interface EditTicketSeed {
+  id: number
+  title: string
+  description: string
+  labels: string[]
+  priority: 'low' | 'medium' | 'high' | 'critical' | null
+  acceptanceCriteria: string[]
 }
 
 export function ExploreSpecShell({
@@ -91,6 +112,7 @@ export function ExploreSpecShell({
   onClose,
   onMinimize,
   onStateChange,
+  editTicket,
   onTicketCreated,
 }: ExploreSpecShellProps) {
   const chat = useChatContext()
@@ -101,10 +123,38 @@ export function ExploreSpecShell({
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [hasComposerText, setHasComposerText] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  // Optimistic "pending turn" flag flipped at submit-time so the skeleton
+  // bubble + Connecting… pill appear within a frame, before the WS round-trip
+  // sets conversation.isStreaming. Cleared when isStreaming actually flips.
+  const [pendingTurn, setPendingTurn] = useState(false)
+  // Review overlay open/closed. Opening it does not mutate any state; the
+  // overlay reads draft live and reuses the same handleCreate handler.
+  const [reviewOpen, setReviewOpen] = useState(false)
+  // Build-time flag — flip to 'false' to remove the Review → entry point.
+  // See openspec/changes/power-up-explore-review-diff/design.md.
+  const REVIEW_ENABLED = ((typeof import.meta !== 'undefined' &&
+    (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_FEATURE_EXPLORE_REVIEW) ?? 'true') !== 'false'
   const [accumulatedAttachments, setAccumulatedAttachments] = useState<Attachment[]>([])
   const previousFocusRef = useRef<Element | null>(null)
   const startedRef = useRef(false)
+  // Tracks whether the current edit-mode shell session has already sent its
+  // first wrapped turn. Resets on remount (each Continue Editing click).
+  const editFirstSendRef = useRef(false)
   const composerRef = useRef<RichAttachmentEditorHandle | null>(null)
+  const conversationScrollRef = useRef<HTMLDivElement | null>(null)
+  const conversationBottomRef = useRef<HTMLDivElement | null>(null)
+  const userScrolledRef = useRef(false)
+
+  // Detect manual scroll-up so streaming responses don't yank the user back
+  // to the bottom while they're reading earlier turns. Threshold mirrors the
+  // sidebar MessageList behaviour.
+  const handleConversationScroll = useCallback(() => {
+    const el = conversationScrollRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    userScrolledRef.current = distanceFromBottom > 100
+  }, [])
+
 
   // Refresh the list of attachments accumulated in pendingSpecId/. Files
   // added in the Add Spec modal AND in any prior conversation turn live in
@@ -144,6 +194,15 @@ export function ExploreSpecShell({
     }
     if (!chat) return
     startedRef.current = true
+    if (editTicket) {
+      // Edit-existing-ticket mode: do NOT auto-send a bootstrap turn. The
+      // draft pane is already pre-filled from the ticket seed, so there's
+      // nothing for Claude to "think about" until the user types a real
+      // refinement instruction. The first send (handled in sendComposer)
+      // wraps the user's text with the ticket context so Claude has what
+      // it needs without any silent preamble turn. See design D2.
+      return
+    }
     const prompt = `/specrails:explore-spec\n\n${initialIdea.trim()}`
     const attachments = initialAttachmentIds.length > 0
       ? { ticketKey: pendingSpecId, ids: initialAttachmentIds }
@@ -151,7 +210,7 @@ export function ExploreSpecShell({
     void chat.startWithMessage(prompt, { lightweight: true, maxTurns: 20, attachments }, initialModel, 'explore').then((id) => {
       if (id) setConversationId(id)
     })
-  }, [chat, initialIdea, pendingSpecId, initialAttachmentIds, resumeConversationId, initialModel])
+  }, [chat, initialIdea, pendingSpecId, initialAttachmentIds, resumeConversationId, initialModel, editTicket])
 
   // Focus restoration on unmount
   useEffect(() => {
@@ -184,6 +243,53 @@ export function ExploreSpecShell({
 
   const turnCount = conversation?.messages.length ?? 0
 
+  // Char-by-char smoothing: render a steady ~60fps animation over the raw
+  // (often bursty) streaming text. Falls back to raw when the feature flag
+  // is off. See design.md D8.
+  const PREMIUM_UX = ((typeof import.meta !== 'undefined' &&
+    (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_FEATURE_EXPLORE_PREMIUM_UX) ?? 'true') !== 'false'
+  const smoothed = useSmoothStream(
+    conversation?.streamingText ?? '',
+    Boolean(conversation?.isStreaming),
+  )
+  const renderedStream = PREMIUM_UX ? smoothed : (conversation?.streamingText ?? '')
+
+  // Auto-scroll the conversation column to the latest content as messages
+  // arrive or the assistant's streaming text grows. Suspended when the user
+  // has manually scrolled up beyond the threshold tracked by handleConversationScroll.
+  // Uses scrollTop = scrollHeight (instant) during streaming so it keeps up
+  // with the char-by-char animation; falls back to smooth on settle.
+  useEffect(() => {
+    if (userScrolledRef.current) return
+    const el = conversationScrollRef.current
+    if (!el) return
+    if (conversation?.isStreaming || pendingTurn) {
+      el.scrollTop = el.scrollHeight
+    } else {
+      conversationBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }
+  }, [turnCount, renderedStream, conversation?.isStreaming, pendingTurn])
+
+  // On mount / navigate-back: jump straight to the bottom so the user lands
+  // on the latest message rather than mid-conversation. Two RAFs ensure the
+  // bubbles have painted before we measure scrollHeight.
+  useEffect(() => {
+    userScrolledRef.current = false
+    let raf2: number | null = null
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const el = conversationScrollRef.current
+        if (el) el.scrollTop = el.scrollHeight
+      })
+    })
+    return () => {
+      cancelAnimationFrame(raf1)
+      if (raf2 != null) cancelAnimationFrame(raf2)
+    }
+    // Only on mount of the shell — intentionally not reacting to turnCount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const {
     draft,
     ready,
@@ -191,7 +297,20 @@ export function ExploreSpecShell({
     lastChangedFields,
     setField,
     clearManualOverrides,
-  } = useSpecDraftStream(conversationId)
+  } = useSpecDraftStream(
+    conversationId,
+    // Seed the draft pane directly from the ticket in edit mode so the
+    // fields are populated on first paint without waiting for WS turns.
+    editTicket
+      ? {
+          title: editTicket.title,
+          description: editTicket.description,
+          labels: editTicket.labels,
+          priority: editTicket.priority ?? 'medium',
+          acceptanceCriteria: editTicket.acceptanceCriteria,
+        }
+      : undefined,
+  )
 
   // Replay parked draft overrides into the stream so user manual edits
   // survive minimize/restore. CRITICAL: only replay fields with meaningful
@@ -204,6 +323,13 @@ export function ExploreSpecShell({
   const draftSeededRef = useRef(false)
   useEffect(() => {
     if (draftSeededRef.current) return
+    // Edit mode is seeded directly via useSpecDraftStream's `initialDraft`
+    // arg (so the draft pane is populated on first paint, not after a
+    // re-render). Only the parked-session replay path is handled here.
+    if (editTicket) {
+      draftSeededRef.current = true
+      return
+    }
     if (!seedDraftOverrides) return
     draftSeededRef.current = true
     const o = seedDraftOverrides
@@ -213,7 +339,7 @@ export function ExploreSpecShell({
     if (o.labels && o.labels.length > 0) setField('labels', o.labels)
     const criteria = o.acceptanceCriteria?.filter((c) => c.trim().length > 0) ?? []
     if (criteria.length > 0) setField('acceptanceCriteria', criteria)
-  }, [seedDraftOverrides, setField])
+  }, [seedDraftOverrides, setField, editTicket])
 
   const requestClose = useCallback(() => {
     // Only confirm when the conversation has progressed beyond the initial user idea
@@ -227,13 +353,50 @@ export function ExploreSpecShell({
 
   const sendComposer = useCallback(async (text: string) => {
     const v = text.trim()
-    if (!v || !conversation || conversation.isStreaming || !chat) return
+    if (!v || !chat) return
+    // Edit-mode first send of this shell session: wrap the user's
+    // instruction with the CURRENT ticket context so Claude knows what
+    // we're refining (the ticket may have diverged since any resumed
+    // conversation history was recorded). Subsequent sends are normal.
+    // The wrapper is invisible in the bubble thanks to stripSlashPrefix.
+    if (editTicket && !editFirstSendRef.current) {
+      editFirstSendRef.current = true
+      const attIds = composerRef.current?.getAttachmentIds() ?? []
+      composerRef.current?.clear()
+      setHasComposerText(false)
+      setComposerText('')
+      setPendingTurn(true)
+      clearManualOverrides()
+      const ticketBlock = [
+        `## Spec context`,
+        `Ticket #${editTicket.id}: ${editTicket.title}`,
+        '',
+        editTicket.description || '(no description)',
+      ].join('\n')
+      const prompt = `/specrails:explore-spec\n\n${ticketBlock}\n\n---\n\n## Instruction\n\n${v}`
+      const attachments = attIds.length > 0
+        ? { ticketKey: pendingSpecId, ids: attIds }
+        : undefined
+      if (conversation) {
+        // We resumed an existing conversation — send the wrapped first turn
+        // via sendMessage so we keep the same conversation row + history.
+        await chat.sendMessage(conversation.id, prompt, { lightweight: true, maxTurns: 20, attachments })
+      } else {
+        // No prior conversation — create one with the wrapped turn.
+        void chat.startWithMessage(prompt, { lightweight: true, maxTurns: 20, attachments }, initialModel, 'explore').then((id) => {
+          if (id) setConversationId(id)
+        })
+      }
+      return
+    }
+    if (!conversation || conversation.isStreaming) return
     // Pull current attachments off the editor (rich editor lets the user
     // drop / paste files mid-conversation; each turn carries its own list).
     const attIds = composerRef.current?.getAttachmentIds() ?? []
     composerRef.current?.clear()
     setHasComposerText(false)
     setComposerText('')
+    setPendingTurn(true) // optimistic skeleton at T+0
     clearManualOverrides()
     if (attIds.length > 0) {
       // New uploads went into pendingSpecId/, so refresh the accumulated list
@@ -245,12 +408,46 @@ export function ExploreSpecShell({
       maxTurns: 20,
       attachments: attIds.length > 0 ? { ticketKey: pendingSpecId, ids: attIds } : undefined,
     })
-  }, [conversation, chat, clearManualOverrides, pendingSpecId, refreshAttachments])
+  }, [conversation, chat, clearManualOverrides, pendingSpecId, refreshAttachments, editTicket, initialModel])
+
+  // Clear the optimistic skeleton flag as soon as the real streaming state
+  // takes over (or surfaces an error). Without this, the skeleton would
+  // double-render alongside the streaming bubble for a frame.
+  useEffect(() => {
+    if (conversation?.isStreaming) setPendingTurn(false)
+  }, [conversation?.isStreaming])
 
   const submitComposer = useCallback(() => {
     const text = composerRef.current?.getPlainText().trim() ?? ''
     if (text) void sendComposer(text)
   }, [sendComposer])
+
+  const handleSaveAsDraft = useCallback(async () => {
+    if (!conversationId || !activeProjectId) return false
+    try {
+      const res = await fetch(`${getApiBase()}/tickets/save-as-draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          title: draft.title?.trim() || undefined,
+          description: draft.description || undefined,
+          labels: draft.labels,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string }
+        toast.error(err.error || 'Failed to save draft')
+        return false
+      }
+      const data = await res.json() as { ticket: LocalTicket }
+      toast.success(`Draft saved — #${data.ticket.id} ${data.ticket.title}`)
+      return true
+    } catch {
+      toast.error('Network error saving draft')
+      return false
+    }
+  }, [conversationId, activeProjectId, draft.title, draft.description, draft.labels])
 
   const handleCreate = useCallback(async () => {
     if (isCreating) return
@@ -261,6 +458,32 @@ export function ExploreSpecShell({
     // Quick-mode flow's behaviour (handled by useSpecGenTracker).
     markSpecGenInFlight(activeProjectId)
     try {
+      if (editTicket) {
+        // Edit-existing-ticket path: PATCH the ticket in place. Status is NOT
+        // included (user editing text must never accidentally flip status).
+        // See design.md D4+D5.
+        const res = await fetch(`${getApiBase()}/tickets/${editTicket.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: draft.title.trim(),
+            description: draft.description,
+            labels: draft.labels,
+            priority: draft.priority,
+            acceptanceCriteria: draft.acceptanceCriteria.filter((c) => c.trim().length > 0),
+          }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({})) as { error?: string }
+          toast.error(err.error || 'Failed to update spec')
+          return
+        }
+        const data = await res.json() as { ticket: LocalTicket }
+        toast.success(`Spec updated — #${data.ticket.id} ${data.ticket.title}`)
+        onTicketCreated?.(data.ticket)
+        onClose()
+        return
+      }
       const res = await fetch(`${getApiBase()}/tickets/from-draft`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -294,7 +517,7 @@ export function ExploreSpecShell({
       setIsCreating(false)
       unmarkSpecGenInFlight(activeProjectId)
     }
-  }, [isCreating, draft, activeProjectId, onTicketCreated, onClose, pendingSpecId])
+  }, [isCreating, draft, activeProjectId, onTicketCreated, onClose, pendingSpecId, editTicket, conversationId])
 
   // Esc -> request close. (⌘⏎ is handled inside RichAttachmentEditor.)
   useEffect(() => {
@@ -353,7 +576,7 @@ export function ExploreSpecShell({
           <ArrowLeft className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
           <div className="text-left min-w-0">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 leading-none">
-              EXPLORE SPEC · interactive
+              {editTicket ? `EDITING SPEC · #${editTicket.id}` : 'EXPLORE SPEC · interactive'}
             </div>
             <span className="text-sm font-medium text-foreground truncate block">
               {draft.title || seedDraftTitle || 'New spec…'}
@@ -363,12 +586,40 @@ export function ExploreSpecShell({
         <div className="flex items-center gap-2">
           <Button
             size="sm"
+            variant="outline"
+            onClick={async () => {
+              const ok = await handleSaveAsDraft()
+              if (ok) onClose()
+            }}
+            disabled={turnCount < 2 || isCreating}
+            className="gap-1.5"
+            aria-label="Save current exploration as draft"
+            data-testid="explore-spec-save-draft"
+            title={turnCount < 2 ? 'Send at least one message before saving' : undefined}
+          >
+            Save as Draft
+          </Button>
+          {REVIEW_ENABLED && draft.title.trim() && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setReviewOpen(true)}
+              disabled={isCreating}
+              className="gap-1.5"
+              aria-label="Review changes before creating spec"
+              data-testid="explore-spec-review"
+            >
+              Review →
+            </Button>
+          )}
+          <Button
+            size="sm"
             onClick={handleCreate}
             disabled={!draft.title.trim() || isCreating}
             className="gap-1.5"
-            aria-label="Create spec from current draft"
+            aria-label={editTicket ? 'Update spec with current draft' : 'Create spec from current draft'}
             data-testid="explore-spec-create"
-            title={!draft.title.trim() ? 'A title is needed to create' : undefined}
+            title={!draft.title.trim() ? 'A title is needed to commit' : undefined}
           >
             {isCreating ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -377,7 +628,7 @@ export function ExploreSpecShell({
             ) : (
               <Check className="w-3.5 h-3.5" />
             )}
-            Create Spec
+            {editTicket ? 'Update Spec' : 'Create Spec'}
           </Button>
           {onMinimize && (
             <Button
@@ -400,21 +651,41 @@ export function ExploreSpecShell({
       <div className="flex-1 min-h-0 grid grid-cols-[1fr_360px] divide-x divide-border/40">
         {/* Conversation column */}
         <div className="flex flex-col min-h-0">
-          <div className="flex-1 overflow-y-auto px-5 py-4 pb-24 space-y-3" data-testid="explore-conversation">
-            {!conversation && (
+          <div
+            ref={conversationScrollRef}
+            onScroll={handleConversationScroll}
+            className="flex-1 overflow-y-auto px-5 py-4 pb-24 space-y-3"
+            data-testid="explore-conversation"
+          >
+            {!conversation && editTicket && (
+              <div className="text-xs text-muted-foreground/70 italic px-1 py-2">
+                Spec loaded on the right. Type a refinement to get started.
+              </div>
+            )}
+            {!conversation && !editTicket && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Starting conversation…
               </div>
             )}
             {conversation?.messages.map((m, i) => (
-              <TurnBubble key={i} role={m.role} content={m.content} />
+              <TurnBubble key={i} role={m.role} content={m.content} timestamp={m.created_at} />
             ))}
-            {conversation?.isStreaming && (
-              conversation.streamingText
-                ? <TurnBubble role="assistant" content={conversation.streamingText} streaming />
-                : <ThinkingBubble />
+            {(pendingTurn || conversation?.isStreaming) && (
+              conversation?.streamingText
+                ? <TurnBubble role="assistant" content={renderedStream} streaming />
+                : (
+                  <div className="px-5 pb-1">
+                    <ExploreStatusPills
+                      active
+                      hasSystemEvent={Boolean(conversation?.isStreaming)}
+                      hasToolUse={false}
+                      hasText={false}
+                    />
+                  </div>
+                )
             )}
+            <div ref={conversationBottomRef} />
           </div>
 
           {/* Chips */}
@@ -442,7 +713,7 @@ export function ExploreSpecShell({
             <RichAttachmentEditor
               ref={composerRef}
               ticketKey={pendingSpecId}
-              placeholder={conversation?.isStreaming ? 'Claude is thinking…' : 'Type your reply… drag files to attach'}
+              placeholder={conversation?.isStreaming ? '' : 'Type your reply… drag files to attach'}
               minHeight={72}
               ariaLabel="Spec idea"
               onChange={() => {
@@ -466,27 +737,17 @@ export function ExploreSpecShell({
               onSubmit={submitComposer}
             />
             <div className="flex items-center justify-between mt-2 gap-3">
-              {conversation?.isStreaming ? (
-                <div className="flex items-center gap-2 text-[11px] text-muted-foreground" aria-live="polite">
-                  <Loader2 className="w-3 h-3 animate-spin text-primary/70" />
-                  <span>Claude is thinking…</span>
-                </div>
-              ) : (
-                <span />
-              )}
+              <span />
+              {/* Streaming indicator removed — ExploreStatusPills covers this state. */}
               <Button
                 size="sm"
                 onClick={submitComposer}
-                disabled={!hasComposerText || !conversation || conversation.isStreaming}
+                disabled={!hasComposerText || (!conversation && !editTicket) || conversation?.isStreaming || pendingTurn}
                 className="gap-1.5"
               >
-                {conversation?.isStreaming ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Send className="w-3.5 h-3.5" />
-                )}
-                {conversation?.isStreaming ? 'Streaming…' : 'Send'}
-                {!conversation?.isStreaming && <span className="text-[10px] opacity-70 ml-1">⌘⏎</span>}
+                <Send className="w-3.5 h-3.5" />
+                Send
+                <span className="text-[10px] opacity-70 ml-1">⌘⏎</span>
               </Button>
             </div>
           </div>
@@ -516,72 +777,121 @@ export function ExploreSpecShell({
         </div>
       </div>
 
-      {/* Confirm discard */}
+      {/* Close prompt — Save as Draft / Discard / Cancel */}
       <Dialog open={confirmDiscard} onOpenChange={(o) => !o && setConfirmDiscard(false)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Discard conversation?</DialogTitle>
+            <DialogTitle>Save this exploration?</DialogTitle>
             <DialogDescription>
-              The current draft and conversation will be lost. You can also click Create Spec to commit a rough draft and refine the ticket later.
+              Save as Draft keeps the conversation so you can pick it up later from the board. Discard throws it away.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 mt-2">
-            <Button variant="ghost" size="sm" onClick={() => setConfirmDiscard(false)}>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmDiscard(false)} data-testid="close-prompt-cancel">
               Cancel
             </Button>
-            <Button variant="destructive" size="sm" onClick={onClose}>
+            <Button variant="destructive" size="sm" onClick={onClose} data-testid="close-prompt-discard">
               Discard
+            </Button>
+            <Button
+              size="sm"
+              onClick={async () => {
+                const ok = await handleSaveAsDraft()
+                setConfirmDiscard(false)
+                if (ok) onClose()
+              }}
+              autoFocus
+              data-testid="close-prompt-save-draft"
+            >
+              Save as Draft
             </Button>
           </div>
         </DialogContent>
       </Dialog>
       </div>
+      {REVIEW_ENABLED && reviewOpen && (
+        <ExploreReviewOverlay
+          baseline={editTicket
+            ? {
+                title: editTicket.title,
+                description: editTicket.description,
+                labels: editTicket.labels,
+                priority: editTicket.priority,
+                acceptanceCriteria: editTicket.acceptanceCriteria,
+              }
+            : EMPTY_REVIEW_BASELINE}
+          proposed={{
+            title: draft.title ?? '',
+            description: draft.description ?? '',
+            labels: draft.labels ?? [],
+            priority: draft.priority ?? null,
+            acceptanceCriteria: draft.acceptanceCriteria ?? [],
+          } satisfies ReviewProposed}
+          mode={editTicket ? 'edit' : 'create'}
+          isCommitting={isCreating}
+          onBack={() => setReviewOpen(false)}
+          onCommit={async () => {
+            await handleCreate()
+            setReviewOpen(false)
+          }}
+        />
+      )}
     </div>
   )
 }
 
 /** Hide the leading `/specrails:explore-spec` command from the visible content
  * so the user sees only their idea. The prefix is sent for Claude's benefit
- * (slash-command resolution); displaying it in the chat is noise. */
+ * (slash-command resolution); displaying it in the chat is noise.
+ *
+ * Edit-mode first turn additionally wraps the user's instruction with a
+ * `## Spec context` block carrying the ticket payload (for Claude only).
+ * This strip removes the wrapper so the visible bubble shows only the
+ * user's actual instruction. */
 function stripSlashPrefix(content: string): string {
-  const trimmed = content.trimStart()
-  if (!trimmed.startsWith('/specrails:explore-spec')) return content
-  // Drop the first line and any immediately-following blank lines
-  const idx = trimmed.indexOf('\n')
-  if (idx === -1) return ''
-  return trimmed.slice(idx + 1).replace(/^\s+/, '')
+  let working = content.trimStart()
+  if (working.startsWith('/specrails:explore-spec')) {
+    const idx = working.indexOf('\n')
+    if (idx === -1) return ''
+    working = working.slice(idx + 1).replace(/^\s+/, '')
+  }
+  // Edit-mode: strip the ticket-context block we attached server-side so the
+  // user sees only their instruction.
+  const editMarker = '## Instruction\n\n'
+  if (working.startsWith('## Spec context')) {
+    const i = working.indexOf(editMarker)
+    if (i !== -1) {
+      return working.slice(i + editMarker.length).trimStart()
+    }
+  }
+  return working
 }
 
-function ThinkingBubble() {
-  return (
-    <div className="flex justify-start" role="status" aria-live="polite" aria-label="Claude is thinking">
-      <div className="rounded-lg px-3 py-2 text-sm bg-card/60 border border-border/40 max-w-[85%]">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-1 font-semibold">
-          Claude
-        </div>
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <span className="flex gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce [animation-delay:0ms]" />
-            <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce [animation-delay:150ms]" />
-            <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce [animation-delay:300ms]" />
-          </span>
-          <span className="text-xs italic">thinking…</span>
-        </div>
-      </div>
-    </div>
-  )
+function formatChatTime(iso?: string): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return null
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-function TurnBubble({ role, content, streaming }: { role: 'user' | 'assistant' | 'system'; content: string; streaming?: boolean }) {
+function TurnBubble({ role, content, streaming, timestamp }: { role: 'user' | 'assistant' | 'system'; content: string; streaming?: boolean; timestamp?: string }) {
   if (role === 'system') return null
   const isUser = role === 'user'
   const visible = isUser ? stripSlashPrefix(content) : content
   if (!visible.trim() && !streaming) return null
+  const timeLabel = formatChatTime(timestamp)
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${isUser ? 'bg-primary/10 text-foreground' : 'bg-card/60 border border-border/40'}`}>
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-1 font-semibold">
-          {isUser ? 'You' : 'Claude'}
+        <div className="flex items-baseline justify-between gap-3 mb-1">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold">
+            {isUser ? 'You' : 'Claude'}
+          </div>
+          {timeLabel && (
+            <div className="text-[10px] text-muted-foreground/50 font-mono tabular-nums">
+              {timeLabel}
+            </div>
+          )}
         </div>
         {isUser ? (
           <div className="whitespace-pre-wrap break-words">
@@ -590,14 +900,23 @@ function TurnBubble({ role, content, streaming }: { role: 'user' | 'assistant' |
           </div>
         ) : (
           <div className={[
-            'prose prose-invert prose-sm max-w-none break-words',
+            'prose prose-sm max-w-none break-words',
+            // Force prose body / paragraph / list colors to the theme's
+            // foreground so light theme renders dark text, dark theme renders
+            // light text. `prose-invert` (dark-mode prose) is intentionally
+            // NOT applied — it broke contrast under the light theme.
+            'text-foreground',
+            '[&_p]:text-foreground [&_li]:text-foreground',
             '[&_p]:my-1.5 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0.5',
             '[&_p:first-child]:mt-0 [&_p:last-child]:mb-0',
-            '[&_strong]:text-foreground [&_strong]:font-semibold',
-            '[&_code]:rounded [&_code]:bg-background/60 [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-primary/90 [&_code]:text-[12px]',
+            // Bolded prose gets the accent colour — keeps Claude's emphasis
+            // visible and on-brand across themes.
+            '[&_strong]:text-accent-primary [&_strong]:font-semibold',
+            '[&_code]:rounded [&_code]:bg-background/60 [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-accent-primary [&_code]:text-[12px]',
             '[&_pre]:rounded [&_pre]:bg-background/60 [&_pre]:p-2 [&_pre]:my-2',
             '[&_pre_code]:bg-transparent [&_pre_code]:p-0',
-            '[&_a]:text-primary [&_a]:underline',
+            '[&_a]:text-accent-primary [&_a]:underline',
+            '[&_h1]:text-foreground [&_h2]:text-foreground [&_h3]:text-foreground',
             '[&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold',
           ].join(' ')}>
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{visible}</ReactMarkdown>

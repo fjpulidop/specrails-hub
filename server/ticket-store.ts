@@ -3,7 +3,7 @@ import path from 'path'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type TicketStatus = 'todo' | 'in_progress' | 'done' | 'cancelled'
+export type TicketStatus = 'draft' | 'todo' | 'in_progress' | 'done' | 'cancelled'
 export type TicketPriority = 'critical' | 'high' | 'medium' | 'low'
 
 export interface Attachment {
@@ -20,7 +20,7 @@ export interface Ticket {
   title: string
   description: string
   status: TicketStatus
-  priority: TicketPriority
+  priority: TicketPriority | null
   labels: string[]
   assignee: string | null
   prerequisites: number[]
@@ -37,10 +37,11 @@ export interface Ticket {
     created_by: string
   }>
   attachments?: Attachment[]
+  origin_conversation_id: string | null
   created_at: string
   updated_at: string
   created_by: string
-  source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'hub'
+  source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'hub' | 'explore-draft'
 }
 
 export interface TicketStore {
@@ -51,8 +52,10 @@ export interface TicketStore {
   tickets: Record<string, Ticket>
 }
 
-const VALID_STATUSES = new Set<TicketStatus>(['todo', 'in_progress', 'done', 'cancelled'])
+const VALID_STATUSES = new Set<TicketStatus>(['draft', 'todo', 'in_progress', 'done', 'cancelled'])
 const VALID_PRIORITIES = new Set<TicketPriority>(['critical', 'high', 'medium', 'low'])
+
+export const CURRENT_SCHEMA_VERSION = '1.1'
 
 const DEFAULT_STORAGE_PATH = '.specrails/local-tickets.json'
 const LOCK_SUFFIX = '.lock'
@@ -133,12 +136,30 @@ function releaseLock(filePath: string): void {
 
 function emptyStore(): TicketStore {
   return {
-    schema_version: '1.0',
+    schema_version: CURRENT_SCHEMA_VERSION,
     revision: 0,
     last_updated: new Date().toISOString(),
     next_id: 1,
     tickets: {},
   }
+}
+
+/**
+ * Normalise a ticket loaded from disk so older stores (schema_version < 1.1)
+ * surface the new fields with sensible defaults. Mutates the input for speed
+ * and returns it.
+ */
+function normalizeTicket(t: Ticket): Ticket {
+  if (!('origin_conversation_id' in t) || t.origin_conversation_id === undefined) {
+    t.origin_conversation_id = null
+  }
+  if (t.priority === undefined) {
+    // Older stores guaranteed a non-null priority; treat undefined defensively
+    // as null only when status is 'draft', otherwise keep undefined → caller
+    // sees it as TicketPriority|null which it must handle.
+    t.priority = null
+  }
+  return t
 }
 
 export function readStore(filePath: string): TicketStore {
@@ -152,6 +173,11 @@ export function readStore(filePath: string): TicketStore {
     if (!data.tickets || typeof data.revision !== 'number') {
       return emptyStore()
     }
+    // Normalise per-ticket fields added in schema 1.1 without rewriting the
+    // file — version bump only happens on next write via writeStore.
+    for (const id of Object.keys(data.tickets)) {
+      data.tickets[id] = normalizeTicket(data.tickets[id])
+    }
     return data
   } catch {
     return emptyStore()
@@ -161,6 +187,10 @@ export function readStore(filePath: string): TicketStore {
 function writeStore(filePath: string, store: TicketStore): void {
   store.last_updated = new Date().toISOString()
   store.revision++
+  // Bump schema_version on first write under the new code so consumers can
+  // detect the new shape. Existing 1.0 stores read fine; we only upgrade once
+  // we've actually persisted something (which means normalize ran).
+  store.schema_version = CURRENT_SCHEMA_VERSION
   const dir = path.dirname(filePath)
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true })
@@ -268,4 +298,29 @@ export function isValidStatus(s: unknown): s is TicketStatus {
 
 export function isValidPriority(p: unknown): p is TicketPriority {
   return typeof p === 'string' && VALID_PRIORITIES.has(p as TicketPriority)
+}
+
+/**
+ * Single source of truth for the rule: priority MAY be null only while the
+ * ticket has status='draft'. Returns an error string (suitable for HTTP 400
+ * responses) when the combination is invalid, or `null` when valid.
+ */
+export function validatePriorityForStatus(
+  status: TicketStatus,
+  priority: TicketPriority | null,
+): string | null {
+  if (status === 'draft') {
+    // null is allowed; non-null must still be a valid priority value.
+    if (priority !== null && !isValidPriority(priority)) {
+      return 'invalid priority value'
+    }
+    return null
+  }
+  if (priority === null) {
+    return `priority is required when status='${status}'`
+  }
+  if (!isValidPriority(priority)) {
+    return 'invalid priority value'
+  }
+  return null
 }

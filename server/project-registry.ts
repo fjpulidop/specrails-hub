@@ -13,6 +13,7 @@ import { SpecLauncherManager } from './spec-launcher-manager'
 import { WebhookManager } from './webhook-manager'
 import { TicketWatcher } from './ticket-watcher'
 import { getTerminalManager } from './terminal-manager'
+import { removeExploreCwd } from './explore-cwd-manager'
 import { resolveTicketStoragePath, mutateStore } from './ticket-store'
 import type { WsMessage, TicketUpdatedMessage } from './types'
 import {
@@ -102,6 +103,8 @@ export class ProjectRegistry {
           fs.rmSync(telemetryDir, { recursive: true, force: true })
         }
       } catch { /* ignore — non-fatal */ }
+      // Drop the hub-managed Explore Spec cwd (CLAUDE.md + symlink to project)
+      try { removeExploreCwd(ctx.project.slug) } catch { /* ignore — non-fatal */ }
       // Close the DB connection
       try { ctx.db.close() } catch { /* ignore */ }
       this._contexts.delete(id)
@@ -275,7 +278,7 @@ export class ProjectRegistry {
         }
       },
     })
-    const chatManager = new ChatManager(boundBroadcast, db, project.path, project.name, project.provider ?? 'claude', project.id)
+    const chatManager = new ChatManager(boundBroadcast, db, project.path, project.name, project.provider ?? 'claude', project.id, project.slug)
     const setupManager = new SetupManager(
       boundBroadcast,
       (pid, sid) => setProjectSetupSession(this._hubDb, pid, sid),

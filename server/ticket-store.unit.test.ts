@@ -11,6 +11,8 @@ import {
   resolveTicketStoragePath,
   isValidStatus,
   isValidPriority,
+  validatePriorityForStatus,
+  CURRENT_SCHEMA_VERSION,
   type Ticket,
   type TicketStore,
 } from './ticket-store'
@@ -28,6 +30,7 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
     assignee: null,
     prerequisites: [],
     metadata: {},
+    origin_conversation_id: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     created_by: 'user',
@@ -427,6 +430,7 @@ describe('resolveTicketStoragePath', () => {
 // ─── isValidStatus / isValidPriority ─────────────────────────────────────────
 
 describe('isValidStatus', () => {
+  it('accepts draft', () => expect(isValidStatus('draft')).toBe(true))
   it('accepts todo', () => expect(isValidStatus('todo')).toBe(true))
   it('accepts in_progress', () => expect(isValidStatus('in_progress')).toBe(true))
   it('accepts done', () => expect(isValidStatus('done')).toBe(true))
@@ -445,4 +449,137 @@ describe('isValidPriority', () => {
   it('rejects invalid string', () => expect(isValidPriority('extreme')).toBe(false))
   it('rejects number', () => expect(isValidPriority(0)).toBe(false))
   it('rejects null', () => expect(isValidPriority(null)).toBe(false))
+})
+
+// ─── validatePriorityForStatus ───────────────────────────────────────────────
+
+describe('validatePriorityForStatus', () => {
+  it('allows null priority on draft', () => {
+    expect(validatePriorityForStatus('draft', null)).toBeNull()
+  })
+  it('allows valid priority on draft', () => {
+    expect(validatePriorityForStatus('draft', 'high')).toBeNull()
+  })
+  it('rejects null priority on todo', () => {
+    expect(validatePriorityForStatus('todo', null)).toMatch(/required/)
+  })
+  it('rejects null priority on in_progress', () => {
+    expect(validatePriorityForStatus('in_progress', null)).toMatch(/required/)
+  })
+  it('accepts valid priority on todo', () => {
+    expect(validatePriorityForStatus('todo', 'medium')).toBeNull()
+  })
+  it('rejects invalid priority value on draft', () => {
+    expect(validatePriorityForStatus('draft', 'extreme' as never)).toMatch(/invalid/)
+  })
+  it('rejects invalid priority value on todo', () => {
+    expect(validatePriorityForStatus('todo', 'extreme' as never)).toMatch(/invalid/)
+  })
+})
+
+// ─── Schema 1.0 → 1.1 back-compat ────────────────────────────────────────────
+
+describe('schema_version 1.0 back-compat', () => {
+  it('reads a 1.0 store without mutating disk and surfaces null origin_conversation_id', () => {
+    const filePath = path.join(tmpDir, 'old-tickets.json')
+    const onDisk = {
+      schema_version: '1.0',
+      revision: 7,
+      last_updated: '2025-01-01T00:00:00Z',
+      next_id: 5,
+      tickets: {
+        '1': {
+          id: 1,
+          title: 'Pre-existing',
+          description: 'Created before draft support',
+          status: 'todo',
+          priority: 'high',
+          labels: ['x'],
+          assignee: null,
+          prerequisites: [],
+          metadata: {},
+          created_at: '2024-12-01T00:00:00Z',
+          updated_at: '2024-12-01T00:00:00Z',
+          created_by: 'user',
+          source: 'manual',
+          // intentionally no origin_conversation_id
+        },
+      },
+    }
+    fs.writeFileSync(filePath, JSON.stringify(onDisk, null, 2), 'utf-8')
+
+    const store = readStore(filePath)
+    expect(store.tickets['1'].origin_conversation_id).toBeNull()
+    expect(store.tickets['1'].title).toBe('Pre-existing')
+    expect(store.tickets['1'].priority).toBe('high')
+
+    // Disk should be untouched by the read
+    const reread = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+    expect(reread.schema_version).toBe('1.0')
+    expect('origin_conversation_id' in reread.tickets['1']).toBe(false)
+  })
+
+  it('bumps schema_version to 1.1 on first write while preserving old rows verbatim', () => {
+    const filePath = path.join(tmpDir, 'old-tickets.json')
+    const oldRow = {
+      id: 1,
+      title: 'Pre-existing',
+      description: 'desc',
+      status: 'todo',
+      priority: 'medium',
+      labels: [],
+      assignee: null,
+      prerequisites: [],
+      metadata: {},
+      created_at: '2024-12-01T00:00:00Z',
+      updated_at: '2024-12-01T00:00:00Z',
+      created_by: 'user',
+      source: 'manual',
+    }
+    fs.writeFileSync(filePath, JSON.stringify({
+      schema_version: '1.0',
+      revision: 1,
+      last_updated: '2025-01-01T00:00:00Z',
+      next_id: 2,
+      tickets: { '1': oldRow },
+    }, null, 2), 'utf-8')
+
+    mutateStore(filePath, (s) => {
+      // Add an unrelated ticket as a draft, do NOT touch the existing row
+      s.tickets['2'] = {
+        id: 2,
+        title: 'New draft',
+        description: '',
+        status: 'draft',
+        priority: null,
+        labels: [],
+        assignee: null,
+        prerequisites: [],
+        metadata: {},
+        origin_conversation_id: 'conv-abc',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+        created_by: 'sr-explore-spec',
+        source: 'explore-draft',
+      }
+      s.next_id = 3
+    })
+
+    const reread = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+    expect(reread.schema_version).toBe(CURRENT_SCHEMA_VERSION)
+    // Old row preserved field-for-field, plus normaliser default
+    expect(reread.tickets['1'].title).toBe('Pre-existing')
+    expect(reread.tickets['1'].priority).toBe('medium')
+    expect(reread.tickets['1'].origin_conversation_id).toBeNull()
+    // Draft row written
+    expect(reread.tickets['2'].status).toBe('draft')
+    expect(reread.tickets['2'].priority).toBeNull()
+    expect(reread.tickets['2'].origin_conversation_id).toBe('conv-abc')
+  })
+
+  it('newly-created empty store starts at the current schema_version', () => {
+    const filePath = path.join(tmpDir, 'fresh.json')
+    const store = readStore(filePath)
+    expect(store.schema_version).toBe(CURRENT_SCHEMA_VERSION)
+  })
 })

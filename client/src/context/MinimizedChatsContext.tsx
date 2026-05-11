@@ -40,6 +40,18 @@ export interface ExploreSpecParams {
     labels?: string[]
     acceptanceCriteria?: string[]
   }
+  /** When set, the shell is launched in edit-existing-ticket mode. The shell
+   *  pre-seeds the draft from this payload, uses it as the Review baseline,
+   *  and commits via PATCH /tickets/:id. See
+   *  openspec/changes/replace-ai-edit-with-continue-editing/design.md D2. */
+  editTicket?: {
+    id: number
+    title: string
+    description: string
+    labels: string[]
+    priority: 'low' | 'medium' | 'high' | 'critical' | null
+    acceptanceCriteria: string[]
+  }
 }
 
 export interface AiEditParams {
@@ -93,6 +105,10 @@ interface MinimizedChatsContextValue {
     kind: MinimizedChatKind,
     projectId: string,
   ) => MinimizedChat | null
+  /** Push a session into the pending-restore queue WITHOUT first parking it as
+   *  a minimized toast. Used by surfaces that want to open a shell from a
+   *  durable record (e.g. a draft ticket's Continue Explore button). */
+  triggerResume: (input: Omit<MinimizedChat, 'id' | 'createdAt'>) => void
 }
 
 const MinimizedChatsContext = createContext<MinimizedChatsContextValue | null>(
@@ -293,6 +309,18 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
       const id = genId()
       const chat = { ...input, id, createdAt: Date.now() } as MinimizedChat
       setChats((prev) => [...prev, chat])
+      // Notify the server for Explore Spec lifecycle (idle-kill timer).
+      // Best-effort; no UX dependency on success.
+      if (input.kind === 'explore-spec') {
+        const params = input.params as ExploreSpecParams
+        const convId = params.resumeConversationId
+        if (convId) {
+          void fetch(
+            `/api/projects/${input.projectId}/chat/conversations/${convId}/minimize`,
+            { method: 'POST' },
+          ).catch(() => { /* ignore */ })
+        }
+      }
       return id
     },
     [],
@@ -342,6 +370,17 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
       if (!target) return
       toast.dismiss(id)
       toastedRef.current.delete(id)
+      // Cancel the server-side idle-kill timer for Explore conversations.
+      if (target.kind === 'explore-spec') {
+        const params = target.params as ExploreSpecParams
+        const convId = params.resumeConversationId
+        if (convId) {
+          void fetch(
+            `/api/projects/${target.projectId}/chat/conversations/${convId}/restore`,
+            { method: 'POST' },
+          ).catch(() => { /* ignore */ })
+        }
+      }
       if (activeProjectId !== target.projectId) {
         setActiveProjectId(target.projectId)
       }
@@ -373,6 +412,19 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const triggerResume = useCallback(
+    (input: Omit<MinimizedChat, 'id' | 'createdAt'>) => {
+      const id = genId()
+      const chat = { ...input, id, createdAt: Date.now() } as MinimizedChat
+      if (activeProjectId !== input.projectId) {
+        setActiveProjectId(input.projectId)
+      }
+      navigate(input.restoreRoute)
+      setPendingRestores((q) => [...q, chat])
+    },
+    [activeProjectId, setActiveProjectId, navigate],
+  )
+
   const value = useMemo<MinimizedChatsContextValue>(
     () => ({
       chats,
@@ -383,8 +435,9 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
       close,
       restore,
       takePendingRestore,
+      triggerResume,
     }),
-    [chats, pendingRestores, minimize, updateLabel, patchExploreSpecDraft, close, restore, takePendingRestore],
+    [chats, pendingRestores, minimize, updateLabel, patchExploreSpecDraft, close, restore, takePendingRestore, triggerResume],
   )
 
   return (
@@ -408,6 +461,7 @@ export function useMinimizedChats(): MinimizedChatsContextValue {
       close: () => {},
       restore: () => {},
       takePendingRestore: () => null,
+      triggerResume: () => {},
     }
   }
   return ctx

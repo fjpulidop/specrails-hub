@@ -59,6 +59,8 @@ export default function SettingsPage() {
   const [isSavingTelemetry, setIsSavingTelemetry] = useState(false)
   const [prePrompt, setPrePrompt] = useState('')
   const [isSavingPrePrompt, setIsSavingPrePrompt] = useState(false)
+  const [exploreMcpEnabled, setExploreMcpEnabled] = useState(false)
+  const [isSavingExploreMcp, setIsSavingExploreMcp] = useState(false)
 
   const cacheRef = useRef<Map<string, ProjectConfig>>(new Map())
 
@@ -107,6 +109,41 @@ export default function SettingsPage() {
     }
     void loadBudget()
   }, [activeProjectId])
+
+  useEffect(() => {
+    if (!activeProjectId || !isHubMode) return
+    async function loadExploreMcp() {
+      try {
+        const res = await fetch(`${getApiBase()}/explore-mcp-enabled`)
+        if (!res.ok) return
+        const data = await res.json() as { enabled?: boolean }
+        setExploreMcpEnabled(Boolean(data.enabled))
+      } catch {
+        /* ignore */
+      }
+    }
+    void loadExploreMcp()
+  }, [activeProjectId, isHubMode])
+
+  async function saveExploreMcpToggle(next: boolean) {
+    setIsSavingExploreMcp(true)
+    const prev = exploreMcpEnabled
+    setExploreMcpEnabled(next)
+    try {
+      const res = await fetch(`${getApiBase()}/explore-mcp-enabled`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: next }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      toast.success(next ? 'MCP servers will load in Explore' : 'MCP servers disabled in Explore')
+    } catch (err) {
+      setExploreMcpEnabled(prev)
+      toast.error('Failed to save Explore setting', { description: (err as Error).message })
+    } finally {
+      setIsSavingExploreMcp(false)
+    }
+  }
 
   useEffect(() => {
     if (!activeProjectId || !isHubMode) return
@@ -229,6 +266,45 @@ export default function SettingsPage() {
           </p>
         )}
       </div>
+
+      {/* Explore Spec — hub mode only */}
+      {isHubMode && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Explore Spec</CardTitle>
+            <CardDescription>
+              Speed up the first token in Explore by skipping the project's MCP servers and the project <span className="font-mono">CLAUDE.md</span> autoload. Built-in tools (<span className="font-mono">Read</span>, <span className="font-mono">Grep</span>, <span className="font-mono">Glob</span>) keep working — your repo is mounted at <span className="font-mono">./project</span>.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <p className="text-xs font-medium">Use MCP servers in Explore</p>
+                <p className="text-[10px] text-muted-foreground">
+                  Off (default): faster first token, no <span className="font-mono">.mcp.json</span> loaded. On: project MCP servers honoured, slower first token.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-label="Use MCP servers in Explore"
+                aria-checked={exploreMcpEnabled}
+                disabled={isSavingExploreMcp}
+                onClick={() => saveExploreMcpToggle(!exploreMcpEnabled)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 ${
+                  exploreMcpEnabled ? 'bg-primary' : 'bg-input'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 rounded-full bg-background shadow-sm transition-transform ${
+                    exploreMcpEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pipeline Telemetry Section — hub mode only */}
       {isHubMode && (
