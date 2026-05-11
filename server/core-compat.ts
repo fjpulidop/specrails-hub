@@ -19,34 +19,32 @@ const HUB_KNOWN_COMMANDS = new Set([
   'enrich',
 ])
 
-// v1.0: cli.initArgs / cli.updateArgs (flat)
+// v1.0: cli.initArgs / cli.updateArgs (flat); checkpoints/commands as string[]
 // v2.0: cli.claude / cli.codex (per-provider objects) + specrailsDir
-// v3.0: cli.tui (TUI-based installer) + tiers (quick/full) + configSchema
+// v3.0: providers/modelPresets/legacyCompat top-level; checkpoints is now an
+//       object (key → description); `commands` field dropped from the contract
 interface IntegrationContract {
   schemaVersion: string
-  coreVersion: string
-  minimumHubVersion: string
+  coreVersion?: string
+  minimumHubVersion?: string
   provider?: string
-  cli: {
-    // v1.0 fields
+  cli?: {
     initArgs?: string[]
     updateArgs?: string[]
-    // v2.0 fields
     claude?: { binary: string; initArgs: string[] }
     codex?: { binary: string; initArgs: string[] }
-    // v3.0 fields — TUI-based installer replaces non-interactive init
     tui?: { binary: string; initArgs: string[] }
   }
   specrailsDir?: { claude: string; codex: string }
-  // v3.0: installation tiers supported by this core version
   tiers?: ('quick' | 'full')[]
-  // v3.0: install-config.yaml schema location for Hub-driven quick install
   configSchema?: {
     path: string
     schema?: string
   }
-  checkpoints: string[]
-  commands: string[]
+  // v1/v2: string[]; v3: { [key: string]: string }
+  checkpoints: string[] | Record<string, string>
+  // v1/v2 only — absent in v3
+  commands?: string[]
   ticketProvider?: {
     type: string
     storagePath: string
@@ -63,6 +61,7 @@ export interface CoreCompatResult {
   missingCommands: string[]
   extraCommands: string[]
   contractFound: boolean
+  contractSchemaVersion?: string
 }
 
 export async function findCoreContract(): Promise<string | null> {
@@ -187,14 +186,23 @@ export async function checkCoreCompat(): Promise<CoreCompatResult> {
   const contract: IntegrationContract = JSON.parse(fs.readFileSync(contractPath, 'utf-8'))
 
   const hubCheckpointKeys = CHECKPOINTS.map((cp) => cp.key)
-  const contractCheckpoints = contract.checkpoints
+  // v1/v2 store checkpoints as a string[]; v3+ stores them as a description map.
+  const contractCheckpoints: string[] = Array.isArray(contract.checkpoints)
+    ? contract.checkpoints
+    : (contract.checkpoints && typeof contract.checkpoints === 'object'
+        ? Object.keys(contract.checkpoints)
+        : [])
 
   const missingCheckpoints = contractCheckpoints.filter((c) => !hubCheckpointKeys.includes(c))
   const extraCheckpoints = hubCheckpointKeys.filter((k) => !contractCheckpoints.includes(k))
 
-  const contractCommands = contract.commands
+  // v3 dropped the `commands` field from the contract — when absent, the
+  // command-set check is a no-op (cannot prove drift either way).
+  const contractCommands: string[] = Array.isArray(contract.commands) ? contract.commands : []
   const missingCommands = contractCommands.filter((c) => !HUB_KNOWN_COMMANDS.has(c))
-  const extraCommands = [...HUB_KNOWN_COMMANDS].filter((c) => !contractCommands.includes(c))
+  const extraCommands = contract.commands === undefined
+    ? []
+    : [...HUB_KNOWN_COMMANDS].filter((c) => !contractCommands.includes(c))
 
   const compatible =
     missingCheckpoints.length === 0 &&
@@ -204,12 +212,32 @@ export async function checkCoreCompat(): Promise<CoreCompatResult> {
 
   return {
     compatible,
-    coreVersion: contract.coreVersion,
+    coreVersion: contract.coreVersion ?? readCoreVersionNear(contractPath),
     hubVersion,
     missingCheckpoints,
     extraCheckpoints,
     missingCommands,
     extraCommands,
     contractFound: true,
+    contractSchemaVersion: contract.schemaVersion,
   }
+}
+
+// v3 contracts no longer include `coreVersion` at the top level — fall back
+// to reading it from the package.json next to the contract file.
+function readCoreVersionNear(contractPath: string): string | null {
+  try {
+    let dir = path.dirname(contractPath)
+    for (let i = 0; i < 4; i++) {
+      const pkgPath = path.join(dir, 'package.json')
+      if (fs.existsSync(pkgPath)) {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as { name?: string; version?: string }
+        if (pkg.name === 'specrails-core' && pkg.version) return pkg.version
+      }
+      const parent = path.dirname(dir)
+      if (parent === dir) break
+      dir = parent
+    }
+  } catch { /* ignore */ }
+  return null
 }
