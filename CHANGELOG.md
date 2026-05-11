@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.54.1](https://github.com/fjpulidop/specrails-hub/compare/v1.54.0...v1.54.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* **save-as-draft:** demote non-draft ticket in place via editTicketId ([#306](https://github.com/fjpulidop/specrails-hub/issues/306)) ([bda7cb0](https://github.com/fjpulidop/specrails-hub/commit/bda7cb0ce6f7031462eee3ffd88950446975f809))
+
 ## [1.54.0](https://github.com/fjpulidop/specrails-hub/compare/v1.53.0...v1.54.0) (2026-05-11)
 
 
