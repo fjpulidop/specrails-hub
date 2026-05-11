@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.54.0](https://github.com/fjpulidop/specrails-hub/compare/v1.53.0...v1.54.0) (2026-05-11)
+
+
+### Features
+
+* **explore-spec:** review overlay, status pills, draft-ticket lifecycle ([#304](https://github.com/fjpulidop/specrails-hub/issues/304)) ([1d50a61](https://github.com/fjpulidop/specrails-hub/commit/1d50a61494d069bd053761ceefc94e923254196d))
+
 ## [1.53.0](https://github.com/fjpulidop/specrails-hub/compare/v1.52.0...v1.53.0) (2026-05-06)
 
 
