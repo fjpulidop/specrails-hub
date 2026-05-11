@@ -354,6 +354,180 @@ describe('POST /tickets/save-as-draft', () => {
   })
 })
 
+// ─── save-as-draft with editTicketId (flip-in-place demotion) ────────────────
+
+describe('POST /tickets/save-as-draft — editTicketId flip-in-place', () => {
+  let tmpDir: string
+  let db: DbInstance
+  let ctx: ProjectContext
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'savedraft-flip-'))
+    db = initDb(':memory:')
+    ctx = makeContext(db, tmpDir)
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  function seedConv(id: string, userText: string) {
+    createConversation(db, { id, model: 'sonnet', kind: 'explore' })
+    addMessage(db, { conversation_id: id, role: 'user', content: userText })
+  }
+
+  function seedTicket(opts: {
+    status: 'todo' | 'backlog' | 'draft'
+    priority: 'high' | 'medium' | 'low' | null
+    title?: string
+    originConversationId?: string | null
+    createdAt?: string
+  }): number {
+    const filePath = resolveTicketStoragePath(tmpDir)
+    let id = 0
+    mutateStore(filePath, (s) => {
+      id = s.next_id++
+      s.tickets[String(id)] = {
+        id,
+        title: opts.title ?? 'Seed',
+        description: 'seed body',
+        status: opts.status,
+        priority: opts.priority,
+        labels: ['seed'],
+        assignee: null,
+        prerequisites: [],
+        metadata: {},
+        comments: [],
+        origin_conversation_id: opts.originConversationId ?? null,
+        created_at: opts.createdAt ?? '2026-01-01T00:00:00Z',
+        updated_at: opts.createdAt ?? '2026-01-01T00:00:00Z',
+        created_by: 'manual',
+        source: 'manual',
+      }
+    })
+    return id
+  }
+
+  it('flips a todo ticket to draft in place (preserves id, clears priority)', async () => {
+    seedConv('c-todo', 'edit this')
+    const id = seedTicket({ status: 'todo', priority: 'high', title: 'Original todo' })
+    const app = createApp(ctx)
+    const res = await request(app)
+      .post('/api/projects/proj-1/tickets/save-as-draft')
+      .send({
+        conversationId: 'c-todo',
+        editTicketId: id,
+        title: 'Updated',
+        description: 'Updated body',
+        labels: ['x', 'y'],
+      })
+    expect(res.status).toBe(200)
+    expect(res.body.ticket.id).toBe(id)
+    expect(res.body.ticket.status).toBe('draft')
+    expect(res.body.ticket.priority).toBeNull()
+    expect(res.body.ticket.origin_conversation_id).toBe('c-todo')
+    expect(res.body.ticket.title).toBe('Updated')
+    expect(res.body.ticket.description).toBe('Updated body')
+    expect(res.body.ticket.labels).toEqual(['x', 'y'])
+    expect(res.body.ticket.created_at).toBe('2026-01-01T00:00:00Z')
+    expect(res.body.ticket.created_by).toBe('manual')
+  })
+
+  it('flips a backlog ticket to draft in place', async () => {
+    seedConv('c-bl', 'edit')
+    const id = seedTicket({ status: 'backlog', priority: 'low' })
+    const app = createApp(ctx)
+    const res = await request(app)
+      .post('/api/projects/proj-1/tickets/save-as-draft')
+      .send({ conversationId: 'c-bl', editTicketId: id })
+    expect(res.status).toBe(200)
+    expect(res.body.ticket.id).toBe(id)
+    expect(res.body.ticket.status).toBe('draft')
+    expect(res.body.ticket.priority).toBeNull()
+  })
+
+  it('idempotent: second save with same editTicketId does not duplicate', async () => {
+    seedConv('c-idem', 'edit')
+    const id = seedTicket({ status: 'todo', priority: 'medium' })
+    const app = createApp(ctx)
+    const r1 = await request(app)
+      .post('/api/projects/proj-1/tickets/save-as-draft')
+      .send({ conversationId: 'c-idem', editTicketId: id, title: 'First' })
+    const r2 = await request(app)
+      .post('/api/projects/proj-1/tickets/save-as-draft')
+      .send({ conversationId: 'c-idem', editTicketId: id, title: 'Second' })
+    expect(r1.status).toBe(200)
+    expect(r2.status).toBe(200)
+    expect(r1.body.ticket.id).toBe(id)
+    expect(r2.body.ticket.id).toBe(id)
+    expect(r2.body.ticket.title).toBe('Second')
+    expect(r2.body.ticket.status).toBe('draft')
+    expect(r2.body.ticket.priority).toBeNull()
+  })
+
+  it('on already-draft target, updates origin_conversation_id but keeps draft', async () => {
+    seedConv('c-new', 'edit')
+    const id = seedTicket({ status: 'draft', priority: null, originConversationId: 'c-old' })
+    const app = createApp(ctx)
+    const res = await request(app)
+      .post('/api/projects/proj-1/tickets/save-as-draft')
+      .send({ conversationId: 'c-new', editTicketId: id })
+    expect(res.status).toBe(200)
+    expect(res.body.ticket.status).toBe('draft')
+    expect(res.body.ticket.priority).toBeNull()
+    expect(res.body.ticket.origin_conversation_id).toBe('c-new')
+  })
+
+  it('returns 404 when editTicketId does not exist', async () => {
+    seedConv('c-404', 'edit')
+    const app = createApp(ctx)
+    const res = await request(app)
+      .post('/api/projects/proj-1/tickets/save-as-draft')
+      .send({ conversationId: 'c-404', editTicketId: 999999 })
+    expect(res.status).toBe(404)
+    expect(ctx.broadcast).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when editTicketId is the wrong type', async () => {
+    seedConv('c-bad', 'edit')
+    const app = createApp(ctx)
+    const res = await request(app)
+      .post('/api/projects/proj-1/tickets/save-as-draft')
+      .send({ conversationId: 'c-bad', editTicketId: 'abc' })
+    expect(res.status).toBe(400)
+    expect(ctx.broadcast).not.toHaveBeenCalled()
+  })
+
+  it('emits exactly one ticket_updated and no ticket_created on flip', async () => {
+    seedConv('c-broadcast', 'edit')
+    const id = seedTicket({ status: 'todo', priority: 'high' })
+    const app = createApp(ctx)
+    await request(app)
+      .post('/api/projects/proj-1/tickets/save-as-draft')
+      .send({ conversationId: 'c-broadcast', editTicketId: id })
+    const calls = (ctx.broadcast as unknown as { mock: { calls: unknown[][] } }).mock.calls
+    const updates = calls.filter((c) => (c[0] as { type: string }).type === 'ticket_updated')
+    const creates = calls.filter((c) => (c[0] as { type: string }).type === 'ticket_created')
+    expect(updates.length).toBe(1)
+    expect(creates.length).toBe(0)
+  })
+
+  it('legacy fresh-session path (no editTicketId) is unchanged', async () => {
+    seedConv('c-legacy', 'fresh idea')
+    const app = createApp(ctx)
+    const r1 = await request(app)
+      .post('/api/projects/proj-1/tickets/save-as-draft')
+      .send({ conversationId: 'c-legacy' })
+    const r2 = await request(app)
+      .post('/api/projects/proj-1/tickets/save-as-draft')
+      .send({ conversationId: 'c-legacy', title: 'Renamed' })
+    expect(r1.status).toBe(201)
+    expect(r2.status).toBe(201)
+    expect(r1.body.ticket.id).toBe(r2.body.ticket.id)
+    expect(r2.body.ticket.title).toBe('Renamed')
+  })
+})
+
 // ─── Cascade behaviour ───────────────────────────────────────────────────────
 
 describe('cascade: conversation delete clears origin_conversation_id', () => {

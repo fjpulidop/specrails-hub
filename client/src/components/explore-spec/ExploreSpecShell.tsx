@@ -425,15 +425,17 @@ export function ExploreSpecShell({
   const handleSaveAsDraft = useCallback(async () => {
     if (!conversationId || !activeProjectId) return false
     try {
+      const body: Record<string, unknown> = {
+        conversationId,
+        title: draft.title?.trim() || undefined,
+        description: draft.description || undefined,
+        labels: draft.labels,
+      }
+      if (editTicket) body.editTicketId = editTicket.id
       const res = await fetch(`${getApiBase()}/tickets/save-as-draft`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversationId,
-          title: draft.title?.trim() || undefined,
-          description: draft.description || undefined,
-          labels: draft.labels,
-        }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({})) as { error?: string }
@@ -447,7 +449,7 @@ export function ExploreSpecShell({
       toast.error('Network error saving draft')
       return false
     }
-  }, [conversationId, activeProjectId, draft.title, draft.description, draft.labels])
+  }, [conversationId, activeProjectId, draft.title, draft.description, draft.labels, editTicket])
 
   const handleCreate = useCallback(async () => {
     if (isCreating) return

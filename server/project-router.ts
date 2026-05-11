@@ -1963,6 +1963,17 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       : []
     const description = typeof body.description === 'string' ? body.description : ''
 
+    // Optional editTicketId — when present, demote that specific ticket in
+    // place instead of looking up by conversationId. Drives the
+    // Continue-Editing-on-non-draft flow.
+    let editTicketId: number | undefined
+    if (body.editTicketId !== undefined && body.editTicketId !== null) {
+      if (typeof body.editTicketId !== 'number' || !Number.isFinite(body.editTicketId)) {
+        res.status(400).json({ error: 'editTicketId must be a number' }); return
+      }
+      editTicketId = body.editTicketId
+    }
+
     try {
       const { db, project, broadcast, ticketWatcher } = ctx(req)
       // Require at least one user-submitted turn before accepting a save
@@ -1975,10 +1986,30 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       const filePath = ticketPath(req)
       const now = new Date().toISOString()
 
-      // Idempotent on conversationId: if a draft ticket already references this
-      // conversation, update in place rather than create a second one.
       let saved: Ticket | undefined
+      let flippedInPlace = false
+      let notFound = false
       const store = mutateStore(filePath, (s) => {
+        if (editTicketId !== undefined) {
+          const target = s.tickets[String(editTicketId)]
+          if (!target) {
+            notFound = true
+            return
+          }
+          const title = providedTitle || target.title || generateAutoTitle(messages.map((m) => ({ role: m.role, content: m.content ?? '' })))
+          target.title = title
+          if (description) target.description = description
+          if (labels.length > 0) target.labels = labels
+          target.status = 'draft'
+          target.priority = null
+          target.origin_conversation_id = conversationId
+          target.updated_at = now
+          saved = target
+          flippedInPlace = true
+          return
+        }
+        // Idempotent on conversationId: if a draft ticket already references this
+        // conversation, update in place rather than create a second one.
         const existing = Object.values(s.tickets).find(
           (t) => t.origin_conversation_id === conversationId && t.status === 'draft',
         )
@@ -2013,7 +2044,22 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         saved = ticket
       })
 
+      if (notFound) {
+        res.status(404).json({ error: 'ticket not found' }); return
+      }
+
       ticketWatcher.notifyHubWrite(store.revision)
+      if (flippedInPlace) {
+        const msg: TicketUpdatedMessage = {
+          type: 'ticket_updated',
+          ticket: saved! as unknown as LocalTicket,
+          projectId: project.id,
+          timestamp: now,
+        }
+        broadcast(msg)
+        res.status(200).json({ ticket: saved!, revision: store.revision })
+        return
+      }
       const msg: TicketCreatedMessage | TicketUpdatedMessage = saved!.created_at === saved!.updated_at
         ? { type: 'ticket_created', ticket: saved! as unknown as LocalTicket, projectId: project.id, timestamp: now }
         : { type: 'ticket_updated', ticket: saved! as unknown as LocalTicket, projectId: project.id, timestamp: now }
