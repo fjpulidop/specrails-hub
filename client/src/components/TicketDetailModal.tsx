@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { formatDistanceToNow } from 'date-fns'
-import { X, Pencil, Trash2, Save, Plus, XCircle, MessageSquare, ArrowRight } from 'lucide-react'
+import { X, Pencil, Trash2, Save, Plus, XCircle, MessageSquare, ArrowRight, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
@@ -50,6 +50,8 @@ interface TicketDetailModalProps {
   rails?: RailState[]
   /** Move-to-Rail handler — same path as the dashboard postit card. */
   onMoveToRail?: (ticketId: number, railId: string) => void
+  /** Reverse of `onMoveToRail`: return the ticket to the specs list. */
+  onRemoveFromRail?: (ticketId: number) => void
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -64,6 +66,7 @@ export function TicketDetailModal({
   onDelete,
   rails,
   onMoveToRail,
+  onRemoveFromRail,
 }: TicketDetailModalProps) {
   const { activeProjectId } = useHub()
   // Feature flag for SMASH. Server gates with `SPECRAILS_SMASH=0` returning
@@ -264,8 +267,13 @@ export function TicketDetailModal({
 
           <ContinueEditingButton ticket={ticket} title={title} description={description} priority={priority} labels={labels} onClose={onClose} />
 
-          {rails && onMoveToRail && (
-            <MoveToRailButton ticket={ticket} rails={rails} onMoveToRail={onMoveToRail} />
+          {rails && (onMoveToRail || onRemoveFromRail) && (
+            <RailAssignmentButton
+              ticket={ticket}
+              rails={rails}
+              onMoveToRail={onMoveToRail}
+              onRemoveFromRail={onRemoveFromRail}
+            />
           )}
 
           <button
@@ -634,24 +642,44 @@ function ContinueEditingButton({ ticket, title, description, priority, labels, o
   )
 }
 
-// ─── MoveToRailButton ───────────────────────────────────────────────────────
+// ─── RailAssignmentButton ───────────────────────────────────────────────────
 
-interface MoveToRailButtonProps {
+interface RailAssignmentButtonProps {
   ticket: LocalTicket
   rails: RailState[]
-  onMoveToRail: (ticketId: number, railId: string) => void
+  onMoveToRail?: (ticketId: number, railId: string) => void
+  onRemoveFromRail?: (ticketId: number) => void
 }
 
 /**
- * Header button next to "Continue Editing" that opens the shared
- * `MoveToRailPopover`. Selecting a rail dispatches the same
- * `onMoveToRail(ticketId, railId)` handler used by the dashboard postit
- * card — so drag-and-drop, postit popover, and modal all converge on one
- * code path.
+ * Header button next to "Continue Editing" that toggles between
+ * "Move to Rail →" (opens the shared `MoveToRailPopover`) and
+ * "← Remove from Rail" (returns the spec to the specs list), depending on
+ * whether the ticket is already assigned to a rail.
  */
-function MoveToRailButton({ ticket, rails, onMoveToRail }: MoveToRailButtonProps) {
+function RailAssignmentButton({ ticket, rails, onMoveToRail, onRemoveFromRail }: RailAssignmentButtonProps) {
   const [anchor, setAnchor] = useState<DOMRect | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
+  const assignedRail = rails.find((r) => r.ticketIds.includes(ticket.id))
+
+  if (assignedRail) {
+    if (!onRemoveFromRail) return null
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        className="shrink-0 mr-2 gap-1.5 border-accent-warning/30 text-accent-warning hover:bg-accent-warning/10 hover:text-accent-warning"
+        data-testid="modal-remove-from-rail"
+        onClick={() => onRemoveFromRail(ticket.id)}
+        title={`Currently on ${assignedRail.label}`}
+      >
+        <ArrowLeft className="w-3.5 h-3.5" aria-hidden />
+        Remove from Rail
+      </Button>
+    )
+  }
+
+  if (!onMoveToRail) return null
   return (
     <>
       <Button

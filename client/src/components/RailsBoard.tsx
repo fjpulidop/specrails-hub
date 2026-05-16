@@ -34,6 +34,8 @@ interface RailsBoardProps {
   onAddRail: () => void
   onDeleteRail: (railId: string) => void
   onRenameRail: (railId: string, newLabel: string) => void
+  /** Right-click → "Move to Specs" handler for compact-tier rail pills. */
+  onTicketMoveToSpecs?: (ticketId: number) => void
 }
 
 function SortableRailWrapper({ railId, children }: { railId: string; children: (props: { listeners: Record<string, Function>; attributes: Record<string, any>; isDragging: boolean }) => React.ReactNode }) {
@@ -55,7 +57,7 @@ function SortableRailWrapper({ railId, children }: { railId: string; children: (
 /** Width threshold below which rail rows switch to the compact mini-card layout. */
 export const RAILS_COMPACT_THRESHOLD_PX = 320
 
-export function RailsBoard({ rails, ticketMap, onModeChange, onProfileChange, onToggle, onTicketClick, onAddRail, onDeleteRail, onRenameRail }: RailsBoardProps) {
+export function RailsBoard({ rails, ticketMap, onModeChange, onProfileChange, onToggle, onTicketClick, onAddRail, onDeleteRail, onRenameRail, onTicketMoveToSpecs }: RailsBoardProps) {
   const activeRails = rails.filter((r) => r.status === 'running').length
   const [jiggleMode, setJiggleMode] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -141,6 +143,7 @@ export function RailsBoard({ rails, ticketMap, onModeChange, onProfileChange, on
                     onDelete={() => onDeleteRail(rail.id)}
                     onLongPress={() => setJiggleMode(true)}
                     onRename={(newLabel) => onRenameRail(rail.id, newLabel)}
+                    onTicketMoveToSpecs={onTicketMoveToSpecs}
                   />
                 </div>
               )}

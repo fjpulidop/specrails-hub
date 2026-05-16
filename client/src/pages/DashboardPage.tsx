@@ -358,6 +358,26 @@ export default function DashboardPage() {
     toast.success(`Moved to ${targetRail.label}`)
   }, [rails, specTickets, updateRails, updateSpecOrder])
 
+  // Reverse of `handleMoveTicketToRail`: remove a ticket from whatever rail
+  // currently owns it and push it back to the spec list (appended to the
+  // current spec order). No-op when the ticket isn't on any rail.
+  const handleRemoveTicketFromRail = useCallback((ticketId: number) => {
+    const sourceRail = rails.find((r) => r.ticketIds.includes(ticketId))
+    if (!sourceRail) return
+    if (sourceRail.status === 'running') {
+      toast.error(`${sourceRail.label} is running — stop it before removing`)
+      return
+    }
+    updateRails((prev) => prev.map((r) =>
+      r.id === sourceRail.id ? { ...r, ticketIds: r.ticketIds.filter((id) => id !== ticketId) } : r,
+    ))
+    updateSpecOrder((prev) => {
+      const current = prev ?? specTickets.map((t) => t.id)
+      return current.includes(ticketId) ? current : [...current, ticketId]
+    })
+    toast.success(`Removed from ${sourceRail.label}`)
+  }, [rails, specTickets, updateRails, updateSpecOrder])
+
   // ── DnD helpers ──────────────────────────────────────────────────────────────
   const findContainer = useCallback(
     (ticketId: number): string | null => {
@@ -662,6 +682,7 @@ export default function DashboardPage() {
             onAddRail={handleAddRail}
             onDeleteRail={handleDeleteRail}
             onRenameRail={handleRenameRail}
+            onTicketMoveToSpecs={handleRemoveTicketFromRail}
           />
         </div>
       </div>
@@ -730,6 +751,7 @@ export default function DashboardPage() {
             }}
             rails={rails}
             onMoveToRail={handleMoveTicketToRail}
+            onRemoveFromRail={handleRemoveTicketFromRail}
           />
         )
       })()}

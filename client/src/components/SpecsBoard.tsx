@@ -463,6 +463,7 @@ export function SpecsBoard({
                       parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
                       onOpenParentEpic={handleOpenParentEpic}
                       jiggleMode={jiggleMode}
+                      onLongPress={onTicketDelete ? enterJiggle : undefined}
                       onDelete={onTicketDelete ? handleCardDelete : undefined}
                     />
                   ))}

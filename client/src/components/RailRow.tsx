@@ -1,7 +1,7 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { GripVertical, Trash2 } from 'lucide-react'
+import { GripVertical, Trash2, ArrowLeft } from 'lucide-react'
 import { RailControls, type RailMode, type RailStatus } from './RailControls'
 import { SpecCard } from './SpecCard'
 import { RailProfileSelector } from './agents/RailProfileSelector'
@@ -37,13 +37,32 @@ interface RailRowProps {
   onDelete: () => void
   onLongPress: () => void
   onRename: (newLabel: string) => void
+  /** Optional — when wired, right-clicking a compact-tier ticket pill opens
+   *  a context menu offering "← Move to Specs" which removes the ticket
+   *  from this rail and returns it to the specs list. */
+  onTicketMoveToSpecs?: (ticketId: number) => void
 }
 
 export function RailRow({
   id, label, tickets, mode, status, activeJobId, profileName, jiggleMode,
   dragHandleListeners, dragHandleAttributes, density = 'normal',
   onModeChange, onProfileChange, onToggle, onTicketClick, onDelete, onLongPress, onRename,
+  onTicketMoveToSpecs,
 }: RailRowProps) {
+  // Compact-tier right-click context menu state. `{ticketId, x, y}` while
+  // open, `null` otherwise. Closed by outside-click, Escape, or selection.
+  const [ticketCtxMenu, setTicketCtxMenu] = useState<{ ticketId: number; x: number; y: number } | null>(null)
+  useEffect(() => {
+    if (!ticketCtxMenu) return
+    function onPointer() { setTicketCtxMenu(null) }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setTicketCtxMenu(null) }
+    document.addEventListener('pointerdown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [ticketCtxMenu])
   const { isOver, setNodeRef } = useDroppable({ id })
   const [swipeX, setSwipeX] = useState(0)
   const [swiping, setSwiping] = useState(false)
@@ -243,12 +262,46 @@ export function RailRow({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onTicketClick(ticket) }}
                 onPointerDown={(e) => e.stopPropagation()}
+                onContextMenu={(e) => {
+                  if (!onTicketMoveToSpecs) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setTicketCtxMenu({ ticketId: ticket.id, x: e.clientX, y: e.clientY })
+                }}
                 title={`#${ticket.id} ${ticket.title}`}
                 className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-mono font-medium border border-accent-info/30 bg-accent-info/10 text-accent-info hover:bg-accent-info/20 hover:border-accent-info/60 transition-colors"
               >
                 #{ticket.id}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Right-click context menu for assigned ticket pills */}
+        {ticketCtxMenu && onTicketMoveToSpecs && (
+          <div
+            role="menu"
+            data-testid={`rail-row-compact-context-menu-${id}`}
+            className="fixed z-50 min-w-[160px] rounded-lg border border-border/60 bg-card/95 backdrop-blur shadow-xl shadow-black/40 p-1"
+            style={{
+              top: Math.min(ticketCtxMenu.y, window.innerHeight - 60),
+              left: Math.min(ticketCtxMenu.x, window.innerWidth - 180),
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                e.stopPropagation()
+                onTicketMoveToSpecs(ticketCtxMenu.ticketId)
+                setTicketCtxMenu(null)
+              }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs text-accent-warning hover:bg-accent-warning/10 transition-colors"
+            >
+              <ArrowLeft className="w-3 h-3" aria-hidden />
+              Move to Specs
+            </button>
           </div>
         )}
 

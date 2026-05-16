@@ -27,8 +27,12 @@ interface TicketPostitCardProps {
   onOpenParentEpic?: (parentEpicId: number) => void
   contractRefining?: boolean
   jiggleMode?: boolean
+  /** Fires after a sustained press on the card body — used to enter jiggle / delete mode. */
+  onLongPress?: () => void
   onDelete?: (ticket: LocalTicket) => void
 }
+
+const LONG_PRESS_MS = 700
 
 /**
  * Square-ish postit card variant of `SpecCard`. Renders the ticket's id,
@@ -48,6 +52,7 @@ export function TicketPostitCard({
   onOpenParentEpic,
   contractRefining = false,
   jiggleMode = false,
+  onLongPress,
   onDelete,
 }: TicketPostitCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -57,8 +62,45 @@ export function TicketPostitCard({
 
   const [popoverAnchor, setPopoverAnchor] = useState<DOMRect | null>(null)
   const moveButtonRef = useRef<HTMLButtonElement>(null)
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressFiredRef = useRef(false)
 
-  const handleCardClick = useCallback(() => {
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }, [])
+
+  const startLongPress = useCallback(() => {
+    if (!onLongPress) return
+    longPressFiredRef.current = false
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true
+      onLongPress()
+      longPressTimerRef.current = null
+    }, LONG_PRESS_MS)
+  }, [onLongPress])
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    // Ignore presses that originated inside child interactive controls
+    // (Move-to-Rail button, parent-epic chip, delete chip…).
+    if ((e.target as HTMLElement).closest('button')) return
+    startLongPress()
+  }, [startLongPress])
+
+  const handlePointerUpOrLeave = useCallback(() => {
+    clearLongPress()
+  }, [clearLongPress])
+
+  const handleCardClick = useCallback((e: React.MouseEvent) => {
+    if (longPressFiredRef.current) {
+      // Suppress the click that follows a long-press so the modal doesn't
+      // open the moment we enter jiggle mode.
+      e.stopPropagation()
+      longPressFiredRef.current = false
+      return
+    }
     if (jiggleMode) return
     onClick(ticket)
   }, [jiggleMode, onClick, ticket])
@@ -95,22 +137,52 @@ export function TicketPostitCard({
         {...listeners}
         style={style}
         onClick={handleCardClick}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUpOrLeave}
+        onPointerLeave={handlePointerUpOrLeave}
+        onPointerCancel={handlePointerUpOrLeave}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
-            handleCardClick()
+            handleCardClick(e as unknown as React.MouseEvent)
           }
         }}
         data-ticket-id={ticket.id}
         data-tier="postit"
-        className={`group relative flex flex-col gap-2 rounded-xl border ${tone} backdrop-blur p-3 cursor-pointer transition-[transform,box-shadow,border-color] duration-150 ease-out hover:border-accent-info/40 hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-info/60 min-h-[180px] ${jiggleMode ? 'animate-pulse' : ''} ${contractRefining ? 'ring-1 ring-accent-info/30' : ''}`}
+        className={`group relative flex flex-col gap-2 rounded-xl border ${tone} backdrop-blur p-3 cursor-pointer transition-[transform,box-shadow,border-color] duration-150 ease-out hover:border-accent-info/40 hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-info/60 min-h-[180px] ${jiggleMode ? 'animate-jiggle' : ''} ${contractRefining ? 'ring-1 ring-accent-info/30' : ''}`}
       >
-        {/* Header: id + priority */}
+        {/* Header: id + parent-epic chip (left) · priority pills (right) */}
         <div className="flex items-start justify-between gap-2">
-          <span className="text-[10px] font-mono text-muted-foreground/60">#{ticket.id}</span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-[10px] font-mono text-muted-foreground/60 shrink-0">#{ticket.id}</span>
+            {isChildOfEpic && parentEpicTitle && ticket.parent_epic_id != null && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenParentEpic?.(ticket.parent_epic_id as number)
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    onOpenParentEpic?.(ticket.parent_epic_id as number)
+                  }
+                }}
+                disabled={!onOpenParentEpic}
+                title={`Open parent Epic #${ticket.parent_epic_id} · ${parentEpicTitle}`}
+                data-testid={`postit-epic-child-pill-${ticket.id}`}
+                className="inline-flex items-center gap-1 rounded-md border border-accent-secondary/40 text-accent-secondary bg-accent-secondary/5 hover:bg-accent-secondary/15 hover:border-accent-secondary/60 disabled:hover:bg-accent-secondary/5 disabled:hover:border-accent-secondary/40 disabled:cursor-default px-1.5 py-0.5 text-[10px] font-medium max-w-[160px] truncate transition-colors"
+              >
+                <Crown className="w-2.5 h-2.5 shrink-0" aria-hidden />
+                <span className="truncate">↑ #{ticket.parent_epic_id} {parentEpicTitle}</span>
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
             {isEpic && (
               <Badge variant="outline" className="h-4 gap-1 px-1.5 text-[9px] border-accent-highlight/40 text-accent-highlight">
                 <Crown className="w-2.5 h-2.5" aria-hidden />
@@ -145,39 +217,13 @@ export function TicketPostitCard({
           </p>
         )}
 
-        {/* Dependency indicator + parent epic chip */}
-        {(hasDependencies || isChildOfEpic) && (
+        {/* Dependency indicator only — parent-epic chip moved up to the header. */}
+        {hasDependencies && (
           <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground/70">
-            {hasDependencies && (
-              <span className="inline-flex items-center gap-1">
-                <Link2 className="w-2.5 h-2.5" aria-hidden />
-                Depends on {ticket.prerequisites!.length}
-              </span>
-            )}
-            {isChildOfEpic && parentEpicTitle && ticket.parent_epic_id != null && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenParentEpic?.(ticket.parent_epic_id as number)
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    onOpenParentEpic?.(ticket.parent_epic_id as number)
-                  }
-                }}
-                disabled={!onOpenParentEpic}
-                title={`Open parent Epic #${ticket.parent_epic_id} · ${parentEpicTitle}`}
-                data-testid={`postit-epic-child-pill-${ticket.id}`}
-                className="inline-flex items-center gap-1 rounded-md border border-accent-secondary/40 text-accent-secondary bg-accent-secondary/5 hover:bg-accent-secondary/15 hover:border-accent-secondary/60 disabled:hover:bg-accent-secondary/5 disabled:hover:border-accent-secondary/40 disabled:cursor-default px-1.5 py-0.5 text-[10px] font-medium max-w-[180px] truncate transition-colors"
-              >
-                <Crown className="w-2.5 h-2.5 shrink-0" aria-hidden />
-                <span className="truncate">↑ #{ticket.parent_epic_id} {parentEpicTitle}</span>
-              </button>
-            )}
+            <span className="inline-flex items-center gap-1">
+              <Link2 className="w-2.5 h-2.5" aria-hidden />
+              Depends on {ticket.prerequisites!.length}
+            </span>
           </div>
         )}
 
