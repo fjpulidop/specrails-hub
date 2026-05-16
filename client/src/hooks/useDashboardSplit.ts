@@ -100,6 +100,11 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
   } | null>(null)
   const rafRef = useRef<number | null>(null)
   const pendingWidthRef = useRef<number | null>(null)
+  // Snapshot of the splitter's position when the app loaded this session for
+  // the active project. `resetToDefault` (double-click) returns the user to
+  // this snapshot instead of the geometric centre — so dragging away and
+  // double-clicking always restores the "natural" position they were on.
+  const originalLeftWidthRef = useRef<number | null>(null)
 
   // Re-resolve when the active project changes.
   useEffect(() => {
@@ -108,11 +113,15 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
     setViewport(v)
     if (v < DISABLE_BELOW_VIEWPORT_PX) {
       setLeftWidth(null)
+      originalLeftWidthRef.current = null
       return
     }
     const stored = loadStored(projectId)
     const next = stored !== null ? clampToViewport(stored, v) : Math.round(v / 2)
     setLeftWidth(next)
+    // Capture the per-project session "original" position used by the
+    // double-click reset target.
+    originalLeftWidthRef.current = next
     // Re-write if we clamped a stale value.
     if (stored !== null && stored !== next) saveStored(projectId, next)
   }, [projectId])
@@ -197,7 +206,11 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
     if (typeof window === 'undefined') return
     const v = window.innerWidth
     if (v < DISABLE_BELOW_VIEWPORT_PX) return
-    const next = Math.round(v / 2)
+    // Prefer the per-session "original" captured on mount / project-switch.
+    // Fall back to viewport/2 only when no original was captured (e.g. the
+    // very first render before the project-switch effect runs).
+    const target = originalLeftWidthRef.current ?? Math.round(v / 2)
+    const next = clampToViewport(target, v)
     setLeftWidth(next)
     saveStored(projectId, next)
   }, [projectId])
