@@ -666,13 +666,36 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Drag overlay — renders a floating ghost while dragging */}
+      {/* Drag overlay — renders a floating ghost while dragging. Matches the
+          tier so a postit dragged from the postit grid keeps looking like a
+          postit instead of collapsing back to a compact row. */}
       <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
         {activeTicket ? (
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-primary/40 bg-card/95 shadow-xl shadow-black/20 backdrop-blur-sm rotate-1 scale-[1.03] pointer-events-none">
-            <span className="text-[10px] font-mono text-muted-foreground/50 shrink-0">#{activeTicket.id}</span>
-            <span className="flex-1 text-sm truncate max-w-[240px]">{activeTicket.title}</span>
-          </div>
+          tier === 'postit' ? (
+            <div className="flex flex-col gap-2 rounded-xl border border-accent-info/40 bg-card/95 shadow-xl shadow-black/30 backdrop-blur-sm p-3 rotate-1 scale-[1.02] pointer-events-none w-[260px] min-h-[180px]">
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-[10px] font-mono text-muted-foreground/60">#{activeTicket.id}</span>
+                {activeTicket.priority && (
+                  <span className="h-4 px-1.5 rounded-full text-[9px] font-medium uppercase bg-muted/40 text-foreground">
+                    {activeTicket.priority}
+                  </span>
+                )}
+              </div>
+              <h3 className="text-sm font-medium leading-snug line-clamp-2 text-foreground">
+                {activeTicket.title}
+              </h3>
+              {activeTicket.short_summary && activeTicket.short_summary.trim().length > 0 && (
+                <p className="text-xs text-muted-foreground/80 leading-relaxed line-clamp-3 italic">
+                  {activeTicket.short_summary}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-primary/40 bg-card/95 shadow-xl shadow-black/20 backdrop-blur-sm rotate-1 scale-[1.03] pointer-events-none">
+              <span className="text-[10px] font-mono text-muted-foreground/50 shrink-0">#{activeTicket.id}</span>
+              <span className="flex-1 text-sm truncate max-w-[240px]">{activeTicket.title}</span>
+            </div>
+          )
         ) : activeRailDragLabel ? (
           <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-primary/40 bg-card/95 shadow-xl shadow-black/20 backdrop-blur-sm rotate-[0.5deg] scale-[1.02] pointer-events-none">
             <span className="text-xs font-medium">{activeRailDragLabel}</span>
