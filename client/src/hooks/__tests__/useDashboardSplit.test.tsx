@@ -52,10 +52,10 @@ describe('useDashboardSplit', () => {
     setViewport(1000)
     localStorage.setItem('specrails-hub:dashboard-split:proj-1', '2000')
     const { result } = renderHook(() => useDashboardSplit('proj-1'))
-    // Max left = 1000 - 180 = 820
-    expect(result.current.leftWidth).toBe(820)
+    // Max left = 1000 - 280 = 720
+    expect(result.current.leftWidth).toBe(720)
     // Stored value is re-written.
-    expect(localStorage.getItem('specrails-hub:dashboard-split:proj-1')).toBe('820')
+    expect(localStorage.getItem('specrails-hub:dashboard-split:proj-1')).toBe('720')
   })
 
   it('clamps a stored width below MIN_LEFT_PX up to the minimum', () => {
@@ -105,7 +105,7 @@ describe('useDashboardSplit', () => {
 
   it('exposes MIN constants as documented bounds', () => {
     expect(MIN_LEFT_PX).toBe(320)
-    expect(MIN_RIGHT_PX).toBe(180)
+    expect(MIN_RIGHT_PX).toBe(280)
     expect(DISABLE_BELOW_VIEWPORT_PX).toBe(900)
   })
 })

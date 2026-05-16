@@ -16,7 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  */
 
 export const MIN_LEFT_PX = 320
-export const MIN_RIGHT_PX = 180
+export const MIN_RIGHT_PX = 280
 export const DISABLE_BELOW_VIEWPORT_PX = 900
 export const TIER_BREAKPOINTS_PX = [600, 900] as const
 export const SNAP_TOLERANCE_PX = 30

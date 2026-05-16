@@ -53,7 +53,7 @@ function SortableRailWrapper({ railId, children }: { railId: string; children: (
 }
 
 /** Width threshold below which rail rows switch to the compact mini-card layout. */
-export const RAILS_COMPACT_THRESHOLD_PX = 220
+export const RAILS_COMPACT_THRESHOLD_PX = 320
 
 export function RailsBoard({ rails, ticketMap, onModeChange, onProfileChange, onToggle, onTicketClick, onAddRail, onDeleteRail, onRenameRail }: RailsBoardProps) {
   const activeRails = rails.filter((r) => r.status === 'running').length
