@@ -133,7 +133,9 @@ export function SpecCard({
       {...(!dragDisabled && !jiggleMode ? { ...attributes, ...listeners } : {})}
       className={cardClass}
       onClick={handleClick}
-      onPointerDown={handlePointerDown}
+      // Capture phase so dnd-kit's bubble-phase onPointerDown (spread above
+      // via `...listeners`) still fires and activates the drag.
+      onPointerDownCapture={handlePointerDown}
       onPointerUp={handlePointerUpOrLeave}
       onPointerLeave={handlePointerUpOrLeave}
       onPointerCancel={handlePointerUpOrLeave}
