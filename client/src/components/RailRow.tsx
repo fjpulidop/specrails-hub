@@ -232,12 +232,25 @@ export function RailRow({
               {label}
             </button>
           )}
-          {tickets.length > 0 && (
-            <span className="text-[9px] text-muted-foreground bg-muted/30 rounded-full px-1.5 py-0.5 leading-none shrink-0">
-              {tickets.length}
-            </span>
-          )}
         </div>
+
+        {/* Assigned spec id pills — clickable, opens the ticket modal */}
+        {tickets.length > 0 && (
+          <div className="flex flex-wrap gap-1" data-testid={`rail-row-compact-tickets-${id}`}>
+            {tickets.map((ticket) => (
+              <button
+                key={ticket.id}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onTicketClick(ticket) }}
+                onPointerDown={(e) => e.stopPropagation()}
+                title={`#${ticket.id} ${ticket.title}`}
+                className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-mono font-medium border border-accent-info/30 bg-accent-info/10 text-accent-info hover:bg-accent-info/20 hover:border-accent-info/60 transition-colors"
+              >
+                #{ticket.id}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Mode dropdown + Profile picker (stacked) */}
         <div className="flex flex-col gap-1">

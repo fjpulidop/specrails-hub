@@ -124,6 +124,22 @@ describe('RailRow', () => {
       expect(screen.queryByText('Drag specs here')).not.toBeInTheDocument()
     })
 
+    it('renders clickable id pills for each assigned ticket and opens via onTicketClick', () => {
+      const onTicketClick = vi.fn()
+      const tickets: LocalTicket[] = [
+        { id: 19, title: 'Training Mode', description: '', status: 'todo', priority: 'medium', labels: [], assignee: null, prerequisites: [], metadata: {}, created_at: '', updated_at: '', created_by: 'u', source: 'manual' },
+        { id: 54, title: 'Audio capture', description: '', status: 'todo', priority: 'high', labels: [], assignee: null, prerequisites: [], metadata: {}, created_at: '', updated_at: '', created_by: 'u', source: 'manual' },
+      ]
+      renderRailRow({ ...defaultProps, density: 'compact', tickets, onTicketClick } as any)
+      const pillContainer = screen.getByTestId('rail-row-compact-tickets-rail-1')
+      const pill19 = within(pillContainer).getByRole('button', { name: /#19/ })
+      const pill54 = within(pillContainer).getByRole('button', { name: /#54/ })
+      expect(pill19).toBeInTheDocument()
+      expect(pill54).toBeInTheDocument()
+      fireEvent.click(pill54)
+      expect(onTicketClick).toHaveBeenCalledWith(tickets[1])
+    })
+
     it('renders a destructive delete button in jiggle mode', () => {
       const onDelete = vi.fn()
       const { container } = renderRailRow({
