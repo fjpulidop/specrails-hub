@@ -461,6 +461,7 @@ export function SpecsBoard({
                       contractRefining={contractRefiningIds.has(ticket.id)}
                       epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
                       parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
+                      onOpenParentEpic={handleOpenParentEpic}
                       jiggleMode={jiggleMode}
                       onDelete={onTicketDelete ? handleCardDelete : undefined}
                     />

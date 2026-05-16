@@ -23,6 +23,8 @@ interface TicketPostitCardProps {
   epicChildrenCount?: number
   /** Resolved épica title when this ticket is a child of an épica. */
   parentEpicTitle?: string | null
+  /** Click handler for the parent-epic chip (opens the parent spec modal). */
+  onOpenParentEpic?: (parentEpicId: number) => void
   contractRefining?: boolean
   jiggleMode?: boolean
   onDelete?: (ticket: LocalTicket) => void
@@ -43,6 +45,7 @@ export function TicketPostitCard({
   onMoveToRail,
   epicChildrenCount,
   parentEpicTitle,
+  onOpenParentEpic,
   contractRefining = false,
   jiggleMode = false,
   onDelete,
@@ -142,7 +145,7 @@ export function TicketPostitCard({
           </p>
         )}
 
-        {/* Dependency indicator + parent epic */}
+        {/* Dependency indicator + parent epic chip */}
         {(hasDependencies || isChildOfEpic) && (
           <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground/70">
             {hasDependencies && (
@@ -151,11 +154,29 @@ export function TicketPostitCard({
                 Depends on {ticket.prerequisites!.length}
               </span>
             )}
-            {isChildOfEpic && parentEpicTitle && (
-              <span className="inline-flex items-center gap-1 truncate max-w-[180px]">
-                <Crown className="w-2.5 h-2.5" aria-hidden />
-                <span className="truncate">{parentEpicTitle}</span>
-              </span>
+            {isChildOfEpic && parentEpicTitle && ticket.parent_epic_id != null && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenParentEpic?.(ticket.parent_epic_id as number)
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    onOpenParentEpic?.(ticket.parent_epic_id as number)
+                  }
+                }}
+                disabled={!onOpenParentEpic}
+                title={`Open parent Epic #${ticket.parent_epic_id} · ${parentEpicTitle}`}
+                data-testid={`postit-epic-child-pill-${ticket.id}`}
+                className="inline-flex items-center gap-1 rounded-md border border-accent-secondary/40 text-accent-secondary bg-accent-secondary/5 hover:bg-accent-secondary/15 hover:border-accent-secondary/60 disabled:hover:bg-accent-secondary/5 disabled:hover:border-accent-secondary/40 disabled:cursor-default px-1.5 py-0.5 text-[10px] font-medium max-w-[180px] truncate transition-colors"
+              >
+                <Crown className="w-2.5 h-2.5 shrink-0" aria-hidden />
+                <span className="truncate">↑ #{ticket.parent_epic_id} {parentEpicTitle}</span>
+              </button>
             )}
           </div>
         )}
