@@ -92,7 +92,7 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
     return Math.round(initialViewport / 2)
   })
 
-  const dragRef = useRef<{ pointerId: number; element: HTMLElement } | null>(null)
+  const dragRef = useRef<{ pointerId: number; element: HTMLElement; offsetX: number } | null>(null)
   const rafRef = useRef<number | null>(null)
   const pendingWidthRef = useRef<number | null>(null)
 
@@ -142,7 +142,10 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
 
   const handleMove = useCallback((e: PointerEvent) => {
     if (!dragRef.current) return
-    pendingWidthRef.current = e.clientX
+    // Subtract the offset captured at pointerdown so the splitter line stays
+    // glued to the same point under the cursor instead of snapping its left
+    // edge to clientX.
+    pendingWidthRef.current = e.clientX - dragRef.current.offsetX
     if (rafRef.current === null) {
       rafRef.current = requestAnimationFrame(applyPending)
     }
@@ -170,7 +173,13 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
     const target = (e as React.PointerEvent).currentTarget as HTMLElement | undefined
     const element = target ?? (native.target as HTMLElement)
     try { element.setPointerCapture(native.pointerId) } catch { /* may fail in tests */ }
-    dragRef.current = { pointerId: native.pointerId, element }
+    // Capture where the pointer sits relative to the splitter's logical
+    // position (= current leftWidth) so subsequent moves preserve the same
+    // gap and the cursor never jumps relative to the handle.
+    const rect = element.getBoundingClientRect()
+    const splitterCenterX = rect.left + rect.width / 2
+    const offsetX = native.clientX - splitterCenterX
+    dragRef.current = { pointerId: native.pointerId, element, offsetX }
     window.addEventListener('pointermove', handleMove)
     window.addEventListener('pointerup', handleUp)
     window.addEventListener('pointercancel', handleUp)
