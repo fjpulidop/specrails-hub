@@ -87,11 +87,7 @@ export function TicketPostitCard({
     // (Move-to-Rail button, parent-epic chip, delete chip…).
     if ((e.target as HTMLElement).closest('button')) return
     startLongPress()
-    // Delegate to dnd-kit so drag start is preserved (our explicit
-    // onPointerDown otherwise shadows the listener from `useSortable`).
-    const dndOnPointerDown = (listeners as Record<string, ((ev: React.PointerEvent) => void) | undefined> | null)?.onPointerDown
-    dndOnPointerDown?.(e)
-  }, [startLongPress, listeners])
+  }, [startLongPress])
 
   const handlePointerUpOrLeave = useCallback(() => {
     clearLongPress()
@@ -147,7 +143,9 @@ export function TicketPostitCard({
         {...listeners}
         style={style}
         onClick={handleCardClick}
-        onPointerDown={handlePointerDown}
+        // Use the capture phase so dnd-kit's bubble-phase onPointerDown
+        // (spread via `...listeners`) still fires and starts the drag.
+        onPointerDownCapture={handlePointerDown}
         onPointerUp={handlePointerUpOrLeave}
         onPointerLeave={handlePointerUpOrLeave}
         onPointerCancel={handlePointerUpOrLeave}
