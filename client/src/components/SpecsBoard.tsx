@@ -6,7 +6,8 @@ import { Button } from './ui/button'
 import { SpecCard } from './SpecCard'
 import { TicketPostitCard } from './TicketPostitCard'
 import type { RailState } from './RailsBoard'
-import { SpecLabelFilterStrip } from './SpecLabelFilterStrip'
+import { SpecLabelFilterDropdown } from './SpecLabelFilterDropdown'
+import { SpecStatusFilter, type SpecStatusFilterValue } from './SpecStatusFilter'
 import { SpecSortControl } from './SpecSortControl'
 import type { SpecSortMode, SpecSortDir } from '../types/spec-sort'
 import { ProposeSpecModal, type ExploreLaunchPayload } from './ProposeSpecModal'
@@ -153,6 +154,7 @@ export function SpecsBoard({
   const [proposeOpen, setProposeOpen] = useState(false)
   const [explore, setExplore] = useState<ExploreState | null>(null)
   const [activeLabels, setActiveLabels] = useState<Set<string>>(new Set())
+  const [statusFilter, setStatusFilter] = useState<SpecStatusFilterValue>('all')
   const { activeProjectId } = useHub()
   const { minimize } = useMinimizedChats()
   // SMASH: build lookup maps so each SpecCard renders the épica badge / child
@@ -183,17 +185,8 @@ export function SpecsBoard({
     setActiveLabels(new Set())
   }, [activeProjectId])
 
-  const toggleLabel = useCallback((label: string) => {
-    setActiveLabels((prev) => {
-      const next = new Set(prev)
-      if (next.has(label)) next.delete(label)
-      else next.add(label)
-      return next
-    })
-  }, [])
-
-  const clearLabels = useCallback(() => {
-    setActiveLabels(new Set())
+  const handleLabelsChange = useCallback((next: Set<string>) => {
+    setActiveLabels(next)
   }, [])
 
   const filteredTickets = useMemo(() => {
@@ -358,27 +351,18 @@ export function SpecsBoard({
   const { isOver, setNodeRef } = useDroppable({ id: 'specs' })
   const { isOver: isDoneOver, setNodeRef: setDoneNodeRef } = useDroppable({ id: 'done-specs' })
 
-  // ── Resizable split divider ──────────────────────────────────────────────────
-  const [splitRatio, setSplitRatio] = useState(0.65) // top panel gets 65%
-  const containerRef = useRef<HTMLDivElement>(null)
-  const isDraggingRef = useRef(false)
-
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    e.preventDefault()
-    isDraggingRef.current = true
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-  }, [])
-
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDraggingRef.current || !containerRef.current) return
-    const rect = containerRef.current.getBoundingClientRect()
-    const ratio = (e.clientY - rect.top) / rect.height
-    setSplitRatio(Math.max(0.2, Math.min(0.85, ratio)))
-  }, [])
-
-  const handlePointerUp = useCallback(() => {
-    isDraggingRef.current = false
-  }, [])
+  // Status filter ⇒ which buckets render. In `all`, todo first then done at
+  // the bottom (always). `todo` / `done` show only that bucket.
+  const showTodoBucket = statusFilter === 'all' || statusFilter === 'todo'
+  const showDoneBucket = statusFilter === 'all' || statusFilter === 'done'
+  const statusCounts = useMemo(
+    () => ({
+      all: tickets.length + doneTickets.length,
+      todo: tickets.length,
+      done: doneTickets.length,
+    }),
+    [tickets.length, doneTickets.length],
+  )
 
   return (
     <div className="flex flex-col h-full" onClick={handleBackgroundClick}>
@@ -387,17 +371,23 @@ export function SpecsBoard({
         <div className="flex items-center gap-2 shrink-0">
           <FileText className="w-4 h-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold text-accent-primary">Spec</h2>
-          {tickets.length > 0 && (
+          {tickets.length + doneTickets.length > 0 && (
             <span className="text-[10px] text-muted-foreground bg-muted/30 rounded-full px-1.5 py-0.5">
-              {activeLabels.size > 0 ? `${filteredTickets.length}/${tickets.length}` : tickets.length}
+              {activeLabels.size > 0
+                ? `${filteredTickets.length + filteredDoneTickets.length}/${tickets.length + doneTickets.length}`
+                : tickets.length + doneTickets.length}
             </span>
           )}
         </div>
-        <SpecLabelFilterStrip
-          tickets={tickets}
+        <SpecStatusFilter
+          value={statusFilter}
+          onChange={setStatusFilter}
+          counts={statusCounts}
+        />
+        <SpecLabelFilterDropdown
+          tickets={[...tickets, ...doneTickets]}
           active={activeLabels}
-          onToggle={toggleLabel}
-          onClear={clearLabels}
+          onChange={handleLabelsChange}
         />
         <SpecSortControl
           mode={sortMode}
@@ -417,113 +407,122 @@ export function SpecsBoard({
         </Button>
       </div>
 
-      {/* Content area — always split between active and done */}
-      <div ref={containerRef} className="flex-1 flex flex-col min-h-0 relative">
-        {/* Active specs — droppable zone */}
-        <div
-          ref={setNodeRef}
-          data-tour="specs-list"
-          style={{ flex: `0 0 ${splitRatio * 100}%` }}
-          className={`overflow-y-auto px-4 py-3 space-y-1.5 transition-colors duration-150 ${isOver ? 'bg-primary/[0.04]' : ''}`}
-        >
-          {isLoading ? (
-            <div className="space-y-1.5">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="h-10 rounded-lg border border-border/40 bg-card/50 animate-pulse" />
-              ))}
-            </div>
-          ) : filteredTickets.length === 0 ? (
-            <div
-              className={`flex flex-col items-center justify-center py-16 text-center transition-colors ${
-                isOver ? 'text-primary/50' : 'text-muted-foreground'
-              }`}
-            >
-              <FileText className="w-8 h-8 mb-3 opacity-20" />
-              <p className="text-sm">
-                {isOver
-                  ? 'Drop here'
-                  : tickets.length === 0
-                    ? 'No specs yet'
-                    : 'No specs match the active labels'}
-              </p>
-              {!isOver && tickets.length === 0 && (
-                <p className="text-xs mt-1 opacity-60">Click "+ Add" to get started</p>
-              )}
-            </div>
-          ) : tier === 'postit' && onMoveToRail ? (
-            <SortableContext items={filteredTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-              <div
-                data-testid="specs-board-postit-grid"
-                className="grid gap-3"
-                style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}
-              >
-                {filteredTickets.map((ticket) => (
-                  <TicketPostitCard
-                    key={ticket.id}
-                    ticket={ticket}
-                    rails={rails}
-                    onClick={onTicketClick}
-                    onMoveToRail={onMoveToRail}
-                    contractRefining={contractRefiningIds.has(ticket.id)}
-                    epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
-                    parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
-                    jiggleMode={jiggleMode}
-                    onDelete={onTicketDelete ? handleCardDelete : undefined}
-                  />
+      {/* Content area — single scrollable list. Status filter decides which
+          buckets render; in `all` mode todo specs come first and the done
+          bucket is always pinned to the bottom of the scroller. */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {/* Active specs bucket (todo) — droppable zone */}
+        {showTodoBucket && (
+          <div
+            ref={setNodeRef}
+            data-tour="specs-list"
+            className={`px-4 pt-3 pb-2 space-y-1.5 transition-colors duration-150 ${isOver ? 'bg-primary/[0.04]' : ''}`}
+          >
+            {isLoading ? (
+              <div className="space-y-1.5">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-10 rounded-lg border border-border/40 bg-card/50 animate-pulse" />
                 ))}
               </div>
-            </SortableContext>
-          ) : (
-            <SortableContext items={filteredTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+            ) : filteredTickets.length === 0 ? (
               <div
-                data-testid="specs-board-list"
-                data-tier={tier}
-                className={tier === 'card' ? 'grid gap-2' : 'space-y-1.5'}
-                style={tier === 'card' ? { gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' } : undefined}
+                className={`flex flex-col items-center justify-center py-12 text-center transition-colors ${
+                  isOver ? 'text-primary/50' : 'text-muted-foreground'
+                }`}
               >
-                {filteredTickets.map((ticket) => (
-                  <SpecCard
-                    key={ticket.id}
-                    ticket={ticket}
-                    onClick={onTicketClick}
-                    contractRefining={contractRefiningIds.has(ticket.id)}
-                    epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
-                    parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
-                    onOpenParentEpic={handleOpenParentEpic}
-                    jiggleMode={jiggleMode}
-                    onLongPress={onTicketDelete ? enterJiggle : undefined}
-                    onDelete={onTicketDelete ? handleCardDelete : undefined}
-                  />
-                ))}
+                <FileText className="w-8 h-8 mb-3 opacity-20" />
+                <p className="text-sm">
+                  {isOver
+                    ? 'Drop here'
+                    : tickets.length === 0
+                      ? 'No specs yet'
+                      : activeLabels.size > 0
+                        ? 'No specs match the active labels'
+                        : 'No active specs'}
+                </p>
+                {!isOver && tickets.length === 0 && (
+                  <p className="text-xs mt-1 opacity-60">Click "+ Add" to get started</p>
+                )}
               </div>
-            </SortableContext>
-          )}
-        </div>
-
-        {/* Resizable divider */}
-        <div
-          className="shrink-0 h-1.5 flex items-center justify-center cursor-row-resize group hover:bg-primary/[0.06] transition-colors select-none touch-none"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-        >
-          <div className="w-8 h-0.5 rounded-full bg-border/60 group-hover:bg-primary/30 transition-colors" />
-        </div>
-
-        {/* Done specs section — droppable zone */}
-        <div ref={setDoneNodeRef} className={`flex-1 min-h-0 flex flex-col overflow-hidden transition-colors duration-150 ${isDoneOver ? 'bg-emerald-500/[0.04]' : ''}`}>
-          <div className="flex items-center gap-2 px-4 py-1.5 border-t border-border/30 shrink-0">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400/70" />
-            <span className="text-[11px] font-medium text-muted-foreground">Done</span>
-            <span className="text-[10px] text-muted-foreground/60 bg-muted/20 rounded-full px-1.5 py-0.5">
-              {activeLabels.size > 0 ? `${filteredDoneTickets.length}/${doneTickets.length}` : doneTickets.length}
-            </span>
+            ) : tier === 'postit' && onMoveToRail ? (
+              <SortableContext items={filteredTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                <div
+                  data-testid="specs-board-postit-grid"
+                  className="grid gap-3"
+                  style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}
+                >
+                  {filteredTickets.map((ticket) => (
+                    <TicketPostitCard
+                      key={ticket.id}
+                      ticket={ticket}
+                      rails={rails}
+                      onClick={onTicketClick}
+                      onMoveToRail={onMoveToRail}
+                      contractRefining={contractRefiningIds.has(ticket.id)}
+                      epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
+                      parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
+                      jiggleMode={jiggleMode}
+                      onDelete={onTicketDelete ? handleCardDelete : undefined}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            ) : (
+              <SortableContext items={filteredTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                <div
+                  data-testid="specs-board-list"
+                  data-tier={tier}
+                  className={tier === 'card' ? 'grid gap-2' : 'space-y-1.5'}
+                  style={tier === 'card' ? { gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' } : undefined}
+                >
+                  {filteredTickets.map((ticket) => (
+                    <SpecCard
+                      key={ticket.id}
+                      ticket={ticket}
+                      onClick={onTicketClick}
+                      contractRefining={contractRefiningIds.has(ticket.id)}
+                      epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
+                      parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
+                      onOpenParentEpic={handleOpenParentEpic}
+                      jiggleMode={jiggleMode}
+                      onLongPress={onTicketDelete ? enterJiggle : undefined}
+                      onDelete={onTicketDelete ? handleCardDelete : undefined}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            )}
           </div>
-          <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-1.5">
+        )}
+
+        {/* Done bucket — droppable, always pinned to the bottom of the scroller. */}
+        {showDoneBucket && (
+          <div
+            ref={setDoneNodeRef}
+            data-testid="specs-board-done-bucket"
+            className={`px-4 pt-2 pb-3 space-y-1.5 transition-colors duration-150 ${
+              isDoneOver ? 'bg-emerald-500/[0.04]' : ''
+            } ${showTodoBucket ? 'border-t border-border/30 mt-1' : ''}`}
+          >
+            <div className="flex items-center gap-2 py-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400/70" />
+              <span className="text-[11px] font-medium text-muted-foreground">Done</span>
+              <span className="text-[10px] text-muted-foreground/60 bg-muted/20 rounded-full px-1.5 py-0.5">
+                {activeLabels.size > 0
+                  ? `${filteredDoneTickets.length}/${doneTickets.length}`
+                  : doneTickets.length}
+              </span>
+            </div>
             {filteredDoneTickets.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
                 <CheckCircle2 className="w-6 h-6 mb-2 opacity-15" />
-                <p className="text-xs opacity-60">{isDoneOver ? 'Drop to mark as done' : 'No completed specs yet'}</p>
+                <p className="text-xs opacity-60">
+                  {isDoneOver
+                    ? 'Drop to mark as done'
+                    : activeLabels.size > 0 && doneTickets.length > 0
+                      ? 'No done specs match the active labels'
+                      : 'No completed specs yet'}
+                </p>
               </div>
             ) : (
               <SortableContext items={filteredDoneTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
@@ -544,7 +543,7 @@ export function SpecsBoard({
               </SortableContext>
             )}
           </div>
-        </div>
+        )}
       </div>
 
       <ProposeSpecModal
