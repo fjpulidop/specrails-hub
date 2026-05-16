@@ -199,14 +199,16 @@ export function TicketDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
+      {/* Backdrop — solid darken; no backdrop-filter so the GPU doesn't have
+          to re-blur each time content behind re-paints (e.g. dnd-kit
+          re-rendering sortable cards on mouse move). */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/70"
         onClick={onClose}
       />
 
-      {/* Panel */}
-      <div className="relative w-full max-w-5xl m-4 rounded-xl glass-card border border-border/30 flex flex-col animate-in fade-in zoom-in-95 duration-200 h-[90vh]">
+      {/* Panel — opaque card so nothing leaks through. */}
+      <div className="relative w-full max-w-5xl m-4 rounded-xl bg-card border border-border/40 shadow-2xl shadow-black/50 flex flex-col animate-in fade-in zoom-in-95 duration-200 h-[90vh]">
         {/* Épica breadcrumb (children only) */}
         {epicParent && (
           <div className="px-5 pt-3">

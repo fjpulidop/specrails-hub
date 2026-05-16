@@ -105,7 +105,7 @@ export function TicketPostitCard({
         }}
         data-ticket-id={ticket.id}
         data-tier="postit"
-        className={`group relative flex flex-col gap-2 rounded-xl border ${tone} backdrop-blur p-3 cursor-pointer transition-all hover:border-accent-info/40 hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-info/60 min-h-[180px] ${jiggleMode ? 'animate-pulse' : ''} ${contractRefining ? 'ring-1 ring-accent-info/30' : ''}`}
+        className={`group relative flex flex-col gap-2 rounded-xl border ${tone} backdrop-blur p-3 cursor-pointer transition-[transform,box-shadow,border-color] duration-150 ease-out hover:border-accent-info/40 hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-info/60 min-h-[180px] ${jiggleMode ? 'animate-pulse' : ''} ${contractRefining ? 'ring-1 ring-accent-info/30' : ''}`}
       >
         {/* Header: id + priority */}
         <div className="flex items-start justify-between gap-2">
