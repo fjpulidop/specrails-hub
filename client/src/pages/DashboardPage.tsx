@@ -728,6 +728,8 @@ export default function DashboardPage() {
               deleteTicket(id)
               setDetailTicket(null)
             }}
+            rails={rails}
+            onMoveToRail={handleMoveTicketToRail}
           />
         )
       })()}

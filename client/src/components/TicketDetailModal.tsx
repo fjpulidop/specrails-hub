@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { formatDistanceToNow } from 'date-fns'
-import { X, Pencil, Trash2, Save, Plus, XCircle, MessageSquare } from 'lucide-react'
+import { X, Pencil, Trash2, Save, Plus, XCircle, MessageSquare, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
@@ -11,6 +11,11 @@ import { TicketSpendingLine } from './TicketSpendingLine'
 import { useMinimizedChats } from '../context/MinimizedChatsContext'
 import { parseAcceptanceCriteria } from './explore-spec/acceptance-criteria'
 import { useHub } from '../hooks/useHub'
+import { SmashActions } from './specs-smash/SmashActions'
+import { EpicBreadcrumb } from './specs-smash/EpicChildrenSection'
+import { EpicFamilySidebar } from './specs-smash/EpicFamilySidebar'
+import { MoveToRailPopover } from './MoveToRailPopover'
+import type { RailState } from './RailsBoard'
 import type { Attachment, LocalTicket, TicketPriority } from '../types'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -34,9 +39,17 @@ const SOURCE_LABELS: Record<string, string> = {
 interface TicketDetailModalProps {
   ticket: LocalTicket
   allLabels: string[]
+  /** All tickets in current project — used to resolve épica children / parent. */
+  allTickets?: LocalTicket[]
   onClose: () => void
+  /** Navigation hook: open a different ticket inside the same modal stack. */
+  onOpenTicket?: (ticketId: number) => void
   onSave: (ticketId: number, fields: Partial<Pick<LocalTicket, 'title' | 'description' | 'status' | 'priority' | 'labels'>>) => Promise<boolean>
   onDelete: (ticketId: number) => void
+  /** Rails available in the project — drives the Move-to-Rail popover. */
+  rails?: RailState[]
+  /** Move-to-Rail handler — same path as the dashboard postit card. */
+  onMoveToRail?: (ticketId: number, railId: string) => void
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -44,10 +57,31 @@ interface TicketDetailModalProps {
 export function TicketDetailModal({
   ticket,
   allLabels,
+  allTickets,
   onClose,
+  onOpenTicket,
   onSave,
   onDelete,
+  rails,
+  onMoveToRail,
 }: TicketDetailModalProps) {
+  const { activeProjectId } = useHub()
+  // Feature flag for SMASH. Server gates with `SPECRAILS_SMASH=0` returning
+  // 409 from endpoints; the UI optimistically shows the affordance and lets
+  // the server reject if disabled. A future pass can hydrate from GET /state.
+  const smashFlagOn = true
+  const childrenList = useMemo(
+    () => (allTickets ?? []).filter((t) => t.parent_epic_id === ticket.id),
+    [allTickets, ticket.id],
+  )
+  const epicParent = useMemo(() => {
+    if (ticket.parent_epic_id == null) return null
+    return (allTickets ?? []).find((t) => t.id === ticket.parent_epic_id) ?? null
+  }, [allTickets, ticket.parent_epic_id])
+  const totalEpicSiblings = useMemo(() => {
+    if (!epicParent) return 0
+    return (allTickets ?? []).filter((t) => t.parent_epic_id === epicParent.id).length
+  }, [allTickets, epicParent])
   // Editable state
   const [title, setTitle] = useState(ticket.title)
   const [description, setDescription] = useState(ticket.description)
@@ -173,6 +207,17 @@ export function TicketDetailModal({
 
       {/* Panel */}
       <div className="relative w-full max-w-5xl m-4 rounded-xl glass-card border border-border/30 flex flex-col animate-in fade-in zoom-in-95 duration-200 h-[90vh]">
+        {/* Épica breadcrumb (children only) */}
+        {epicParent && (
+          <div className="px-5 pt-3">
+            <EpicBreadcrumb
+              epic={epicParent}
+              childExecutionOrder={ticket.execution_order ?? null}
+              totalChildren={totalEpicSiblings}
+              onOpenEpic={() => onOpenTicket?.(epicParent.id)}
+            />
+          </div>
+        )}
         {/* Header */}
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border/30">
           <div className="flex-1 min-w-0">
@@ -204,8 +249,22 @@ export function TicketDetailModal({
             <TicketSpendingLine ticketId={ticket.id} />
           </div>
 
+          {activeProjectId && (
+            <div className="shrink-0">
+              <SmashActions
+                ticket={ticket}
+                projectId={activeProjectId}
+                featureFlagOn={smashFlagOn}
+                childrenCount={childrenList.length}
+              />
+            </div>
+          )}
+
           <ContinueEditingButton ticket={ticket} title={title} description={description} priority={priority} labels={labels} onClose={onClose} />
 
+          {rails && onMoveToRail && (
+            <MoveToRailButton ticket={ticket} rails={rails} onMoveToRail={onMoveToRail} />
+          )}
 
           <button
             onClick={onClose}
@@ -261,16 +320,10 @@ export function TicketDetailModal({
                     </div>
                   </div>
                 ) : description ? (
-                  <div
-                    className="flex-1 rounded-lg bg-muted/20 px-3 py-2 overflow-y-auto transition-colors"
-                    onClick={() => setEditingDescription(true)}
-                    role="button"
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <div className="prose prose-invert prose-xs max-w-none prose-p:my-1 prose-headings:mt-2 prose-headings:mb-1 prose-headings:text-sm prose-headings:font-semibold prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-code:text-cyan-300 prose-code:text-[10px] prose-code:bg-muted/40 prose-code:px-1 prose-code:py-0.5 prose-code:rounded text-foreground/80 text-xs">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{description}</ReactMarkdown>
-                    </div>
-                  </div>
+                  <DescriptionRender
+                    description={description}
+                    onEdit={() => setEditingDescription(true)}
+                  />
                 ) : (
                   <button
                     type="button"
@@ -402,6 +455,13 @@ export function TicketDetailModal({
                   </button>
                 )}
               </div>
+
+              {/* SMASH family — list of Sub-Specs (Epic view) or parent + siblings (child view) */}
+              <EpicFamilySidebar
+                ticket={ticket}
+                allTickets={allTickets ?? []}
+                onOpenTicket={(id) => onOpenTicket?.(id)}
+              />
 
               {/* Continue Editing lives in the modal header — see top of component. */}
 
@@ -571,3 +631,121 @@ function ContinueEditingButton({ ticket, title, description, priority, labels, o
     </Button>
   )
 }
+
+// ─── MoveToRailButton ───────────────────────────────────────────────────────
+
+interface MoveToRailButtonProps {
+  ticket: LocalTicket
+  rails: RailState[]
+  onMoveToRail: (ticketId: number, railId: string) => void
+}
+
+/**
+ * Header button next to "Continue Editing" that opens the shared
+ * `MoveToRailPopover`. Selecting a rail dispatches the same
+ * `onMoveToRail(ticketId, railId)` handler used by the dashboard postit
+ * card — so drag-and-drop, postit popover, and modal all converge on one
+ * code path.
+ */
+function MoveToRailButton({ ticket, rails, onMoveToRail }: MoveToRailButtonProps) {
+  const [anchor, setAnchor] = useState<DOMRect | null>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  return (
+    <>
+      <Button
+        ref={buttonRef}
+        variant="outline"
+        size="sm"
+        className="shrink-0 mr-2 gap-1.5 border-accent-info/30 text-accent-info hover:bg-accent-info/10 hover:text-accent-info"
+        data-testid="modal-move-to-rail"
+        onClick={() => {
+          if (!buttonRef.current) return
+          setAnchor(buttonRef.current.getBoundingClientRect())
+        }}
+      >
+        Move to Rail
+        <ArrowRight className="w-3.5 h-3.5" aria-hidden />
+      </Button>
+      {anchor && (
+        <MoveToRailPopover
+          rails={rails}
+          anchorRect={anchor}
+          onMoveToRail={(railId) => onMoveToRail(ticket.id, railId)}
+          onClose={() => setAnchor(null)}
+        />
+      )}
+    </>
+  )
+}
+
+// ─── Contract Layer disclosure ──────────────────────────────────────────────
+
+const CONTRACT_LAYER_SEPARATOR = '\n\n---\n\n## Contract Layer\n\n'
+
+function splitDescriptionAtContractLayer(description: string): { user: string; contract: string | null } {
+  const idx = description.indexOf(CONTRACT_LAYER_SEPARATOR)
+  if (idx < 0) return { user: description, contract: null }
+  return {
+    user: description.slice(0, idx),
+    contract: description.slice(idx + CONTRACT_LAYER_SEPARATOR.length),
+  }
+}
+
+function countContractSubsections(contract: string): number {
+  const subs = ['### Naming Contract', '### Data Shapes', '### State Machine', '### Invariants', '### File Touch List']
+  let count = 0
+  for (const sub of subs) {
+    const start = contract.indexOf(sub)
+    if (start < 0) continue
+    const tail = contract.slice(start + sub.length)
+    const naIdx = tail.indexOf('N/A — model did not produce items')
+    const nextHeading = tail.indexOf('### ')
+    if (naIdx >= 0 && (nextHeading < 0 || naIdx < nextHeading)) continue
+    count++
+  }
+  return count
+}
+
+interface DescriptionRenderProps {
+  description: string
+  onEdit: () => void
+}
+
+function DescriptionRender({ description, onEdit }: DescriptionRenderProps) {
+  const { user, contract } = splitDescriptionAtContractLayer(description)
+  const userPart = user || description
+  return (
+    <div
+      className="flex-1 rounded-lg bg-muted/20 px-3 py-2 overflow-y-auto transition-colors"
+      onClick={(e) => {
+        // Don't enter edit mode when interacting with the disclosure
+        if ((e.target as HTMLElement).closest('details, summary')) return
+        onEdit()
+      }}
+      role="button"
+      style={{ cursor: 'pointer' }}
+    >
+      <div className="prose prose-invert prose-xs max-w-none prose-p:my-1 prose-headings:mt-2 prose-headings:mb-1 prose-headings:text-sm prose-headings:font-semibold prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-code:text-cyan-300 prose-code:text-[10px] prose-code:bg-muted/40 prose-code:px-1 prose-code:py-0.5 prose-code:rounded text-foreground/80 text-xs">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{userPart}</ReactMarkdown>
+      </div>
+      {contract && (
+        <details
+          data-testid="contract-layer-disclosure"
+          className="mt-3 rounded-md border border-border/40 bg-muted/10 px-2 py-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <summary className="cursor-pointer text-[10px] font-medium text-foreground/80 select-none flex items-center gap-2">
+            Contract Layer
+            <span className="rounded-full bg-muted/40 px-1.5 text-[9px] text-foreground/60">
+              {countContractSubsections(contract)}/5 populated
+            </span>
+          </summary>
+          <div className="mt-2 prose prose-invert prose-xs max-w-none prose-p:my-1 prose-headings:mt-2 prose-headings:mb-1 prose-headings:text-sm prose-headings:font-semibold prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-code:text-cyan-300 prose-code:text-[10px] prose-code:bg-muted/40 prose-code:px-1 prose-code:py-0.5 prose-code:rounded text-foreground/80 text-xs">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{contract}</ReactMarkdown>
+          </div>
+        </details>
+      )}
+    </div>
+  )
+}
+
