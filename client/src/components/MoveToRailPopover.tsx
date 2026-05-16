@@ -37,9 +37,17 @@ export function MoveToRailPopover({ rails, onMoveToRail, onClose, anchorRect }: 
     }
   }, [onClose])
 
-  // Position the popover below the anchor, right-aligned, clamped to viewport.
+  // Position the popover below the anchor. Default placement: align the
+  // popover's RIGHT edge with the anchor's right edge so it opens leftward
+  // (keeps it inside whatever container the anchor lives in — modal header,
+  // postit card, etc.). Clamp to the viewport with an 8 px gutter on both
+  // sides so it never goes off-screen.
+  const POPOVER_WIDTH = 224 // w-56 in tailwind
+  const GUTTER = 8
   const top = anchorRect.bottom + 6
-  const left = Math.max(8, Math.min(window.innerWidth - 240, anchorRect.left))
+  const idealLeft = anchorRect.right - POPOVER_WIDTH
+  const maxLeft = window.innerWidth - POPOVER_WIDTH - GUTTER
+  const left = Math.max(GUTTER, Math.min(maxLeft, idealLeft))
 
   return (
     <div
