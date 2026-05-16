@@ -1,11 +1,16 @@
 import { useCallback, useRef, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Link2, ArrowRight, Crown, Trash2 } from 'lucide-react'
+import { Link2, ArrowRight, Crown, Trash2, MessageSquare } from 'lucide-react'
 import { Badge } from './ui/badge'
 import { MoveToRailPopover } from './MoveToRailPopover'
+import { useMinimizedChats } from '../context/MinimizedChatsContext'
+import { useHub } from '../hooks/useHub'
+import { parseAcceptanceCriteria } from './explore-spec/acceptance-criteria'
 import type { LocalTicket, TicketPriority } from '../types'
 import type { RailState } from './RailsBoard'
+
+const POSTIT_EDITABLE_STATUSES = new Set<LocalTicket['status']>(['draft', 'todo'])
 
 const PRIORITY_VARIANT: Record<TicketPriority, 'destructive' | 'default' | 'warning' | 'outline'> = {
   critical: 'destructive',
@@ -116,6 +121,39 @@ export function TicketPostitCard({
   const isChildOfEpic = ticket.parent_epic_id != null
   const hasDependencies = (ticket.prerequisites?.length ?? 0) > 0
   const summary = ticket.short_summary && ticket.short_summary.trim().length > 0 ? ticket.short_summary : null
+
+  // Inline "Continue Editing" — same path as the ticket detail modal. The
+  // affordance is hidden for non-editable statuses (done, cancelled, etc.)
+  // to keep the postit clean.
+  const { triggerResume } = useMinimizedChats()
+  const { activeProjectId } = useHub()
+  const canContinueEditing = POSTIT_EDITABLE_STATUSES.has(ticket.status) && Boolean(activeProjectId)
+
+  const handleContinueEditing = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!activeProjectId) return
+    const { body, criteria } = parseAcceptanceCriteria(ticket.description ?? '')
+    triggerResume({
+      kind: 'explore-spec',
+      projectId: activeProjectId,
+      label: ticket.title || `Ticket #${ticket.id}`,
+      restoreRoute: '/',
+      params: {
+        initialIdea: '',
+        pendingSpecId: '',
+        initialAttachmentIds: [],
+        resumeConversationId: ticket.origin_conversation_id ?? undefined,
+        editTicket: {
+          id: ticket.id,
+          title: ticket.title,
+          description: body,
+          labels: ticket.labels ?? [],
+          priority: ticket.priority ?? 'medium',
+          acceptanceCriteria: criteria,
+        },
+      },
+    })
+  }, [activeProjectId, ticket, triggerResume])
 
   // Stable per-ticket jiggle phase offset (0..−399 ms over the 400 ms
   // animation) so each card wobbles out of phase with its neighbours
@@ -238,18 +276,33 @@ export function TicketPostitCard({
         {/* Spacer pushes the Move-to-Rail button to the bottom */}
         <div className="flex-1" />
 
-        {/* Move to Rail button */}
+        {/* Footer actions: Continue Editing (when editable) · Move to Rail */}
         <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/30">
-          <button
-            ref={moveButtonRef}
-            type="button"
-            onClick={handleMoveClick}
-            data-testid="move-to-rail-button"
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-accent-info/90 hover:bg-accent-info/10 hover:text-accent-info transition-colors"
-          >
-            Move to Rail
-            <ArrowRight className="w-2.5 h-2.5" aria-hidden />
-          </button>
+          <div className="flex items-center gap-1">
+            {canContinueEditing && (
+              <button
+                type="button"
+                onClick={handleContinueEditing}
+                onPointerDown={(e) => e.stopPropagation()}
+                data-testid="postit-continue-editing"
+                title="Continue editing this spec"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-accent-primary/90 hover:bg-accent-primary/10 hover:text-accent-primary transition-colors"
+              >
+                <MessageSquare className="w-2.5 h-2.5" aria-hidden />
+                Continue Editing
+              </button>
+            )}
+            <button
+              ref={moveButtonRef}
+              type="button"
+              onClick={handleMoveClick}
+              data-testid="move-to-rail-button"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-accent-info/90 hover:bg-accent-info/10 hover:text-accent-info transition-colors"
+            >
+              Move to Rail
+              <ArrowRight className="w-2.5 h-2.5" aria-hidden />
+            </button>
+          </div>
           {jiggleMode && onDelete && (
             <button
               type="button"
