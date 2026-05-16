@@ -87,7 +87,11 @@ export function TicketPostitCard({
     // (Move-to-Rail button, parent-epic chip, delete chip…).
     if ((e.target as HTMLElement).closest('button')) return
     startLongPress()
-  }, [startLongPress])
+    // Delegate to dnd-kit so drag start is preserved (our explicit
+    // onPointerDown otherwise shadows the listener from `useSortable`).
+    const dndOnPointerDown = (listeners as Record<string, ((ev: React.PointerEvent) => void) | undefined> | null)?.onPointerDown
+    dndOnPointerDown?.(e)
+  }, [startLongPress, listeners])
 
   const handlePointerUpOrLeave = useCallback(() => {
     clearLongPress()
@@ -117,10 +121,16 @@ export function TicketPostitCard({
   const hasDependencies = (ticket.prerequisites?.length ?? 0) > 0
   const summary = ticket.short_summary && ticket.short_summary.trim().length > 0 ? ticket.short_summary : null
 
-  const style = {
+  // Stable per-ticket jiggle phase offset (0..−399 ms over the 400 ms
+  // animation) so each card wobbles out of phase with its neighbours
+  // instead of all dancing in lockstep.
+  const jigglePhaseMs = jiggleMode ? -((ticket.id * 73) % 400) : undefined
+
+  const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : undefined,
+    ...(jigglePhaseMs !== undefined ? { animationDelay: `${jigglePhaseMs}ms` } : {}),
   }
 
   const tone = isDraft

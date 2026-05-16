@@ -172,6 +172,15 @@ export function RailRow({
   }, [onDelete])
 
   // ── Compact density rendering ─────────────────────────────────────────────
+  // Independent jiggle phase derived from the rail id so neighbouring rails
+  // wobble out of sync instead of all dancing in lockstep.
+  const railJigglePhaseMs = jiggleMode && canDelete
+    ? -((Array.from(id).reduce((a, c) => a + c.charCodeAt(0), 0) * 53) % 400)
+    : undefined
+  const railJiggleStyle = railJigglePhaseMs !== undefined
+    ? ({ animationDelay: `${railJigglePhaseMs}ms` } as React.CSSProperties)
+    : undefined
+
   if (density === 'compact') {
     return (
       <div
@@ -182,6 +191,7 @@ export function RailRow({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onClick={handleClick}
+        style={railJiggleStyle}
         className={`group relative flex flex-col gap-1.5 rounded-xl border bg-card/80 backdrop-blur p-2.5 transition-all ${
           isOver
             ? 'border-accent-info/60 shadow-[0_0_0_1px_hsl(var(--accent-info)/0.35),0_0_14px_hsl(var(--accent-info)/0.18)]'
@@ -373,6 +383,7 @@ export function RailRow({
           transform: swipeX < 0 ? `translateX(${swipeX}px)` : undefined,
           transition: swiping ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1)',
           backdropFilter: 'blur(8px)',
+          ...(railJigglePhaseMs !== undefined ? { animationDelay: `${railJigglePhaseMs}ms` } : {}),
         }}
       >
         {/* Row header */}
@@ -480,11 +491,50 @@ export function RailRow({
           ) : (
             <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
               {tickets.map((ticket) => (
-                <SpecCard key={ticket.id} ticket={ticket} onClick={onTicketClick} dragDisabled={status === 'running'} />
+                <div
+                  key={ticket.id}
+                  onContextMenu={(e) => {
+                    if (!onTicketMoveToSpecs) return
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setTicketCtxMenu({ ticketId: ticket.id, x: e.clientX, y: e.clientY })
+                  }}
+                >
+                  <SpecCard ticket={ticket} onClick={onTicketClick} dragDisabled={status === 'running'} />
+                </div>
               ))}
             </SortableContext>
           )}
         </div>
+
+        {/* Right-click context menu also reachable from the normal-density
+            rail body (same component instance as the compact branch). */}
+        {ticketCtxMenu && onTicketMoveToSpecs && density === 'normal' && (
+          <div
+            role="menu"
+            data-testid={`rail-row-normal-context-menu-${id}`}
+            className="fixed z-50 min-w-[160px] rounded-lg border border-border/60 bg-card/95 backdrop-blur shadow-xl shadow-black/40 p-1"
+            style={{
+              top: Math.min(ticketCtxMenu.y, window.innerHeight - 60),
+              left: Math.min(ticketCtxMenu.x, window.innerWidth - 180),
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                e.stopPropagation()
+                onTicketMoveToSpecs(ticketCtxMenu.ticketId)
+                setTicketCtxMenu(null)
+              }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs text-accent-warning hover:bg-accent-warning/10 transition-colors"
+            >
+              <ArrowLeft className="w-3 h-3" aria-hidden />
+              Move to Specs
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
