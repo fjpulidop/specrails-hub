@@ -271,13 +271,25 @@ export function RailRow({
                 key={ticket.id}
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onTicketClick(ticket) }}
-                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => {
+                  // Right-click (button 2) opens the context menu directly.
+                  // `onContextMenu` is suppressed in the Tauri webview by
+                  // default, so we trigger off `mousedown` to work in both
+                  // the browser and the desktop app.
+                  if (e.button === 2 && onTicketMoveToSpecs) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setTicketCtxMenu({ ticketId: ticket.id, x: e.clientX, y: e.clientY })
+                  }
+                }}
                 onContextMenu={(e) => {
+                  // Always prevent the OS / Tauri default menu, even when
+                  // the popup was already opened via mousedown above.
                   if (!onTicketMoveToSpecs) return
                   e.preventDefault()
                   e.stopPropagation()
-                  setTicketCtxMenu({ ticketId: ticket.id, x: e.clientX, y: e.clientY })
                 }}
+                onPointerDown={(e) => e.stopPropagation()}
                 title={`#${ticket.id} ${ticket.title}`}
                 className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-mono font-medium border border-accent-info/30 bg-accent-info/10 text-accent-info hover:bg-accent-info/20 hover:border-accent-info/60 transition-colors"
               >
@@ -493,11 +505,17 @@ export function RailRow({
               {tickets.map((ticket) => (
                 <div
                   key={ticket.id}
+                  onMouseDown={(e) => {
+                    if (e.button === 2 && onTicketMoveToSpecs) {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setTicketCtxMenu({ ticketId: ticket.id, x: e.clientX, y: e.clientY })
+                    }
+                  }}
                   onContextMenu={(e) => {
                     if (!onTicketMoveToSpecs) return
                     e.preventDefault()
                     e.stopPropagation()
-                    setTicketCtxMenu({ ticketId: ticket.id, x: e.clientX, y: e.clientY })
                   }}
                 >
                   <SpecCard ticket={ticket} onClick={onTicketClick} dragDisabled={status === 'running'} />

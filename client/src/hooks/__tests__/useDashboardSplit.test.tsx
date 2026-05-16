@@ -42,27 +42,20 @@ describe('useDashboardSplit', () => {
     expect(result.current.tier).toBe('postit')
   })
 
-  it('restores the persisted width on mount', () => {
+  it('ignores any persisted width at mount and uses the canonical default', () => {
+    // Persistence is in-session only — first paint always matches dblclick.
     localStorage.setItem('specrails-hub:dashboard-split:proj-1', '950')
     const { result } = renderHook(() => useDashboardSplit('proj-1'))
-    expect(result.current.leftWidth).toBe(950)
+    expect(result.current.leftWidth).toBe(1100) // 1400 viewport → canonical 1100
     expect(result.current.tier).toBe('postit')
   })
 
-  it('clamps a stored width that exceeds viewport - MIN_RIGHT_PX', () => {
+  it('canonical default clamps to viewport - MIN_RIGHT_PX on small viewports', () => {
     setViewport(1000)
-    localStorage.setItem('specrails-hub:dashboard-split:proj-1', '2000')
     const { result } = renderHook(() => useDashboardSplit('proj-1'))
-    // Max left = 1000 - 280 = 720
+    // computeDefaultLeftWidth(1000) = max(901, 1000-300=700) = 901; clamped to
+    // min(901, 1000-280=720) = 720.
     expect(result.current.leftWidth).toBe(720)
-    // Stored value is re-written.
-    expect(localStorage.getItem('specrails-hub:dashboard-split:proj-1')).toBe('720')
-  })
-
-  it('clamps a stored width below MIN_LEFT_PX up to the minimum', () => {
-    localStorage.setItem('specrails-hub:dashboard-split:proj-1', '100')
-    const { result } = renderHook(() => useDashboardSplit('proj-1'))
-    expect(result.current.leftWidth).toBe(MIN_LEFT_PX)
   })
 
   it('is disabled when viewport is below DISABLE_BELOW_VIEWPORT_PX', () => {
@@ -73,13 +66,10 @@ describe('useDashboardSplit', () => {
     expect(result.current.tier).toBe('row')
   })
 
-  it('resetToDefault restores the canonical default even when a stored value exists', () => {
-    localStorage.setItem('specrails-hub:dashboard-split:proj-1', '950')
+  it('resetToDefault restores the canonical default and persists', () => {
     const { result } = renderHook(() => useDashboardSplit('proj-1'))
-    // Mount loads the stored value.
-    expect(result.current.leftWidth).toBe(950)
+    expect(result.current.leftWidth).toBe(1100)
     act(() => result.current.resetToDefault())
-    // viewport 1400 → default = 1100, overriding the stored 950.
     expect(result.current.leftWidth).toBe(1100)
     expect(localStorage.getItem('specrails-hub:dashboard-split:proj-1')).toBe('1100')
   })
@@ -93,22 +83,23 @@ describe('useDashboardSplit', () => {
     expect(localStorage.getItem('specrails-hub:dashboard-split:proj-1')).toBe('1100')
   })
 
-  it('uses a project-specific localStorage key', () => {
+  it('switching projects resets to the canonical default', () => {
+    // Pre-existing stored values are ignored — the splitter always opens at
+    // the canonical default for whichever project becomes active.
     localStorage.setItem('specrails-hub:dashboard-split:proj-A', '800')
     localStorage.setItem('specrails-hub:dashboard-split:proj-B', '500')
     const { result, rerender } = renderHook(({ id }) => useDashboardSplit(id), {
       initialProps: { id: 'proj-A' as string | null },
     })
-    expect(result.current.leftWidth).toBe(800)
+    expect(result.current.leftWidth).toBe(1100)
     rerender({ id: 'proj-B' })
-    expect(result.current.leftWidth).toBe(Math.max(MIN_LEFT_PX, 500))
+    expect(result.current.leftWidth).toBe(1100)
   })
 
-  it('responds to viewport resize by re-clamping', () => {
+  it('responds to viewport resize by toggling the disabled state', () => {
     setViewport(1400)
-    localStorage.setItem('specrails-hub:dashboard-split:proj-1', '1000')
     const { result } = renderHook(() => useDashboardSplit('proj-1'))
-    expect(result.current.leftWidth).toBe(1000)
+    expect(result.current.leftWidth).toBe(1100)
     act(() => setViewport(800))
     // 800 < DISABLE_BELOW_VIEWPORT_PX (900) → disabled, leftWidth=null
     expect(result.current.enabled).toBe(false)

@@ -102,8 +102,9 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
     if (typeof window === 'undefined') return null
     const initialViewport = window.innerWidth
     if (initialViewport < DISABLE_BELOW_VIEWPORT_PX) return null
-    const stored = loadStored(projectId)
-    if (stored !== null) return clampToViewport(stored, initialViewport)
+    // Always open at the canonical "postit + compact rails" default so the
+    // first paint matches what double-clicking the splitter restores to.
+    // Persistence (`localStorage`) is only used for in-session drag state.
     return computeDefaultLeftWidth(initialViewport)
   })
 
@@ -125,11 +126,11 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
       setLeftWidth(null)
       return
     }
-    const stored = loadStored(projectId)
-    const next = stored !== null ? clampToViewport(stored, v) : computeDefaultLeftWidth(v)
-    setLeftWidth(next)
-    // Re-write if we clamped a stale value.
-    if (stored !== null && stored !== next) saveStored(projectId, next)
+    // Project switch (or initial mount): reset to the canonical default so
+    // it matches the double-click target. localStorage is intentionally
+    // ignored here — it's an in-session drag memory, not a remembered
+    // start position.
+    setLeftWidth(computeDefaultLeftWidth(v))
   }, [projectId])
 
   // Window resize: re-clamp and toggle enabled-ness.
