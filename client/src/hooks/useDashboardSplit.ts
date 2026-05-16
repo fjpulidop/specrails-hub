@@ -61,6 +61,21 @@ function clampToViewport(width: number, viewport: number): number {
   return Math.min(Math.max(width, MIN_LEFT_PX), maxLeft)
 }
 
+/**
+ * Default splitter position the first time a project is opened (no stored
+ * value). Targets the "postit + compact rails" experience: postit tier on
+ * the left (≥ 901 px) and the rails panel narrow enough to render the
+ * compact mini-cards (right < `RAILS_COMPACT_THRESHOLD_PX` = 320). On
+ * viewports too narrow to fit both, the postit tier wins and the rails
+ * panel falls back to its normal layout.
+ */
+export function computeDefaultLeftWidth(viewport: number): number {
+  // Aim for `viewport - 300` so the rails panel gets 300 px (< 320 ⇒ compact).
+  // Floor at 901 so we never default below the postit tier when there's room.
+  const preferred = Math.max(901, viewport - 300)
+  return clampToViewport(preferred, viewport)
+}
+
 function snapToBreakpoint(width: number): number {
   for (const bp of TIER_BREAKPOINTS_PX) {
     if (Math.abs(width - bp) <= SNAP_TOLERANCE_PX) return bp
@@ -89,7 +104,7 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
     if (initialViewport < DISABLE_BELOW_VIEWPORT_PX) return null
     const stored = loadStored(projectId)
     if (stored !== null) return clampToViewport(stored, initialViewport)
-    return Math.round(initialViewport / 2)
+    return computeDefaultLeftWidth(initialViewport)
   })
 
   const dragRef = useRef<{
@@ -117,7 +132,7 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
       return
     }
     const stored = loadStored(projectId)
-    const next = stored !== null ? clampToViewport(stored, v) : Math.round(v / 2)
+    const next = stored !== null ? clampToViewport(stored, v) : computeDefaultLeftWidth(v)
     setLeftWidth(next)
     // Capture the per-project session "original" position used by the
     // double-click reset target.
@@ -136,7 +151,7 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
         return
       }
       setLeftWidth((prev) => {
-        const base = prev ?? loadStored(projectId) ?? Math.round(v / 2)
+        const base = prev ?? loadStored(projectId) ?? computeDefaultLeftWidth(v)
         const clamped = clampToViewport(base, v)
         if (clamped !== base) saveStored(projectId, clamped)
         return clamped
@@ -209,7 +224,7 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
     // Prefer the per-session "original" captured on mount / project-switch.
     // Fall back to viewport/2 only when no original was captured (e.g. the
     // very first render before the project-switch effect runs).
-    const target = originalLeftWidthRef.current ?? Math.round(v / 2)
+    const target = originalLeftWidthRef.current ?? computeDefaultLeftWidth(v)
     const next = clampToViewport(target, v)
     setLeftWidth(next)
     saveStored(projectId, next)

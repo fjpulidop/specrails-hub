@@ -34,11 +34,12 @@ describe('useDashboardSplit', () => {
     localStorage.clear()
   })
 
-  it('initialises at 50/50 when no stored value exists', () => {
+  it('initialises in the postit + compact-rails preset when no stored value exists', () => {
+    // viewport 1400 → default = max(901, 1400 - 300) = 1100
     const { result } = renderHook(() => useDashboardSplit('proj-1'))
-    expect(result.current.leftWidth).toBe(700)
+    expect(result.current.leftWidth).toBe(1100)
     expect(result.current.enabled).toBe(true)
-    expect(result.current.tier).toBe('card') // 700 is in card range
+    expect(result.current.tier).toBe('postit')
   })
 
   it('restores the persisted width on mount', () => {
@@ -83,12 +84,13 @@ describe('useDashboardSplit', () => {
     expect(localStorage.getItem('specrails-hub:dashboard-split:proj-1')).toBe('950')
   })
 
-  it('falls back to viewport / 2 when no stored value existed at mount', () => {
+  it('falls back to the postit + compact-rails preset when no stored value existed at mount', () => {
     const { result } = renderHook(() => useDashboardSplit('proj-1'))
-    expect(result.current.leftWidth).toBe(700)
+    // viewport 1400 → default = 1100
+    expect(result.current.leftWidth).toBe(1100)
     act(() => result.current.resetToDefault())
-    expect(result.current.leftWidth).toBe(700)
-    expect(localStorage.getItem('specrails-hub:dashboard-split:proj-1')).toBe('700')
+    expect(result.current.leftWidth).toBe(1100)
+    expect(localStorage.getItem('specrails-hub:dashboard-split:proj-1')).toBe('1100')
   })
 
   it('uses a project-specific localStorage key', () => {
@@ -99,7 +101,7 @@ describe('useDashboardSplit', () => {
     })
     expect(result.current.leftWidth).toBe(800)
     rerender({ id: 'proj-B' })
-    expect(result.current.leftWidth).toBe(MIN_LEFT_PX > 500 ? MIN_LEFT_PX : 500)
+    expect(result.current.leftWidth).toBe(Math.max(MIN_LEFT_PX, 500))
   })
 
   it('responds to viewport resize by re-clamping', () => {
