@@ -266,9 +266,14 @@ export interface LocalTicket {
   }
   attachments?: Attachment[]
   origin_conversation_id?: string | null
+  is_epic?: boolean
+  parent_epic_id?: number | null
+  execution_order?: number | null
+  /** AI-generated short summary (≤240 chars). Shown in dashboard postit tier when non-null. */
+  short_summary?: string | null
   created_at: string
   updated_at: string
   created_by: string
-  source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'explore-draft'
+  source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'explore-draft' | 'specs-smash'
 }
 

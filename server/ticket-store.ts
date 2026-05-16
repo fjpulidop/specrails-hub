@@ -38,10 +38,14 @@ export interface Ticket {
   }>
   attachments?: Attachment[]
   origin_conversation_id: string | null
+  is_epic: boolean
+  parent_epic_id: number | null
+  execution_order: number | null
+  short_summary: string | null
   created_at: string
   updated_at: string
   created_by: string
-  source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'hub' | 'explore-draft'
+  source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'hub' | 'explore-draft' | 'specs-smash'
 }
 
 export interface TicketStore {
@@ -55,7 +59,28 @@ export interface TicketStore {
 const VALID_STATUSES = new Set<TicketStatus>(['draft', 'todo', 'in_progress', 'done', 'cancelled'])
 const VALID_PRIORITIES = new Set<TicketPriority>(['critical', 'high', 'medium', 'low'])
 
-export const CURRENT_SCHEMA_VERSION = '1.1'
+export const CURRENT_SCHEMA_VERSION = '1.3'
+
+export const SHORT_SUMMARY_MAX_LEN = 240
+
+/**
+ * Sanitize a `shortSummary` value coming from an AI response or external input.
+ * - Returns `null` for nullish, non-string, or empty-after-trim values.
+ * - Strips control characters, collapses whitespace, trims.
+ * - Hard-caps to `SHORT_SUMMARY_MAX_LEN` characters (server-side safety net).
+ */
+export function clampShortSummary(raw: unknown): string | null {
+  if (raw === null || raw === undefined) return null
+  if (typeof raw !== 'string') return null
+  // Strip ASCII control chars (except common whitespace) and collapse runs.
+  // eslint-disable-next-line no-control-regex
+  const cleaned = raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').replace(/\s+/g, ' ').trim()
+  if (cleaned.length === 0) return null
+  if (cleaned.length > SHORT_SUMMARY_MAX_LEN) {
+    return cleaned.slice(0, SHORT_SUMMARY_MAX_LEN)
+  }
+  return cleaned
+}
 
 const DEFAULT_STORAGE_PATH = '.specrails/local-tickets.json'
 const LOCK_SUFFIX = '.lock'
@@ -159,7 +184,43 @@ function normalizeTicket(t: Ticket): Ticket {
     // sees it as TicketPriority|null which it must handle.
     t.priority = null
   }
+  // Schema 1.2 fields (specs-smash).
+  if (!('is_epic' in t) || t.is_epic === undefined) {
+    t.is_epic = false
+  }
+  if (!('parent_epic_id' in t) || t.parent_epic_id === undefined) {
+    t.parent_epic_id = null
+  }
+  if (!('execution_order' in t) || t.execution_order === undefined) {
+    t.execution_order = null
+  }
+  // Schema 1.3 field: AI-generated short summary for postit dashboard view.
+  if (!('short_summary' in t) || t.short_summary === undefined) {
+    t.short_summary = null
+  }
   return t
+}
+
+/**
+ * Defensive integrity check used after épica/child mutations: every ticket
+ * with parent_epic_id must reference an existing ticket whose is_epic === true.
+ * Returns an array of violation messages (empty when the store is consistent).
+ */
+export function validateEpicChildIntegrity(store: TicketStore): string[] {
+  const errors: string[] = []
+  for (const id of Object.keys(store.tickets)) {
+    const t = store.tickets[id]
+    if (t.parent_epic_id === null || t.parent_epic_id === undefined) continue
+    const parent = store.tickets[String(t.parent_epic_id)]
+    if (!parent) {
+      errors.push(`ticket ${t.id} references missing parent_epic_id=${t.parent_epic_id}`)
+      continue
+    }
+    if (!parent.is_epic) {
+      errors.push(`ticket ${t.id} parent ${t.parent_epic_id} is not an epic`)
+    }
+  }
+  return errors
 }
 
 export function readStore(filePath: string): TicketStore {

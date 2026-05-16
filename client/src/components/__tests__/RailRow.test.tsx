@@ -103,4 +103,38 @@ describe('RailRow', () => {
     renderRailRow({ ...defaultProps, status: 'running', jiggleMode: true })
     expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
   })
+
+  describe('compact density', () => {
+    it('renders the compact mini-card variant', () => {
+      const { container } = renderRailRow({ ...defaultProps, density: 'compact' } as any)
+      const card = container.querySelector('[data-testid="rail-row-compact-rail-1"]')
+      expect(card).toBeInTheDocument()
+      expect(card).toHaveAttribute('data-density', 'compact')
+    })
+
+    it('keeps the label clickable for rename in compact mode', () => {
+      renderRailRow({ ...defaultProps, density: 'compact' } as any)
+      const labelBtn = screen.getByRole('button', { name: 'Rail 1' })
+      fireEvent.click(labelBtn)
+      expect(screen.getByRole('textbox')).toBeInTheDocument()
+    })
+
+    it('omits the drop zone in compact mode', () => {
+      renderRailRow({ ...defaultProps, density: 'compact' } as any)
+      expect(screen.queryByText('Drag specs here')).not.toBeInTheDocument()
+    })
+
+    it('renders a destructive delete button in jiggle mode', () => {
+      const onDelete = vi.fn()
+      const { container } = renderRailRow({
+        ...defaultProps,
+        density: 'compact',
+        jiggleMode: true,
+        onDelete,
+      } as any)
+      const btn = within(container).getByRole('button', { name: /Delete Rail 1/i })
+      fireEvent.click(btn)
+      expect(onDelete).toHaveBeenCalled()
+    })
+  })
 })

@@ -16,6 +16,8 @@ import { toast } from 'sonner'
 import { useTickets } from '../hooks/useTickets'
 import { SpecsBoard } from '../components/SpecsBoard'
 import { RailsBoard, type RailState, isRailSortId, extractRailId } from '../components/RailsBoard'
+import { DashboardSplitter } from '../components/DashboardSplitter'
+import { useDashboardSplit } from '../hooks/useDashboardSplit'
 import { TicketDetailModal } from '../components/TicketDetailModal'
 import { CreateTicketModal } from '../components/CreateTicketModal'
 import { getApiBase } from '../lib/api'
@@ -24,6 +26,8 @@ import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import { useSpecGenTracker } from '../hooks/useSpecGenTracker'
 import type { LocalTicket } from '../types'
 import type { RailMode, RailStatus } from '../components/RailControls'
+import type { SpecSortMode, SpecSortDir } from '../types/spec-sort'
+import { applySpecSort, loadSpecSort, saveSpecSort } from '../lib/spec-sort'
 
 const INITIAL_RAILS: RailState[] = [
   { id: 'rail-1', label: 'Rail 1', ticketIds: [], mode: 'implement', status: 'idle' },
@@ -77,7 +81,7 @@ function saveRails(projectId: string | null, rails: RailState[]) {
 
 export default function DashboardPage() {
   const { activeProjectId } = useHub()
-  const { tickets, isLoading, updateTicket, deleteTicket, createTicket, refetch } = useTickets()
+  const { tickets, isLoading, updateTicket, deleteTicket, createTicket, refetch, contractRefiningIds } = useTickets()
   const { registerHandler, unregisterHandler, connectionStatus } = useSharedWebSocket()
   const { specToOpen, clearSpecToOpen } = useSpecGenTracker()
   const [detailTicket, setDetailTicket] = useState<LocalTicket | null>(null)
@@ -96,11 +100,23 @@ export default function DashboardPage() {
   const [activeRailDragLabel, setActiveRailDragLabel] = useState<string | null>(null)
   const [specOrderIds, setSpecOrderIds] = useState<number[] | null>(() => loadSpecOrder(activeProjectId))
   const [rails, setRails] = useState<RailState[]>(() => loadRails(activeProjectId) ?? INITIAL_RAILS)
+  const initialSort = loadSpecSort(activeProjectId)
+  const [sortMode, setSortMode] = useState<SpecSortMode>(initialSort.mode)
+  const [sortDir, setSortDir] = useState<SpecSortDir>(initialSort.dir)
 
-  // Reset spec order and rails when active project changes
+  // Reset spec order, rails, and sort when active project changes
   useEffect(() => {
     setSpecOrderIds(loadSpecOrder(activeProjectId))
     setRails(loadRails(activeProjectId) ?? INITIAL_RAILS)
+    const s = loadSpecSort(activeProjectId)
+    setSortMode(s.mode)
+    setSortDir(s.dir)
+  }, [activeProjectId])
+
+  const handleSortChange = useCallback((mode: SpecSortMode, dir: SpecSortDir) => {
+    setSortMode(mode)
+    setSortDir(dir)
+    saveSpecSort(activeProjectId, mode, dir)
   }, [activeProjectId])
 
   // ── Reconcile stale 'running' rails on mount / project switch / WS reconnect ─
@@ -222,6 +238,7 @@ export default function DashboardPage() {
     updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, label: `Rail ${newLabel}` } : r)))
   }, [updateRails])
 
+
   // ── WebSocket: listen for rail.job_completed to reset rail status ────────────
   const activeProjectIdRef = useRef(activeProjectId)
   useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
@@ -287,14 +304,17 @@ export default function DashboardPage() {
         (t.source === 'propose-spec' ||
           t.source === 'product-backlog' ||
           t.source === 'get-backlog-specs' ||
-          t.source === 'explore-draft') &&
+          t.source === 'explore-draft' ||
+          t.source === 'specs-smash') &&
         !railTicketIds.has(t.id),
     )
   }, [tickets, railTicketIds])
 
-  // Active specs (not done) in user drag-order
+  // Active specs (not done). Default mode → user drag-order; sorted modes
+  // → comparator applied to the unordered filtered list.
   const specTickets = useMemo(() => {
     const filtered = allSpecTickets.filter((t) => t.status !== 'done')
+    if (sortMode !== 'default') return applySpecSort(filtered, sortMode, sortDir)
     if (!specOrderIds) return filtered
     const map = new Map(filtered.map((t) => [t.id, t]))
     const result: LocalTicket[] = []
@@ -306,12 +326,37 @@ export default function DashboardPage() {
       if (!specOrderIds.includes(t.id)) result.push(t)
     }
     return result
-  }, [allSpecTickets, specOrderIds])
+  }, [allSpecTickets, specOrderIds, sortMode, sortDir])
 
-  // Done specs
+  // Done specs — sort applies same comparator; default mode keeps API order.
   const doneSpecTickets = useMemo(() => {
-    return allSpecTickets.filter((t) => t.status === 'done')
-  }, [allSpecTickets])
+    const filtered = allSpecTickets.filter((t) => t.status === 'done')
+    return sortMode === 'default' ? filtered : applySpecSort(filtered, sortMode, sortDir)
+  }, [allSpecTickets, sortMode, sortDir])
+
+  // Shared assignment helper. Used both by the drag-and-drop ticket→rail
+  // path (`handleDragEnd`) and by the `Move to Rail` popover on the
+  // dashboard postit tier. Idempotent: re-assigning to the same rail is a
+  // no-op; assigning to a different rail moves the ticket atomically.
+  const handleMoveTicketToRail = useCallback((ticketId: number, railId: string) => {
+    const targetRail = rails.find((r) => r.id === railId)
+    if (!targetRail) return
+    if (targetRail.ticketIds.includes(ticketId)) {
+      toast.info(`Already on ${targetRail.label}`)
+      return
+    }
+    updateSpecOrder((prev) => (prev ?? specTickets.map((t) => t.id)).filter((id) => id !== ticketId))
+    updateRails((prev) => prev.map((r) => {
+      if (r.id === railId) {
+        return { ...r, ticketIds: [...r.ticketIds.filter((id) => id !== ticketId), ticketId] }
+      }
+      if (r.ticketIds.includes(ticketId)) {
+        return { ...r, ticketIds: r.ticketIds.filter((id) => id !== ticketId) }
+      }
+      return r
+    }))
+    toast.success(`Moved to ${targetRail.label}`)
+  }, [rails, specTickets, updateRails, updateSpecOrder])
 
   // ── DnD helpers ──────────────────────────────────────────────────────────────
   const findContainer = useCallback(
@@ -387,7 +432,12 @@ export default function DashboardPage() {
         const oldIdx = ids.indexOf(draggedId)
         const newIdx = ids.indexOf(overId as number)
         if (oldIdx !== -1 && newIdx !== -1 && oldIdx !== newIdx) {
-          updateSpecOrder(() => arrayMove(ids, oldIdx, newIdx))
+          const nextIds = arrayMove(ids, oldIdx, newIdx)
+          updateSpecOrder(() => nextIds)
+          if (sortMode !== 'default') {
+            setSortMode('default')
+            saveSpecSort(activeProjectId, 'default', sortDir)
+          }
         }
       } else {
         updateRails((prev) =>
@@ -559,16 +609,49 @@ export default function DashboardPage() {
 
   const activeTicket = activeId !== null ? ticketMap.get(activeId) : undefined
 
+  const { leftWidth, tier, enabled: splitterEnabled, beginDrag, resetToDefault } = useDashboardSplit(activeProjectId)
+  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex h-full overflow-hidden">
         {/* Left panel: Specs board */}
-        <div className="flex-1 min-w-0 border-r border-border/40 flex flex-col overflow-hidden">
-          <SpecsBoard tickets={specTickets} allTickets={tickets} doneTickets={doneSpecTickets} isLoading={isLoading} onTicketClick={setDetailTicket} onTicketCreated={(ticket) => { setDetailTicket(ticket); refetch() }} />
+        <div
+          className="min-w-0 flex flex-col overflow-hidden"
+          style={splitterEnabled && leftWidth !== null
+            ? { width: `${leftWidth}px`, flex: '0 0 auto' }
+            : { flex: '1 1 0%' }}
+        >
+          <SpecsBoard
+            tickets={specTickets}
+            allTickets={tickets}
+            doneTickets={doneSpecTickets}
+            isLoading={isLoading}
+            onTicketClick={setDetailTicket}
+            onTicketCreated={(ticket) => { setDetailTicket(ticket); refetch() }}
+            onTicketDelete={(id) => deleteTicket(id)}
+            contractRefiningIds={contractRefiningIds}
+            sortMode={sortMode}
+            sortDir={sortDir}
+            onSortChange={handleSortChange}
+            tier={tier}
+            rails={rails}
+            onMoveToRail={handleMoveTicketToRail}
+          />
         </div>
 
+        {/* Splitter — only mounted when the viewport is wide enough. */}
+        {splitterEnabled && leftWidth !== null && (
+          <DashboardSplitter
+            leftWidth={leftWidth}
+            viewport={viewportWidth}
+            onPointerDown={beginDrag}
+            onReset={resetToDefault}
+          />
+        )}
+
         {/* Right panel: Rails board */}
-        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden border-l border-border/40">
           <RailsBoard
             rails={rails}
             ticketMap={ticketMap}
@@ -598,18 +681,33 @@ export default function DashboardPage() {
       </DragOverlay>
 
       {/* Modals */}
-      {detailTicket && (
-        <TicketDetailModal
-          ticket={detailTicket}
-          allLabels={allTicketLabels}
-          onClose={() => setDetailTicket(null)}
-          onSave={updateTicket}
-          onDelete={(id) => {
-            deleteTicket(id)
-            setDetailTicket(null)
-          }}
-        />
-      )}
+      {detailTicket && (() => {
+        // Keep the modal's ticket in sync with the latest version from the
+        // tickets list (so WS updates — e.g. is_epic=true after SMASH —
+        // propagate without closing/reopening the modal).
+        const fresh = tickets.find((t) => t.id === detailTicket.id) ?? detailTicket
+        return (
+          // key={ticket.id} forces a fresh mount when navigating across the
+          // SMASH family (Epic ↔ Sub-Spec) so the modal's internal state
+          // (title/desc/priority) is re-initialised from the new ticket.
+          <TicketDetailModal
+            key={fresh.id}
+            ticket={fresh}
+            allLabels={allTicketLabels}
+            allTickets={tickets}
+            onClose={() => setDetailTicket(null)}
+            onOpenTicket={(id) => {
+              const next = tickets.find((t) => t.id === id)
+              if (next) setDetailTicket(next)
+            }}
+            onSave={updateTicket}
+            onDelete={(id) => {
+              deleteTicket(id)
+              setDetailTicket(null)
+            }}
+          />
+        )
+      })()}
       <CreateTicketModal
         open={createTicketOpen}
         allLabels={allTicketLabels}

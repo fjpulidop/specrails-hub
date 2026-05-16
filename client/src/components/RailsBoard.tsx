@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Layers, Plus } from 'lucide-react'
@@ -52,9 +52,30 @@ function SortableRailWrapper({ railId, children }: { railId: string; children: (
   )
 }
 
+/** Width threshold below which rail rows switch to the compact mini-card layout. */
+export const RAILS_COMPACT_THRESHOLD_PX = 220
+
 export function RailsBoard({ rails, ticketMap, onModeChange, onProfileChange, onToggle, onTicketClick, onAddRail, onDeleteRail, onRenameRail }: RailsBoardProps) {
   const activeRails = rails.filter((r) => r.status === 'running').length
   const [jiggleMode, setJiggleMode] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [density, setDensity] = useState<'normal' | 'compact'>('normal')
+
+  // Observe the panel's own width and switch to the compact rail layout when
+  // the dashboard splitter has collapsed us below the threshold.
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return
+    const el = containerRef.current
+    if (!el) return
+    const obs = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = entry.contentRect.width
+        setDensity(w < RAILS_COMPACT_THRESHOLD_PX ? 'compact' : 'normal')
+      }
+    })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
 
   // Exit jiggle mode on click outside (on the board background)
   const handleBackgroundClick = useCallback(() => {
@@ -72,7 +93,7 @@ export function RailsBoard({ rails, ticketMap, onModeChange, onProfileChange, on
   const sortableIds = rails.map((r) => railSortId(r.id))
 
   return (
-    <div className="flex flex-col h-full" onClick={handleBackgroundClick}>
+    <div ref={containerRef} className="flex flex-col h-full" data-density={density} onClick={handleBackgroundClick}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 h-12 border-b border-border/40 shrink-0">
         <div className="flex items-center gap-2">
@@ -110,6 +131,7 @@ export function RailsBoard({ rails, ticketMap, onModeChange, onProfileChange, on
                     activeJobId={rail.activeJobId}
                     profileName={rail.profileName ?? null}
                     jiggleMode={jiggleMode}
+                    density={density}
                     dragHandleListeners={listeners}
                     dragHandleAttributes={attributes}
                     onModeChange={(mode) => onModeChange(rail.id, mode)}

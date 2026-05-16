@@ -1,0 +1,156 @@
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { DndContext } from '@dnd-kit/core'
+import { SortableContext } from '@dnd-kit/sortable'
+import { TicketPostitCard } from '../TicketPostitCard'
+import type { LocalTicket } from '../../types'
+import type { RailState } from '../RailsBoard'
+
+function makeTicket(overrides: Partial<LocalTicket> = {}): LocalTicket {
+  return {
+    id: 42,
+    title: 'Add dark mode toggle',
+    description: 'body',
+    status: 'todo',
+    priority: 'high',
+    labels: [],
+    assignee: null,
+    prerequisites: [],
+    metadata: {},
+    short_summary: 'Lets users switch theme persisted hub-wide.',
+    is_epic: false,
+    parent_epic_id: null,
+    execution_order: null,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    created_by: 'user',
+    source: 'propose-spec',
+    ...overrides,
+  } as LocalTicket
+}
+
+function makeRails(): RailState[] {
+  return [
+    { id: 'rail-1', label: 'Rail Alpha', ticketIds: [], mode: 'implement', status: 'idle' },
+    { id: 'rail-2', label: 'Rail Beta', ticketIds: [], mode: 'implement', status: 'running' },
+  ]
+}
+
+function wrap(ui: React.ReactNode, ids: number[] = [42]) {
+  return (
+    <DndContext>
+      <SortableContext items={ids}>{ui}</SortableContext>
+    </DndContext>
+  )
+}
+
+describe('TicketPostitCard', () => {
+  it('renders id, title, priority, and summary when present', () => {
+    render(
+      wrap(
+        <TicketPostitCard
+          ticket={makeTicket()}
+          rails={makeRails()}
+          onClick={() => {}}
+          onMoveToRail={() => {}}
+        />,
+      ),
+    )
+    expect(screen.getByText('#42')).toBeInTheDocument()
+    expect(screen.getByText('Add dark mode toggle')).toBeInTheDocument()
+    expect(screen.getByText(/high/i)).toBeInTheDocument()
+    expect(screen.getByTestId('postit-short-summary')).toHaveTextContent('Lets users switch theme persisted hub-wide.')
+  })
+
+  it('hides the summary region when short_summary is null', () => {
+    render(
+      wrap(
+        <TicketPostitCard
+          ticket={makeTicket({ short_summary: null })}
+          rails={makeRails()}
+          onClick={() => {}}
+          onMoveToRail={() => {}}
+        />,
+      ),
+    )
+    expect(screen.queryByTestId('postit-short-summary')).not.toBeInTheDocument()
+  })
+
+  it('hides the summary region when short_summary is empty string', () => {
+    render(
+      wrap(
+        <TicketPostitCard
+          ticket={makeTicket({ short_summary: '   ' })}
+          rails={makeRails()}
+          onClick={() => {}}
+          onMoveToRail={() => {}}
+        />,
+      ),
+    )
+    expect(screen.queryByTestId('postit-short-summary')).not.toBeInTheDocument()
+  })
+
+  it('renders a Draft pill when status is draft and hides priority', () => {
+    render(
+      wrap(
+        <TicketPostitCard
+          ticket={makeTicket({ status: 'draft', priority: null })}
+          rails={makeRails()}
+          onClick={() => {}}
+          onMoveToRail={() => {}}
+        />,
+      ),
+    )
+    expect(screen.getByText(/draft/i)).toBeInTheDocument()
+  })
+
+  it('opens the Move-to-Rail popover and calls onMoveToRail when a rail is picked', () => {
+    const onMove = vi.fn()
+    render(
+      wrap(
+        <TicketPostitCard
+          ticket={makeTicket()}
+          rails={makeRails()}
+          onClick={() => {}}
+          onMoveToRail={onMove}
+        />,
+      ),
+    )
+    fireEvent.click(screen.getByTestId('move-to-rail-button'))
+    expect(screen.getByTestId('move-to-rail-popover')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Rail Alpha'))
+    expect(onMove).toHaveBeenCalledWith(42, 'rail-1')
+    expect(screen.queryByTestId('move-to-rail-popover')).not.toBeInTheDocument()
+  })
+
+  it('shows a dependency indicator when the ticket has prerequisites', () => {
+    render(
+      wrap(
+        <TicketPostitCard
+          ticket={makeTicket({ prerequisites: [1, 2, 3] })}
+          rails={makeRails()}
+          onClick={() => {}}
+          onMoveToRail={() => {}}
+        />,
+      ),
+    )
+    expect(screen.getByText(/Depends on 3/)).toBeInTheDocument()
+  })
+
+  it('does not fire onClick when in jiggleMode', () => {
+    const onClick = vi.fn()
+    render(
+      wrap(
+        <TicketPostitCard
+          ticket={makeTicket()}
+          rails={makeRails()}
+          onClick={onClick}
+          onMoveToRail={() => {}}
+          jiggleMode
+        />,
+      ),
+    )
+    fireEvent.click(screen.getByText('Add dark mode toggle'))
+    expect(onClick).not.toHaveBeenCalled()
+  })
+})

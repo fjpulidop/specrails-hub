@@ -12,6 +12,7 @@ import {
   isValidStatus,
   isValidPriority,
   validatePriorityForStatus,
+  validateEpicChildIntegrity,
   CURRENT_SCHEMA_VERSION,
   type Ticket,
   type TicketStore,
@@ -31,6 +32,10 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
     prerequisites: [],
     metadata: {},
     origin_conversation_id: null,
+    is_epic: false,
+    parent_epic_id: null,
+    execution_order: null,
+    short_summary: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     created_by: 'user',
@@ -557,6 +562,10 @@ describe('schema_version 1.0 back-compat', () => {
         prerequisites: [],
         metadata: {},
         origin_conversation_id: 'conv-abc',
+        is_epic: false,
+        parent_epic_id: null,
+        execution_order: null,
+        short_summary: null,
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
         created_by: 'sr-explore-spec',
@@ -581,5 +590,219 @@ describe('schema_version 1.0 back-compat', () => {
     const filePath = path.join(tmpDir, 'fresh.json')
     const store = readStore(filePath)
     expect(store.schema_version).toBe(CURRENT_SCHEMA_VERSION)
+  })
+})
+
+// ─── Schema 1.1 → 1.2 back-compat (specs-smash) ──────────────────────────────
+
+describe('schema_version 1.1+ → 1.3 back-compat', () => {
+  it('reads a 1.1 store and surfaces default is_epic / parent_epic_id / execution_order', () => {
+    const filePath = path.join(tmpDir, 'v1_1-tickets.json')
+    const onDisk = {
+      schema_version: '1.1',
+      revision: 3,
+      last_updated: '2026-04-01T00:00:00Z',
+      next_id: 2,
+      tickets: {
+        '1': {
+          id: 1,
+          title: 'Pre-smash ticket',
+          description: 'no epic fields on disk',
+          status: 'todo',
+          priority: 'medium',
+          labels: [],
+          assignee: null,
+          prerequisites: [],
+          metadata: {},
+          origin_conversation_id: null,
+          created_at: '2026-03-01T00:00:00Z',
+          updated_at: '2026-03-01T00:00:00Z',
+          created_by: 'user',
+          source: 'manual',
+          // intentionally no is_epic / parent_epic_id / execution_order
+        },
+      },
+    }
+    fs.writeFileSync(filePath, JSON.stringify(onDisk, null, 2), 'utf-8')
+
+    const store = readStore(filePath)
+    expect(store.tickets['1'].is_epic).toBe(false)
+    expect(store.tickets['1'].parent_epic_id).toBeNull()
+    expect(store.tickets['1'].execution_order).toBeNull()
+
+    // Disk untouched on read
+    const reread = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+    expect(reread.schema_version).toBe('1.1')
+    expect('is_epic' in reread.tickets['1']).toBe(false)
+  })
+
+  it('bumps schema_version to 1.2 on first write while preserving rows', () => {
+    const filePath = path.join(tmpDir, 'v1_1-tickets.json')
+    fs.writeFileSync(filePath, JSON.stringify({
+      schema_version: '1.1',
+      revision: 1,
+      last_updated: '2026-03-01T00:00:00Z',
+      next_id: 2,
+      tickets: {
+        '1': {
+          id: 1,
+          title: 'Pre-existing',
+          description: 'd',
+          status: 'todo',
+          priority: 'medium',
+          labels: [],
+          assignee: null,
+          prerequisites: [],
+          metadata: {},
+          origin_conversation_id: null,
+          created_at: '2026-03-01T00:00:00Z',
+          updated_at: '2026-03-01T00:00:00Z',
+          created_by: 'user',
+          source: 'manual',
+        },
+      },
+    }, null, 2), 'utf-8')
+
+    mutateStore(filePath, (s) => {
+      s.next_id = 3
+    })
+
+    const reread = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+    expect(reread.schema_version).toBe(CURRENT_SCHEMA_VERSION)
+    expect(CURRENT_SCHEMA_VERSION).toBe('1.3')
+    expect(reread.tickets['1'].is_epic).toBe(false)
+    expect(reread.tickets['1'].parent_epic_id).toBeNull()
+    expect(reread.tickets['1'].execution_order).toBeNull()
+  })
+
+  it('normalizes missing short_summary to null on read (1.2 store)', () => {
+    const filePath = path.join(tmpDir, 'v1_2-tickets.json')
+    const onDisk = {
+      schema_version: '1.2',
+      revision: 1,
+      last_updated: '2026-04-01T00:00:00Z',
+      next_id: 2,
+      tickets: {
+        '1': {
+          id: 1,
+          title: 'Pre-summary ticket',
+          description: 'no summary field on disk',
+          status: 'todo',
+          priority: 'medium',
+          labels: [],
+          assignee: null,
+          prerequisites: [],
+          metadata: {},
+          origin_conversation_id: null,
+          is_epic: false,
+          parent_epic_id: null,
+          execution_order: null,
+          created_at: '2026-03-01T00:00:00Z',
+          updated_at: '2026-03-01T00:00:00Z',
+          created_by: 'user',
+          source: 'manual',
+        },
+      },
+    }
+    fs.writeFileSync(filePath, JSON.stringify(onDisk, null, 2), 'utf-8')
+
+    const store = readStore(filePath)
+    expect(store.tickets['1'].short_summary).toBeNull()
+
+    // Disk untouched on read.
+    const reread = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+    expect('short_summary' in reread.tickets['1']).toBe(false)
+  })
+})
+
+// ─── clampShortSummary ───────────────────────────────────────────────────────
+
+describe('clampShortSummary', () => {
+  it('returns null for null / undefined / non-string', async () => {
+    const { clampShortSummary } = await import('./ticket-store')
+    expect(clampShortSummary(null)).toBeNull()
+    expect(clampShortSummary(undefined)).toBeNull()
+    expect(clampShortSummary(42)).toBeNull()
+    expect(clampShortSummary({ foo: 'bar' })).toBeNull()
+  })
+
+  it('returns null for empty / whitespace-only strings', async () => {
+    const { clampShortSummary } = await import('./ticket-store')
+    expect(clampShortSummary('')).toBeNull()
+    expect(clampShortSummary('   ')).toBeNull()
+    expect(clampShortSummary('\n\n\t  ')).toBeNull()
+  })
+
+  it('trims and collapses internal whitespace', async () => {
+    const { clampShortSummary } = await import('./ticket-store')
+    expect(clampShortSummary('  hello   world  ')).toBe('hello world')
+    expect(clampShortSummary('line1\n\nline2')).toBe('line1 line2')
+  })
+
+  it('strips ASCII control characters', async () => {
+    const { clampShortSummary } = await import('./ticket-store')
+    const withCtrl = 'hi\u0007there\u001Fworld'
+    expect(clampShortSummary(withCtrl)).toBe('hithereworld')
+  })
+
+  it('hard-caps at 240 chars', async () => {
+    const { clampShortSummary, SHORT_SUMMARY_MAX_LEN } = await import('./ticket-store')
+    expect(SHORT_SUMMARY_MAX_LEN).toBe(240)
+    const long = 'x'.repeat(500)
+    const out = clampShortSummary(long)
+    expect(out).not.toBeNull()
+    expect(out!.length).toBe(240)
+  })
+
+  it('preserves normal short strings unchanged', async () => {
+    const { clampShortSummary } = await import('./ticket-store')
+    const text = 'Add dark mode toggle persisted per user.'
+    expect(clampShortSummary(text)).toBe(text)
+  })
+})
+
+// ─── validateEpicChildIntegrity ──────────────────────────────────────────────
+
+describe('validateEpicChildIntegrity', () => {
+  it('returns no errors when store has no épicas or children', () => {
+const store: TicketStore = makeStore({
+      tickets: {
+        '1': makeTicket({ id: 1 }),
+      },
+    })
+    expect(validateEpicChildIntegrity(store)).toEqual([])
+  })
+
+  it('returns no errors when a child correctly references an épica', () => {
+const store: TicketStore = makeStore({
+      tickets: {
+        '1': makeTicket({ id: 1, is_epic: true }),
+        '2': makeTicket({ id: 2, parent_epic_id: 1, execution_order: 1 }),
+      },
+    })
+    expect(validateEpicChildIntegrity(store)).toEqual([])
+  })
+
+  it('flags a child referencing a missing parent', () => {
+const store: TicketStore = makeStore({
+      tickets: {
+        '2': makeTicket({ id: 2, parent_epic_id: 999, execution_order: 1 }),
+      },
+    })
+    const errs = validateEpicChildIntegrity(store)
+    expect(errs).toHaveLength(1)
+    expect(errs[0]).toMatch(/missing parent_epic_id=999/)
+  })
+
+  it('flags a child whose parent is not an épica', () => {
+const store: TicketStore = makeStore({
+      tickets: {
+        '1': makeTicket({ id: 1, is_epic: false }),
+        '2': makeTicket({ id: 2, parent_epic_id: 1, execution_order: 1 }),
+      },
+    })
+    const errs = validateEpicChildIntegrity(store)
+    expect(errs).toHaveLength(1)
+    expect(errs[0]).toMatch(/parent 1 is not an epic/)
   })
 })

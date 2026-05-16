@@ -4,7 +4,11 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { FileText, Plus, CheckCircle2 } from 'lucide-react'
 import { Button } from './ui/button'
 import { SpecCard } from './SpecCard'
+import { TicketPostitCard } from './TicketPostitCard'
+import type { RailState } from './RailsBoard'
 import { SpecLabelFilterStrip } from './SpecLabelFilterStrip'
+import { SpecSortControl } from './SpecSortControl'
+import type { SpecSortMode, SpecSortDir } from '../types/spec-sort'
 import { ProposeSpecModal, type ExploreLaunchPayload } from './ProposeSpecModal'
 import { ExploreSpecShell } from './explore-spec/ExploreSpecShell'
 import { useMinimizedChats, usePendingRestore } from '../context/MinimizedChatsContext'
@@ -27,6 +31,24 @@ interface SpecsBoardProps {
   isLoading: boolean
   onTicketClick: (ticket: LocalTicket) => void
   onTicketCreated?: (ticket: LocalTicket) => void
+  /** Delete handler — when provided, long-press on cards enters jiggle mode
+   *  and reveals a per-card delete button. */
+  onTicketDelete?: (ticketId: number) => void
+  contractRefiningIds?: Set<number>
+  sortMode?: SpecSortMode
+  sortDir?: SpecSortDir
+  onSortChange?: (mode: SpecSortMode, dir: SpecSortDir) => void
+  /**
+   * Current visual tier derived from the dashboard splitter. When `'postit'`,
+   * the active spec list uses square `TicketPostitCard`s in an auto-fill
+   * grid; `'card'` is the same component with denser CSS; `'row'` is the
+   * default compact list.
+   */
+  tier?: 'row' | 'card' | 'postit'
+  /** Rails available in the project — required for the postit Move-to-Rail popover. */
+  rails?: RailState[]
+  /** Handler invoked when the user picks a rail from the Move-to-Rail popover. */
+  onMoveToRail?: (ticketId: number, railId: string) => void
 }
 
 interface DraftOverrides {
@@ -64,6 +86,7 @@ interface ExploreState {
     priority: 'low' | 'medium' | 'high' | 'critical' | null
     acceptanceCriteria: string[]
   }
+  contextScope?: import('../types/context-scope').ContextScope
 }
 
 /** Returns true when at least one draft field carries a meaningful value. */
@@ -93,12 +116,68 @@ function deriveExploreLabel(
   return 'Untitled spec'
 }
 
-export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, onTicketClick, onTicketCreated }: SpecsBoardProps) {
+export function SpecsBoard({
+  tickets,
+  allTickets,
+  doneTickets = [],
+  isLoading,
+  onTicketClick,
+  onTicketCreated,
+  onTicketDelete,
+  contractRefiningIds = new Set(),
+  sortMode = 'default',
+  sortDir = 'desc',
+  onSortChange = () => {},
+  tier = 'row',
+  rails = [],
+  onMoveToRail,
+}: SpecsBoardProps) {
+  const [jiggleMode, setJiggleMode] = useState(false)
+  // Exit jiggle mode when clicking outside any card or pressing Escape.
+  useEffect(() => {
+    if (!jiggleMode) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setJiggleMode(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [jiggleMode])
+  const handleBackgroundClick = useCallback(() => {
+    if (jiggleMode) setJiggleMode(false)
+  }, [jiggleMode])
+  const enterJiggle = useCallback(() => setJiggleMode(true), [])
+  const handleCardDelete = useCallback(
+    (t: LocalTicket) => {
+      if (onTicketDelete) onTicketDelete(t.id)
+    },
+    [onTicketDelete],
+  )
   const [proposeOpen, setProposeOpen] = useState(false)
   const [explore, setExplore] = useState<ExploreState | null>(null)
   const [activeLabels, setActiveLabels] = useState<Set<string>>(new Set())
   const { activeProjectId } = useHub()
   const { minimize } = useMinimizedChats()
+  // SMASH: build lookup maps so each SpecCard renders the épica badge / child
+  // pill without re-scanning the full ticket list per render.
+  const epicChildCounts = useMemo(() => {
+    const m = new Map<number, number>()
+    for (const t of allTickets ?? []) {
+      if (t.parent_epic_id != null) m.set(t.parent_epic_id, (m.get(t.parent_epic_id) ?? 0) + 1)
+    }
+    return m
+  }, [allTickets])
+  const epicTitles = useMemo(() => {
+    const m = new Map<number, string>()
+    for (const t of allTickets ?? []) if (t.is_epic) m.set(t.id, t.title)
+    return m
+  }, [allTickets])
+  const ticketsById = useMemo(() => {
+    const m = new Map<number, LocalTicket>()
+    for (const t of allTickets ?? []) m.set(t.id, t)
+    return m
+  }, [allTickets])
+  const handleOpenParentEpic = useCallback((parentEpicId: number) => {
+    const parent = ticketsById.get(parentEpicId)
+    if (parent) onTicketClick(parent)
+  }, [ticketsById, onTicketClick])
 
   useEffect(() => {
     setActiveLabels(new Set())
@@ -235,6 +314,7 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
       pendingSpecId: payload.pendingSpecId,
       initialAttachmentIds: payload.initialAttachmentIds,
       initialModel: payload.model,
+      contextScope: payload.contextScope,
     })
   }, [parkCurrentExplore])
 
@@ -301,7 +381,7 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
   }, [])
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" onClick={handleBackgroundClick}>
       {/* Header */}
       <div className="flex items-center px-4 h-12 border-b border-border/40 shrink-0 gap-2">
         <div className="flex items-center gap-2 shrink-0">
@@ -319,10 +399,16 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
           onToggle={toggleLabel}
           onClear={clearLabels}
         />
+        <SpecSortControl
+          mode={sortMode}
+          dir={sortDir}
+          onChange={onSortChange}
+          className="ml-auto"
+        />
         <Button
           size="sm"
           variant="outline"
-          className="h-7 text-xs gap-1 shrink-0 ml-auto"
+          className="h-7 text-xs gap-1 shrink-0"
           onClick={() => setProposeOpen(true)}
           data-tour="add-spec-btn"
         >
@@ -364,11 +450,52 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
                 <p className="text-xs mt-1 opacity-60">Click "+ Add" to get started</p>
               )}
             </div>
+          ) : tier === 'postit' && onMoveToRail ? (
+            <SortableContext items={filteredTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+              <div
+                data-testid="specs-board-postit-grid"
+                className="grid gap-3"
+                style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}
+              >
+                {filteredTickets.map((ticket) => (
+                  <TicketPostitCard
+                    key={ticket.id}
+                    ticket={ticket}
+                    rails={rails}
+                    onClick={onTicketClick}
+                    onMoveToRail={onMoveToRail}
+                    contractRefining={contractRefiningIds.has(ticket.id)}
+                    epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
+                    parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
+                    jiggleMode={jiggleMode}
+                    onDelete={onTicketDelete ? handleCardDelete : undefined}
+                  />
+                ))}
+              </div>
+            </SortableContext>
           ) : (
             <SortableContext items={filteredTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-              {filteredTickets.map((ticket) => (
-                <SpecCard key={ticket.id} ticket={ticket} onClick={onTicketClick} />
-              ))}
+              <div
+                data-testid="specs-board-list"
+                data-tier={tier}
+                className={tier === 'card' ? 'grid gap-2' : 'space-y-1.5'}
+                style={tier === 'card' ? { gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' } : undefined}
+              >
+                {filteredTickets.map((ticket) => (
+                  <SpecCard
+                    key={ticket.id}
+                    ticket={ticket}
+                    onClick={onTicketClick}
+                    contractRefining={contractRefiningIds.has(ticket.id)}
+                    epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
+                    parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
+                    onOpenParentEpic={handleOpenParentEpic}
+                    jiggleMode={jiggleMode}
+                    onLongPress={onTicketDelete ? enterJiggle : undefined}
+                    onDelete={onTicketDelete ? handleCardDelete : undefined}
+                  />
+                ))}
+              </div>
             </SortableContext>
           )}
         </div>
@@ -401,7 +528,18 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
             ) : (
               <SortableContext items={filteredDoneTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                 {filteredDoneTickets.map((ticket) => (
-                  <SpecCard key={ticket.id} ticket={ticket} onClick={onTicketClick} />
+                  <SpecCard
+                    key={ticket.id}
+                    ticket={ticket}
+                    onClick={onTicketClick}
+                    contractRefining={contractRefiningIds.has(ticket.id)}
+                    epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
+                    parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
+                    onOpenParentEpic={handleOpenParentEpic}
+                    jiggleMode={jiggleMode}
+                    onLongPress={onTicketDelete ? enterJiggle : undefined}
+                    onDelete={onTicketDelete ? handleCardDelete : undefined}
+                  />
                 ))}
               </SortableContext>
             )}
@@ -432,6 +570,7 @@ export function SpecsBoard({ tickets, allTickets, doneTickets = [], isLoading, o
           seedComposerText={explore.seedComposerText}
           seedDraftOverrides={explore.seedDraftOverrides}
           editTicket={explore.editTicket}
+          contextScope={explore.contextScope}
           onStateChange={(s) => setLiveShell(s)}
           onClose={() => {
             // Discarding the overlay → wipe any attachments uploaded during

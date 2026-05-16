@@ -21,6 +21,15 @@ interface RailRowProps {
   jiggleMode: boolean
   dragHandleListeners?: Record<string, Function>
   dragHandleAttributes?: Record<string, any>
+  /**
+   * Visual density. `'normal'` (default) renders the full rail card with
+   * a droppable body and embedded spec cards. `'compact'` renders a tall
+   * premium mini-card with only the header controls (name, Mode dropdown,
+   * Profile picker, Play/Stop/Log, spec counter) — used when the dashboard
+   * splitter has collapsed the rails panel below ~220 px wide. Tickets are
+   * still reachable via the Move-to-Rail popover on dashboard postits.
+   */
+  density?: 'normal' | 'compact'
   onModeChange: (mode: RailMode) => void
   onProfileChange?: (profileName: string | null) => void
   onToggle: () => void
@@ -32,7 +41,7 @@ interface RailRowProps {
 
 export function RailRow({
   id, label, tickets, mode, status, activeJobId, profileName, jiggleMode,
-  dragHandleListeners, dragHandleAttributes,
+  dragHandleListeners, dragHandleAttributes, density = 'normal',
   onModeChange, onProfileChange, onToggle, onTicketClick, onDelete, onLongPress, onRename,
 }: RailRowProps) {
   const { isOver, setNodeRef } = useDroppable({ id })
@@ -142,6 +151,123 @@ export function RailRow({
     setSwipeX(0)
     onDelete()
   }, [onDelete])
+
+  // ── Compact density rendering ─────────────────────────────────────────────
+  if (density === 'compact') {
+    return (
+      <div
+        ref={setNodeRef}
+        data-testid={`rail-row-compact-${id}`}
+        data-density="compact"
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onClick={handleClick}
+        className={`group relative flex flex-col gap-1.5 rounded-xl border bg-card/80 backdrop-blur p-2.5 transition-all ${
+          isOver
+            ? 'border-accent-info/60 shadow-[0_0_0_1px_hsl(var(--accent-info)/0.35),0_0_14px_hsl(var(--accent-info)/0.18)]'
+            : isRunning
+              ? 'border-accent-success/40 shadow-sm'
+              : 'border-border/40 hover:border-accent-info/30 hover:shadow-md'
+        } ${jiggleMode && canDelete ? 'animate-jiggle' : ''}`}
+      >
+        {/* Header line: drag grip + status dot + label */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <button
+            type="button"
+            className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground/70 transition-colors shrink-0"
+            {...dragHandleListeners}
+            {...dragHandleAttributes}
+          >
+            <GripVertical className="w-3 h-3" />
+          </button>
+          <div
+            className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300 ${
+              isRunning
+                ? 'bg-accent-success shadow-[0_0_4px_hsl(var(--accent-success)/0.8)] animate-pulse'
+                : status === 'failed'
+                  ? 'bg-accent-warning shadow-[0_0_4px_hsl(var(--accent-warning)/0.6)]'
+                  : 'bg-muted-foreground/25'
+            }`}
+            aria-hidden
+          />
+          {editing ? (
+            <form
+              className="flex items-center gap-0.5 min-w-0 flex-1"
+              onSubmit={(e) => {
+                e.preventDefault()
+                const trimmed = editValue.trim()
+                if (trimmed) onRename(trimmed)
+                setEditing(false)
+              }}
+            >
+              <input
+                ref={inputRef}
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={() => {
+                  const trimmed = editValue.trim()
+                  if (trimmed) onRename(trimmed)
+                  setEditing(false)
+                }}
+                onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false) }}
+                className="flex-1 min-w-0 text-xs font-medium bg-transparent border-b border-accent-info/60 outline-none text-foreground/90 px-0.5"
+                autoFocus
+              />
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                const suffix = label.startsWith('Rail ') ? label.slice(5) : label
+                setEditValue(suffix)
+                setEditing(true)
+                setTimeout(() => inputRef.current?.select(), 0)
+              }}
+              className="flex-1 min-w-0 text-left text-xs font-medium text-foreground/90 hover:text-foreground truncate"
+              title={label}
+            >
+              {label}
+            </button>
+          )}
+          {tickets.length > 0 && (
+            <span className="text-[9px] text-muted-foreground bg-muted/30 rounded-full px-1.5 py-0.5 leading-none shrink-0">
+              {tickets.length}
+            </span>
+          )}
+        </div>
+
+        {/* Mode dropdown + Profile picker (stacked) */}
+        <div className="flex flex-col gap-1">
+          {onProfileChange && !isRunning && (
+            <RailProfileSelector value={profileName ?? null} onChange={onProfileChange} />
+          )}
+          <RailControls
+            mode={mode}
+            status={status}
+            activeJobId={activeJobId}
+            ticketCount={tickets.length}
+            onModeChange={onModeChange}
+            onToggle={onToggle}
+          />
+        </div>
+
+        {/* Jiggle-mode delete button */}
+        {jiggleMode && canDelete && (
+          <button
+            type="button"
+            onClick={handleDeleteClick}
+            className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm hover:opacity-90 transition-opacity"
+            aria-label={`Delete ${label}`}
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div

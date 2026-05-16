@@ -23,7 +23,10 @@ vi.mock('@dnd-kit/sortable', () => ({
 }))
 
 vi.mock('@dnd-kit/utilities', () => ({
-  CSS: { Transform: { toString: () => '' } },
+  CSS: {
+    Transform: { toString: () => '' },
+    Translate: { toString: () => '' },
+  },
 }))
 
 vi.mock('../ProposeSpecModal', () => ({
@@ -71,6 +74,53 @@ describe('SpecsBoard', () => {
     render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
     expect(screen.getByText('No specs yet')).toBeInTheDocument()
     expect(screen.getByText(/Click "\+ Add" to get started/i)).toBeInTheDocument()
+  })
+
+  it('renders the postit grid when tier=postit and onMoveToRail is provided', () => {
+    const tickets = [makeTicket({ id: 1, title: 'A' }), makeTicket({ id: 2, title: 'B' })]
+    render(
+      <SpecsBoard
+        tickets={tickets}
+        isLoading={false}
+        onTicketClick={onTicketClick}
+        tier="postit"
+        rails={[]}
+        onMoveToRail={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('specs-board-postit-grid')).toBeInTheDocument()
+    expect(screen.queryByTestId('specs-board-list')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the row list when tier=row', () => {
+    const tickets = [makeTicket({ id: 1 })]
+    render(
+      <SpecsBoard
+        tickets={tickets}
+        isLoading={false}
+        onTicketClick={onTicketClick}
+        tier="row"
+        rails={[]}
+        onMoveToRail={vi.fn()}
+      />,
+    )
+    const list = screen.getByTestId('specs-board-list')
+    expect(list).toBeInTheDocument()
+    expect(list).toHaveAttribute('data-tier', 'row')
+  })
+
+  it('uses the row list when tier=postit but no onMoveToRail handler is provided', () => {
+    const tickets = [makeTicket({ id: 1 })]
+    render(
+      <SpecsBoard
+        tickets={tickets}
+        isLoading={false}
+        onTicketClick={onTicketClick}
+        tier="postit"
+      />,
+    )
+    expect(screen.queryByTestId('specs-board-postit-grid')).not.toBeInTheDocument()
+    expect(screen.getByTestId('specs-board-list')).toBeInTheDocument()
   })
 
   it('shows loading skeletons when isLoading is true', () => {
@@ -122,5 +172,44 @@ describe('SpecsBoard', () => {
     expect(screen.getByTestId('propose-spec-modal')).toBeInTheDocument()
     fireEvent.click(screen.getByText('close modal'))
     expect(screen.queryByTestId('propose-spec-modal')).not.toBeInTheDocument()
+  })
+
+  it('renders the sort control in the header', () => {
+    render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
+    expect(screen.getByLabelText('Sort mode')).toBeInTheDocument()
+  })
+
+  it('hides direction arrow when sortMode is default', () => {
+    render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} sortMode="default" />)
+    expect(screen.queryByLabelText('Toggle sort direction')).toBeNull()
+  })
+
+  it('shows direction arrow when sortMode is not default', () => {
+    render(
+      <SpecsBoard
+        tickets={[]}
+        isLoading={false}
+        onTicketClick={onTicketClick}
+        sortMode="priority"
+        sortDir="desc"
+      />,
+    )
+    expect(screen.getByLabelText('Toggle sort direction')).toBeInTheDocument()
+  })
+
+  it('calls onSortChange when direction arrow is clicked', () => {
+    const onSortChange = vi.fn()
+    render(
+      <SpecsBoard
+        tickets={[]}
+        isLoading={false}
+        onTicketClick={onTicketClick}
+        sortMode="ticket-id"
+        sortDir="desc"
+        onSortChange={onSortChange}
+      />,
+    )
+    fireEvent.click(screen.getByLabelText('Toggle sort direction'))
+    expect(onSortChange).toHaveBeenCalledWith('ticket-id', 'asc')
   })
 })

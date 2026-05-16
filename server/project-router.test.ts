@@ -5,7 +5,7 @@ import path from 'path'
 import express from 'express'
 import request from 'supertest'
 
-import { createProjectRouter, stripSpecMetadataSections, formatDescriptionWithCriteria } from './project-router'
+import { createProjectRouter, stripSpecMetadataSections, formatDescriptionWithCriteria, extractShortSummary } from './project-router'
 import { resolveTicketStoragePath, mutateStore, readStore } from './ticket-store'
 import { initDb } from './db'
 import { initHubDb } from './hub-db'
@@ -1903,50 +1903,177 @@ describe('project-router', () => {
     })
   })
 
-  // ─── GET/PATCH /:projectId/explore-mcp-enabled ───────────────────────────
-
-  describe('GET /:projectId/explore-mcp-enabled', () => {
-    it('returns false by default', async () => {
+  // ─── Removed project-level Explore toggles ─────────────────────────────
+  // The four endpoints `(GET|PATCH) /:projectId/(explore-mcp-enabled|
+  // explore-contract-refine-enabled)` were deleted. Decisions for MCP and
+  // Contract Refine are now exclusively per-spec (via context_scope).
+  describe('removed Explore project-toggle endpoints', () => {
+    it.each([
+      'explore-mcp-enabled',
+      'explore-contract-refine-enabled',
+    ])('GET /:projectId/%s returns 404', async (path) => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).get('/api/projects/proj-1/explore-mcp-enabled')
-      expect(res.status).toBe(200)
-      expect(res.body.enabled).toBe(false)
+      const res = await request(app).get(`/api/projects/proj-1/${path}`)
+      expect(res.status).toBe(404)
+    })
+
+    it.each([
+      'explore-mcp-enabled',
+      'explore-contract-refine-enabled',
+    ])('PATCH /:projectId/%s returns 404', async (path) => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .patch(`/api/projects/proj-1/${path}`)
+        .send({ enabled: true })
+      expect(res.status).toBe(404)
     })
   })
 
-  describe('PATCH /:projectId/explore-mcp-enabled', () => {
-    it('round-trips the toggle', async () => {
+  // ─── GET/PATCH /:projectId/add-spec-quick-contract-refine-last ──────────
+
+  describe('GET /:projectId/add-spec-quick-contract-refine-last', () => {
+    it('returns false and configured=false by default', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/add-spec-quick-contract-refine-last')
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ enabled: false, configured: false })
+    })
+  })
+
+  describe('PATCH /:projectId/add-spec-quick-contract-refine-last', () => {
+    it('round-trips the last-used value', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const on = await request(app)
-        .patch('/api/projects/proj-1/explore-mcp-enabled')
+        .patch('/api/projects/proj-1/add-spec-quick-contract-refine-last')
         .send({ enabled: true })
       expect(on.status).toBe(200)
       expect(on.body.enabled).toBe(true)
-      const verify = await request(app).get('/api/projects/proj-1/explore-mcp-enabled')
-      expect(verify.body.enabled).toBe(true)
-      const off = await request(app)
-        .patch('/api/projects/proj-1/explore-mcp-enabled')
-        .send({ enabled: false })
-      expect(off.body.enabled).toBe(false)
+      const verify = await request(app).get('/api/projects/proj-1/add-spec-quick-contract-refine-last')
+      expect(verify.body).toEqual({ enabled: true, configured: true })
     })
 
     it('rejects non-boolean payloads', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const res = await request(app)
-        .patch('/api/projects/proj-1/explore-mcp-enabled')
+        .patch('/api/projects/proj-1/add-spec-quick-contract-refine-last')
         .send({ enabled: 'yes' })
       expect(res.status).toBe(400)
       expect(res.body.error).toContain('boolean')
     })
+  })
 
-    it('rejects missing payload', async () => {
+  // ─── GET /:projectId/context-budget ──────────────────────────────────────
+
+  describe('GET /:projectId/context-budget', () => {
+    it('returns a budget shape for the project path', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
-      const res = await request(app).patch('/api/projects/proj-1/explore-mcp-enabled').send({})
+      const res = await request(app).get('/api/projects/proj-1/context-budget')
+      expect(res.status).toBe(200)
+      expect(res.body).toHaveProperty('specrailsTicketsTokens')
+      expect(res.body).toHaveProperty('openspecSpecsTokens')
+      expect(res.body).toHaveProperty('codebaseFileCount')
+      expect(res.body).toHaveProperty('codebaseEstimatedTokens')
+      expect(Array.isArray(res.body.mcpServers)).toBe(true)
+    })
+  })
+
+  // ─── GET/PATCH /:projectId/context-scope-last ────────────────────────────
+
+  describe('GET /:projectId/context-scope-last', () => {
+    it('returns default boot when nothing persisted', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/context-scope-last')
+      expect(res.status).toBe(200)
+      expect(res.body.scope).toEqual({
+        specrails: true, openspec: false, full: true, mcp: false, contractRefine: false,
+      })
+    })
+  })
+
+  describe('PATCH /:projectId/context-scope-last', () => {
+    it('merges partial updates and persists', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const a = await request(app)
+        .patch('/api/projects/proj-1/context-scope-last')
+        .send({ openspec: true, full: false })
+      expect(a.status).toBe(200)
+      expect(a.body.scope).toEqual({
+        specrails: true, openspec: true, full: false, mcp: false, contractRefine: false,
+      })
+      const verify = await request(app).get('/api/projects/proj-1/context-scope-last')
+      expect(verify.body.scope.openspec).toBe(true)
+      expect(verify.body.scope.full).toBe(false)
+    })
+
+    it('rejects non-boolean values', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .patch('/api/projects/proj-1/context-scope-last')
+        .send({ specrails: 'yes' })
       expect(res.status).toBe(400)
+    })
+
+    it('rejects non-object body', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .patch('/api/projects/proj-1/context-scope-last')
+        .send('not-an-object')
+      expect(res.status).toBe(400)
+    })
+  })
+
+  // ─── POST /:projectId/chat/conversations with contextScope ─────────────────
+
+  describe('POST /chat/conversations with contextScope', () => {
+    it('persists contextScope on explore conversations', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/chat/conversations')
+        .send({
+          model: 'sonnet',
+          kind: 'explore',
+          contextScope: { specrails: false, openspec: true, full: false, mcp: true, contractRefine: false },
+        })
+      expect(res.status).toBe(201)
+      const row = db.prepare('SELECT context_scope FROM chat_conversations WHERE id = ?')
+        .get(res.body.conversation.id) as { context_scope: string }
+      const parsed = JSON.parse(row.context_scope)
+      expect(parsed).toEqual({ specrails: false, openspec: true, full: false, mcp: true, contractRefine: false })
+    })
+
+    it('rejects contextScope on sidebar conversations', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/chat/conversations')
+        .send({ model: 'sonnet', kind: 'sidebar', contextScope: { full: true } })
+      expect(res.status).toBe(400)
+    })
+
+    it('uses last persisted scope as default when explore conv omits scope', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      await request(app)
+        .patch('/api/projects/proj-1/context-scope-last')
+        .send({ openspec: true })
+      const res = await request(app)
+        .post('/api/projects/proj-1/chat/conversations')
+        .send({ model: 'sonnet', kind: 'explore' })
+      expect(res.status).toBe(201)
+      const row = db.prepare('SELECT context_scope FROM chat_conversations WHERE id = ?')
+        .get(res.body.conversation.id) as { context_scope: string }
+      expect(JSON.parse(row.context_scope).openspec).toBe(true)
     })
   })
 
@@ -2686,6 +2813,55 @@ describe('project-router', () => {
       expect(out).not.toMatch(/^## Labels/m)
       expect(out).toContain('Problem Statement')
       expect(out).toContain('foo')
+    })
+
+    it('also strips the Short Summary section', () => {
+      const input = [
+        '## Spec Title',
+        'Add dark mode',
+        '',
+        '## Problem Statement',
+        'Users want dark mode.',
+        '',
+        '## Short Summary',
+        'Lets users switch to a dark theme persisted hub-wide.',
+      ].join('\n')
+      const out = stripSpecMetadataSections(input)
+      expect(out).not.toMatch(/Short Summary/)
+      expect(out).toContain('Problem Statement')
+    })
+  })
+
+  describe('extractShortSummary', () => {
+    it('returns the body of the Short Summary section', () => {
+      const input = [
+        '## Problem Statement',
+        'foo',
+        '',
+        '## Short Summary',
+        'A crisp one-line summary.',
+        '',
+        '## Estimated Complexity',
+        'Low',
+      ].join('\n')
+      expect(extractShortSummary(input)).toBe('A crisp one-line summary.')
+    })
+
+    it('returns null when no Short Summary section is present', () => {
+      expect(extractShortSummary('## Problem Statement\nfoo')).toBeNull()
+    })
+
+    it('returns null for an empty Short Summary section', () => {
+      const input = '## Short Summary\n\n## Next Section\nbody'
+      expect(extractShortSummary(input)).toBeNull()
+    })
+
+    it('supports multi-line summary body', () => {
+      const input = '## Short Summary\nLine one.\nLine two.\n\n## Next\nbody'
+      const out = extractShortSummary(input)
+      expect(out).not.toBeNull()
+      expect(out).toContain('Line one.')
+      expect(out).toContain('Line two.')
     })
   })
 
