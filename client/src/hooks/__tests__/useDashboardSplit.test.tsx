@@ -73,15 +73,15 @@ describe('useDashboardSplit', () => {
     expect(result.current.tier).toBe('row')
   })
 
-  it('resetToDefault returns to the per-session original captured on mount', () => {
+  it('resetToDefault restores the canonical default even when a stored value exists', () => {
     localStorage.setItem('specrails-hub:dashboard-split:proj-1', '950')
     const { result } = renderHook(() => useDashboardSplit('proj-1'))
-    // Mount snapshot = 950 (loaded from localStorage).
+    // Mount loads the stored value.
     expect(result.current.leftWidth).toBe(950)
-    // Drag elsewhere.
-    act(() => result.current.resetToDefault()) // simulate: still 950 (snapshot)
-    expect(result.current.leftWidth).toBe(950)
-    expect(localStorage.getItem('specrails-hub:dashboard-split:proj-1')).toBe('950')
+    act(() => result.current.resetToDefault())
+    // viewport 1400 → default = 1100, overriding the stored 950.
+    expect(result.current.leftWidth).toBe(1100)
+    expect(localStorage.getItem('specrails-hub:dashboard-split:proj-1')).toBe('1100')
   })
 
   it('falls back to the postit + compact-rails preset when no stored value existed at mount', () => {
