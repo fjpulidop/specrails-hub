@@ -6,65 +6,65 @@
 
 ## 1. Foundations: provider adapter scaffolding
 
-- [ ] 1.1 Add `server/providers/types.ts` declaring `ProviderId`, `SpawnAction`, `SpawnOptions`, `AdapterEvent`, `NormalisedResult`, `DetectionResult`, `ProviderAdapter` interface, and `UnknownProviderError`
-- [ ] 1.2 Add `server/providers/registry.ts` with `getAdapter`, `listAdapters`, `hasAdapter`, internal `register(adapter)` helper, and a `clearForTests()` only-exported-under-tests escape hatch
-- [ ] 1.3 Add `server/providers/index.ts` that imports each adapter module so registration runs at module load; export `getAdapter`, `listAdapters`, `hasAdapter`
-- [ ] 1.4 Add `server/providers/__fixtures__/` directory placeholder with README explaining the JSONL fixture layout (one file per provider per CLI version)
-- [ ] 1.5 Write `server/providers/registry.test.ts` covering: registered ids visible, unknown lookup throws, isolation between tests via `clearForTests()`
+- [x] 1.1 Add `server/providers/types.ts` declaring `ProviderId`, `SpawnAction`, `SpawnOptions`, `AdapterEvent`, `NormalisedResult`, `DetectionResult`, `ProviderAdapter` interface, and `UnknownProviderError`
+- [x] 1.2 Add `server/providers/registry.ts` with `getAdapter`, `listAdapters`, `hasAdapter`, internal `register(adapter)` helper, and a `clearForTests()` only-exported-under-tests escape hatch
+- [x] 1.3 Add `server/providers/index.ts` that imports each adapter module so registration runs at module load; export `getAdapter`, `listAdapters`, `hasAdapter`
+- [x] 1.4 Add `server/providers/__fixtures__/` directory placeholder with README explaining the JSONL fixture layout (one file per provider per CLI version)
+- [x] 1.5 Write `server/providers/registry.test.ts` covering: registered ids visible, unknown lookup throws, isolation between tests via `clearForTests()`
 
 ## 2. Claude adapter
 
-- [ ] 2.1 Implement `server/providers/claude-adapter.ts` exposing the full `ProviderAdapter` contract — port logic from current `chat-manager.ts`, `queue-manager.ts`, `agent-refine-manager.ts`, `project-router.ts/generate-spec`, `result-event.ts/normaliseResultEvent('claude')` without behaviour change
-- [ ] 2.2 `capabilities` block returns `{ nativeResume: true, nativeStreamJson: true, nativeCostUsd: true, nativeOtelEnv: true, profileEnvSupport: true, systemPromptArg: true }`
-- [ ] 2.3 `modelCatalog()` returns the existing `CLAUDE_MODELS` from `spec-models.ts`; `defaultModel()` returns `'sonnet'`
-- [ ] 2.4 `parseStreamLine` handles `assistant`, `result`, `tool_use`, `system` event types — returns `{kind:'other'}` for unknown types
-- [ ] 2.5 `extractResult` reads `usage.input_tokens/output_tokens/cache_read_input_tokens/cache_creation_input_tokens`, `total_cost_usd`, `num_turns`, `model`, `duration_ms`, `api_duration_ms`, `session_id`
-- [ ] 2.6 `baselineAgents()` returns `['sr-architect','sr-developer','sr-reviewer','sr-merge-resolver']`
-- [ ] 2.7 `detectInstalled()` runs `which claude` + `claude --version`, parses semver
-- [ ] 2.8 Adapter calls `registry.register(this)` on module load
-- [ ] 2.9 Write `server/providers/claude-adapter.test.ts`: full contract surface plus parse-stream fixtures captured from a real claude job (drop fixtures under `server/providers/__fixtures__/claude/`)
+- [x] 2.1 Implement `server/providers/claude-adapter.ts` exposing the full `ProviderAdapter` contract — port logic from current `chat-manager.ts`, `queue-manager.ts`, `agent-refine-manager.ts`, `project-router.ts/generate-spec`, `result-event.ts/normaliseResultEvent('claude')` without behaviour change
+- [x] 2.2 `capabilities` block returns `{ nativeResume: true, nativeStreamJson: true, nativeCostUsd: true, nativeOtelEnv: true, profileEnvSupport: true, systemPromptArg: true }`
+- [x] 2.3 `modelCatalog()` returns the existing `CLAUDE_MODELS` from `spec-models.ts`; `defaultModel()` returns `'sonnet'`
+- [x] 2.4 `parseStreamLine` handles `assistant`, `result`, `tool_use`, `system` event types — returns `{kind:'other'}` for unknown types
+- [x] 2.5 `extractResult` reads `usage.input_tokens/output_tokens/cache_read_input_tokens/cache_creation_input_tokens`, `total_cost_usd`, `num_turns`, `model`, `duration_ms`, `api_duration_ms`, `session_id`
+- [x] 2.6 `baselineAgents()` returns `['sr-architect','sr-developer','sr-reviewer','sr-merge-resolver']`
+- [x] 2.7 `detectInstalled()` runs `which claude` + `claude --version`, parses semver
+- [x] 2.8 Adapter calls `registry.register(this)` on module load
+- [x] 2.9 Write `server/providers/claude-adapter.test.ts`: full contract surface plus parse-stream fixtures captured from a real claude job (drop fixtures under `server/providers/__fixtures__/claude/`)
 
 ## 3. Codex adapter
 
-- [ ] 3.1 Implement `server/providers/codex-adapter.ts` exposing the full `ProviderAdapter` contract
-- [ ] 3.2 `capabilities` block returns `{ nativeResume: true, nativeStreamJson: true, nativeCostUsd: false, nativeOtelEnv: false, profileEnvSupport: true, systemPromptArg: false }`
-- [ ] 3.3 `modelCatalog()` returns the existing `CODEX_MODELS` from `spec-models.ts`; `defaultModel()` returns `'gpt-5.4-mini'`
-- [ ] 3.4 `minCliVersion = '0.128.0'` (the version that supports `exec --json` + `exec resume` semantics this design relies on)
-- [ ] 3.5 `projectDirName = '.codex'`, `instructionsFilename = 'AGENTS.md'`, `mcpRegistration = 'cli-add'`
-- [ ] 3.6 `buildArgs('chat-turn', opts)` returns `['exec', '--json', combinedPrompt, '--model', opts.model]` where `combinedPrompt = systemPrompt + '\n\n---\n\n' + userPrompt` (system prompt folded since `systemPromptArg: false`); honours optional `cwd` via `-C`
-- [ ] 3.7 `buildArgs('chat-resume', opts)` returns `['exec', 'resume', '--json', opts.sessionId, opts.prompt, '--model', opts.model]`
-- [ ] 3.8 `buildArgs('rail-job', opts)` follows the chat-turn shape with `--sandbox workspace-write` added and the rail prompt folded
-- [ ] 3.9 `buildArgs('spec-gen' | 'agent-refine' | 'setup-enrich', opts)` per design
-- [ ] 3.10 `parseStreamLine` handles `thread.started → session-started`, `turn.started → other`, `item.completed{type:agent_message} → text-delta`, `item.completed{type:function_call|local_shell_call} → tool-use`, `turn.completed → result`, unknown types → `other`
-- [ ] 3.11 `extractResult` reads `payload.usage.input_tokens / output_tokens / cached_input_tokens / reasoning_output_tokens`, maps `cached_input_tokens` to `tokens_cache_read`, sums `reasoning_output_tokens` into `tokens_out` (matches OpenAI billing); model from `--model` arg; session id from earliest `session-started` event; duration from `turn.completed` timestamps when available
-- [ ] 3.12 `baselineAgents()` returns the same set as claude (`['sr-architect','sr-developer','sr-reviewer','sr-merge-resolver']`)
-- [ ] 3.13 `detectInstalled()` runs `which codex` + `codex --version`, parses semver, checks `meetsMinimum` against `minCliVersion`
-- [ ] 3.14 Adapter calls `registry.register(this)` on module load
-- [ ] 3.15 Write `server/providers/codex-adapter.test.ts`: full contract surface plus parse-stream fixtures captured live (drop under `server/providers/__fixtures__/codex/0.128.0/`)
-- [ ] 3.16 Add a fixture-version-vs-minCliVersion CI guard: assert that fixtures directory names match a version `>= minCliVersion`
+- [x] 3.1 Implement `server/providers/codex-adapter.ts` exposing the full `ProviderAdapter` contract
+- [x] 3.2 `capabilities` block returns `{ nativeResume: true, nativeStreamJson: true, nativeCostUsd: false, nativeOtelEnv: false, profileEnvSupport: true, systemPromptArg: false }`
+- [x] 3.3 `modelCatalog()` returns the existing `CODEX_MODELS` from `spec-models.ts`; `defaultModel()` returns `'gpt-5.4-mini'`
+- [x] 3.4 `minCliVersion = '0.128.0'` (the version that supports `exec --json` + `exec resume` semantics this design relies on)
+- [x] 3.5 `projectDirName = '.codex'`, `instructionsFilename = 'AGENTS.md'`, `mcpRegistration = 'cli-add'`
+- [x] 3.6 `buildArgs('chat-turn', opts)` returns `['exec', '--json', combinedPrompt, '--model', opts.model]` where `combinedPrompt = systemPrompt + '\n\n---\n\n' + userPrompt` (system prompt folded since `systemPromptArg: false`); honours optional `cwd` via `-C`
+- [x] 3.7 `buildArgs('chat-resume', opts)` returns `['exec', 'resume', '--json', opts.sessionId, opts.prompt, '--model', opts.model]`
+- [x] 3.8 `buildArgs('rail-job', opts)` follows the chat-turn shape with `--sandbox workspace-write` added and the rail prompt folded
+- [x] 3.9 `buildArgs('spec-gen' | 'agent-refine' | 'setup-enrich', opts)` per design
+- [x] 3.10 `parseStreamLine` handles `thread.started → session-started`, `turn.started → other`, `item.completed{type:agent_message} → text-delta`, `item.completed{type:function_call|local_shell_call} → tool-use`, `turn.completed → result`, unknown types → `other`
+- [x] 3.11 `extractResult` reads `payload.usage.input_tokens / output_tokens / cached_input_tokens / reasoning_output_tokens`, maps `cached_input_tokens` to `tokens_cache_read`, sums `reasoning_output_tokens` into `tokens_out` (matches OpenAI billing); model from `--model` arg; session id from earliest `session-started` event; duration from `turn.completed` timestamps when available
+- [x] 3.12 `baselineAgents()` returns the same set as claude (`['sr-architect','sr-developer','sr-reviewer','sr-merge-resolver']`)
+- [x] 3.13 `detectInstalled()` runs `which codex` + `codex --version`, parses semver, checks `meetsMinimum` against `minCliVersion`
+- [x] 3.14 Adapter calls `registry.register(this)` on module load
+- [x] 3.15 Write `server/providers/codex-adapter.test.ts`: full contract surface plus parse-stream fixtures captured live (drop under `server/providers/__fixtures__/codex/0.128.0/`)
+- [x] 3.16 Add a fixture-version-vs-minCliVersion CI guard: assert that fixtures directory names match a version `>= minCliVersion`
 
 ## 4. Pricing table
 
-- [ ] 4.1 Add `server/pricing.ts` with `PRICING` map keyed `<providerId>:<model>` and `estimateCostUsd(providerId, model, usage) → number | null` + `lastReviewedAt() → string`
-- [ ] 4.2 Seed with `codex:gpt-5.5`, `codex:gpt-5.4`, `codex:gpt-5.4-mini`, `codex:gpt-5.3-codex` — pricing-of-record fetched at `lastReviewedAt: '2026-05-17'`
-- [ ] 4.3 Document the pricing review cadence (quarterly) inline at the top of the file; include link/notes to OpenAI pricing
-- [ ] 4.4 Write `server/pricing.test.ts`: cost = (in*price_in + out*price_out + cache_read*price_cache) / 1M for every entry; unknown model returns null; missing usage fields treated as 0
+- [x] 4.1 Add `server/pricing.ts` with `PRICING` map keyed `<providerId>:<model>` and `estimateCostUsd(providerId, model, usage) → number | null` + `lastReviewedAt() → string`
+- [x] 4.2 Seed with `codex:gpt-5.5`, `codex:gpt-5.4`, `codex:gpt-5.4-mini`, `codex:gpt-5.3-codex` — pricing-of-record fetched at `lastReviewedAt: '2026-05-17'`
+- [x] 4.3 Document the pricing review cadence (quarterly) inline at the top of the file; include link/notes to OpenAI pricing
+- [x] 4.4 Write `server/pricing.test.ts`: cost = (in*price_in + out*price_out + cache_read*price_cache) / 1M for every entry; unknown model returns null; missing usage fields treated as 0
 
 ## 5. Codex OTEL bridge
 
-- [ ] 5.1 Add `server/codex-otel-bridge.ts` exporting `createCodexOtelBridge({ jobId, projectId, hubPort, model })` returning an object with `consumeEvent(event: AdapterEvent)` and `finalize(stderr?: string)`
-- [ ] 5.2 Bridge buffers events, on `result` emits an OTLP/JSON traces payload (root span + per-tool child events), a metrics payload (one data point per token field + duration), and a logs payload (text-delta accumulator); posts each to `http://127.0.0.1:<hubPort>/otlp/v1/{traces,metrics,logs}`
-- [ ] 5.3 Implement the 10 MB cap shared with the existing OTLP receiver path: after the receiver returns `logs_truncated`, the bridge stops sending log payloads but continues traces/metrics
-- [ ] 5.4 Resource attributes: `specrails.job_id`, `specrails.project_id`, `specrails.provider=codex`, `specrails.codex.thread_id` (from session-started), `specrails.codex.cli_version` (best-effort)
-- [ ] 5.5 Write `server/codex-otel-bridge.test.ts`: feed a recorded JSONL fixture, assert the receiver was called with expected payloads (mock fetch / mock POST)
+- [x] 5.1 Add `server/codex-otel-bridge.ts` exporting `createCodexOtelBridge({ jobId, projectId, hubPort, model })` returning an object with `consumeEvent(event: AdapterEvent)` and `finalize(stderr?: string)`
+- [x] 5.2 Bridge buffers events, on `result` emits an OTLP/JSON traces payload (root span + per-tool child events), a metrics payload (one data point per token field + duration), and a logs payload (text-delta accumulator); posts each to `http://127.0.0.1:<hubPort>/otlp/v1/{traces,metrics,logs}`
+- [x] 5.3 Implement the 10 MB cap shared with the existing OTLP receiver path: after the receiver returns `logs_truncated`, the bridge stops sending log payloads but continues traces/metrics
+- [x] 5.4 Resource attributes: `specrails.job_id`, `specrails.project_id`, `specrails.provider=codex`, `specrails.codex.thread_id` (from session-started), `specrails.codex.cli_version` (best-effort)
+- [x] 5.5 Write `server/codex-otel-bridge.test.ts`: feed a recorded JSONL fixture, assert the receiver was called with expected payloads (mock fetch / mock POST)
 - [ ] 5.6 Wire `QueueManager` to instantiate the bridge when `adapter.capabilities.nativeOtelEnv === false` and telemetry is ON; consume every parsed `AdapterEvent`; call `bridge.finalize` on process close
 
 ## 6. Refactor `result-event.ts`
 
-- [ ] 6.1 Replace the legacy `normaliseResultEvent(event, provider)` with `normaliseResultEvent(adapter, events): NormalisedResult` that delegates to `adapter.extractResult(events)`
-- [ ] 6.2 After result extraction, if `adapter.capabilities.nativeCostUsd === false`, invoke `estimateCostUsd(adapter.id, normalised.model, normalised)` and set `total_cost_usd` + carry forward an `estimated: true` flag in the returned shape
+- [x] 6.1 Replace the legacy `normaliseResultEvent(event, provider)` with `normaliseResultEvent(adapter, events): NormalisedResult` that delegates to `adapter.extractResult(events)`
+- [x] 6.2 After result extraction, if `adapter.capabilities.nativeCostUsd === false`, invoke `estimateCostUsd(adapter.id, normalised.model, normalised)` and set `total_cost_usd` + carry forward an `estimated: true` flag in the returned shape
 - [ ] 6.3 Update every callsite (`queue-manager.ts`, `chat-manager.ts`, `agent-refine-manager.ts`) to pass the adapter + events array
-- [ ] 6.4 Update `server/result-event.test.ts` for both providers
+- [x] 6.4 Update `server/result-event.test.ts` for both providers
 
 ## 7. Refactor `ChatManager`
 

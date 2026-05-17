@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { normaliseResultEvent } from './result-event'
+import { normaliseResultEvent, finaliseInvocationResult } from './result-event'
+import './providers' // register claude+codex adapters
+import { getAdapter } from './providers/registry'
+import type { AdapterEvent } from './providers/types'
 
-describe('normaliseResultEvent', () => {
+describe('normaliseResultEvent (legacy single-event API)', () => {
   it('returns empty object for null/undefined', () => {
     expect(normaliseResultEvent(null)).toEqual({})
     expect(normaliseResultEvent(undefined)).toEqual({})
@@ -45,7 +48,7 @@ describe('normaliseResultEvent', () => {
   it('parses a synthesised codex event with NULLs for missing fields', () => {
     const r = normaliseResultEvent(
       { type: 'result', total_cost_usd: 0, model: 'gpt-5.4-mini', duration_ms: 5000, num_turns: 1 },
-      'codex'
+      'codex',
     )
     expect(r.total_cost_usd).toBe(0)
     expect(r.model).toBe('gpt-5.4-mini')
@@ -53,5 +56,138 @@ describe('normaliseResultEvent', () => {
     expect(r.num_turns).toBe(1)
     expect(r.tokens_in).toBeUndefined()
     expect(r.tokens_out).toBeUndefined()
+  })
+})
+
+describe('finaliseInvocationResult (new adapter-aware API)', () => {
+  it('claude: passes through native total_cost_usd, estimated=false', () => {
+    const adapter = getAdapter('claude')
+    const events: AdapterEvent[] = [
+      { kind: 'session-started', sessionId: 'S1' },
+      {
+        kind: 'result',
+        payload: {
+          type: 'result',
+          session_id: 'S1',
+          total_cost_usd: 0.0123,
+          num_turns: 1,
+          model: 'claude-sonnet-4-6',
+          usage: { input_tokens: 100, output_tokens: 50 },
+        },
+      },
+    ]
+    const { result, estimated } = finaliseInvocationResult(adapter, events)
+    expect(estimated).toBe(false)
+    expect(result.total_cost_usd).toBe(0.0123)
+    expect(result.tokens_in).toBe(100)
+    expect(result.tokens_out).toBe(50)
+    expect(result.model).toBe('claude-sonnet-4-6')
+  })
+
+  it('codex: estimates cost from pricing table when model is in catalog', () => {
+    const adapter = getAdapter('codex')
+    // Use the parser to build the events array from a realistic JSONL fragment
+    const lines = [
+      '{"type":"thread.started","thread_id":"T1"}',
+      '{"type":"item.completed","item":{"type":"agent_message","text":"hi"}}',
+      '{"type":"turn.completed","usage":{"input_tokens":1000000,"output_tokens":500000,"cached_input_tokens":200000,"reasoning_output_tokens":0}}',
+    ]
+    const events = lines
+      .map((l) => adapter.parseStreamLine(l))
+      .filter((e): e is AdapterEvent => e !== null)
+    const { result, estimated } = finaliseInvocationResult(adapter, events, {
+      fallbackModel: 'gpt-5.4-mini',
+    })
+    expect(estimated).toBe(true)
+    // codex:gpt-5.4-mini → input 0.25, output 2.00, cache_read 0.025 per 1M
+    // cost = 1M*0.25 + 500K*2.00 + 200K*0.025 / 1M = 0.25 + 1.00 + 0.005 = 1.255
+    expect(result.total_cost_usd).toBeCloseTo(1.255, 5)
+    expect(result.model).toBe('gpt-5.4-mini')
+    expect(result.tokens_in).toBe(1_000_000)
+    expect(result.tokens_out).toBe(500_000)
+    expect(result.tokens_cache_read).toBe(200_000)
+    expect(result.session_id).toBe('T1')
+  })
+
+  it('codex: no estimation when model is not in pricing table', () => {
+    const adapter = getAdapter('codex')
+    const events: AdapterEvent[] = [
+      { kind: 'session-started', sessionId: 'T' },
+      {
+        kind: 'result',
+        payload: {
+          type: 'turn.completed',
+          usage: { input_tokens: 100, output_tokens: 50, cached_input_tokens: 0 },
+        },
+      },
+    ]
+    const { result, estimated } = finaliseInvocationResult(adapter, events, {
+      fallbackModel: 'gpt-99-future-model',
+    })
+    expect(estimated).toBe(false)
+    expect(result.total_cost_usd).toBeUndefined()
+    expect(result.model).toBe('gpt-99-future-model')
+    expect(result.tokens_in).toBe(100)
+  })
+
+  it('codex: no estimation when no fallbackModel and adapter cannot derive', () => {
+    const adapter = getAdapter('codex')
+    const events: AdapterEvent[] = [
+      { kind: 'session-started', sessionId: 'T' },
+      {
+        kind: 'result',
+        payload: {
+          type: 'turn.completed',
+          usage: { input_tokens: 100, output_tokens: 50 },
+        },
+      },
+    ]
+    const { result, estimated } = finaliseInvocationResult(adapter, events)
+    expect(estimated).toBe(false)
+    expect(result.model).toBeUndefined()
+    expect(result.total_cost_usd).toBeUndefined()
+  })
+
+  it('passes the events through the adapter extractor (claude reasoning fold check N/A)', () => {
+    const adapter = getAdapter('codex')
+    const events: AdapterEvent[] = [
+      { kind: 'session-started', sessionId: 'T' },
+      {
+        kind: 'result',
+        payload: {
+          type: 'turn.completed',
+          usage: {
+            input_tokens: 100,
+            output_tokens: 10,
+            reasoning_output_tokens: 5, // codex folds reasoning into tokens_out
+            cached_input_tokens: 20,
+          },
+        },
+      },
+    ]
+    const { result } = finaliseInvocationResult(adapter, events, { fallbackModel: 'gpt-5.4-mini' })
+    // adapter.extractResult folds reasoning into tokens_out
+    expect(result.tokens_out).toBe(15)
+  })
+
+  it('honours the estimator hook for testing', () => {
+    const adapter = getAdapter('codex')
+    const events: AdapterEvent[] = [
+      { kind: 'result', payload: { type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } } },
+    ]
+    const estimator = () => 0.42
+    const { result, estimated } = finaliseInvocationResult(adapter, events, {
+      fallbackModel: 'gpt-5.4-mini',
+      estimator,
+    })
+    expect(estimated).toBe(true)
+    expect(result.total_cost_usd).toBe(0.42)
+  })
+
+  it('empty events array returns the adapter default + estimated=false', () => {
+    const adapter = getAdapter('claude')
+    const { result, estimated } = finaliseInvocationResult(adapter, [])
+    expect(estimated).toBe(false)
+    expect(result.total_cost_usd).toBeUndefined()
   })
 })
