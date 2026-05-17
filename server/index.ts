@@ -21,6 +21,11 @@ import { cleanupStaleShimDirs } from './terminal-shell-integration'
 import { createTelemetryRouter } from './telemetry-receiver'
 import { runCompactionForAll } from './telemetry-compactor'
 import { resolveStartupPath, augmentPathFromLoginShell, getPathDiagnostic } from './path-resolver'
+// Side-effect import: registers every bundled ProviderAdapter (claude, codex,
+// future providers) so `getAdapter`/`hasAdapter`/`listAdapters` are populated
+// before any manager constructs a project context. See
+// openspec/changes/add-multi-provider-support/specs/multi-provider-architecture/spec.md.
+import './providers'
 
 const inheritedPathBeforeResolve = (process.env.PATH ?? '').split(process.platform === 'win32' ? ';' : ':').filter(Boolean).length
 resolveStartupPath()
