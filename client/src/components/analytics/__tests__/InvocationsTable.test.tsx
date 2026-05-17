@@ -54,4 +54,92 @@ describe('InvocationsTable', () => {
     )
     expect(screen.getByText(/Showing first 1 of 50,000/)).toBeInTheDocument()
   })
+
+  it('labels Contract Layer invocations distinctly from the source ticket', () => {
+    render(
+      <InvocationsTable
+        rows={[row({
+          id: 'contract-1',
+          surface: 'explore-spec',
+          surface_ref_id: 'contract-refine:conv-1',
+          conversation_id: 'conv-1',
+          ticket_id: 48,
+          ticket_title: 'Stage select screen',
+        })]}
+        loading={false}
+        truncated={false}
+        totalAvailable={1}
+        tableFilters={{}}
+        onTableFiltersChange={() => {}}
+      />
+    )
+
+    expect(screen.getByText('Contract Layer')).toBeInTheDocument()
+    expect(screen.getByText(/#48/)).toBeInTheDocument()
+    expect(screen.getByText(/Contract Layer refinement/)).toBeInTheDocument()
+    expect(screen.queryByText(/Stage select screen/)).not.toBeInTheDocument()
+  })
+
+  it('does not treat ordinary backfilled Explore rows as Contract Layer', () => {
+    render(
+      <InvocationsTable
+        rows={[row({
+          id: 'explore-1',
+          surface: 'explore-spec',
+          surface_ref_id: 'conv-1',
+          conversation_id: 'conv-1',
+          ticket_id: 48,
+          ticket_title: 'Stage select screen',
+        })]}
+        loading={false}
+        truncated={false}
+        totalAvailable={1}
+        tableFilters={{}}
+        onTableFiltersChange={() => {}}
+      />
+    )
+
+    expect(screen.getByText('Explore')).toBeInTheDocument()
+    expect(screen.getByText(/#48 Stage select screen/)).toBeInTheDocument()
+    expect(screen.queryByText('Contract Layer')).not.toBeInTheDocument()
+  })
+
+  it('labels legacy model-less Contract Layer rows and infers the model from the Explore row', () => {
+    render(
+      <InvocationsTable
+        rows={[
+          row({
+            id: 'explore-1',
+            surface: 'explore-spec',
+            surface_ref_id: 'conv-1',
+            conversation_id: 'conv-1',
+            ticket_id: 48,
+            ticket_title: 'Stage select screen',
+            model: 'opus',
+          }),
+          row({
+            id: 'legacy-contract-1',
+            surface: 'explore-spec',
+            surface_ref_id: 'conv-1',
+            conversation_id: 'conv-1',
+            ticket_id: 48,
+            ticket_title: 'Stage select screen',
+            model: null,
+          }),
+        ]}
+        loading={false}
+        truncated={false}
+        totalAvailable={2}
+        tableFilters={{}}
+        onTableFiltersChange={() => {}}
+      />
+    )
+
+    expect(screen.getByText('Explore')).toBeInTheDocument()
+    expect(screen.getByText('Contract Layer')).toBeInTheDocument()
+    expect(screen.getByText(/#48 Stage select screen/)).toBeInTheDocument()
+    expect(screen.getByText(/Contract Layer refinement/)).toBeInTheDocument()
+    expect(screen.getAllByText('opus')).toHaveLength(2)
+    expect(screen.getByText('inferred')).toBeInTheDocument()
+  })
 })

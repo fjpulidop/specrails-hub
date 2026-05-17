@@ -33,33 +33,72 @@ const defaultProps = {
   onOpenSettings: vi.fn(),
 }
 
+beforeEach(() => {
+  window.localStorage.clear()
+  vi.clearAllMocks()
+})
+
 describe('ArcSidebar', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
+  it('renders collapsed (unpinned) by default', () => {
+    render(<ArcSidebar {...defaultProps} />)
+    expect(screen.getByRole('button', { name: /Pin left sidebar open/i })).toBeInTheDocument()
+    expect(screen.queryByText('Hub')).not.toBeInTheDocument()
   })
 
-  it('renders in collapsed state by default', () => {
+  it('cycle from unpinned → pinned-open expands and updates label', () => {
     render(<ArcSidebar {...defaultProps} />)
-    const sidebar = screen.getByRole('button', { name: /Pin left sidebar|Unpin left sidebar/i }).closest('div')!.parentElement
-    expect(sidebar).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar open/i }))
+    expect(screen.getByText('Hub')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Collapse left sidebar \(keep pinned\)/i })).toBeInTheDocument()
   })
 
-  it('renders the pin/unpin toggle button', () => {
+  it('cycle from pinned-open → pinned-collapsed collapses and keeps lit label', () => {
     render(<ArcSidebar {...defaultProps} />)
-    const toggleBtn = screen.getByRole('button', { name: /Pin left sidebar/i })
-    expect(toggleBtn).toBeInTheDocument()
-  })
-
-  it('toggles to pinned state on click', () => {
-    render(<ArcSidebar {...defaultProps} />)
-    const pinBtn = screen.getByRole('button', { name: /Pin left sidebar/i })
-    fireEvent.click(pinBtn)
+    const btn = screen.getByRole('button', { name: /Pin left sidebar open/i })
+    fireEvent.click(btn) // → pinned-open
+    fireEvent.click(screen.getByRole('button', { name: /Collapse left sidebar/i })) // → pinned-collapsed
+    expect(screen.queryByText('Hub')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Unpin left sidebar/i })).toBeInTheDocument()
   })
 
-  it('renders the Hub label when expanded (pinned)', () => {
+  it('cycle wraps pinned-collapsed → unpinned → pinned-open', () => {
     render(<ArcSidebar {...defaultProps} />)
-    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
+    const btn = () => screen.getByRole('button', { name: /sidebar/i })
+    fireEvent.click(btn()) // pinned-open
+    fireEvent.click(btn()) // pinned-collapsed
+    fireEvent.click(btn()) // unpinned
+    expect(screen.getByRole('button', { name: /Pin left sidebar open/i })).toBeInTheDocument()
+    fireEvent.click(btn()) // pinned-open
+    expect(screen.getByText('Hub')).toBeInTheDocument()
+  })
+
+  it('expands on mouse enter when unpinned', () => {
+    const { container } = render(<ArcSidebar {...defaultProps} />)
+    fireEvent.mouseEnter(container.firstChild as Element)
+    expect(screen.getByText('Hub')).toBeInTheDocument()
+  })
+
+  it('collapses on mouse leave when unpinned', () => {
+    const { container } = render(<ArcSidebar {...defaultProps} />)
+    fireEvent.mouseEnter(container.firstChild as Element)
+    fireEvent.mouseLeave(container.firstChild as Element)
+    expect(screen.queryByText('Hub')).not.toBeInTheDocument()
+  })
+
+  it('does not expand on mouse enter when pinned-collapsed', () => {
+    const { container } = render(<ArcSidebar {...defaultProps} />)
+    const btn = () => screen.getByRole('button', { name: /sidebar/i })
+    fireEvent.click(btn()) // pinned-open
+    fireEvent.click(btn()) // pinned-collapsed
+    expect(screen.queryByText('Hub')).not.toBeInTheDocument()
+    fireEvent.mouseEnter(container.firstChild as Element)
+    expect(screen.queryByText('Hub')).not.toBeInTheDocument()
+  })
+
+  it('stays expanded on mouse leave when pinned-open', () => {
+    const { container } = render(<ArcSidebar {...defaultProps} />)
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar open/i }))
+    fireEvent.mouseLeave(container.firstChild as Element)
     expect(screen.getByText('Hub')).toBeInTheDocument()
   })
 
@@ -74,24 +113,23 @@ describe('ArcSidebar', () => {
     expect(defaultProps.onAddProject).toHaveBeenCalledOnce()
   })
 
-  it('renders project list buttons', () => {
+  it('renders project list buttons when expanded', () => {
     render(<ArcSidebar {...defaultProps} />)
-    // Pin to expand and see project names
-    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar open/i }))
     expect(screen.getByText('Project Alpha')).toBeInTheDocument()
     expect(screen.getByText('Project Beta')).toBeInTheDocument()
   })
 
   it('calls setActiveProjectId when a project is clicked', () => {
     render(<ArcSidebar {...defaultProps} />)
-    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar open/i }))
     fireEvent.click(screen.getByText('Project Beta'))
     expect(mockSetActiveProjectId).toHaveBeenCalledWith('proj-2')
   })
 
   it('renders hub nav items when expanded', () => {
     render(<ArcSidebar {...defaultProps} />)
-    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar open/i }))
     expect(screen.getByRole('button', { name: /Docs/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Analytics$/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Settings$/i })).toBeInTheDocument()
@@ -99,44 +137,26 @@ describe('ArcSidebar', () => {
 
   it('calls onOpenAnalytics when Analytics is clicked', () => {
     render(<ArcSidebar {...defaultProps} />)
-    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar open/i }))
     fireEvent.click(screen.getByRole('button', { name: /^Analytics$/i }))
     expect(defaultProps.onOpenAnalytics).toHaveBeenCalledOnce()
   })
 
   it('calls onOpenSettings when Settings is clicked', () => {
     render(<ArcSidebar {...defaultProps} />)
-    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar open/i }))
     fireEvent.click(screen.getByRole('button', { name: /^Settings$/i }))
     expect(defaultProps.onOpenSettings).toHaveBeenCalledOnce()
   })
 
-  it('expands on mouse enter when not pinned', () => {
-    const { container } = render(<ArcSidebar {...defaultProps} />)
-    const sidebar = container.firstChild as Element
-    fireEvent.mouseEnter(sidebar)
-    expect(screen.getByText('Hub')).toBeInTheDocument()
-  })
-
-  it('collapses on mouse leave when not pinned', () => {
-    const { container } = render(<ArcSidebar {...defaultProps} />)
-    const sidebar = container.firstChild as Element
-    fireEvent.mouseEnter(sidebar)
-    fireEvent.mouseLeave(sidebar)
-    expect(screen.queryByText('Hub')).not.toBeInTheDocument()
-  })
-
   it('shows confirm prompt then removes project on second click', async () => {
     render(<ArcSidebar {...defaultProps} />)
-    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Pin left sidebar open/i }))
 
-    // Click remove button for Project Beta (not active)
     const removeBtn = screen.getByRole('button', { name: /Remove Project Beta/i })
     fireEvent.click(removeBtn)
-    // Now shows confirm prompt
     expect(screen.getByRole('button', { name: /Confirm remove Project Beta/i })).toBeInTheDocument()
 
-    // Confirm
     fireEvent.click(screen.getByRole('button', { name: /Confirm remove Project Beta/i }))
     expect(mockRemoveProject).toHaveBeenCalledWith('proj-2')
   })

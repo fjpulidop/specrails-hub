@@ -332,8 +332,8 @@ export function TicketListView({
                     </div>
 
                     {/* Title */}
-                    <div className="flex-1 min-w-0">
-                      <span className={`text-xs truncate block ${
+                    <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                      <span className={`text-xs truncate ${
                         isCancelled
                           ? 'text-foreground/40 line-through decoration-muted-foreground/40'
                           : isDone
@@ -342,6 +342,22 @@ export function TicketListView({
                       }`}>
                         {ticket.title}
                       </span>
+                      {ticket.is_epic && (
+                        <span
+                          className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border border-accent-highlight/60 text-accent-highlight bg-accent-highlight/10 shrink-0"
+                          data-testid={`epic-badge-list-${ticket.id}`}
+                        >
+                          Epic
+                        </span>
+                      )}
+                      {ticket.parent_epic_id != null && (
+                        <span
+                          className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border border-accent-secondary/40 text-accent-secondary shrink-0"
+                          data-testid={`epic-child-pill-list-${ticket.id}`}
+                        >
+                          ↑ Sub-Spec
+                        </span>
+                      )}
                     </div>
 
                     {/* Priority / Draft pill */}

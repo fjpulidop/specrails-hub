@@ -16,10 +16,18 @@ const navItems = [
   { to: '/settings', end: false, icon: Settings, label: 'Settings' },
 ]
 
+const RIGHT_PIN_LABEL: Record<'pinned-open' | 'pinned-collapsed' | 'unpinned', string> = {
+  'pinned-open': 'Collapse right sidebar (keep pinned)',
+  'pinned-collapsed': 'Unpin right sidebar',
+  'unpinned': 'Pin right sidebar open',
+}
+
 export function ProjectRightSidebar() {
-  const { rightPinned: pinned, setRightPinned: setPinned } = useSidebarPin()
+  const { rightMode, cycleRightMode } = useSidebarPin()
   const [hovered, setHovered] = useState(false)
-  const expanded = pinned || hovered
+  const expanded = rightMode === 'pinned-open' || (rightMode === 'unpinned' && hovered)
+  const lit = rightMode !== 'unpinned'
+  const pinLabel = RIGHT_PIN_LABEL[rightMode]
 
   return (
     <div
@@ -28,8 +36,8 @@ export function ProjectRightSidebar() {
         'transition-all duration-200 ease-in-out overflow-hidden',
         expanded ? 'w-44' : 'w-11'
       )}
-      onMouseEnter={() => { if (!pinned) setHovered(true) }}
-      onMouseLeave={() => { if (!pinned) setHovered(false) }}
+      onMouseEnter={() => { if (rightMode === 'unpinned') setHovered(true) }}
+      onMouseLeave={() => { if (rightMode === 'unpinned') setHovered(false) }}
     >
       {/* Header */}
       <div className={cn(
@@ -43,15 +51,15 @@ export function ProjectRightSidebar() {
         )}
         <button
           type="button"
-          onClick={() => setPinned((p) => !p)}
+          onClick={cycleRightMode}
           className={cn(
             'flex items-center justify-center w-7 h-7 rounded-md transition-colors',
-            pinned
+            lit
               ? 'text-foreground bg-muted'
               : 'text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50'
           )}
-          aria-label={pinned ? 'Unpin right sidebar' : 'Pin right sidebar'}
-          title={pinned ? 'Unpin right sidebar (⌘B)' : 'Pin right sidebar (⌘B)'}
+          aria-label={pinLabel}
+          title={`${pinLabel} (⌘B)`}
         >
           <PanelRight className="w-4 h-4" />
         </button>

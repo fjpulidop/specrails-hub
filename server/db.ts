@@ -407,6 +407,15 @@ const MIGRATIONS: Migration[] = [
       ALTER TABLE chat_conversations ADD COLUMN kind TEXT NOT NULL DEFAULT 'sidebar';
     `)
   },
+
+  // Migration 18: chat_conversations.context_scope — per-conversation JSON
+  // freezing the Add Spec context scope at creation time. NULL means "legacy
+  // behavior" so existing rows behave unchanged.
+  (db) => {
+    db.exec(`
+      ALTER TABLE chat_conversations ADD COLUMN context_scope TEXT;
+    `)
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {
@@ -675,11 +684,12 @@ export function getProjectActivity(db: DbInstance, opts: ActivityQueryOpts): Act
 
 export function createConversation(
   db: DbInstance,
-  opts: { id: string; model: string; kind?: 'sidebar' | 'explore' }
+  opts: { id: string; model: string; kind?: 'sidebar' | 'explore'; contextScope?: unknown }
 ): void {
+  const scopeJson = opts.contextScope != null ? JSON.stringify(opts.contextScope) : null
   db.prepare(
-    'INSERT INTO chat_conversations (id, model, kind) VALUES (?, ?, ?)'
-  ).run(opts.id, opts.model, opts.kind ?? 'sidebar')
+    'INSERT INTO chat_conversations (id, model, kind, context_scope) VALUES (?, ?, ?, ?)'
+  ).run(opts.id, opts.model, opts.kind ?? 'sidebar', scopeJson)
 }
 
 export function listConversations(db: DbInstance): ChatConversationRow[] {
@@ -918,23 +928,26 @@ export function updateProjectSettings(db: DbInstance, patch: Partial<ProjectSett
 // ─── Explore Spec acceleration ────────────────────────────────────────────────
 
 /**
- * Per-project toggle controlling whether Explore Spec turns spawn from the
- * project path (so `.mcp.json` is honoured) or from the hub-managed
- * explore-cwd (faster first-token, no project MCP servers loaded). Stored in
- * the existing `queue_state` key/value table; default `false`.
- *
- * See openspec/changes/accelerate-spec-chat-first-token/design.md decision D4.
+ * Per-project last-used value for the Quick mode Contract Refine toggle in
+ * the Add Spec modal. Default `false` when never set.
  */
-export function getExploreMcpEnabled(db: DbInstance): boolean {
+export function getQuickContractRefineLast(db: DbInstance): boolean {
   const row = db.prepare(
-    `SELECT value FROM queue_state WHERE key = 'config.explore_mcp_enabled'`
+    `SELECT value FROM queue_state WHERE key = 'config.add_spec_quick_contract_refine_last'`
   ).get() as { value: string } | undefined
   return row?.value === 'true'
 }
 
-export function setExploreMcpEnabled(db: DbInstance, enabled: boolean): void {
+export function hasQuickContractRefineLast(db: DbInstance): boolean {
+  const row = db.prepare(
+    `SELECT 1 FROM queue_state WHERE key = 'config.add_spec_quick_contract_refine_last'`
+  ).get() as { 1: number } | undefined
+  return !!row
+}
+
+export function setQuickContractRefineLast(db: DbInstance, enabled: boolean): void {
   db.prepare(
-    `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.explore_mcp_enabled', ?)`
+    `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.add_spec_quick_contract_refine_last', ?)`
   ).run(enabled ? 'true' : 'false')
 }
 

@@ -20,6 +20,12 @@ export const MIN_RIGHT_PX = 280
 export const DISABLE_BELOW_VIEWPORT_PX = 900
 export const TIER_BREAKPOINTS_PX = [600, 900] as const
 export const SNAP_TOLERANCE_PX = 30
+/**
+ * The canonical default ratio is the strongest magnet on the splitter — a wider
+ * tolerance than `SNAP_TOLERANCE_PX` so the user feels the splitter "stick"
+ * to its starting position when they drag close to it.
+ */
+export const DEFAULT_SNAP_TOLERANCE_PX = 48
 
 export type SpecsBoardTier = 'row' | 'card' | 'postit'
 
@@ -61,22 +67,30 @@ function clampToViewport(width: number, viewport: number): number {
   return Math.min(Math.max(width, MIN_LEFT_PX), maxLeft)
 }
 
+/** Default rails-panel width in pixels (right side of the dashboard split). */
+export const DEFAULT_RIGHT_PX = 360
+
 /**
  * Default splitter position the first time a project is opened (no stored
- * value). Targets the "postit + compact rails" experience: postit tier on
- * the left (≥ 901 px) and the rails panel narrow enough to render the
- * compact mini-cards (right < `RAILS_COMPACT_THRESHOLD_PX` = 320). On
- * viewports too narrow to fit both, the postit tier wins and the rails
- * panel falls back to its normal layout.
+ * value). Reserves `DEFAULT_RIGHT_PX` for the rails panel — wide enough that
+ * the header row ("Rails" + "N running" badge) stays on a single line and
+ * the compact-density mini-cards remain in play (≥ `RAILS_COMPACT_THRESHOLD_PX`
+ * = 320 ⇒ normal density; we sit just above the threshold by default).
+ * Floors at 901 px on the left so we never default below the postit tier
+ * when there's room.
  */
 export function computeDefaultLeftWidth(viewport: number): number {
-  // Aim for `viewport - 300` so the rails panel gets 300 px (< 320 ⇒ compact).
-  // Floor at 901 so we never default below the postit tier when there's room.
-  const preferred = Math.max(901, viewport - 300)
+  const preferred = Math.max(901, viewport - DEFAULT_RIGHT_PX)
   return clampToViewport(preferred, viewport)
 }
 
-function snapToBreakpoint(width: number): number {
+function snapToBreakpoint(width: number, viewport: number): number {
+  // 1. Canonical default snaps first with the widest tolerance so the splitter
+  //    "sticks" to the initial position the user sees on first paint.
+  const defaultWidth = computeDefaultLeftWidth(viewport)
+  if (Math.abs(width - defaultWidth) <= DEFAULT_SNAP_TOLERANCE_PX) return defaultWidth
+  // 2. Tier breakpoints retain a smaller magnetic feel for users who want to
+  //    align with the row / card / postit visual transitions.
   for (const bp of TIER_BREAKPOINTS_PX) {
     if (Math.abs(width - bp) <= SNAP_TOLERANCE_PX) return bp
   }
@@ -183,7 +197,7 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
     window.removeEventListener('pointercancel', handleUp)
     setLeftWidth((prev) => {
       if (prev === null) return prev
-      const snapped = snapToBreakpoint(prev)
+      const snapped = snapToBreakpoint(prev, viewport)
       const clamped = clampToViewport(snapped, viewport)
       saveStored(projectId, clamped)
       return clamped

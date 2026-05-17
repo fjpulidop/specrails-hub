@@ -6,6 +6,7 @@ import { SharedWebSocketContext } from '../../../hooks/useSharedWebSocket'
 
 const mockStartWithMessage = vi.fn().mockResolvedValue('conv-1')
 const mockSendMessage = vi.fn().mockResolvedValue(undefined)
+const mockAbortStream = vi.fn()
 const conversationsRef: { value: Array<{
   id: string; title: string | null; model: string;
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
@@ -18,7 +19,7 @@ vi.mock('../../../hooks/useChat', () => ({
     activeTabIndex: 0,
     startWithMessage: mockStartWithMessage,
     sendMessage: mockSendMessage,
-    abortStream: vi.fn(),
+    abortStream: mockAbortStream,
     confirmCommand: vi.fn(),
     dismissCommandProposal: vi.fn(),
     changeConversationModel: vi.fn(),
@@ -93,6 +94,7 @@ describe('ExploreSpecShell', () => {
     mockStartWithMessage.mockClear()
     mockStartWithMessage.mockResolvedValue('conv-1')
     mockSendMessage.mockClear()
+    mockAbortStream.mockClear()
   })
 
   it('starts the conversation with the slash-command prefix on mount', async () => {
@@ -192,17 +194,92 @@ describe('ExploreSpecShell', () => {
     })
   })
 
-  it('disables Send button while assistant is streaming', async () => {
+  it('replaces Send with a Stop button while assistant is streaming and aborts on click', async () => {
     const ws = makeFakeWs()
     conversationsRef.value = [{
       id: 'conv-1', title: null, model: 'sonnet',
-      messages: [{ role: 'user', content: 'hi' }],
+      messages: [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'ok' }, { role: 'user', content: 'more' }],
       isStreaming: true, streamingText: 'thinking...', commandProposals: [],
     }]
     render(<ExploreSpecShell initialIdea="hi" pendingSpecId="pending-1" initialAttachmentIds={[]} onClose={onClose} />, { wrapper: wrap(ws) })
     await waitFor(() => expect(mockStartWithMessage).toHaveBeenCalled())
-    const sendBtn = screen.getByRole('button', { name: /streaming|send/i })
-    expect(sendBtn).toBeDisabled()
+
+    const stopBtn = await screen.findByTestId('explore-stop-button')
+    expect(stopBtn).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^send/i })).toBeNull()
+
+    fireEvent.click(stopBtn)
+    expect(mockAbortStream).toHaveBeenCalledWith('conv-1')
+  })
+
+  it('Stop button is enabled even when composer is empty', async () => {
+    const ws = makeFakeWs()
+    conversationsRef.value = [{
+      id: 'conv-1', title: null, model: 'sonnet',
+      messages: [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'ok' }, { role: 'user', content: 'more' }],
+      isStreaming: true, streamingText: '', commandProposals: [],
+    }]
+    render(<ExploreSpecShell initialIdea="hi" pendingSpecId="pending-1" initialAttachmentIds={[]} onClose={onClose} />, { wrapper: wrap(ws) })
+    const stopBtn = await screen.findByTestId('explore-stop-button')
+    expect(stopBtn).not.toBeDisabled()
+  })
+
+  it('does NOT show Stop during the very first (bootstrap) streaming turn', async () => {
+    const ws = makeFakeWs()
+    conversationsRef.value = [{
+      id: 'conv-1', title: null, model: 'sonnet',
+      messages: [{ role: 'user', content: '/specrails:explore-spec\n\ndark mode' }],
+      isStreaming: true, streamingText: 'thinking...', commandProposals: [],
+    }]
+    render(<ExploreSpecShell initialIdea="dark mode" pendingSpecId="pending-1" initialAttachmentIds={[]} onClose={onClose} />, { wrapper: wrap(ws) })
+    await waitFor(() => expect(mockStartWithMessage).toHaveBeenCalled())
+
+    expect(screen.queryByTestId('explore-stop-button')).toBeNull()
+
+    const editor = screen.getByLabelText('Spec idea') as HTMLTextAreaElement
+    fireEvent.keyDown(editor, { key: 'Enter', metaKey: true })
+    expect(mockAbortStream).not.toHaveBeenCalled()
+  })
+
+  it('Cmd+Enter while streaming aborts the turn instead of sending', async () => {
+    const ws = makeFakeWs()
+    conversationsRef.value = [{
+      id: 'conv-1', title: null, model: 'sonnet',
+      messages: [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'ok' }, { role: 'user', content: 'more' }],
+      isStreaming: true, streamingText: '', commandProposals: [],
+    }]
+    render(<ExploreSpecShell initialIdea="hi" pendingSpecId="pending-1" initialAttachmentIds={[]} onClose={onClose} />, { wrapper: wrap(ws) })
+    await screen.findByTestId('explore-stop-button')
+
+    const editor = screen.getByLabelText('Spec idea') as HTMLTextAreaElement
+    // Mock RichAttachmentEditor routes Cmd+Enter to props.onSubmit
+    fireEvent.keyDown(editor, { key: 'Enter', metaKey: true })
+
+    expect(mockAbortStream).toHaveBeenCalledWith('conv-1')
+    expect(mockSendMessage).not.toHaveBeenCalled()
+  })
+
+  it('restores Send (and unmounts Stop) when streaming flips back to false', async () => {
+    const ws = makeFakeWs()
+    conversationsRef.value = [{
+      id: 'conv-1', title: null, model: 'sonnet',
+      messages: [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'ok' }],
+      isStreaming: true, streamingText: '', commandProposals: [],
+    }]
+    const { rerender } = render(<ExploreSpecShell initialIdea="hi" pendingSpecId="pending-1" initialAttachmentIds={[]} onClose={onClose} />, { wrapper: wrap(ws) })
+    await screen.findByTestId('explore-stop-button')
+
+    conversationsRef.value = [{
+      id: 'conv-1', title: null, model: 'sonnet',
+      messages: [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'ok' }],
+      isStreaming: false, streamingText: '', commandProposals: [],
+    }]
+    rerender(<ExploreSpecShell initialIdea="hi" pendingSpecId="pending-1" initialAttachmentIds={[]} onClose={onClose} />)
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('explore-stop-button')).toBeNull()
+    })
+    expect(screen.getByRole('button', { name: /^send/i })).toBeTruthy()
   })
 
   it('calls onTicketCreated and onClose after a successful Create Spec POST', async () => {

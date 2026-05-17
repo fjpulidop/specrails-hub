@@ -231,6 +231,24 @@ function PostItCard({ ticket, onClick }: PostItCardProps) {
         </div>
       ) : null}
 
+      {/* Epic / child badges */}
+      {ticket.is_epic && (
+        <div
+          className="absolute top-1.5 right-7 inline-flex items-center rounded px-1 py-0.5 text-[8px] font-semibold border border-accent-highlight/60 text-accent-highlight bg-accent-highlight/10"
+          data-testid={`epic-badge-postit-${ticket.id}`}
+        >
+          E
+        </div>
+      )}
+      {ticket.parent_epic_id != null && (
+        <div
+          className="absolute top-1.5 right-7 inline-flex items-center rounded px-1 py-0.5 text-[8px] font-semibold border border-accent-secondary/40 text-accent-secondary"
+          data-testid={`epic-child-pill-postit-${ticket.id}`}
+        >
+          ↑
+        </div>
+      )}
+
       {/* Title */}
       <p
         className={cn(

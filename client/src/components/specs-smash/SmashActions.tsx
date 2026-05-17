@@ -1,0 +1,128 @@
+import { useState, useCallback } from 'react'
+import { toast } from 'sonner'
+import { Split } from 'lucide-react'
+
+import { Button } from '../ui/button'
+import { API_ORIGIN } from '../../lib/origin'
+import { useSmashInflight } from '../../context/SmashTrackerContext'
+import { SmashStatusPills } from './SmashStatusPills'
+import { SmashConfirmModal, type SmashMode } from './SmashConfirmModal'
+import type { LocalTicket } from '../../types'
+
+const CONTRACT_LAYER_MARKER = '## Contract Layer'
+
+export function ticketCanSmash(ticket: LocalTicket, featureFlagOn: boolean): boolean {
+  if (!featureFlagOn) return false
+  if (ticket.status === 'draft') return false
+  if (ticket.parent_epic_id != null) return false
+  if (!ticket.description?.includes(CONTRACT_LAYER_MARKER)) return false
+  return true
+}
+
+export interface SmashActionsProps {
+  ticket: LocalTicket
+  projectId: string
+  featureFlagOn: boolean
+  /** When true and épica has children, the action is "Re-SMASH" with confirm. */
+  childrenCount: number
+}
+
+/**
+ * The full SMASH button + confirm modal + streaming pills UX, scoped to a
+ * single ticket inside `TicketDetailModal`.
+ */
+export function SmashActions({ ticket, projectId, featureFlagOn, childrenCount }: SmashActionsProps) {
+  const inflight = useSmashInflight(ticket.id)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  const isEpic = ticket.is_epic === true
+  const showInitial = !isEpic && ticketCanSmash(ticket, featureFlagOn)
+  const showReSmash = isEpic && featureFlagOn
+  const isReSmash = isEpic && childrenCount > 0
+
+  const fireSmash = useCallback(
+    async (mode: SmashMode) => {
+      setSubmitting(true)
+      try {
+        const res = await fetch(`${API_ORIGIN}/api/projects/${projectId}/tickets/${ticket.id}/smash`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode }),
+        })
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string; reason?: string }
+          toast.error(`Could not start SMASH${body.reason ? `: ${body.reason}` : ''}`)
+          return
+        }
+        // Toast lifecycle is driven by SmashTrackerContext from WS events.
+        setModalOpen(false)
+      } catch (err) {
+        toast.error(`SMASH failed: ${(err as Error).message}`)
+      } finally {
+        setSubmitting(false)
+      }
+    },
+    [projectId, ticket.id],
+  )
+
+  const handleConfirm = useCallback(
+    async (mode: SmashMode) => {
+      if (isReSmash) {
+        // Delete current children first, then fire SMASH.
+        setSubmitting(true)
+        try {
+          const delRes = await fetch(`${API_ORIGIN}/api/projects/${projectId}/tickets/${ticket.id}/children`, {
+            method: 'DELETE',
+          })
+          if (!delRes.ok) {
+            toast.error('Could not delete current Sub-Specs')
+            setSubmitting(false)
+            return
+          }
+        } catch (err) {
+          toast.error(`Delete failed: ${(err as Error).message}`)
+          setSubmitting(false)
+          return
+        }
+      }
+      await fireSmash(mode)
+    },
+    [isReSmash, fireSmash, projectId, ticket.id],
+  )
+
+  if (!showInitial && !showReSmash) return null
+
+  // Streaming: render pills only, hide button.
+  if (inflight) {
+    return (
+      <div className="flex flex-col gap-2" data-testid="smash-actions-streaming">
+        <SmashStatusPills stage={inflight.stage} />
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => setModalOpen(true)}
+        className="border-accent-highlight/40 text-accent-highlight hover:bg-accent-highlight/10"
+        data-testid={showReSmash ? 'resmash-button' : 'smash-button'}
+      >
+        <Split className="w-3.5 h-3.5 mr-1.5" />
+        {showReSmash ? 'Re-SMASH' : 'SMASH Spec into Sub-Specs'}
+      </Button>
+      <SmashConfirmModal
+        open={modalOpen}
+        ticketTitle={ticket.title}
+        isReSmash={isReSmash}
+        childrenCount={childrenCount}
+        submitting={submitting}
+        onCancel={() => setModalOpen(false)}
+        onConfirm={handleConfirm}
+      />
+    </>
+  )
+}

@@ -1,4 +1,4 @@
-export type Surface = 'job' | 'quick-spec' | 'explore-spec' | 'ai-edit'
+export type Surface = 'job' | 'quick-spec' | 'explore-spec' | 'ai-edit' | 'smash'
 export type SurfaceFilter = Surface | 'all'
 export type Period = '7d' | '30d' | '90d' | 'all' | 'custom'
 
@@ -21,6 +21,7 @@ export interface DailyEntry {
   quickCostUsd: number
   exploreCostUsd: number
   aiEditCostUsd: number
+  smashCostUsd: number
   totalCostUsd: number
 }
 export interface ScatterPoint {
@@ -116,6 +117,7 @@ export const SURFACE_LABEL: Record<Surface, string> = {
   'quick-spec': 'Quick',
   'explore-spec': 'Explore',
   'ai-edit': 'Refine',
+  smash: 'SMASH',
 }
 
 /** Surface → semantic accent token (Tailwind class name) used across the dashboard. */
@@ -143,5 +145,11 @@ export const SURFACE_ACCENT: Record<Surface, { bg: string; text: string; ring: s
     text: 'text-accent-success',
     ring: 'ring-accent-success/40',
     dot: 'bg-accent-success',
+  },
+  smash: {
+    bg: 'bg-accent-highlight/15',
+    text: 'text-accent-highlight',
+    ring: 'ring-accent-highlight/40',
+    dot: 'bg-accent-highlight',
   },
 }

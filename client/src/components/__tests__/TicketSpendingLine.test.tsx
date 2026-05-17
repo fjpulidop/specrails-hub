@@ -1,9 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '../../test-utils'
+import { render, screen, waitFor, fireEvent } from '../../test-utils'
 import { TicketSpendingLine } from '../TicketSpendingLine'
 
 vi.mock('../../lib/api', () => ({
   getApiBase: () => '/api/projects/p1',
+}))
+
+const navigateMock = vi.fn()
+vi.mock('react-router-dom', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('react-router-dom')>()
+  return { ...mod, useNavigate: () => navigateMock }
+})
+
+const closeTicketDetailMock = vi.fn()
+vi.mock('../../context/TicketDetailModalContext', () => ({
+  useTicketDetailModal: () => ({
+    openTicketDetail: vi.fn(),
+    closeTicketDetail: closeTicketDetailMock,
+  }),
 }))
 
 describe('TicketSpendingLine', () => {
@@ -43,8 +57,13 @@ describe('TicketSpendingLine', () => {
     expect(screen.getByText(/12 turns/)).toBeInTheDocument()
     expect(screen.getByText(/3m/)).toBeInTheDocument()
     expect(screen.getByText(/2 jobs/)).toBeInTheDocument()
-    const link = screen.getByRole('link') as HTMLAnchorElement
-    expect(link.getAttribute('href')).toBe('/analytics?ticketId=42')
+    const button = screen.getByRole('button') as HTMLButtonElement
+    expect(button.getAttribute('aria-label')).toBe('View ticket spending in Analytics')
+
+    // Clicking navigates and closes the modal
+    fireEvent.click(button)
+    expect(closeTicketDetailMock).toHaveBeenCalled()
+    expect(navigateMock).toHaveBeenCalledWith('/analytics?ticketId=42')
   })
 
   it('formats short duration in seconds', async () => {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Trash2, ChevronRight, Circle, Loader2, CheckCircle2, XCircle, AlertCircle, Flag, ArrowUp, ArrowRight, ArrowDown } from 'lucide-react'
+import { Trash2, ChevronRight, Circle, CheckCircle2, AlertCircle, Flag, ArrowUp, ArrowRight, ArrowDown } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
 import { Button } from './ui/button'
@@ -16,22 +16,10 @@ const STATUS_ITEMS: { value: TicketStatus; label: string; icon: React.ReactNode;
     className: 'text-slate-400',
   },
   {
-    value: 'in_progress',
-    label: 'In Progress',
-    icon: <Loader2 className="w-3.5 h-3.5 text-blue-400" />,
-    className: 'text-blue-400',
-  },
-  {
     value: 'done',
     label: 'Done',
     icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />,
     className: 'text-emerald-400',
-  },
-  {
-    value: 'cancelled',
-    label: 'Cancelled',
-    icon: <XCircle className="w-3.5 h-3.5 text-red-400/70" />,
-    className: 'text-red-400/70',
   },
 ]
 
@@ -129,7 +117,7 @@ function ContextMenuPortal({
       role="menu"
       aria-label="Ticket actions"
       style={{ left: adjustedPos.x, top: adjustedPos.y }}
-      className="fixed z-[200] min-w-[180px] rounded-lg border border-border/50 bg-popover shadow-xl text-xs overflow-hidden py-1"
+      className="fixed z-[200] min-w-[180px] rounded-lg border border-border/50 bg-popover shadow-xl text-xs py-1"
     >
       {/* Delete */}
       <button
@@ -147,13 +135,18 @@ function ContextMenuPortal({
       {/* Change status */}
       <div
         role="menuitem"
+        tabIndex={-1}
         aria-haspopup="menu"
         aria-expanded={activeSubmenu === 'status'}
         className={cn(
-          'relative flex w-full items-center justify-between gap-2 px-3 py-2 cursor-default select-none text-foreground/80 hover:bg-accent/50 hover:text-foreground transition-colors',
+          'relative flex w-full items-center justify-between gap-2 px-3 py-2 cursor-pointer select-none text-foreground/80 hover:bg-accent/50 hover:text-foreground transition-colors',
           activeSubmenu === 'status' && 'bg-accent/50 text-foreground'
         )}
         onMouseEnter={() => onSetSubmenu('status')}
+        onClick={(e) => {
+          e.stopPropagation()
+          onSetSubmenu(activeSubmenu === 'status' ? null : 'status')
+        }}
       >
         <span className="flex items-center gap-2">
           <Circle className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
@@ -190,13 +183,18 @@ function ContextMenuPortal({
       {/* Set priority */}
       <div
         role="menuitem"
+        tabIndex={-1}
         aria-haspopup="menu"
         aria-expanded={activeSubmenu === 'priority'}
         className={cn(
-          'relative flex w-full items-center justify-between gap-2 px-3 py-2 cursor-default select-none text-foreground/80 hover:bg-accent/50 hover:text-foreground transition-colors',
+          'relative flex w-full items-center justify-between gap-2 px-3 py-2 cursor-pointer select-none text-foreground/80 hover:bg-accent/50 hover:text-foreground transition-colors',
           activeSubmenu === 'priority' && 'bg-accent/50 text-foreground'
         )}
         onMouseEnter={() => onSetSubmenu('priority')}
+        onClick={(e) => {
+          e.stopPropagation()
+          onSetSubmenu(activeSubmenu === 'priority' ? null : 'priority')
+        }}
       >
         <span className="flex items-center gap-2">
           <Flag className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />

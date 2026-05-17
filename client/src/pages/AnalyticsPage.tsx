@@ -29,6 +29,7 @@ const SURFACE_CHIPS: { value: Surface | 'all'; label: string }[] = [
   { value: 'explore-spec', label: 'Explore' },
   { value: 'quick-spec', label: 'Quick' },
   { value: 'ai-edit', label: 'Refine' },
+  { value: 'smash', label: 'SMASH' },
 ]
 
 function buildQuery(filters: SpendingFilters): string {

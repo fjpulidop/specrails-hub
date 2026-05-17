@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -108,8 +108,8 @@ function DocsIndex({ categories }: { categories: DocCategory[] }) {
         <h1 className="text-xl font-bold mb-2">Documentation</h1>
         <p className="text-sm text-muted-foreground">
           {total === 0
-            ? 'No documents yet. Add Markdown files to ~/.specrails/docs/ to get started.'
-            : `${total} document${total !== 1 ? 's' : ''} across ${categories.filter((c) => c.docs.length > 0).length} categories.`}
+            ? 'No documents available. The bundled docs ship under docs/ in the repo — drop Markdown files there or under ~/.specrails/docs/ to extend them.'
+            : `${total} document${total !== 1 ? 's' : ''} across ${categories.filter((c) => c.docs.length > 0).length} categor${categories.filter((c) => c.docs.length > 0).length === 1 ? 'y' : 'ies'}.`}
         </p>
       </div>
 
@@ -146,16 +146,35 @@ function DocsIndex({ categories }: { categories: DocCategory[] }) {
 
 // ─── Document view ────────────────────────────────────────────────────────────
 
-function DocView({ category, slug }: { category: string; slug: string }) {
+// Memoized markdown renderer — only re-renders when the actual content
+// changes, so navigating between cached docs doesn't re-parse / re-highlight.
+const MemoMarkdown = memo(function MemoMarkdown({ content }: { content: string }) {
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+      {content}
+    </ReactMarkdown>
+  )
+})
+
+function DocView({
+  category,
+  slug,
+  scrollContainerRef,
+}: {
+  category: string
+  slug: string
+  scrollContainerRef: React.RefObject<HTMLElement | null>
+}) {
+  // Stale-while-revalidate: keep the previous doc on screen while fetching
+  // the next one so navigation between docs doesn't flicker.
   const [doc, setDoc] = useState<DocContent | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const requestRef = useRef(0)
   const navigate = useNavigate()
 
   useEffect(() => {
-    setLoading(true)
+    const requestId = ++requestRef.current
     setError(null)
-    setDoc(null)
 
     fetch(`/api/docs/${category}/${slug}`)
       .then(async (res) => {
@@ -167,15 +186,21 @@ function DocView({ category, slug }: { category: string; slug: string }) {
         return res.json()
       })
       .then((data: DocContent | undefined) => {
-        if (data) setDoc(data)
+        if (requestId !== requestRef.current) return // stale
+        if (data) {
+          setDoc(data)
+          // Reset scroll so the new doc starts at the top.
+          if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0
+        }
       })
       .catch((err: unknown) => {
+        if (requestId !== requestRef.current) return
         setError(err instanceof Error ? err.message : 'Failed to load document')
       })
-      .finally(() => setLoading(false))
-  }, [category, slug, navigate])
+  }, [category, slug, navigate, scrollContainerRef])
 
-  if (loading) {
+  // Full-screen spinner only on the very first load (no previous content).
+  if (!doc && !error) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
@@ -183,7 +208,7 @@ function DocView({ category, slug }: { category: string; slug: string }) {
     )
   }
 
-  if (error) {
+  if (error && !doc) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-sm text-destructive">{error}</p>
@@ -208,12 +233,7 @@ function DocView({ category, slug }: { category: string; slug: string }) {
           prose-th:text-foreground prose-td:text-foreground/90
           prose-li:text-foreground/90"
       >
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeHighlight]}
-        >
-          {doc.content}
-        </ReactMarkdown>
+        <MemoMarkdown content={doc.content} />
       </div>
     </article>
   )
@@ -225,6 +245,7 @@ export default function DocsPage() {
   const { category, slug } = useParams<{ category?: string; slug?: string }>()
   const [index, setIndex] = useState<DocsIndex | null>(null)
   const [indexLoading, setIndexLoading] = useState(true)
+  const scrollRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     fetch('/api/docs')
@@ -252,9 +273,9 @@ export default function DocsPage() {
       )}
 
       {/* Content */}
-      <main className="flex-1 overflow-y-auto">
+      <main ref={scrollRef} className="flex-1 overflow-y-auto">
         {isDocView && category && slug ? (
-          <DocView category={category} slug={slug} />
+          <DocView category={category} slug={slug} scrollContainerRef={scrollRef} />
         ) : (
           index && <DocsIndex categories={index.categories} />
         )}

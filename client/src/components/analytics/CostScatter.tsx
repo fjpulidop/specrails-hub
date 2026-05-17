@@ -23,6 +23,7 @@ const COLOR: Record<string, string> = {
   'quick-spec': 'var(--accent-secondary, #f7768e)',
   'explore-spec': 'var(--accent-highlight, #c084fc)',
   'ai-edit': 'var(--accent-success, #50fa7b)',
+  smash: 'var(--accent-highlight, #c084fc)',
 }
 
 export function CostScatter({ data, loading, onSelectPoint }: Props) {
@@ -31,7 +32,7 @@ export function CostScatter({ data, loading, onSelectPoint }: Props) {
   }
   if (!data) return null
 
-  const surfaces: Array<'job' | 'quick-spec' | 'explore-spec' | 'ai-edit'> = ['job', 'quick-spec', 'explore-spec', 'ai-edit']
+  const surfaces: Array<'job' | 'quick-spec' | 'explore-spec' | 'ai-edit' | 'smash'> = ['job', 'quick-spec', 'explore-spec', 'ai-edit', 'smash']
   const datasets = surfaces.map((s) => ({
     surface: s,
     points: data.scatter

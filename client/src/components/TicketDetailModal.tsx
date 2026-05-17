@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { formatDistanceToNow } from 'date-fns'
-import { X, Pencil, Trash2, Save, Plus, XCircle, MessageSquare, ArrowRight, ArrowLeft } from 'lucide-react'
+import { X, Pencil, Trash2, Save, Plus, XCircle, MessageSquare, ArrowRight, ArrowLeft, Columns2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
 import { AttachmentsSection } from './AttachmentsSection'
 import { TicketSpendingLine } from './TicketSpendingLine'
 import { useMinimizedChats } from '../context/MinimizedChatsContext'
+import { useTicketDetailModal } from '../context/TicketDetailModalContext'
 import { parseAcceptanceCriteria } from './explore-spec/acceptance-criteria'
 import { useHub } from '../hooks/useHub'
 import { SmashActions } from './specs-smash/SmashActions'
@@ -17,6 +18,9 @@ import { EpicFamilySidebar } from './specs-smash/EpicFamilySidebar'
 import { MoveToRailPopover } from './MoveToRailPopover'
 import type { RailState } from './RailsBoard'
 import type { Attachment, LocalTicket, TicketPriority } from '../types'
+
+const COMPARE_VIEWPORT_MIN = 900
+const DRAG_SNAP_THRESHOLD = 0.20 // 20% of viewport width
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -52,6 +56,12 @@ interface TicketDetailModalProps {
   onMoveToRail?: (ticketId: number, railId: string) => void
   /** Reverse of `onMoveToRail`: return the ticket to the specs list. */
   onRemoveFromRail?: (ticketId: number) => void
+  /**
+   * When true the modal renders as a panel without the centered backdrop
+   * wrapper (used by `SplitViewShell` to compose two modals side-by-side).
+   * Disables the drag-to-snap entry gesture and hides the "Compare" button.
+   */
+  embedded?: boolean
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -67,8 +77,11 @@ export function TicketDetailModal({
   rails,
   onMoveToRail,
   onRemoveFromRail,
+  embedded = false,
 }: TicketDetailModalProps) {
   const { activeProjectId } = useHub()
+  const { enterSplit, state: splitState } = useTicketDetailModal()
+  const inSplit = splitState.originSide !== null
   // Feature flag for SMASH. Server gates with `SPECRAILS_SMASH=0` returning
   // 409 from endpoints; the UI optimistically shows the affordance and lets
   // the server reject if disabled. A future pass can hydrate from GET /state.
@@ -200,18 +213,84 @@ export function TicketDetailModal({
     onClose()
   }, [ticket.id, onDelete, onClose])
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop — solid darken; no backdrop-filter so the GPU doesn't have
-          to re-blur each time content behind re-paints (e.g. dnd-kit
-          re-rendering sortable cards on mouse move). */}
-      <div
-        className="absolute inset-0 bg-black/70"
-        onClick={onClose}
-      />
+  // ─── Drag-to-snap (entry to split-view) ────────────────────────────────────
+  const [dragOffset, setDragOffset] = useState(0)
+  const dragRef = useRef<{ startX: number; pointerId: number } | null>(null)
+  const canDrag = !embedded && !inSplit && typeof window !== 'undefined' && window.innerWidth >= COMPARE_VIEWPORT_MIN
 
-      {/* Panel — opaque card so nothing leaks through. */}
-      <div className="relative w-full max-w-5xl m-4 rounded-xl bg-card border border-border/40 shadow-2xl shadow-black/50 flex flex-col animate-in fade-in zoom-in-95 duration-200 h-[90vh]">
+  const handleDragMove = useCallback((e: PointerEvent) => {
+    if (!dragRef.current) return
+    setDragOffset(e.clientX - dragRef.current.startX)
+  }, [])
+
+  const handleDragUp = useCallback((e: PointerEvent) => {
+    if (!dragRef.current) return
+    const delta = e.clientX - dragRef.current.startX
+    const threshold = window.innerWidth * DRAG_SNAP_THRESHOLD
+    window.removeEventListener('pointermove', handleDragMove)
+    window.removeEventListener('pointerup', handleDragUp)
+    window.removeEventListener('pointercancel', handleDragUp)
+    dragRef.current = null
+    setDragOffset(0)
+    if (Math.abs(delta) >= threshold) {
+      // If this modal instance is rendered by a third-party site (e.g.
+      // DashboardPage's local state) the provider's leftId is not ours;
+      // pass ticket.id so the reducer can bootstrap, then call onClose to
+      // dismiss the third-party modal so only the provider's split shell
+      // remains visible. For the provider's own modal (leftId === ticket.id)
+      // we skip onClose because that handler would call closeAll and undo
+      // the enterSplit we just dispatched.
+      const isProviderModal = splitState.leftId === ticket.id
+      enterSplit(delta < 0 ? 'left' : 'right', ticket.id)
+      if (!isProviderModal) onClose()
+    }
+  }, [enterSplit, handleDragMove, splitState.leftId, ticket.id, onClose])
+
+  const handleDragDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!canDrag) return
+      // Only react to primary pointer; ignore right-clicks
+      if (e.button !== 0) return
+      // Don't start drag if clicking on inputs/buttons inside the header
+      const target = e.target as HTMLElement
+      if (target.closest('button, input, textarea, select, [contenteditable="true"]')) return
+      dragRef.current = { startX: e.clientX, pointerId: e.pointerId }
+      window.addEventListener('pointermove', handleDragMove)
+      window.addEventListener('pointerup', handleDragUp)
+      window.addEventListener('pointercancel', handleDragUp)
+    },
+    [canDrag, handleDragMove, handleDragUp],
+  )
+
+  // Clean up listeners if component unmounts mid-drag
+  useEffect(() => {
+    return () => {
+      if (dragRef.current) {
+        window.removeEventListener('pointermove', handleDragMove)
+        window.removeEventListener('pointerup', handleDragUp)
+        window.removeEventListener('pointercancel', handleDragUp)
+      }
+    }
+  }, [handleDragMove, handleDragUp])
+
+  const handleCompareClick = useCallback(() => {
+    if (!canDrag) return
+    const isProviderModal = splitState.leftId === ticket.id
+    enterSplit('right', ticket.id)
+    if (!isProviderModal) onClose()
+  }, [canDrag, enterSplit, splitState.leftId, ticket.id, onClose])
+
+  // ─── Layout helpers ────────────────────────────────────────────────────────
+  const panel = (
+    <>
+      <div
+        className={
+          embedded
+            ? 'relative w-full h-full rounded-xl bg-card border border-border/40 shadow-2xl shadow-black/50 flex flex-col overflow-hidden'
+            : 'relative w-full max-w-5xl m-4 rounded-xl bg-card border border-border/40 shadow-2xl shadow-black/50 flex flex-col animate-in fade-in zoom-in-95 duration-200 h-[90vh]'
+        }
+        style={dragOffset !== 0 ? { transform: `translateX(${dragOffset}px)`, transition: 'none' } : { transition: 'transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+      >
         {/* Épica breadcrumb (children only) */}
         {epicParent && (
           <div className="px-5 pt-3">
@@ -224,7 +303,11 @@ export function TicketDetailModal({
           </div>
         )}
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border/30">
+        <div
+          className={`flex items-start justify-between gap-3 px-5 py-4 border-b border-border/30 ${canDrag ? 'cursor-grab active:cursor-grabbing' : ''}`}
+          onPointerDown={handleDragDown}
+          data-testid="ticket-modal-header"
+        >
           <div className="flex-1 min-w-0">
             {editingTitle ? (
               <input
@@ -276,9 +359,24 @@ export function TicketDetailModal({
             />
           )}
 
+          {canDrag && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 mr-1 gap-1.5"
+              data-testid="ticket-modal-compare"
+              onClick={handleCompareClick}
+              title="Compare with another spec"
+            >
+              <Columns2 className="w-3.5 h-3.5" />
+              Compare
+            </Button>
+          )}
+
           <button
             onClick={onClose}
             className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-surface/50 transition-colors cursor-pointer shrink-0"
+            data-testid="ticket-modal-close"
           >
             <X className="w-4 h-4" />
           </button>
@@ -555,6 +653,14 @@ export function TicketDetailModal({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  )
+
+  if (embedded) return panel
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      {panel}
     </div>
   )
 }
@@ -597,6 +703,7 @@ const EDITABLE_STATUSES = new Set(['draft', 'todo', 'backlog'])
 function ContinueEditingButton({ ticket, title, description, priority, labels, onClose }: ContinueEditingButtonProps) {
   const { triggerResume } = useMinimizedChats()
   const { activeProjectId } = useHub()
+  const { closeTicketDetail } = useTicketDetailModal()
   if (!EDITABLE_STATUSES.has(ticket.status)) return null
   const handleClick = () => {
     if (!activeProjectId) return
@@ -626,6 +733,13 @@ function ContinueEditingButton({ ticket, title, description, priority, labels, o
         },
       },
     })
+    // Continue Editing navigates the user to ExploreSpecShell. Always
+    // collapse the modal context (split or centered) so the comparison
+    // disappears and the shell takes over the surface. `onClose` is also
+    // called for any third-party modal mount (e.g. DashboardPage's local
+    // state) — harmless when the modal is provider-owned because the state
+    // has already been cleared.
+    closeTicketDetail()
     onClose()
   }
   return (

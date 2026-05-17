@@ -28,10 +28,44 @@ function fmtNum(v: number | null): string {
   return String(v)
 }
 
+function isContractLayerInvocation(r: InvocationRow): boolean {
+  if (r.surface_ref_id?.startsWith('contract-refine:')) return true
+  return r.surface === 'explore-spec'
+    && r.ticket_id != null
+    && r.conversation_id != null
+    && r.surface_ref_id === r.conversation_id
+    && r.model == null
+}
+
+function buildInferredModelMap(rows: InvocationRow[]): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const r of rows) {
+    if (!r.model) continue
+    if (r.conversation_id) out.set(`conversation:${r.conversation_id}`, r.model)
+    if (r.ticket_id != null && r.surface === 'explore-spec') out.set(`ticket:${r.ticket_id}:explore-spec`, r.model)
+    if (r.ticket_id != null && r.surface === 'quick-spec') out.set(`ticket:${r.ticket_id}:quick-spec`, r.model)
+  }
+  return out
+}
+
+function inferredModelFor(r: InvocationRow, modelMap: Map<string, string>): string | null {
+  if (r.model) return r.model
+  if (!isContractLayerInvocation(r)) return null
+  if (r.conversation_id) {
+    const byConversation = modelMap.get(`conversation:${r.conversation_id}`)
+    if (byConversation) return byConversation
+  }
+  if (r.ticket_id != null) {
+    return modelMap.get(`ticket:${r.ticket_id}:${r.surface}`) ?? null
+  }
+  return null
+}
+
 export function InvocationsTable({
   rows, loading, truncated, totalAvailable, tableFilters, onTableFiltersChange,
 }: Props) {
   const [openId, setOpenId] = useState<string | null>(null)
+  const inferredModels = buildInferredModelMap(rows)
 
   return (
     <div className="rounded-xl border border-border/50 bg-card/40 p-4">
@@ -89,6 +123,9 @@ export function InvocationsTable({
                 const surface = r.surface as Surface
                 const accent = SURFACE_ACCENT[surface]
                 const totalTokens = (r.tokens_in ?? 0) + (r.tokens_out ?? 0)
+                const isContractLayer = isContractLayerInvocation(r)
+                const surfaceLabel = isContractLayer ? 'Contract Layer' : SURFACE_LABEL[surface]
+                const model = inferredModelFor(r, inferredModels)
                 return (
                   <tr
                     key={r.id}
@@ -98,19 +135,33 @@ export function InvocationsTable({
                     <td className="px-2 py-2">
                       <span className={`inline-flex items-center gap-1.5 px-2 h-5 rounded-full text-[10px] font-medium ${accent.bg} ${accent.text}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${accent.dot}`} />
-                        {SURFACE_LABEL[surface]}
+                        {surfaceLabel}
                       </span>
                     </td>
                     <td className="px-2 py-2 max-w-[260px]">
-                      {r.ticket_id == null
-                        ? <span className="text-muted-foreground/70">—</span>
-                        : <span className="truncate block">#{r.ticket_id} {r.ticket_title ?? <span className="text-muted-foreground/70 italic">(deleted)</span>}</span>
+                      {r.ticket_id != null
+                        ? (
+                          <span className="truncate block">
+                            #{r.ticket_id}{' '}
+                            {isContractLayer ? (
+                              <span className="text-muted-foreground/90">Contract Layer refinement</span>
+                            ) : (
+                              r.ticket_title ?? <span className="text-muted-foreground/70 italic">(deleted)</span>
+                            )}
+                          </span>
+                        )
+                        : r.ticket_title
+                          ? <span className="truncate block text-muted-foreground/90 italic" title="Provisional Explore title — not yet committed">{r.ticket_title}</span>
+                          : <span className="text-muted-foreground/70">—</span>
                       }
                     </td>
                     <td className="px-2 py-2 text-right font-medium">{fmtCost(r.total_cost_usd)}</td>
                     <td className="px-2 py-2 text-right">{fmtNum(r.num_turns)}</td>
                     <td className="px-2 py-2 text-right">{totalTokens > 0 ? fmtNum(totalTokens) : '—'}</td>
-                    <td className="px-2 py-2 max-w-[180px] truncate">{r.model ?? '—'}</td>
+                    <td className="px-2 py-2 max-w-[180px] truncate">
+                      {model ?? '—'}
+                      {model && !r.model ? <span className="ml-1 text-[10px] text-muted-foreground/70">inferred</span> : null}
+                    </td>
                     <td className="px-2 py-2">
                       {r.status === 'success'
                         ? <span className="text-accent-success/90">●</span>

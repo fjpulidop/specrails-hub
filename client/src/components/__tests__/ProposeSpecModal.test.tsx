@@ -161,6 +161,45 @@ describe('ProposeSpecModal', () => {
     expect(screen.getByRole('button', { name: /continue/i })).toBeInTheDocument()
   })
 
+  it('shows Context Awareness and Fine-tune in both Quick and Explore', async () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('context-scope-slider')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('context-scope-toggle')).toHaveTextContent(/fine-tune/i)
+    expect(screen.getByTestId('scope-stop-max')).toBeInTheDocument()
+    expect(screen.queryByTestId('scope-stop-hub')).not.toBeInTheDocument()
+
+    const exploreTab = screen.getAllByRole('tab').find((t) => t.textContent?.toLowerCase().includes('explore'))!
+    fireEvent.click(exploreTab)
+
+    expect(screen.getByTestId('context-scope-slider')).toBeInTheDocument()
+    expect(screen.getByTestId('context-scope-toggle')).toHaveTextContent(/fine-tune/i)
+    expect(screen.getByTestId('scope-stop-hub')).toBeInTheDocument()
+  })
+
+  it('sends contractRefine in the Quick generate-spec body', async () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    await waitFor(() => expect(screen.getByTestId('context-scope-slider')).toBeInTheDocument())
+    await waitFor(() => {
+      expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls.some((c) => String(c[0]).includes('/add-spec-quick-contract-refine-last'))).toBe(true)
+    })
+    fireEvent.click(screen.getByTestId('scope-stop-max'))
+
+    const textarea = screen.getByPlaceholderText(/add a dark mode toggle/i)
+    fireEvent.change(textarea, { target: { value: 'Quick contract layer' } })
+    fireEvent.click(screen.getByRole('button', { name: /generate spec/i }))
+
+    await waitFor(() => {
+      const generateCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
+        .find((c) => typeof c[0] === 'string' && c[0].includes('/tickets/generate-spec'))
+      expect(generateCall).toBeTruthy()
+      const body = JSON.parse((generateCall![1] as { body: string }).body)
+      expect(body.contractRefine).toBe(true)
+      expect(body.contextScope).toEqual(expect.objectContaining({ contractRefine: true, full: true }))
+    })
+  })
+
   it('hands off to onExploreLaunch when Continue is clicked in Explore mode', async () => {
     const onExploreLaunch = vi.fn()
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} onExploreLaunch={onExploreLaunch} />)
@@ -181,6 +220,25 @@ describe('ProposeSpecModal', () => {
       expect.stringContaining('/tickets/generate-spec'),
       expect.anything(),
     )
+  })
+
+  it('hands slider-derived contractRefine through to Explore launch payload', async () => {
+    const onExploreLaunch = vi.fn()
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} onExploreLaunch={onExploreLaunch} />)
+    const exploreTab = screen.getAllByRole('tab').find((t) => t.textContent?.toLowerCase().includes('explore'))!
+    fireEvent.click(exploreTab)
+    fireEvent.click(screen.getByTestId('scope-stop-max'))
+    const textarea = screen.getByPlaceholderText(/dark mode/i)
+    fireEvent.change(textarea, { target: { value: 'max context idea' } })
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }))
+
+    await waitFor(() => {
+      expect(onExploreLaunch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contextScope: expect.objectContaining({ contractRefine: true, mcp: false }),
+        }),
+      )
+    })
   })
 
   it('resets state when reopened', async () => {

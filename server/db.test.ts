@@ -500,4 +500,7 @@ describe('job templates', () => {
     const row = getJob(db, id)!
     expect(row.priority).toBe('normal')
   })
+
+  // The Explore MCP / Contract Refine project toggles were removed; the
+  // decisions now live exclusively per-spec in chat_conversations.context_scope.
 })

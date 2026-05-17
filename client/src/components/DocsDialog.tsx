@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { BookOpen, ChevronRight, FileText, Loader2 } from 'lucide-react'
 import { cn } from '../lib/utils'
-import { Dialog, DialogContent } from './ui/dialog'
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog'
 import 'highlight.js/styles/atom-one-dark.css'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -118,8 +118,8 @@ function DocsIndexView({
         <h1 className="text-xl font-bold mb-2">Documentation</h1>
         <p className="text-sm text-muted-foreground">
           {total === 0
-            ? 'No documents yet. Add Markdown files to ~/.specrails/docs/ to get started.'
-            : `${total} document${total !== 1 ? 's' : ''} across ${categories.filter((c) => c.docs.length > 0).length} categories.`}
+            ? 'No documents available. The bundled docs ship under docs/ in the repo — drop Markdown files there or under ~/.specrails/docs/ to extend them.'
+            : `${total} document${total !== 1 ? 's' : ''} across ${categories.filter((c) => c.docs.length > 0).length} categor${categories.filter((c) => c.docs.length > 0).length === 1 ? 'y' : 'ies'}.`}
         </p>
       </div>
 
@@ -156,23 +156,38 @@ function DocsIndexView({
 
 // ─── Document view ────────────────────────────────────────────────────────────
 
+// Memoized markdown renderer — only re-renders when the actual content
+// changes, so navigating between cached docs doesn't re-parse / re-highlight.
+const MemoMarkdown = memo(function MemoMarkdown({ content }: { content: string }) {
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+      {content}
+    </ReactMarkdown>
+  )
+})
+
 function DocView({
   category,
   slug,
   onNotFound,
+  scrollContainerRef,
 }: {
   category: string
   slug: string
   onNotFound: () => void
+  scrollContainerRef: React.RefObject<HTMLElement | null>
 }) {
+  // Stale-while-revalidate: keep the previous doc on screen until the new
+  // fetch resolves so navigation between docs doesn't flicker.
   const [doc, setDoc] = useState<DocContent | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Track the latest request so a slow earlier fetch can't overwrite a newer
+  // one when the user clicks through the sidebar quickly.
+  const requestRef = useRef(0)
 
   useEffect(() => {
-    setLoading(true)
+    const requestId = ++requestRef.current
     setError(null)
-    setDoc(null)
 
     fetch(`/api/docs/${category}/${slug}`)
       .then(async (res) => {
@@ -184,15 +199,22 @@ function DocView({
         return res.json()
       })
       .then((data: DocContent | undefined) => {
-        if (data) setDoc(data)
+        if (requestId !== requestRef.current) return // stale
+        if (data) {
+          setDoc(data)
+          // Reset scroll so the new doc starts at the top without a jarring
+          // mid-document offset carried over from the previous doc.
+          if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0
+        }
       })
       .catch((err: unknown) => {
+        if (requestId !== requestRef.current) return
         setError(err instanceof Error ? err.message : 'Failed to load document')
       })
-      .finally(() => setLoading(false))
-  }, [category, slug, onNotFound])
+  }, [category, slug, onNotFound, scrollContainerRef])
 
-  if (loading) {
+  // Full-screen spinner only on the very first load (no previous content).
+  if (!doc && !error) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
@@ -200,7 +222,7 @@ function DocView({
     )
   }
 
-  if (error) {
+  if (error && !doc) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-sm text-destructive">{error}</p>
@@ -225,12 +247,7 @@ function DocView({
           prose-th:text-foreground prose-td:text-foreground/90
           prose-li:text-foreground/90"
       >
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeHighlight]}
-        >
-          {doc.content}
-        </ReactMarkdown>
+        <MemoMarkdown content={doc.content} />
       </div>
     </article>
   )
@@ -243,11 +260,12 @@ interface DocsDialogProps {
   onClose: () => void
 }
 
-export default function DocsDialog({ open, onClose }: DocsDialogProps) {
+function DocsDialogImpl({ open, onClose }: DocsDialogProps) {
   const [index, setIndex] = useState<DocsIndex | null>(null)
   const [indexLoading, setIndexLoading] = useState(true)
   const [activeCategory, setActiveCategory] = useState<string | undefined>()
   const [activeSlug, setActiveSlug] = useState<string | undefined>()
+  const scrollRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -259,21 +277,33 @@ export default function DocsDialog({ open, onClose }: DocsDialogProps) {
       .finally(() => setIndexLoading(false))
   }, [open])
 
-  function handleSelect(category: string, slug: string) {
+  // Stabilise these handlers so `DocView`'s useEffect deps don't change every
+  // parent re-render — otherwise every HubApp render (job streaming, WS
+  // events, etc.) triggers a refetch storm that flickers the panel.
+  const handleSelect = useCallback((category: string, slug: string) => {
     setActiveCategory(category)
     setActiveSlug(slug)
-  }
+  }, [])
 
-  function handleHome() {
+  const handleHome = useCallback(() => {
     setActiveCategory(undefined)
     setActiveSlug(undefined)
-  }
+  }, [])
 
   const isDocView = Boolean(activeCategory && activeSlug)
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
+        {/* Accessibility: Radix requires DialogTitle + DialogDescription on every
+            DialogContent or it logs a warning on every render (and a flood of
+            warnings can contribute to perceived flicker). The visible heading
+            lives inside the index/sidebar; these are visually hidden but read
+            by screen readers. */}
+        <DialogTitle className="sr-only">Documentation</DialogTitle>
+        <DialogDescription className="sr-only">
+          Browse the bundled specrails-hub documentation. Use the sidebar to switch between guides.
+        </DialogDescription>
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar */}
           {indexLoading ? (
@@ -291,9 +321,14 @@ export default function DocsDialog({ open, onClose }: DocsDialogProps) {
           )}
 
           {/* Content */}
-          <main className="flex-1 overflow-y-auto">
+          <main ref={scrollRef} className="flex-1 overflow-y-auto">
             {isDocView && activeCategory && activeSlug ? (
-              <DocView category={activeCategory} slug={activeSlug} onNotFound={handleHome} />
+              <DocView
+                category={activeCategory}
+                slug={activeSlug}
+                onNotFound={handleHome}
+                scrollContainerRef={scrollRef}
+              />
             ) : (
               index && <DocsIndexView categories={index.categories} onSelect={handleSelect} />
             )}
@@ -303,3 +338,8 @@ export default function DocsDialog({ open, onClose }: DocsDialogProps) {
     </Dialog>
   )
 }
+
+// Memoise the whole dialog so HubApp re-renders (job streaming, WS events,
+// theme provider, etc.) don't cascade into a markdown re-parse.
+const DocsDialog = memo(DocsDialogImpl)
+export default DocsDialog

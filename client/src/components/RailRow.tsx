@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { GripVertical, Trash2, ArrowLeft } from 'lucide-react'
@@ -54,7 +55,13 @@ export function RailRow({
   const [ticketCtxMenu, setTicketCtxMenu] = useState<{ ticketId: number; x: number; y: number } | null>(null)
   useEffect(() => {
     if (!ticketCtxMenu) return
-    function onPointer() { setTicketCtxMenu(null) }
+    function onPointer(e: PointerEvent) {
+      // Don't close when the pointerdown lands inside the popup itself —
+      // otherwise the menu unmounts before the menuitem's click handler fires.
+      const target = e.target as Element | null
+      if (target?.closest('[role="menu"]')) return
+      setTicketCtxMenu(null)
+    }
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setTicketCtxMenu(null) }
     document.addEventListener('pointerdown', onPointer)
     document.addEventListener('keydown', onKey)
@@ -299,12 +306,16 @@ export function RailRow({
           </div>
         )}
 
-        {/* Right-click context menu for assigned ticket pills */}
-        {ticketCtxMenu && onTicketMoveToSpecs && (
+        {/* Right-click context menu for assigned ticket pills.
+            Portal'd to document.body so `position: fixed` is always relative
+            to the viewport, regardless of any transformed ancestor (dnd-kit
+            sortable, animation, etc.) that would otherwise turn the rail row
+            into the fixed-positioning containing block. */}
+        {ticketCtxMenu && onTicketMoveToSpecs && createPortal(
           <div
             role="menu"
             data-testid={`rail-row-compact-context-menu-${id}`}
-            className="fixed z-50 min-w-[160px] rounded-lg border border-border/60 bg-card/95 backdrop-blur shadow-xl shadow-black/40 p-1"
+            className="fixed z-[200] min-w-[160px] rounded-lg border border-border/60 bg-card/95 backdrop-blur shadow-xl shadow-black/40 p-1"
             style={{
               top: Math.min(ticketCtxMenu.y, window.innerHeight - 60),
               left: Math.min(ticketCtxMenu.x, window.innerWidth - 180),
@@ -324,7 +335,8 @@ export function RailRow({
               <ArrowLeft className="w-3 h-3" aria-hidden />
               Move to Specs
             </button>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* Mode dropdown + Profile picker (stacked) */}
@@ -526,12 +538,13 @@ export function RailRow({
         </div>
 
         {/* Right-click context menu also reachable from the normal-density
-            rail body (same component instance as the compact branch). */}
-        {ticketCtxMenu && onTicketMoveToSpecs && density === 'normal' && (
+            rail body (same component instance as the compact branch).
+            Portal'd to body — see compact branch above for rationale. */}
+        {ticketCtxMenu && onTicketMoveToSpecs && density === 'normal' && createPortal(
           <div
             role="menu"
             data-testid={`rail-row-normal-context-menu-${id}`}
-            className="fixed z-50 min-w-[160px] rounded-lg border border-border/60 bg-card/95 backdrop-blur shadow-xl shadow-black/40 p-1"
+            className="fixed z-[200] min-w-[160px] rounded-lg border border-border/60 bg-card/95 backdrop-blur shadow-xl shadow-black/40 p-1"
             style={{
               top: Math.min(ticketCtxMenu.y, window.innerHeight - 60),
               left: Math.min(ticketCtxMenu.x, window.innerWidth - 180),
@@ -551,7 +564,8 @@ export function RailRow({
               <ArrowLeft className="w-3 h-3" aria-hidden />
               Move to Specs
             </button>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>
