@@ -2035,6 +2035,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         recordInvocation(ctx(req).db, {
           id: randomUUID(),
           project_id: projectId,
+          provider: cliProvider,
           surface: 'quick-spec',
           surface_ref_id: requestId,
           ticket_id: createdTicketId,

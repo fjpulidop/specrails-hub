@@ -14,6 +14,9 @@ const ALLOWED_SURFACES: ReadonlySet<Surface> = new Set([
 export interface RecordInput extends NormalisedResult {
   id: string
   project_id: string
+  /** Provider id from the resolved adapter. Required after migration 18.
+   *  Existing pre-migration rows are backfilled to 'claude'. */
+  provider: string
   surface: Surface
   surface_ref_id?: string | null
   ticket_id?: number | null
@@ -21,11 +24,16 @@ export interface RecordInput extends NormalisedResult {
   status: InvocationStatus
   started_at: string
   finished_at?: string | null
+  /** True when `total_cost_usd` came from the local pricing table fallback
+   *  (vs the provider's terminal event). Writes the `total_cost_usd_estimated`
+   *  flag column. Default false. */
+  total_cost_usd_estimated?: boolean
 }
 
 export interface InvocationRow {
   id: string
   project_id: string
+  provider: string | null
   surface: Surface
   surface_ref_id: string | null
   ticket_id: number | null
@@ -41,6 +49,7 @@ export interface InvocationRow {
   tokens_cache_read: number | null
   tokens_cache_create: number | null
   total_cost_usd: number | null
+  total_cost_usd_estimated: number
   num_turns: number | null
   session_id: string | null
   created_at: string
@@ -57,16 +66,20 @@ export function recordInvocation(db: DbInstance, input: RecordInput): void {
   if (!ALLOWED_SURFACES.has(input.surface)) {
     throw new InvalidSurfaceError(input.surface)
   }
+  if (!input.provider) {
+    throw new Error('recordInvocation: provider is required')
+  }
   db.prepare(`
     INSERT INTO ai_invocations (
-      id, project_id, surface, surface_ref_id, ticket_id, conversation_id,
+      id, project_id, provider, surface, surface_ref_id, ticket_id, conversation_id,
       model, status, started_at, finished_at, duration_ms, duration_api_ms,
       tokens_in, tokens_out, tokens_cache_read, tokens_cache_create,
-      total_cost_usd, num_turns, session_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      total_cost_usd, total_cost_usd_estimated, num_turns, session_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     input.id,
     input.project_id,
+    input.provider,
     input.surface,
     input.surface_ref_id ?? null,
     input.ticket_id ?? null,
@@ -82,6 +95,7 @@ export function recordInvocation(db: DbInstance, input: RecordInput): void {
     input.tokens_cache_read ?? null,
     input.tokens_cache_create ?? null,
     input.total_cost_usd ?? null,
+    input.total_cost_usd_estimated ? 1 : 0,
     input.num_turns ?? null,
     input.session_id ?? null,
   )
@@ -144,4 +158,46 @@ export function getTicketSpendingSummary(
     activeDurationMs += r.duration_ms ?? 0
   }
   return { totalCostUsd, totalTurns, activeDurationMs, bySurface, totalRuns: rows.length }
+}
+
+/**
+ * Per-provider aggregation for the Analytics dashboard. Returns counts +
+ * authoritative cost (rows with total_cost_usd_estimated=0) and estimated
+ * cost (rows with total_cost_usd_estimated=1) split, so the UI can render the
+ * ~ badge and the "Includes estimated costs" footnote accurately.
+ *
+ * Spec: openspec/.../specs/project-spending/spec.md ("byProvider analytics breakdown")
+ */
+export function getInvocationsByProvider(
+  db: DbInstance,
+  projectId: string,
+  opts: { fromIso?: string; toIso?: string } = {},
+): Array<{ provider: string; count: number; costUsd: number; estimatedCostUsd: number }> {
+  const params: Array<string> = [projectId]
+  let dateClause = ''
+  if (opts.fromIso) {
+    dateClause += ' AND started_at >= ?'
+    params.push(opts.fromIso)
+  }
+  if (opts.toIso) {
+    dateClause += ' AND started_at < ?'
+    params.push(opts.toIso)
+  }
+  const rows = db.prepare(`
+    SELECT
+      COALESCE(provider, 'claude') AS provider,
+      COUNT(*)                                                         AS count,
+      COALESCE(SUM(CASE WHEN total_cost_usd_estimated = 0 THEN total_cost_usd ELSE 0 END), 0) AS costUsd,
+      COALESCE(SUM(CASE WHEN total_cost_usd_estimated = 1 THEN total_cost_usd ELSE 0 END), 0) AS estimatedCostUsd
+    FROM ai_invocations
+    WHERE project_id = ?${dateClause}
+    GROUP BY provider
+    ORDER BY (costUsd + estimatedCostUsd) DESC
+  `).all(...params) as Array<{
+    provider: string
+    count: number
+    costUsd: number
+    estimatedCostUsd: number
+  }>
+  return rows
 }

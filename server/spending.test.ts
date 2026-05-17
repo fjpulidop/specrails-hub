@@ -9,6 +9,7 @@ function seed(db: DbInstance, rows: Array<Partial<Parameters<typeof recordInvoca
     recordInvocation(db, {
       id: `id-${i++}`,
       project_id: 'p1',
+      provider: 'claude',
       surface: 'job',
       status: 'success',
       started_at: new Date().toISOString(),
@@ -108,7 +109,7 @@ describe('getInvocations', () => {
   it('paginates results', () => {
     for (let i = 0; i < 5; i++) {
       recordInvocation(db, {
-        id: `r${i}`, project_id: 'p1', surface: 'job', status: 'success',
+        id: `r${i}`, project_id: 'p1', provider: 'claude', surface: 'job', status: 'success',
         started_at: new Date(Date.now() - i * 1000).toISOString(),
       })
     }
@@ -120,7 +121,7 @@ describe('getInvocations', () => {
   it('applies cap and sets truncated flag', () => {
     for (let i = 0; i < 10; i++) {
       recordInvocation(db, {
-        id: `r${i}`, project_id: 'p1', surface: 'job', status: 'success',
+        id: `r${i}`, project_id: 'p1', provider: 'claude', surface: 'job', status: 'success',
         started_at: new Date(Date.now() - i * 1000).toISOString(),
       })
     }

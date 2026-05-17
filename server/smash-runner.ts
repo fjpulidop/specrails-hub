@@ -401,6 +401,7 @@ function recordSafely(
     recordInvocation(deps.db, {
       id: randomUUID(),
       project_id: deps.projectId,
+      provider: 'claude', // smash-runner is Claude-only WIP; provider becomes adapter-driven once smash migrates
       surface: 'smash',
       surface_ref_id: `smash:${runId}`,
       conversation_id: null,
@@ -447,6 +448,7 @@ function recordChildrenInvocations(
       recordInvocation(deps.db, {
         id: randomUUID(),
         project_id: deps.projectId,
+        provider: 'claude',
         surface: 'smash',
         surface_ref_id: `smash:${runId}:child:${childId}`,
         conversation_id: null,

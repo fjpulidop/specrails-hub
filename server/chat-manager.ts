@@ -741,6 +741,7 @@ export class ChatManager {
             recordInvocation(this._db, {
               id: randomUUID(),
               project_id: this._projectId,
+              provider,
               surface: 'explore-spec',
               surface_ref_id: conversationId,
               conversation_id: conversationId,

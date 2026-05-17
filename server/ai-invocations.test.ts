@@ -12,6 +12,7 @@ function fixedInput(overrides: Partial<Parameters<typeof recordInvocation>[1]> =
   return {
     id: 'inv-1',
     project_id: 'p1',
+    provider: 'claude',
     surface: 'job' as const,
     status: 'success' as const,
     started_at: '2026-05-06T10:00:00Z',
@@ -52,6 +53,7 @@ describe('ai-invocations', () => {
     recordInvocation(db, {
       id: 'inv-2',
       project_id: 'p1',
+      provider: 'claude',
       surface: 'job',
       status: 'failed',
       started_at: '2026-05-06T10:00:00Z',
@@ -99,5 +101,56 @@ describe('ai-invocations', () => {
     expect(summary.bySurface.job.costUsd).toBeCloseTo(3.0)
     expect(summary.bySurface['explore-spec'].count).toBe(1)
     expect(summary.bySurface['quick-spec'].count).toBe(0)
+  })
+
+  it('persists provider column from input', () => {
+    recordInvocation(db, fixedInput({ id: 'cl', provider: 'claude' }))
+    recordInvocation(db, fixedInput({ id: 'co', provider: 'codex' }))
+    const rows = db.prepare(`SELECT id, provider FROM ai_invocations ORDER BY id`).all() as Array<{ id: string; provider: string }>
+    expect(rows).toEqual([
+      { id: 'cl', provider: 'claude' },
+      { id: 'co', provider: 'codex' },
+    ])
+  })
+
+  it('rejects insert when provider is empty/missing at runtime', () => {
+    expect(() =>
+      recordInvocation(db, fixedInput({ provider: '' }))
+    ).toThrow(/provider is required/)
+  })
+
+  it('writes total_cost_usd_estimated=1 when flag set', () => {
+    recordInvocation(db, fixedInput({ id: 'est', total_cost_usd_estimated: true }))
+    const row = db.prepare(`SELECT total_cost_usd_estimated FROM ai_invocations WHERE id = ?`).get('est') as { total_cost_usd_estimated: number }
+    expect(row.total_cost_usd_estimated).toBe(1)
+  })
+
+  it('writes total_cost_usd_estimated=0 by default', () => {
+    recordInvocation(db, fixedInput({ id: 'auth' }))
+    const row = db.prepare(`SELECT total_cost_usd_estimated FROM ai_invocations WHERE id = ?`).get('auth') as { total_cost_usd_estimated: number }
+    expect(row.total_cost_usd_estimated).toBe(0)
+  })
+})
+
+describe('getInvocationsByProvider', () => {
+  let db: DbInstance
+  beforeEach(() => { db = initDb(':memory:') })
+
+  it('returns one row per provider with authoritative + estimated cost split', async () => {
+    const { getInvocationsByProvider } = await import('./ai-invocations')
+    const now = new Date().toISOString()
+    recordInvocation(db, fixedInput({ id: 'a', provider: 'claude', total_cost_usd: 1.0, total_cost_usd_estimated: false, started_at: now }))
+    recordInvocation(db, fixedInput({ id: 'b', provider: 'claude', total_cost_usd: 0.5, total_cost_usd_estimated: false, started_at: now }))
+    recordInvocation(db, fixedInput({ id: 'c', provider: 'codex', total_cost_usd: 0.02, total_cost_usd_estimated: true, started_at: now }))
+    recordInvocation(db, fixedInput({ id: 'd', provider: 'codex', total_cost_usd: 0.03, total_cost_usd_estimated: true, started_at: now }))
+    const result = getInvocationsByProvider(db, 'p1')
+    const claude = result.find((r) => r.provider === 'claude')!
+    expect(claude.count).toBe(2)
+    expect(claude.costUsd).toBeCloseTo(1.5)
+    expect(claude.estimatedCostUsd).toBe(0)
+    const codex = result.find((r) => r.provider === 'codex')!
+    expect(codex.count).toBe(2)
+    expect(codex.costUsd).toBe(0)
+    expect(codex.estimatedCostUsd).toBeCloseTo(0.05)
   })
 })

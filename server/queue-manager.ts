@@ -989,6 +989,7 @@ export class QueueManager {
           recordInvocation(this._db, {
             id: randomUUID(),
             project_id: this._projectId,
+            provider,
             surface: 'job',
             surface_ref_id: jobId,
             ticket_id: ticketIds[0] ?? null,

@@ -333,6 +333,7 @@ export class AgentRefineManager {
             recordInvocation(this._db, {
               id: randomUUID(),
               project_id: this._projectId,
+              provider: 'claude', // AgentRefineManager is Claude-only pre-§9 refactor
               surface: 'ai-edit',
               surface_ref_id: refineId,
               status: invStatus,

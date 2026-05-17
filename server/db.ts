@@ -407,6 +407,29 @@ const MIGRATIONS: Migration[] = [
       ALTER TABLE chat_conversations ADD COLUMN kind TEXT NOT NULL DEFAULT 'sidebar';
     `)
   },
+
+  // Migration 18: ai_invocations.provider — provider id stamped at insert.
+  // Existing rows backfill to 'claude' since pre-migration that was the only
+  // path. New rows MUST be populated from the resolved adapter's id (see
+  // openspec/changes/add-multi-provider-support/specs/project-spending/spec.md).
+  (db) => {
+    db.exec(`
+      ALTER TABLE ai_invocations ADD COLUMN provider TEXT;
+      UPDATE ai_invocations SET provider = 'claude' WHERE provider IS NULL;
+      CREATE INDEX IF NOT EXISTS idx_ai_inv_project_provider
+        ON ai_invocations(project_id, provider);
+    `)
+  },
+
+  // Migration 19: ai_invocations.total_cost_usd_estimated — 1 when the cost
+  // came from server/pricing.ts (estimated fallback for non-native-cost
+  // providers); 0 when authoritative from the provider's terminal event.
+  (db) => {
+    db.exec(`
+      ALTER TABLE ai_invocations
+        ADD COLUMN total_cost_usd_estimated INTEGER NOT NULL DEFAULT 0;
+    `)
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {
