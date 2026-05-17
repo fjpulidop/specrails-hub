@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.54.2](https://github.com/fjpulidop/specrails-hub/compare/v1.54.1...v1.54.2) (2026-05-17)
+
+
+### Bug Fixes
+
+* **dashboard:** restore right-click context menu on specs and rail pills ([#308](https://github.com/fjpulidop/specrails-hub/issues/308)) ([de3d17a](https://github.com/fjpulidop/specrails-hub/commit/de3d17a810c98cad9773c450bbe85137208252d9))
+
 ## [1.54.1](https://github.com/fjpulidop/specrails-hub/compare/v1.54.0...v1.54.1) (2026-05-11)
 
 
