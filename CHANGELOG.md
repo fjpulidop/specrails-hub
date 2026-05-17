@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.54.3](https://github.com/fjpulidop/specrails-hub/compare/v1.54.2...v1.54.3) (2026-05-17)
+
+
+### Bug Fixes
+
+* **dashboard:** preserve rails column width when outer sidebars toggle ([#310](https://github.com/fjpulidop/specrails-hub/issues/310)) ([f1aeca0](https://github.com/fjpulidop/specrails-hub/commit/f1aeca0abffe8d2f8d267a9ec9ce274c50b84725))
+
 ## [1.54.2](https://github.com/fjpulidop/specrails-hub/compare/v1.54.1...v1.54.2) (2026-05-17)
 
 
