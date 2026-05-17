@@ -3,7 +3,7 @@ import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
 import type { DbInstance } from './db'
-import { getConversation, addMessage, updateConversation, getStats, listJobs, getExploreMcpEnabled } from './db'
+import { getConversation, addMessage, updateConversation, getStats, listJobs } from './db'
 import { resolveCommand } from './command-resolver'
 import { spawnAiCli, spawnClaude, spawnCodex } from './util/cli-prompt'
 import { ensureExploreCwd } from './explore-cwd-manager'
@@ -12,6 +12,10 @@ import { normaliseResultEvent } from './result-event'
 import { randomUUID } from 'crypto'
 import { parseSpecDraftBlocks, applyBlocks, type ConversationDraftState } from './spec-draft-parser'
 import { attachmentManager, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
+import {
+  buildScopedSystemPromptPrefix, toolFlagsForScope, normalizeContextScope,
+  defaultBootScope, type ContextScope,
+} from './context-scope'
 
 const COMMAND_INSTRUCTION =
   'When you want to suggest a SpecRails command for the user to execute, wrap it in a command block like this: ' +
@@ -307,11 +311,12 @@ export class ChatManager {
    *
    * See openspec/changes/accelerate-spec-chat-first-token/design.md D1+D4.
    */
-  private _resolveSpawnCwd(kind: string | null | undefined): string | undefined {
+  private _resolveSpawnCwd(kind: string | null | undefined, scope?: ContextScope | null): string | undefined {
     if (kind !== 'explore') return this._cwd
     if (!this._projectSlug || !this._cwd || !this._projectName) return this._cwd
-    let mcpEnabled = false
-    try { mcpEnabled = getExploreMcpEnabled(this._db) } catch { /* default false */ }
+    // Per-conversation scope.mcp is the only source of truth. Legacy null
+    // scope is treated as mcp=false (spawn from hub-managed cwd).
+    const mcpEnabled = scope ? !!scope.mcp : false
     if (mcpEnabled) return this._cwd
     try {
       const cwd = ensureExploreCwd({
@@ -324,6 +329,17 @@ export class ChatManager {
     } catch (err) {
       console.error('[chat-manager] ensureExploreCwd failed, falling back to project path:', err)
       return this._cwd
+    }
+  }
+
+  private _resolveConversationScope(row: { kind?: string | null; context_scope?: string | null } | null | undefined): ContextScope | null {
+    if (!row || row.kind !== 'explore') return null
+    const fallback = defaultBootScope('explore')
+    if (!row.context_scope) return fallback
+    try {
+      return normalizeContextScope(JSON.parse(row.context_scope), fallback)
+    } catch {
+      return fallback
     }
   }
 
@@ -408,16 +424,19 @@ export class ChatManager {
    *
    * See openspec/changes/accelerate-spec-chat-first-token/design.md D5.
    */
-  private _buildLightweightSystemPrompt(): string {
+  private _buildLightweightSystemPrompt(scope?: ContextScope | null): string {
     const name = this._projectName ?? 'this project'
-    return (
+    const base =
       `You are a fast, focused assistant for the "${name}" specrails project. ` +
       `You have explicit permission to read and write .specrails/local-tickets.json — ` +
       `this is the project's local ticket store managed by specrails-hub. It is NOT sensitive. ` +
       `When creating or updating tickets, write directly to this JSON file.\n\n` +
       `IMPORTANT: Be efficient. Minimize tool calls. Only read files that are directly relevant. ` +
       `Do not explore broadly — focus on the specific task.`
-    )
+    if (!scope || !this._cwd) return base
+    const prefix = buildScopedSystemPromptPrefix(scope, this._cwd)
+    if (!prefix) return base
+    return `${base}\n\n${prefix}`
   }
 
   isActive(conversationId: string): boolean {
@@ -510,6 +529,8 @@ export class ChatManager {
     let binary: string
     let args: string[]
 
+    const conversationScope = this._resolveConversationScope(conversation)
+
     if (this._provider === 'codex') {
       binary = 'codex'
       // Codex: single-turn exec with model selection.
@@ -520,7 +541,7 @@ export class ChatManager {
       // are honoured on every codex chat turn.
       const lightweight = options?.lightweight ?? false
       let systemPrompt = lightweight
-        ? this._buildLightweightSystemPrompt()
+        ? this._buildLightweightSystemPrompt(conversationScope)
         : this._buildSystemPrompt()
       if (hasAttachments) systemPrompt = `${systemPrompt}\n\n${USER_ATTACHMENT_SYSTEM_NOTE}`
       const fullPrompt = `${systemPrompt}\n\n---\n\n${resolvedText}`
@@ -529,18 +550,27 @@ export class ChatManager {
       binary = 'claude'
       const lightweight = options?.lightweight ?? false
       let systemPrompt = lightweight
-        ? this._buildLightweightSystemPrompt()
+        ? this._buildLightweightSystemPrompt(conversationScope)
         : this._buildSystemPrompt()
       if (hasAttachments) systemPrompt = `${systemPrompt}\n\n${USER_ATTACHMENT_SYSTEM_NOTE}`
       args = [
         '--model', normalizeClaudeCodeModel(conversation.model),
         '--dangerously-skip-permissions',
-        '--tools', 'default',
         '--output-format', 'stream-json',
         '--verbose',
         '--system-prompt', systemPrompt,
         '-p', resolvedText,
       ]
+      // Apply per-conversation context scope tool flags (Explore only).
+      // When a scope is present we own the tool surface explicitly — do NOT
+      // also pass `--tools default`, which can conflict with --disallowedTools.
+      if (conversationScope) {
+        const toolFlags = toolFlagsForScope(conversationScope)
+        args.push(...toolFlags.args)
+        console.log(`[chat-manager] scope=${JSON.stringify(conversationScope)} flags=${toolFlags.args.join(' ')} promptBytes=${Buffer.byteLength(systemPrompt)}`)
+      } else {
+        args.push('--tools', 'default')
+      }
       if (conversation.session_id) {
         args.push('--resume', conversation.session_id)
       }
@@ -553,7 +583,7 @@ export class ChatManager {
     // No OTEL env injection here — ChatManager spawns are interactive user sessions,
     // not pipeline jobs. Telemetry is scoped to QueueManager pipeline runs only.
     // spawnAiCli reroutes multi-line argv values through stdin on Windows.
-    const spawnCwd = this._resolveSpawnCwd(conversation.kind)
+    const spawnCwd = this._resolveSpawnCwd(conversation.kind, conversationScope)
     const child = spawnAiCli(binary, args, {
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],

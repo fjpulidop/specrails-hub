@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '../../test-utils'
+import { render, screen, fireEvent, within } from '../../test-utils'
 import { SpecsBoard } from '../SpecsBoard'
 import type { LocalTicket } from '../../types'
 
@@ -22,7 +22,7 @@ vi.mock('@dnd-kit/sortable', () => ({
 }))
 
 vi.mock('@dnd-kit/utilities', () => ({
-  CSS: { Transform: { toString: () => '' } },
+  CSS: { Transform: { toString: () => '' }, Translate: { toString: () => '' } },
 }))
 
 vi.mock('../ProposeSpecModal', () => ({
@@ -47,10 +47,15 @@ function makeTicket(id: number, title: string, labels: string[]): LocalTicket {
   }
 }
 
-describe('SpecsBoard label filter', () => {
+function openLabelDropdown() {
+  fireEvent.click(screen.getByTestId('spec-label-filter-dropdown'))
+  return screen.getByTestId('spec-label-filter-panel')
+}
+
+describe('SpecsBoard label filter dropdown', () => {
   const onTicketClick = vi.fn()
 
-  it('renders pills derived from active tickets and filters on click', () => {
+  it('renders an All entry plus one option per label from the active + done tickets', () => {
     const tickets = [
       makeTicket(1, 'Auth one', ['auth']),
       makeTicket(2, 'Auth two', ['auth']),
@@ -58,20 +63,28 @@ describe('SpecsBoard label filter', () => {
       makeTicket(4, 'Ui one', ['ui']),
     ]
     render(<SpecsBoard tickets={tickets} isLoading={false} onTicketClick={onTicketClick} />)
-    expect(screen.getByText('Auth one')).toBeInTheDocument()
-    expect(screen.getByText('Api one')).toBeInTheDocument()
-    expect(screen.getByText('Ui one')).toBeInTheDocument()
+    const panel = openLabelDropdown()
+    expect(within(panel).getByText('All')).toBeInTheDocument()
+    expect(within(panel).getByText('auth')).toBeInTheDocument()
+    expect(within(panel).getByText('api')).toBeInTheDocument()
+    expect(within(panel).getByText('ui')).toBeInTheDocument()
+  })
 
-    const authPill = screen.getByRole('button', { name: /^auth\s*2$/, pressed: false })
-    fireEvent.click(authPill)
-
+  it('selecting a single label filters the visible specs', () => {
+    const tickets = [
+      makeTicket(1, 'Auth one', ['auth']),
+      makeTicket(2, 'Api one', ['api']),
+      makeTicket(3, 'Ui one', ['ui']),
+    ]
+    render(<SpecsBoard tickets={tickets} isLoading={false} onTicketClick={onTicketClick} />)
+    const panel = openLabelDropdown()
+    fireEvent.click(within(panel).getByText('auth'))
     expect(screen.getByText('Auth one')).toBeInTheDocument()
-    expect(screen.getByText('Auth two')).toBeInTheDocument()
     expect(screen.queryByText('Api one')).toBeNull()
     expect(screen.queryByText('Ui one')).toBeNull()
   })
 
-  it('multi-select uses OR semantics across both active and Done sections', () => {
+  it('multi-select uses OR semantics across both active and Done buckets', () => {
     const tickets = [
       makeTicket(1, 'Auth one', ['auth']),
       makeTicket(2, 'Api one', ['api']),
@@ -85,10 +98,9 @@ describe('SpecsBoard label filter', () => {
     render(
       <SpecsBoard tickets={tickets} doneTickets={doneTickets} isLoading={false} onTicketClick={onTicketClick} />,
     )
-
-    fireEvent.click(screen.getByRole('button', { name: /^auth\s*\d/ }))
-    fireEvent.click(screen.getByRole('button', { name: /^api\s*\d/ }))
-
+    const panel = openLabelDropdown()
+    fireEvent.click(within(panel).getByText('auth'))
+    fireEvent.click(within(panel).getByText('api'))
     expect(screen.getByText('Auth one')).toBeInTheDocument()
     expect(screen.getByText('Api one')).toBeInTheDocument()
     expect(screen.queryByText('Ui one')).toBeNull()
@@ -97,56 +109,28 @@ describe('SpecsBoard label filter', () => {
     expect(screen.queryByText('Done ui')).toBeNull()
   })
 
-  it('shows filtered/total in the count chip when filter is active and resets via clear', () => {
-    const tickets = [
-      makeTicket(1, 'Auth one', ['auth']),
-      makeTicket(2, 'Auth two', ['auth']),
-      makeTicket(3, 'Api one', ['api']),
-      makeTicket(4, 'Ui one', ['ui']),
-    ]
-    render(<SpecsBoard tickets={tickets} isLoading={false} onTicketClick={onTicketClick} />)
-    expect(screen.getByText('4')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: /^auth\s*\d/ }))
-    expect(screen.getByText('2/4')).toBeInTheDocument()
-    expect(screen.queryByText('Api one')).toBeNull()
-
-    const clear = screen.getByTestId('spec-label-filter-clear')
-    fireEvent.click(clear)
-    expect(screen.getByText('4')).toBeInTheDocument()
-    expect(screen.getByText('Api one')).toBeInTheDocument()
-  })
-
-  it('toggling the same pill twice clears the filter', () => {
+  it('All entry clears the active selection', () => {
     const tickets = [
       makeTicket(1, 'Auth one', ['auth']),
       makeTicket(2, 'Api one', ['api']),
     ]
     render(<SpecsBoard tickets={tickets} isLoading={false} onTicketClick={onTicketClick} />)
-
-    const auth = () => screen.getByRole('button', { name: /^auth\s*\d/ })
-    fireEvent.click(auth())
+    const panel = openLabelDropdown()
+    fireEvent.click(within(panel).getByText('auth'))
     expect(screen.queryByText('Api one')).toBeNull()
-    fireEvent.click(auth())
+    fireEvent.click(within(panel).getByText('All'))
     expect(screen.getByText('Api one')).toBeInTheDocument()
   })
 
-  it('does not render the strip when no tickets carry labels', () => {
+  it('renders the dropdown trigger even when no tickets carry labels', () => {
     const tickets = [makeTicket(1, 'Plain one', []), makeTicket(2, 'Plain two', [])]
     render(<SpecsBoard tickets={tickets} isLoading={false} onTicketClick={onTicketClick} />)
-    expect(screen.queryByTestId('spec-label-filter-strip')).toBeNull()
+    expect(screen.getByTestId('spec-label-filter-dropdown')).toBeInTheDocument()
+    const panel = openLabelDropdown()
+    expect(within(panel).getByText('No labels in this project.')).toBeInTheDocument()
   })
 
-  it('shows a no-match empty state when the filter matches nothing', () => {
-    const tickets = [makeTicket(1, 'Auth one', ['auth'])]
-    render(<SpecsBoard tickets={tickets} isLoading={false} onTicketClick={onTicketClick} />)
-    fireEvent.click(screen.getByRole('button', { name: /^auth\s*\d/ }))
-    fireEvent.click(screen.getByRole('button', { name: /^auth\s*\d/ }))
-    // Clear → list visible again
-    expect(screen.getByText('Auth one')).toBeInTheDocument()
-  })
-
-  it('does not introduce dracula-* tokens in the rendered strip', () => {
+  it('does not introduce dracula-* tokens in the dropdown trigger or panel', () => {
     const tickets = [
       makeTicket(1, 'Auth one', ['auth']),
       makeTicket(2, 'Api one', ['api']),
@@ -154,8 +138,9 @@ describe('SpecsBoard label filter', () => {
     const { container } = render(
       <SpecsBoard tickets={tickets} isLoading={false} onTicketClick={onTicketClick} />,
     )
-    const strip = container.querySelector('[data-testid="spec-label-filter-strip"]')
-    expect(strip).not.toBeNull()
-    expect(strip!.outerHTML).not.toMatch(/dracula-/)
+    expect(container.querySelector('[data-testid="spec-label-filter-dropdown"]')!.outerHTML).not.toMatch(/dracula-/)
+    openLabelDropdown()
+    const panel = container.querySelector('[data-testid="spec-label-filter-panel"]')!
+    expect(panel.outerHTML).not.toMatch(/dracula-/)
   })
 })

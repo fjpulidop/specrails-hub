@@ -197,6 +197,23 @@ function KanbanCard({
               </span>
             )}
 
+            {ticket.is_epic && (
+              <span
+                className="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium border border-accent-highlight/60 text-accent-highlight bg-accent-highlight/10"
+                data-testid={`epic-badge-grid-${ticket.id}`}
+              >
+                Epic
+              </span>
+            )}
+            {ticket.parent_epic_id != null && (
+              <span
+                className="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium border border-accent-secondary/40 text-accent-secondary"
+                data-testid={`epic-child-pill-grid-${ticket.id}`}
+              >
+                ↑ Sub-Spec
+              </span>
+            )}
+
             {(ticket.labels ?? []).slice(0, 2).map((label) => (
               <span
                 key={label}

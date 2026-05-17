@@ -103,4 +103,54 @@ describe('RailRow', () => {
     renderRailRow({ ...defaultProps, status: 'running', jiggleMode: true })
     expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
   })
+
+  describe('compact density', () => {
+    it('renders the compact mini-card variant', () => {
+      const { container } = renderRailRow({ ...defaultProps, density: 'compact' } as any)
+      const card = container.querySelector('[data-testid="rail-row-compact-rail-1"]')
+      expect(card).toBeInTheDocument()
+      expect(card).toHaveAttribute('data-density', 'compact')
+    })
+
+    it('keeps the label clickable for rename in compact mode', () => {
+      renderRailRow({ ...defaultProps, density: 'compact' } as any)
+      const labelBtn = screen.getByRole('button', { name: 'Rail 1' })
+      fireEvent.click(labelBtn)
+      expect(screen.getByRole('textbox')).toBeInTheDocument()
+    })
+
+    it('omits the drop zone in compact mode', () => {
+      renderRailRow({ ...defaultProps, density: 'compact' } as any)
+      expect(screen.queryByText('Drag specs here')).not.toBeInTheDocument()
+    })
+
+    it('renders clickable id pills for each assigned ticket and opens via onTicketClick', () => {
+      const onTicketClick = vi.fn()
+      const tickets: LocalTicket[] = [
+        { id: 19, title: 'Training Mode', description: '', status: 'todo', priority: 'medium', labels: [], assignee: null, prerequisites: [], metadata: {}, created_at: '', updated_at: '', created_by: 'u', source: 'manual' },
+        { id: 54, title: 'Audio capture', description: '', status: 'todo', priority: 'high', labels: [], assignee: null, prerequisites: [], metadata: {}, created_at: '', updated_at: '', created_by: 'u', source: 'manual' },
+      ]
+      renderRailRow({ ...defaultProps, density: 'compact', tickets, onTicketClick } as any)
+      const pillContainer = screen.getByTestId('rail-row-compact-tickets-rail-1')
+      const pill19 = within(pillContainer).getByRole('button', { name: /#19/ })
+      const pill54 = within(pillContainer).getByRole('button', { name: /#54/ })
+      expect(pill19).toBeInTheDocument()
+      expect(pill54).toBeInTheDocument()
+      fireEvent.click(pill54)
+      expect(onTicketClick).toHaveBeenCalledWith(tickets[1])
+    })
+
+    it('renders a destructive delete button in jiggle mode', () => {
+      const onDelete = vi.fn()
+      const { container } = renderRailRow({
+        ...defaultProps,
+        density: 'compact',
+        jiggleMode: true,
+        onDelete,
+      } as any)
+      const btn = within(container).getByRole('button', { name: /Delete Rail 1/i })
+      fireEvent.click(btn)
+      expect(onDelete).toHaveBeenCalled()
+    })
+  })
 })

@@ -89,6 +89,10 @@ export interface ExploreSpecShellProps {
    * See openspec/changes/replace-ai-edit-with-continue-editing/design.md D2.
    */
   editTicket?: EditTicketSeed
+  /** Context scope chosen in the Add Spec modal. Used at conversation
+   *  creation time to freeze the per-turn spawn behaviour and to render
+   *  the persistent header pill. Ignored when resumeConversationId is set. */
+  contextScope?: import('../../types/context-scope').ContextScope
 }
 
 export interface EditTicketSeed {
@@ -114,6 +118,7 @@ export function ExploreSpecShell({
   onStateChange,
   editTicket,
   onTicketCreated,
+  contextScope,
 }: ExploreSpecShellProps) {
   const chat = useChatContext()
   const { activeProjectId } = useHub()
@@ -190,6 +195,10 @@ export function ExploreSpecShell({
     if (startedRef.current) return
     if (resumeConversationId) {
       startedRef.current = true
+      // Hydrate the conv if it's not already in the chat hook's top-3
+      // window — without this the shell stalls on "Starting conversation…"
+      // forever because the lookup returns undefined.
+      void chat?.hydrateConversation?.(resumeConversationId)
       return
     }
     if (!chat) return
@@ -207,10 +216,16 @@ export function ExploreSpecShell({
     const attachments = initialAttachmentIds.length > 0
       ? { ticketKey: pendingSpecId, ids: initialAttachmentIds }
       : undefined
-    void chat.startWithMessage(prompt, { lightweight: true, maxTurns: 20, attachments }, initialModel, 'explore').then((id) => {
+    void chat.startWithMessage(
+      prompt,
+      { lightweight: true, maxTurns: 20, attachments },
+      initialModel,
+      'explore',
+      contextScope,
+    ).then((id) => {
       if (id) setConversationId(id)
     })
-  }, [chat, initialIdea, pendingSpecId, initialAttachmentIds, resumeConversationId, initialModel, editTicket])
+  }, [chat, initialIdea, pendingSpecId, initialAttachmentIds, resumeConversationId, initialModel, editTicket, contextScope])
 
   // Focus restoration on unmount
   useEffect(() => {
@@ -418,9 +433,14 @@ export function ExploreSpecShell({
   }, [conversation?.isStreaming])
 
   const submitComposer = useCallback(() => {
+    if (conversation?.isStreaming) {
+      const canAbort = (conversation.messages?.length ?? 0) > 1
+      if (canAbort && chat) void chat.abortStream(conversation.id)
+      return
+    }
     const text = composerRef.current?.getPlainText().trim() ?? ''
     if (text) void sendComposer(text)
-  }, [sendComposer])
+  }, [conversation, chat, sendComposer])
 
   const handleSaveAsDraft = useCallback(async () => {
     if (!conversationId || !activeProjectId) return false
@@ -586,6 +606,20 @@ export function ExploreSpecShell({
           </div>
         </button>
         <div className="flex items-center gap-2">
+          {contextScope ? (
+            <span
+              data-testid="explore-context-pill"
+              title="Active context scope for this Explore session"
+              className="hidden md:inline-flex items-center gap-1 px-2 py-1 rounded-full border border-border/50 bg-card/60 text-[10px] text-muted-foreground"
+            >
+              Context: {[
+                contextScope.specrails && 'specrails',
+                contextScope.openspec && 'openspec',
+                contextScope.full && 'codebase',
+                contextScope.mcp && 'mcp',
+              ].filter(Boolean).join(', ') || 'minimal'}
+            </span>
+          ) : null}
           <Button
             size="sm"
             variant="outline"
@@ -741,16 +775,31 @@ export function ExploreSpecShell({
             <div className="flex items-center justify-between mt-2 gap-3">
               <span />
               {/* Streaming indicator removed — ExploreStatusPills covers this state. */}
-              <Button
-                size="sm"
-                onClick={submitComposer}
-                disabled={!hasComposerText || (!conversation && !editTicket) || conversation?.isStreaming || pendingTurn}
-                className="gap-1.5"
-              >
-                <Send className="w-3.5 h-3.5" />
-                Send
-                <span className="text-[10px] opacity-70 ml-1">⌘⏎</span>
-              </Button>
+              {conversation?.isStreaming && turnCount > 1 ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    if (conversation && chat) void chat.abortStream(conversation.id)
+                  }}
+                  className="gap-1.5 text-destructive hover:text-destructive"
+                  data-testid="explore-stop-button"
+                >
+                  Stop
+                  <span className="text-[10px] opacity-70 ml-1">⌘⏎</span>
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={submitComposer}
+                  disabled={!hasComposerText || (!conversation && !editTicket) || pendingTurn}
+                  className="gap-1.5"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Send
+                  <span className="text-[10px] opacity-70 ml-1">⌘⏎</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>

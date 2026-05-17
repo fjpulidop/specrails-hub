@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useCallback,
@@ -95,8 +96,16 @@ export function SharedWebSocketProvider({ url, children }: { url: string; childr
     handlers.current.delete(id)
   }, [])
 
+  // Memoise the context value so consumers don't re-render every time the
+  // provider re-renders — only when `connectionStatus` actually changes
+  // (registerHandler / unregisterHandler are already stable via useCallback).
+  const value = useMemo(
+    () => ({ registerHandler, unregisterHandler, connectionStatus }),
+    [registerHandler, unregisterHandler, connectionStatus],
+  )
+
   return (
-    <SharedWebSocketContext.Provider value={{ registerHandler, unregisterHandler, connectionStatus }}>
+    <SharedWebSocketContext.Provider value={value}>
       {children}
     </SharedWebSocketContext.Provider>
   )

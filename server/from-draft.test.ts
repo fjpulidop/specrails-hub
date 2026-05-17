@@ -153,6 +153,43 @@ describe('POST /tickets/from-draft', () => {
     expect(res.body.ticket.labels).toEqual(['ui', 'theme'])
   })
 
+  it('persists short_summary from explicit body field', async () => {
+    const app = createApp(ctx)
+    const res = await request(app)
+      .post('/api/projects/proj-1/tickets/from-draft')
+      .send({
+        title: 'With summary',
+        description: '## Problem Statement\nfoo',
+        shortSummary: '  Crisp one-liner with extra whitespace.  ',
+      })
+    expect(res.status).toBe(201)
+    expect(res.body.ticket.short_summary).toBe('Crisp one-liner with extra whitespace.')
+  })
+
+  it('extracts short_summary from a Short Summary section in the description', async () => {
+    const app = createApp(ctx)
+    const res = await request(app)
+      .post('/api/projects/proj-1/tickets/from-draft')
+      .send({
+        title: 'Extract from desc',
+        description: '## Problem Statement\nfoo\n\n## Short Summary\nDerived from description.',
+      })
+    expect(res.status).toBe(201)
+    expect(res.body.ticket.short_summary).toBe('Derived from description.')
+    // The section is stripped from the stored description.
+    expect(res.body.ticket.description).not.toContain('Short Summary')
+    expect(res.body.ticket.description).toContain('Problem Statement')
+  })
+
+  it('persists short_summary = null when neither body nor description provide one', async () => {
+    const app = createApp(ctx)
+    const res = await request(app)
+      .post('/api/projects/proj-1/tickets/from-draft')
+      .send({ title: 'No summary', description: '## Problem Statement\nfoo' })
+    expect(res.status).toBe(201)
+    expect(res.body.ticket.short_summary).toBeNull()
+  })
+
   it('accepts pendingSpecId without crashing when no attachments exist', async () => {
     // Migration is a no-op when the pending dir is empty (renameTicketDir
     // returns []). The endpoint must still succeed and produce a ticket.
@@ -205,6 +242,10 @@ describe('POST /tickets/from-draft — flip-in-place', () => {
         metadata: {},
         comments: [],
         origin_conversation_id: opts.conversationId,
+        is_epic: false,
+        parent_epic_id: null,
+        execution_order: null,
+        short_summary: null,
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
         created_by: 'sr-explore-spec',
@@ -399,6 +440,10 @@ describe('POST /tickets/save-as-draft — editTicketId flip-in-place', () => {
         metadata: {},
         comments: [],
         origin_conversation_id: opts.originConversationId ?? null,
+        is_epic: false,
+        parent_epic_id: null,
+        execution_order: null,
+        short_summary: null,
         created_at: opts.createdAt ?? '2026-01-01T00:00:00Z',
         updated_at: opts.createdAt ?? '2026-01-01T00:00:00Z',
         created_by: 'manual',

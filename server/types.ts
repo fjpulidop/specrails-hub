@@ -208,6 +208,7 @@ export interface ChatConversationRow {
   created_at: string
   updated_at: string
   kind: 'sidebar' | 'explore'
+  context_scope: string | null
 }
 
 export interface ChatMessageRow {
@@ -953,9 +954,59 @@ export type WsMessage =
   | PluginInstallProgressMessage
   | PluginPrereqInstallProgressMessage | PluginPrereqInstalledMessage
   | SpendingInvalidatedMessage
+  | SmashStartedMessage | SmashProgressMessage | SmashCompletedMessage
+  | SmashFailedMessage | SmashUndoneMessage
 
 export interface SpendingInvalidatedMessage {
   type: 'spending.invalidated'
   projectId: string
+}
+
+// ─── SPECs SMASH ─────────────────────────────────────────────────────────────
+
+export interface SmashStartedMessage {
+  type: 'smash.started'
+  projectId: string
+  ticketId: number
+  runId: string
+  ticketTitle?: string
+  timestamp: string
+}
+
+export interface SmashProgressMessage {
+  type: 'smash.progress'
+  projectId: string
+  ticketId: number
+  runId: string
+  stage: 'analyzing' | 'identifying' | 'ordering'
+  timestamp: string
+}
+
+export interface SmashCompletedMessage {
+  type: 'smash.completed'
+  projectId: string
+  ticketId: number
+  runId: string
+  smashedAt: string
+  childrenIds: number[]
+  timestamp: string
+}
+
+export interface SmashFailedMessage {
+  type: 'smash.failed'
+  projectId: string
+  ticketId: number
+  runId: string
+  reason: 'timeout' | 'model_error' | 'crashed' | 'invalid-output' | 'mutation-failed'
+  detail?: string
+  timestamp: string
+}
+
+export interface SmashUndoneMessage {
+  type: 'smash.undone'
+  projectId: string
+  ticketId: number
+  childrenIds: number[]
+  timestamp: string
 }
 

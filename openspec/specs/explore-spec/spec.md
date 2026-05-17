@@ -245,7 +245,6 @@ The ExploreSpec full-screen overlay SHALL expose a minimize control in its heade
 - **THEN** the ExploreSpec shell remains mounted (in the global minimized chats provider's hidden host)
 - **AND** the session is added to the dock as a chip if it wasn't already visible there
 
-
 ### Requirement: ExploreSpec shell exposes a Save as Draft action
 
 `ExploreSpecShell` SHALL render a `Save as Draft` action in its header (or equivalent persistent control surface), distinct from the back arrow, the minimize control, the close (`×`) button, and the existing `Create Spec` action. Activating the action MUST persist the current Explore session as a ticket with `status='draft'` and `origin_conversation_id` equal to the session's conversation id, and MUST close the shell without triggering the discard-confirm dialog. The action MUST be available whenever the conversation has at least one user-submitted turn.
@@ -351,26 +350,28 @@ When the user invokes the existing `Create Spec` action (which calls `POST /tick
 
 ### Requirement: Explore turns spawn from a hub-managed cwd by default
 
-Every Explore conversation turn (chat conversations with `kind='explore'`) SHALL spawn `claude` with `cwd = ~/.specrails/projects/<slug>/explore-cwd/` UNLESS the per-project `explore_mcp_enabled` setting is `true`. The hub-managed cwd MUST contain a hub-owned `CLAUDE.md` and a symlink `./project` (junction on Windows) pointing at the project's absolute path. The user's `<project>/CLAUDE.md` MUST NOT be modified, moved, deleted, or referenced by the spawn cwd in any way.
+Every Explore conversation turn (chat conversations with `kind='explore'`) SHALL spawn `claude` with `cwd` selected by the conversation's `contextScope.mcp` flag. When `contextScope.mcp` is `true` the spawn cwd MUST be `<project.path>`; otherwise it MUST be `~/.specrails/projects/<slug>/explore-cwd/`. The hub-managed cwd MUST contain a hub-owned `CLAUDE.md` and a symlink `./project` (junction on Windows) pointing at the project's absolute path. The user's `<project>/CLAUDE.md` MUST NOT be modified, moved, deleted, or referenced by the spawn cwd in any way. The conversation's stored `contextScope.mcp` MUST be set at creation time exclusively from the Add Spec modal's `External tools (MCPs)` toggle (or the active preset). The hub MUST NOT consult any project-level setting when initialising or interpreting `contextScope.mcp`. Legacy conversations whose `context_scope` is `null` or missing the `mcp` field MUST be treated as `mcp: false` (spawn from hub-managed cwd).
 
-#### Scenario: Default Explore turn uses the hub-managed cwd
-
-- **WHEN** an Explore conversation sends its first turn and `explore_mcp_enabled` is unset or `false`
+#### Scenario: contextScope.mcp false uses hub-managed cwd
+- **WHEN** an Explore turn fires and the conversation's `contextScope.mcp` is `false`
 - **THEN** `claude` is spawned with `cwd` equal to `~/.specrails/projects/<slug>/explore-cwd/`
 - **AND** that directory contains a hub-owned `CLAUDE.md` file
 - **AND** that directory contains a `project` entry that resolves to the project's absolute path
 
-#### Scenario: Toggle ON falls back to legacy spawn cwd
-
-- **WHEN** an Explore turn is sent and `explore_mcp_enabled` is `true`
+#### Scenario: contextScope.mcp true uses project cwd
+- **WHEN** an Explore turn fires and the conversation's `contextScope.mcp` is `true`
 - **THEN** `claude` is spawned with `cwd` equal to `<project.path>`
 - **AND** the hub-managed `explore-cwd/` directory is not used for that turn
 
 #### Scenario: Project CLAUDE.md is never touched
-
 - **WHEN** an Explore conversation is created, run, resumed, minimized, restored, or closed
 - **THEN** the file `<project.path>/CLAUDE.md` is not modified, moved, or deleted by the hub
 - **AND** the hub-managed `explore-cwd/CLAUDE.md` is a separate file with hub-owned content
+
+#### Scenario: Legacy null scope defaults to hub-managed cwd
+- **GIVEN** an Explore conversation row whose stored `context_scope` is `null` or lacks the `mcp` field
+- **WHEN** a turn fires for that conversation
+- **THEN** `claude` is spawned with `cwd` equal to `~/.specrails/projects/<slug>/explore-cwd/`
 
 ### Requirement: Explore-cwd lifecycle is hub-managed
 
@@ -415,28 +416,6 @@ The system prompt sent to `claude` for an Explore turn (i.e. when `options.light
 - **WHEN** the same prompt is built once with no attachments and once with attachments
 - **THEN** the two strings differ only by appending the `USER_ATTACHMENT_SYSTEM_NOTE` suffix
 - **AND** all other characters are unchanged
-
-### Requirement: Per-project Use-MCPs-in-Explore toggle defaults OFF
-
-The hub SHALL persist a per-project boolean setting `explore_mcp_enabled`, default `false`, exposed via `GET /api/projects/:projectId/explore-mcp-enabled` and `PATCH /api/projects/:projectId/explore-mcp-enabled`. The PATCH endpoint MUST accept `{ enabled: boolean }` and reject other payloads with HTTP 400. The setting MUST be read fresh at every Explore turn so toggling takes effect on the next message without restarting any process. The client SHALL render the toggle in `SettingsPage` under an Explore section.
-
-#### Scenario: Default value is false
-
-- **WHEN** a fresh project is registered and `GET /api/projects/:id/explore-mcp-enabled` is called before any user interaction
-- **THEN** the response is `{ enabled: false }`
-
-#### Scenario: Toggle takes effect on next turn
-
-- **GIVEN** an active Explore conversation that has streamed at least one turn with `enabled=false`
-- **WHEN** the user PATCHes `enabled=true` and sends another message in the same conversation
-- **THEN** the next spawn uses `<project.path>` as cwd
-- **AND** no process restart is required for the change to apply
-
-#### Scenario: Invalid payload rejected
-
-- **WHEN** the client PATCHes `{ enabled: "yes" }` or any non-boolean
-- **THEN** the server responds 400
-- **AND** the stored value is unchanged
 
 ### Requirement: Explore turns kept warm via session resume
 
@@ -838,3 +817,559 @@ The hub SHALL extend `PATCH /api/projects/:projectId/tickets/:id` to accept an o
 
 - **WHEN** a PATCH request omits `acceptanceCriteria` entirely
 - **THEN** the persisted description retains any pre-existing `## Acceptance Criteria` section unchanged
+
+### Requirement: Explore turns honor per-conversation context scope
+Every Explore conversation SHALL carry a `contextScope: { specrails: boolean, openspec: boolean, full: boolean, mcp: boolean }` record set at launch (from the Add Spec modal) and persisted on the `chat_conversations` row. Each turn spawn MUST consult this record and:
+- When `specrails=true`, prepend `<project>/.specrails/specs/**/*.md` content to the system prompt under a section labelled `## Specrails Specs` (capped at 30k tokens, truncated with `(truncated)` marker).
+- When `openspec=true`, prepend `<project>/openspec/specs/**/spec.md` content under `## OpenSpec Specs` (same cap).
+- When `full=true`, pass `--allowedTools Read,Grep,Glob` (Bash excluded by default). When `full=false`, pass `--disallowedTools Read,Grep,Glob,Bash`. The two flags MUST NOT both be passed; a falsy `full` selects disallow.
+- When `specrails=true` or `openspec=true` AND `full=false`, the spawn MUST additionally allow Read on the specific spec directory paths via `--allowedTools` so the model can re-read the concatenated specs if it asks. The remaining file system remains blocked.
+
+#### Scenario: Specs concat appears under labelled sections
+- **WHEN** the first Explore turn fires with `contextScope: { specrails: true, openspec: true, full: false, mcp: false }`
+- **THEN** the system prompt contains a `## Specrails Specs` section followed by spec contents
+- **AND** the system prompt contains a `## OpenSpec Specs` section followed by openspec contents
+- **AND** the spawn includes `--disallowedTools Read,Grep,Glob,Bash` for non-spec paths
+- **AND** Read on the spec directories is permitted via `--allowedTools`
+
+#### Scenario: Full ON opens read tools
+- **WHEN** an Explore turn fires with `full=true`
+- **THEN** the spawn includes `--allowedTools Read,Grep,Glob`
+- **AND** Bash is not in the allowed list
+
+#### Scenario: Full OFF closes read tools
+- **WHEN** an Explore turn fires with `full=false` and both spec toggles OFF
+- **THEN** the spawn includes `--disallowedTools Read,Grep,Glob,Bash`
+- **AND** no allow-list is present for those tools
+
+#### Scenario: 30k cap on spec concat
+- **WHEN** the combined specrails spec content exceeds 30k tokens
+- **THEN** the prompt section is truncated to fit
+- **AND** ends with the literal marker `(truncated)`
+
+### Requirement: Explore conversation persists its contextScope
+The `chat_conversations` table SHALL gain a `context_scope` text column (JSON) for rows where `kind='explore'`. The column MUST be populated at conversation creation from the Add Spec modal payload and MUST NOT change for the lifetime of the conversation. Resumed conversations (via `--resume`) MUST re-read this stored scope on every turn.
+
+#### Scenario: Scope persists across resume
+- **GIVEN** an Explore conversation created with `context_scope = { specrails: true, openspec: false, full: false, mcp: true }`
+- **WHEN** the conversation is minimized and later resumed via a new spawn with `--resume`
+- **THEN** the resumed spawn reads the stored `context_scope` and applies the same flags
+
+#### Scenario: Scope is immutable
+- **WHEN** a user changes the toggles in a new Add Spec modal while an older Explore conversation is active
+- **THEN** the older conversation's spawns continue to use its original scope
+
+### Requirement: ExploreSpec composer exposes a Stop affordance while streaming
+
+While an Explore Spec turn is streaming (`conversation.isStreaming === true`) **and** the conversation already has more than one message (i.e. at least one prior user turn has completed and a new user turn is being processed), the composer SHALL present a Stop control in the same DOM slot as the Send button. The very first (bootstrap) streaming turn of a conversation — when `conversation.messages.length <= 1` — SHALL NOT expose a Stop control, because cancelling the priming turn would leave the conversation in an unusable half-initialised state. Activating the Stop control SHALL cancel the in-flight assistant turn by calling `useChat.abortStream(conversationId)`, which `DELETE`s `/api/projects/:projectId/chat/conversations/:id/messages/stream`. The Stop control SHALL be enabled regardless of whether the composer textarea contains text, because the user MUST be able to interrupt without having to type a new message first. When `isStreaming` flips back to `false`, the composer SHALL revert to the Send affordance, preserving any text the user typed during the streaming interval.
+
+#### Scenario: Stop button replaces Send while streaming
+
+- **WHEN** the user submits an Explore Spec turn and the server begins streaming (`conversation.isStreaming` flips to `true`)
+- **THEN** the composer's Send button SHALL be replaced in place by a Stop button styled with the destructive (red) variant
+- **AND** the Stop button SHALL be enabled even if the composer textarea is empty
+
+#### Scenario: Click on Stop cancels the in-flight turn
+
+- **WHEN** the user clicks the Stop button while streaming
+- **THEN** the client SHALL invoke `useChat.abortStream(conversation.id)`, which issues `DELETE /chat/conversations/:id/messages/stream`
+- **AND** the server SHALL terminate the spawned `claude` child via the existing `ChatManager.abort` path
+- **AND** any assistant output already rendered SHALL remain visible
+
+#### Scenario: Stop is hidden during the bootstrap turn
+
+- **WHEN** the user opens an Explore Spec shell and the slash-command bootstrap turn is streaming, with `conversation.messages.length <= 1`
+- **THEN** the composer SHALL NOT render a Stop button
+- **AND** the keybind `⌘⏎` / `Ctrl+⏎` SHALL NOT trigger `abortStream` during this window
+
+#### Scenario: Send affordance restored after streaming ends
+
+- **WHEN** `conversation.isStreaming` transitions from `true` back to `false` (either because the turn completed naturally or because the user pressed Stop)
+- **THEN** the composer SHALL re-render the Send button in the same DOM slot
+- **AND** any text the user typed into the composer during the streaming interval SHALL still be present
+
+### Requirement: ⌘⏎ / Ctrl+⏎ triggers Stop while streaming
+
+The `Cmd+Enter` (macOS) / `Ctrl+Enter` (other platforms) keybind inside the Explore Spec composer SHALL be context-sensitive: while `conversation.isStreaming === false`, it submits the composer text exactly as today; while `conversation.isStreaming === true`, it cancels the in-flight turn via the same `abortStream` call as the Stop button. The keybind hint displayed next to the action label SHALL remain visible in both states so the affordance is discoverable from muscle memory.
+
+#### Scenario: ⌘⏎ submits while idle
+
+- **WHEN** the user presses `Cmd+Enter` (or `Ctrl+Enter`) while `conversation.isStreaming` is `false` and the composer contains non-whitespace text
+- **THEN** the composer SHALL submit the message exactly as today (existing behaviour, unchanged)
+
+#### Scenario: ⌘⏎ aborts while streaming
+
+- **WHEN** the user presses `Cmd+Enter` (or `Ctrl+Enter`) while `conversation.isStreaming` is `true`
+- **THEN** the client SHALL invoke `useChat.abortStream(conversation.id)` instead of submitting any composer text
+- **AND** any text currently in the composer SHALL be preserved (not consumed by the keybind)
+
+### Requirement: Hub-wide kill switch for Contract Refine
+
+The hub SHALL honour an environment variable `SPECRAILS_EXPLORE_CONTRACT_REFINE`. When the variable is the literal string `0`, `false`, or `off` (case-insensitive), the refine step MUST be skipped for every project regardless of per-conversation scope. The kill switch suppresses both the post-commit auto-fire path and the manual retry endpoint.
+
+#### Scenario: Kill switch disables refine across all projects
+- **GIVEN** the server is started with `SPECRAILS_EXPLORE_CONTRACT_REFINE=0`
+- **WHEN** any committed Explore conversation has `context_scope.contractRefine=true`
+- **THEN** no refine spawn is scheduled
+- **AND** the ticket description is left as the user committed it
+
+#### Scenario: Kill switch disables retry endpoint
+- **GIVEN** the server is started with `SPECRAILS_EXPLORE_CONTRACT_REFINE=off`
+- **WHEN** the client POSTs `POST /api/projects/:projectId/tickets/:id/contract-refine` for a ticket with a valid `origin_conversation_id`
+- **THEN** the server responds 409
+- **AND** no spawn is scheduled
+
+#### Scenario: Default-empty env behaves as enabled
+- **WHEN** the server is started without `SPECRAILS_EXPLORE_CONTRACT_REFINE` set
+- **THEN** the kill switch is treated as inactive
+- **AND** per-conversation scope drives refine behaviour normally
+
+### Requirement: Contract Refine runs as a post-commit Explore turn
+
+When the hub-wide kill switch is inactive, the hub SHALL fire a Contract Refine turn after every successful Explore spec commit whose source conversation has `context_scope.contractRefine === true`. The refine MUST run asynchronously (the client's `Create Spec` request MUST return as fast as it does today). The refine MUST spawn `claude` through `ChatManager` reusing the parent Explore conversation's lifecycle (concurrency cap, idle-kill, crash auto-respawn, `--resume <session_id>`, cwd resolution from the conversation's `contextScope.mcp`). The refine MUST use the same model as the parent conversation. The post-commit path MUST NOT consult any project-level setting.
+
+#### Scenario: Refine fires after new-ticket commit
+- **WHEN** the user commits an Explore draft via `POST /tickets/from-draft` (legacy insert path)
+- **AND** the committed conversation has `context_scope.contractRefine=true`
+- **THEN** `ChatManager.runContractRefine(conversationId, ticketId)` is invoked after the HTTP response is sent
+- **AND** the refine spawn uses `--resume <session_id>` of the parent Explore conversation
+
+#### Scenario: Refine fires after draft flip-in-place commit
+- **WHEN** the user commits a session whose source ticket is `status='draft'` (flip-in-place path)
+- **AND** the committed conversation has `context_scope.contractRefine=true`
+- **THEN** the refine fires against the flipped ticket id, not a new ticket id
+
+#### Scenario: Refine reuses parent conversation model
+- **GIVEN** an Explore conversation created with `model='haiku'`
+- **WHEN** the refine fires for its commit
+- **THEN** the spawned `claude` argv selects `haiku` (same as parent turns)
+
+#### Scenario: Refine respects parent conversation cwd
+- **GIVEN** an Explore conversation with `contextScope.mcp=false` (hub-managed cwd)
+- **WHEN** the refine fires
+- **THEN** the spawn `cwd` is `~/.specrails/projects/<slug>/explore-cwd/`
+- **AND** the spawn does NOT add `<project.path>` cwd
+
+#### Scenario: Refine counts against per-project concurrency cap
+- **GIVEN** five Explore turns currently streaming for a project (cap reached)
+- **WHEN** a refine fires for a sixth turn
+- **THEN** the refine queues using the existing Explore queue semantics
+- **AND** the 30 s busy timeout applies identically
+
+### Requirement: Contract Refine system prompt is structural and read-only
+
+The refine turn SHALL be initiated by a marker user message `/specrails:contract-refine` and rely on a dedicated structural system prompt distinct from the main Explore prompt. The system prompt MUST forbid the model from modifying user-authored content, MUST instruct the model to emit exactly one fenced block tagged ` ```contract-layer ` containing a JSON object, and MUST forbid any tool calls regardless of the parent conversation's `contextScope.full`. The system prompt MUST be byte-stable across two refines of the same `(conversationId, ticketId, contract-prompt-version)` so retries hit the Anthropic prompt cache. The spawn argv MUST include `--disallowedTools Read,Grep,Glob,Bash` for the refine turn even when the parent conversation enabled them.
+
+#### Scenario: Marker message starts the refine
+- **WHEN** the refine fires
+- **THEN** the user message sent into the conversation is exactly `/specrails:contract-refine`
+- **AND** this message is NOT shown in the client's conversation history (filtered like the parent `/specrails:explore-spec` bootstrap)
+
+#### Scenario: Refine spawn forbids tools
+- **WHEN** the refine fires for a parent conversation that had `contextScope.full=true`
+- **THEN** the spawn argv includes `--disallowedTools Read,Grep,Glob,Bash`
+- **AND** does NOT include `--allowedTools Read,Grep,Glob`
+
+#### Scenario: System prompt is byte-stable across retries
+- **WHEN** the refine is invoked twice in a row for the same `(conversationId, ticketId)` and the same `contract-prompt-version`
+- **THEN** the two system prompt strings are byte-for-byte equal
+
+#### Scenario: System prompt forbids user-content edits
+- **WHEN** the refine system prompt is built
+- **THEN** the prompt contains an explicit instruction that the model MUST NOT alter or restate the user-authored title, description, labels, priority, or acceptance criteria
+- **AND** the prompt instructs the model to emit only the `contract-layer` fenced block
+
+### Requirement: contract-layer fenced block parses to a known shape
+
+The hub SHALL recognise a fenced code block tagged ` ```contract-layer ` in the refine assistant turn and parse the JSON payload against a fixed shape:
+
+```
+{
+  "contractVersion": 1,
+  "namingContract": {
+    "enums":     [{ "name": string, "values": string[], "file": string }],
+    "fields":    [{ "name": string, "type": string, "where": string }],
+    "functions": [{ "signature": string, "file": string }],
+    "files":     [{ "path": string, "purpose": string }]
+  },
+  "dataShapes":    [{ "name": string, "ts": string }],
+  "stateMachine":  string | null,
+  "invariants":    string[],
+  "fileTouchList": [{ "path": string, "action": "create" | "extend" | "delete", "reason": string }]
+}
+```
+
+Unknown keys MUST be dropped silently. Missing arrays MUST default to `[]`. A missing or non-integer `contractVersion` MUST cause the block to be treated as malformed. The raw fenced block MUST be stripped from the chat content broadcast to clients (same scrub behaviour as the `spec-draft` block). Malformed blocks MUST log a server warning with `conversationId` and `ticketId` and MUST be treated as a refine failure.
+
+#### Scenario: Valid block parses to canonical shape
+- **WHEN** the refine assistant turn contains a `contract-layer` block with the full known shape
+- **THEN** the parsed object exposes all five top-level fields with the declared types
+- **AND** the raw block is removed from the chat content broadcast over the WS
+
+#### Scenario: Missing optional arrays default to empty
+- **WHEN** the block omits `invariants` and `dataShapes`
+- **THEN** the parsed object has `invariants: []` and `dataShapes: []`
+
+#### Scenario: Unknown keys are dropped
+- **WHEN** the block contains `{ "contractVersion": 1, "namingContract": {...}, "specFlavour": "weird" }`
+- **THEN** `specFlavour` is not surfaced in the parsed result
+- **AND** parsing succeeds
+
+#### Scenario: Missing contractVersion is malformed
+- **WHEN** the block omits `contractVersion` or sets it to a non-integer
+- **THEN** parsing fails
+- **AND** a server warning is logged with `conversationId` and `ticketId`
+- **AND** the refine is treated as a failure per the refine-failure requirement
+
+#### Scenario: Malformed JSON does not crash
+- **WHEN** the block contains malformed JSON
+- **THEN** parsing fails gracefully
+- **AND** the chat content broadcast still strips the fenced block boundaries
+- **AND** the refine is treated as a failure
+
+### Requirement: Successful refine patches the ticket description with a Contract Layer section
+
+On successful parse of the `contract-layer` block, the hub SHALL patch the committed ticket's description by appending a deterministic Contract Layer markdown section. The section MUST be separated from the user-authored body by a single horizontal rule line `\n\n---\n\n` followed by the heading `## Contract Layer` and exactly five labelled subsections in this order: `### Naming Contract`, `### Data Shapes`, `### State Machine`, `### Invariants`, `### File Touch List`. Subsections that have no items MUST render the literal line `_N/A — model did not produce items for this subsection._` (or equivalent). The patch MUST use the existing `PATCH /api/projects/:projectId/tickets/:id` endpoint with only the `description` field set. The patch MUST NOT alter `title`, `labels`, `priority`, or any other ticket field. The hub MUST broadcast a `ticket_updated` WebSocket event after the patch, identical in shape to other PATCH-driven updates.
+
+#### Scenario: Successful refine appends the Contract Layer section
+- **WHEN** the refine produces a valid `contract-layer` block
+- **THEN** the ticket's `description` is patched
+- **AND** the patched description ends with `\n\n---\n\n## Contract Layer\n\n### Naming Contract\n...\n### Data Shapes\n...\n### State Machine\n...\n### Invariants\n...\n### File Touch List\n...`
+- **AND** the original user-authored part of the description (everything before the `\n\n---\n\n` separator) is byte-identical to the description committed by `from-draft`
+
+#### Scenario: Empty subsections render an N/A placeholder
+- **WHEN** the `contract-layer` block contains an empty `invariants` array
+- **THEN** the rendered `### Invariants` subsection contains the literal `_N/A — model did not produce items for this subsection._` line
+
+#### Scenario: stateMachine null renders N/A
+- **WHEN** the `contract-layer` block contains `stateMachine: null`
+- **THEN** the rendered `### State Machine` subsection contains the N/A placeholder line
+
+#### Scenario: PATCH carries only description
+- **WHEN** the hub fires the patch after a successful refine
+- **THEN** the PATCH request body contains only `description`
+- **AND** does NOT contain `title`, `labels`, `priority`, `acceptanceCriteria`, or `status`
+
+#### Scenario: ticket_updated WS event fires after patch
+- **WHEN** the patch succeeds
+- **THEN** a `ticket_updated` WS event is broadcast for the project
+- **AND** subscribers receive the updated ticket payload including the new description
+
+### Requirement: Refine failure is non-blocking and surfaces a recoverable toast
+
+If the refine fails for any reason — model error, `chat_error`, crash that exhausts auto-respawn, malformed `contract-layer` block, hub-side parser exception, timeout at 60 seconds from refine spawn start — the hub MUST NOT patch the ticket description and MUST broadcast a project-scoped WebSocket event `explore.contract_refine_failed { ticketId, reason }` where `reason` is one of `model_error | crashed | malformed | timeout | parser_error`. The client SHALL react by showing a sonner toast on the SpecsBoard surface with copy "Contract layer skipped — ticket saved without it" and an action button `Reintentar`. Activating `Reintentar` SHALL invoke `POST /api/projects/:projectId/tickets/:id/contract-refine` to fire a fresh refine for the same ticket. The retry endpoint MUST gate on the hub-wide kill switch and on the ticket having a non-null `origin_conversation_id`; it MUST NOT gate on the originating conversation's `context_scope.contractRefine`. The retry MUST reuse the same `(conversationId, ticketId)` pair and the same lifecycle as the original refine.
+
+#### Scenario: Model error emits failure event and skips patch
+- **WHEN** the refine spawn exits with a `chat_error` after auto-respawn is exhausted
+- **THEN** no PATCH is sent to the ticket
+- **AND** an `explore.contract_refine_failed` WS event is broadcast with `reason: "model_error"` or `"crashed"`
+- **AND** the ticket description remains as the user committed it
+
+#### Scenario: 60-second timeout treated as failure
+- **WHEN** the refine has been running for 60 seconds without emitting a parseable `contract-layer` block
+- **THEN** the refine spawn is terminated
+- **AND** an `explore.contract_refine_failed` WS event is broadcast with `reason: "timeout"`
+
+#### Scenario: Retry endpoint fires a fresh refine
+- **WHEN** the client POSTs `POST /api/projects/:projectId/tickets/:id/contract-refine` for a ticket with a non-null `origin_conversation_id`
+- **AND** the kill switch is inactive
+- **THEN** a fresh refine spawn is scheduled for the same ticket id
+- **AND** the response is 202 with `{ scheduled: true }`
+
+#### Scenario: Retry endpoint rejects when kill switch active
+- **WHEN** the client POSTs the retry endpoint while `SPECRAILS_EXPLORE_CONTRACT_REFINE=off`
+- **THEN** the server responds 409 with an error code indicating the feature is disabled
+- **AND** no spawn is scheduled
+
+#### Scenario: Retry endpoint rejects ticket without origin conversation
+- **WHEN** the client POSTs the retry endpoint for a ticket whose `origin_conversation_id` is `null`
+- **THEN** the server responds 409 with an error code indicating no origin conversation
+- **AND** no spawn is scheduled
+
+#### Scenario: Retry endpoint rejects unknown ticket
+- **WHEN** the client POSTs the retry endpoint for a ticket id that does not exist
+- **THEN** the server responds 404
+
+### Requirement: Refine writes one ai_invocations row per turn
+
+Each Contract Refine spawn SHALL write a single row to `ai_invocations` at process exit via the existing `recordInvocation` capture path. The row MUST have `surface='explore-spec'`, `conversation_id` equal to the parent Explore conversation id, and `ticket_id` equal to the ticket being refined. Other columns (`model`, `started_at`, `finished_at`, `duration_ms`, `duration_api_ms`, `tokens_in/out/cache_read/cache_create`, `total_cost_usd`, `num_turns`, `status`, `session_id`) MUST be populated using the same rules as Explore turns. Refine failures MUST still record a row with `status` set to `failed` or `aborted` so spending analytics absorb the cost transparently.
+
+#### Scenario: Successful refine records one row
+- **WHEN** a refine completes successfully and the ticket is patched
+- **THEN** exactly one new `ai_invocations` row exists for the refine spawn
+- **AND** the row's `surface='explore-spec'`, `conversation_id` matches the parent, and `ticket_id` matches the refined ticket
+
+#### Scenario: Failed refine still records a row
+- **WHEN** a refine fails because the spawn crashed and auto-respawn was exhausted
+- **THEN** an `ai_invocations` row is still recorded for the failed attempt
+- **AND** its `status` is `failed` or `aborted`
+
+#### Scenario: ticket_id back-fill works for flipped drafts
+- **WHEN** the refine fires after a flip-in-place draft commit
+- **THEN** the recorded `ticket_id` is the flipped ticket id (not a new id)
+- **AND** matches the ticket id targeted by the patch
+
+### Requirement: TicketDetailModal renders Contract Layer collapsed by default
+
+When a ticket's description contains a Contract Layer section (delimited by the `\n\n---\n\n## Contract Layer\n\n` prefix), `TicketDetailModal` SHALL render the body in two regions: the user-authored body (rendered normally) and the Contract Layer region rendered inside a collapsible disclosure widget that defaults to collapsed. The disclosure header MUST display the label `Contract Layer` and an indicator of whether sections are populated (e.g., a count badge of non-N/A subsections). Expanding the disclosure MUST reveal the full Contract Layer markdown. SpecsBoard previews (and any other card-style summary surface) MUST ignore content after the `\n\n---\n\n` separator when computing the preview text.
+
+#### Scenario: Modal renders collapsed disclosure
+- **WHEN** the modal opens for a ticket whose description contains a Contract Layer section
+- **THEN** a collapsible disclosure with the label `Contract Layer` is rendered after the user-authored body
+- **AND** the disclosure is collapsed by default
+
+#### Scenario: Expand reveals full Contract Layer
+- **WHEN** the user clicks the disclosure header
+- **THEN** the disclosure expands to show all five subsections rendered as markdown
+
+#### Scenario: SpecsBoard preview ignores Contract Layer
+- **WHEN** SpecsBoard renders a card preview for a ticket whose description contains a Contract Layer
+- **THEN** the preview text is computed from only the user-authored portion of the description (everything before `\n\n---\n\n`)
+
+#### Scenario: Ticket without Contract Layer renders unchanged
+- **WHEN** the modal opens for a ticket whose description does not contain the Contract Layer separator
+- **THEN** no disclosure is rendered
+- **AND** the description renders identically to today
+
+### Requirement: SpecsBoard surface tracks refine pending and failure states
+
+The client SHALL render a sonner toast on the SpecsBoard surface for each ticket whose refine is in-flight. The toast text SHALL be `Afinando contrato…` and the toast id MUST be derived deterministically from the ticket id so consecutive refines do not stack. On `ticket_updated` (refine success) the toast MUST be dismissed automatically. On `explore.contract_refine_failed` the toast MUST swap to an error variant with copy `Contract layer skipped — ticket saved without it` and an action `Reintentar` that POSTs to the retry endpoint. The toast MUST be dismissable manually at any time.
+
+#### Scenario: Pending toast appears on commit when conversation scope has contractRefine ON
+- **WHEN** the user commits an Explore spec whose conversation has `context_scope.contractRefine=true`
+- **THEN** a sonner toast with id `contract-refine:<ticketId>` and text `Afinando contrato…` appears within 100 ms of the commit response
+
+#### Scenario: Success dismisses the toast
+- **WHEN** the matching `ticket_updated` event arrives and the patched description contains a Contract Layer section
+- **THEN** the toast with id `contract-refine:<ticketId>` is dismissed
+
+#### Scenario: Failure swaps the toast to error variant
+- **WHEN** an `explore.contract_refine_failed` WS event arrives for `ticketId`
+- **THEN** the existing toast with id `contract-refine:<ticketId>` is updated to the error variant
+- **AND** an action button `Reintentar` is rendered on the toast
+- **AND** clicking `Reintentar` POSTs `POST /api/projects/:projectId/tickets/<ticketId>/contract-refine`
+
+#### Scenario: Toast id is stable across retries
+- **WHEN** the user activates `Reintentar` on the error toast
+- **THEN** the toast id remains `contract-refine:<ticketId>` and reverts to the pending variant
+- **AND** no second toast for the same ticket is created
+
+### Requirement: contextScope carries contractRefine per conversation
+
+The server-side `ContextScope` type SHALL include a `contractRefine: boolean` field, persisted in `chat_conversations.context_scope` JSON alongside the existing `specrails`, `openspec`, `full`, `mcp` flags. `normalizeContextScope` MUST default missing `contractRefine` values to `false`. The boot value for the Add Spec modal's `contractRefine` toggle MUST come from the active preset or, when a per-project sticky scope exists (`useContextScope`), from that persisted value. The hub MUST NOT consult any project-level setting when seeding the boot value.
+
+#### Scenario: contractRefine defaults to false when absent in stored scope
+- **GIVEN** a legacy `chat_conversations` row whose `context_scope` JSON lacks `contractRefine`
+- **WHEN** the runner reads the scope via `normalizeContextScope`
+- **THEN** `contractRefine` is `false`
+
+#### Scenario: Modal boot uses per-project sticky scope when available
+- **GIVEN** the project has a persisted `useContextScope` value with `contractRefine: true`
+- **WHEN** the user opens the Add Spec modal in Explore mode
+- **THEN** the Contract Refine flag in the slider/fine-tune surface boots to `true`
+
+#### Scenario: contractRefine round-trips through JSON
+- **WHEN** a scope `{ specrails: true, openspec: false, full: true, mcp: false, contractRefine: true }` is JSON-stringified and re-normalised
+- **THEN** every flag including `contractRefine` round-trips byte-equal
+
+### Requirement: from-draft commit reads contractRefine from conversation scope
+
+When `POST /tickets/from-draft` schedules `runContractRefine` after a successful commit, the runner SHALL gate the spawn exclusively on `conversation.context_scope.contractRefine` (and on the hub-wide kill switch). If the field is `false` (including the legacy `false` default) the runner MUST early-return with `reason='scope-disabled'`. The runner MUST NOT consult any project-level setting.
+
+#### Scenario: Per-conversation false skips refine
+- **GIVEN** the committed conversation's `context_scope.contractRefine` is `false`
+- **WHEN** the user commits via `Create Spec`
+- **THEN** no refine spawn is scheduled
+- **AND** the ticket has no Contract Layer appended
+
+#### Scenario: Per-conversation true fires refine
+- **GIVEN** the committed conversation's `context_scope.contractRefine` is `true`
+- **AND** the kill switch is inactive
+- **WHEN** the user commits via `Create Spec`
+- **THEN** a refine spawn is scheduled
+- **AND** on success the ticket gains a Contract Layer section
+
+#### Scenario: scope-disabled reason recorded as skipped, not failed
+- **WHEN** the runner early-returns with `reason='scope-disabled'`
+- **THEN** no `claude` process is spawned
+- **AND** no `ai_invocations` row is recorded for that attempt
+- **AND** no `explore.contract_refine_failed` WS event is broadcast
+
+### Requirement: Retry endpoint stays gated by the project setting
+
+`POST /api/projects/:projectId/tickets/:id/contract-refine` SHALL continue to gate on the project-wide `explore_contract_refine_enabled` setting and the hub-wide kill switch, NOT on the originating conversation's `contextScope.contractRefine`. Tickets created with `contractRefine=false` in their scope MUST still be retriable when the project default is `true`.
+
+#### Scenario: Retry succeeds for a ticket whose origin scope opted out
+- **GIVEN** ticket `T` whose origin Explore conversation had `context_scope.contractRefine=false`
+- **AND** the project setting is `true`
+- **WHEN** the user POSTs the retry endpoint for `T`
+- **THEN** the server responds 202 with `{ scheduled: true }`
+- **AND** a refine spawn fires for `T`
+
+#### Scenario: Retry rejected when project setting is OFF
+- **GIVEN** the project setting is `false`
+- **WHEN** the user POSTs the retry endpoint
+- **THEN** the server responds 409 regardless of the conversation's stored scope
+
+### Requirement: Quick mode supports Contract Refine after generate-spec
+
+The `POST /api/projects/:projectId/tickets/generate-spec` endpoint SHALL accept an optional `contractRefine: boolean` field in its request body. When `true` and the hub-wide kill switch is inactive, the server MUST schedule `runContractRefine` after the generated ticket is persisted. The refine spawn MUST use a one-shot pathway (no `--resume`, no parent conversation): the system prompt is augmented with the just-generated `title` and `description` so the model has the spec body in-context, and the recorded `ai_invocations` row uses `surface='quick-spec'` with `conversation_id=null` and the new ticket id. The endpoint MUST NOT consult any project-level setting.
+
+#### Scenario: Quick toggle ON fires refine after generation
+- **GIVEN** the kill switch is inactive
+- **WHEN** the client posts `{ idea, contractRefine: true }` to `generate-spec`
+- **THEN** the ticket is created normally
+- **AND** within 100 ms of the response the refine spawn is scheduled
+- **AND** the refine spawn argv does NOT include `--resume`
+
+#### Scenario: Quick toggle OFF skips refine
+- **WHEN** the client posts `{ idea, contractRefine: false }` to `generate-spec`
+- **THEN** the ticket is created and no refine spawn is scheduled
+
+#### Scenario: Quick toggle ON skipped under kill switch
+- **GIVEN** the kill switch is active
+- **WHEN** the client posts `{ idea, contractRefine: true }` to `generate-spec`
+- **THEN** the ticket is created and no refine spawn is scheduled
+
+#### Scenario: Quick refine writes a quick-spec invocation row
+- **WHEN** a Quick refine completes successfully
+- **THEN** an `ai_invocations` row exists with `surface='quick-spec'`, `conversation_id IS NULL`, and `ticket_id` equal to the new ticket id
+
+### Requirement: Add Spec modal Explore mode renders the six-stop slider
+
+In Explore mode, the Add Spec modal SHALL render a `<ContextScopeSlider>` component in place of the existing four-checkbox row. The slider MUST expose exactly six stops in fixed left-to-right order: `Minimal`, `Light`, `Standard`, `Rich`, `Max`, `Hub`. The label of the active stop MUST be highlighted; inactive stop labels MUST remain visible. A one-line cost summary MUST appear directly below the rail, copy fixed per stop (see design.md D5). The `▾ Fine-tune` disclosure MUST render below the cost line and contain the five individual flag toggles (`specrails`, `openspec`, `full`, `mcp`, `contractRefine`), bound to the same state as the slider.
+
+#### Scenario: Initial mount picks the matching preset
+- **WHEN** the modal opens with a boot scope matching `Rich` (specrails+openspec+full, mcp=false, contractRefine=false)
+- **THEN** the slider thumb sits on the `Rich` stop
+- **AND** the active stop label is highlighted
+
+#### Scenario: Drag and release snaps to nearest stop
+- **WHEN** the user drags the thumb 60 % of the rail width to the right and releases mid-air
+- **THEN** the thumb snaps to the closest stop on release
+- **AND** the bound scope flags update to that preset's combination
+- **AND** the cost line updates to the new preset's copy
+
+#### Scenario: Click on a stop dot jumps to that preset
+- **WHEN** the user clicks on the `Max` stop label / dot
+- **THEN** the thumb animates to `Max`
+- **AND** the bound flags are `{ specrails: true, openspec: true, full: true, mcp: false, contractRefine: true }`
+
+#### Scenario: Keyboard arrow keys move one stop
+- **GIVEN** focus on the slider with the thumb on `Standard`
+- **WHEN** the user presses `ArrowRight`
+- **THEN** the thumb moves to `Rich`
+- **AND** `ArrowLeft` from `Rich` moves back to `Standard`
+- **AND** `End` jumps to `Hub`
+- **AND** `Home` jumps to `Minimal`
+
+#### Scenario: Touch / pointer-events drag works in webview
+- **WHEN** a pointer-down on the thumb is followed by a pointer-move and pointer-up
+- **THEN** the slider tracks the pointer and snaps on pointer-up
+- **AND** the same handlers fire for both mouse and touch input types
+
+### Requirement: Custom indicator appears when the scope matches no preset
+
+When the bound scope combination does not match any of the six preset rows exactly, the slider MUST render a `Custom` pill that replaces the active-stop highlight, positioned between the two nearest stops by interpolated cost rank. The user MUST NOT be able to drag *to* `Custom`; dragging always snaps to one of the six preset stops on release.
+
+#### Scenario: Toggling a single flag off-preset enters Custom
+- **GIVEN** the slider is on `Standard` (specrails+openspec, others false)
+- **WHEN** the user opens Fine-tune and toggles `contractRefine` on
+- **THEN** the slider shows the `Custom` pill (no preset matches `specrails+openspec+contractRefine`)
+- **AND** the cost line reads "Custom mix — see Fine-tune below"
+
+#### Scenario: Dragging from Custom snaps to a preset, never to Custom
+- **GIVEN** the slider is currently in the Custom state
+- **WHEN** the user drags the thumb and releases anywhere on the rail
+- **THEN** the thumb snaps to one of the six preset stops
+- **AND** the Custom pill disappears
+
+### Requirement: Fine-tune disclosure stays available
+
+The `▾ Fine-tune` disclosure under the slider MUST render five aligned rows, one per flag: `Specrails specs`, `OpenSpec specs`, `Full repo read`, `External tools (MCPs)`, `Enrich with Contract Layer`. Each row MUST render the toggle styled identically to the existing Settings page toggles (height `h-5`, width `w-9`, theme tokens, `shrink-0`). Toggling any flag MUST write through to the same state the slider reads, so the slider's thumb position re-derives automatically.
+
+#### Scenario: Disclosure starts collapsed
+- **WHEN** the modal opens
+- **THEN** the Fine-tune disclosure is collapsed by default
+- **AND** the slider is fully visible above it
+
+#### Scenario: Expanding the disclosure reveals five toggles
+- **WHEN** the user clicks the `▾ Fine-tune` chevron
+- **THEN** the five toggles render in fixed order: specrails, openspec, full, mcp, contractRefine
+- **AND** the chevron rotates to `▴`
+
+#### Scenario: Toggle changes propagate to the slider position
+- **WHEN** the user clicks the `Specrails specs` toggle off while on `Standard`
+- **THEN** the slider re-derives to `Custom` (specrails off but openspec on does not match any preset)
+
+### Requirement: contractRefine persists in add_spec_context_scope_last
+
+The per-project `add_spec_context_scope_last` payload SHALL include `contractRefine: boolean` alongside the other four flags. Boot order in the modal: (a) per-project last value when present → (b) `defaultBootScope` from project settings.
+
+#### Scenario: Last value rehydrates on next open
+- **GIVEN** the user last committed an Explore spec with scope `{ ..., contractRefine: true }`
+- **WHEN** the user opens the Add Spec modal again for the same project
+- **THEN** the slider boots on a preset that includes `contractRefine: true` (`Max` or `Hub`, depending on other flags) — or `Custom` if no preset matches
+
+#### Scenario: Missing field in legacy payload normalises to false
+- **GIVEN** a stored `add_spec_context_scope_last` payload without `contractRefine`
+- **WHEN** the modal boots
+- **THEN** `contractRefine` is `false`
+- **AND** the slider position reflects the matching preset for the remaining flags (or Custom)
+
+### Requirement: Quick mode renders a standalone Contract Refine toggle
+
+In Quick mode, the Add Spec modal SHALL render a single toggle labelled `Enrich with Contract Layer` underneath the model picker. The toggle MUST NOT render in Explore mode (where the slider already covers Contract Refine). The boot value of the Quick toggle MUST come from `add_spec_quick_contract_refine_last` (per project) when present, else the project setting `explore_contract_refine_enabled`. The toggle's value MUST be included in the request body of `POST /tickets/generate-spec` as `contractRefine: boolean`.
+
+#### Scenario: Toggle visible only in Quick mode
+- **WHEN** the user selects `Quick` in the segmented control
+- **THEN** the Contract Refine toggle renders below the model picker
+- **AND** when the user switches to `Explore` the toggle disappears (the slider covers it instead)
+
+#### Scenario: Quick last-used value rehydrates on next open
+- **GIVEN** the user last submitted a Quick spec with the toggle ON
+- **WHEN** the user reopens the modal in Quick mode for the same project
+- **THEN** the toggle boots ON
+
+#### Scenario: Quick submit sends the field in the request body
+- **WHEN** the user submits with the toggle ON
+- **THEN** the body of the `POST /tickets/generate-spec` request includes `contractRefine: true`
+
+### Requirement: Contract Refine sits at the heavy end of the slider
+
+The slider's preset-to-flag mapping MUST place `contractRefine: true` ONLY at the two heaviest stops: `Max` and `Hub`. The four lighter stops (`Minimal`, `Light`, `Standard`, `Rich`) MUST keep `contractRefine: false`. This positioning communicates that Contract Refine is the highest-cost / highest-output option.
+
+#### Scenario: Light stops do not enable Contract Refine
+- **WHEN** the slider is on any of `Minimal`, `Light`, `Standard`, or `Rich`
+- **THEN** the bound scope's `contractRefine` is `false`
+
+#### Scenario: Max and Hub stops enable Contract Refine
+- **WHEN** the slider is on `Max` or `Hub`
+- **THEN** the bound scope's `contractRefine` is `true`
+
+### Requirement: Settings page relabels the project default
+
+The Settings page Explore Spec card SHALL relabel the existing Contract Refine toggle to "Default for new Explore specs" with helper copy that clarifies the value seeds the modal's default and gates retry attempts. The PATCH endpoint and storage shape MUST be unchanged.
+
+#### Scenario: Card label uses the new copy
+- **WHEN** the user opens Settings → Explore Spec card
+- **THEN** the second toggle reads "Default for new Explore specs"
+- **AND** a helper line explains "Seeds the toggle in Add Spec and gates manual retry attempts"
+
+#### Scenario: Endpoint shape unchanged
+- **WHEN** the client PATCHes `/explore-contract-refine-enabled` with `{ enabled: true }`
+- **THEN** the server still responds `{ enabled: true }` (no schema change)
+
+### Requirement: Explore session captures short_summary at commit
+
+The Explore flow SHALL request a `shortSummary` value in the same final AI call that produces title and description at `from-draft` commit time, and SHALL persist it on the resulting ticket.
+
+#### Scenario: Summary present in commit
+- **WHEN** the user commits an Explore session via `from-draft` and the model returns `shortSummary`
+- **THEN** the committed ticket persists `short_summary` (trimmed, max 240 chars)
+
+#### Scenario: Summary absent in commit response
+- **WHEN** the model omits `shortSummary`
+- **THEN** the committed ticket has `short_summary = null` (fresh insert) or preserves the prior value (flip-in-place)
+- **AND** the commit succeeds
+

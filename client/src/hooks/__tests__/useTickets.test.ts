@@ -229,6 +229,38 @@ describe('useTickets', () => {
       expect(result.current.tickets[0].status).toBe('in_progress')
     })
 
+    it('clears Contract Layer refining state when the updated ticket contains the Contract Layer', async () => {
+      ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        json: async () => ({ tickets: [makeTicket({ id: 1, title: 'Original' })] }),
+      })
+
+      const { result } = renderHook(() => useTickets())
+      await waitFor(() => expect(result.current.tickets).toHaveLength(1))
+
+      act(() => {
+        wsHandler?.({
+          type: 'explore.contract_refine_started',
+          projectId: 'proj-1',
+          ticketId: 1,
+        })
+      })
+      expect(result.current.contractRefiningIds.has(1)).toBe(true)
+
+      act(() => {
+        wsHandler?.({
+          type: 'ticket_updated',
+          projectId: 'proj-1',
+          ticket: makeTicket({
+            id: 1,
+            description: 'body\n\n---\n\n## Contract Layer\n\n{}',
+          }),
+        })
+      })
+
+      expect(result.current.contractRefiningIds.has(1)).toBe(false)
+    })
+
     it('triggers full refetch on id:0 (file watcher signal)', async () => {
       ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
         ok: true,
@@ -256,6 +288,31 @@ describe('useTickets', () => {
         expect(result.current.tickets).toHaveLength(1)
       })
       expect(result.current.tickets[0].title).toBe('From CLI')
+    })
+  })
+
+  describe('contract refine websocket events', () => {
+    it('tracks started and failed Contract Layer refinement states', async () => {
+      const { result } = renderHook(() => useTickets())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+
+      act(() => {
+        wsHandler?.({
+          type: 'explore.contract_refine_started',
+          projectId: 'proj-1',
+          ticketId: 9,
+        })
+      })
+      expect(result.current.contractRefiningIds.has(9)).toBe(true)
+
+      act(() => {
+        wsHandler?.({
+          type: 'explore.contract_refine_failed',
+          projectId: 'proj-1',
+          ticketId: 9,
+        })
+      })
+      expect(result.current.contractRefiningIds.has(9)).toBe(false)
     })
   })
 

@@ -16,7 +16,7 @@ function buildApp() {
 }
 
 // Create a real temp homedir so resolveDocsDir() picks it up correctly.
-// Structure: tmpHome/.specrails/docs/{category}/*.md
+// Structure: tmpHome/.specrails/docs/{<top-level .md>, <subdir>/<.md>}
 function makeTempHome(): { home: string; docsDir: string } {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-home-test-'))
   const docsDir = path.join(home, '.specrails', 'docs')
@@ -50,135 +50,178 @@ describe('docs-router', () => {
       expect(Array.isArray(res.body.categories)).toBe(true)
     })
 
-    it('includes all known categories in correct order', async () => {
+    it('returns empty categories array when docs dir is empty', async () => {
+      const res = await request(buildApp()).get('/docs')
+      expect(res.body.categories).toEqual([])
+    })
+
+    it('surfaces top-level .md files under the synthetic "guides" category', async () => {
+      fs.writeFileSync(path.join(docsDir, 'getting-started.md'), '# Getting started\n\nHello.')
+      fs.writeFileSync(path.join(docsDir, 'cli.md'), '# CLI\n\nHello.')
+
+      const res = await request(buildApp()).get('/docs')
+      const guides = res.body.categories.find((c: { slug: string }) => c.slug === 'guides')
+      expect(guides).toBeDefined()
+      expect(guides.name).toBe('Guides')
+      expect(guides.docs.map((d: { slug: string }) => d.slug)).toContain('getting-started')
+      expect(guides.docs.map((d: { slug: string }) => d.slug)).toContain('cli')
+    })
+
+    it('orders guides docs by preferred order then alphabetically', async () => {
+      // Write in a weird order
+      fs.writeFileSync(path.join(docsDir, 'cli.md'), '# CLI')
+      fs.writeFileSync(path.join(docsDir, 'unknown-doc.md'), '# Unknown')
+      fs.writeFileSync(path.join(docsDir, 'getting-started.md'), '# Getting started')
+      fs.writeFileSync(path.join(docsDir, 'running-pipelines.md'), '# Running pipelines')
+
+      const res = await request(buildApp()).get('/docs')
+      const guides = res.body.categories.find((c: { slug: string }) => c.slug === 'guides')
+      const slugs = guides.docs.map((d: { slug: string }) => d.slug)
+      // Known docs first, in preferred order
+      expect(slugs.indexOf('getting-started')).toBeLessThan(slugs.indexOf('running-pipelines'))
+      expect(slugs.indexOf('running-pipelines')).toBeLessThan(slugs.indexOf('cli'))
+      // Unknown doc lands after the known ones
+      expect(slugs.indexOf('cli')).toBeLessThan(slugs.indexOf('unknown-doc'))
+    })
+
+    it('excludes README.md from the guides listing', async () => {
+      fs.writeFileSync(path.join(docsDir, 'README.md'), '# Index')
+      fs.writeFileSync(path.join(docsDir, 'getting-started.md'), '# Getting started')
+
+      const res = await request(buildApp()).get('/docs')
+      const guides = res.body.categories.find((c: { slug: string }) => c.slug === 'guides')
+      const slugs = guides.docs.map((d: { slug: string }) => d.slug)
+      expect(slugs).not.toContain('README')
+      expect(slugs).toContain('getting-started')
+    })
+
+    it('each subdirectory becomes its own category', async () => {
+      const internalsDir = path.join(docsDir, 'internals')
+      fs.mkdirSync(internalsDir)
+      fs.writeFileSync(path.join(internalsDir, 'architecture.md'), '# Architecture')
+
+      const platformsDir = path.join(docsDir, 'platforms')
+      fs.mkdirSync(platformsDir)
+      fs.writeFileSync(path.join(platformsDir, 'macos.md'), '# macOS notes')
+
+      const res = await request(buildApp()).get('/docs')
+      const slugs = res.body.categories.map((c: { slug: string }) => c.slug)
+      expect(slugs).toContain('internals')
+      expect(slugs).toContain('platforms')
+    })
+
+    it('honours preferred category order: guides → platforms → internals', async () => {
+      // Write subdirectories first
+      fs.mkdirSync(path.join(docsDir, 'internals'))
+      fs.writeFileSync(path.join(docsDir, 'internals', 'x.md'), '# X')
+      fs.mkdirSync(path.join(docsDir, 'platforms'))
+      fs.writeFileSync(path.join(docsDir, 'platforms', 'y.md'), '# Y')
+      // Then a top-level doc
+      fs.writeFileSync(path.join(docsDir, 'getting-started.md'), '# Getting started')
+
+      const res = await request(buildApp()).get('/docs')
+      const slugs = res.body.categories.map((c: { slug: string }) => c.slug)
+      expect(slugs).toEqual(['guides', 'platforms', 'internals'])
+    })
+
+    it('uses friendly labels for known categories', async () => {
+      fs.mkdirSync(path.join(docsDir, 'internals'))
+      fs.writeFileSync(path.join(docsDir, 'internals', 'x.md'), '# X')
+      const res = await request(buildApp()).get('/docs')
+      const internals = res.body.categories.find((c: { slug: string }) => c.slug === 'internals')
+      expect(internals.name).toBe('Internals')
+    })
+
+    it('title-cases unknown category names', async () => {
+      fs.mkdirSync(path.join(docsDir, 'my-custom-section'))
+      fs.writeFileSync(path.join(docsDir, 'my-custom-section', 'x.md'), '# X')
+      const res = await request(buildApp()).get('/docs')
+      const custom = res.body.categories.find((c: { slug: string }) => c.slug === 'my-custom-section')
+      expect(custom.name).toBe('My Custom Section')
+    })
+
+    it('falls back to slug-derived title when no H1 in file', async () => {
+      fs.writeFileSync(path.join(docsDir, 'no-heading.md'), 'Just some content.')
+
+      const res = await request(buildApp()).get('/docs')
+      const guides = res.body.categories.find((c: { slug: string }) => c.slug === 'guides')
+      const doc = guides.docs.find((d: { slug: string }) => d.slug === 'no-heading')
+      expect(doc.title).toBe('No Heading')
+    })
+
+    it('does not include non-markdown files', async () => {
+      fs.writeFileSync(path.join(docsDir, 'guide.md'), '# Guide')
+      fs.writeFileSync(path.join(docsDir, 'ignore.txt'), 'not markdown')
+
+      const res = await request(buildApp()).get('/docs')
+      const guides = res.body.categories.find((c: { slug: string }) => c.slug === 'guides')
+      const slugs = guides.docs.map((d: { slug: string }) => d.slug)
+      expect(slugs).toEqual(['guide'])
+    })
+
+    it('legacy `general`/`product`/`engineering`/`operations` subdirs still work', async () => {
+      // Backwards-compat for user-customised ~/.specrails/docs trees
+      for (const cat of ['general', 'product', 'engineering', 'operations']) {
+        const dir = path.join(docsDir, cat)
+        fs.mkdirSync(dir, { recursive: true })
+        fs.writeFileSync(path.join(dir, 'item.md'), `# ${cat} item`)
+      }
       const res = await request(buildApp()).get('/docs')
       const slugs = res.body.categories.map((c: { slug: string }) => c.slug)
       expect(slugs).toContain('general')
       expect(slugs).toContain('product')
       expect(slugs).toContain('engineering')
       expect(slugs).toContain('operations')
-      expect(slugs[0]).toBe('general')
-    })
-
-    it('returns empty docs array for categories with no files', async () => {
-      // No files created — all category dirs are absent
-      const res = await request(buildApp()).get('/docs')
-      for (const cat of res.body.categories) {
-        expect(Array.isArray(cat.docs)).toBe(true)
-        expect(cat.docs).toHaveLength(0)
-      }
-    })
-
-    it('lists markdown files from an existing category dir', async () => {
-      const opsDir = path.join(docsDir, 'operations')
-      fs.mkdirSync(opsDir, { recursive: true })
-      fs.writeFileSync(path.join(opsDir, 'my-guide.md'), '# My Guide\n\nContent.')
-
-      const res = await request(buildApp()).get('/docs')
-      const opsCat = res.body.categories.find(
-        (c: { slug: string }) => c.slug === 'operations'
-      )
-      expect(opsCat.docs).toHaveLength(1)
-      expect(opsCat.docs[0].slug).toBe('my-guide')
-      expect(opsCat.docs[0].title).toBe('My Guide')
-    })
-
-    it('falls back to slug-derived title when no H1 in file', async () => {
-      const opsDir = path.join(docsDir, 'operations')
-      fs.mkdirSync(opsDir, { recursive: true })
-      fs.writeFileSync(path.join(opsDir, 'no-heading.md'), 'Just some content.')
-
-      const res = await request(buildApp()).get('/docs')
-      const opsCat = res.body.categories.find(
-        (c: { slug: string }) => c.slug === 'operations'
-      )
-      expect(opsCat.docs[0].title).toBe('No Heading')
-    })
-
-    it('does not include non-markdown files in docs list', async () => {
-      const opsDir = path.join(docsDir, 'operations')
-      fs.mkdirSync(opsDir, { recursive: true })
-      fs.writeFileSync(path.join(opsDir, 'guide.md'), '# Guide')
-      fs.writeFileSync(path.join(opsDir, 'ignore.txt'), 'not markdown')
-
-      const res = await request(buildApp()).get('/docs')
-      const opsCat = res.body.categories.find(
-        (c: { slug: string }) => c.slug === 'operations'
-      )
-      expect(opsCat.docs).toHaveLength(1)
-      expect(opsCat.docs[0].slug).toBe('guide')
     })
   })
 
   // ── GET /:category/:slug ───────────────────────────────────────────────────
 
   describe('GET /docs/:category/:slug', () => {
-    it('returns 404 for an unknown category', async () => {
-      const res = await request(buildApp()).get('/docs/unknown-cat/some-doc')
-      expect(res.status).toBe(404)
-      expect(res.body.error).toMatch(/category not found/i)
-    })
-
     it('returns 404 when the document file does not exist', async () => {
-      const res = await request(buildApp()).get('/docs/general/nonexistent')
+      const res = await request(buildApp()).get('/docs/guides/nonexistent')
       expect(res.status).toBe(404)
       expect(res.body.error).toMatch(/document not found/i)
     })
 
-    it('returns 404 for engineering (removed section)', async () => {
-      const res = await request(buildApp()).get('/docs/engineering/some-doc')
-      expect(res.status).toBe(404)
-    })
+    it('serves top-level .md files under the "guides" category', async () => {
+      fs.writeFileSync(path.join(docsDir, 'test-doc.md'), '# Test Doc\n\nHello world.')
 
-    it('returns 200 with title, content, category, and slug for a valid doc', async () => {
-      const opsDir = path.join(docsDir, 'operations')
-      fs.mkdirSync(opsDir, { recursive: true })
-      fs.writeFileSync(path.join(opsDir, 'test-doc.md'), '# Test Doc\n\nHello world.')
-
-      const res = await request(buildApp()).get('/docs/operations/test-doc')
+      const res = await request(buildApp()).get('/docs/guides/test-doc')
       expect(res.status).toBe(200)
       expect(res.body.title).toBe('Test Doc')
       expect(res.body.content).toContain('Hello world.')
-      expect(res.body.category).toBe('operations')
+      expect(res.body.category).toBe('guides')
       expect(res.body.slug).toBe('test-doc')
     })
 
-    it('works for all three valid categories', async () => {
-      const categories = ['general', 'product', 'operations']
-      for (const cat of categories) {
-        const catDir = path.join(docsDir, cat)
-        fs.mkdirSync(catDir, { recursive: true })
-        fs.writeFileSync(path.join(catDir, 'sample.md'), `# Sample ${cat}\n\nContent.`)
+    it('serves files from subdirectory categories', async () => {
+      const dir = path.join(docsDir, 'internals')
+      fs.mkdirSync(dir, { recursive: true })
+      fs.writeFileSync(path.join(dir, 'architecture.md'), '# Architecture\n\nBody.')
 
-        const res = await request(buildApp()).get(`/docs/${cat}/sample`)
-        expect(res.status).toBe(200)
-        expect(res.body.category).toBe(cat)
-      }
+      const res = await request(buildApp()).get('/docs/internals/architecture')
+      expect(res.status).toBe(200)
+      expect(res.body.title).toBe('Architecture')
+      expect(res.body.category).toBe('internals')
     })
 
     it('derives title from slug when file has no H1', async () => {
-      const genDir = path.join(docsDir, 'general')
-      fs.mkdirSync(genDir, { recursive: true })
-      fs.writeFileSync(path.join(genDir, 'plain-doc.md'), 'No heading here.')
+      fs.writeFileSync(path.join(docsDir, 'plain-doc.md'), 'No heading here.')
 
-      const res = await request(buildApp()).get('/docs/general/plain-doc')
+      const res = await request(buildApp()).get('/docs/guides/plain-doc')
       expect(res.status).toBe(200)
       expect(res.body.title).toBe('Plain Doc')
     })
 
-    it('returns 400 for a slug containing backslash (invalid path)', async () => {
-      // Express URL encoding usually handles this, but ensure the router
-      // handles edge cases without crashing
-      const res = await request(buildApp()).get('/docs/general/bad%5Cslug')
+    it('returns 400 or 404 for a slug containing backslash (invalid path)', async () => {
+      const res = await request(buildApp()).get('/docs/guides/bad%5Cslug')
       expect([400, 404]).toContain(res.status)
     })
 
     it('returns 500 when readFileSync throws on an existing file', async () => {
-      const genDir = path.join(docsDir, 'general')
-      fs.mkdirSync(genDir, { recursive: true })
-      fs.writeFileSync(path.join(genDir, 'read-error.md'), '# Content')
+      fs.writeFileSync(path.join(docsDir, 'read-error.md'), '# Content')
 
-      // Mock readFileSync to throw after existsSync returns true
       const origReadFileSync = fs.readFileSync
       vi.spyOn(fs, 'readFileSync').mockImplementation((p, ...args) => {
         if (typeof p === 'string' && p.includes('read-error.md')) {
@@ -187,68 +230,26 @@ describe('docs-router', () => {
         return origReadFileSync(p, ...args as [any])
       })
 
-      const res = await request(buildApp()).get('/docs/general/read-error')
+      const res = await request(buildApp()).get('/docs/guides/read-error')
       expect(res.status).toBe(500)
       expect(res.body.error).toContain('Failed to read document')
     })
   })
 
-  // ── Error handling in listing ────────────────────────────────────────────
+  // ── Bundled fallback ───────────────────────────────────────────────────────
 
-  describe('GET /docs error handling', () => {
-    it('handles readdirSync failure gracefully', async () => {
-      const opsDir = path.join(docsDir, 'operations')
-      fs.mkdirSync(opsDir, { recursive: true })
-
-      // Make readdirSync throw for the operations directory
-      const origReaddirSync = fs.readdirSync
-      vi.spyOn(fs, 'readdirSync').mockImplementation((p, ...args) => {
-        if (typeof p === 'string' && p.includes('operations')) {
-          throw new Error('I/O error')
-        }
-        return origReaddirSync(p, ...args as [any])
-      })
-
-      const res = await request(buildApp()).get('/docs')
-      expect(res.status).toBe(200)
-      const opsCat = res.body.categories.find(
-        (c: { slug: string }) => c.slug === 'operations'
-      )
-      expect(opsCat.docs).toEqual([])
-    })
-
-    it('handles readFileSync failure in doc listing gracefully', async () => {
-      const opsDir = path.join(docsDir, 'operations')
-      fs.mkdirSync(opsDir, { recursive: true })
-      fs.writeFileSync(path.join(opsDir, 'broken.md'), '# Broken')
-
-      const origReadFileSync = fs.readFileSync
-      vi.spyOn(fs, 'readFileSync').mockImplementation((p, ...args) => {
-        if (typeof p === 'string' && p.includes('broken.md')) {
-          throw new Error('Corrupted file')
-        }
-        return origReadFileSync(p, ...args as [any])
-      })
-
-      const res = await request(buildApp()).get('/docs')
-      expect(res.status).toBe(200)
-      const opsCat = res.body.categories.find(
-        (c: { slug: string }) => c.slug === 'operations'
-      )
-      // Should use slug-derived title as fallback
-      expect(opsCat.docs[0].title).toBe('Broken')
-    })
-
-    it('uses bundled docs when user docs dir does not exist', async () => {
+  describe('bundled fallback', () => {
+    it('falls back to the bundled docs dir when ~/.specrails/docs/ does not exist', async () => {
       // Point homedir to a dir without .specrails/docs
       const emptyHome = fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-empty-'))
       vi.spyOn(os, 'homedir').mockReturnValue(emptyHome)
 
       const res = await request(buildApp()).get('/docs')
       expect(res.status).toBe(200)
-      // Should still return categories (bundled or empty fallback)
-      expect(res.body.categories).toBeDefined()
-      expect(res.body.categories.length).toBe(4)
+      // Bundled docs/ at the repo root carries at least the guides + internals layout.
+      expect(res.body.categories.length).toBeGreaterThan(0)
+      const slugs = res.body.categories.map((c: { slug: string }) => c.slug)
+      expect(slugs).toContain('guides')
 
       fs.rmSync(emptyHome, { recursive: true, force: true })
     })

@@ -1,20 +1,132 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import { TicketDetailModal } from '../components/TicketDetailModal'
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react'
 import { useTickets } from '../hooks/useTickets'
+import { SplitViewShell } from '../components/SplitViewShell'
+import { TicketDetailModal } from '../components/TicketDetailModal'
+
+export type CompareSide = 'left' | 'right'
+
+interface SplitState {
+  /** Ticket id shown on the left panel (or in centered modal when not in split). */
+  leftId: number | null
+  /** Ticket id shown on the right panel; only set in split mode. */
+  rightId: number | null
+  /** Which side holds the originally-opened ticket. `null` ⇒ not in split mode (centered modal). */
+  originSide: CompareSide | null
+  /** Left-panel ratio of the viewport when in split mode. Range [0.25, 0.75]. */
+  splitRatio: number
+}
+
+const INITIAL_RATIO = 0.5
+const MIN_RATIO = 0.25
+const MAX_RATIO = 0.75
+
+const INITIAL_STATE: SplitState = {
+  leftId: null,
+  rightId: null,
+  originSide: null,
+  splitRatio: INITIAL_RATIO,
+}
+
+type Action =
+  | { type: 'openCentered'; id: number }
+  | { type: 'closeAll' }
+  | { type: 'enterSplit'; side: CompareSide; ticketId?: number }
+  | { type: 'setComparedTicket'; id: number | null; side: CompareSide }
+  | { type: 'exitSplit' }
+  | { type: 'setSplitRatio'; ratio: number }
+
+function clampRatio(r: number): number {
+  if (!Number.isFinite(r)) return INITIAL_RATIO
+  return Math.min(MAX_RATIO, Math.max(MIN_RATIO, r))
+}
+
+export function reduceSplit(state: SplitState, action: Action): SplitState {
+  switch (action.type) {
+    case 'openCentered': {
+      if (state.originSide !== null && state.leftId !== action.id && state.rightId !== action.id) {
+        return { leftId: action.id, rightId: null, originSide: null, splitRatio: INITIAL_RATIO }
+      }
+      if (state.originSide !== null && (state.leftId === action.id || state.rightId === action.id)) {
+        return state
+      }
+      return { ...INITIAL_STATE, leftId: action.id }
+    }
+    case 'closeAll':
+      return INITIAL_STATE
+    case 'enterSplit': {
+      const baseId = action.ticketId ?? state.leftId
+      if (baseId === null) return state
+      if (state.originSide !== null) return state
+      if (action.side === 'left') {
+        return { leftId: baseId, rightId: null, originSide: 'left', splitRatio: INITIAL_RATIO }
+      }
+      return {
+        leftId: null,
+        rightId: baseId,
+        originSide: 'right',
+        splitRatio: INITIAL_RATIO,
+      }
+    }
+    case 'setComparedTicket': {
+      if (state.originSide === null) return state
+      const oppositeSide: CompareSide = state.originSide === 'left' ? 'right' : 'left'
+      if (action.side !== oppositeSide) return state
+      if (action.side === 'left') return { ...state, leftId: action.id }
+      return { ...state, rightId: action.id }
+    }
+    case 'exitSplit': {
+      if (state.originSide === null) return state
+      const keepId = state.originSide === 'left' ? state.leftId : state.rightId
+      return { ...INITIAL_STATE, leftId: keepId }
+    }
+    case 'setSplitRatio':
+      return { ...state, splitRatio: clampRatio(action.ratio) }
+    default:
+      return state
+  }
+}
 
 interface TicketDetailModalContextValue {
   openTicketDetail: (ticketId: number) => void
   closeTicketDetail: () => void
+  enterSplit: (side: CompareSide, ticketId?: number) => void
+  setComparedTicket: (ticketId: number | null, side: CompareSide) => void
+  exitSplit: () => void
+  setSplitRatio: (ratio: number) => void
+  state: SplitState
 }
 
 const TicketDetailModalContext = createContext<TicketDetailModalContextValue | null>(null)
 
+const COMPARE_VIEWPORT_MIN = 900
+
 export function TicketDetailModalProvider({ children }: { children: ReactNode }) {
-  const [openId, setOpenId] = useState<number | null>(null)
+  const [state, dispatch] = useReducer(reduceSplit, INITIAL_STATE)
   const { tickets, updateTicket, deleteTicket } = useTickets()
 
-  const openTicketDetail = useCallback((id: number) => setOpenId(id), [])
-  const closeTicketDetail = useCallback(() => setOpenId(null), [])
+  const openTicketDetail = useCallback((id: number) => dispatch({ type: 'openCentered', id }), [])
+  const closeTicketDetail = useCallback(() => dispatch({ type: 'closeAll' }), [])
+  const enterSplit = useCallback(
+    (side: CompareSide, ticketId?: number) => dispatch({ type: 'enterSplit', side, ticketId }),
+    [],
+  )
+  const setComparedTicket = useCallback(
+    (id: number | null, side: CompareSide) => dispatch({ type: 'setComparedTicket', id, side }),
+    [],
+  )
+  const exitSplit = useCallback(() => dispatch({ type: 'exitSplit' }), [])
+  const setSplitRatio = useCallback((ratio: number) => dispatch({ type: 'setSplitRatio', ratio }), [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    function onResize() {
+      if (window.innerWidth < COMPARE_VIEWPORT_MIN) {
+        dispatch({ type: 'exitSplit' })
+      }
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const allLabels = useMemo(() => {
     const set = new Set<string>()
@@ -22,26 +134,59 @@ export function TicketDetailModalProvider({ children }: { children: ReactNode })
     return Array.from(set).sort()
   }, [tickets])
 
-  const ticket = openId != null ? tickets.find((t) => t.id === openId) ?? null : null
+  const leftTicket = state.leftId != null ? tickets.find((t) => t.id === state.leftId) ?? null : null
+  const rightTicket = state.rightId != null ? tickets.find((t) => t.id === state.rightId) ?? null : null
 
-  const value = useMemo(
-    () => ({ openTicketDetail, closeTicketDetail }),
-    [openTicketDetail, closeTicketDetail],
+  const value = useMemo<TicketDetailModalContextValue>(
+    () => ({
+      openTicketDetail,
+      closeTicketDetail,
+      enterSplit,
+      setComparedTicket,
+      exitSplit,
+      setSplitRatio,
+      state,
+    }),
+    [openTicketDetail, closeTicketDetail, enterSplit, setComparedTicket, exitSplit, setSplitRatio, state],
   )
+
+  const inSplit = state.originSide !== null
 
   return (
     <TicketDetailModalContext.Provider value={value}>
       {children}
-      {ticket && (
+      {!inSplit && leftTicket && (
         <TicketDetailModal
-          ticket={ticket}
+          key={leftTicket.id}
+          ticket={leftTicket}
           allLabels={allLabels}
+          allTickets={tickets}
           onClose={closeTicketDetail}
+          onOpenTicket={openTicketDetail}
           onSave={updateTicket}
           onDelete={(id) => {
             deleteTicket(id)
             closeTicketDetail()
           }}
+        />
+      )}
+      {inSplit && (
+        <SplitViewShell
+          state={state}
+          leftTicket={leftTicket}
+          rightTicket={rightTicket}
+          allTickets={tickets}
+          allLabels={allLabels}
+          onSave={updateTicket}
+          onDelete={(id) => {
+            deleteTicket(id)
+            closeTicketDetail()
+          }}
+          onOpenTicket={openTicketDetail}
+          onCloseAll={closeTicketDetail}
+          onSetCompared={setComparedTicket}
+          onSetRatio={setSplitRatio}
+          onExitSplit={exitSplit}
         />
       )}
     </TicketDetailModalContext.Provider>
@@ -51,8 +196,6 @@ export function TicketDetailModalProvider({ children }: { children: ReactNode })
 export function useTicketDetailModal(): TicketDetailModalContextValue {
   const ctx = useContext(TicketDetailModalContext)
   if (!ctx) {
-    // No-op fallback so consumers can be safely placed outside the provider
-    // (e.g. in unit tests). Logging helps surface accidental misuse.
     return {
       openTicketDetail: () => {
         if (typeof console !== 'undefined') {
@@ -60,7 +203,15 @@ export function useTicketDetailModal(): TicketDetailModalContextValue {
         }
       },
       closeTicketDetail: () => {},
+      enterSplit: () => {},
+      setComparedTicket: () => {},
+      exitSplit: () => {},
+      setSplitRatio: () => {},
+      state: INITIAL_STATE,
     }
   }
   return ctx
 }
+
+export { INITIAL_STATE, INITIAL_RATIO, MIN_RATIO, MAX_RATIO }
+export type { SplitState }

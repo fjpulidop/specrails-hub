@@ -15,7 +15,9 @@ vi.mock('tree-kill', () => ({
 import { spawn as mockSpawn, execSync as mockExecSync } from 'child_process'
 import treeKill from 'tree-kill'
 import { ChatManager } from './chat-manager'
-import { initDb, createConversation, getConversation, createJob, finishJob, setExploreMcpEnabled } from './db'
+import { initDb, createConversation, getConversation, createJob, finishJob } from './db'
+
+const MCP_SCOPE = { specrails: false, openspec: false, full: false, mcp: true, contractRefine: false }
 import type { DbInstance } from './db'
 
 function createMockChildProcess() {
@@ -769,13 +771,12 @@ describe('ChatManager', () => {
       await sendPromise
     })
 
-    it('falls back to project path when MCP toggle is enabled', async () => {
-      setExploreMcpEnabled(db, true)
+    it('uses project path when the conversation scope has mcp=true', async () => {
       const cmExplore = new ChatManager(
         broadcast, db, projectPath, 'P', 'claude', 'proj-x', 'slug-x',
       )
       const convId = 'conv-explore-mcp-on'
-      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore', contextScope: MCP_SCOPE })
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
       const sendPromise = cmExplore.sendMessage(convId, 'hi', { lightweight: true })
@@ -862,12 +863,12 @@ describe('ChatManager', () => {
 
     it('busy when 5 explore turns are streaming and queue times out', async () => {
       const cmL = new ChatManager(broadcast, db, '/tmp/proj', 'P', 'claude', 'pid-l3', 'sl-l3')
-      setExploreMcpEnabled(db, true) // skip filesystem IO
+      // (per-conversation scope.mcp=true is seeded below to skip filesystem IO)
       const fiveChildren: any[] = []
       // Spawn 5 streaming explore turns (no result, never closes)
       for (let i = 0; i < 5; i++) {
         const cid = `conv-life-busy-${i}`
-        createConversation(db, { id: cid, model: 'sonnet', kind: 'explore' })
+        createConversation(db, { id: cid, model: 'sonnet', kind: 'explore', contextScope: MCP_SCOPE })
         const c = createMockChildProcess()
         fiveChildren.push(c)
         vi.mocked(mockSpawn).mockReturnValueOnce(c as any)
@@ -877,7 +878,7 @@ describe('ChatManager', () => {
       // 6th attempt — should queue, then time out at 30s with chat_error busy.
       vi.useFakeTimers()
       const cid6 = 'conv-life-busy-6'
-      createConversation(db, { id: cid6, model: 'sonnet', kind: 'explore' })
+      createConversation(db, { id: cid6, model: 'sonnet', kind: 'explore', contextScope: MCP_SCOPE })
       const sixthPromise = cmL.sendMessage(cid6, 'hi', { lightweight: true })
       // Flush microtask + advance the 30 s queue timeout.
       await vi.advanceTimersByTimeAsync(30 * 1000 + 100)
@@ -893,9 +894,9 @@ describe('ChatManager', () => {
 
     it('crash before result auto-respawns once', async () => {
       const cmL = new ChatManager(broadcast, db, '/tmp/proj', 'P', 'claude', 'pid-l4', 'sl-l4')
-      setExploreMcpEnabled(db, true)
+      // (per-conversation scope.mcp=true is seeded below to skip filesystem IO)
       const convId = 'conv-life-crash'
-      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore', contextScope: MCP_SCOPE })
       const first = createMockChildProcess()
       const second = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValueOnce(first as any).mockReturnValueOnce(second as any)
@@ -915,9 +916,9 @@ describe('ChatManager', () => {
 
     it('second crash surfaces chat_error', async () => {
       const cmL = new ChatManager(broadcast, db, '/tmp/proj', 'P', 'claude', 'pid-l5', 'sl-l5')
-      setExploreMcpEnabled(db, true)
+      // (per-conversation scope.mcp=true is seeded below to skip filesystem IO)
       const convId = 'conv-life-doublecrash'
-      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore', contextScope: MCP_SCOPE })
       const first = createMockChildProcess()
       const second = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValueOnce(first as any).mockReturnValueOnce(second as any)

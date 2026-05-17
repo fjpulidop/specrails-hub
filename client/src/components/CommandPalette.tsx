@@ -33,7 +33,17 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
   const [commands, setCommands] = useState<CommandInfo[]>([])
   const [recentJobs, setRecentJobs] = useState<JobSummary[]>([])
   const { projects, activeProjectId, setActiveProjectId } = useHub()
-  const { leftPinned, setLeftPinned, rightPinned, setRightPinned } = useSidebarPin()
+  const { leftMode, rightMode, cycleLeftMode, cycleRightMode } = useSidebarPin()
+  const leftLabel = leftMode === 'pinned-open'
+    ? 'Collapse left sidebar (keep pinned)'
+    : leftMode === 'pinned-collapsed'
+      ? 'Unpin left sidebar'
+      : 'Pin left sidebar open'
+  const rightLabel = rightMode === 'pinned-open'
+    ? 'Collapse right sidebar (keep pinned)'
+    : rightMode === 'pinned-collapsed'
+      ? 'Unpin right sidebar'
+      : 'Pin right sidebar open'
   const navigate = useNavigate()
   const fetchedRef = useRef(false)
 
@@ -250,22 +260,22 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
             <span>Docs</span>
           </Command.Item>
           <Command.Item
-            value={leftPinned ? 'Unpin left sidebar' : 'Pin left sidebar'}
-            keywords={['sidebar', 'panel', 'left']}
-            onSelect={() => { setLeftPinned((p) => !p); setOpen(false) }}
+            value={leftLabel}
+            keywords={['sidebar', 'panel', 'left', 'pin', 'collapse', 'unpin', 'cycle']}
+            onSelect={() => { cycleLeftMode(); setOpen(false) }}
             className={navItemClass}
           >
             <PanelLeft className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>{leftPinned ? 'Unpin left sidebar' : 'Pin left sidebar'}</span>
+            <span>{leftLabel}</span>
           </Command.Item>
           <Command.Item
-            value={rightPinned ? 'Unpin right sidebar' : 'Pin right sidebar'}
-            keywords={['sidebar', 'panel', 'right', 'nav']}
-            onSelect={() => { setRightPinned((p) => !p); setOpen(false) }}
+            value={rightLabel}
+            keywords={['sidebar', 'panel', 'right', 'nav', 'pin', 'collapse', 'unpin', 'cycle']}
+            onSelect={() => { cycleRightMode(); setOpen(false) }}
             className={navItemClass}
           >
             <PanelRight className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>{rightPinned ? 'Unpin right sidebar' : 'Pin right sidebar'}</span>
+            <span>{rightLabel}</span>
           </Command.Item>
         </Command.Group>
       </Command.List>

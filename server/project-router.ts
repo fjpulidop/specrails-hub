@@ -11,7 +11,7 @@ import {
   createProposal, getProposal, listProposals, deleteProposal,
   createTemplate, listTemplates, getTemplate, updateTemplate, deleteTemplate,
   getProjectSettings, updateProjectSettings,
-  getExploreMcpEnabled, setExploreMcpEnabled,
+  getQuickContractRefineLast, setQuickContractRefineLast, hasQuickContractRefineLast,
   getTelemetryBlob, getTelemetrySummaries, getJobsWithTelemetry, hasJobTelemetry,
 } from './db'
 import { createDiagnosticZip } from './telemetry-export'
@@ -22,7 +22,18 @@ import { VALID_PRIORITIES } from './types'
 import { resolveCommand } from './command-resolver'
 import { createHooksRouter, getPhaseStates } from './hooks'
 import { getConfig, fetchIssues } from './config'
+import { runContractRefine, runContractRefineForQuick } from './contract-refine-runner'
+import { isExploreContractRefineKillSwitchActive } from './explore-contract-refine'
+import { runSmash, runSmashUndo, applyDeleteEpicChildren, checkSmashEligibility } from './smash-runner'
+import { isSpecsSmashKillSwitchActive } from './explore-smash'
 import { recordInvocation, updateTicketIdForConversation, getTicketSpendingSummary } from './ai-invocations'
+import { getContextBudget } from './context-budget'
+import {
+  getLastContextScope, setLastContextScope, normalizeContextScope,
+  setConversationContextScope, getConversationContextScope,
+  buildScopedSystemPromptPrefix, toolFlagsForScope, defaultBootScope,
+  type ContextScope,
+} from './context-scope'
 import { normaliseResultEvent } from './result-event'
 import { getSpending, getInvocations, parseSpendingFilters } from './spending'
 import { randomUUID } from 'crypto'
@@ -39,6 +50,7 @@ import {
   resolveTicketStoragePath, readStore, mutateStore, filterTickets,
   isValidStatus, isValidPriority, validatePriorityForStatus,
   resolveTicketsFromCommand,
+  clampShortSummary,
   type Ticket,
 } from './ticket-store'
 import { generateAutoTitle } from './explore-draft-title'
@@ -215,17 +227,31 @@ function applyModelConfig(projectPath: string): void {
 }
 
 /**
- * Strip the metadata sections (Spec Title, Labels, Estimated Complexity)
- * from a generate-spec LLM response so they don't end up duplicated inside
- * the ticket's description — they're already parsed into dedicated fields
- * and re-rendered by the UI.
+ * Strip the metadata sections (Spec Title, Labels, Estimated Complexity,
+ * Short Summary) from a generate-spec LLM response so they don't end up
+ * duplicated inside the ticket's description — they're already parsed into
+ * dedicated fields and re-rendered by the UI.
  */
 export function stripSpecMetadataSections(buffer: string): string {
   return buffer
     .replace(/##\s*Spec Title\s*\n+[^\n]*\n*/i, '')
     .replace(/##\s*Labels\s*\n+(?:[^\n]+(?:\n(?!##)[^\n]+)*)\n*/i, '')
     .replace(/##\s*Estimated Complexity\s*\n+(?:[^\n]+(?:\n(?!##)[^\n]+)*)\n*/i, '')
+    .replace(/##\s*Short Summary\s*\n+(?:[^\n]+(?:\n(?!##)[^\n]+)*)\n*/i, '')
     .trim()
+}
+
+/**
+ * Extract the `## Short Summary` section body from a generate-spec response.
+ * Returns the raw multi-line string (the ticket-store `clampShortSummary`
+ * helper applies trim, control-strip, and the 240-char hard cap before
+ * persistence). Returns `null` when the section is missing or empty.
+ */
+export function extractShortSummary(buffer: string): string | null {
+  const m = buffer.match(/##\s*Short Summary\s*\n+((?:(?!##)[^\n]+(?:\n(?!##)[^\n]+)*))/i)
+  if (!m) return null
+  const body = m[1].trim()
+  return body.length > 0 ? body : null
 }
 
 /**
@@ -407,6 +433,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       phases: getPhaseStates(),
       busy: queueManager.getActiveJobId() !== null,
       currentJobId: queueManager.getActiveJobId(),
+      featureFlags: {
+        smash: !isSpecsSmashKillSwitchActive(),
+      },
     })
   })
 
@@ -1036,7 +1065,19 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const rawKind = req.body?.kind
     const kind: 'sidebar' | 'explore' = rawKind === 'explore' ? 'explore' : 'sidebar'
     const id = uuidv4()
-    createConversation(db, { id, model, kind })
+    const rawScope = req.body?.contextScope
+    if (rawScope !== undefined && kind !== 'explore') {
+      res.status(400).json({ error: 'contextScope is only allowed for kind=explore' })
+      return
+    }
+    let scope: ContextScope | undefined
+    if (kind === 'explore') {
+      const fallback = getLastContextScope(db, 'explore')
+      scope = normalizeContextScope(rawScope ?? fallback, fallback)
+      setLastContextScope(db, scope)
+      console.log(`[project-router] new explore conv ${id} scope=${JSON.stringify(scope)} rawScope=${JSON.stringify(rawScope)}`)
+    }
+    createConversation(db, { id, model, kind, contextScope: scope })
     const conversation = getConversation(db, id) as ChatConversationRow
     res.status(201).json({ conversation })
   })
@@ -1682,12 +1723,36 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       }
     }
 
-    const codebaseRule = hasAttachments
-      ? `- Do NOT explore the project codebase. The resources inside <user-attachment> blocks below are pre-loaded context the user intentionally provided — read and use them freely.`
-      : `- Do NOT read any files or explore the codebase. Work purely from the user's description.`
+    // Parse contextScope from body. Quick and Explore share the same Context
+    // Awareness controls; Quick still keeps Contract Refine as a top-level
+    // field for the refine scheduler.
+    const rawScope = req.body?.contextScope
+    const quickContractRefine = typeof req.body?.contractRefine === 'boolean'
+      ? req.body.contractRefine
+      : typeof rawScope?.contractRefine === 'boolean'
+        ? rawScope.contractRefine
+      : false
+    const quickScope: ContextScope = {
+      specrails: typeof rawScope?.specrails === 'boolean' ? rawScope.specrails : false,
+      openspec: typeof rawScope?.openspec === 'boolean' ? rawScope.openspec : false,
+      full: typeof rawScope?.full === 'boolean' ? rawScope.full : false,
+      mcp: false,
+      contractRefine: quickContractRefine,
+    }
+    // Persist Quick mode Contract Refine choice (per-project last value).
+    setQuickContractRefineLast(ctx(req).db, quickContractRefine)
+
+    const specsPrefix = buildScopedSystemPromptPrefix(quickScope, project.path)
+
+    const codebaseRule = quickScope.full
+      ? `- You MAY use Read, Grep, and Glob to inspect the project codebase. Bash is not available.`
+      : hasAttachments
+        ? `- Do NOT explore the project codebase. The resources inside <user-attachment> blocks below are pre-loaded context the user intentionally provided — read and use them freely.`
+        : `- Do NOT read any files or explore the codebase. Work purely from the user's description.`
 
     let baseSystemPrompt =
       `You are a senior product engineer generating a structured spec proposal.\n\n` +
+      (specsPrefix ? `${specsPrefix}\n\n` : '') +
       `RULES:\n` +
       `${codebaseRule}\n` +
       `- Do NOT create files, tickets, or issues.\n` +
@@ -1700,7 +1765,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       `## Out of Scope\n[Bullet list]\n\n` +
       `## Acceptance Criteria\n[Numbered list of testable outcomes]\n\n` +
       `## Technical Considerations\n[Bullet list]\n\n` +
-      `## Estimated Complexity\n[Low/Medium/High/Very High + one sentence justification]`
+      `## Estimated Complexity\n[Low/Medium/High/Very High + one sentence justification]\n\n` +
+      `## Short Summary\n[One or two plain-language sentences, max 120 characters total, that capture the essence of this spec for a dashboard postit. No markdown, no bullets, no headings.]`
 
     if (hasAttachments) baseSystemPrompt = `${baseSystemPrompt}\n\n${USER_ATTACHMENT_SYSTEM_NOTE}`
 
@@ -1715,12 +1781,13 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', resolvedModel]
     } else {
       binary = 'claude'
+      const toolFlags = toolFlagsForScope(quickScope)
       args = [
         '--dangerously-skip-permissions',
-        '--tools', 'default',
+        ...toolFlags.args,
         '--output-format', 'stream-json',
         '--verbose',
-        '--max-turns', hasAttachments ? '3' : '1',
+        '--max-turns', quickScope.full ? '6' : (hasAttachments ? '3' : '1'),
         '--model', resolvedModel,
         ...imageFlags,
         '--system-prompt', systemPrompt,
@@ -1833,6 +1900,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
           : []
         const finalLabels = Array.from(new Set(['spec-proposal', ...claudeLabels]))
 
+        const shortSummary = clampShortSummary(extractShortSummary(buffer))
         const description = stripSpecMetadataSections(buffer)
 
         // Create ticket directly
@@ -1853,6 +1921,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
               metadata: {},
               comments: [],
               origin_conversation_id: null,
+              is_epic: false,
+              parent_epic_id: null,
+              execution_order: null,
+              short_summary: shortSummary,
               created_at: now,
               updated_at: now,
               created_by: 'sr-product-engineer',
@@ -1893,6 +1965,34 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
             ticket: created! as unknown as LocalTicket, timestamp: new Date().toISOString(),
           }
           broadcast(doneMsg)
+
+          // Quick mode Contract Refine: when toggle is on in the request body
+          // AND the project setting + kill switch permit it, fire the no-resume
+          // Quick refine path asynchronously.
+          if (quickContractRefine && created) {
+            const refineTicketId = created.id
+            const refineTitle = created.title
+            const refineDescription = created.description
+            const refineModel = (req.body?.model as string | undefined) ?? null
+            process.nextTick(() => {
+              void runContractRefineForQuick(
+                {
+                  db: ctx(req).db,
+                  projectId: project.id,
+                  projectSlug: project.slug,
+                  projectPath: project.path,
+                  projectName: project.name,
+                  broadcast: broadcast as (m: unknown) => void,
+                },
+                refineTicketId,
+                refineTitle,
+                refineDescription,
+                refineModel,
+              ).catch((err: unknown) => {
+                console.error('[project-router] runContractRefineForQuick error:', err)
+              })
+            })
+          }
         } catch (err) {
           console.error('[project-router] generate-spec ticket creation error:', err)
           const errMsg: SpecGenErrorMessage = {
@@ -2035,6 +2135,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
           metadata: {},
           comments: [],
           origin_conversation_id: conversationId,
+          is_epic: false,
+          parent_epic_id: null,
+          execution_order: null,
+          short_summary: null,
           created_at: now,
           updated_at: now,
           created_by: 'sr-explore-spec',
@@ -2106,6 +2210,22 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     // Acceptance Criteria bullets.
     const description = formatDescriptionWithCriteria(baseDescription, acceptanceCriteria)
 
+    // Short summary: explicit body field wins; otherwise try extracting a
+    // `## Short Summary` section from the description and stripping it.
+    let bodyShortSummary: string | null = null
+    let descriptionForStore = description
+    if (typeof body.shortSummary === 'string') {
+      bodyShortSummary = clampShortSummary(body.shortSummary)
+    } else {
+      const extracted = extractShortSummary(description)
+      if (extracted !== null) {
+        bodyShortSummary = clampShortSummary(extracted)
+        descriptionForStore = description
+          .replace(/##\s*Short Summary\s*\n+(?:[^\n]+(?:\n(?!##)[^\n]+)*)\n*/i, '')
+          .trim()
+      }
+    }
+
     try {
       const filePath = ticketPath(req)
       const now = new Date().toISOString()
@@ -2133,9 +2253,14 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
           flipTarget.status = 'todo'
           flipTarget.priority = priority
           flipTarget.title = rawTitle
-          flipTarget.description = description
+          flipTarget.description = descriptionForStore
           if (labels.length > 0) flipTarget.labels = labels
           flipTarget.updated_at = now
+          // Preserve prior short_summary on flip when the model/body omits one;
+          // overwrite only when a non-null value is provided.
+          if (bodyShortSummary !== null) {
+            flipTarget.short_summary = bodyShortSummary
+          }
           // origin_conversation_id is intentionally preserved
           created = flipTarget
           wasFlip = true
@@ -2146,7 +2271,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         const ticket: Ticket = {
           id,
           title: rawTitle,
-          description,
+          description: descriptionForStore,
           status: 'todo',
           priority,
           labels,
@@ -2155,6 +2280,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
           metadata: {},
           comments: [],
           origin_conversation_id: conversationId,
+          is_epic: false,
+          parent_epic_id: null,
+          execution_order: null,
+          short_summary: bodyShortSummary,
           created_at: now,
           updated_at: now,
           created_by: 'sr-explore-spec',
@@ -2216,9 +2345,194 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       }
 
       res.status(201).json({ ticket: created!, revision: store.revision })
+
+      // Fire Contract Refine post-commit (fire-and-forget). Toggle + kill-switch
+      // are checked inside runContractRefine; this call is safe to make
+      // unconditionally. We schedule via process.nextTick so the HTTP response
+      // is flushed before the spawn runs.
+      if (conversationId && created) {
+        const createdTicketId = created.id
+        const convoId = conversationId
+        console.log(`[project-router] from-draft hook: scheduling refine ticket=${createdTicketId} conv=${convoId}`)
+        process.nextTick(() => {
+          void runContractRefine(
+            {
+              db: ctx(req).db,
+              projectId: project.id,
+              projectSlug: project.slug,
+              projectPath: project.path,
+              projectName: project.name,
+              broadcast: broadcast as (m: unknown) => void,
+            },
+            convoId,
+            createdTicketId,
+          ).catch((err) => {
+            console.error('[project-router] runContractRefine error:', err)
+          })
+        })
+      }
     } catch (err) {
       console.error('[project-router] from-draft create error:', err)
       res.status(500).json({ error: 'Failed to create ticket' })
+    }
+  })
+
+  // POST /:projectId/tickets/:id/contract-refine — Manually re-fire refine
+  router.post('/:projectId/tickets/:id/contract-refine', async (req: Request, res: Response) => {
+    const ticketId = Number.parseInt(String(req.params.id ?? ''), 10)
+    if (!Number.isFinite(ticketId)) {
+      res.status(400).json({ error: 'invalid ticket id' }); return
+    }
+    const { project, db, broadcast } = ctx(req)
+    if (isExploreContractRefineKillSwitchActive()) {
+      res.status(409).json({ error: 'feature_disabled_by_env' }); return
+    }
+    // Validate the ticket exists.
+    try {
+      const filePath = ticketPath(req)
+      const { withLock } = await import('./ticket-store')
+      const ticket = withLock(filePath, (s) => s.tickets[String(ticketId)])
+      if (!ticket) { res.status(404).json({ error: 'ticket not found' }); return }
+      if (!ticket.origin_conversation_id) {
+        res.status(409).json({ error: 'ticket has no origin conversation' }); return
+      }
+      const convoId = ticket.origin_conversation_id
+      res.status(202).json({ scheduled: true })
+      process.nextTick(() => {
+        void runContractRefine(
+          {
+            db,
+            projectId: project.id,
+            projectSlug: project.slug,
+            projectPath: project.path,
+            projectName: project.name,
+            broadcast: broadcast as (m: unknown) => void,
+            ignoreConversationScope: true,
+          },
+          convoId,
+          ticketId,
+        ).catch((err) => {
+          console.error('[project-router] retry runContractRefine error:', err)
+        })
+      })
+    } catch (err) {
+      console.error('[project-router] retry endpoint error:', err)
+      res.status(500).json({ error: 'Failed to schedule retry' })
+    }
+  })
+
+  // POST /:projectId/tickets/:id/smash — Decompose ticket into N children
+  router.post('/:projectId/tickets/:id/smash', async (req: Request, res: Response) => {
+    const ticketId = Number.parseInt(String(req.params.id ?? ''), 10)
+    if (!Number.isFinite(ticketId)) {
+      res.status(400).json({ error: 'invalid ticket id' }); return
+    }
+    if (isSpecsSmashKillSwitchActive()) {
+      res.status(409).json({ error: 'feature_disabled_by_env', reason: 'disabled' }); return
+    }
+    const { project, db, broadcast } = ctx(req)
+    try {
+      const filePath = ticketPath(req)
+      const { readStore } = await import('./ticket-store')
+      const store = readStore(filePath)
+      const gate = checkSmashEligibility(store, ticketId)
+      if (!gate.ok) {
+        const statusCode = gate.reason === 'ticket-not-found' ? 404 : 409
+        res.status(statusCode).json({ error: 'ineligible', reason: gate.reason })
+        return
+      }
+      const rawMode = typeof req.body?.mode === 'string' ? req.body.mode : 'simple'
+      const mode: 'simple' | 'full' = rawMode === 'full' ? 'full' : 'simple'
+      const model = typeof req.body?.model === 'string' && req.body.model.length > 0 ? req.body.model : null
+      res.status(202).json({ scheduled: true, mode })
+      process.nextTick(() => {
+        void runSmash(
+          {
+            db,
+            projectId: project.id,
+            projectSlug: project.slug,
+            projectPath: project.path,
+            projectName: project.name,
+            broadcast: broadcast as (m: unknown) => void,
+            mode,
+            model,
+          },
+          ticketId,
+        ).catch((err) => {
+          console.error('[project-router] runSmash error:', err)
+        })
+      })
+    } catch (err) {
+      console.error('[project-router] smash endpoint error:', err)
+      res.status(500).json({ error: 'Failed to schedule SMASH' })
+    }
+  })
+
+  // POST /:projectId/tickets/:id/smash/undo — Reverse a prior SMASH
+  router.post('/:projectId/tickets/:id/smash/undo', async (req: Request, res: Response) => {
+    const ticketId = Number.parseInt(String(req.params.id ?? ''), 10)
+    if (!Number.isFinite(ticketId)) {
+      res.status(400).json({ error: 'invalid ticket id' }); return
+    }
+    if (isSpecsSmashKillSwitchActive()) {
+      res.status(409).json({ error: 'feature_disabled_by_env', reason: 'disabled' }); return
+    }
+    const smashedAt = typeof req.body?.smashedAt === 'string' ? req.body.smashedAt : null
+    if (!smashedAt) {
+      res.status(400).json({ error: 'smashedAt timestamp required' }); return
+    }
+    const { project, db, broadcast } = ctx(req)
+    try {
+      const result = await runSmashUndo(
+        {
+          db,
+          projectId: project.id,
+          projectSlug: project.slug,
+          projectPath: project.path,
+          projectName: project.name,
+          broadcast: broadcast as (m: unknown) => void,
+        },
+        ticketId,
+        smashedAt,
+      )
+      if (!result.ok) {
+        const statusCode = result.reason === 'ticket-not-found' ? 404 : 409
+        res.status(statusCode).json({ error: 'undo_failed', reason: result.reason }); return
+      }
+      res.json({ ok: true, deletedChildren: result.deletedChildren })
+    } catch (err) {
+      console.error('[project-router] smash/undo endpoint error:', err)
+      res.status(500).json({ error: 'Failed to undo SMASH' })
+    }
+  })
+
+  // DELETE /:projectId/tickets/:id/children — Delete all children of an épica
+  router.delete('/:projectId/tickets/:id/children', (req: Request, res: Response) => {
+    const ticketId = Number.parseInt(String(req.params.id ?? ''), 10)
+    if (!Number.isFinite(ticketId)) {
+      res.status(400).json({ error: 'invalid ticket id' }); return
+    }
+    if (isSpecsSmashKillSwitchActive()) {
+      res.status(409).json({ error: 'feature_disabled_by_env', reason: 'disabled' }); return
+    }
+    const { project, broadcast, ticketWatcher } = ctx(req)
+    try {
+      const filePath = ticketPath(req)
+      const result = applyDeleteEpicChildren(filePath, ticketId)
+      ticketWatcher.notifyHubWrite(0)
+      const now = new Date().toISOString()
+      for (const id of result.deletedChildren) {
+        broadcast({
+          type: 'ticket_deleted',
+          ticketId: id,
+          projectId: project.id,
+          timestamp: now,
+        } as TicketDeletedMessage)
+      }
+      res.json({ ok: true, deletedChildren: result.deletedChildren })
+    } catch (err) {
+      console.error('[project-router] delete-children error:', err)
+      res.status(500).json({ error: 'Failed to delete children' })
     }
   })
 
@@ -2255,6 +2569,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
           metadata: typeof metadata === 'object' && metadata !== null ? metadata : {},
           comments: [],
           origin_conversation_id: null,
+          is_epic: false,
+          parent_epic_id: null,
+          execution_order: null,
+          short_summary: null,
           created_at: now,
           updated_at: now,
           created_by: 'hub',
@@ -2280,7 +2598,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     if (!/^\d+$/.test(ticketId)) {
       res.status(400).json({ error: 'Invalid ticket ID' }); return
     }
-    const { title, description, status, priority, labels, assignee, prerequisites, metadata, acceptanceCriteria } = req.body ?? {}
+    const { title, description, status, priority, labels, assignee, prerequisites, metadata, acceptanceCriteria, short_summary } = req.body ?? {}
     if (status !== undefined && !isValidStatus(status)) {
       res.status(400).json({ error: 'status must be one of: draft, todo, in_progress, done, cancelled' }); return
     }
@@ -2321,6 +2639,14 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         if (prerequisites !== undefined && Array.isArray(prerequisites)) ticket.prerequisites = prerequisites.filter((p: unknown) => typeof p === 'number')
         if (metadata !== undefined && typeof metadata === 'object' && metadata !== null) {
           ticket.metadata = { ...ticket.metadata, ...metadata }
+        }
+        // Short summary: explicit non-empty overwrites; explicit null clears;
+        // omitted leaves the existing value untouched (preserves prior summary
+        // when AI Refine omits it for a partial edit).
+        if (short_summary === null) {
+          ticket.short_summary = null
+        } else if (typeof short_summary === 'string') {
+          ticket.short_summary = clampShortSummary(short_summary)
         }
         ticket.updated_at = new Date().toISOString()
         updated = ticket
@@ -2378,13 +2704,16 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const baseRules =
       `- Output format MUST be exactly:\n` +
       `    TITLE: <one-line spec title>\n` +
+      `    SHORT-SUMMARY: <one or two plain-language sentences, max 120 chars, summarising the spec for a dashboard postit. No markdown, no bullets.>\n` +
       `    \n` +
       `    <markdown description body>\n` +
       `  The first line MUST start with "TITLE: " followed by the refined title.\n` +
+      `  The second line MUST start with "SHORT-SUMMARY: " followed by the summary.\n` +
       `  Then exactly one blank line. Then the markdown description.\n` +
       `- Keep the title concise (under 80 characters) and reflective of the latest description.\n` +
       `  If the user's refinement does not affect the title's intent, you may keep it unchanged — but always emit the TITLE line.\n` +
-      `- After the title line, output ONLY the modified description in markdown. No preamble, no explanation, no wrapping.\n` +
+      `- The SHORT-SUMMARY line MUST always be present. If the user's refinement does not change what the spec is about, keep the previous summary verbatim. Never omit the line.\n` +
+      `- After the SHORT-SUMMARY line and blank line, output ONLY the modified description in markdown. No preamble, no explanation, no wrapping.\n` +
       `- Preserve the existing markdown structure and section headings in the description.\n` +
       `- If the user asks to add technical details, briefly check CLAUDE.md and the project directory structure (ls, not deep reads) to ground your edits.\n` +
       `- Keep it concise and actionable.\n` +
@@ -2565,6 +2894,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       const filePath = ticketPath(req)
       let found = false
       let orphanedConversationId: string | null = null
+      const orphanedChildren: Ticket[] = []
+      const numericId = Number(ticketId)
       const store = mutateStore(filePath, (s) => {
         const t = s.tickets[ticketId]
         if (!t) return
@@ -2575,6 +2906,20 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
             (other) => other.id !== t.id && other.origin_conversation_id === t.origin_conversation_id,
           )
           if (!otherRefs) orphanedConversationId = t.origin_conversation_id
+        }
+        // SMASH: when deleting an épica, orphan its children (set
+        // parent_epic_id/execution_order to null) rather than cascade-delete.
+        if (t.is_epic) {
+          const now = new Date().toISOString()
+          for (const childId of Object.keys(s.tickets)) {
+            const child = s.tickets[childId]
+            if (child.parent_epic_id === numericId) {
+              child.parent_epic_id = null
+              child.execution_order = null
+              child.updated_at = now
+              orphanedChildren.push(child)
+            }
+          }
         }
         delete s.tickets[ticketId]
         found = true
@@ -2599,6 +2944,16 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         } catch (err) {
           console.error('[project-router] orphan conversation cleanup failed:', err)
         }
+      }
+      // Broadcast ticket_updated for each orphaned child so observers see them
+      // as regular tickets (no longer attached to the deleted épica).
+      for (const child of orphanedChildren) {
+        broadcast({
+          type: 'ticket_updated',
+          ticket: child,
+          projectId: ctx(req).project.id,
+          timestamp: new Date().toISOString(),
+        } as unknown as TicketCreatedMessage)
       }
       const msg: TicketDeletedMessage = { type: 'ticket_deleted', ticketId: Number(ticketId), projectId: ctx(req).project.id, timestamp: new Date().toISOString() }
       broadcast(msg)
@@ -2828,20 +3183,60 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     res.json(settings)
   })
 
-  // ─── Explore Spec acceleration: per-project MCP toggle ───────────────────────
+  // ─── Per-project Quick mode Contract Refine last-used value ─────────────────
 
-  router.get('/:projectId/explore-mcp-enabled', (req: Request, res: Response) => {
-    res.json({ enabled: getExploreMcpEnabled(ctx(req).db) })
+  router.get('/:projectId/add-spec-quick-contract-refine-last', (req: Request, res: Response) => {
+    res.json({
+      enabled: getQuickContractRefineLast(ctx(req).db),
+      configured: hasQuickContractRefineLast(ctx(req).db),
+    })
   })
 
-  router.patch('/:projectId/explore-mcp-enabled', (req: Request, res: Response) => {
+  router.patch('/:projectId/add-spec-quick-contract-refine-last', (req: Request, res: Response) => {
     const enabled = req.body?.enabled
     if (typeof enabled !== 'boolean') {
       res.status(400).json({ error: 'enabled must be a boolean' })
       return
     }
-    setExploreMcpEnabled(ctx(req).db, enabled)
-    res.json({ enabled: getExploreMcpEnabled(ctx(req).db) })
+    setQuickContractRefineLast(ctx(req).db, enabled)
+    res.json({ enabled: getQuickContractRefineLast(ctx(req).db) })
+  })
+
+  // ─── Add Spec context scope ────────────────────────────────────────────────
+
+  router.get('/:projectId/context-budget', (req: Request, res: Response) => {
+    const { project } = ctx(req)
+    try {
+      const budget = getContextBudget(project.id, project.path)
+      res.json(budget)
+    } catch (err) {
+      console.error('[project-router] context-budget failed:', err)
+      res.status(500).json({ error: 'failed to compute context budget' })
+    }
+  })
+
+  router.get('/:projectId/context-scope-last', (req: Request, res: Response) => {
+    const scope = getLastContextScope(ctx(req).db, 'explore')
+    res.json({ scope })
+  })
+
+  router.patch('/:projectId/context-scope-last', (req: Request, res: Response) => {
+    const body = req.body
+    if (!body || typeof body !== 'object') {
+      res.status(400).json({ error: 'body must be an object' })
+      return
+    }
+    // Validate booleans-only for any provided key.
+    for (const key of ['specrails', 'openspec', 'full', 'mcp', 'contractRefine']) {
+      if (body[key] !== undefined && typeof body[key] !== 'boolean') {
+        res.status(400).json({ error: `${key} must be a boolean` })
+        return
+      }
+    }
+    const current = getLastContextScope(ctx(req).db, 'explore')
+    const merged = normalizeContextScope({ ...current, ...body }, current)
+    setLastContextScope(ctx(req).db, merged)
+    res.json({ scope: merged })
   })
 
   router.patch('/:projectId/settings', (req: Request, res: Response) => {

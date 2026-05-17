@@ -12,7 +12,7 @@ export type { LocalTicket }
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TicketWsMessage {
-  type: 'ticket_created' | 'ticket_updated' | 'ticket_deleted'
+  type: 'ticket_created' | 'ticket_updated' | 'ticket_deleted' | 'explore.contract_refine_started' | 'explore.contract_refine_failed'
   projectId?: string
   ticket?: LocalTicket
   ticketId?: number
@@ -20,6 +20,7 @@ interface TicketWsMessage {
 }
 
 const GLOW_DURATION_MS = 3000
+const CONTRACT_LAYER_MARKER = '\n\n---\n\n## Contract Layer\n\n'
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ export function useTickets() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [newTicketIds, setNewTicketIds] = useState<Set<number>>(new Set())
+  const [contractRefiningIds, setContractRefiningIds] = useState<Set<number>>(new Set())
 
   const activeProjectIdRef = useRef(activeProjectId)
   useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
@@ -88,6 +90,7 @@ export function useTickets() {
       setError(null)
       knownIdsRef.current = new Set()
       setNewTicketIds(new Set())
+      setContractRefiningIds(new Set())
       return
     }
 
@@ -95,6 +98,7 @@ export function useTickets() {
     setLoading(true)
     setError(null)
     setNewTicketIds(new Set())
+    setContractRefiningIds(new Set())
 
     const controller = new AbortController()
 
@@ -161,6 +165,14 @@ export function useTickets() {
         setTickets((prev) =>
           prev.map((t) => (t.id === updated.id ? updated : t))
         )
+        if (typeof updated.description === 'string' && updated.description.includes(CONTRACT_LAYER_MARKER)) {
+          setContractRefiningIds((prev) => {
+            if (!prev.has(updated.id)) return prev
+            const next = new Set(prev)
+            next.delete(updated.id)
+            return next
+          })
+        }
         break
       }
 
@@ -169,6 +181,24 @@ export function useTickets() {
         const deletedId = msg.ticketId
         setTickets((prev) => prev.filter((t) => t.id !== deletedId))
         knownIdsRef.current.delete(deletedId)
+        break
+      }
+
+      case 'explore.contract_refine_started': {
+        if (msg.ticketId == null) break
+        setContractRefiningIds((prev) => new Set([...prev, msg.ticketId!]))
+        break
+      }
+
+      case 'explore.contract_refine_failed': {
+        if (msg.ticketId == null) break
+        const ticketId = msg.ticketId
+        setContractRefiningIds((prev) => {
+          if (!prev.has(ticketId)) return prev
+          const next = new Set(prev)
+          next.delete(ticketId)
+          return next
+        })
         break
       }
     }
@@ -245,6 +275,7 @@ export function useTickets() {
     isLoading: loading,
     error,
     newTicketIds,
+    contractRefiningIds,
     refetch,
     refresh: refetch,
     deleteTicket,

@@ -1,7 +1,8 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { GripVertical, Trash2 } from 'lucide-react'
+import { GripVertical, Trash2, ArrowLeft } from 'lucide-react'
 import { RailControls, type RailMode, type RailStatus } from './RailControls'
 import { SpecCard } from './SpecCard'
 import { RailProfileSelector } from './agents/RailProfileSelector'
@@ -21,6 +22,15 @@ interface RailRowProps {
   jiggleMode: boolean
   dragHandleListeners?: Record<string, Function>
   dragHandleAttributes?: Record<string, any>
+  /**
+   * Visual density. `'normal'` (default) renders the full rail card with
+   * a droppable body and embedded spec cards. `'compact'` renders a tall
+   * premium mini-card with only the header controls (name, Mode dropdown,
+   * Profile picker, Play/Stop/Log, spec counter) — used when the dashboard
+   * splitter has collapsed the rails panel below ~220 px wide. Tickets are
+   * still reachable via the Move-to-Rail popover on dashboard postits.
+   */
+  density?: 'normal' | 'compact'
   onModeChange: (mode: RailMode) => void
   onProfileChange?: (profileName: string | null) => void
   onToggle: () => void
@@ -28,13 +38,38 @@ interface RailRowProps {
   onDelete: () => void
   onLongPress: () => void
   onRename: (newLabel: string) => void
+  /** Optional — when wired, right-clicking a compact-tier ticket pill opens
+   *  a context menu offering "← Move to Specs" which removes the ticket
+   *  from this rail and returns it to the specs list. */
+  onTicketMoveToSpecs?: (ticketId: number) => void
 }
 
 export function RailRow({
   id, label, tickets, mode, status, activeJobId, profileName, jiggleMode,
-  dragHandleListeners, dragHandleAttributes,
+  dragHandleListeners, dragHandleAttributes, density = 'normal',
   onModeChange, onProfileChange, onToggle, onTicketClick, onDelete, onLongPress, onRename,
+  onTicketMoveToSpecs,
 }: RailRowProps) {
+  // Compact-tier right-click context menu state. `{ticketId, x, y}` while
+  // open, `null` otherwise. Closed by outside-click, Escape, or selection.
+  const [ticketCtxMenu, setTicketCtxMenu] = useState<{ ticketId: number; x: number; y: number } | null>(null)
+  useEffect(() => {
+    if (!ticketCtxMenu) return
+    function onPointer(e: PointerEvent) {
+      // Don't close when the pointerdown lands inside the popup itself —
+      // otherwise the menu unmounts before the menuitem's click handler fires.
+      const target = e.target as Element | null
+      if (target?.closest('[role="menu"]')) return
+      setTicketCtxMenu(null)
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setTicketCtxMenu(null) }
+    document.addEventListener('pointerdown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [ticketCtxMenu])
   const { isOver, setNodeRef } = useDroppable({ id })
   const [swipeX, setSwipeX] = useState(0)
   const [swiping, setSwiping] = useState(false)
@@ -143,6 +178,197 @@ export function RailRow({
     onDelete()
   }, [onDelete])
 
+  // ── Compact density rendering ─────────────────────────────────────────────
+  // Independent jiggle phase derived from the rail id so neighbouring rails
+  // wobble out of sync instead of all dancing in lockstep.
+  const railJigglePhaseMs = jiggleMode && canDelete
+    ? -((Array.from(id).reduce((a, c) => a + c.charCodeAt(0), 0) * 53) % 400)
+    : undefined
+  const railJiggleStyle = railJigglePhaseMs !== undefined
+    ? ({ animationDelay: `${railJigglePhaseMs}ms` } as React.CSSProperties)
+    : undefined
+
+  if (density === 'compact') {
+    return (
+      <div
+        ref={setNodeRef}
+        data-testid={`rail-row-compact-${id}`}
+        data-density="compact"
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onClick={handleClick}
+        style={railJiggleStyle}
+        className={`group relative flex flex-col gap-1.5 rounded-xl border bg-card/80 backdrop-blur p-2.5 transition-all ${
+          isOver
+            ? 'border-accent-info/60 shadow-[0_0_0_1px_hsl(var(--accent-info)/0.35),0_0_14px_hsl(var(--accent-info)/0.18)]'
+            : isRunning
+              ? 'border-accent-success/40 shadow-sm'
+              : 'border-border/40 hover:border-accent-info/30 hover:shadow-md'
+        } ${jiggleMode && canDelete ? 'animate-jiggle' : ''}`}
+      >
+        {/* Header line: drag grip + status dot + label */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <button
+            type="button"
+            className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground/70 transition-colors shrink-0"
+            {...dragHandleListeners}
+            {...dragHandleAttributes}
+          >
+            <GripVertical className="w-3 h-3" />
+          </button>
+          <div
+            className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300 ${
+              isRunning
+                ? 'bg-accent-success shadow-[0_0_4px_hsl(var(--accent-success)/0.8)] animate-pulse'
+                : status === 'failed'
+                  ? 'bg-accent-warning shadow-[0_0_4px_hsl(var(--accent-warning)/0.6)]'
+                  : 'bg-muted-foreground/25'
+            }`}
+            aria-hidden
+          />
+          {editing ? (
+            <form
+              className="flex items-center gap-0.5 min-w-0 flex-1"
+              onSubmit={(e) => {
+                e.preventDefault()
+                const trimmed = editValue.trim()
+                if (trimmed) onRename(trimmed)
+                setEditing(false)
+              }}
+            >
+              <input
+                ref={inputRef}
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={() => {
+                  const trimmed = editValue.trim()
+                  if (trimmed) onRename(trimmed)
+                  setEditing(false)
+                }}
+                onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false) }}
+                className="flex-1 min-w-0 text-xs font-medium bg-transparent border-b border-accent-info/60 outline-none text-foreground/90 px-0.5"
+                autoFocus
+              />
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                const suffix = label.startsWith('Rail ') ? label.slice(5) : label
+                setEditValue(suffix)
+                setEditing(true)
+                setTimeout(() => inputRef.current?.select(), 0)
+              }}
+              className="flex-1 min-w-0 text-left text-xs font-medium text-foreground/90 hover:text-foreground truncate"
+              title={label}
+            >
+              {label}
+            </button>
+          )}
+        </div>
+
+        {/* Assigned spec id pills — clickable, opens the ticket modal */}
+        {tickets.length > 0 && (
+          <div className="flex flex-wrap gap-1" data-testid={`rail-row-compact-tickets-${id}`}>
+            {tickets.map((ticket) => (
+              <button
+                key={ticket.id}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onTicketClick(ticket) }}
+                onMouseDown={(e) => {
+                  // Right-click (button 2) opens the context menu directly.
+                  // `onContextMenu` is suppressed in the Tauri webview by
+                  // default, so we trigger off `mousedown` to work in both
+                  // the browser and the desktop app.
+                  if (e.button === 2 && onTicketMoveToSpecs) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setTicketCtxMenu({ ticketId: ticket.id, x: e.clientX, y: e.clientY })
+                  }
+                }}
+                onContextMenu={(e) => {
+                  // Always prevent the OS / Tauri default menu, even when
+                  // the popup was already opened via mousedown above.
+                  if (!onTicketMoveToSpecs) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                title={`#${ticket.id} ${ticket.title}`}
+                className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-mono font-medium border border-accent-info/30 bg-accent-info/10 text-accent-info hover:bg-accent-info/20 hover:border-accent-info/60 transition-colors"
+              >
+                #{ticket.id}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Right-click context menu for assigned ticket pills.
+            Portal'd to document.body so `position: fixed` is always relative
+            to the viewport, regardless of any transformed ancestor (dnd-kit
+            sortable, animation, etc.) that would otherwise turn the rail row
+            into the fixed-positioning containing block. */}
+        {ticketCtxMenu && onTicketMoveToSpecs && createPortal(
+          <div
+            role="menu"
+            data-testid={`rail-row-compact-context-menu-${id}`}
+            className="fixed z-[200] min-w-[160px] rounded-lg border border-border/60 bg-card/95 backdrop-blur shadow-xl shadow-black/40 p-1"
+            style={{
+              top: Math.min(ticketCtxMenu.y, window.innerHeight - 60),
+              left: Math.min(ticketCtxMenu.x, window.innerWidth - 180),
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                e.stopPropagation()
+                onTicketMoveToSpecs(ticketCtxMenu.ticketId)
+                setTicketCtxMenu(null)
+              }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs text-accent-warning hover:bg-accent-warning/10 transition-colors"
+            >
+              <ArrowLeft className="w-3 h-3" aria-hidden />
+              Move to Specs
+            </button>
+          </div>,
+          document.body
+        )}
+
+        {/* Mode dropdown + Profile picker (stacked) */}
+        <div className="flex flex-col gap-1">
+          {onProfileChange && !isRunning && (
+            <RailProfileSelector value={profileName ?? null} onChange={onProfileChange} />
+          )}
+          <RailControls
+            mode={mode}
+            status={status}
+            activeJobId={activeJobId}
+            ticketCount={tickets.length}
+            onModeChange={onModeChange}
+            onToggle={onToggle}
+          />
+        </div>
+
+        {/* Jiggle-mode delete button */}
+        {jiggleMode && canDelete && (
+          <button
+            type="button"
+            onClick={handleDeleteClick}
+            className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm hover:opacity-90 transition-opacity"
+            aria-label={`Delete ${label}`}
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div
       className="relative overflow-hidden rounded-xl"
@@ -181,6 +407,7 @@ export function RailRow({
           transform: swipeX < 0 ? `translateX(${swipeX}px)` : undefined,
           transition: swiping ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1)',
           backdropFilter: 'blur(8px)',
+          ...(railJigglePhaseMs !== undefined ? { animationDelay: `${railJigglePhaseMs}ms` } : {}),
         }}
       >
         {/* Row header */}
@@ -288,11 +515,58 @@ export function RailRow({
           ) : (
             <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
               {tickets.map((ticket) => (
-                <SpecCard key={ticket.id} ticket={ticket} onClick={onTicketClick} dragDisabled={status === 'running'} />
+                <div
+                  key={ticket.id}
+                  onMouseDown={(e) => {
+                    if (e.button === 2 && onTicketMoveToSpecs) {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setTicketCtxMenu({ ticketId: ticket.id, x: e.clientX, y: e.clientY })
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    if (!onTicketMoveToSpecs) return
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                >
+                  <SpecCard ticket={ticket} onClick={onTicketClick} dragDisabled={status === 'running'} />
+                </div>
               ))}
             </SortableContext>
           )}
         </div>
+
+        {/* Right-click context menu also reachable from the normal-density
+            rail body (same component instance as the compact branch).
+            Portal'd to body — see compact branch above for rationale. */}
+        {ticketCtxMenu && onTicketMoveToSpecs && density === 'normal' && createPortal(
+          <div
+            role="menu"
+            data-testid={`rail-row-normal-context-menu-${id}`}
+            className="fixed z-[200] min-w-[160px] rounded-lg border border-border/60 bg-card/95 backdrop-blur shadow-xl shadow-black/40 p-1"
+            style={{
+              top: Math.min(ticketCtxMenu.y, window.innerHeight - 60),
+              left: Math.min(ticketCtxMenu.x, window.innerWidth - 180),
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                e.stopPropagation()
+                onTicketMoveToSpecs(ticketCtxMenu.ticketId)
+                setTicketCtxMenu(null)
+              }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs text-accent-warning hover:bg-accent-warning/10 transition-colors"
+            >
+              <ArrowLeft className="w-3 h-3" aria-hidden />
+              Move to Specs
+            </button>
+          </div>,
+          document.body
+        )}
       </div>
     </div>
   )

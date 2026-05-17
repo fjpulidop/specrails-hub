@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { getApiBase } from '../lib/api'
+import { useTicketDetailModal } from '../context/TicketDetailModalContext'
 import type { TicketSpendingSummary, Surface } from '../types/spending'
 import { SURFACE_LABEL } from '../types/spending'
 
@@ -22,6 +24,8 @@ function fmtDur(ms: number): string {
 
 export function TicketSpendingLine({ ticketId }: Props) {
   const [summary, setSummary] = useState<TicketSpendingSummary | null>(null)
+  const navigate = useNavigate()
+  const { closeTicketDetail } = useTicketDetailModal()
 
   useEffect(() => {
     const ctrl = new AbortController()
@@ -40,9 +44,14 @@ export function TicketSpendingLine({ ticketId }: Props) {
     .join(' + ')
 
   return (
-    <a
-      href={`/analytics?ticketId=${ticketId}`}
-      className="mt-1.5 group inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        closeTicketDetail()
+        navigate(`/analytics?ticketId=${ticketId}`)
+      }}
+      className="mt-1.5 group inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
       aria-label="View ticket spending in Analytics"
     >
       <span className="tabular-nums font-medium text-foreground">{fmtCost(summary.totalCostUsd)}</span>
@@ -57,6 +66,6 @@ export function TicketSpendingLine({ ticketId }: Props) {
         </>
       )}
       <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-    </a>
+    </button>
   )
 }
