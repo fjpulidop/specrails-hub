@@ -146,9 +146,9 @@
 
 ## 15. DB migrations
 
-- [ ] 15.1 Add migration 18 in `server/db.ts`: `ALTER TABLE ai_invocations ADD COLUMN provider TEXT;` + `UPDATE ai_invocations SET provider = 'claude' WHERE provider IS NULL;` + create index `idx_ai_inv_project_provider ON ai_invocations(project_id, provider)`
-- [ ] 15.2 Add migration 19: `ALTER TABLE ai_invocations ADD COLUMN total_cost_usd_estimated INTEGER NOT NULL DEFAULT 0;`
-- [ ] 15.3 Update `recordInvocation` to require `provider` and accept optional `estimated: boolean` (writes 1 when true, 0 default)
+- [x] 15.1 Add migration 18 in `server/db.ts`: `ALTER TABLE ai_invocations ADD COLUMN provider TEXT;` + `UPDATE ai_invocations SET provider = 'claude' WHERE provider IS NULL;` + create index `idx_ai_inv_project_provider ON ai_invocations(project_id, provider)`
+- [x] 15.2 Add migration 19: `ALTER TABLE ai_invocations ADD COLUMN total_cost_usd_estimated INTEGER NOT NULL DEFAULT 0;`
+- [x] 15.3 Update `recordInvocation` to require `provider` and accept optional `estimated: boolean` (writes 1 when true, 0 default)
 - [ ] 15.4 Update `spending.ts` `getSpending` and `getInvocations` to surface `provider`, `total_cost_usd_estimated`, `totalEstimatedCostUsd` totals, and `byProvider` breakdown
 - [ ] 15.5 Update `client/src/pages/AnalyticsPage.tsx`: `~` prefix on estimated cost cells with tooltip; Hero footnote when `totalEstimatedCostUsd > 0`; `byProvider` widget (new component `client/src/components/analytics/ProviderBreakdownCard.tsx`)
 - [ ] 15.6 Update `server/spending.test.ts` and `analytics/*.test.tsx` accordingly
