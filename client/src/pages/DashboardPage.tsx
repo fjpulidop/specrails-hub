@@ -629,12 +629,13 @@ export default function DashboardPage() {
 
   const activeTicket = activeId !== null ? ticketMap.get(activeId) : undefined
 
-  const { leftWidth, tier, enabled: splitterEnabled, beginDrag, resetToDefault } = useDashboardSplit(activeProjectId)
+  const dashboardContainerRef = useRef<HTMLDivElement | null>(null)
+  const { leftWidth, tier, enabled: splitterEnabled, beginDrag, resetToDefault } = useDashboardSplit(activeProjectId, dashboardContainerRef)
   const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex h-full overflow-hidden">
+      <div ref={dashboardContainerRef} className="flex h-full overflow-hidden">
         {/* Left panel: Specs board */}
         <div
           className="min-w-0 flex flex-col overflow-hidden"
