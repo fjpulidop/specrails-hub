@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 
 /**
  * Resizable vertical split between the left (`SpecsBoard`) and right
@@ -110,8 +110,12 @@ interface UseDashboardSplitResult {
   resetToDefault: () => void
 }
 
-export function useDashboardSplit(projectId: string | null): UseDashboardSplitResult {
+export function useDashboardSplit(
+  projectId: string | null,
+  containerRef?: RefObject<HTMLElement | null>,
+): UseDashboardSplitResult {
   const [viewport, setViewport] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1200))
+  const prevViewportRef = useRef<number>(viewport)
   const [leftWidth, setLeftWidth] = useState<number | null>(() => {
     if (typeof window === 'undefined') return null
     const initialViewport = window.innerWidth
@@ -134,8 +138,10 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
   // Re-resolve when the active project changes.
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const v = window.innerWidth
+    const el = containerRef?.current
+    const v = el?.clientWidth || window.innerWidth
     setViewport(v)
+    prevViewportRef.current = v
     if (v < DISABLE_BELOW_VIEWPORT_PX) {
       setLeftWidth(null)
       return
@@ -145,27 +151,46 @@ export function useDashboardSplit(projectId: string | null): UseDashboardSplitRe
     // ignored here — it's an in-session drag memory, not a remembered
     // start position.
     setLeftWidth(computeDefaultLeftWidth(v))
-  }, [projectId])
+  }, [projectId, containerRef])
 
-  // Window resize: re-clamp and toggle enabled-ness.
+  // Container/window resize: re-clamp, toggle enabled-ness, and shift
+  // `leftWidth` by the container's width delta so the rails (right) panel
+  // preserves its pixel width when outer sidebars open/close.
   useEffect(() => {
-    function onResize() {
-      const v = window.innerWidth
+    function applyViewport(v: number) {
       setViewport(v)
       if (v < DISABLE_BELOW_VIEWPORT_PX) {
+        prevViewportRef.current = v
         setLeftWidth(null)
         return
       }
-      setLeftWidth((prev) => {
-        const base = prev ?? loadStored(projectId) ?? computeDefaultLeftWidth(v)
-        const clamped = clampToViewport(base, v)
-        if (clamped !== base) saveStored(projectId, clamped)
+      const prev = prevViewportRef.current
+      const delta = v - prev
+      prevViewportRef.current = v
+      setLeftWidth((prevLeft) => {
+        const base = prevLeft ?? loadStored(projectId) ?? computeDefaultLeftWidth(v)
+        // Shift by delta so rails panel keeps its current pixel width.
+        const shifted = prevLeft !== null && Number.isFinite(delta) ? base + delta : base
+        const clamped = clampToViewport(shifted, v)
+        if (clamped !== prevLeft) saveStored(projectId, clamped)
         return clamped
       })
     }
+    const el = containerRef?.current
+    if (el && typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver((entries) => {
+        const w = entries[0]?.contentRect.width
+        if (typeof w === 'number') applyViewport(w)
+      })
+      ro.observe(el)
+      // Seed with current container width.
+      applyViewport(el.clientWidth || window.innerWidth)
+      return () => ro.disconnect()
+    }
+    function onResize() { applyViewport(window.innerWidth) }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
-  }, [projectId])
+  }, [projectId, containerRef])
 
   const applyPending = useCallback(() => {
     rafRef.current = null
