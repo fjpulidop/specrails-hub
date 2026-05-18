@@ -5,21 +5,14 @@ OpenSpec-tracked artifact — `proposal.md`, `design.md`, `specs/`, and
 `tasks.md` are. Update this file when you commit work so anyone resuming the
 branch sees the current state at a glance.
 
-## Stage A progress — **NEARLY COMPLETE**
+## Stage A — **COMPLETE** ✅
 
-Every server-side manager that spawns an AI CLI runs through
-ProviderAdapter. The codex path is functional end-to-end internally with
-the UI gates still up: jobs capture real `thread_id`, tokens land in
-`ai_invocations` with estimated cost from the local pricing table, OTEL
-spans get synthesised by the bridge, the setup wizard captures real codex
-sessions, the explore-cwd materialises `AGENTS.md` for codex projects,
-profiles validate against the codex catalog, and plugin contributors target
-`AGENTS.md` on codex projects.
-
-The only Stage A piece remaining is the **codex MCP-registration path**
-(`codex mcp add` with per-project `CODEX_HOME` + `providerSupport` on the
-plugin manifest + `not-applicable` status surfacing in the UI). It does
-not block Stage B and can be parallelised with it.
+Every server-side path that interacts with an AI CLI runs through the
+ProviderAdapter contract. Codex projects are functionally end-to-end
+within the hub server: chat, rails (with synthetic OTEL spans), AI Edit,
+setup wizard, explore-cwd, profiles, and plugins (Serena via `codex mcp
+add`) all work. The UI gates ("Codex coming soon") stay UP — that's
+Stage C.
 
 ### Branch
 `feat/multi-provider-support` off `main`.
@@ -42,6 +35,8 @@ not block Stage B and can be parallelised with it.
 14. `feat(profile-manager): adapter-driven model catalog + optional provider field`
 15. `refactor(project-router): generate-spec spawn uses adapter.buildArgs`
 16. `feat(plugins): provider-aware contributors target AGENTS.md on codex`
+17. `docs(openspec): handoff refresh — 16 commits, Stage A 95% done`
+18. `feat(plugins): codex `mcp add` install path with per-project CODEX_HOME`
 
 ### Sections of tasks.md status
 
@@ -60,43 +55,15 @@ not block Stage B and can be parallelised with it.
 | 11 | project-router refactor | ✅ |
 | 12 | explore-cwd-manager refactor | ✅ |
 | 13 | ProfileManager (per-provider model catalog) | ✅ |
-| 14 | PluginManager — contributors target adapter.instructionsFilename (§14.5/14.7) | ⏳ partial |
-| 14.1-14.4, 14.6 | `codex mcp add` + manifest `providerSupport` + CODEX_HOME + not-applicable status | ⏳ pending |
+| 14 | PluginManager (full codex MCP-add path + AGENTS.md contributors) | ✅ |
 | 15 | DB migrations + recordInvocation extended + byProvider helper | ✅ |
 | 16 | setup-prerequisites: registry-driven providers + at-least-one rule | ✅ |
 | 17 | core-compat: registry-walking detection | ✅ |
 
-### What still must happen before Stage B
-
-Only one thing: **complete §14** (codex MCP-add path). Roughly 200-400 LOC
-across `server/plugins/serena/{manifest,install}.ts`,
-`server/plugin-manager.ts`, and new tests. The plumbing for it is already in
-place: `adapter.mcpRegistration === 'cli-add'` is exposed, contributors
-already write to AGENTS.md, and the provider id flows through every
-PluginManager method. The remaining work is:
-
-1. Add `providerSupport: { claude?: ..., codex?: ... }` to `PluginManifest`
-   (TypeScript type in `server/types.ts`).
-2. Serena's manifest declares `providerSupport.codex.mcpEntry` (same `uvx
-   --from git+... serena start-mcp-server ...` command).
-3. `installSerena` branches on `adapter.mcpRegistration`: claude uses the
-   existing `mergeMcpServers` (project-json) path; codex spawns `codex mcp
-   add serena -- uvx ...` with `CODEX_HOME=~/.specrails/projects/<slug>/
-   codex-home/` exported.
-4. Same for `uninstallSerena` (`codex mcp remove serena`).
-5. `PluginManager.listAvailable` returns `status: 'not-applicable'` for
-   plugins that lack `providerSupport[project.provider]`.
-
-### Stage B/C status
-
-Both untouched. Stage B (specrails-core 4.6.0 lift gates + codex skill rails)
-is a separate repo PR. Stage C (lift hub gates, UI polish, e2e, docs,
-rollout) is gated on Stage B publishing to npm.
-
 ## Test status
 
 ```
-PASS (1771) FAIL (1)
+PASS (1784) FAIL (1)
 ```
 
 The lone failure is the pre-existing smash-runner test
@@ -119,7 +86,8 @@ The lone failure is the pre-existing smash-runner test
 | server/profile-manager | 32 |
 | server/plugin-manager | 30 |
 | server/plugins/contributors | 12 |
-| server/plugins/serena (install + verify) | 14 |
+| server/plugins/serena (install + verify) | 14+5 codex |
+| server/plugins/codex-mcp | 8 |
 | server/plugins-router | 16 |
 
 ## Typecheck status
@@ -132,10 +100,65 @@ All 12 errors are pre-existing in `server/project-router.ts` and
 `server/smash-runner.ts` (the user's other WIP). Zero errors introduced
 by this branch.
 
+## End-to-end codex behaviour (gates still up)
+
+When the gates are lifted in Stage C, the following will all work
+correctly with codex projects:
+
+| Surface | Codex behaviour |
+|---|---|
+| **Add project** | hub-router POST /projects + AddProjectDialog accept provider: 'codex' (Stage C flips one boolean) |
+| **Chat (sidebar + Explore)** | `codex exec --json` first turn → real `thread_id` captured → `codex exec resume <UUID>` on every subsequent turn → context preserved |
+| **Rails (QueueManager)** | `codex exec --json --sandbox workspace-write --skip-git-repo-check <prompt> --model <m>` → tokens from `turn.completed.usage` → estimated cost from pricing.ts → OTEL spans synthesised → diagnostic ZIP works |
+| **AI Edit (AgentRefineManager)** | refines `.codex/skills/<id>/SKILL.md` (was `.claude/agents/<id>.md`); no model field check on codex frontmatter |
+| **Setup wizard** | `_spawnSetupWithAdapter` adapter-driven; captures real `thread_id`; resume via `codex exec resume <UUID>`; legacy synthetic-session fallback for upgrades; checkpoint detection recognises `.codex/skills/sr-*/SKILL.md`, `.codex/rules.star` |
+| **Explore-cwd** | `~/.specrails/projects/<slug>/explore-cwd/AGENTS.md` (not `CLAUDE.md`); stale-file cleanup if provider switches |
+| **Profiles** | profile schema accepts `provider: 'codex'`; models validated against `codexAdapter.modelCatalog()`; cross-provider model mixing rejected with a clear "not valid for provider 'codex'" message |
+| **Plugins** | `codex mcp add` with per-project `CODEX_HOME=~/.specrails/projects/<slug>/codex-home/`; AGENTS.md contributor block; `not-applicable` status for plugins lacking `providerSupport.codex` |
+| **setup-prerequisites** | Reports one entry per registered adapter; blocks Add Project only when zero providers are usable |
+| **Analytics** | `ai_invocations.provider` populated; `ai_invocations.total_cost_usd_estimated=1` for codex rows; getInvocationsByProvider helper ready for UI |
+
+## What's next: Stage B and Stage C
+
+### Stage B (specrails-core 4.6.0) — separate repo
+
+Tasks §18–§20. Lives at `/Users/javi/repos/specrails-core`. Three gate-
+lifts, scaffold updates, port rails to SKILL.md format, npm publish.
+Blueprint in `tasks.md` §18-§20 + `proposal.md` §3.
+
+### Stage C (lift hub gates + UI polish + rollout) — this repo
+
+Tasks §21–§26. Concrete checklist:
+
+1. **One-line gate flips** (§21):
+   - `server/hub-router.ts:147`: change hardcoded `codex: false` to
+     `codex: providers.codex` (real value).
+   - `server/hub-router.ts:181-188`: remove the `provider === 'codex'`
+     rejection block.
+   - `client/src/hooks/useHub.tsx:37`: widen `addProject` parameter
+     type to `provider?: 'claude' | 'codex'`.
+   - `client/src/components/AddProjectDialog.tsx:59,74`: stop force-
+     setting `codex: false`; remove the early-return + "Coming Soon"
+     toast.
+2. **AnalyticsPage codex surfacing** (§22.5):
+   - Render `~` prefix on cost cells where
+     `total_cost_usd_estimated === 1`.
+   - Hero footnote "Includes estimated costs" when
+     `totalEstimatedCostUsd > 0`.
+   - New `ProviderBreakdownCard` driven by `getInvocationsByProvider`.
+3. **e2e dry run** (§23): manual on a real codex project end-to-end.
+4. **Docs** (§25): `README.md` "Requirements" updated; new
+   `docs/codex.md` user guide; CHANGELOG entries.
+5. **Rollout** (§26): `SPECRAILS_HUB_CODEX_BETA` env var first, then
+   drop the gate.
+
+Stage C is small in code-volume — maybe 200 LOC — but UX-critical. Wait
+for Stage B to publish before flipping.
+
 ## Test commands
 
 ```bash
-# Just the multi-provider modules
+# Multi-provider modules
 npx vitest run server/providers server/pricing server/result-event \
   server/codex-otel-bridge server/chat-manager server/queue-manager \
   server/agent-refine-manager server/setup-prerequisites \
@@ -153,24 +176,6 @@ npx tsc --noEmit -p tsconfig.json
 npm run test:coverage
 cd client && npm run test:coverage
 ```
-
-## How to continue
-
-1. **§14 finish** — codex MCP registration. Reference: see the 5-step plan
-   in the section above. The blueprint is `server/plugins/serena/install.ts`
-   today; the new codex path mirrors it but invokes `codex mcp add/remove`
-   via `child_process.spawnSync` instead of `.mcp.json` mutation. Tests live
-   alongside in `server/plugins/serena/install.test.ts`.
-2. After §14 lands, do a full e2e dry-run (§23) on a real codex project to
-   confirm tokens / cost / OTEL / Serena all line up.
-3. Then **Stage B** — specrails-core 4.6.0. Three gate-lifts, scaffold
-   updates, port rails to SKILL.md format, npm publish. Plan documented in
-   tasks.md §18-§20.
-4. Finally **Stage C** — flip the hub gates (one-line change in
-   `hub-router.ts` line 147 + the gates in `AddProjectDialog.tsx`),
-   surface the AnalyticsPage estimated-cost `~` badge + `byProvider`
-   widget (§22.5), update README + `docs/codex.md`, and roll out behind
-   `SPECRAILS_HUB_CODEX_BETA` until stable.
 
 ## Pre-existing repo state to be aware of
 
