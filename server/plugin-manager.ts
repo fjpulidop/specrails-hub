@@ -297,6 +297,7 @@ export class PluginManager {
     projectId: string,
     name: string,
     broadcast: PluginBroadcast,
+    providerId?: string,
   ): Promise<void> {
     const plugin = this.registry.byName.get(name)
     if (!plugin) throw new PluginNotFoundError(name)
@@ -376,7 +377,7 @@ export class PluginManager {
 
       // Apply shared-file contributors (CLAUDE.md block today, more in the
       // future). Each contributor is per-plugin and idempotent.
-      const sharedTouched = await applyContributors(plugin, projectPath)
+      const sharedTouched = await applyContributors(plugin, projectPath, providerId)
       if (sharedTouched.length > 0) {
         for (const p of sharedTouched) {
           if (!installedFiles.includes(p)) installedFiles.push(p)
@@ -422,6 +423,7 @@ export class PluginManager {
     projectId: string,
     name: string,
     broadcast: PluginBroadcast,
+    providerId?: string,
   ): Promise<void> {
     const state = this.getProjectState(projectPath)
     const entry = state.plugins[name]
@@ -441,7 +443,7 @@ export class PluginManager {
     if (plugin) {
       // Revert shared-file contributors first so a partial uninstall doesn't
       // leave dangling instructions referencing missing tools.
-      await revertContributors(plugin, projectPath)
+      await revertContributors(plugin, projectPath, providerId)
       await plugin.uninstall({
         projectPath,
         projectId,
@@ -481,6 +483,7 @@ export class PluginManager {
     projectId: string,
     name: string,
     broadcast: PluginBroadcast,
+    providerId?: string,
   ): Promise<void> {
     const plugin = this.registry.byName.get(name)
     if (!plugin) throw new PluginNotFoundError(name)
@@ -496,7 +499,7 @@ export class PluginManager {
     await PluginManager.mergeMcpServers(projectPath, entries)
     // Refresh shared-file contributions too: a drift may exist in CLAUDE.md
     // even when the .mcp.json entry matches.
-    await applyContributors(plugin, projectPath)
+    await applyContributors(plugin, projectPath, providerId)
     broadcast({
       type: 'plugin.health_changed',
       projectId,
@@ -527,6 +530,7 @@ export class PluginManager {
     name: string,
     active: boolean,
     broadcast: PluginBroadcast,
+    providerId?: string,
   ): Promise<void> {
     const plugin = this.registry.byName.get(name)
     if (!plugin) throw new PluginNotFoundError(name)
@@ -546,10 +550,10 @@ export class PluginManager {
       const entries: Record<string, unknown> = {}
       for (const k of owned) entries[k] = expected
       await PluginManager.mergeMcpServers(projectPath, entries)
-      await applyContributors(plugin, projectPath)
+      await applyContributors(plugin, projectPath, providerId)
     } else {
       await PluginManager.removeMcpServers(projectPath, owned)
-      await revertContributors(plugin, projectPath)
+      await revertContributors(plugin, projectPath, providerId)
     }
 
     broadcast({

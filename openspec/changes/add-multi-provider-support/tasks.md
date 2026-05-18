@@ -135,9 +135,9 @@
 - [ ] 14.2 Update `server/plugins/serena/manifest.ts` to declare `providerSupport.codex.mcpEntry` (same `uvx` command); add a fallback `install` callback for codex that runs `codex mcp add` + verifies via `codex mcp list`
 - [ ] 14.3 `PluginManager.install` dispatches: if `adapter.mcpRegistration === 'project-json'` use existing surgical merge; else call `plugin.providerSupport[adapter.id].install(ctx, adapter)` or build the `codex mcp add` invocation from `mcpEntry`
 - [ ] 14.4 Per-project `CODEX_HOME` directory created at `~/.specrails/projects/<slug>/codex-home/` lazily on first codex plugin op; lock-file at `.specrails.lock` shared with the existing file-mutation lock module
-- [ ] 14.5 `applyContributors` and `revertContributors`: target `adapter.instructionsFilename` (CLAUDE.md for claude, AGENTS.md for codex); sentinel format unchanged
+- [x] 14.5 `applyContributors` and `revertContributors`: target `adapter.instructionsFilename` (CLAUDE.md for claude, AGENTS.md for codex); sentinel format unchanged
 - [ ] 14.6 `listAvailable`: plugins missing `providerSupport[project.provider]` surface as `not-applicable` (new status)
-- [ ] 14.7 `verify`: provider-agnostic — Serena verify is `uvx serena --version` regardless of provider, but the codex path additionally probes `codex mcp list` for the entry
+- [x] 14.7 `verify`: provider-agnostic — Serena verify is `uvx serena --version` regardless of provider, but the codex path additionally probes `codex mcp list` for the entry
 - [ ] 14.8 Tests:
   - `server/plugin-manager.test.ts`: install/uninstall on codex project via mock `codex mcp` subprocess
   - `server/plugins/serena/install.codex.test.ts`: codex-specific install path

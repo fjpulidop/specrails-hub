@@ -83,7 +83,7 @@ export function createPluginsRouter(): Router {
   router.post('/:name/install', async (req, res) => {
     try {
       const { project, broadcast } = ctx(req)
-      await getPluginManager().install(project.path, project.id, req.params.name, broadcast)
+      await getPluginManager().install(project.path, project.id, req.params.name, broadcast, project.provider)
       res.status(200).json({ ok: true })
     } catch (err) {
       handleError(res, err)
@@ -94,7 +94,7 @@ export function createPluginsRouter(): Router {
   router.delete('/:name', async (req, res) => {
     try {
       const { project, broadcast } = ctx(req)
-      await getPluginManager().uninstall(project.path, project.id, req.params.name, broadcast)
+      await getPluginManager().uninstall(project.path, project.id, req.params.name, broadcast, project.provider)
       res.status(200).json({ ok: true })
     } catch (err) {
       handleError(res, err)
@@ -185,7 +185,7 @@ export function createPluginsRouter(): Router {
   router.post('/:name/activate', async (req, res) => {
     try {
       const { project, broadcast } = ctx(req)
-      await getPluginManager().setActive(project.path, project.id, req.params.name, true, broadcast)
+      await getPluginManager().setActive(project.path, project.id, req.params.name, true, broadcast, project.provider)
       res.json({ ok: true })
     } catch (err) {
       handleError(res, err)
@@ -196,7 +196,7 @@ export function createPluginsRouter(): Router {
   router.post('/:name/deactivate', async (req, res) => {
     try {
       const { project, broadcast } = ctx(req)
-      await getPluginManager().setActive(project.path, project.id, req.params.name, false, broadcast)
+      await getPluginManager().setActive(project.path, project.id, req.params.name, false, broadcast, project.provider)
       res.json({ ok: true })
     } catch (err) {
       handleError(res, err)
@@ -207,7 +207,7 @@ export function createPluginsRouter(): Router {
   router.post('/:name/update', async (req, res) => {
     try {
       const { project, broadcast } = ctx(req)
-      await getPluginManager().updateMcpEntry(project.path, project.id, req.params.name, broadcast)
+      await getPluginManager().updateMcpEntry(project.path, project.id, req.params.name, broadcast, project.provider)
       res.json({ ok: true })
     } catch (err) {
       handleError(res, err)

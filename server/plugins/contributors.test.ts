@@ -27,8 +27,8 @@ beforeEach(() => { projectPath = fs.mkdtempSync(path.join(os.tmpdir(), 'contrib-
 afterEach(() => { fs.rmSync(projectPath, { recursive: true, force: true }) })
 
 describe('contributors registry', () => {
-  it('claude-md contributor present', () => {
-    expect(SHARED_FILE_CONTRIBUTORS.find((c) => c.id === 'claude-md')).toBeDefined()
+  it('instructions-md contributor present (replaces the legacy claude-md id from before §14)', () => {
+    expect(SHARED_FILE_CONTRIBUTORS.find((c) => c.id === 'instructions-md')).toBeDefined()
   })
 })
 
@@ -92,5 +92,34 @@ describe('applyContributors / revertContributors', () => {
     const touched = await applyContributors(plugin, projectPath)
     expect(touched).toEqual([])
     expect(fs.existsSync(path.join(projectPath, 'CLAUDE.md'))).toBe(false)
+  })
+
+  it('writes AGENTS.md instead of CLAUDE.md when providerId=codex', async () => {
+    const plugin = makePlugin('## codex-aware hint')
+    const touched = await applyContributors(plugin, projectPath, 'codex')
+    expect(touched).toEqual(['AGENTS.md'])
+    expect(fs.existsSync(path.join(projectPath, 'AGENTS.md'))).toBe(true)
+    expect(fs.existsSync(path.join(projectPath, 'CLAUDE.md'))).toBe(false)
+    const agentsMd = fs.readFileSync(path.join(projectPath, 'AGENTS.md'), 'utf8')
+    expect(agentsMd).toContain('## codex-aware hint')
+    expect(agentsMd).toContain('specrails-hub-managed:serena')
+
+    await revertContributors(plugin, projectPath, 'codex')
+    // AGENTS.md deleted when only managed block was its content
+    const agentsMdPath = path.join(projectPath, 'AGENTS.md')
+    if (fs.existsSync(agentsMdPath)) {
+      const after = fs.readFileSync(agentsMdPath, 'utf8')
+      expect(after).not.toContain('specrails-hub-managed:serena')
+    }
+  })
+
+  it('contributorPaths reflects provider (CLAUDE.md vs AGENTS.md)', () => {
+    expect(contributorPaths(makePlugin('## x'))).toEqual(['CLAUDE.md'])
+    expect(contributorPaths(makePlugin('## x'), 'claude')).toEqual(['CLAUDE.md'])
+    expect(contributorPaths(makePlugin('## x'), 'codex')).toEqual(['AGENTS.md'])
+  })
+
+  it('unknown providerId falls back to CLAUDE.md gracefully', () => {
+    expect(contributorPaths(makePlugin('## x'), 'turbofake')).toEqual(['CLAUDE.md'])
   })
 })

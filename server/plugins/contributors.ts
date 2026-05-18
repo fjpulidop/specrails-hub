@@ -1,5 +1,6 @@
 import type { Plugin } from '../types'
 import { upsertBlock, removeBlock } from './claude-md-mutation'
+import { getAdapter } from '../providers'
 
 /**
  * "Contributors" abstract per-plugin contributions to **shared project
@@ -25,37 +26,53 @@ export interface SharedFileContributor {
   id: string
   /** True when this plugin actually contributes via this contributor. */
   appliesTo(plugin: Plugin): boolean
-  /** Project-relative paths this contributor will create/modify. */
-  relativePaths(plugin: Plugin): string[]
+  /** Project-relative paths this contributor will create/modify. The
+   *  optional `providerId` lets the contributor pick a per-provider file
+   *  (CLAUDE.md vs AGENTS.md). */
+  relativePaths(plugin: Plugin, providerId?: string): string[]
   /** Write/refresh the plugin's region. Idempotent. */
-  apply(plugin: Plugin, projectPath: string): Promise<void>
+  apply(plugin: Plugin, projectPath: string, providerId?: string): Promise<void>
   /** Remove the plugin's region. No-op when already absent. */
-  revert(plugin: Plugin, projectPath: string): Promise<void>
+  revert(plugin: Plugin, projectPath: string, providerId?: string): Promise<void>
 }
 
-const claudeMdContributor: SharedFileContributor = {
-  id: 'claude-md',
+/** Resolve the instructions filename for a provider id, defaulting to
+ *  `CLAUDE.md` when the id is unknown or absent. */
+function instructionsFilenameFor(providerId?: string): string {
+  if (!providerId) return 'CLAUDE.md'
+  try {
+    return getAdapter(providerId).instructionsFilename
+  } catch {
+    return 'CLAUDE.md'
+  }
+}
+
+/** Provider-aware instructions-file contributor. Same block format
+ *  (`<!-- specrails-hub-managed:<plugin>:start/end -->`); destination
+ *  filename is the adapter's `instructionsFilename`. */
+const instructionsMdContributor: SharedFileContributor = {
+  id: 'instructions-md',
   appliesTo: (p) => typeof p.manifest.claudeMdInstructions === 'string' && p.manifest.claudeMdInstructions.trim().length > 0,
-  relativePaths: () => ['CLAUDE.md'],
-  apply: async (p, projectPath) => {
-    await upsertBlock(projectPath, p.manifest.name, p.manifest.claudeMdInstructions!)
+  relativePaths: (_p, providerId) => [instructionsFilenameFor(providerId)],
+  apply: async (p, projectPath, providerId) => {
+    await upsertBlock(projectPath, p.manifest.name, p.manifest.claudeMdInstructions!, instructionsFilenameFor(providerId))
   },
-  revert: async (p, projectPath) => {
-    await removeBlock(projectPath, p.manifest.name)
+  revert: async (p, projectPath, providerId) => {
+    await removeBlock(projectPath, p.manifest.name, instructionsFilenameFor(providerId))
   },
 }
 
 export const SHARED_FILE_CONTRIBUTORS: SharedFileContributor[] = [
-  claudeMdContributor,
+  instructionsMdContributor,
 ]
 
 /** Run `apply` for every contributor that applies to this plugin. */
-export async function applyContributors(plugin: Plugin, projectPath: string): Promise<string[]> {
+export async function applyContributors(plugin: Plugin, projectPath: string, providerId?: string): Promise<string[]> {
   const touchedPaths: string[] = []
   for (const c of SHARED_FILE_CONTRIBUTORS) {
     if (!c.appliesTo(plugin)) continue
-    await c.apply(plugin, projectPath)
-    for (const rel of c.relativePaths(plugin)) {
+    await c.apply(plugin, projectPath, providerId)
+    for (const rel of c.relativePaths(plugin, providerId)) {
       if (!touchedPaths.includes(rel)) touchedPaths.push(rel)
     }
   }
@@ -63,19 +80,19 @@ export async function applyContributors(plugin: Plugin, projectPath: string): Pr
 }
 
 /** Run `revert` for every contributor that applies to this plugin. */
-export async function revertContributors(plugin: Plugin, projectPath: string): Promise<void> {
+export async function revertContributors(plugin: Plugin, projectPath: string, providerId?: string): Promise<void> {
   for (const c of SHARED_FILE_CONTRIBUTORS) {
     if (!c.appliesTo(plugin)) continue
-    await c.revert(plugin, projectPath)
+    await c.revert(plugin, projectPath, providerId)
   }
 }
 
 /** Project-relative paths every applicable contributor will touch. */
-export function contributorPaths(plugin: Plugin): string[] {
+export function contributorPaths(plugin: Plugin, providerId?: string): string[] {
   const out: string[] = []
   for (const c of SHARED_FILE_CONTRIBUTORS) {
     if (!c.appliesTo(plugin)) continue
-    for (const rel of c.relativePaths(plugin)) {
+    for (const rel of c.relativePaths(plugin, providerId)) {
       if (!out.includes(rel)) out.push(rel)
     }
   }
