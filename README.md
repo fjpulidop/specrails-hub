@@ -10,7 +10,7 @@ A local dashboard and CLI for managing all your [specrails-core](https://github.
 - **Ticket panel** — visual interface for local tickets with List, Kanban, and Post-it views; real-time sync with CLI agents
 - **Command launcher** — organized into Discovery (propose-spec, auto-propose specs, auto-select specs) and Delivery (implement, batch-implement) sections; other commands available in a collapsible group
 - **Analytics** — cost, duration, token usage, and throughput metrics per project
-- **Conversations** — full-page chat interface with Claude, scoped per project
+- **Conversations** — full-page chat interface with Claude or Codex, scoped per project
 - **Native desktop app (macOS/Windows/Linux via Tauri)** — installable app that bundles the server; macOS uses native traffic lights with a custom titlebar, Windows/Linux use a custom frameless titlebar
 - **Demo mode for offline previews** — run the UI with fixture data, no server required
 - **Persistent spec generation state across refreshes** — in-progress spec generation survives page reloads and project switches
@@ -18,10 +18,17 @@ A local dashboard and CLI for managing all your [specrails-core](https://github.
 
 ## Prerequisites
 
-- Node.js 20+ (specrails-core ≥ 4.2.0 dependency)
-- `claude` CLI on your PATH ([Claude Code](https://claude.com/claude-code))
-- At least one project with specrails-core installed (`npx specrails-core@latest init`)
+- Node.js 20+ (specrails-core ≥ 4.6.0 dependency for codex projects; ≥ 4.2.0 for claude-only)
+- **At least one AI CLI** on your PATH:
+  - [Claude Code](https://claude.com/claude-code) — `claude` binary
+  - [Codex CLI](https://developers.openai.com/codex) ≥ 0.128.0 — `codex` binary
+- At least one project with specrails-core installed (`npx specrails-core@latest init`).
+  The provider is chosen per-project at install time and is immutable after creation.
 - **Windows users:** see [docs/windows.md](docs/windows.md) for Windows 10/11 specifics (PowerShell ExecutionPolicy, SmartScreen warning, ARM64 emulation)
+
+For the Codex provider specifically — auth, sandbox config, estimated cost
+caveats, plugin support, and emergency rollback — see
+[docs/codex.md](docs/codex.md).
 
 ## Installation
 

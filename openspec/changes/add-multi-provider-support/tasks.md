@@ -245,16 +245,16 @@
 
 ## 25. Documentation
 
-- [ ] 25.1 Update root `README.md`: "Requirements" section now reads "Claude Code or Codex CLI (≥ 0.128.0)"; add a brief Codex section under "Architecture" pointing at the new `server/providers/` and `pricing.ts`
-- [ ] 25.2 Update `CLAUDE.md` of the hub repo: add a "Multi-provider architecture" section after "Architecture" pointing readers at `server/providers/`, listing the capability-flag invariant, and naming `add-multi-provider-support` as the originating change
-- [ ] 25.3 Add `docs/codex.md`: end-user guide to using Codex (auth via OAuth or API key, model picking, what's estimated, expectations vs Claude)
-- [ ] 25.4 Add `docs/adding-a-provider.md`: developer guide for adding a new provider in the future — covers the one-file-plus-registry-entry path, the capability flags, and how to write a test fixture
-- [ ] 25.5 specrails-core `README.md`: mention codex support in the "Providers" section
-- [ ] 25.6 CHANGELOG.md (hub): under the next minor version, list the new capabilities and the gate-lift, document `SPECRAILS_HUB_CODEX_BETA` env var
+- [x] 25.1 Update root `README.md`: "Requirements" section now reads "Claude Code or Codex CLI (≥ 0.128.0)"; add a brief Codex section under "Architecture" pointing at the new `server/providers/` and `pricing.ts`
+- [x] 25.2 Update `CLAUDE.md` of the hub repo: add a "Multi-provider architecture" section after "Architecture" pointing readers at `server/providers/`, listing the capability-flag invariant, and naming `add-multi-provider-support` as the originating change
+- [x] 25.3 Add `docs/codex.md`: end-user guide to using Codex (auth via OAuth or API key, model picking, what's estimated, expectations vs Claude)
+- [x] 25.4 Add `docs/adding-a-provider.md`: developer guide for adding a new provider in the future — covers the one-file-plus-registry-entry path, the capability flags, and how to write a test fixture
+- [x] 25.5 specrails-core `README.md`: mention codex support in the "Providers" section
+- [x] 25.6 CHANGELOG.md (hub): under the next minor version, list the new capabilities and the gate-lift, document `SPECRAILS_HUB_CODEX_BETA` env var
 
 ## 26. Rollout
 
-- [ ] 26.1 Stage A merge: ship the adapter refactor + codex correctness + DB migrations + tests behind unchanged "Coming Soon" gates. PR to main, CI green, release-please bumps a minor (Claude-only behaviour is byte-identical)
-- [ ] 26.2 Stage B: specrails-core 4.6.0 published to npm
-- [ ] 26.3 Stage C: merge the gates-lift commit (§21) behind `SPECRAILS_HUB_CODEX_BETA=1`. Test on at least one real codex project. Once stable, drop the env var requirement (the codex path is enabled by default)
-- [ ] 26.4 Announce in CHANGELOG and (if applicable) social channels; capture initial adoption metrics from `ai_invocations.provider` aggregation
+- [x] 26.1 Stage A merge: ship the adapter refactor + codex correctness + DB migrations + tests behind unchanged "Coming Soon" gates. PR to main, CI green, release-please bumps a minor (Claude-only behaviour is byte-identical)
+- [x] 26.2 Stage B: specrails-core 4.6.0 published to npm
+- [x] 26.3 Stage C: merge the gates-lift commit (§21) behind `SPECRAILS_HUB_CODEX_BETA=1`. Test on at least one real codex project. Once stable, drop the env var requirement (the codex path is enabled by default)
+- [x] 26.4 Announce in CHANGELOG and (if applicable) social channels; capture initial adoption metrics from `ai_invocations.provider` aggregation
