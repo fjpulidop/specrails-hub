@@ -21,6 +21,45 @@ export const serenaManifest: PluginManifest = {
     mcpServers: ['serena'],
     agentFragments: ['.claude/agents/custom-serena.md'],
   },
+  providerSupport: {
+    // claude: project-json `.mcp.json` merge (existing path).
+    claude: {
+      mcpEntry: {
+        command: 'uvx',
+        args: [
+          '--from',
+          'git+https://github.com/oraios/serena',
+          'serena',
+          'start-mcp-server',
+          '--context',
+          'ide-assistant',
+          '--project',
+          '.',
+          '--enable-web-dashboard',
+          'false',
+        ],
+      },
+    },
+    // codex: cli-add via `codex mcp add` with per-project CODEX_HOME.
+    // Same `uvx ...` command; the adapter just registers it differently.
+    codex: {
+      mcpEntry: {
+        command: 'uvx',
+        args: [
+          '--from',
+          'git+https://github.com/oraios/serena',
+          'serena',
+          'start-mcp-server',
+          '--context',
+          'ide-assistant',
+          '--project',
+          '.',
+          '--enable-web-dashboard',
+          'false',
+        ],
+      },
+    },
+  },
   // Format: structured "when / tools / why / fallback" block. Lets generic
   // agent prompts (specrails-core sr-* "Tool Selection — Honor Project-
   // Documented MCP Tools" section) match the right entry to the task.

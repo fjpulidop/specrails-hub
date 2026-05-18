@@ -752,12 +752,40 @@ export interface PluginManifest {
   /** Optional per-platform notes shown in the install dialog. Keys are
    *  `<platform>-<arch>` (e.g., `darwin-arm64`, `win32-x64`, `linux-x64`). */
   platformNotes?: Partial<Record<string, string>>
-  /** Optional Markdown block appended (under marker comments) to
-   *  `<project>/CLAUDE.md` when the plugin is active. Lets a plugin teach
-   *  the global agent context to prefer its tools over generic ones. The
-   *  block is removed on uninstall and on deactivate; any user content
-   *  outside the markers is preserved byte-identical. */
+  /** Optional Markdown block appended (under marker comments) to the
+   *  project's top-level instructions file when the plugin is active.
+   *  Targets `CLAUDE.md` on claude projects and `AGENTS.md` on codex projects
+   *  (resolved via the adapter's `instructionsFilename`). The block is
+   *  removed on uninstall and on deactivate; any user content outside the
+   *  markers is preserved byte-identical. The field name retains the
+   *  historical `claudeMd` prefix for backwards compatibility; new plugins
+   *  SHOULD treat it as provider-neutral. */
   claudeMdInstructions?: string
+  /** Per-provider support descriptor. When present, controls how the plugin
+   *  is installed for each provider (declarative MCP entry for the
+   *  `project-json` registration mode, imperative command for `cli-add`).
+   *  Plugins that omit this map are treated as claude-only and surface as
+   *  `not-applicable` on codex projects. */
+  providerSupport?: PluginProviderSupportMap
+}
+
+/** Provider-specific install descriptors, keyed by provider id. */
+export type PluginProviderSupportMap = {
+  [providerId: string]: PluginProviderSupportEntry
+}
+
+/** Per-provider install descriptor. At least one of `mcpEntry` or `install`
+ *  SHOULD be present so the manager knows how to register the plugin for
+ *  that provider. */
+export interface PluginProviderSupportEntry {
+  /** Declarative MCP entry. Used by `project-json` providers (claude) for the
+   *  surgical `.mcp.json` merge; codex (`cli-add` mode) maps it to the
+   *  `codex mcp add <name> -- <command> <args...>` invocation. */
+  mcpEntry?: {
+    command: string
+    args: string[]
+    env?: Record<string, string>
+  }
 }
 
 /**
@@ -768,6 +796,11 @@ export interface PluginManifest {
 export interface PluginLifecycleContext {
   projectPath: string
   projectId: string
+  /** Provider id of the project the install is targeting. Plugins use this
+   *  to decide between the project-json MCP merge path (claude) and the
+   *  `<binary> mcp add` cli-add path (codex). Optional for backwards compat;
+   *  pre-multi-provider plugins treat it as `'claude'`. */
+  providerId?: string
   /** Append a project-relative path that this install created/modified. */
   recordInstalledFile(relativePath: string): void
   /** Append a log line — surfaced to the install dialog over the WS. */
@@ -838,6 +871,7 @@ export type PluginCardStatus =
   | 'not-installed'
   | 'orphan'              // state.json entry but no plugin in registry
   | 'degraded'            // installed but verify failed
+  | 'not-applicable'      // plugin lacks providerSupport for the project's provider
 
 export interface PluginCatalogEntry {
   name: string

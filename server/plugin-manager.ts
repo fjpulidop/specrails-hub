@@ -22,6 +22,7 @@ import {
   findInstalledButNotEnabledMarketplaceKeys,
 } from './plugins/claude-approval'
 import { detectMcpDrift } from './plugins/drift'
+import { getAdapter, hasAdapter } from './providers'
 import {
   mcpJsonPath,
   pluginsDir,
@@ -133,7 +134,7 @@ export class PluginManager {
 
   // ─── Catalog ───────────────────────────────────────────────────────────────
 
-  async listAvailable(projectPath: string): Promise<PluginCatalogEntry[]> {
+  async listAvailable(projectPath: string, providerId?: string): Promise<PluginCatalogEntry[]> {
     const state = this.getProjectState(projectPath)
     const entries: PluginCatalogEntry[] = []
 
@@ -142,7 +143,21 @@ export class PluginManager {
       const m = plugin.manifest
       const stateEntry = state.plugins[m.name]
       let status: PluginCatalogEntry['status']
-      if (!stateEntry) {
+
+      // Provider applicability: a plugin is `not-applicable` when the
+      // project's provider is registered, providerSupport is declared, and
+      // there's no entry for this provider. Plugins that don't declare
+      // providerSupport at all default to claude-compatible (preserves
+      // pre-§14 behaviour for unchanged manifests).
+      const supportsThisProvider = providerId === undefined
+        ? true
+        : m.providerSupport === undefined
+          ? providerId === 'claude'
+          : providerId in m.providerSupport
+
+      if (!supportsThisProvider) {
+        status = 'not-applicable'
+      } else if (!stateEntry) {
         status = 'not-installed'
       } else if (stateEntry.health === 'degraded') {
         status = 'degraded'
@@ -151,11 +166,20 @@ export class PluginManager {
         //   (a) state.json — the hub's record that the plugin is installed
         //   (b) .mcp.json  — the actual contract with Claude (loaded blindly)
         // Active = both present. Deactivated = (a) without the (b) keys
-        // (user toggled off; install survives).
+        // (user toggled off; install survives). For codex projects the
+        // (b) check is skipped because the registration lives outside the
+        // project filesystem (CODEX_HOME).
         let allKeysPresent = true
-        const mcpServers = readMcpServersMap(projectPath)
-        for (const server of m.owns.mcpServers ?? []) {
-          if (!(server in mcpServers)) { allKeysPresent = false; break }
+        if (providerId === 'codex') {
+          // For codex we trust state.json — `codex mcp list` against the
+          // per-project CODEX_HOME is the source of truth, but it requires a
+          // subprocess which is too expensive for a catalog listing call.
+          allKeysPresent = true
+        } else {
+          const mcpServers = readMcpServersMap(projectPath)
+          for (const server of m.owns.mcpServers ?? []) {
+            if (!(server in mcpServers)) { allKeysPresent = false; break }
+          }
         }
         status = allKeysPresent ? 'installed' : 'deactivated'
       }
@@ -302,20 +326,41 @@ export class PluginManager {
     const plugin = this.registry.byName.get(name)
     if (!plugin) throw new PluginNotFoundError(name)
 
+    // Provider applicability gate: refuse to install a plugin that has no
+    // providerSupport entry for this project's provider. Plugins that omit
+    // providerSupport altogether default to claude-compatible.
+    if (providerId !== undefined && providerId !== 'claude') {
+      const declared = plugin.manifest.providerSupport
+      if (declared !== undefined && !(providerId in declared)) {
+        throw new PluginInstallError(
+          `plugin '${name}' is not applicable for provider '${providerId}'. Declared providers: ${Object.keys(declared).join(', ')}.`,
+        )
+      }
+    }
+
     const state = this.getProjectState(projectPath)
     if (state.plugins[name]) throw new PluginAlreadyInstalledError(name)
 
-    // Check for ownership conflicts with user-authored .mcp.json entries.
-    const mcpFile = mcpJsonPath(projectPath)
-    if (fs.existsSync(mcpFile)) {
-      const raw = fs.readFileSync(mcpFile, 'utf8')
-      const parsed = raw.trim() ? (JSON.parse(raw) as Record<string, unknown>) : {}
-      const servers = (parsed.mcpServers as Record<string, unknown> | undefined) ?? {}
-      for (const key of plugin.manifest.owns.mcpServers ?? []) {
-        if (key in servers) {
-          throw new PluginInstallError(
-            `cannot install '${name}': '${mcpJsonPath(projectPath)}' already has a 'mcpServers.${key}' entry. Remove it first.`,
-          )
+    // Check for ownership conflicts with user-authored `.mcp.json` entries.
+    // Only meaningful for `project-json` MCP registration providers (claude
+    // today). Codex registers via `codex mcp add` against per-project
+    // CODEX_HOME, which the plugin's install path checks via `codex mcp list`.
+    const adapter = providerId !== undefined && hasAdapter(providerId)
+      ? getAdapter(providerId)
+      : null
+    const usesProjectJsonMcp = adapter === null || adapter.mcpRegistration === 'project-json'
+    if (usesProjectJsonMcp) {
+      const mcpFile = mcpJsonPath(projectPath)
+      if (fs.existsSync(mcpFile)) {
+        const raw = fs.readFileSync(mcpFile, 'utf8')
+        const parsed = raw.trim() ? (JSON.parse(raw) as Record<string, unknown>) : {}
+        const servers = (parsed.mcpServers as Record<string, unknown> | undefined) ?? {}
+        for (const key of plugin.manifest.owns.mcpServers ?? []) {
+          if (key in servers) {
+            throw new PluginInstallError(
+              `cannot install '${name}': '${mcpJsonPath(projectPath)}' already has a 'mcpServers.${key}' entry. Remove it first.`,
+            )
+          }
         }
       }
     }
@@ -347,6 +392,7 @@ export class PluginManager {
     const ctx = {
       projectPath,
       projectId,
+      providerId,
       recordInstalledFile: (rel: string) => { installedFiles.push(rel) },
       log: onLog,
     }
@@ -447,6 +493,7 @@ export class PluginManager {
       await plugin.uninstall({
         projectPath,
         projectId,
+        providerId,
         recordInstalledFile: () => {},
         log: onLog,
       })

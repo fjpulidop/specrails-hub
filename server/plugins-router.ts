@@ -61,7 +61,7 @@ export function createPluginsRouter(): Router {
   router.get('/', async (req, res) => {
     try {
       const { project } = ctx(req)
-      const list = await getPluginManager().listAvailable(project.path)
+      const list = await getPluginManager().listAvailable(project.path, project.provider)
       res.json({ plugins: list })
     } catch (err) {
       handleError(res, err)
