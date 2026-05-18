@@ -86,35 +86,45 @@ export async function findCoreContract(): Promise<string | null> {
 
 // ─── CLI detection ────────────────────────────────────────────────────────────
 
-export type CLIProvider = 'claude' | 'codex'
+// Importing the providers barrel registers every bundled adapter so the
+// detection helpers below walk the registry instead of hardcoding provider
+// ids. Detection order follows registration order (claude first, codex
+// second today) so behaviour is unchanged for existing callers that take
+// the first non-null result.
+import { listAdapters } from './providers'
+
+export type CLIProvider = string
 
 /**
- * Synchronously detect which AI CLI is available in the user's PATH.
- * Prefers Claude Code if both are present.
- * Returns null if neither is found.
+ * Synchronously detect the first AI CLI available in the user's PATH.
+ * Detection order is the registry order; today that means Claude before
+ * Codex. Returns null if no registered provider's CLI is found.
  */
 export function detectCLISync(): CLIProvider | null {
-  try {
-    execSync(`${WHICH_CMD} claude`, { stdio: 'ignore' })
-    return 'claude'
-  } catch { /* not found */ }
-  try {
-    execSync(`${WHICH_CMD} codex`, { stdio: 'ignore' })
-    return 'codex'
-  } catch { /* not found */ }
+  for (const adapter of listAdapters()) {
+    try {
+      execSync(`${WHICH_CMD} ${adapter.binary}`, { stdio: 'ignore' })
+      return adapter.id
+    } catch { /* keep looking */ }
+  }
   return null
 }
 
 /**
- * Check which AI CLIs are available in the user's PATH.
- * Returns a map of provider → available flag.
+ * Check which AI CLIs are available in the user's PATH. Returns a map of
+ * provider id → available flag, one entry per registered adapter.
  */
-export function detectAvailableCLIs(): { claude: boolean; codex: boolean } {
-  let claude = false
-  let codex = false
-  try { execSync(`${WHICH_CMD} claude`, { stdio: 'ignore' }); claude = true } catch { /* not found */ }
-  try { execSync(`${WHICH_CMD} codex`, { stdio: 'ignore' }); codex = true } catch { /* not found */ }
-  return { claude, codex }
+export function detectAvailableCLIs(): Record<string, boolean> {
+  const out: Record<string, boolean> = {}
+  for (const adapter of listAdapters()) {
+    try {
+      execSync(`${WHICH_CMD} ${adapter.binary}`, { stdio: 'ignore' })
+      out[adapter.id] = true
+    } catch {
+      out[adapter.id] = false
+    }
+  }
+  return out
 }
 
 /**
@@ -138,7 +148,12 @@ export function getCLIStatus(): CLIStatus {
 
   try {
     const versionFlag = '--version'
-    const raw = execSync(`${provider} ${versionFlag}`, {
+    // Look up the binary name from the registry rather than using the
+    // provider id as the binary (they happen to match for claude/codex but
+    // future providers MAY split them).
+    const adapter = listAdapters().find((a) => a.id === provider)
+    const binary = adapter?.binary ?? provider
+    const raw = execSync(`${binary} ${versionFlag}`, {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'ignore'],
       timeout: 3000,

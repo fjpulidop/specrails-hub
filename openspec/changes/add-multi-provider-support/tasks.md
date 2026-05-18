@@ -163,10 +163,10 @@
 
 ## 17. Refactor `core-compat.ts`
 
-- [ ] 17.1 Deprecate `detectAvailableCLIs` in favour of `detectAvailableProviders` that walks the registry; keep `detectAvailableCLIs` as a thin compat wrapper that returns `{ claude, codex }` from the new map
-- [ ] 17.2 `detectCLISync` keeps existing name but delegates to registry too
-- [ ] 17.3 Drop the hardcoded `WHICH_CMD` paths used elsewhere in favour of `adapter.detectInstalled()`
-- [ ] 17.4 Update `server/core-compat.test.ts`
+- [x] 17.1 Deprecate `detectAvailableCLIs` in favour of `detectAvailableProviders` that walks the registry; keep `detectAvailableCLIs` as a thin compat wrapper that returns `{ claude, codex }` from the new map
+- [x] 17.2 `detectCLISync` keeps existing name but delegates to registry too
+- [x] 17.3 Drop the hardcoded `WHICH_CMD` paths used elsewhere in favour of `adapter.detectInstalled()`
+- [x] 17.4 Update `server/core-compat.test.ts`
 
 ---
 
