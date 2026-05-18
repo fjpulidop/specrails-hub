@@ -5,12 +5,14 @@ OpenSpec-tracked artifact — `proposal.md`, `design.md`, `specs/`, and
 `tasks.md` are. Update this file when you commit work so anyone resuming the
 branch sees the current state at a glance.
 
-## Stage A — foundations + supporting modules — **DONE**
+## Stage A progress — **MOST OF THE WAY DONE**
 
-The internal infrastructure is in place. Every adapter-related primitive is
-implemented and tested. The codex path inside managers is **not** yet wired
-onto the adapter — that is Stage A's remaining work (sections 7–14 of
-`tasks.md`).
+The provider-adapter contract, supporting modules, every spawn manager
+except SetupManager, the DB migrations, setup-prerequisites, and
+core-compat are migrated. The Claude path is byte-identical for users;
+the codex path runs end-to-end internally with the gates still up. The
+remaining Stage A items are PluginManager (codex `mcp add`) and
+ProfileManager (per-provider model catalog validation).
 
 ### Branch
 `feat/multi-provider-support` off `main`.
@@ -20,113 +22,133 @@ onto the adapter — that is Stage A's remaining work (sections 7–14 of
 2. `feat(providers): introduce ProviderAdapter contract + claude/codex adapters`
 3. `feat(server): pricing table + finaliseInvocationResult + codex OTEL bridge`
 4. `feat(db): ai_invocations.provider + total_cost_usd_estimated + byProvider`
+5. `docs(openspec): handoff log + tasks.md progress markers through §15.3`
+6. `refactor(chat-manager): migrate onto ProviderAdapter; real codex thread_id`
+7. `refactor(core-compat): registry-walking provider detection`
+8. `feat(setup-prerequisites): registry-driven provider entries + at-least-one rule`
+9. `refactor(queue-manager): migrate onto ProviderAdapter; wire codex OTEL bridge`
+10. `refactor(agent-refine-manager): adapter-driven; codex SKILL.md path support`
+11. `feat(explore-cwd): provider-aware instructions file (AGENTS.md for codex)`
 
-### What is on disk
-- `server/providers/` — `types.ts`, `registry.ts`, `claude-adapter.ts`,
-  `codex-adapter.ts`, `index.ts`, `__fixtures__/{claude,codex/0.128.0}/*.jsonl`,
-  plus 3 test files (71 tests, full contract coverage including real codex
-  0.128.0 fixture parsing).
-- `server/pricing.ts` + test — 4 codex models seeded with quarterly review
-  reminder; `estimateCostUsd(providerId, model, usage)` returns null for
-  unknown rate cards (no fabrication).
-- `server/codex-otel-bridge.ts` + test — `createCodexOtelBridge(...)` produces
-  OTLP/JSON traces+metrics+logs payloads from `AdapterEvent` streams and
-  POSTs to the in-process receiver so `telemetry_blobs`, gzip-NDJSON storage,
-  and the diagnostic export ZIP work identically across providers.
-- `server/result-event.ts` — new `finaliseInvocationResult(adapter, events,
-  opts)` returns `{ result, estimated }` integrating the pricing fallback.
-  Legacy `normaliseResultEvent` kept verbatim for the un-migrated callsites.
-- `server/db.ts` — migrations 18 + 19 (`provider`, `total_cost_usd_estimated`
-  columns + `idx_ai_inv_project_provider`).
-- `server/ai-invocations.ts` — `provider` required at TS + runtime; optional
-  `total_cost_usd_estimated`; new `getInvocationsByProvider(db, projectId,
-  opts)` helper.
-- All existing `recordInvocation` callsites (queue-manager, chat-manager,
-  agent-refine-manager, project-router/generate-spec, smash-runner, test
-  fixtures) updated to pass `provider`.
-- `server/index.ts` — side-effect import of `./providers` so the registry is
-  populated at server start.
+### Sections of tasks.md complete
 
-### What is **not** done yet in Stage A
-
-`tasks.md` remains the source of truth. The big chunks still pending:
-
-| Task | What it does | Why deferred |
+| § | What | Status |
 |---|---|---|
-| §5.6 | Wire `QueueManager` to instantiate the OTEL bridge when telemetry ON and `adapter.capabilities.nativeOtelEnv === false` | Lives inside the §8 QueueManager refactor |
-| §6.3 | Migrate `chat-manager`, `queue-manager`, `agent-refine-manager` callsites of `normaliseResultEvent` onto `finaliseInvocationResult(adapter, events)` | Same as §7-§9 manager refactors |
-| §7 | ChatManager — adapter-driven argv, real `codex exec resume`, real `thread_id` capture (no more synthetic `codex-<convId>-<timestamp>`), per-conversation event accumulator passed into `finaliseInvocationResult` | The biggest single refactor |
-| §8 | QueueManager — `adapter.buildArgs('rail-job', ...)`, profile injection gate flipped from `provider==='claude'` to `capabilities.profileEnvSupport`, plugin injection from project-json to provider-aware, OTEL env vs synthetic bridge dispatch | Second-biggest refactor |
-| §9 | AgentRefineManager — add codex branch via adapter; remove the hardcoded `.claude/agents/` path; provider-aware `validateAgentBody` model regex | New surface area for codex |
-| §10 | SetupManager — adapter-driven argv for `setup-enrich` / `setup-enrich-resume`, real codex `thread_id`, codex skill checkpoint detection patterns | |
-| §11 | project-router `/tickets/generate-spec` adapter-driven (already partly there) + `/tickets/:id/ai-edit` once §9 lands | |
-| §12 | explore-cwd-manager provider-aware (AGENTS.md for codex) | |
-| §13 | ProfileManager — provider optional field + adapter-driven model catalog in `validateStructural`; remove hardcoded baseline agent ids | |
-| §14 | PluginManager — `providerSupport` per-plugin, codex `mcp add` install path with per-project `CODEX_HOME`, contributors target `adapter.instructionsFilename` (CLAUDE.md vs AGENTS.md) | Touches plugin contracts |
-| §15.4-15.6 | Wire `byProvider` into `getSpending`; UI estimated-cost `~` badge + Hero footnote; analytics `ProviderBreakdownCard` | |
-| §16 | `setup-prerequisites` reports one entry per registered provider | |
-| §17 | `core-compat.detectAvailableCLIs` walks the registry instead of hardcoding `claude`+`codex` | Trivial, ~30 LOC |
+| 1 | Foundations: types, registry, fixtures | ✅ |
+| 2 | Claude adapter + tests | ✅ |
+| 3 | Codex adapter + tests + fixture-vs-minVersion CI guard | ✅ |
+| 4 | Pricing table | ✅ |
+| 5 | Codex OTEL bridge (incl §5.6 wiring into QueueManager) | ✅ |
+| 6 | result-event refactor (incl §6.3 callsite migration in ChatManager, QueueManager, AgentRefineManager) | ✅ |
+| 7 | ChatManager refactor | ✅ |
+| 8 | QueueManager refactor | ✅ |
+| 9 | AgentRefineManager refactor | ✅ |
+| 10 | SetupManager refactor | ⏳ pending |
+| 11 | project-router refactor (generate-spec already adapter-aware; ai-edit delegates to §9) | ⏳ partial |
+| 12 | explore-cwd-manager (provider-aware AGENTS.md) | ✅ |
+| 13 | ProfileManager (per-provider model catalog) | ⏳ pending |
+| 14 | PluginManager (codex `mcp add` + AGENTS.md contributors) | ⏳ pending |
+| 15 | DB migrations + recordInvocation extended + byProvider helper (UI surfacing in §22) | ✅ |
+| 16 | setup-prerequisites: registry-driven providers + at-least-one rule | ✅ |
+| 17 | core-compat: registry-walking detection | ✅ |
 
-## Stage B — specrails-core 4.6.0 — **NOT STARTED**
+### Sections still pending (in priority order)
 
-Sections 18–20 of `tasks.md`. Different repo (`/Users/javi/repos/specrails-core`).
-Lift the three "coming soon" gates (provider-detect.ts, install-config.ts,
-init.ts), extend scaffold.ts to deploy `.codex/skills/`, port the four rail
-agents to `templates/skills/rails/sr-*/SKILL.md`, apply `codex-config.toml` +
-`codex-rules.star` at scaffold time, generate a sentinel-protected
-`AGENTS.md`, bump to 4.6.0, publish.
+| § | Why it matters |
+|---|---|
+| 10 SetupManager | Codex setup-enrich pass currently uses a stale codex-only branch; refactor onto `adapter.buildArgs('setup-enrich'/'setup-enrich-resume')` so wizard checkpoint detection + resume work like the chat-manager flow. |
+| 13 ProfileManager | Profile schema validation rejects codex models today. Extend `validateStructural` to resolve `getAdapter(profile.provider ?? project.provider)` and check `agents[i].model ∈ adapter.modelCatalog().map(m => m.value)`. Schema bumps optional `provider?: string` field. |
+| 14 PluginManager | Plugins (Serena today) hardcode `.mcp.json` writes. Add `providerSupport.codex.mcpEntry` to manifest, dispatch on `adapter.mcpRegistration === 'cli-add'`, run `codex mcp add` with per-project `CODEX_HOME=~/.specrails/projects/<slug>/codex-home/`. Shared-file contributors target `adapter.instructionsFilename` (AGENTS.md for codex). |
+| 11 project-router | Minor cleanup — generate-spec already branches on provider; refactor to `adapter.buildArgs('spec-gen', ...)` for symmetry with the rest of the codebase. ai-edit delegates entirely to AgentRefineManager (already migrated). |
+| 22.5 client/AnalyticsPage | Surface the `provider` column and `total_cost_usd_estimated` flag — render `~` prefix on estimated rows + Hero footnote when `totalEstimatedCostUsd > 0`. New `ProviderBreakdownCard`. |
 
-## Stage C — gate lift + UI + rollout — **NOT STARTED**
+### Stage B/C status
 
-Sections 21–26 of `tasks.md`. Wait for Stage B to be on npm before merging.
+Both untouched. Stage B (specrails-core 4.6.0 lift gates + codex skill rails)
+is a separate repo PR. Stage C (lift hub gates, UI gate lift, e2e, docs,
+rollout) is gated on Stage B publishing to npm.
 
-## How to continue
+## Test status
 
-1. Pick the next task from §7 onwards (deepest first: ChatManager is the most
-   educational refactor because every other manager follows its shape).
-2. For each manager:
-   - Read its current file; identify every `provider`/`if (provider === ...)`
-     branch.
-   - Replace with `adapter.capabilities.*` checks or `adapter.method()` calls.
-   - Capture events into an array, pass it to `finaliseInvocationResult` at
-     close.
-   - Update tests in lockstep — fixture-driven where possible.
-   - Run `npx vitest run server/<manager> server/providers server/pricing
-     server/result-event server/codex-otel-bridge server/ai-invocations
-     server/spending` after each edit.
-3. After all §7–§17 are done, the **gates can be lifted** (§21). At that
-   point codex is end-to-end usable in the hub UI. Coverage thresholds
-   (server ≥80 % lines/funcs/stmts, client ≥80 % lines/stmts) must hold —
-   if they regress, write tests until they pass before pushing (per
-   `CLAUDE.md` policy).
+```
+PASS (1759) FAIL (1)
+```
+
+The lone failure is the pre-existing smash-runner test
+(`server/smash-runner.test.ts:381`) which is the user's WIP, not in scope
+for this change. Multi-provider tests all green:
+
+| Module | Tests |
+|---|---|
+| server/providers/ | 71 |
+| server/pricing | 18 |
+| server/result-event | 11 |
+| server/codex-otel-bridge | 7 |
+| server/chat-manager | 41 |
+| server/queue-manager | 85 |
+| server/agent-refine-manager | 29 |
+| server/setup-prerequisites | 15 |
+| server/core-compat | 19 |
+| server/explore-cwd-manager | 12 |
+| server/ai-invocations | 12 |
+
+## Typecheck status
+
+```
+TypeScript: 12 errors in 2 files
+```
+
+All 12 errors are pre-existing in `server/project-router.ts` and
+`server/smash-runner.ts` (the user's other WIP). Zero errors introduced
+by this branch.
 
 ## Test commands
 
 ```bash
-# Fast: just the new module
+# Modules touched by this branch
 npx vitest run server/providers server/pricing server/result-event \
-  server/codex-otel-bridge server/ai-invocations
+  server/codex-otel-bridge server/chat-manager server/queue-manager \
+  server/agent-refine-manager server/setup-prerequisites \
+  server/core-compat server/explore-cwd-manager server/ai-invocations
 
-# Full server suite
+# Full server+CLI suite
 npx vitest run
 
-# Typecheck (pre-existing errors in project-router.ts and smash-runner.ts
-# are user WIP, NOT caused by this branch)
+# Typecheck
 npx tsc --noEmit -p tsconfig.json
 
-# Coverage
-npm run test:coverage              # server
-cd client && npm run test:coverage # client
+# Coverage (must hold ≥80% server lines/funcs/stmts, ≥80% client lines/stmts)
+npm run test:coverage
+cd client && npm run test:coverage
 ```
+
+## How to continue
+
+1. **§10 SetupManager** — pattern mirrors §7 ChatManager. Inject the adapter,
+   replace `if (this._provider === 'codex')` branches in `_spawnSetup` /
+   `resumeEnrich` with `adapter.buildArgs('setup-enrich' | 'setup-enrich-
+   resume')`, switch `parseStreamLine` to the adapter, drop the synthetic
+   `codex-<projectId>-<ts>` session id (use the real thread_id), extend
+   checkpoint detection regexes for `.codex/skills/sr-*/SKILL.md` paths.
+2. **§13 ProfileManager** — extend `validateStructural` to resolve the
+   adapter and validate models against its catalog. Bump
+   `schemas/profile.v1.json` to allow `provider?: string` and replace the
+   enum on `ProfileAgent.model` with a string pattern (runtime validation
+   enforces the catalog).
+3. **§14 PluginManager** — the biggest remaining chunk. Add
+   `providerSupport` to manifests, branch install/uninstall on
+   `adapter.mcpRegistration`, plumb per-project `CODEX_HOME`, target
+   `adapter.instructionsFilename` from `applyContributors`.
+4. After §10, §11, §13, §14 all land, run the full e2e §23 dry-run to
+   confirm a codex project can be created → installed → ticket created →
+   implement → tokens/cost visible. Then move to Stage B (specrails-core
+   4.6.0) and finally Stage C (gate lift).
 
 ## Pre-existing repo state to be aware of
 
-The user has WIP in stashes (`git stash list` shows 30+ entries). One stash
-named `claude-model-auth-fix-wip` was accidentally popped into the working
-tree during early investigation but immediately reverted; it remains safe in
-the stash list. Do not run bare `git stash pop` again — always use
-`git stash list` first.
-
-`server/project-router.ts` and `server/smash-runner.ts` have 12 pre-existing
-TypeScript errors and 1 pre-existing test failure that are not within this
-change's scope. They will be addressed by the user's separate WIP.
+- `git stash list` shows 30+ entries. The first is `claude-model-auth-fix-
+  wip` which was accidentally popped early in session 1 but is preserved.
+  Never run bare `git stash pop`.
+- `server/project-router.ts` and `server/smash-runner.ts` have pre-existing
+  TypeScript errors and 1 pre-existing test failure outside this change's
+  scope.
