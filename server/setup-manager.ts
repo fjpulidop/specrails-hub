@@ -400,10 +400,11 @@ export function detectCheckpointFromText(
   if (text.includes('/rules/') && text.includes('.md')) {
     hits.push({ key: 'stack_conventions', detail: 'Writing conventions...' })
   }
-  // Codex rules.star (Starlark sandbox config) is the codex equivalent of
-  // claude rules markdown.
-  if (/\.codex\/rules\.star/.test(text)) {
-    hits.push({ key: 'stack_conventions', detail: 'Writing codex sandbox rules...' })
+  // Codex sandbox / approval policy lives inside .codex/config.toml
+  // (top-level `sandbox_mode` + `approval_policy` keys, per codex
+  // 0.128.0+). There is no separate Starlark rules file.
+  if (/\.codex\/config\.toml/.test(text)) {
+    hits.push({ key: 'stack_conventions', detail: 'Writing codex sandbox config...' })
   }
   if (text.includes('.specrails-manifest.json') || text.includes('specrails/specrails-manifest.json')) {
     hits.push({ key: 'final_verification' })

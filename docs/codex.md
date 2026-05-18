@@ -30,8 +30,8 @@ binary isn't on `PATH`; it shows install commands if you click "More info".
 3. In the **AI provider** row, click **Codex**.
 4. Submit. The hub spawns `npx specrails-core@latest init --provider
    codex --quick` and produces the codex install:
-   - `.codex/config.toml` — model + sandbox baseline.
-   - `.codex/rules.star` — Starlark execution policy.
+   - `.codex/config.toml` — model, reasoning effort, sandbox mode, and
+     approval policy (all top-level keys per the codex 0.128.0+ schema).
    - `.codex/skills/sr-*/SKILL.md` — general specrails skills
      (implement, batch-implement, why, compat-check, …).
    - `.codex/skills/rails/sr-{architect,developer,reviewer,merge-resolver}/SKILL.md`
