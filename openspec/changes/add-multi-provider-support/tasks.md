@@ -155,11 +155,11 @@
 
 ## 16. Extend `setup-prerequisites.ts`
 
-- [ ] 16.1 `getSetupPrerequisitesStatus`: iterate `listAdapters()` and call each `adapter.detectInstalled()`; produce one entry per provider with `installed`, `executable`, `version`, `meetsMinimum`, plus the existing `uv` (for serena) check
-- [ ] 16.2 `formatMissingSetupPrerequisites`: changes wording — block only when zero providers are usable
-- [ ] 16.3 Update `client/src/components/PrerequisitesPanel.tsx` to list each provider as a row with detected/missing chip and install-info link
-- [ ] 16.4 Update `client/src/components/InstallInstructionsModal.tsx` with codex install commands (Homebrew `brew install codex`, npm `npm i -g @openai/codex` or whatever's official — confirm at implementation time)
-- [ ] 16.5 Update `server/setup-prerequisites.test.ts`
+- [x] 16.1 `getSetupPrerequisitesStatus`: iterate `listAdapters()` and call each `adapter.detectInstalled()`; produce one entry per provider with `installed`, `executable`, `version`, `meetsMinimum`, plus the existing `uv` (for serena) check
+- [x] 16.2 `formatMissingSetupPrerequisites`: changes wording — block only when zero providers are usable
+- [x] 16.3 Update `client/src/components/PrerequisitesPanel.tsx` to list each provider as a row with detected/missing chip and install-info link
+- [x] 16.4 Update `client/src/components/InstallInstructionsModal.tsx` with codex install commands (Homebrew `brew install codex`, npm `npm i -g @openai/codex` or whatever's official — confirm at implementation time)
+- [x] 16.5 Update `server/setup-prerequisites.test.ts`
 
 ## 17. Refactor `core-compat.ts`
 

@@ -1,11 +1,21 @@
 import { spawnSync } from 'child_process'
+import { listAdapters } from './providers'
 
 const WHICH_CMD = process.platform === 'win32' ? 'where' : 'which'
 
 export type Platform = 'darwin' | 'win32' | 'linux'
 
+/** Discriminator on `SetupPrerequisite.kind`. `'tool'` is a dev prerequisite
+ *  always required (node, npm, npx, git) or always optional (uv). `'provider'`
+ *  is an AI CLI registered in `providerRegistry`; at least one must be
+ *  usable for the hub to accept Add Project. */
+export type PrerequisiteKind = 'tool' | 'provider'
+
 export interface SetupPrerequisite {
-  key: 'node' | 'npm' | 'npx' | 'git' | 'uv'
+  /** Stable lookup key. For tools: the literal `node`/`npm`/.... For providers:
+   *  the adapter id (`claude`, `codex`, future ids). */
+  key: string
+  kind: PrerequisiteKind
   label: string
   command: string
   required: boolean
@@ -142,6 +152,7 @@ export function getSetupPrerequisitesStatus(options: PrerequisiteOptions = {}): 
   const definitions: Array<Omit<SetupPrerequisite, 'installed' | 'executable' | 'version' | 'resolvedPath' | 'meetsMinimum'>> = [
     {
       key: 'node',
+      kind: 'tool',
       label: 'Node.js',
       command: 'node',
       required: true,
@@ -153,6 +164,7 @@ export function getSetupPrerequisitesStatus(options: PrerequisiteOptions = {}): 
     },
     {
       key: 'npm',
+      kind: 'tool',
       label: 'npm',
       command: 'npm',
       required: true,
@@ -162,6 +174,7 @@ export function getSetupPrerequisitesStatus(options: PrerequisiteOptions = {}): 
     },
     {
       key: 'npx',
+      kind: 'tool',
       label: 'npx',
       command: 'npx',
       required: true,
@@ -170,6 +183,7 @@ export function getSetupPrerequisitesStatus(options: PrerequisiteOptions = {}): 
     },
     {
       key: 'git',
+      kind: 'tool',
       label: 'Git',
       command: 'git',
       required: true,
@@ -183,9 +197,26 @@ export function getSetupPrerequisitesStatus(options: PrerequisiteOptions = {}): 
     },
   ]
 
+  // Provider CLIs (one entry per registered adapter). Individually `required:
+  // false` — the "at least one provider" rule is enforced at the bottom of
+  // this function, not via `required`.
+  for (const adapter of listAdapters()) {
+    definitions.push({
+      key: adapter.id,
+      kind: 'provider',
+      label: adapter.displayName,
+      command: adapter.binary,
+      required: false,
+      minVersion: adapter.minCliVersion ?? undefined,
+      installUrl: providerInstallUrl(adapter.id),
+      installHint: providerInstallHint(adapter.id, process.platform),
+    })
+  }
+
   if (options.includeUv) {
     definitions.push({
       key: 'uv',
+      kind: 'tool',
       label: 'uv',
       command: 'uv',
       required: false,
@@ -232,11 +263,52 @@ export function getSetupPrerequisitesStatus(options: PrerequisiteOptions = {}): 
     (item) => item.required && (!item.installed || !item.executable || !item.meetsMinimum),
   )
 
+  // At-least-one provider rule: if no provider entry is usable, surface a
+  // synthetic "missing required" entry so the UI blocks Add Project.
+  const providers = prerequisites.filter((p) => p.kind === 'provider')
+  const anyProviderUsable = providers.some(
+    (p) => p.installed && p.executable && p.meetsMinimum,
+  )
+  if (providers.length > 0 && !anyProviderUsable) {
+    // Mark all provider rows as missingRequired so PrerequisitesPanel renders
+    // them visibly. They keep `required: false` so the type still matches the
+    // tool semantics; the panel inspects `kind === 'provider'` for grouping.
+    for (const p of providers) missingRequired.push(p)
+  }
+
   return {
     ok: missingRequired.length === 0,
     platform,
     prerequisites,
     missingRequired,
+  }
+}
+
+// ─── Provider install hints ────────────────────────────────────────────────
+
+function providerInstallUrl(id: string): string {
+  switch (id) {
+    case 'claude':
+      return 'https://claude.com/download'
+    case 'codex':
+      return 'https://developers.openai.com/codex'
+    default:
+      return 'https://github.com'
+  }
+}
+
+function providerInstallHint(id: string, platform: NodeJS.Platform): string {
+  switch (id) {
+    case 'claude':
+      return 'Install Claude Code from https://claude.com/download, run `claude login`, then restart SpecRails Hub.'
+    case 'codex':
+      return platform === 'darwin'
+        ? 'Install Codex CLI via `brew install codex` (or follow https://developers.openai.com/codex), authenticate with `codex login`, then restart SpecRails Hub.'
+        : platform === 'win32'
+          ? 'Install Codex CLI from https://developers.openai.com/codex, authenticate with `codex login`, then restart SpecRails Hub.'
+          : 'Install Codex CLI from https://developers.openai.com/codex (or `pipx install codex-cli`), authenticate with `codex login`, then restart SpecRails Hub.'
+    default:
+      return `Install the ${id} CLI and restart SpecRails Hub.`
   }
 }
 
