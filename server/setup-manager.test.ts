@@ -535,11 +535,12 @@ describe('SetupManager', () => {
         expect.stringContaining('.claude/commands/sr/enrich.md'),
         'utf-8'
       )
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'codex',
-        ['exec', '--full-auto', '# Full enrich instructions'],
-        expect.objectContaining({ cwd: '/path/to/project' })
-      )
+      const codexCall = mockSpawn.mock.calls.find((c) => c[0] === 'codex')
+      expect(codexCall).toBeDefined()
+      const args = codexCall![1] as string[]
+      expect(args[0]).toBe('exec')
+      expect(args).toContain('--json')
+      expect(args.find((a) => a.includes('Full enrich instructions'))).toBeDefined()
     })
 
     it('falls back to setup.md for codex when enrich.md missing', () => {
@@ -554,11 +555,14 @@ describe('SetupManager', () => {
 
       sm.startEnrich('p1', '/path/to/project')
 
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'codex',
-        ['exec', '--full-auto', '# Legacy setup content'],
-        expect.objectContaining({ cwd: '/path/to/project' })
-      )
+      // Codex argv (post-§10 adapter-driven): exec --json --sandbox workspace-write --skip-git-repo-check <prompt> --model gpt-5.4-mini
+      const codexCall = mockSpawn.mock.calls.find((c) => c[0] === 'codex')
+      expect(codexCall).toBeDefined()
+      const args = codexCall![1] as string[]
+      expect(args[0]).toBe('exec')
+      expect(args).toContain('--json')
+      expect(args.find((a) => a.includes('Legacy setup content'))).toBeDefined()
+      expect((codexCall![2] as { cwd?: string }).cwd).toBe('/path/to/project')
     })
 
     it('falls back to claude binary when no CLI is detected', () => {
@@ -583,11 +587,12 @@ describe('SetupManager', () => {
 
       sm.startEnrich('p1', '/path/to/project', 'codex')
 
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'codex',
-        ['exec', '--full-auto', '# Enrich'],
-        expect.objectContaining({ cwd: '/path/to/project' })
-      )
+      const codexCall = mockSpawn.mock.calls.find((c) => c[0] === 'codex')
+      expect(codexCall).toBeDefined()
+      const args = codexCall![1] as string[]
+      expect(args[0]).toBe('exec')
+      expect(args).toContain('--json')
+      expect(args.find((a) => a.includes('Enrich'))).toBeDefined()
       expect(detectCLISync).not.toHaveBeenCalled()
     })
 
@@ -619,7 +624,7 @@ describe('SetupManager', () => {
       expect(detectCLISync).not.toHaveBeenCalled()
     })
 
-    it('generates synthetic sessionId for codex and calls onSessionCaptured', () => {
+    it('captures real codex thread_id from session-started event and calls onSessionCaptured', async () => {
       const onSessionCaptured = vi.fn()
       const smWithCallback = new SetupManager(broadcast, onSessionCaptured)
       vi.mocked(readFileSync).mockReturnValue('# Enrich')
@@ -627,22 +632,30 @@ describe('SetupManager', () => {
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
       smWithCallback.startEnrich('p1', '/path/to/project', 'codex')
+      // Feed real codex JSONL with a thread.started event — post-§10 the
+      // SetupManager captures the real UUID instead of a synthetic id.
+      child.stdout.push('{"type":"thread.started","thread_id":"019e2222-3333-7444-aaaa-bbbbbbbbbbbb"}\n')
+      // Give the stream reader a microtask to process
+      await new Promise((r) => setImmediate(r))
 
-      expect(onSessionCaptured).toHaveBeenCalledWith('p1', expect.stringMatching(/^codex-p1-\d+$/))
+      expect(onSessionCaptured).toHaveBeenCalledWith('p1', '019e2222-3333-7444-aaaa-bbbbbbbbbbbb')
     })
 
-    it('emits setup_turn_done with synthetic sessionId for codex when incomplete', async () => {
+    it('emits setup_turn_done with real codex thread_id when incomplete', async () => {
       vi.mocked(readFileSync).mockReturnValue('# Enrich')
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
       vi.mocked(existsSync).mockReturnValue(false)
 
       sm.startEnrich('p1', '/path/to/project', 'codex')
+      child.stdout.push('{"type":"thread.started","thread_id":"019e3333-4444-7555-cccc-dddddddddddd"}\n')
+      child.stdout.push('{"type":"item.completed","item":{"type":"agent_message","text":"hi"}}\n')
+      child.stdout.push('{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}\n')
       await finishProcess(child, 0)
 
       const turnDone = getBroadcastedByType(broadcast, 'setup_turn_done')
       expect(turnDone).toHaveLength(1)
-      expect(turnDone[0].sessionId).toMatch(/^codex-p1-\d+$/)
+      expect(turnDone[0].sessionId).toBe('019e3333-4444-7555-cccc-dddddddddddd')
     })
 
     it('getInstallTier returns full after startEnrich', () => {
@@ -815,26 +828,36 @@ describe('SetupManager', () => {
       expect(mockSpawn).toHaveBeenCalledTimes(1)
     })
 
-    it('uses enrich.md content for codex resume continuation prompt', () => {
+    // Legacy synthetic-session fallback: pre-§10 codex sessions used
+    // `codex-<projectId>-<timestamp>` ids. Those cannot be resumed against a
+    // real codex thread, so resumeEnrich folds enrich.md content into a fresh
+    // exec. New codex sessions capture the real thread UUID and take the
+    // modern resume path (exercised by the "modern path" tests below).
+
+    it('legacy synthetic session: folds enrich.md content into continuation prompt for codex', () => {
       vi.mocked(detectCLISync).mockReturnValue('claude')
       vi.mocked(readFileSync).mockReturnValue('# Enrich prompt content')
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.resumeEnrich('p1', '/path', 'sess-abc', 'continue please', 'codex')
+      // Synthetic id from before §10
+      sm.resumeEnrich('p1', '/path', 'codex-p1-1700000000000', 'continue please', 'codex')
 
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'codex',
-        ['exec', '--full-auto', expect.stringContaining('continue please')],
-        expect.any(Object)
-      )
-      const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
-      expect(spawnArgs[2]).toContain('# Enrich prompt content')
-      expect(spawnArgs[2]).toContain('continuation of a previous enrich run')
+      const codexCall = mockSpawn.mock.calls.find((c) => c[0] === 'codex')
+      expect(codexCall).toBeDefined()
+      const args = codexCall![1] as string[]
+      expect(args[0]).toBe('exec')
+      expect(args).toContain('--json')
+      // No `resume` subcommand — this is a fresh exec
+      expect(args).not.toContain('resume')
+      // Combined prompt embeds the enrich content + the continuation header + user reply
+      const promptArg = args.find((a) => a.includes('continue please'))!
+      expect(promptArg).toContain('# Enrich prompt content')
+      expect(promptArg).toContain('continuation of a previous enrich run')
       expect(detectCLISync).not.toHaveBeenCalled()
     })
 
-    it('falls back to setup.md when enrich.md is missing for codex resume', () => {
+    it('legacy synthetic session: falls back to setup.md when enrich.md is missing', () => {
       vi.mocked(readFileSync).mockImplementation((p: any) => {
         if (String(p).includes('enrich.md')) throw new Error('ENOENT')
         return '# Legacy setup content'
@@ -842,24 +865,40 @@ describe('SetupManager', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.resumeEnrich('p1', '/path', 'sess-abc', 'continue please', 'codex')
+      sm.resumeEnrich('p1', '/path', 'codex-p1-1700000000001', 'continue please', 'codex')
 
-      const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
-      expect(spawnArgs[2]).toContain('# Legacy setup content')
+      const args = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      const promptArg = args.find((a) => a.includes('continue please'))!
+      expect(promptArg).toContain('# Legacy setup content')
     })
 
-    it('falls back to plain user message when both enrich.md and setup.md are missing', () => {
+    it('legacy synthetic session: falls back to plain user message when both enrich.md and setup.md are missing', () => {
       vi.mocked(readFileSync).mockImplementation(() => { throw new Error('ENOENT') })
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
-      sm.resumeEnrich('p1', '/path', 'sess-abc', 'continue please', 'codex')
+      sm.resumeEnrich('p1', '/path', 'codex-p1-1700000000002', 'continue please', 'codex')
 
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'codex',
-        ['exec', '--full-auto', 'continue please'],
-        expect.any(Object)
-      )
+      const args = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      expect(args[0]).toBe('exec')
+      expect(args).toContain('--json')
+      expect(args).not.toContain('resume')
+      expect(args).toContain('continue please')
+    })
+
+    it('modern path: real thread_id uses codex exec resume', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      // Real codex thread UUID (8-4-4-4-12 hex)
+      sm.resumeEnrich('p1', '/path', '019e1111-2222-7333-bbbb-cccccccccccc', 'next turn', 'codex')
+
+      const args = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      expect(args[0]).toBe('exec')
+      expect(args[1]).toBe('resume')
+      expect(args).toContain('--json')
+      expect(args).toContain('019e1111-2222-7333-bbbb-cccccccccccc')
+      expect(args).toContain('next turn')
     })
   })
 

@@ -99,12 +99,12 @@
 
 ## 10. Refactor `SetupManager`
 
-- [ ] 10.1 `startEnrich` and `resumeEnrich`: replace branch-on-provider with `adapter.buildArgs('setup-enrich' | 'setup-enrich-resume', { ... })`
-- [ ] 10.2 Codex stream parsing: use `adapter.parseStreamLine`; capture real thread id and persist via `onSessionCaptured`; REMOVE the `codex-<projectId>-<timestamp>` synthetic id
-- [ ] 10.3 Re-spawn for `resumeEnrich` on codex: uses adapter's `setup-enrich-resume` (which is `exec resume`), not a fresh re-spawn of the enrich content
-- [ ] 10.4 Project context header injection (`PROJECT: …\nCWD: …`) is now adapter-driven (`adapter.buildSetupEnrichContext` is a helper exposed on adapters that need it; claude returns empty, codex returns the header)
-- [ ] 10.5 Checkpoint detection regex (`detectCheckpointFromText`) must also recognise codex skill paths: `.codex/skills/sr-*/SKILL.md`, `AGENTS.md`, etc. Extend the existing patterns
-- [ ] 10.6 Update tests in `server/setup-manager.test.ts` codex suite for the new resume path and the new checkpoint patterns
+- [x] 10.1 `startEnrich` and `resumeEnrich`: replace branch-on-provider with `adapter.buildArgs('setup-enrich' | 'setup-enrich-resume', { ... })`
+- [x] 10.2 Codex stream parsing: use `adapter.parseStreamLine`; capture real thread id and persist via `onSessionCaptured`; REMOVE the `codex-<projectId>-<timestamp>` synthetic id
+- [x] 10.3 Re-spawn for `resumeEnrich` on codex: uses adapter's `setup-enrich-resume` (which is `exec resume`), not a fresh re-spawn of the enrich content
+- [x] 10.4 Project context header injection (`PROJECT: …\nCWD: …`) is now adapter-driven (`adapter.buildSetupEnrichContext` is a helper exposed on adapters that need it; claude returns empty, codex returns the header)
+- [x] 10.5 Checkpoint detection regex (`detectCheckpointFromText`) must also recognise codex skill paths: `.codex/skills/sr-*/SKILL.md`, `AGENTS.md`, etc. Extend the existing patterns
+- [x] 10.6 Update tests in `server/setup-manager.test.ts` codex suite for the new resume path and the new checkpoint patterns
 
 ## 11. Refactor `project-router` spawn callsites
 
