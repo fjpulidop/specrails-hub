@@ -20,7 +20,7 @@ function fmtUsdLarge(v: number): string {
   return `$${v.toFixed(2)}`
 }
 
-const SURFACES: Surface[] = ['job', 'explore-spec', 'quick-spec', 'ai-edit']
+const SURFACES: Surface[] = ['job', 'explore-spec', 'quick-spec', 'ai-edit', 'smash']
 
 export function SpendingHero({ data, loading }: Props) {
   const [displayedTotal, setDisplayedTotal] = useState(0)

@@ -408,39 +408,55 @@ const MIGRATIONS: Migration[] = [
     `)
   },
 
-  // Migration 18: ai_invocations.provider — provider id stamped at insert.
+  // Migration 18: chat_conversations.context_scope — per-conversation JSON
+  // freezing the Add Spec context scope at creation time. NULL means "legacy
+  // behavior" so existing rows behave unchanged.
+  //
+  // Idempotent: a parallel WIP branch shipped this column under migration #20,
+  // so on machines where it already exists we swallow the duplicate-column
+  // error rather than crash on a re-run.
+  (db) => {
+    try {
+      db.exec(`ALTER TABLE chat_conversations ADD COLUMN context_scope TEXT;`)
+    } catch (err) {
+      const msg = (err as Error).message ?? ''
+      if (!/duplicate column name/i.test(msg)) throw err
+    }
+  },
+
+  // Migration 19: ai_invocations.provider — provider id stamped at insert.
   // Existing rows backfill to 'claude' since pre-migration that was the only
   // path. New rows MUST be populated from the resolved adapter's id (see
   // openspec/changes/add-multi-provider-support/specs/project-spending/spec.md).
+  //
+  // Idempotent: same dual-WIP concern — multi-provider branch originally
+  // numbered this #18, so on machines that ran the pre-merge multi-provider
+  // build the column already exists.
   (db) => {
+    try {
+      db.exec(`ALTER TABLE ai_invocations ADD COLUMN provider TEXT;`)
+    } catch (err) {
+      const msg = (err as Error).message ?? ''
+      if (!/duplicate column name/i.test(msg)) throw err
+    }
+    db.exec(`UPDATE ai_invocations SET provider = 'claude' WHERE provider IS NULL;`)
     db.exec(`
-      ALTER TABLE ai_invocations ADD COLUMN provider TEXT;
-      UPDATE ai_invocations SET provider = 'claude' WHERE provider IS NULL;
       CREATE INDEX IF NOT EXISTS idx_ai_inv_project_provider
         ON ai_invocations(project_id, provider);
     `)
   },
 
-  // Migration 19: ai_invocations.total_cost_usd_estimated — 1 when the cost
+  // Migration 20: ai_invocations.total_cost_usd_estimated — 1 when the cost
   // came from server/pricing.ts (estimated fallback for non-native-cost
   // providers); 0 when authoritative from the provider's terminal event.
-  (db) => {
-    db.exec(`
-      ALTER TABLE ai_invocations
-        ADD COLUMN total_cost_usd_estimated INTEGER NOT NULL DEFAULT 0;
-    `)
-  },
-
-  // Migration 20: chat_conversations.context_scope — per-conversation JSON
-  // freezing the Add Spec context scope at creation time. NULL means "legacy
-  // behavior" so existing rows behave unchanged.
   //
-  // Idempotent: an earlier WIP branch shipped this column under a different
-  // migration number, so on machines where the column already exists we
-  // swallow the "duplicate column" SqliteError and move on.
+  // Idempotent for the same reason as #18/#19.
   (db) => {
     try {
-      db.exec(`ALTER TABLE chat_conversations ADD COLUMN context_scope TEXT;`)
+      db.exec(`
+        ALTER TABLE ai_invocations
+          ADD COLUMN total_cost_usd_estimated INTEGER NOT NULL DEFAULT 0;
+      `)
     } catch (err) {
       const msg = (err as Error).message ?? ''
       if (!/duplicate column name/i.test(msg)) throw err
@@ -956,27 +972,6 @@ export function updateProjectSettings(db: DbInstance, patch: Partial<ProjectSett
 }
 
 // ─── Explore Spec acceleration ────────────────────────────────────────────────
-
-/**
- * Per-project toggle controlling whether Explore Spec turns spawn from the
- * project path (so `.mcp.json` is honoured) or from the hub-managed
- * explore-cwd (faster first-token, no project MCP servers loaded). Stored in
- * the existing `queue_state` key/value table; default `false`.
- *
- * See openspec/changes/accelerate-spec-chat-first-token/design.md decision D4.
- */
-export function getExploreMcpEnabled(db: DbInstance): boolean {
-  const row = db.prepare(
-    `SELECT value FROM queue_state WHERE key = 'config.explore_mcp_enabled'`
-  ).get() as { value: string } | undefined
-  return row?.value === 'true'
-}
-
-export function setExploreMcpEnabled(db: DbInstance, enabled: boolean): void {
-  db.prepare(
-    `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.explore_mcp_enabled', ?)`
-  ).run(enabled ? 'true' : 'false')
-}
 
 /**
  * Per-project last-used value for the Quick mode Contract Refine toggle in

@@ -5,6 +5,8 @@ import { FileText, Plus, CheckCircle2 } from 'lucide-react'
 import { Button } from './ui/button'
 import { SpecCard } from './SpecCard'
 import { TicketPostitCard } from './TicketPostitCard'
+import { TicketContextMenu } from './TicketContextMenu'
+import type { TicketStatus, TicketPriority } from '../types'
 import type { RailState } from './RailsBoard'
 import { SpecLabelFilterDropdown } from './SpecLabelFilterDropdown'
 import { SpecStatusFilter, type SpecStatusFilterValue } from './SpecStatusFilter'
@@ -50,6 +52,10 @@ interface SpecsBoardProps {
   rails?: RailState[]
   /** Handler invoked when the user picks a rail from the Move-to-Rail popover. */
   onMoveToRail?: (ticketId: number, railId: string) => void
+  /** Right-click context menu — status change. */
+  onTicketStatusChange?: (ticketId: number, status: TicketStatus) => void
+  /** Right-click context menu — priority change. */
+  onTicketPriorityChange?: (ticketId: number, priority: TicketPriority) => void
 }
 
 interface DraftOverrides {
@@ -132,6 +138,8 @@ export function SpecsBoard({
   tier = 'row',
   rails = [],
   onMoveToRail,
+  onTicketStatusChange,
+  onTicketPriorityChange,
 }: SpecsBoardProps) {
   const [jiggleMode, setJiggleMode] = useState(false)
   // Exit jiggle mode when clicking outside any card or pressing Escape.
@@ -452,20 +460,27 @@ export function SpecsBoard({
                   style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}
                 >
                   {filteredTickets.map((ticket) => (
-                    <TicketPostitCard
+                    <MaybeContextMenu
                       key={ticket.id}
                       ticket={ticket}
-                      rails={rails}
-                      onClick={onTicketClick}
-                      onMoveToRail={onMoveToRail}
-                      contractRefining={contractRefiningIds.has(ticket.id)}
-                      epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
-                      parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
-                      onOpenParentEpic={handleOpenParentEpic}
-                      jiggleMode={jiggleMode}
-                      onLongPress={onTicketDelete ? enterJiggle : undefined}
-                      onDelete={onTicketDelete ? handleCardDelete : undefined}
-                    />
+                      onTicketDelete={onTicketDelete}
+                      onTicketStatusChange={onTicketStatusChange}
+                      onTicketPriorityChange={onTicketPriorityChange}
+                    >
+                      <TicketPostitCard
+                        ticket={ticket}
+                        rails={rails}
+                        onClick={onTicketClick}
+                        onMoveToRail={onMoveToRail}
+                        contractRefining={contractRefiningIds.has(ticket.id)}
+                        epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
+                        parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
+                        onOpenParentEpic={handleOpenParentEpic}
+                        jiggleMode={jiggleMode}
+                        onLongPress={onTicketDelete ? enterJiggle : undefined}
+                        onDelete={onTicketDelete ? handleCardDelete : undefined}
+                      />
+                    </MaybeContextMenu>
                   ))}
                 </div>
               </SortableContext>
@@ -478,18 +493,25 @@ export function SpecsBoard({
                   style={tier === 'card' ? { gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' } : undefined}
                 >
                   {filteredTickets.map((ticket) => (
-                    <SpecCard
+                    <MaybeContextMenu
                       key={ticket.id}
                       ticket={ticket}
-                      onClick={onTicketClick}
-                      contractRefining={contractRefiningIds.has(ticket.id)}
-                      epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
-                      parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
-                      onOpenParentEpic={handleOpenParentEpic}
-                      jiggleMode={jiggleMode}
-                      onLongPress={onTicketDelete ? enterJiggle : undefined}
-                      onDelete={onTicketDelete ? handleCardDelete : undefined}
-                    />
+                      onTicketDelete={onTicketDelete}
+                      onTicketStatusChange={onTicketStatusChange}
+                      onTicketPriorityChange={onTicketPriorityChange}
+                    >
+                      <SpecCard
+                        ticket={ticket}
+                        onClick={onTicketClick}
+                        contractRefining={contractRefiningIds.has(ticket.id)}
+                        epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
+                        parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
+                        onOpenParentEpic={handleOpenParentEpic}
+                        jiggleMode={jiggleMode}
+                        onLongPress={onTicketDelete ? enterJiggle : undefined}
+                        onDelete={onTicketDelete ? handleCardDelete : undefined}
+                      />
+                    </MaybeContextMenu>
                   ))}
                 </div>
               </SortableContext>
@@ -529,18 +551,25 @@ export function SpecsBoard({
             ) : (
               <SortableContext items={filteredDoneTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                 {filteredDoneTickets.map((ticket) => (
-                  <SpecCard
+                  <MaybeContextMenu
                     key={ticket.id}
                     ticket={ticket}
-                    onClick={onTicketClick}
-                    contractRefining={contractRefiningIds.has(ticket.id)}
-                    epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
-                    parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
-                    onOpenParentEpic={handleOpenParentEpic}
-                    jiggleMode={jiggleMode}
-                    onLongPress={onTicketDelete ? enterJiggle : undefined}
-                    onDelete={onTicketDelete ? handleCardDelete : undefined}
-                  />
+                    onTicketDelete={onTicketDelete}
+                    onTicketStatusChange={onTicketStatusChange}
+                    onTicketPriorityChange={onTicketPriorityChange}
+                  >
+                    <SpecCard
+                      ticket={ticket}
+                      onClick={onTicketClick}
+                      contractRefining={contractRefiningIds.has(ticket.id)}
+                      epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
+                      parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
+                      onOpenParentEpic={handleOpenParentEpic}
+                      jiggleMode={jiggleMode}
+                      onLongPress={onTicketDelete ? enterJiggle : undefined}
+                      onDelete={onTicketDelete ? handleCardDelete : undefined}
+                    />
+                  </MaybeContextMenu>
                 ))}
               </SortableContext>
             )}
@@ -608,5 +637,35 @@ export function SpecsBoard({
         />
       )}
     </div>
+  )
+}
+
+interface MaybeContextMenuProps {
+  ticket: LocalTicket
+  onTicketDelete?: (ticketId: number) => void
+  onTicketStatusChange?: (ticketId: number, status: TicketStatus) => void
+  onTicketPriorityChange?: (ticketId: number, priority: TicketPriority) => void
+  children: React.ReactNode
+}
+
+function MaybeContextMenu({
+  ticket,
+  onTicketDelete,
+  onTicketStatusChange,
+  onTicketPriorityChange,
+  children,
+}: MaybeContextMenuProps) {
+  if (!onTicketDelete || !onTicketStatusChange || !onTicketPriorityChange) {
+    return <>{children}</>
+  }
+  return (
+    <TicketContextMenu
+      ticket={ticket}
+      onDelete={onTicketDelete}
+      onStatusChange={onTicketStatusChange}
+      onPriorityChange={onTicketPriorityChange}
+    >
+      {children}
+    </TicketContextMenu>
   )
 }

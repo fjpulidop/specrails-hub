@@ -1440,10 +1440,18 @@ export class SetupManager {
   getSummary(projectPath: string): SetupSummary {
     const config = readInstallConfig(projectPath)
     const tier = config?.tier ?? 'quick'
-    // Detect provider from the on-disk layout — `.codex/` wins if present,
-    // otherwise default to claude. Avoids reading install-config when the
-    // file isn't there yet (legacy installs).
-    const provider: CLIProvider = existsSync(join(projectPath, '.codex')) ? 'codex' : 'claude'
+    // Provider is authoritative from install-config.yaml when present; we
+    // do NOT fall back to filesystem heuristics because both `.codex/` and
+    // `.claude/` can legitimately coexist (e.g. a project that's been
+    // re-init'd) and a generic `existsSync` probe would mis-route.
+    let provider: CLIProvider = 'claude'
+    try {
+      const text = readFileSync(join(projectPath, '.specrails', 'install-config.yaml'), 'utf-8')
+      const m = text.match(/^provider:\s*(\w+)/m)
+      if (m && m[1] === 'codex') provider = 'codex'
+    } catch {
+      // Missing install-config — stay on claude default.
+    }
     return computeSummary(projectPath, tier, provider)
   }
 }

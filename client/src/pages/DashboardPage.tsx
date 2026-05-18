@@ -81,7 +81,7 @@ function saveRails(projectId: string | null, rails: RailState[]) {
 
 export default function DashboardPage() {
   const { activeProjectId } = useHub()
-  const { tickets, isLoading, updateTicket, deleteTicket, createTicket, refetch, contractRefiningIds } = useTickets()
+  const { tickets, isLoading, updateTicket, updateTicketStatus, updateTicketPriority, deleteTicket, createTicket, refetch, contractRefiningIds } = useTickets()
   const { registerHandler, unregisterHandler, connectionStatus } = useSharedWebSocket()
   const { specToOpen, clearSpecToOpen } = useSpecGenTracker()
   const [detailTicket, setDetailTicket] = useState<LocalTicket | null>(null)
@@ -629,12 +629,13 @@ export default function DashboardPage() {
 
   const activeTicket = activeId !== null ? ticketMap.get(activeId) : undefined
 
-  const { leftWidth, tier, enabled: splitterEnabled, beginDrag, resetToDefault } = useDashboardSplit(activeProjectId)
+  const dashboardContainerRef = useRef<HTMLDivElement | null>(null)
+  const { leftWidth, tier, enabled: splitterEnabled, beginDrag, resetToDefault } = useDashboardSplit(activeProjectId, dashboardContainerRef)
   const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex h-full overflow-hidden">
+      <div ref={dashboardContainerRef} className="flex h-full overflow-hidden">
         {/* Left panel: Specs board */}
         <div
           className="min-w-0 flex flex-col overflow-hidden"
@@ -650,6 +651,8 @@ export default function DashboardPage() {
             onTicketClick={setDetailTicket}
             onTicketCreated={(ticket) => { setDetailTicket(ticket); refetch() }}
             onTicketDelete={(id) => deleteTicket(id)}
+            onTicketStatusChange={(id, status) => { void updateTicketStatus(id, status) }}
+            onTicketPriorityChange={(id, priority) => { void updateTicketPriority(id, priority) }}
             contractRefiningIds={contractRefiningIds}
             sortMode={sortMode}
             sortDir={sortDir}
@@ -670,8 +673,10 @@ export default function DashboardPage() {
           />
         )}
 
-        {/* Right panel: Rails board */}
-        <div className="flex-1 min-w-0 flex flex-col overflow-hidden border-l border-border/40">
+        {/* Right panel: Rails board. The visual separator is rendered by
+            `DashboardSplitter` (a centered 1px rule inside its 6px hit area);
+            adding a `border-l` here would duplicate the line. */}
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
           <RailsBoard
             rails={rails}
             ticketMap={ticketMap}

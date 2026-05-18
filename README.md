@@ -1,320 +1,133 @@
-# specrails hub
+# specrails-hub
 
-A local dashboard and CLI for managing all your [specrails-core](https://github.com/fjpulidop/specrails-core) projects from a single interface. Visualizes the AI pipeline phases (Architect, Developer, Reviewer, Ship), streams logs in real-time, and lets you launch commands from the browser, terminal, or native desktop app.
+**The local dashboard for shipping software with AI agents.**
 
-## Features
+specrails-hub turns "I'll let Claude do it" into a workflow you can see, steer, and trust. Draft specs in conversation with Claude, drag them onto execution rails, and watch the pipeline ship — all from one window, on your laptop, with every cost tracked.
 
-- **Multi-project hub** — register multiple specrails projects and switch between them with browser-style tabs
-- **Live pipeline visualization** — see Architect, Developer, Reviewer, and Ship phases update in real-time
-- **Streaming logs** — all `claude` CLI output streamed via WebSocket to the browser
-- **Ticket panel** — visual interface for local tickets with List, Kanban, and Post-it views; real-time sync with CLI agents
-- **Command launcher** — organized into Discovery (propose-spec, auto-propose specs, auto-select specs) and Delivery (implement, batch-implement) sections; other commands available in a collapsible group
-- **Analytics** — cost, duration, token usage, and throughput metrics per project
-- **Conversations** — full-page chat interface with Claude or Codex, scoped per project
-- **Native desktop app (macOS/Windows/Linux via Tauri)** — installable app that bundles the server; macOS uses native traffic lights with a custom titlebar, Windows/Linux use a custom frameless titlebar
-- **Demo mode for offline previews** — run the UI with fixture data, no server required
-- **Persistent spec generation state across refreshes** — in-progress spec generation survives page reloads and project switches
-- **`specrails-hub` CLI** — terminal bridge that auto-routes commands to the correct project
+It's a local-first companion to [specrails-core](https://github.com/fjpulidop/specrails-core): one window for all your projects, one place to manage specs and pipelines, one place to see what AI cost you this week.
+
+> 100% local. Single user. No accounts. No telemetry leaving your machine. Your code stays on your laptop unless **you** spawn an agent against it.
+
+## What you can do with it
+
+- **Draft a spec by talking to Claude or Codex** — open Explore, describe what you want; the live draft updates each turn. Save it as a draft and come back later, or commit when it looks right.
+- **Generate a spec in one shot** — Quick mode for when you already know what you want. Optionally enrich it with a "Contract Layer" of names, shapes, invariants, and a file touch list.
+- **Drag specs onto execution rails** — each rail is an independent lane. Run multiple specs in parallel, with different agent profiles per rail.
+- **Compare two specs side by side** — drag any spec modal to the edge of the screen; a picker of your todo specs appears on the other side. Pick one and they live next to each other. Tablet-style.
+- **Split a big epic** — SMASH a parent spec into a family of sub-specs in one click; the children carry short summaries on their cards.
+- **Refine a spec in place** — *Continue Editing* reopens any draft / todo / backlog spec in Explore, with the original conversation resumed if there was one.
+- **Track every AI cost** — every AI CLI invocation across rails, Quick spec, Explore turns, and AI edits is recorded — across **both** Claude and Codex. Codex cost is estimated from a local rate-card since the CLI doesn't report it natively. The Analytics page shows your burn rate, top tickets, breaks down spend per provider, and lets you export CSV.
+- **Customise everything** — three themes, font sizes, terminal preferences, agent profiles, plugin integrations (Serena bundled today).
+
+## How specrails-hub looks
+
+```
+┌──────────┬───────────────────────────────────────────────────┐
+│          │  Dashboard · Jobs · Analytics · Agents · ⚙        │
+│   Arc    │ ──────────────────────────────────────────────── │
+│  side-   │                                                   │
+│   bar    │   SpecsBoard            │   Rails                 │
+│          │   (your specs)          │   (execution lanes)     │
+│ projects │                         │                         │
+│          │   #1  Login flow ●      │   ▶ Rail 1   #1 #2     │
+│ + Add    │   #2  Webhook retry     │     [profile: default]  │
+│          │   #3  Cost limits  ●    │                         │
+│          │                         │   ▶ Rail 2   running    │
+│          │                         │     [profile: budget]   │
+│   ⚙      │                         │                         │
+└──────────┴───────────────────────────────────────────────────┘
+                  ⌥ Terminal panel (Cmd+J)
+```
+
+## Quick start
+
+```bash
+# 1. Install
+npm install -g specrails-hub
+
+# 2. Start the hub
+specrails-hub start
+
+# 3. Add a project from the CLI…
+specrails-hub add /path/to/your/project
+
+# …or click "+ Add project" in the dashboard sidebar at
+#   http://127.0.0.1:4200
+```
+
+If the project doesn't have specrails-core yet, the setup wizard walks you through installing it. One flow, no tier picker. Total time: about a minute on a warm cache.
+
+**Prefer a desktop app?** Download a signed build for macOS or Windows from `https://specrails.dev/downloads/specrails-hub/latest/`. The desktop app bundles the server, so you don't need a separate `start` command.
 
 ## Prerequisites
 
-- Node.js 20+ (specrails-core ≥ 4.6.0 dependency for codex projects; ≥ 4.2.0 for claude-only)
+- **Node.js 20+** (specrails-core ≥ 4.6.0 for codex projects; ≥ 4.2.0 for claude-only)
 - **At least one AI CLI** on your PATH:
-  - [Claude Code](https://claude.com/claude-code) — `claude` binary
-  - [Codex CLI](https://developers.openai.com/codex) ≥ 0.128.0 — `codex` binary
-- At least one project with specrails-core installed (`npx specrails-core@latest init`).
-  The provider is chosen per-project at install time and is immutable after creation.
-- **Windows users:** see [docs/windows.md](docs/windows.md) for Windows 10/11 specifics (PowerShell ExecutionPolicy, SmartScreen warning, ARM64 emulation)
+  - **[Claude Code](https://claude.com/claude-code)** — `claude` binary. Set `ANTHROPIC_API_KEY` to authenticate.
+  - **[Codex CLI](https://developers.openai.com/codex)** ≥ 0.128.0 — `codex` binary. Run `codex login` or set `OPENAI_API_KEY`.
+- **`git`**
+- (Optional) **`uv`** if you want to use the Serena plugin
 
-For the Codex provider specifically — auth, sandbox config, estimated cost
-caveats, plugin support, and emergency rollback — see
+The provider is chosen per-project at install time and is immutable after
+creation. On macOS, the desktop app handles Homebrew/Volta/nvm paths
+automatically — see [docs/platforms/macos.md](docs/platforms/macos.md).
+**Windows users:** see [docs/windows.md](docs/windows.md) for Windows
+10/11 specifics. For Codex-specific topics — auth, sandbox config,
+estimated cost caveats, plugin support, and emergency rollback — see
 [docs/codex.md](docs/codex.md).
 
-## Installation
+## Documentation
 
-```bash
-npm install -g specrails-hub
-```
+User guides:
 
-## Quick Start
+| Guide | What it covers |
+|-------|----------------|
+| [Getting started](docs/getting-started.md) | Install, register a project, run your first pipeline |
+| [Creating specs](docs/creating-specs.md) | Quick vs Explore, drafts, SMASH, Compare, Continue Editing |
+| [Running pipelines](docs/running-pipelines.md) | Rails, jobs, agent profiles, plugins |
+| [Tracking cost](docs/tracking-cost.md) | Analytics page, exports, per-ticket spending |
+| [Customising the hub](docs/customizing.md) | Themes, settings, telemetry, kill switches |
+| [Terminal panel](docs/terminal.md) | Keyboard shortcuts, shell integration, drag-and-drop |
+| [CLI reference](docs/cli.md) | Every command grouped by task |
 
-```bash
-# Start the hub server
-specrails-hub start
+Platform notes:
 
-# Register a project
-specrails-hub add /path/to/your/project
+- [macOS](docs/platforms/macos.md) — GUI-launch PATH, broken-symlink detection
+- [Windows](docs/platforms/windows.md) — installer formats, SmartScreen, ConPTY
 
-# Open in browser
-open http://localhost:4200
-```
+Contributing or extending:
 
-On first launch with no projects, you'll see a welcome screen with an "Add your first project" button.
-
-## Desktop App
-
-```bash
-npm run tauri dev      # Run desktop app in development mode
-npm run tauri build    # Build production desktop app
-```
-
-macOS: native traffic lights with a custom drag region and centered search pill. Windows/Linux: custom frameless titlebar with SR icon, app name, and window controls.
-
-## Architecture
-
-```
-~/.specrails/
-  hub.sqlite              # project registry (name, path, slug)
-  manager.pid             # server PID for clean shutdown
-  projects/
-    my-app/jobs.sqlite    # isolated DB per project (jobs, events, chat)
-    api-srv/jobs.sqlite
-```
-
-A single Express process (port 4200) manages all projects. Each project gets its own:
-
-- **SQLite database** — jobs, events, chat conversations
-- **QueueManager** — independent job queue (sequential within a project, parallel across projects)
-- **ChatManager** — isolated Claude conversations
-
-```
-┌─────────────────────────────────────────────────────┐
-│  Express Server (port 4200)                         │
-│                                                     │
-│  ProjectRegistry                                    │
-│  ├── Project A → { db, queue, chat, cwd }          │
-│  ├── Project B → { db, queue, chat, cwd }          │
-│  └── Project C → { db, queue, chat, cwd }          │
-│                                                     │
-│  Routes:                                            │
-│  /api/hub/*              → hub-level operations     │
-│  /api/projects/:id/*     → project-scoped actions   │
-└─────────────────────────────────────────────────────┘
-```
-
-### Three-layer monorepo
-
-```
-specrails-hub/
-├── server/       → Express + WebSocket + SQLite (TypeScript, CommonJS)
-├── client/       → React + Vite + Tailwind v4 (TypeScript, ESM)
-├── cli/          → specrails-hub CLI bridge (TypeScript, CommonJS)
-└── src-tauri/    → Tauri desktop shell (Rust + bundled server sidecar)
-```
-
-## UI Overview
-
-```
-┌───────────────────────────────────────────────────────┐
-│  specrails hub   [my-app ●] [api-srv] [dashboard] [+]│
-│  Home   Analytics   Conversations                  ⚙ │
-│───────────────────────────────────────────────────────│
-│                                                       │
-│  Command grid, recent jobs, pipeline phases           │
-│                                                       │
-└───────────────────────────────────────────────────────┘
-```
-
-- **Tabs** — one per project, green dot when a job is active
-- **Home** — command grid (Discovery and Delivery sections), ticket panel, recent jobs, pipeline phase indicators
-- **Tickets** — List, Kanban, and Post-it views of local tickets; real-time sync with CLI agents
-- **Analytics** — cost and token metrics
-- **Conversations** — Claude chat sessions scoped to the project
-- **Settings** (gear icon) — global hub configuration, registered projects
-
-## CLI: `specrails-hub`
-
-### Hub management
-
-| Command | Description |
-|---------|-------------|
-| `specrails-hub start [--port N]` | Start the hub server (default port 4200) |
-| `specrails-hub stop` | Stop the hub server |
-| `specrails-hub status` | Show hub state and registered projects |
-| `specrails-hub list` | List all registered projects |
-| `specrails-hub add <path>` | Register a project |
-| `specrails-hub remove <id>` | Unregister a project |
-
-### Running commands
-
-```bash
-cd ~/repos/my-app
-specrails-hub implement #42          # auto-detects project from CWD
-specrails-hub product-backlog        # routes to the correct project
-specrails-hub "any raw prompt"       # passes directly to claude
-```
-
-`specrails-hub` detects which project you're in by matching your current directory against registered projects. If the hub isn't running, it falls back to invoking `claude` directly.
-
-### Options
-
-| Flag | Description |
-|------|-------------|
-| `--port <n>` | Override default port (4200) |
-| `--status` | Print hub/manager state |
-| `--jobs` | Print recent job history |
-| `--help` | Show usage |
-
-### Output
-
-```
-[specrails-hub] running: /sr:implement #42
-[specrails-hub] routing via hub → project my-app (a1b2c3d4)
-... (live claude output) ...
-[specrails-hub] done  duration: 4m32s  cost: $0.08  tokens: 12,400  exit: 0
-```
-
-## API
-
-### Hub routes
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/hub/state` | Hub version, project count, uptime |
-| GET | `/api/hub/projects` | List registered projects |
-| POST | `/api/hub/projects` | Register a project (`{ path }`) |
-| DELETE | `/api/hub/projects/:id` | Unregister a project |
-| GET | `/api/hub/resolve?path=<p>` | Find project by filesystem path |
-| GET | `/api/hub/settings` | Global settings |
-| PUT | `/api/hub/settings` | Update global settings |
-
-### Project-scoped routes
-
-All under `/api/projects/:projectId/`:
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/spawn` | Launch a command |
-| GET | `/jobs` | Job history |
-| GET | `/jobs/:id` | Job detail |
-| GET | `/analytics` | Cost and usage metrics |
-| GET | `/config` | Available commands |
-| POST | `/chat/conversations` | Create chat conversation |
-| GET | `/chat/conversations` | List conversations |
-| POST | `/hooks/events` | Pipeline phase notifications |
-| GET | `/tickets` | List tickets (`?status=`, `?label=`, `?q=` filters supported) |
-| GET | `/tickets/:id` | Get ticket by ID |
-| POST | `/tickets` | Create ticket |
-| PATCH | `/tickets/:id` | Update ticket fields |
-| DELETE | `/tickets/:id` | Delete ticket |
-| GET | `/integration-contract` | Read project integration-contract.json |
+- [`docs/internals/`](docs/internals/) — architecture, REST reference, operations runbook, OpenSpec workflow, profile internals
 
 ## Development
 
 ```bash
 git clone https://github.com/fjpulidop/specrails-hub.git
 cd specrails-hub
-npm install          # install root (server + CLI) dependencies
-cd client && npm install && cd ..   # install client dependencies separately
-npm run dev          # starts server (4200) + client (4201) concurrently
+npm install                        # root deps (server + CLI)
+cd client && npm install && cd ..  # client deps (separate tree)
+npm run dev                        # server (4200) + client (4201)
 ```
-
-> **Note:** This repo has two separate `node_modules` trees — one at the root (server + CLI) and one inside `client/` (Vite + React). Both `npm install` calls are required. If you see `sh: tsc: command not found` during `npm run build`, it means one of them is missing.
 
 | Script | Description |
 |--------|-------------|
-| `npm run dev` | Start server + client with hot reload |
-| `npm run dev:server` | Server only (tsx watch) |
-| `npm run dev:client` | Client only (Vite) |
-| `npm run build` | Production build (server + client + CLI) |
-| `npm run typecheck` | TypeScript check (server + client) |
-| `npm test` | Run tests (vitest) |
+| `npm run dev` | Server + client with hot reload |
+| `npm run build` | Production build |
+| `npm test` | vitest |
+| `npm run tauri dev` | Run desktop app in dev mode |
 
-### Project structure
+CI gates coverage hard: 70 % global, 80 % server, 80 % client. Local runs must clear the same bars.
 
-```
-specrails-hub/
-├── server/
-│   ├── index.ts              # hub entry point
-│   ├── hub-db.ts             # hub SQLite (project registry)
-│   ├── project-registry.ts   # per-project context manager
-│   ├── hub-router.ts         # /api/hub/* routes
-│   ├── project-router.ts     # /api/projects/:id/* routes (includes ticket endpoints)
-│   ├── ticket-store.ts       # local-tickets.json read/write with file locking
-│   ├── ticket-watcher.ts     # chokidar watcher → WebSocket broadcast
-│   ├── db.ts                 # per-project SQLite (jobs, events, chat)
-│   ├── queue-manager.ts      # job queue per project
-│   ├── chat-manager.ts       # Claude chat per project
-│   ├── config.ts             # command discovery
-│   ├── hooks.ts              # pipeline event handler
-│   ├── analytics.ts          # metrics aggregation
-│   └── types.ts              # shared TypeScript types (includes ticket WS messages)
-├── client/
-│   └── src/
-│       ├── App.tsx
-│       ├── components/
-│       │   ├── TabBar.tsx           # project tabs
-│       │   ├── AddProjectDialog.tsx # register project modal
-│       │   ├── WelcomeScreen.tsx    # zero-state
-│       │   ├── ProjectLayout.tsx    # per-project wrapper
-│       │   ├── ProjectNavbar.tsx    # Home/Analytics/Conversations nav
-│       │   ├── CommandGrid.tsx      # command launcher
-│       │   ├── TitleBar.tsx         # custom titlebar (Windows/Linux frameless)
-│       │   ├── ArcSidebar.tsx       # collapsible Arc-style sidebar
-│       │   ├── ProjectRightSidebar.tsx # project-level right panel
-│       │   ├── TicketsSection.tsx   # ticket panel container (view mode toggle)
-│       │   ├── TicketListView.tsx   # sortable table view
-│       │   ├── TicketGridView.tsx   # kanban drag-and-drop view
-│       │   ├── TicketPostItView.tsx # sticky-note grid view
-│       │   ├── TicketDetailModal.tsx # ticket editor modal
-│       │   ├── CreateTicketModal.tsx # new ticket form
-│       │   ├── TicketStatusIndicator.tsx # status dot, badge, border
-│       │   ├── TicketContextMenu.tsx # right-click menu
-│       │   └── ...
-│       ├── hooks/
-│       │   ├── useHub.tsx           # hub state context
-│       │   ├── useSpecGenTracker.tsx # spec generation state (persists via localStorage)
-│       │   ├── useTickets.ts        # ticket CRUD + WS subscription + toast/glow
-│       │   ├── useChat.ts          # chat operations
-│       │   ├── usePipeline.ts      # pipeline phases
-│       │   └── useSharedWebSocket.tsx
-│       ├── pages/
-│       │   ├── DashboardPage.tsx
-│       │   ├── AnalyticsPage.tsx
-│       │   ├── ConversationsPage.tsx
-│       │   ├── GlobalSettingsPage.tsx
-│       │   └── JobDetailPage.tsx
-│       └── lib/
-│           ├── api.ts              # dynamic API base routing
-│           ├── pending-specs.ts    # spec generation state persistence
-│           └── route-memory.ts     # per-project route save/restore
-├── src-tauri/                      # Tauri desktop shell
-├── scripts/
-│   ├── build-sidecar.mjs           # build bundled server binary for Tauri
-│   └── generate-icons.mjs          # regenerate all icon sizes from SVG
-├── cli/
-│   └── specrails-hub.ts            # CLI bridge
-├── package.json
-├── tsconfig.json
-└── vitest.config.ts
-```
+## Security model
 
-## WebSocket
-
-The server broadcasts events over a single WebSocket connection. All project-scoped messages include a `projectId` field — the client filters by active project.
-
-| Message type | Scope | Description |
-|-------------|-------|-------------|
-| `init` | project | Job started |
-| `log` | project | Streaming log line |
-| `phase` | project | Pipeline phase transition |
-| `queue_update` | project | Queue state change |
-| `ticket_created` | project | New ticket created (via API or CLI) |
-| `ticket_updated` | project | Ticket updated; if `ticket.id === 0`, signals a full external file change |
-| `ticket_deleted` | project | Ticket deleted |
-| `hub.project_added` | hub | New project registered |
-| `hub.project_removed` | hub | Project unregistered |
-
-## Security
-
-- Binds to `127.0.0.1` (loopback only) — **do not expose to a network**
-- No authentication (single-user local tool)
-- All SQL operations use parameterized queries
-- Project paths validated as existing directories on registration
+- Binds to `127.0.0.1` only. **Do not expose to a network.**
+- No authentication (single-user local tool).
+- Parameterised SQL throughout.
+- Reserved paths in your project (`.mcp.json`, `.specrails/plugins/state.json`, `.specrails/profiles/.user-preferred.json`) are mutated surgically — read, modify owned keys, atomic rename — so adding plugin N+1 never disturbs plugin N's state.
 
 ## Support
 
-If specrails-hub saves you time, you can donate on [Ko-fi](https://ko-fi.com/D1D81Y002C) ☕ to support ongoing development.
+If specrails-hub saves you time, you can buy me a coffee on [Ko-fi](https://ko-fi.com/D1D81Y002C). It funds development of the open-source ecosystem.
 
 [![Donate on Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-FF5E5B?logo=kofi&logoColor=white&style=flat-square)](https://ko-fi.com/D1D81Y002C)
 

@@ -77,6 +77,7 @@ describe('CommandPalette', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockFetchResponses()
+    window.localStorage.clear()
   })
 
   // ─── Opening / Closing ─────────────────────────────────────────────────────
@@ -417,6 +418,26 @@ describe('CommandPalette', () => {
 
     await user.click(screen.getByText('Docs'))
     expect(mockNavigate).toHaveBeenCalledWith('/docs')
+  })
+
+  // ─── Sidebar pin cycle entry ─────────────────────────────────────────────
+
+  it('cycles the left sidebar mode via the palette entry', async () => {
+    const user = userEvent.setup()
+    render(<CommandPalette />)
+
+    await user.keyboard('{Meta>}k{/Meta}')
+    await waitFor(() => {
+      expect(screen.getByText('Pin left sidebar open')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByText('Pin left sidebar open'))
+
+    // Palette closes; reopen and verify the label advanced one step in the cycle
+    await user.keyboard('{Meta>}k{/Meta}')
+    await waitFor(() => {
+      expect(screen.getByText('Collapse left sidebar (keep pinned)')).toBeInTheDocument()
+    })
   })
 
   // ─── Keyboard hints ───────────────────────────────────────────────────────

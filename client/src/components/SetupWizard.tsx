@@ -3,11 +3,9 @@ import { Check, ArrowRight, Package, Bot, ChevronLeft, Settings2 } from 'lucide-
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Button } from './ui/button'
-import { CheckpointTracker, type CheckpointState } from './CheckpointTracker'
-import { SetupChat, type SetupChatMessage } from './SetupChat'
+import { type CheckpointState } from './CheckpointTracker'
 import { AgentSelector, ALL_AGENTS, CORE_AGENTS, DEFAULT_SELECTED } from './AgentSelector'
 import { ModelSelector, type ModelPreset, type ModelOverrides } from './ModelSelector'
-import { TierSelector, type InstallTier } from './TierSelector'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import { cn } from '../lib/utils'
 import type { HubProject } from '../hooks/useHub'
@@ -18,16 +16,14 @@ import { PrerequisitesPanel } from './PrerequisitesPanel'
 
 type WizardStep =
   | { step: 'agent-selection' }
-  | { step: 'installing'; tier: InstallTier }
-  | { step: 'enriching'; sessionId?: string }
+  | { step: 'installing' }
   | { step: 'complete'; summary: SetupSummary }
-  | { step: 'error'; message: string; retryStep: 'installing' | 'enriching' }
+  | { step: 'error'; message: string; retryStep: 'installing' }
 
 interface SetupSummary {
   agents: number
   specrailsCommands: number
   opsxCommands: number
-  personas: number
   legacySrRemoved: number
   tier: 'quick' | 'full'
   provider?: 'claude' | 'codex'
@@ -37,7 +33,6 @@ const EMPTY_SUMMARY: SetupSummary = {
   agents: 0,
   specrailsCommands: 0,
   opsxCommands: 0,
-  personas: 0,
   legacySrRemoved: 0,
   tier: 'quick',
   provider: 'claude',
@@ -46,7 +41,6 @@ const EMPTY_SUMMARY: SetupSummary = {
 // ─── Install config ───────────────────────────────────────────────────────────
 
 interface InstallConfig {
-  tier: InstallTier
   selectedAgents: string[]
   modelPreset: ModelPreset
   modelOverrides: ModelOverrides
@@ -75,7 +69,6 @@ function presetToDefaultModel(preset: ModelPreset): string {
 
 function buildDefaultConfig(): InstallConfig {
   return {
-    tier: 'quick',
     selectedAgents: [...DEFAULT_SELECTED],
     modelPreset: 'balanced',
     modelOverrides: {},
@@ -84,20 +77,10 @@ function buildDefaultConfig(): InstallConfig {
 
 // ─── Initial checkpoint states ────────────────────────────────────────────────
 
-const QUICK_CHECKPOINTS: CheckpointState[] = [
+const INSTALL_CHECKPOINTS: CheckpointState[] = [
   { key: 'base_install', name: 'Base installation', status: 'pending' },
   { key: 'agent_selection', name: 'Agent selection', status: 'pending' },
   { key: 'agent_generation', name: 'Agent generation', status: 'pending' },
-]
-
-const FULL_CHECKPOINTS: CheckpointState[] = [
-  { key: 'base_install', name: 'Base installation', status: 'pending' },
-  { key: 'repo_analysis', name: 'Repository analysis', status: 'pending' },
-  { key: 'stack_conventions', name: 'Stack & conventions', status: 'pending' },
-  { key: 'product_discovery', name: 'Product discovery', status: 'pending' },
-  { key: 'agent_generation', name: 'Agent generation', status: 'pending' },
-  { key: 'command_config', name: 'Command configuration', status: 'pending' },
-  { key: 'final_verification', name: 'Final verification', status: 'pending' },
 ]
 
 // ─── Per-project wizard state cache (survives unmount on tab switch) ─────────
@@ -106,9 +89,6 @@ interface WizardSnapshot {
   wizardStep: WizardStep
   checkpoints: CheckpointState[]
   logLines: string[]
-  chatMessages: SetupChatMessage[]
-  sessionId: string | null
-  isStreaming: boolean
   installConfig: InstallConfig
 }
 
@@ -193,12 +173,6 @@ function AgentSelectionStep({
           onRefresh={onRefreshPrerequisites}
         />
 
-        {/* Tier selector */}
-        <TierSelector
-          tier={config.tier}
-          onChange={(tier) => onChange({ ...config, tier })}
-        />
-
         {/* Tabs */}
         <div className="flex border-b border-border/30">
           {(['agents', 'models'] as AgentSelectionTab[]).map((tab) => (
@@ -271,7 +245,7 @@ function AgentSelectionStep({
             disabled={installDisabled}
           >
             <Package className="w-3.5 h-3.5" />
-            {config.tier === 'quick' ? 'Quick Install' : 'Install & Enrich'}
+            Install
           </Button>
         </div>
       </div>
@@ -283,11 +257,9 @@ function AgentSelectionStep({
 
 function InstallingStep({
   logLines,
-  tier,
   onBack,
 }: {
   logLines: string[]
-  tier: InstallTier
   onBack: () => void
 }) {
   return (
@@ -299,11 +271,7 @@ function InstallingStep({
           </div>
           <div>
             <h2 className="text-sm font-semibold">Installing specrails...</h2>
-            <p className="text-xs text-muted-foreground">
-              {tier === 'quick'
-                ? 'Installing agents from templates'
-                : 'Running npx specrails-core in your project'}
-            </p>
+            <p className="text-xs text-muted-foreground">Installing agents from templates</p>
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={onBack} className="h-7 gap-1.5 text-xs">
@@ -323,65 +291,7 @@ function InstallingStep({
   )
 }
 
-// ─── Step 3 (full only): Enriching ───────────────────────────────────────────
-
-function EnrichStep({
-  checkpoints,
-  logLines,
-  chatMessages,
-  isStreaming,
-  streamingText,
-  sessionId,
-  projectId,
-  onBack,
-  onSendMessage,
-}: {
-  checkpoints: CheckpointState[]
-  logLines: string[]
-  chatMessages: SetupChatMessage[]
-  isStreaming: boolean
-  streamingText: string
-  sessionId: string | null
-  projectId: string
-  onBack: () => void
-  onSendMessage: (text: string) => void
-}) {
-  return (
-    <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-3 py-1.5 border-b border-border/20">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1.5 text-xs"
-          onClick={onBack}
-        >
-          <ChevronLeft className="w-3.5 h-3.5" />
-          Back
-        </Button>
-      </div>
-      <div className="flex flex-1 overflow-hidden">
-        <div className="w-72 flex-shrink-0 border-r border-border/30 overflow-hidden">
-          <CheckpointTracker
-            checkpoints={checkpoints}
-            logLines={logLines}
-          />
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <SetupChat
-            projectId={projectId}
-            messages={chatMessages}
-            isStreaming={isStreaming}
-            streamingText={streamingText}
-            sessionId={sessionId}
-            onSendMessage={onSendMessage}
-          />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Step 4: Complete ─────────────────────────────────────────────────────────
+// ─── Step 3: Complete ─────────────────────────────────────────────────────────
 
 function CompleteStep({
   projectName,
@@ -392,9 +302,6 @@ function CompleteStep({
   summary: SetupSummary
   onGoToProject: () => void
 }) {
-  const showPersonas = summary.tier === 'full' && summary.personas > 0
-  const tileCount = showPersonas ? 4 : 3
-
   return (
     <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto px-6 gap-8">
       <div className="w-16 h-16 rounded-2xl bg-accent-success/20 flex items-center justify-center">
@@ -407,15 +314,12 @@ function CompleteStep({
         </h2>
         <p className="text-sm text-muted-foreground max-w-sm">
           <strong className="text-foreground">{projectName}</strong> is now configured with
-          AI-powered development workflows.{' '}
-          {summary.tier === 'full' && summary.personas > 0
-            ? 'Your specialized agents, personas, and commands are ready to use.'
-            : 'Your specialized agents and commands are ready to use.'}
+          AI-powered development workflows. Your specialized agents and commands are ready to use.
         </p>
       </div>
 
       <div className="w-full rounded-lg border border-border/50 bg-muted/20 p-4">
-        <div className={cn('grid gap-4 text-center', tileCount === 4 ? 'grid-cols-4' : 'grid-cols-3')}>
+        <div className="grid grid-cols-3 gap-4 text-center">
           <div>
             <div className="text-2xl font-bold text-accent-primary">{summary.agents}</div>
             <div className="text-[10px] text-muted-foreground">
@@ -434,12 +338,6 @@ function CompleteStep({
               {summary.provider === 'codex' ? 'OpenSpec skills' : '/opsx:*'}
             </div>
           </div>
-          {showPersonas && (
-            <div>
-              <div className="text-2xl font-bold text-accent-secondary">{summary.personas}</div>
-              <div className="text-[10px] text-muted-foreground">Personas</div>
-            </div>
-          )}
         </div>
 
         {summary.legacySrRemoved > 0 && (
@@ -506,20 +404,12 @@ function ErrorStep({
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
-function StepIndicator({ wizardStep, tier }: { wizardStep: WizardStep; tier: InstallTier }) {
-  const quickSteps = [
+function StepIndicator({ wizardStep }: { wizardStep: WizardStep }) {
+  const steps = [
     { id: 'agent-selection', label: 'Configure' },
     { id: 'installing', label: 'Install' },
     { id: 'complete', label: 'Done' },
   ]
-  const fullSteps = [
-    { id: 'agent-selection', label: 'Configure' },
-    { id: 'installing', label: 'Install' },
-    { id: 'enriching', label: 'Enrich' },
-    { id: 'complete', label: 'Done' },
-  ]
-
-  const steps = tier === 'quick' ? quickSteps : fullSteps
   const stepOrder = steps.map((s) => s.id)
 
   const currentStepId = wizardStep.step === 'error' ? wizardStep.retryStep : wizardStep.step
@@ -577,12 +467,8 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
 
   const [wizardStep, setWizardStep] = useState<WizardStep>(cached?.wizardStep ?? { step: 'agent-selection' })
   const [installConfig, setInstallConfig] = useState<InstallConfig>(cached?.installConfig ?? buildDefaultConfig())
-  const [checkpoints, setCheckpoints] = useState<CheckpointState[]>(cached?.checkpoints ?? QUICK_CHECKPOINTS)
+  const [checkpoints, setCheckpoints] = useState<CheckpointState[]>(cached?.checkpoints ?? INSTALL_CHECKPOINTS)
   const [logLines, setLogLines] = useState<string[]>(cached?.logLines ?? [])
-  const [chatMessages, setChatMessages] = useState<SetupChatMessage[]>(cached?.chatMessages ?? [])
-  const [streamingText, setStreamingText] = useState('')
-  const [isStreaming, setIsStreaming] = useState(cached?.isStreaming ?? false)
-  const [sessionId, setSessionId] = useState<string | null>(cached?.sessionId ?? null)
   const {
     status: setupPrerequisites,
     isLoading: isRefreshingPrerequisites,
@@ -590,24 +476,15 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
     recheck: refreshSetupPrerequisites,
   } = usePrerequisites()
 
-  const pendingEnrichStart = useRef(false)
-  const streamingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   // Persist refs for cache-on-unmount
   const wizardStepRef = useRef(wizardStep)
   const checkpointsRef = useRef(checkpoints)
   const logLinesRef = useRef(logLines)
-  const chatMessagesRef = useRef(chatMessages)
-  const sessionIdRef = useRef(sessionId)
-  const isStreamingRef = useRef(isStreaming)
   const installConfigRef = useRef(installConfig)
 
   wizardStepRef.current = wizardStep
   checkpointsRef.current = checkpoints
   logLinesRef.current = logLines
-  chatMessagesRef.current = chatMessages
-  sessionIdRef.current = sessionId
-  isStreamingRef.current = isStreaming
   installConfigRef.current = installConfig
 
   useEffect(() => {
@@ -616,17 +493,14 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
         wizardStep: wizardStepRef.current,
         checkpoints: checkpointsRef.current,
         logLines: logLinesRef.current,
-        chatMessages: chatMessagesRef.current,
-        sessionId: sessionIdRef.current,
-        isStreaming: isStreamingRef.current,
         installConfig: installConfigRef.current,
       })
     }
   }, [project.id])
 
-  // On remount after tab switch: check if the install/enrich finished while we were away
+  // On remount after tab switch: check if the install finished while we were away
   useEffect(() => {
-    if (wizardStep.step !== 'installing' && wizardStep.step !== 'enriching') return
+    if (wizardStep.step !== 'installing') return
 
     async function syncState() {
       try {
@@ -636,13 +510,8 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
           checkpoints: CheckpointState[]
           isInstalling: boolean
           isSettingUp: boolean
-          savedSessionId: string | null
           logLines?: string[]
           summary?: SetupSummary
-        }
-
-        if (data.savedSessionId && !sessionIdRef.current) {
-          setSessionId(data.savedSessionId)
         }
 
         if (data.checkpoints) {
@@ -660,32 +529,13 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
           setLogLines((prev) => data.logLines!.length > prev.length ? data.logLines! : prev)
         }
 
-        if (!data.isSettingUp && !data.isInstalling) {
-          setIsStreaming(false)
-        }
-
-        // Install done → advance to enrich (full) or complete (quick)
         if (wizardStep.step === 'installing' && !data.isInstalling) {
           const hasBaseInstall = data.checkpoints?.some(
             (cp: CheckpointState) => cp.key === 'base_install' && cp.status === 'done'
           )
           if (hasBaseInstall) {
-            if (installConfigRef.current.tier === 'full') {
-              setWizardStep({ step: 'enriching' })
-              pendingEnrichStart.current = true
-            } else {
-              setWizardStep({ step: 'complete', summary: data.summary ?? { ...EMPTY_SUMMARY } })
-            }
+            setWizardStep({ step: 'complete', summary: data.summary ?? { ...EMPTY_SUMMARY } })
           }
-        }
-
-        // Enrich finished
-        const finalDone = data.checkpoints?.find(
-          (cp: CheckpointState) => cp.key === 'final_verification'
-        )
-        if (finalDone?.status === 'done' && !data.isSettingUp) {
-          setCheckpoints((prev) => prev.map((cp) => ({ ...cp, status: 'done' as const })))
-          setWizardStep({ step: 'complete', summary: data.summary ?? { ...EMPTY_SUMMARY } })
         }
       } catch {
         // non-fatal
@@ -711,14 +561,8 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
       }
 
       case 'setup_install_done': {
-        if (installConfigRef.current.tier === 'full') {
-          pendingEnrichStart.current = true
-          setWizardStep({ step: 'enriching' })
-        } else {
-          // Quick install done → complete
-          const summary = (msg.summary as SetupSummary | undefined) ?? { ...EMPTY_SUMMARY }
-          setWizardStep({ step: 'complete', summary })
-        }
+        const summary = (msg.summary as SetupSummary | undefined) ?? { ...EMPTY_SUMMARY }
+        setWizardStep({ step: 'complete', summary })
         break
       }
 
@@ -737,81 +581,18 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
         break
       }
 
-      case 'setup_chat': {
-        const text = msg.text as string
-        const role = msg.role as 'assistant' | 'user'
-        if (role === 'assistant') {
-          setIsStreaming(true)
-          setStreamingText((prev) => prev + text)
-        }
-        break
-      }
-
-      case 'setup_turn_done': {
-        const turnSid = msg.sessionId as string | undefined
-        if (turnSid) setSessionId(turnSid)
-        setStreamingText((prev) => {
-          if (prev) setChatMessages((msgs) => [...msgs, { role: 'assistant', text: prev }])
-          return ''
-        })
-        setIsStreaming(false)
-        break
-      }
-
-      case 'setup_complete': {
-        const sid = msg.sessionId as string | undefined
-        if (sid) setSessionId(sid)
-        setStreamingText((prev) => {
-          if (prev) setChatMessages((msgs) => [...msgs, { role: 'assistant', text: prev }])
-          return ''
-        })
-        setIsStreaming(false)
-        setCheckpoints((prev) => prev.map((cp) => ({ ...cp, status: 'done' as const })))
-        setWizardStep({ step: 'complete', summary: msg.summary as SetupSummary })
-        break
-      }
-
       case 'setup_error': {
         const error = msg.error as string
-        setStreamingText((prev) => {
-          if (prev) setChatMessages((msgs) => [...msgs, { role: 'assistant', text: prev }])
-          return ''
-        })
-        setIsStreaming(false)
-        const step = wizardStep.step
-        const retryStep: 'installing' | 'enriching' =
-          step === 'installing' ? 'installing' : 'enriching'
-        setWizardStep({ step: 'error', message: error, retryStep })
+        setWizardStep({ step: 'error', message: error, retryStep: 'installing' })
         break
       }
     }
-  }, [project.id, wizardStep.step])
+  }, [project.id])
 
   useLayoutEffect(() => {
     registerHandler(`setup-${project.id}`, handleWsMessage)
     return () => unregisterHandler(`setup-${project.id}`)
   }, [handleWsMessage, registerHandler, unregisterHandler, project.id])
-
-  // Safety streaming timeout
-  useEffect(() => {
-    if (!isStreaming) {
-      if (streamingTimeoutRef.current) {
-        clearTimeout(streamingTimeoutRef.current)
-        streamingTimeoutRef.current = null
-      }
-      return
-    }
-    if (streamingTimeoutRef.current) clearTimeout(streamingTimeoutRef.current)
-    streamingTimeoutRef.current = setTimeout(() => { setIsStreaming(false) }, 30_000)
-    return () => { if (streamingTimeoutRef.current) clearTimeout(streamingTimeoutRef.current) }
-  }, [isStreaming, streamingText])
-
-  useEffect(() => {
-    if (!isStreaming && streamingText) {
-      setChatMessages((prev) => [...prev, { role: 'assistant', text: streamingText }])
-      setStreamingText('')
-    }
-  }, [isStreaming, streamingText])
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 
@@ -841,12 +622,14 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
       if (modelId) shortOverrides[agentId] = toShortModelName(modelId)
     }
 
-    // Reset checkpoints based on tier
-    setCheckpoints(cfg.tier === 'quick' ? QUICK_CHECKPOINTS : FULL_CHECKPOINTS)
+    setCheckpoints(INSTALL_CHECKPOINTS)
     setLogLines([])
-    setWizardStep({ step: 'installing', tier: cfg.tier })
+    setWizardStep({ step: 'installing' })
 
-    // Write install config matching specrails-core's install-config.yaml schema
+    // Write install config matching specrails-core's install-config.yaml schema.
+    // `tier: 'quick'` is hardcoded — the hub only exposes the template-agent
+    // install flow now; the legacy AI-enrich flow lives in specrails-core's
+    // standalone `npx specrails-core@latest init` for users who want it.
     try {
       await fetch(`/api/projects/${project.id}/setup/install-config`, {
         method: 'POST',
@@ -854,7 +637,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
         body: JSON.stringify({
           version: 1,
           provider,
-          tier: cfg.tier,
+          tier: 'quick',
           agents: {
             selected: selectedWithCore,
             excluded,
@@ -876,52 +659,10 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
     })
   }
 
-  function startEnrich() {
-    setChatMessages([])
-    setStreamingText('')
-    setIsStreaming(false)
-    fetch(`/api/projects/${project.id}/setup/start`, { method: 'POST' }).catch((err) => {
-      console.error('[SetupWizard] enrich start error:', err)
-    })
-  }
-
-  function handleSendMessage(text: string) {
-    if (!sessionId) return
-    setChatMessages((prev) => [...prev, { role: 'user', text }])
-    setStreamingText('')
-    setIsStreaming(true)
-    fetch(`/api/projects/${project.id}/setup/message`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, message: text }),
-    }).catch((err) => {
-      console.error('[SetupWizard] send message error:', err)
-    })
-  }
-
   function handleRetry() {
     if (wizardStep.step !== 'error') return
-    const retryStep = wizardStep.retryStep
-    if (retryStep === 'installing') {
-      handleInstall()
-    } else {
-      setWizardStep({ step: 'enriching' })
-      startEnrich()
-    }
+    handleInstall()
   }
-
-  // Auto-start enrich phase when install completes (full tier)
-  useEffect(() => {
-    if (wizardStep.step === 'enriching' && pendingEnrichStart.current) {
-      pendingEnrichStart.current = false
-      startEnrich()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wizardStep.step])
-
-  // Determine current tier for step indicator (use config tier, fallback to 'full')
-  const currentTier: InstallTier =
-    wizardStep.step === 'installing' ? wizardStep.tier : installConfig.tier
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -929,7 +670,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
     <div className="flex flex-col h-full overflow-hidden bg-background">
       {/* Wizard step indicator */}
       <div className="flex-shrink-0 border-b border-border/30 px-4 py-2">
-        <StepIndicator wizardStep={wizardStep} tier={currentTier} />
+        <StepIndicator wizardStep={wizardStep} />
       </div>
 
       {/* Step content */}
@@ -951,22 +692,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
         {wizardStep.step === 'installing' && (
           <InstallingStep
             logLines={logLines}
-            tier={wizardStep.tier}
             onBack={() => setWizardStep({ step: 'agent-selection' })}
-          />
-        )}
-
-        {wizardStep.step === 'enriching' && (
-          <EnrichStep
-            checkpoints={checkpoints}
-            logLines={logLines}
-            chatMessages={chatMessages}
-            isStreaming={isStreaming}
-            streamingText={streamingText}
-            sessionId={sessionId}
-            projectId={project.id}
-            onBack={() => setWizardStep({ step: 'installing', tier: installConfig.tier })}
-            onSendMessage={handleSendMessage}
           />
         )}
 

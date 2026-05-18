@@ -27,7 +27,7 @@ describe('getSpending', () => {
     expect(r.summary.totalCostUsd).toBe(0)
     expect(r.summary.totalRuns).toBe(0)
     expect(r.summary.deltaPct).toBeNull()
-    expect(r.bySurface).toHaveLength(4)
+    expect(r.bySurface).toHaveLength(5)
     expect(r.bySurface.every((s) => s.count === 0)).toBe(true)
     expect(r.topTickets).toEqual([])
   })
@@ -117,6 +117,38 @@ describe('getSpending', () => {
     expect(r.summary.totalEstimatedCostUsd).toBe(0)
   })
 
+  it('aggregates smash surface rows alongside other surfaces', () => {
+    const now = new Date().toISOString()
+    seed(db, [
+      { id: 's1', surface: 'smash', ticket_id: 42, status: 'success', total_cost_usd: 0.15, num_turns: 1, duration_ms: 4000, started_at: now },
+      { id: 's2', surface: 'smash', ticket_id: 42, status: 'success', total_cost_usd: 0.12, num_turns: 1, duration_ms: 3000, started_at: now },
+      { id: 's3', surface: 'smash', ticket_id: 50, status: 'failed', total_cost_usd: null, started_at: now },
+      { id: 'j1', surface: 'job', ticket_id: 42, status: 'success', total_cost_usd: 1.0, started_at: now },
+    ])
+    const r = getSpending(db, 'p1', { period: 'all' })
+    const smashEntry = r.bySurface.find((s) => s.surface === 'smash')
+    expect(smashEntry).toBeDefined()
+    expect(smashEntry!.count).toBe(3)
+    expect(smashEntry!.costUsd).toBeCloseTo(0.27)
+    // Ticket 42 should show the SMASH costs in bySurface breakdown
+    const t42 = r.topTickets.find((t) => t.ticketId === 42)!
+    expect(t42.bySurface.smash.count).toBe(2)
+    expect(t42.bySurface.smash.costUsd).toBeCloseTo(0.27)
+    expect(t42.bySurface.job.costUsd).toBeCloseTo(1.0)
+  })
+
+  it('filters by smash surface alone', () => {
+    const now = new Date().toISOString()
+    seed(db, [
+      { id: 's1', surface: 'smash', total_cost_usd: 0.5, started_at: now },
+      { id: 'j1', surface: 'job', total_cost_usd: 10, started_at: now },
+      { id: 'q1', surface: 'quick-spec', total_cost_usd: 1, started_at: now },
+    ])
+    const r = getSpending(db, 'p1', { period: 'all', surface: ['smash'] })
+    expect(r.summary.totalCostUsd).toBeCloseTo(0.5)
+    expect(r.summary.totalRuns).toBe(1)
+  })
+
   it('computes deltaPct vs previous period', () => {
     const today = new Date()
     const tenDaysAgo = new Date(today.getTime() - 10 * 86_400_000).toISOString()
@@ -146,6 +178,27 @@ describe('getInvocations', () => {
     const r = getInvocations(db, 'p1', { period: 'all', limit: 2, offset: 1 })
     expect(r.rows).toHaveLength(2)
     expect(r.totalAvailable).toBe(5)
+  })
+
+  it('uses conv title when present, else first-message summary', () => {
+    db.prepare(`INSERT INTO chat_conversations (id, model, kind, title) VALUES (?, ?, ?, ?)`)
+      .run('conv-1', 'sonnet', 'explore', 'Real Title')
+    db.prepare(`INSERT INTO chat_conversations (id, model, kind, title) VALUES (?, ?, ?, ?)`)
+      .run('conv-2', 'sonnet', 'explore', null)
+    db.prepare(`INSERT INTO chat_messages (conversation_id, role, content) VALUES (?, ?, ?)`)
+      .run('conv-2', 'user', '/specrails:explore-spec\n\nAdd a dark mode toggle to settings')
+    recordInvocation(db, {
+      id: 'i1', project_id: 'p1', provider: 'claude', surface: 'explore-spec', status: 'success',
+      conversation_id: 'conv-1', started_at: new Date().toISOString(),
+    })
+    recordInvocation(db, {
+      id: 'i2', project_id: 'p1', provider: 'claude', surface: 'explore-spec', status: 'success',
+      conversation_id: 'conv-2', started_at: new Date(Date.now() - 1000).toISOString(),
+    })
+    const r = getInvocations(db, 'p1', { period: 'all' })
+    const byId = new Map(r.rows.map((row) => [row.id, row]))
+    expect(byId.get('i1')?.ticket_title).toBe('Real Title')
+    expect(byId.get('i2')?.ticket_title).toBe('Add a dark mode…')
   })
 
   it('applies cap and sets truncated flag', () => {

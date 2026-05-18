@@ -31,27 +31,28 @@ export function MinimizedChatChip({
   return (
     <div
       data-testid={`minimized-chat-chip-${chat.id}`}
-      className="flex items-start gap-2 w-full max-w-full overflow-hidden"
+      className="grid items-start gap-2 w-full max-w-full"
+      style={{ gridTemplateColumns: 'auto minmax(0, 1fr) auto' }}
     >
       <KindIcon kind={chat.kind} />
       <button
         type="button"
         onClick={onRestore}
-        className="flex-1 min-w-0 max-w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/50 rounded overflow-hidden"
+        className="min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/50 rounded overflow-hidden"
         aria-label={`Restore ${chat.label}`}
         title={chat.label}
       >
-        <div className="text-sm font-medium text-foreground truncate block max-w-full">
+        <div className="text-sm font-medium text-foreground truncate">
           {visibleLabel}
         </div>
-        <div className="text-[11px] text-muted-foreground mt-0.5 truncate block max-w-full">
+        <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
           Continue editing · {projectName}
         </div>
       </button>
       <button
         type="button"
         onClick={onClose}
-        className="flex-shrink-0 p-1 -mr-1 -mt-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/50"
+        className="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/50"
         aria-label={`Close ${chat.label}`}
       >
         <X className="w-3.5 h-3.5" />

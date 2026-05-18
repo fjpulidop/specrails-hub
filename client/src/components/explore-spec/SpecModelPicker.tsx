@@ -32,7 +32,7 @@ interface SpecModelPickerProps {
 
 export function SpecModelPicker({ value, allowed, loading, onChange, ariaLabel }: SpecModelPickerProps) {
   return (
-    <Select value={value ?? undefined} onValueChange={onChange} disabled={loading || allowed.length === 0}>
+    <Select value={value ?? ''} onValueChange={onChange} disabled={loading || allowed.length === 0}>
       <SelectTrigger
         className="h-8 w-[160px] text-xs gap-1.5"
         aria-label={ariaLabel ?? 'Spec generation model'}

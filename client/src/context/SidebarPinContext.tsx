@@ -1,26 +1,84 @@
-import { createContext, useContext, useState } from 'react'
-import type { ReactNode, Dispatch, SetStateAction } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
+
+export type SidebarMode = 'pinned-open' | 'pinned-collapsed' | 'unpinned'
+
+const VALID_MODES: readonly SidebarMode[] = ['pinned-open', 'pinned-collapsed', 'unpinned']
+const STORAGE_KEY_LEFT = 'specrails-hub:sidebar-mode:left'
+const STORAGE_KEY_RIGHT = 'specrails-hub:sidebar-mode:right'
+
+function isSidebarMode(value: unknown): value is SidebarMode {
+  return typeof value === 'string' && (VALID_MODES as readonly string[]).includes(value)
+}
+
+function readMode(key: string): SidebarMode {
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (isSidebarMode(raw)) return raw
+  } catch {
+    // localStorage unavailable (private mode, SSR, etc.) — fall through
+  }
+  return 'unpinned'
+}
+
+function writeMode(key: string, mode: SidebarMode): void {
+  try {
+    window.localStorage.setItem(key, mode)
+  } catch {
+    // best-effort: ignore quota / private-mode failures
+  }
+}
+
+function nextMode(mode: SidebarMode): SidebarMode {
+  switch (mode) {
+    case 'pinned-open':
+      return 'pinned-collapsed'
+    case 'pinned-collapsed':
+      return 'unpinned'
+    case 'unpinned':
+      return 'pinned-open'
+  }
+}
 
 interface SidebarPinContextValue {
-  leftPinned: boolean
-  setLeftPinned: Dispatch<SetStateAction<boolean>>
-  rightPinned: boolean
-  setRightPinned: Dispatch<SetStateAction<boolean>>
+  leftMode: SidebarMode
+  rightMode: SidebarMode
+  setLeftMode: (mode: SidebarMode) => void
+  setRightMode: (mode: SidebarMode) => void
+  cycleLeftMode: () => void
+  cycleRightMode: () => void
 }
 
 const SidebarPinContext = createContext<SidebarPinContextValue>({
-  leftPinned: false,
-  setLeftPinned: () => {},
-  rightPinned: false,
-  setRightPinned: () => {},
+  leftMode: 'unpinned',
+  rightMode: 'unpinned',
+  setLeftMode: () => {},
+  setRightMode: () => {},
+  cycleLeftMode: () => {},
+  cycleRightMode: () => {},
 })
 
 export function SidebarPinProvider({ children }: { children: ReactNode }) {
-  const [leftPinned, setLeftPinned] = useState(false)
-  const [rightPinned, setRightPinned] = useState(false)
+  const [leftMode, setLeftModeState] = useState<SidebarMode>(() => readMode(STORAGE_KEY_LEFT))
+  const [rightMode, setRightModeState] = useState<SidebarMode>(() => readMode(STORAGE_KEY_RIGHT))
+
+  useEffect(() => {
+    writeMode(STORAGE_KEY_LEFT, leftMode)
+  }, [leftMode])
+
+  useEffect(() => {
+    writeMode(STORAGE_KEY_RIGHT, rightMode)
+  }, [rightMode])
+
+  const setLeftMode = useCallback((mode: SidebarMode) => setLeftModeState(mode), [])
+  const setRightMode = useCallback((mode: SidebarMode) => setRightModeState(mode), [])
+  const cycleLeftMode = useCallback(() => setLeftModeState((m) => nextMode(m)), [])
+  const cycleRightMode = useCallback(() => setRightModeState((m) => nextMode(m)), [])
 
   return (
-    <SidebarPinContext.Provider value={{ leftPinned, setLeftPinned, rightPinned, setRightPinned }}>
+    <SidebarPinContext.Provider
+      value={{ leftMode, rightMode, setLeftMode, setRightMode, cycleLeftMode, cycleRightMode }}
+    >
       {children}
     </SidebarPinContext.Provider>
   )

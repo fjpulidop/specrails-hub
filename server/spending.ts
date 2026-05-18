@@ -28,6 +28,7 @@ export interface DailyEntry {
   quickCostUsd: number
   exploreCostUsd: number
   aiEditCostUsd: number
+  smashCostUsd: number
   totalCostUsd: number
 }
 export interface ScatterPoint {
@@ -104,7 +105,7 @@ export interface InvocationWithTicket extends InvocationRow {
   ticket_title: string | null
 }
 
-const ALL_SURFACES: Surface[] = ['job', 'quick-spec', 'explore-spec', 'ai-edit']
+const ALL_SURFACES: Surface[] = ['job', 'quick-spec', 'explore-spec', 'ai-edit', 'smash']
 
 interface ResolvedRange {
   from: string
@@ -277,7 +278,7 @@ export function getSpending(
   const dayMap = new Map<string, DailyEntry>()
   for (const day of days) {
     dayMap.set(day, {
-      date: day, jobsCostUsd: 0, quickCostUsd: 0, exploreCostUsd: 0, aiEditCostUsd: 0, totalCostUsd: 0,
+      date: day, jobsCostUsd: 0, quickCostUsd: 0, exploreCostUsd: 0, aiEditCostUsd: 0, smashCostUsd: 0, totalCostUsd: 0,
     })
   }
   for (const r of dayRows) {
@@ -288,6 +289,7 @@ export function getSpending(
     else if (r.surface === 'quick-spec') entry.quickCostUsd += c
     else if (r.surface === 'explore-spec') entry.exploreCostUsd += c
     else if (r.surface === 'ai-edit') entry.aiEditCostUsd += c
+    else if (r.surface === 'smash') entry.smashCostUsd += c
     entry.totalCostUsd += c
   }
   const dailyTimeline = Array.from(dayMap.values())
@@ -447,6 +449,31 @@ export function getSpending(
   }
 }
 
+/**
+ * Produce a short identifying label from an Explore conversation's first
+ * user message. Strips leading slash-command lines and resolved-command
+ * frontmatter, takes the first non-empty line, and truncates to a few
+ * words so the analytics TICKET column stays readable.
+ */
+export function summariseExplorePrompt(raw: string): string | null {
+  if (!raw) return null
+  let text = raw
+  // Strip the slash-command head (`/specrails:explore-spec ...` plus any
+  // trailing blank lines until the user's content).
+  text = text.replace(/^\/[^\n]*\n+/, '')
+  // Find the first non-frontmatter, non-empty, non-heading line.
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+  let first = lines.find((l) =>
+    !l.startsWith('#') && !l.startsWith('---') && !l.startsWith('//') && !l.startsWith('>'),
+  ) ?? lines[0] ?? ''
+  // Strip markdown emphasis / inline code so the chip reads clean.
+  first = first.replace(/[*_`]/g, '').trim()
+  if (!first) return null
+  const words = first.split(/\s+/).filter(Boolean)
+  const top = words.slice(0, 4).join(' ')
+  return words.length > 4 ? `${top}…` : top
+}
+
 export function getInvocations(
   db: DbInstance,
   projectId: string,
@@ -464,8 +491,42 @@ export function getInvocations(
     SELECT * FROM ai_invocations WHERE ${where.sql}
     ORDER BY started_at DESC LIMIT ? OFFSET ?
   `).all(...where.params, limit, offset) as InvocationRow[]
-  // (ticket_title joined client-side — tickets store is YAML, not SQLite)
-  const enriched: InvocationWithTicket[] = rows.map((r) => ({ ...r, ticket_title: null }))
+  // For Explore rows (conversation_id non-null) without a committed ticket,
+  // surface the conversation title as the provisional ticket label so the
+  // analytics table is useful before commit.
+  const convIds = Array.from(new Set(
+    rows.filter((r) => r.conversation_id).map((r) => r.conversation_id as string),
+  ))
+  const titleByConv = new Map<string, string | null>()
+  if (convIds.length > 0) {
+    const placeholders = convIds.map(() => '?').join(',')
+    const titleRows = db.prepare(
+      `SELECT id, title FROM chat_conversations WHERE id IN (${placeholders})`,
+    ).all(...convIds) as Array<{ id: string; title: string | null }>
+    for (const tr of titleRows) titleByConv.set(tr.id, tr.title)
+    // Fallback: first user message for convs without a title yet (Explore
+    // lightweight mode never auto-titles unless saved as draft).
+    const missing = convIds.filter((id) => !titleByConv.get(id))
+    if (missing.length > 0) {
+      const p2 = missing.map(() => '?').join(',')
+      const msgRows = db.prepare(
+        `SELECT conversation_id, content FROM chat_messages
+         WHERE role = 'user' AND conversation_id IN (${p2})
+         ORDER BY conversation_id, id ASC`,
+      ).all(...missing) as Array<{ conversation_id: string; content: string }>
+      const seen = new Set<string>()
+      for (const mr of msgRows) {
+        if (seen.has(mr.conversation_id)) continue
+        seen.add(mr.conversation_id)
+        const summary = summariseExplorePrompt(mr.content)
+        if (summary) titleByConv.set(mr.conversation_id, summary)
+      }
+    }
+  }
+  const enriched: InvocationWithTicket[] = rows.map((r) => ({
+    ...r,
+    ticket_title: r.conversation_id ? (titleByConv.get(r.conversation_id) ?? null) : null,
+  }))
   return {
     rows: enriched,
     total: cap ? Math.min(rows.length, cap) : rows.length,

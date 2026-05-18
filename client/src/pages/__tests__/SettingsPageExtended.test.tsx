@@ -194,7 +194,6 @@ describe('SettingsPage - extended coverage', () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => mockConfig }) // GET /config
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) })        // GET /budget
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ enabled: false }) }) // GET /explore-mcp-enabled
       .mockResolvedValueOnce({ ok: true, json: async () => ({ pipelineTelemetryEnabled: false, orchestratorModel: 'sonnet' }) }) // GET /settings
       .mockResolvedValueOnce({ ok: true, json: async () => ({ agents: [] }) }) // GET /agent-models
       .mockResolvedValueOnce({ ok: true })                                 // PATCH budget save
@@ -239,7 +238,6 @@ describe('SettingsPage - extended coverage', () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ...mockConfig, dailyBudgetUsd: 5.0 }) })  // GET /config
       .mockResolvedValueOnce({ ok: true, json: async () => ({ dailyBudgetUsd: 5.0 }) })                   // GET /budget
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ enabled: false }) })                        // GET /explore-mcp-enabled
       .mockResolvedValueOnce({ ok: true, json: async () => ({ pipelineTelemetryEnabled: false, orchestratorModel: 'sonnet' }) }) // GET /settings
       .mockResolvedValueOnce({ ok: true, json: async () => ({ agents: [] }) })                             // GET /agent-models
       .mockResolvedValueOnce({ ok: true })                                                                  // PATCH /budget

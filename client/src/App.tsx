@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { _registerRouteForcer } from './lib/route-memory'
@@ -33,12 +33,15 @@ import { CommandPalette } from './components/CommandPalette'
 import { SharedWebSocketProvider } from './hooks/useSharedWebSocket'
 import { HubProvider, useHub } from './hooks/useHub'
 import { SpecGenTrackerProvider } from './hooks/useSpecGenTracker'
+import { ContractRefineTrackerProvider } from './hooks/useContractRefineTracker'
+import { SmashTrackerProvider } from './context/SmashTrackerContext'
 import { useOsNotifications } from './hooks/useOsNotifications'
 import { useDesktopUpdateNotifier } from './hooks/useDesktopUpdateNotifier'
 import { WS_URL } from './lib/ws-url'
 import { TerminalsProvider, useTerminals } from './context/TerminalsContext'
 import { MinimizedChatsProvider } from './context/MinimizedChatsContext'
 import { TicketDetailModalProvider } from './context/TicketDetailModalContext'
+import { useCompareUrlSync } from './hooks/useCompareUrlSync'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { FEATURE_AGENTS_SECTION, FEATURE_TERMINAL_PANEL } from './lib/feature-flags'
 
@@ -116,13 +119,18 @@ function useProjectRouteMemory(activeProjectId: string | null) {
 
 function HubApp() {
   const { projects, activeProjectId, isLoading, isSwitchingProject, setupProjectIds, completeSetupWizard, setActiveProjectId } = useHub()
-  const { setLeftPinned, setRightPinned } = useSidebarPin()
+  const { cycleLeftMode, cycleRightMode } = useSidebarPin()
   const navigate = useNavigate()
   const terminals = useTerminals()
+
+  // Two-way sync between split-view comparison state and ?compare=… URL params.
+  useCompareUrlSync()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [analyticsOpen, setAnalyticsOpen] = useState(false)
   const [docsOpen, setDocsOpen] = useState(false)
+  // Stable onClose so memoised DocsDialog doesn't re-render every HubApp render.
+  const closeDocs = useCallback(() => setDocsOpen(false), [])
   const [onboardingOpen, setOnboardingOpen] = useState(() => !hasSeenOnboarding())
 
   // Remember which page each project was on
@@ -135,8 +143,8 @@ function HubApp() {
     : ['/', '/jobs', '/analytics', '/integrations', '/settings']
   useKeyboardShortcuts({
     onOpenCheatsheet: openCheatsheet,
-    onToggleLeftSidebar: () => setLeftPinned((p) => !p),
-    onToggleRightSidebar: () => setRightPinned((p) => !p),
+    onToggleLeftSidebar: cycleLeftMode,
+    onToggleRightSidebar: cycleRightMode,
     onSwitchProject: (index) => {
       const project = projects[index - 1]
       if (project) setActiveProjectId(project.id)
@@ -259,7 +267,7 @@ function HubApp() {
       </Dialog>
 
       <Suspense fallback={null}>
-        <DocsDialog open={docsOpen} onClose={() => setDocsOpen(false)} />
+        <DocsDialog open={docsOpen} onClose={closeDocs} />
       </Suspense>
 
       <CommandPalette
@@ -361,6 +369,8 @@ export default function App() {
               {/* Custom frameless titlebar inside HubProvider so it can read active project */}
               <TitleBar />
               <SpecGenTrackerProvider>
+                <ContractRefineTrackerProvider>
+                <SmashTrackerProvider>
                 <SidebarPinProvider>
                   <TerminalsProviderWithHub>
                     <MinimizedChatsProvider>
@@ -371,6 +381,8 @@ export default function App() {
                     </MinimizedChatsProvider>
                   </TerminalsProviderWithHub>
                 </SidebarPinProvider>
+                </SmashTrackerProvider>
+                </ContractRefineTrackerProvider>
               </SpecGenTrackerProvider>
             </HubProvider>
           </ThemeProvider>

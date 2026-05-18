@@ -35,7 +35,8 @@ export interface UseChatReturn {
   createConversation: (model?: string) => Promise<void>
   deleteConversation: (id: string) => Promise<void>
   sendMessage: (conversationId: string, text: string, options?: ChatSendOptions) => Promise<void>
-  startWithMessage: (text: string, options?: ChatSendOptions, model?: string, kind?: 'sidebar' | 'explore') => Promise<string | null>
+  startWithMessage: (text: string, options?: ChatSendOptions, model?: string, kind?: 'sidebar' | 'explore', contextScope?: { specrails: boolean; openspec: boolean; full: boolean; mcp: boolean }) => Promise<string | null>
+  hydrateConversation: (id: string) => Promise<void>
   abortStream: (conversationId: string) => Promise<void>
   confirmCommand: (command: string) => Promise<void>
   dismissCommandProposal: (conversationId: string, command: string) => void
@@ -340,12 +341,20 @@ export function useChat(): UseChatReturn {
   }, [])
 
   // Create a conversation and immediately send the first message
-  const startWithMessage = useCallback(async (text: string, options?: ChatSendOptions, model?: string, kind?: 'sidebar' | 'explore'): Promise<string | null> => {
+  const startWithMessage = useCallback(async (
+    text: string,
+    options?: ChatSendOptions,
+    model?: string,
+    kind?: 'sidebar' | 'explore',
+    contextScope?: { specrails: boolean; openspec: boolean; full: boolean; mcp: boolean },
+  ): Promise<string | null> => {
     try {
+      const body: Record<string, unknown> = { model: model ?? undefined, kind: kind ?? undefined }
+      if (contextScope && kind === 'explore') body.contextScope = contextScope
       const res = await fetch(`${getApiBase()}/chat/conversations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: model ?? undefined, kind: kind ?? undefined }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) return null
       const data = await res.json() as { conversation: ChatConversationSummary }
@@ -371,6 +380,34 @@ export function useChat(): UseChatReturn {
     }
   }, [sendMessage])
 
+  // Hydrate a specific conversation by id (used by Explore shell restore when
+  // the conversation is older than the top-3 kept in memory). Idempotent —
+  // no-op if the conv is already present.
+  const hydrateConversation = useCallback(async (id: string): Promise<void> => {
+    if (conversations.some((c) => c.id === id)) return
+    try {
+      const res = await fetch(`${getApiBase()}/chat/conversations/${id}`)
+      if (!res.ok) return
+      const data = await res.json() as {
+        conversation: ChatConversationSummary
+        messages: ChatMessage[]
+      }
+      const hydrated: ChatConversation = {
+        id: data.conversation.id,
+        title: data.conversation.title,
+        model: data.conversation.model,
+        messages: data.messages,
+        isStreaming: false,
+        streamingText: '',
+        commandProposals: [],
+      }
+      setConversations((prev) => {
+        if (prev.some((c) => c.id === id)) return prev
+        return [...prev, hydrated]
+      })
+    } catch { /* ignore */ }
+  }, [conversations])
+
   return {
     conversations,
     activeTabIndex,
@@ -381,6 +418,7 @@ export function useChat(): UseChatReturn {
     deleteConversation,
     sendMessage,
     startWithMessage,
+    hydrateConversation,
     abortStream,
     confirmCommand,
     dismissCommandProposal,

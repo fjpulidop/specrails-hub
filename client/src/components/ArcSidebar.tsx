@@ -100,6 +100,12 @@ function ProjectItem({
   )
 }
 
+const LEFT_PIN_LABEL: Record<'pinned-open' | 'pinned-collapsed' | 'unpinned', string> = {
+  'pinned-open': 'Collapse left sidebar (keep pinned)',
+  'pinned-collapsed': 'Unpin left sidebar',
+  'unpinned': 'Pin left sidebar open',
+}
+
 export function ArcSidebar({
   onAddProject,
   onOpenAnalytics,
@@ -107,9 +113,11 @@ export function ArcSidebar({
   onOpenSettings,
 }: ArcSidebarProps) {
   const { projects, activeProjectId, setActiveProjectId, removeProject } = useHub()
-  const { leftPinned: pinned, setLeftPinned: setPinned } = useSidebarPin()
+  const { leftMode, cycleLeftMode } = useSidebarPin()
   const [hovered, setHovered] = useState(false)
-  const expanded = pinned || hovered
+  const expanded = leftMode === 'pinned-open' || (leftMode === 'unpinned' && hovered)
+  const lit = leftMode !== 'unpinned'
+  const pinLabel = LEFT_PIN_LABEL[leftMode]
 
   const navItems = [
     { label: 'Docs', icon: BookOpen, action: onOpenDocs },
@@ -132,8 +140,8 @@ export function ArcSidebar({
         'transition-all duration-200 ease-in-out overflow-hidden',
         expanded ? 'w-52' : 'w-11'
       )}
-      onMouseEnter={() => { if (!pinned) setHovered(true) }}
-      onMouseLeave={() => { if (!pinned) setHovered(false) }}
+      onMouseEnter={() => { if (leftMode === 'unpinned') setHovered(true) }}
+      onMouseLeave={() => { if (leftMode === 'unpinned') setHovered(false) }}
     >
       {/* Header */}
       <div
@@ -149,15 +157,15 @@ export function ArcSidebar({
         )}
         <button
           type="button"
-          onClick={() => setPinned((p) => !p)}
+          onClick={cycleLeftMode}
           className={cn(
             'flex items-center justify-center w-7 h-7 rounded-md transition-colors flex-shrink-0',
-            pinned
+            lit
               ? 'text-foreground bg-muted'
               : 'text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50'
           )}
-          aria-label={pinned ? 'Unpin left sidebar' : 'Pin left sidebar'}
-          title={pinned ? 'Unpin left sidebar (⌥⌘B)' : 'Pin left sidebar (⌥⌘B)'}
+          aria-label={pinLabel}
+          title={`${pinLabel} (⌥⌘B)`}
         >
           <PanelLeft className="w-4 h-4" />
         </button>

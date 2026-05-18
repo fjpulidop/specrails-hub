@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
 import { Sparkles, Send, Zap, MessagesSquare } from 'lucide-react'
 import { toast } from 'sonner'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
 import { useHub } from '../hooks/useHub'
 import { useSpecGenTracker } from '../hooks/useSpecGenTracker'
@@ -10,6 +10,12 @@ import { deleteAllAttachments } from '../lib/attachments'
 import { RichAttachmentEditor, type RichAttachmentEditorHandle } from './RichAttachmentEditor'
 import { SpecModelPicker, useDefaultSpecModel } from './explore-spec/SpecModelPicker'
 import type { LocalTicket } from '../types'
+import { ContextScopeChecks } from './ContextScopeChecks'
+import { ContextScopeSlider } from './ContextScopeSlider'
+import { useContextScope } from '../hooks/useContextScope'
+import { useContextBudget } from '../hooks/useContextBudget'
+import { useQuickContractRefineLast } from '../hooks/useQuickContractRefineLast'
+import { quickHintForScope, tierFromScope, submitAccentForTier, type ContextScope } from '../types/context-scope'
 
 type SpecMode = 'quick' | 'explore'
 
@@ -22,7 +28,7 @@ export interface ExploreLaunchPayload {
   model: string
   /** Add Spec context scope frozen at launch time. Forwarded to the
    *  ExploreSpecShell so the server-side conversation row carries it. */
-  contextScope?: import('../types/context-scope').ContextScope
+  contextScope: ContextScope
 }
 
 interface ProposeSpecModalProps {
@@ -55,11 +61,31 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
   const [pendingSpecId, setPendingSpecId] = useState<string>(() => genPendingId())
   const editorRef = useRef<RichAttachmentEditorHandle | null>(null)
   const submittedRef = useRef(false)
+  const scopeTouchedRef = useRef(false)
 
   // Model picker — fetched on each open. Locked for the whole flow once the
   // user submits; no downstream surface changes it. See spec
   // `add-spec-model-selection`.
   const { model, setModel, allowed, loading: modelLoading } = useDefaultSpecModel(activeProjectId, open)
+
+  const { scope, setScope, persist: persistScope } = useContextScope(activeProjectId, mode, open)
+  const quickRefine = useQuickContractRefineLast(activeProjectId, open)
+  const { data: budget, isError: budgetError } = useContextBudget(activeProjectId, open)
+  const tier = useMemo(() => tierFromScope(scope), [scope])
+
+  useEffect(() => {
+    if (mode !== 'quick' || !quickRefine.loaded || scopeTouchedRef.current) return
+    setScope((prev) => ({ ...prev, contractRefine: quickRefine.value }))
+  }, [mode, quickRefine.loaded, quickRefine.value, setScope])
+
+  const handleScopeChange = useCallback((next: ContextScope | ((s: ContextScope) => ContextScope)) => {
+    scopeTouchedRef.current = true
+    setScope(next)
+  }, [setScope])
+
+  useEffect(() => {
+    scopeTouchedRef.current = false
+  }, [mode])
 
   const activeProjectIdRef = useRef(activeProjectId)
   useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
@@ -76,6 +102,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
       setHasText(false)
       setAttachmentCount(0)
       submittedRef.current = false
+      scopeTouchedRef.current = false
       // defer to let dialog mount; reset any user-resized height so the modal
       // always opens at the configured minHeight, then focus the editor.
       setTimeout(() => {
@@ -113,10 +140,15 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
         return
       }
       submittedRef.current = true // suppress attachment cleanup on close
+      void persistScope(scope)
       // If the picker is still resolving, fall back to 'sonnet' as a safe
       // claude default — server re-validates and will resolve the project's
       // configured default if this doesn't fit.
-      onExploreLaunch({ idea, pendingSpecId, initialAttachmentIds: attachmentIds, model: model ?? 'sonnet' })
+      onExploreLaunch({
+        idea, pendingSpecId, initialAttachmentIds: attachmentIds,
+        model: model ?? 'sonnet',
+        contextScope: scope,
+      })
       onClose()
       return
     }
@@ -130,6 +162,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     toast.loading(`${projectName} · ${truncated}`, { id: toastId, description: 'Generating...' })
 
     submittedRef.current = true
+    void quickRefine.persist(scope.contractRefine)
     setIsSubmitting(true)
     editorRef.current?.clear()
     setAttachmentCount(0)
@@ -143,7 +176,17 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
         res = await fetch(`${API_ORIGIN}/api/projects/${projectId}/tickets/generate-spec`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idea, attachmentIds, pendingSpecId, model: model ?? undefined }),
+          body: JSON.stringify({
+            idea, attachmentIds, pendingSpecId, model: model ?? undefined,
+            contextScope: {
+              specrails: scope.specrails,
+              openspec: scope.openspec,
+              full: scope.full,
+              mcp: scope.mcp,
+              contractRefine: scope.contractRefine,
+            },
+            contractRefine: scope.contractRefine,
+          }),
         })
       } catch (err) {
         console.error('[ProposeSpec] generate-spec fetch threw:', err)
@@ -159,7 +202,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     } finally {
       setIsSubmitting(false)
     }
-  }, [mode, tickets, tracker, pendingSpecId, onClose, onExploreLaunch, model])
+  }, [mode, tickets, tracker, pendingSpecId, onClose, onExploreLaunch, model, quickRefine, scope])
 
   return (
     <>
@@ -170,17 +213,32 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
               <Sparkles className="w-4 h-4 text-primary/70" />
               Add Spec
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Create a new spec from a short idea, either immediately or through Explore mode.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col p-5 gap-4">
             <div className="flex items-center justify-between gap-3">
-              <ModeSegmented value={mode} onChange={setMode} />
+              <ModeSegmented value={mode} onChange={setMode} fullCodebase={scope.full} />
               <SpecModelPicker
                 value={model}
                 allowed={allowed}
                 loading={modelLoading}
                 onChange={setModel}
               />
+            </div>
+
+            <div className="space-y-3">
+              <ContextScopeSlider
+                value={scope}
+                onChange={handleScopeChange}
+                budget={budget}
+                budgetError={budgetError}
+                model={model ?? 'sonnet'}
+                maxPresetId={mode === 'quick' ? 'max' : 'hub'}
+              />
+              <ContextScopeChecks scope={scope} mode={mode} onChange={handleScopeChange} label="Fine-tune" showSummary={false} />
             </div>
 
             <p className="text-sm text-muted-foreground">
@@ -212,7 +270,8 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                 size="sm"
                 onClick={handleSubmit}
                 disabled={!canSubmit}
-                className="gap-1.5"
+                className={`gap-1.5 ${submitAccentForTier(tier)}`}
+                data-testid="propose-submit"
               >
                 <Send className="w-3.5 h-3.5" />
                 {mode === 'quick' ? 'Generate Spec' : 'Continue'}
@@ -226,14 +285,16 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
   )
 }
 
-function ModeSegmented({ value, onChange }: { value: SpecMode; onChange: (v: SpecMode) => void }) {
+function ModeSegmented({
+  value, onChange, fullCodebase,
+}: { value: SpecMode; onChange: (v: SpecMode) => void; fullCodebase: boolean }) {
   return (
     <div role="tablist" aria-label="Spec creation mode" className="inline-flex items-center gap-1 p-1 rounded-lg border border-border/50 bg-card/40 self-start">
       <ModeOption
         active={value === 'quick'}
         icon={<Zap className="w-3.5 h-3.5" />}
         label="Quick"
-        hint="~15s"
+        hint={quickHintForScope({ specrails: false, openspec: false, full: fullCodebase, mcp: false, contractRefine: false })}
         onClick={() => onChange('quick')}
       />
       <ModeOption

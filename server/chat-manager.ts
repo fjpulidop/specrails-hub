@@ -3,7 +3,7 @@ import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
 import type { DbInstance } from './db'
-import { getConversation, addMessage, updateConversation, getStats, listJobs, getExploreMcpEnabled } from './db'
+import { getConversation, addMessage, updateConversation, getStats, listJobs } from './db'
 import { resolveCommand } from './command-resolver'
 import { spawnAiCli } from './util/cli-prompt'
 import { ensureExploreCwd } from './explore-cwd-manager'
@@ -13,6 +13,10 @@ import { randomUUID } from 'crypto'
 import { parseSpecDraftBlocks, applyBlocks, type ConversationDraftState } from './spec-draft-parser'
 import { attachmentManager, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
 import { getAdapter, type ProviderAdapter, type AdapterEvent } from './providers'
+import {
+  buildScopedSystemPromptPrefix, toolFlagsForScope, normalizeContextScope,
+  defaultBootScope, type ContextScope,
+} from './context-scope'
 
 const COMMAND_INSTRUCTION =
   'When you want to suggest a SpecRails command for the user to execute, wrap it in a command block like this: ' +
@@ -271,11 +275,12 @@ export class ChatManager {
    *
    * See openspec/changes/accelerate-spec-chat-first-token/design.md D1+D4.
    */
-  private _resolveSpawnCwd(kind: string | null | undefined): string | undefined {
+  private _resolveSpawnCwd(kind: string | null | undefined, scope?: ContextScope | null): string | undefined {
     if (kind !== 'explore') return this._cwd
     if (!this._projectSlug || !this._cwd || !this._projectName) return this._cwd
-    let mcpEnabled = false
-    try { mcpEnabled = getExploreMcpEnabled(this._db) } catch { /* default false */ }
+    // Per-conversation scope.mcp is the only source of truth. Legacy null
+    // scope is treated as mcp=false (spawn from hub-managed cwd).
+    const mcpEnabled = scope ? !!scope.mcp : false
     if (mcpEnabled) return this._cwd
     try {
       const cwd = ensureExploreCwd({
@@ -289,6 +294,17 @@ export class ChatManager {
     } catch (err) {
       console.error('[chat-manager] ensureExploreCwd failed, falling back to project path:', err)
       return this._cwd
+    }
+  }
+
+  private _resolveConversationScope(row: { kind?: string | null; context_scope?: string | null } | null | undefined): ContextScope | null {
+    if (!row || row.kind !== 'explore') return null
+    const fallback = defaultBootScope('explore')
+    if (!row.context_scope) return fallback
+    try {
+      return normalizeContextScope(JSON.parse(row.context_scope), fallback)
+    } catch {
+      return fallback
     }
   }
 
@@ -373,16 +389,19 @@ export class ChatManager {
    *
    * See openspec/changes/accelerate-spec-chat-first-token/design.md D5.
    */
-  private _buildLightweightSystemPrompt(): string {
+  private _buildLightweightSystemPrompt(scope?: ContextScope | null): string {
     const name = this._projectName ?? 'this project'
-    return (
+    const base =
       `You are a fast, focused assistant for the "${name}" specrails project. ` +
       `You have explicit permission to read and write .specrails/local-tickets.json — ` +
       `this is the project's local ticket store managed by specrails-hub. It is NOT sensitive. ` +
       `When creating or updating tickets, write directly to this JSON file.\n\n` +
       `IMPORTANT: Be efficient. Minimize tool calls. Only read files that are directly relevant. ` +
       `Do not explore broadly — focus on the specific task.`
-    )
+    if (!scope || !this._cwd) return base
+    const prefix = buildScopedSystemPromptPrefix(scope, this._cwd)
+    if (!prefix) return base
+    return `${base}\n\n${prefix}`
   }
 
   isActive(conversationId: string): boolean {
@@ -463,8 +482,9 @@ export class ChatManager {
     // (--system-prompt flag vs prompt-fold) and resume vs fresh-turn are both
     // adapter-driven via capability flags.
     const lightweight = options?.lightweight ?? false
+    const conversationScope = this._resolveConversationScope(conversation)
     let systemPrompt = lightweight
-      ? this._buildLightweightSystemPrompt()
+      ? this._buildLightweightSystemPrompt(conversationScope)
       : this._buildSystemPrompt()
     if (hasAttachments) systemPrompt = `${systemPrompt}\n\n${USER_ATTACHMENT_SYSTEM_NOTE}`
 
@@ -473,18 +493,31 @@ export class ChatManager {
     const action = conversation.session_id && this._adapter.capabilities.nativeResume
       ? 'chat-resume' as const
       : 'chat-turn' as const
+    // Translate the per-conversation Explore scope into provider-native
+    // tool-gating flags. Adapter is the single source of truth for whether
+    // those flags travel as argv (claude `--disallowedTools …`) or as a
+    // config override (codex `-c features.…`). When no scope is set, the
+    // claude path keeps its legacy `--tools default` behaviour via the
+    // adapter; codex ignores it.
+    const scopeFlags = conversationScope
+      ? toolFlagsForScope(conversationScope).args
+      : []
     let args = this._adapter.buildArgs(action, {
       prompt: resolvedText,
       systemPrompt,
       model,
       sessionId: conversation.session_id ?? undefined,
       maxTurns: options?.maxTurns,
+      extraArgs: scopeFlags,
     })
+    if (conversationScope) {
+      console.log(`[chat-manager] scope=${JSON.stringify(conversationScope)} flags=${scopeFlags.join(' ')} promptBytes=${Buffer.byteLength(systemPrompt)}`)
+    }
 
     // No OTEL env injection here — ChatManager spawns are interactive user sessions,
     // not pipeline jobs. Telemetry is scoped to QueueManager pipeline runs only.
     // spawnAiCli reroutes multi-line argv values through stdin on Windows.
-    const spawnCwd = this._resolveSpawnCwd(conversation.kind)
+    const spawnCwd = this._resolveSpawnCwd(conversation.kind, conversationScope)
     const child = spawnAiCli(binary, args, {
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
