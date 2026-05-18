@@ -7,13 +7,19 @@ import path from 'path'
 
 vi.mock('./util/cli-prompt', () => ({
   spawnClaude: vi.fn(),
+  spawnAiCli: vi.fn(),
 }))
 
 vi.mock('tree-kill', () => ({
   default: vi.fn(),
 }))
 
-import { spawnClaude as mockSpawnClaude } from './util/cli-prompt'
+import { spawnAiCli } from './util/cli-prompt'
+
+// Backwards-compat alias: tests refer to `mockSpawnClaude` even after the
+// manager migrated onto `spawnAiCli`. Both point at the same mock function
+// so the test bodies stay readable.
+const mockSpawnClaude = spawnAiCli
 import treeKill from 'tree-kill'
 import { initDb, type DbInstance } from './db'
 import { AgentRefineManager, validateAgentBody, buildFirstTurnPrompt } from './agent-refine-manager'
@@ -157,10 +163,10 @@ memory: project
       const child = createMockChild()
       vi.mocked(mockSpawnClaude).mockReturnValue(child as never)
       await mgr.startRefine({ agentId: 'custom-foo', instruction: 'go', autoTest: false })
-      const args = vi.mocked(mockSpawnClaude).mock.calls[0][0]
+      // spawnAiCli signature: (binary, args, options). Slot 1 is the argv.
+      const args = vi.mocked(mockSpawnClaude).mock.calls[0][1] as string[]
       expect(args).not.toContain('--resume')
-      // And that cwd is the project path.
-      const opts = vi.mocked(mockSpawnClaude).mock.calls[0][1]!
+      const opts = vi.mocked(mockSpawnClaude).mock.calls[0][2]!
       expect(opts.cwd).toBe(projectPath)
       pushLine(child, systemInit('sess'))
       pushLine(child, assistantText(VALID_BODY))
@@ -243,7 +249,7 @@ memory: project
       vi.mocked(mockSpawnClaude).mockReturnValue(child2 as never)
 
       await mgr.sendTurn({ refineId, instruction: 'tighter' })
-      const args = vi.mocked(mockSpawnClaude).mock.calls[1][0]
+      const args = vi.mocked(mockSpawnClaude).mock.calls[1][1] as string[]
       expect(args).toContain('--resume')
       const idx = args.indexOf('--resume')
       expect(args[idx + 1]).toBe('sess-r1')

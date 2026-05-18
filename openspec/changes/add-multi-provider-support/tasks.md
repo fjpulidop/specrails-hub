@@ -90,12 +90,12 @@
 
 ## 9. Refactor `AgentRefineManager`
 
-- [ ] 9.1 Accept an adapter (or resolve via project) in the constructor; remove direct `spawnClaude` calls; route through `adapter.buildArgs('agent-refine', {...})`
-- [ ] 9.2 Replace stream parsing with `adapter.parseStreamLine`; preserve the existing phase machine (`reading → drafting → validating → done`)
-- [ ] 9.3 `validateAgentBody`: the `model: sonnet|opus|haiku` regex MUST become provider-aware — for codex projects, validate against `adapter.modelCatalog()` model values; for claude keep the existing list
-- [ ] 9.4 Spawn site for `auto-test`: also route through the adapter
-- [ ] 9.5 `recordInvocation` call passes `provider: adapter.id`
-- [ ] 9.6 Add a new test file `server/agent-refine-manager.codex.test.ts`: codex refine flow end-to-end with a fake child process
+- [x] 9.1 Accept an adapter (or resolve via project) in the constructor; remove direct `spawnClaude` calls; route through `adapter.buildArgs('agent-refine', {...})`
+- [x] 9.2 Replace stream parsing with `adapter.parseStreamLine`; preserve the existing phase machine (`reading → drafting → validating → done`)
+- [x] 9.3 `validateAgentBody`: the `model: sonnet|opus|haiku` regex MUST become provider-aware — for codex projects, validate against `adapter.modelCatalog()` model values; for claude keep the existing list
+- [x] 9.4 Spawn site for `auto-test`: also route through the adapter
+- [x] 9.5 `recordInvocation` call passes `provider: adapter.id`
+- [x] 9.6 Add a new test file `server/agent-refine-manager.codex.test.ts`: codex refine flow end-to-end with a fake child process
 
 ## 10. Refactor `SetupManager`
 
