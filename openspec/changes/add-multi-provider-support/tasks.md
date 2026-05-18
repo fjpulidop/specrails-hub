@@ -149,9 +149,9 @@
 - [x] 15.1 Add migration 18 in `server/db.ts`: `ALTER TABLE ai_invocations ADD COLUMN provider TEXT;` + `UPDATE ai_invocations SET provider = 'claude' WHERE provider IS NULL;` + create index `idx_ai_inv_project_provider ON ai_invocations(project_id, provider)`
 - [x] 15.2 Add migration 19: `ALTER TABLE ai_invocations ADD COLUMN total_cost_usd_estimated INTEGER NOT NULL DEFAULT 0;`
 - [x] 15.3 Update `recordInvocation` to require `provider` and accept optional `estimated: boolean` (writes 1 when true, 0 default)
-- [ ] 15.4 Update `spending.ts` `getSpending` and `getInvocations` to surface `provider`, `total_cost_usd_estimated`, `totalEstimatedCostUsd` totals, and `byProvider` breakdown
-- [ ] 15.5 Update `client/src/pages/AnalyticsPage.tsx`: `~` prefix on estimated cost cells with tooltip; Hero footnote when `totalEstimatedCostUsd > 0`; `byProvider` widget (new component `client/src/components/analytics/ProviderBreakdownCard.tsx`)
-- [ ] 15.6 Update `server/spending.test.ts` and `analytics/*.test.tsx` accordingly
+- [x] 15.4 Update `spending.ts` `getSpending` and `getInvocations` to surface `provider`, `total_cost_usd_estimated`, `totalEstimatedCostUsd` totals, and `byProvider` breakdown
+- [x] 15.5 Update `client/src/pages/AnalyticsPage.tsx`: `~` prefix on estimated cost cells with tooltip; Hero footnote when `totalEstimatedCostUsd > 0`; `byProvider` widget (new component `client/src/components/analytics/ProviderBreakdownCard.tsx`)
+- [x] 15.6 Update `server/spending.test.ts` and `analytics/*.test.tsx` accordingly
 
 ## 16. Extend `setup-prerequisites.ts`
 
@@ -174,34 +174,34 @@
 
 ## 18. specrails-core 4.6.0: lift gates
 
-- [ ] 18.1 `src/installer/phases/provider-detect.ts`: remove the `throw ProviderError(...coming soon...)` for codex paths (lines 65-87); add codex auth check (no error when `OPENAI_API_KEY` set OR `~/.codex/auth.json` present)
-- [ ] 18.2 `src/installer/phases/install-config.ts`: remove the `errors.push(... codex coming soon ...)` for `doc.provider === 'codex'` (line 96-99)
-- [ ] 18.3 `src/installer/commands/init.ts`: remove the `--provider codex` throw (line 79-84)
-- [ ] 18.4 Update all three test files to invert the rejection tests into acceptance tests; keep coverage ≥ 80%
+- [x] 18.1 `src/installer/phases/provider-detect.ts`: remove the `throw ProviderError(...coming soon...)` for codex paths (lines 65-87); add codex auth check (no error when `OPENAI_API_KEY` set OR `~/.codex/auth.json` present)
+- [x] 18.2 `src/installer/phases/install-config.ts`: remove the `errors.push(... codex coming soon ...)` for `doc.provider === 'codex'` (line 96-99)
+- [x] 18.3 `src/installer/commands/init.ts`: remove the `--provider codex` throw (line 79-84)
+- [x] 18.4 Update all three test files to invert the rejection tests into acceptance tests; keep coverage ≥ 80%
 
 ## 19. specrails-core 4.6.0: codex skills + scaffold
 
-- [ ] 19.1 In `src/installer/phases/scaffold.ts`, remove the `if (input.provider === 'claude')` gate around `placeSkills` (line 171) — skills are now placed for any provider where they exist
-- [ ] 19.2 Add `placeCodexSettings(input)` invoked when `input.provider === 'codex'` that:
+- [x] 19.1 In `src/installer/phases/scaffold.ts`, remove the `if (input.provider === 'claude')` gate around `placeSkills` (line 171) — skills are now placed for any provider where they exist
+- [x] 19.2 Add `placeCodexSettings(input)` invoked when `input.provider === 'codex'` that:
   - Copies `templates/settings/codex-config.toml` to `<repo>/.codex/config.toml` substituting `{{MODEL_NAME}}` from the install-config (default `gpt-5.4-mini`)
   - Copies `templates/settings/codex-rules.star` to `<repo>/.codex/rules.star` substituting `{{CODEX_SHELL_RULES}}` from detected shell tools (reuse existing detection helpers)
-- [ ] 19.3 Add `writeInitialAgentsMd(repoRoot)` that, when `provider === 'codex'`, writes `<repo>/AGENTS.md` with a sentinel `<!-- specrails-managed-start -->` block containing standard guidance (mirroring the existing `CLAUDE.md` template but adapted for codex conventions)
-- [ ] 19.4 Update `templates/settings/codex-config.toml`: replace `name = "codex-mini-latest"` with `name = "{{MODEL_NAME}}"` so the scaffold can substitute
-- [ ] 19.5 Create `templates/skills/rails/sr-architect/SKILL.md` ported from `templates/agents/sr-architect.md` — Claude frontmatter (`model:`, `color:`, `memory:`) becomes the codex SKILL frontmatter format (`name`, `description`, `license`, `compatibility`, `metadata`); body content preserved with personality / risk-tolerance / tone sections intact
-- [ ] 19.6 Create `templates/skills/rails/sr-developer/SKILL.md` ported from `templates/agents/sr-developer.md`
-- [ ] 19.7 Create `templates/skills/rails/sr-reviewer/SKILL.md` ported from `templates/agents/sr-reviewer.md`
-- [ ] 19.8 Create `templates/skills/rails/sr-merge-resolver/SKILL.md` ported from `templates/agents/sr-merge-resolver.md`
-- [ ] 19.9 Update `placeSkills` to descend into `skills/rails/` and place under `.codex/skills/rails/<name>/SKILL.md` for codex projects (and equivalently `.claude/skills/rails/<name>/` for claude projects, even though Claude already has the agents in `.claude/agents/` — these skill versions are additive, not replacements)
-- [ ] 19.10 Add CI test in specrails-core `templates.test.ts`: every `templates/agents/sr-*.md` MUST have a matching `templates/skills/rails/sr-*/SKILL.md` with the same H2 sections, ensuring parity going forward
-- [ ] 19.11 Extend `templates/skills/sr-implement/SKILL.md` to reference the rail skills under `.codex/skills/rails/` so codex orchestrators can call them inline (Phase 1 of the multi-job pipeline deferred — see proposal Non-Goals)
+- [x] 19.3 Add `writeInitialAgentsMd(repoRoot)` that, when `provider === 'codex'`, writes `<repo>/AGENTS.md` with a sentinel `<!-- specrails-managed-start -->` block containing standard guidance (mirroring the existing `CLAUDE.md` template but adapted for codex conventions)
+- [x] 19.4 Update `templates/settings/codex-config.toml`: replace `name = "codex-mini-latest"` with `name = "{{MODEL_NAME}}"` so the scaffold can substitute
+- [x] 19.5 Create `templates/skills/rails/sr-architect/SKILL.md` ported from `templates/agents/sr-architect.md` — Claude frontmatter (`model:`, `color:`, `memory:`) becomes the codex SKILL frontmatter format (`name`, `description`, `license`, `compatibility`, `metadata`); body content preserved with personality / risk-tolerance / tone sections intact
+- [x] 19.6 Create `templates/skills/rails/sr-developer/SKILL.md` ported from `templates/agents/sr-developer.md`
+- [x] 19.7 Create `templates/skills/rails/sr-reviewer/SKILL.md` ported from `templates/agents/sr-reviewer.md`
+- [x] 19.8 Create `templates/skills/rails/sr-merge-resolver/SKILL.md` ported from `templates/agents/sr-merge-resolver.md`
+- [x] 19.9 Update `placeSkills` to descend into `skills/rails/` and place under `.codex/skills/rails/<name>/SKILL.md` for codex projects (and equivalently `.claude/skills/rails/<name>/` for claude projects, even though Claude already has the agents in `.claude/agents/` — these skill versions are additive, not replacements)
+- [x] 19.10 Add CI test in specrails-core `templates.test.ts`: every `templates/agents/sr-*.md` MUST have a matching `templates/skills/rails/sr-*/SKILL.md` with the same H2 sections, ensuring parity going forward
+- [x] 19.11 Extend `templates/skills/sr-implement/SKILL.md` to reference the rail skills under `.codex/skills/rails/` so codex orchestrators can call them inline (Phase 1 of the multi-job pipeline deferred — see proposal Non-Goals)
 
 ## 20. specrails-core 4.6.0: release
 
-- [ ] 20.1 Bump `package.json` version to `4.6.0`; update `VERSION`
-- [ ] 20.2 Update `CHANGELOG.md` under "Features" with: "Codex (OpenAI) CLI is now a supported provider. New rail skills under `templates/skills/rails/`. Scaffold deploys `.codex/config.toml` and `.codex/rules.star` for codex projects. Provider gates lifted from `init`."
-- [ ] 20.3 Update `integration-contract.json`: increment any minor schema version if shape changed (it shouldn't — providers.codex already exists); update `coreVersion` if the field exists at top level
-- [ ] 20.4 Run full test suite + coverage in specrails-core; expect ≥80% (verify before publishing)
-- [ ] 20.5 Publish `npm publish` (release-please pipeline handles tag + GitHub release)
+- [ ] 20.1 Bump `package.json` version to `4.6.0`; update `VERSION` — **deferred: release-please owns the bump on PR merge**
+- [ ] 20.2 Update `CHANGELOG.md` under "Features" with: "Codex (OpenAI) CLI is now a supported provider. New rail skills under `templates/skills/rails/`. Scaffold deploys `.codex/config.toml` and `.codex/rules.star` for codex projects. Provider gates lifted from `init`." — **deferred: release-please owns CHANGELOG**
+- [x] 20.3 Update `integration-contract.json`: increment any minor schema version if shape changed (it shouldn't — providers.codex already exists); update `coreVersion` if the field exists at top level — verified: schemaVersion 3.0 already has providers.codex entry, no shape change required
+- [x] 20.4 Run full test suite + coverage in specrails-core; expect ≥80% (verify before publishing) — 175/175 pass on `feat/codex-provider-support`
+- [ ] 20.5 Publish `npm publish` (release-please pipeline handles tag + GitHub release) — **deferred: triggered by PR merge to main**
 
 ## 21. Hub: lift gates (Stage C entry)
 
@@ -236,12 +236,12 @@
 
 ## 24. Coverage + CI
 
-- [ ] 24.1 Run `npm run typecheck` — expect 0 errors
-- [ ] 24.2 Run `npm test` — expect 0 failures
-- [ ] 24.3 Run `npm run test:coverage` (server) — expect ≥80% lines/funcs/stmts, ≥70% branches
-- [ ] 24.4 Run `cd client && npm run test:coverage` — expect ≥80% lines/stmts, ≥70% functions
-- [ ] 24.5 If any threshold fails, write more tests until it passes (per CLAUDE.md coverage policy)
-- [ ] 24.6 Verify all CI checks green on the PR branch before merging
+- [x] 24.1 Run `npm run typecheck` — 0 errors introduced by this change (12 pre-existing in `project-router.ts` / `smash-runner.ts` outside scope)
+- [x] 24.2 Run `npm test` — server 1788/1789 (lone pre-existing smash-runner fail), client 1818/1818
+- [x] 24.3 Run `npm run test:coverage` (server) — verified pre-handoff
+- [x] 24.4 Run `cd client && npm run test:coverage` — verified pre-handoff
+- [x] 24.5 If any threshold fails, write more tests until it passes (per CLAUDE.md coverage policy) — no thresholds failed
+- [ ] 24.6 Verify all CI checks green on the PR branch before merging — **deferred: gated on PR creation**
 
 ## 25. Documentation
 
