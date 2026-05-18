@@ -218,11 +218,11 @@
 
 ## 22. Hub: settings page + analytics polish
 
-- [ ] 22.1 `client/src/pages/SettingsPage.tsx`: render a read-only "Provider" badge near the project name, with a tooltip "Cannot be changed after project creation"
-- [ ] 22.2 `client/src/pages/AnalyticsPage.tsx`: byProvider widget (§15.5) wired; estimated cost tilde rendered; Hero footnote when `totalEstimatedCostUsd > 0`
-- [ ] 22.3 `client/src/pages/AgentsPage.tsx` Catalog tab: for codex projects, list `.codex/skills/rails/sr-*/SKILL.md` files alongside Claude `.claude/agents/sr-*.md` for projects where both exist
-- [ ] 22.4 `client/src/components/Navbar.tsx`: provider chip (small) next to the active project name when there's space — pure visual identification
-- [ ] 22.5 Update `client/src/lib/api.ts` and `client/src/lib/models.ts` if any provider-specific URL or constant is hardcoded; verify all calls use `getApiBase()`
+- [x] 22.1 `client/src/pages/SettingsPage.tsx`: render a read-only "Provider" badge near the project name, with a tooltip "Cannot be changed after project creation"
+- [x] 22.2 `client/src/pages/AnalyticsPage.tsx`: byProvider widget (§15.5) wired; estimated cost tilde rendered; Hero footnote when `totalEstimatedCostUsd > 0`
+- [x] 22.3 `client/src/pages/AgentsPage.tsx` Catalog tab: for codex projects, list `.codex/skills/rails/sr-*/SKILL.md` files alongside Claude `.claude/agents/sr-*.md` for projects where both exist
+- [x] 22.4 `client/src/components/Navbar.tsx`: provider chip (small) next to the active project name when there's space — pure visual identification
+- [x] 22.5 Update `client/src/lib/api.ts` and `client/src/lib/models.ts` if any provider-specific URL or constant is hardcoded; verify all calls use `getApiBase()`
 
 ## 23. End-to-end validation
 

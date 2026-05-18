@@ -107,7 +107,18 @@ export function InvocationsTable({
                         : <span className="truncate block">#{r.ticket_id} {r.ticket_title ?? <span className="text-muted-foreground/70 italic">(deleted)</span>}</span>
                       }
                     </td>
-                    <td className="px-2 py-2 text-right font-medium">{fmtCost(r.total_cost_usd)}</td>
+                    <td className="px-2 py-2 text-right font-medium">
+                      {r.total_cost_usd_estimated === 1 && r.total_cost_usd != null ? (
+                        <span
+                          title="Estimated from local pricing table — this provider does not report cost natively."
+                          className="text-muted-foreground/90"
+                        >
+                          ~{fmtCost(r.total_cost_usd)}
+                        </span>
+                      ) : (
+                        fmtCost(r.total_cost_usd)
+                      )}
+                    </td>
                     <td className="px-2 py-2 text-right">{fmtNum(r.num_turns)}</td>
                     <td className="px-2 py-2 text-right">{totalTokens > 0 ? fmtNum(totalTokens) : '—'}</td>
                     <td className="px-2 py-2 max-w-[180px] truncate">{r.model ?? '—'}</td>

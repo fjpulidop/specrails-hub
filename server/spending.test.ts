@@ -87,6 +87,36 @@ describe('getSpending', () => {
     expect(r.byMode.find((m) => m.mode === 'explore')!.ticketsCreated).toBe(1)
   })
 
+  it('byProvider splits authoritative vs estimated cost', () => {
+    const now = new Date().toISOString()
+    seed(db, [
+      { id: 'a', provider: 'claude', surface: 'job', status: 'success', total_cost_usd: 1.0, total_cost_usd_estimated: false, started_at: now },
+      { id: 'b', provider: 'claude', surface: 'job', status: 'success', total_cost_usd: 0.5, total_cost_usd_estimated: false, started_at: now },
+      { id: 'c', provider: 'codex',  surface: 'job', status: 'success', total_cost_usd: 0.02, total_cost_usd_estimated: true,  started_at: now },
+      { id: 'd', provider: 'codex',  surface: 'job', status: 'success', total_cost_usd: 0.03, total_cost_usd_estimated: true,  started_at: now },
+    ])
+    const r = getSpending(db, 'p1', { period: 'all' })
+    const claude = r.byProvider.find((p) => p.provider === 'claude')!
+    expect(claude.count).toBe(2)
+    expect(claude.costUsd).toBeCloseTo(1.5)
+    expect(claude.estimatedCostUsd).toBe(0)
+    const codex = r.byProvider.find((p) => p.provider === 'codex')!
+    expect(codex.count).toBe(2)
+    expect(codex.costUsd).toBe(0)
+    expect(codex.estimatedCostUsd).toBeCloseTo(0.05)
+    // totalEstimatedCostUsd surfaced on summary for the Hero footnote
+    expect(r.summary.totalEstimatedCostUsd).toBeCloseTo(0.05)
+  })
+
+  it('summary.totalEstimatedCostUsd is 0 when no estimated rows', () => {
+    const now = new Date().toISOString()
+    seed(db, [
+      { id: 'a', provider: 'claude', surface: 'job', total_cost_usd: 1.0, total_cost_usd_estimated: false, started_at: now },
+    ])
+    const r = getSpending(db, 'p1', { period: 'all' })
+    expect(r.summary.totalEstimatedCostUsd).toBe(0)
+  })
+
   it('computes deltaPct vs previous period', () => {
     const today = new Date()
     const tenDaysAgo = new Date(today.getTime() - 10 * 86_400_000).toISOString()

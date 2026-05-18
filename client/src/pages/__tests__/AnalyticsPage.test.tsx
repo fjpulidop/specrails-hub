@@ -39,6 +39,9 @@ vi.mock('../../components/analytics/SpendingHero', () => ({
     <div data-testid="hero">{data ? 'hero-loaded' : 'hero-loading'}</div>
   ),
 }))
+vi.mock('../../components/analytics/ProviderBreakdownCard', () => ({
+  ProviderBreakdownCard: () => <div data-testid="provider-breakdown">provider</div>,
+}))
 vi.mock('../../components/analytics/SpendingTimeline', () => ({
   SpendingTimeline: () => <div data-testid="timeline">timeline</div>,
 }))
@@ -64,8 +67,16 @@ vi.mock('../../components/ExportDropdown', () => ({
 }))
 
 const emptySpending = {
-  summary: { totalCostUsd: 0, totalRuns: 0, failureRate: 0, prevTotalCostUsd: 0, deltaPct: null, avgCostPerRun: null },
-  bySurface: [], byModel: [], byMode: [], dailyTimeline: [], scatter: [], topTickets: [],
+  summary: {
+    totalCostUsd: 0,
+    totalEstimatedCostUsd: 0,
+    totalRuns: 0,
+    failureRate: 0,
+    prevTotalCostUsd: 0,
+    deltaPct: null,
+    avgCostPerRun: null,
+  },
+  bySurface: [], byModel: [], byMode: [], byProvider: [], dailyTimeline: [], scatter: [], topTickets: [],
   trackingStartedAt: null, rangeFrom: '', rangeTo: '',
 }
 const emptyInvocations = { rows: [], total: 0, truncated: false, totalAvailable: 0 }
