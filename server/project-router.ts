@@ -20,6 +20,7 @@ import { ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError, DEFAULT
 import type { JobPriority } from './types'
 import { VALID_PRIORITIES } from './types'
 import { resolveCommand } from './command-resolver'
+import { getAdapter } from './providers'
 import { createHooksRouter, getPhaseStates } from './hooks'
 import { getConfig, fetchIssues } from './config'
 import { runContractRefine, runContractRefineForQuick } from './contract-refine-runner'
@@ -1773,27 +1774,24 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const systemPrompt = baseSystemPrompt
     const userPrompt = baseUserPrompt
 
-    let binary: string
-    let args: string[]
-
-    if (provider === 'codex') {
-      binary = 'codex'
-      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', resolvedModel]
-    } else {
-      binary = 'claude'
-      const toolFlags = toolFlagsForScope(quickScope)
-      args = [
-        '--dangerously-skip-permissions',
-        ...toolFlags.args,
-        '--output-format', 'stream-json',
-        '--verbose',
-        '--max-turns', quickScope.full ? '6' : (hasAttachments ? '3' : '1'),
-        '--model', resolvedModel,
-        ...imageFlags,
-        '--system-prompt', systemPrompt,
-        '-p', userPrompt,
-      ]
-    }
+    // Generate-spec spawn args are adapter-driven. For Claude the `--tools`
+    // flag set comes from `toolFlagsForScope(quickScope)` which the adapter
+    // doesn't model — pass them through `extraArgs` so they slot in after
+    // the standard COMMON_FLAGS. `imageFlags` (also Claude-only) goes the
+    // same way. For codex the system prompt folds into the user prompt
+    // (no --system-prompt flag) and the extra Claude-only flags are ignored
+    // by the codex adapter (it doesn't read extraArgs that don't apply).
+    const adapter = getAdapter(provider)
+    const toolFlags = provider === 'claude' ? toolFlagsForScope(quickScope) : { args: [] }
+    const claudeMaxTurns = quickScope.full ? 6 : (hasAttachments ? 3 : 1)
+    const args = adapter.buildArgs('spec-gen', {
+      prompt: userPrompt,
+      systemPrompt,
+      model: resolvedModel,
+      maxTurns: provider === 'claude' ? claudeMaxTurns : undefined,
+      extraArgs: provider === 'claude' ? [...toolFlags.args, ...imageFlags] : undefined,
+    })
+    const binary = adapter.binary
 
     // spawnAiCli reroutes multi-line argv values through stdin on Windows;
     // POSIX argv path unchanged.

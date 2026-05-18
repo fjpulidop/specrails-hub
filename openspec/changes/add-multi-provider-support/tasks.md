@@ -108,10 +108,10 @@
 
 ## 11. Refactor `project-router` spawn callsites
 
-- [ ] 11.1 `POST /tickets/generate-spec`: replace inline `if (provider === 'codex')` with adapter-driven argv via `adapter.buildArgs('spec-gen', {...})` and `adapter.parseStreamLine`
-- [ ] 11.2 `POST /tickets/:id/ai-edit`: delegated to `AgentRefineManager` (already refactored in §9); confirm no codex-specific logic remains in the route
-- [ ] 11.3 `GET /default-spec-model` returns the catalog from `adapter.modelCatalog()` directly (already mostly compliant via `spec-models.ts`; ensure no duplication of the catalog)
-- [ ] 11.4 Extend `server/project-router.codex.test.ts` for the new codex stream parse path (thread_id captured, model fallback when missing)
+- [x] 11.1 `POST /tickets/generate-spec`: replace inline `if (provider === 'codex')` with adapter-driven argv via `adapter.buildArgs('spec-gen', {...})` and `adapter.parseStreamLine`
+- [x] 11.2 `POST /tickets/:id/ai-edit`: delegated to `AgentRefineManager` (already refactored in §9); confirm no codex-specific logic remains in the route
+- [x] 11.3 `GET /default-spec-model` returns the catalog from `adapter.modelCatalog()` directly (already mostly compliant via `spec-models.ts`; ensure no duplication of the catalog)
+- [x] 11.4 Extend `server/project-router.codex.test.ts` for the new codex stream parse path (thread_id captured, model fallback when missing)
 
 ## 12. Refactor `explore-cwd-manager`
 
