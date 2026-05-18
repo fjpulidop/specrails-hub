@@ -205,16 +205,16 @@
 
 ## 21. Hub: lift gates (Stage C entry)
 
-- [ ] 21.1 `server/hub-router.ts` line 147: replace `codex: false` with `codex: providers.codex` from `detectAvailableProviders()`
-- [ ] 21.2 `server/hub-router.ts` lines 181-188: remove the `if (provider === 'codex') {...}` rejection block; replace the `if (provider !== undefined && provider !== 'claude')` check with `if (provider !== undefined && !hasAdapter(provider))` returning a 400 listing registered adapter ids
-- [ ] 21.3 `client/src/hooks/useHub.tsx` line 37: change `addProject(... provider?: 'claude')` to `addProject(... provider?: string)` (or, more tightly, `ProviderId`); update the request body accordingly
-- [ ] 21.4 `client/src/components/AddProjectDialog.tsx`:
+- [x] 21.1 `server/hub-router.ts` line 147: replace `codex: false` with `codex: providers.codex` from `detectAvailableProviders()`
+- [x] 21.2 `server/hub-router.ts` lines 181-188: remove the `if (provider === 'codex') {...}` rejection block; replace the `if (provider !== undefined && provider !== 'claude')` check with `if (provider !== undefined && !hasAdapter(provider))` returning a 400 listing registered adapter ids
+- [x] 21.3 `client/src/hooks/useHub.tsx` line 37: change `addProject(... provider?: 'claude')` to `addProject(... provider?: string)` (or, more tightly, `ProviderId`); update the request body accordingly
+- [x] 21.4 `client/src/components/AddProjectDialog.tsx`:
   - Line 59: stop forcing `codex: false`; use the server's truthful response
   - Lines 74-77: remove the `if (selectedProvider !== 'claude') toast.error(...)` early-return
   - Lines 220-236: codex button `disabled={!availableProviders.codex}` (instead of unconditional `disabled`)
   - Remove the "Coming Soon" badge from the codex button
-- [ ] 21.5 Add hub env-var gate `SPECRAILS_HUB_CODEX_BETA`: when set to `'1'` (or unset), codex is enabled in `/available-providers`. When set to `'0'` explicitly, the hub re-fakes `codex: false` (an escape hatch for emergency rollback after Stage C). Document in `README.md` and `CHANGELOG.md`.
-- [ ] 21.6 Update `server/hub-router.test.ts` and `client/src/components/AddProjectDialog.test.tsx`
+- [x] 21.5 Add hub env-var gate `SPECRAILS_HUB_CODEX_BETA`: when set to `'1'` (or unset), codex is enabled in `/available-providers`. When set to `'0'` explicitly, the hub re-fakes `codex: false` (an escape hatch for emergency rollback after Stage C). Document in `README.md` and `CHANGELOG.md`.
+- [x] 21.6 Update `server/hub-router.test.ts` and `client/src/components/AddProjectDialog.test.tsx`
 
 ## 22. Hub: settings page + analytics polish
 

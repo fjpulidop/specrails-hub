@@ -10,6 +10,7 @@ import type { WebhookEvent } from './hub-db'
 import { WebhookManager } from './webhook-manager'
 import { createSpecrailsTechClient } from './specrails-tech-client'
 import { checkCoreCompat, getCLIStatus, detectAvailableCLIs } from './core-compat'
+import { hasAdapter, listAdapters } from './providers'
 import { getHubAnalytics, getHubTodayStats, getHubRecentJobs } from './hub-analytics'
 import { getSetupPrerequisitesStatus } from './setup-prerequisites'
 import { getPathDiagnostic } from './path-resolver'
@@ -137,14 +138,21 @@ export function createHubRouter(
 
   // GET /api/hub/available-providers — which AI CLIs are installed, plus supported install tiers
   //
-  // Codex (OpenAI) support is currently being tested in our lab ("Coming Soon") and is
-  // intentionally reported as unavailable so the Hub UI renders it non-selectable.
+  // Codex (OpenAI) is supported as a first-class provider as of Stage C of
+  // the multi-provider work. The legacy `SPECRAILS_HUB_CODEX_BETA=0` env var
+  // is honoured as an emergency rollback (forces codex back to "unavailable"
+  // in the UI without redeploying) — unset or `1` reports the real detection.
   router.get('/available-providers', (_req, res) => {
     const providers = detectAvailableCLIs()
     // tiers: quick install is always available (Hub-driven config); full requires an AI CLI
     const tiers: ('quick' | 'full')[] = ['quick']
-    if (providers.claude) tiers.push('full')
-    res.json({ claude: providers.claude, codex: false, tiers })
+    if (providers.claude || providers.codex) tiers.push('full')
+    const codexBetaOff = process.env.SPECRAILS_HUB_CODEX_BETA === '0'
+    res.json({
+      claude: providers.claude,
+      codex: codexBetaOff ? false : providers.codex,
+      tiers,
+    })
   })
 
   router.get('/setup-prerequisites', (req, res) => {
@@ -178,14 +186,21 @@ export function createHubRouter(
       res.status(400).json({ error: 'path is required' })
       return
     }
-    if (provider === 'codex') {
+    // Provider validation walks the registry — `claude` and `codex` are
+    // both accepted as of Stage C; future providers register one adapter
+    // file and become acceptable here without further changes.
+    if (provider !== undefined && !hasAdapter(provider)) {
       res.status(400).json({
-        error: 'Codex (OpenAI) support is coming soon — currently being tested in our lab. Please use Claude for now.',
+        error: `provider must be one of: ${[...listAdapters().map((a) => a.id)].join(', ')}`,
       })
       return
     }
-    if (provider !== undefined && provider !== 'claude') {
-      res.status(400).json({ error: 'provider must be "claude"' })
+    // Beta-gate parity: if codex beta is forced off via env, refuse codex
+    // POSTs too (consistency with /available-providers).
+    if (provider === 'codex' && process.env.SPECRAILS_HUB_CODEX_BETA === '0') {
+      res.status(400).json({
+        error: 'Codex provider is currently disabled (SPECRAILS_HUB_CODEX_BETA=0). Unset or set to 1 to enable.',
+      })
       return
     }
 

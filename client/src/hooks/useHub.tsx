@@ -34,7 +34,7 @@ interface HubContextValue {
   projects: HubProject[]
   activeProjectId: string | null
   setActiveProjectId: (id: string | null) => void
-  addProject: (path: string, name?: string, provider?: 'claude') => Promise<AddProjectResult | null>
+  addProject: (path: string, name?: string, provider?: 'claude' | 'codex') => Promise<AddProjectResult | null>
   removeProject: (id: string) => Promise<void>
   isLoading: boolean
   /** True briefly after switching active project — triggers the loading bar */
@@ -142,7 +142,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
     return () => unregisterHandler('hub')
   }, [handleMessage, registerHandler, unregisterHandler])
 
-  const addProject = useCallback(async (projectPath: string, name?: string, provider: 'claude' = 'claude'): Promise<AddProjectResult | null> => {
+  const addProject = useCallback(async (projectPath: string, name?: string, provider: 'claude' | 'codex' = 'claude'): Promise<AddProjectResult | null> => {
     try {
       const body: Record<string, string> = { path: projectPath }
       if (name) body.name = name

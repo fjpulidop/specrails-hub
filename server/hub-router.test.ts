@@ -520,14 +520,50 @@ describe('hub-router', () => {
       expect(res.body.error).toContain('provider')
     })
 
-    it('rejects codex provider with 400 (coming soon — in lab)', async () => {
+    it('accepts codex provider (Stage C of multi-provider; gate lifted)', async () => {
+      const { app } = createApp()
+      // Path must exist for the registry to accept registration. Use a real
+      // dir under tmp so the registry validation passes.
+      const projectPath = fs.mkdtempSync(path.join(require('os').tmpdir(), 'codex-project-'))
+      try {
+        const res = await request(app).post('/api/hub/projects').send({
+          path: projectPath,
+          provider: 'codex',
+        })
+        expect(res.status).toBe(201)
+        expect(res.body.project.provider).toBe('codex')
+      } finally {
+        fs.rmSync(projectPath, { recursive: true, force: true })
+      }
+    })
+
+    it('rejects unknown provider id with a clear allow-list error', async () => {
       const { app } = createApp()
       const res = await request(app).post('/api/hub/projects').send({
-        path: '/home/user/proj-codex',
-        provider: 'codex',
+        path: '/tmp/whatever',
+        provider: 'turbofake',
       })
       expect(res.status).toBe(400)
-      expect(res.body.error).toMatch(/coming soon|lab/i)
+      expect(res.body.error).toMatch(/provider must be one of:.*claude.*codex/)
+    })
+
+    it('SPECRAILS_HUB_CODEX_BETA=0 env var disables codex acceptance', async () => {
+      const prev = process.env.SPECRAILS_HUB_CODEX_BETA
+      process.env.SPECRAILS_HUB_CODEX_BETA = '0'
+      const projectPath = fs.mkdtempSync(path.join(require('os').tmpdir(), 'codex-blocked-'))
+      try {
+        const { app } = createApp()
+        const res = await request(app).post('/api/hub/projects').send({
+          path: projectPath,
+          provider: 'codex',
+        })
+        expect(res.status).toBe(400)
+        expect(res.body.error).toMatch(/disabled|SPECRAILS_HUB_CODEX_BETA/)
+      } finally {
+        fs.rmSync(projectPath, { recursive: true, force: true })
+        if (prev === undefined) delete process.env.SPECRAILS_HUB_CODEX_BETA
+        else process.env.SPECRAILS_HUB_CODEX_BETA = prev
+      }
     })
 
     it('returns 400 when path is a system-critical directory', async () => {
