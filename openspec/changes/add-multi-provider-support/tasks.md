@@ -68,14 +68,14 @@
 
 ## 7. Refactor `ChatManager`
 
-- [ ] 7.1 Inject the adapter into `ChatManager` constructor via project-registry resolution (`ctx.adapter = getAdapter(project.provider)`); remove the `provider: 'claude' | 'codex'` literal type and the `_provider` field
-- [ ] 7.2 `sendMessage`: replace `provider === 'codex'` branches with `adapter.capabilities.systemPromptArg`-style checks; use `adapter.buildArgs('chat-turn'|'chat-resume')` exclusively
-- [ ] 7.3 Replace the line-reader logic with the adapter's `parseStreamLine`; emit `text-delta` events to the existing live-strip filter
-- [ ] 7.4 Capture `session-started` event into `capturedSessionId` (real codex thread_id, not synthetic); REMOVE the `codex-<convId>-<timestamp>` synthetic id generator
-- [ ] 7.5 On close, call `adapter.extractResult(events)` and pass the result to `recordInvocation` with `provider: adapter.id`
-- [ ] 7.6 Update `auto-title` to use `adapter.buildArgs('spec-gen', { prompt: titlePrompt, model: ... })` to stay provider-agnostic
-- [ ] 7.7 Extend `server/chat-manager.test.ts` codex suite: assert real thread_id captured, second turn uses `exec resume`, third turn after minimize/restore preserves the session id
-- [ ] 7.8 Add a regression test: claude path is byte-identical (mock spawn, assert argv unchanged from pre-refactor)
+- [x] 7.1 Inject the adapter into `ChatManager` constructor via project-registry resolution (`ctx.adapter = getAdapter(project.provider)`); remove the `provider: 'claude' | 'codex'` literal type and the `_provider` field
+- [x] 7.2 `sendMessage`: replace `provider === 'codex'` branches with `adapter.capabilities.systemPromptArg`-style checks; use `adapter.buildArgs('chat-turn'|'chat-resume')` exclusively
+- [x] 7.3 Replace the line-reader logic with the adapter's `parseStreamLine`; emit `text-delta` events to the existing live-strip filter
+- [x] 7.4 Capture `session-started` event into `capturedSessionId` (real codex thread_id, not synthetic); REMOVE the `codex-<convId>-<timestamp>` synthetic id generator
+- [x] 7.5 On close, call `adapter.extractResult(events)` and pass the result to `recordInvocation` with `provider: adapter.id`
+- [x] 7.6 Update `auto-title` to use `adapter.buildArgs('spec-gen', { prompt: titlePrompt, model: ... })` to stay provider-agnostic
+- [x] 7.7 Extend `server/chat-manager.test.ts` codex suite: assert real thread_id captured, second turn uses `exec resume`, third turn after minimize/restore preserves the session id
+- [x] 7.8 Add a regression test: claude path is byte-identical (mock spawn, assert argv unchanged from pre-refactor)
 
 ## 8. Refactor `QueueManager`
 

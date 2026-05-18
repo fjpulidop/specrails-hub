@@ -161,7 +161,7 @@ export function createCodexOtelBridge(opts: BridgeOptions): CodexOtelBridge {
     const tokensOut = (usage.output_tokens ?? 0) + (usage.reasoning_output_tokens ?? 0)
     const tokensCacheRead = usage.cached_input_tokens ?? 0
 
-    const spanAttrs = [
+    const spanAttrs: Array<{ key: string; value: { intValue?: string; stringValue?: string } }> = [
       intAttr('codex.tokens.input', tokensIn),
       intAttr('codex.tokens.output', tokensOut),
       intAttr('codex.tokens.cache_read', tokensCacheRead),
