@@ -1835,38 +1835,54 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const stdoutReader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
 
     stdoutReader.on('line', (line) => {
+      let parsed: Record<string, unknown> | null = null
+      try { parsed = JSON.parse(line) } catch { /* skip */ }
+      if (!parsed) return
+
       if (provider === 'codex') {
-        if (line) {
-          buffer += line + '\n'
-          const msg: SpecGenStreamMessage = {
-            type: 'spec_gen_stream', projectId, requestId,
-            delta: line + '\n', timestamp: new Date().toISOString(),
-          }
-          broadcast(msg)
-        }
-      } else {
-        let parsed: Record<string, unknown> | null = null
-        try { parsed = JSON.parse(line) } catch { /* skip */ }
-        if (!parsed) return
-
-        if ((parsed.type as string) === 'result') {
+        // Codex `exec --json` emits one event per line. Capture the final
+        // `turn.completed` for usage extraction, and accumulate ONLY the
+        // assistant_message text — never the command_execution items or
+        // wrapper events, otherwise the raw JSONL ends up in the ticket
+        // description.
+        if ((parsed.type as string) === 'turn.completed') {
           lastResultEvent = parsed
+          return
         }
+        if ((parsed.type as string) !== 'item.completed') return
+        const item = parsed.item as { type?: string; text?: string } | undefined
+        if (!item || item.type !== 'agent_message') return
+        const newText = (item.text ?? '').trim()
+        if (!newText) return
+        // Each agent_message is a complete chunk — separate with a blank
+        // line so the parser regexes match cleanly across chunks.
+        buffer += (buffer.endsWith('\n') || buffer.length === 0 ? '' : '\n') + newText + '\n'
+        const msg: SpecGenStreamMessage = {
+          type: 'spec_gen_stream', projectId, requestId,
+          delta: newText + '\n', timestamp: new Date().toISOString(),
+        }
+        broadcast(msg)
+        return
+      }
 
-        if ((parsed.type as string) === 'assistant') {
-          const msg = parsed.message as { content?: Array<{ type: string; text?: string }> } | undefined
-          const texts = (msg?.content ?? [])
-            .filter((c) => c.type === 'text')
-            .map((c) => c.text ?? '')
-          const newText = texts.join('')
-          if (newText) {
-            buffer += newText
-            const wsMsg: SpecGenStreamMessage = {
-              type: 'spec_gen_stream', projectId, requestId,
-              delta: newText, timestamp: new Date().toISOString(),
-            }
-            broadcast(wsMsg)
+      // Claude path.
+      if ((parsed.type as string) === 'result') {
+        lastResultEvent = parsed
+      }
+
+      if ((parsed.type as string) === 'assistant') {
+        const msg = parsed.message as { content?: Array<{ type: string; text?: string }> } | undefined
+        const texts = (msg?.content ?? [])
+          .filter((c) => c.type === 'text')
+          .map((c) => c.text ?? '')
+        const newText = texts.join('')
+        if (newText) {
+          buffer += newText
+          const wsMsg: SpecGenStreamMessage = {
+            type: 'spec_gen_stream', projectId, requestId,
+            delta: newText, timestamp: new Date().toISOString(),
           }
+          broadcast(wsMsg)
         }
       }
     })

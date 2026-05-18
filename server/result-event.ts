@@ -105,8 +105,20 @@ export function normaliseResultEvent(
       session_id: event.session_id as string | undefined,
     }
   }
-  // codex legacy path: cost=0 / sparse fields synthesised by callers.
+  // Codex path: callers may pass either a `turn.completed` event (with a
+  // nested `usage` block) or a synthesised result-like object with
+  // pre-flattened fields. Read whichever shape is present.
+  const usage = event.usage as Record<string, number> | undefined
+  // Codex folds reasoning_output_tokens into the billed output token count
+  // (OpenAI bills reasoning tokens at output-token rates), so we collapse
+  // them here to keep cost estimation consistent with the adapter.
+  const outputTokens = usage
+    ? (usage.output_tokens ?? 0) + (usage.reasoning_output_tokens ?? 0)
+    : undefined
   return {
+    tokens_in: usage?.input_tokens,
+    tokens_out: outputTokens,
+    tokens_cache_read: usage?.cached_input_tokens,
     total_cost_usd: typeof event.total_cost_usd === 'number' ? event.total_cost_usd : undefined,
     num_turns: typeof event.num_turns === 'number' ? event.num_turns : undefined,
     model: typeof event.model === 'string' ? event.model : undefined,
