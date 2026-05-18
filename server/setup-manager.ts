@@ -422,6 +422,11 @@ export interface SetupSummary {
   personas: number
   legacySrRemoved: number
   tier: 'quick' | 'full'
+  /** Provider used during the install — drives label phrasing on the
+   *  completion screen (codex shows "Skills" instead of "/specrails:*",
+   *  "OpenSpec" instead of "/opsx:*"). Optional for back-compat with
+   *  callers that haven't been updated; defaults to 'claude' on read. */
+  provider?: CLIProvider
 }
 
 export const EMPTY_SUMMARY: SetupSummary = {
@@ -431,6 +436,7 @@ export const EMPTY_SUMMARY: SetupSummary = {
   personas: 0,
   legacySrRemoved: 0,
   tier: 'quick',
+  provider: 'claude',
 }
 
 const MIN_NODE_NATIVE_CORE_VERSION = '4.1.0'
@@ -501,36 +507,71 @@ function formatLegacyInstallError(reasons: string[]): string {
   ].join('\n')
 }
 
-export function computeSummary(projectPath: string, tier: 'quick' | 'full'): SetupSummary {
-  const dir = SPECRAILS_DIR
+export function computeSummary(
+  projectPath: string,
+  tier: 'quick' | 'full',
+  provider: CLIProvider = 'claude',
+): SetupSummary {
   let agents = 0
   let personas = 0
   let specrailsCommands = 0
   let opsxCommands = 0
 
   try {
-    const agentsDir = join(projectPath, dir, 'agents')
-    if (existsSync(agentsDir)) {
-      const files = readdirSync(agentsDir) as string[]
-      agents = files.filter((f) => /^sr-.*\.md$/.test(f)).length
-      const personasDir = join(agentsDir, 'personas')
-      if (existsSync(personasDir)) {
-        personas = (readdirSync(personasDir) as string[]).filter((f) => f.endsWith('.md')).length
+    if (provider === 'codex') {
+      // Codex layout: every artefact ships as a SKILL under `.codex/skills/`.
+      // - agents  = rail personas (`skills/rails/sr-*/SKILL.md`) + orchestrator
+      //             skills at the root with an `sr-` prefix (sr-implement,
+      //             sr-batch-implement, …)
+      // - opsxCommands     = `skills/openspec-*/SKILL.md`
+      // - specrailsCommands = everything else under `skills/` (ported claude
+      //   slash commands like propose-spec, explore-spec, retry, doctor,
+      //   enrich, vpc-drift, …)
+      // - personas = 0 today; codex VPC pass not implemented yet.
+      const skillsDir = join(projectPath, '.codex', 'skills')
+      if (existsSync(skillsDir)) {
+        // Rails (always counted as agents).
+        const railsDir = join(skillsDir, 'rails')
+        if (existsSync(railsDir)) {
+          for (const entry of readdirSync(railsDir) as string[]) {
+            if (existsSync(join(railsDir, entry, 'SKILL.md'))) agents++
+          }
+        }
+        // Top-level skill dirs.
+        for (const entry of readdirSync(skillsDir) as string[]) {
+          if (entry === 'rails') continue
+          if (!existsSync(join(skillsDir, entry, 'SKILL.md'))) continue
+          if (/^sr-/.test(entry)) agents++
+          else if (/^openspec-/.test(entry)) opsxCommands++
+          else specrailsCommands++
+        }
       }
-    }
-    const commandsDirSpecrails = join(projectPath, dir, 'commands', 'specrails')
-    const commandsDirOpsx = join(projectPath, dir, 'commands', 'opsx')
-    if (existsSync(commandsDirSpecrails)) {
-      specrailsCommands = (readdirSync(commandsDirSpecrails) as string[]).filter((f) => f.endsWith('.md')).length
-    }
-    if (existsSync(commandsDirOpsx)) {
-      opsxCommands = (readdirSync(commandsDirOpsx) as string[]).filter((f) => f.endsWith('.md')).length
+    } else {
+      // Claude layout (unchanged).
+      const dir = SPECRAILS_DIR
+      const agentsDir = join(projectPath, dir, 'agents')
+      if (existsSync(agentsDir)) {
+        const files = readdirSync(agentsDir) as string[]
+        agents = files.filter((f) => /^sr-.*\.md$/.test(f)).length
+        const personasDir = join(agentsDir, 'personas')
+        if (existsSync(personasDir)) {
+          personas = (readdirSync(personasDir) as string[]).filter((f) => f.endsWith('.md')).length
+        }
+      }
+      const commandsDirSpecrails = join(projectPath, dir, 'commands', 'specrails')
+      const commandsDirOpsx = join(projectPath, dir, 'commands', 'opsx')
+      if (existsSync(commandsDirSpecrails)) {
+        specrailsCommands = (readdirSync(commandsDirSpecrails) as string[]).filter((f) => f.endsWith('.md')).length
+      }
+      if (existsSync(commandsDirOpsx)) {
+        opsxCommands = (readdirSync(commandsDirOpsx) as string[]).filter((f) => f.endsWith('.md')).length
+      }
     }
   } catch {
     // non-fatal
   }
 
-  return { agents, specrailsCommands, opsxCommands, personas, legacySrRemoved: 0, tier }
+  return { agents, specrailsCommands, opsxCommands, personas, legacySrRemoved: 0, tier, provider }
 }
 
 /**
@@ -803,7 +844,7 @@ export class SetupManager {
         this._completeCheckpoint(projectId, 'quick_complete')
         const legacySrRemoved = sweepLegacySrCommands(projectPath)
         const tier = this._projectTiers.get(projectId) ?? 'quick'
-        const summary: SetupSummary = { ...computeSummary(projectPath, tier), legacySrRemoved }
+        const summary: SetupSummary = { ...computeSummary(projectPath, tier, this._projectProviders.get(projectId) ?? 'claude'), legacySrRemoved }
         this._broadcast({
           type: 'setup_install_done',
           projectId,
@@ -931,7 +972,7 @@ export class SetupManager {
         this._advanceCheckpoint(projectId, 'base_install')
         this._completeCheckpoint(projectId, 'base_install')
         const legacySrRemoved = sweepLegacySrCommands(projectPath)
-        const summary: SetupSummary = { ...computeSummary(projectPath, tier), legacySrRemoved }
+        const summary: SetupSummary = { ...computeSummary(projectPath, tier, this._projectProviders.get(projectId) ?? 'claude'), legacySrRemoved }
         this._broadcast({
           type: 'setup_install_done',
           projectId,
@@ -1228,7 +1269,7 @@ export class SetupManager {
         if (isComplete) {
           const legacySrRemoved = sweepLegacySrCommands(projectPath)
           const tier = this._projectTiers.get(projectId) ?? 'full'
-          const summary: SetupSummary = { ...computeSummary(projectPath, tier), legacySrRemoved }
+          const summary: SetupSummary = { ...computeSummary(projectPath, tier, this._projectProviders.get(projectId) ?? 'claude'), legacySrRemoved }
           this._onSetupDone?.(projectId)
           this._broadcast({
             type: 'setup_complete',
@@ -1399,6 +1440,10 @@ export class SetupManager {
   getSummary(projectPath: string): SetupSummary {
     const config = readInstallConfig(projectPath)
     const tier = config?.tier ?? 'quick'
-    return computeSummary(projectPath, tier)
+    // Detect provider from the on-disk layout — `.codex/` wins if present,
+    // otherwise default to claude. Avoids reading install-config when the
+    // file isn't there yet (legacy installs).
+    const provider: CLIProvider = existsSync(join(projectPath, '.codex')) ? 'codex' : 'claude'
+    return computeSummary(projectPath, tier, provider)
   }
 }

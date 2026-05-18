@@ -37,6 +37,11 @@ const CODEX_MODELS = [
 ] as const
 
 const SANDBOX_FLAGS = ['--sandbox', 'workspace-write'] as const
+// `codex exec resume` does NOT accept `--sandbox` (the flag only exists on
+// `codex exec`); pass the policy as a `-c` config override instead so the
+// resumed session honours workspace-write even when the per-project
+// `.codex/config.toml` isn't on the spawn cwd (e.g. explore-cwd).
+const SANDBOX_RESUME_FLAGS = ['-c', 'sandbox_mode="workspace-write"'] as const
 const SKIP_GIT_CHECK = '--skip-git-repo-check' as const
 
 /** Fold system prompt into the user prompt for providers without --system-prompt. */
@@ -65,7 +70,7 @@ function buildCodexArgs(action: SpawnAction, opts: SpawnOptions): string[] {
       if (!opts.sessionId) {
         throw new Error(`${action} requires sessionId`)
       }
-      args.push('exec', 'resume', '--json', ...SANDBOX_FLAGS, SKIP_GIT_CHECK)
+      args.push('exec', 'resume', '--json', ...SANDBOX_RESUME_FLAGS, SKIP_GIT_CHECK)
       args.push(opts.sessionId)
       args.push(fold(opts.systemPrompt, opts.prompt))
       args.push('--model', opts.model)

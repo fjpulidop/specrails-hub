@@ -120,6 +120,12 @@ describe('codexAdapter.buildArgs', () => {
     expect(args).toContain('019e37c6-3bd4-7120-992f-6f96dc82eda1')
     expect(args.find((a) => a === 'next msg')).toBe('next msg')
     expect(args[args.indexOf('--model') + 1]).toBe('gpt-5.4-mini')
+    // `codex exec resume` rejects `--sandbox`; the policy must travel as a
+    // `-c` config override instead. Asserting both: no bare `--sandbox`,
+    // sandbox_mode override present.
+    expect(args).not.toContain('--sandbox')
+    expect(args).toContain('-c')
+    expect(args).toContain('sandbox_mode="workspace-write"')
   })
 
   it('rail-job uses the same exec shape with sandbox workspace-write', () => {
@@ -160,6 +166,8 @@ describe('codexAdapter.buildArgs', () => {
     })
     expect(args.slice(0, 2)).toEqual(['exec', 'resume'])
     expect(args).toContain('UUID')
+    expect(args).not.toContain('--sandbox')
+    expect(args).toContain('sandbox_mode="workspace-write"')
   })
 
   it('extraArgs append after the model flag', () => {
