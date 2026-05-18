@@ -282,6 +282,7 @@ export class ChatManager {
         slug: this._projectSlug,
         projectPath: this._cwd,
         projectName: this._projectName,
+        provider: this._adapter.id as 'claude' | 'codex',
       })
       console.log(`[chat-manager] explore spawn cwd=${cwd} (mcp=off)`)
       return cwd

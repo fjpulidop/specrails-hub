@@ -115,10 +115,10 @@
 
 ## 12. Refactor `explore-cwd-manager`
 
-- [ ] 12.1 Accept the adapter; generate `<adapter.instructionsFilename>` (CLAUDE.md or AGENTS.md) from per-provider embedded templates
-- [ ] 12.2 Add `server/explore-cwd-templates/codex-AGENTS.md` (mirrors the existing claude `CLAUDE.md` template content) — focused on the Explore-Spec stance, minimal, no project-specific content
-- [ ] 12.3 On project removal: provider-agnostic recursive rm (already)
-- [ ] 12.4 Update `explore-cwd-manager.test.ts` codex suite
+- [x] 12.1 Accept the adapter; generate `<adapter.instructionsFilename>` (CLAUDE.md or AGENTS.md) from per-provider embedded templates
+- [x] 12.2 Add `server/explore-cwd-templates/codex-AGENTS.md` (mirrors the existing claude `CLAUDE.md` template content) — focused on the Explore-Spec stance, minimal, no project-specific content
+- [x] 12.3 On project removal: provider-agnostic recursive rm (already)
+- [x] 12.4 Update `explore-cwd-manager.test.ts` codex suite
 
 ## 13. Extend `ProfileManager`
 
