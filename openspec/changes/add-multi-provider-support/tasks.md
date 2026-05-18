@@ -122,12 +122,12 @@
 
 ## 13. Extend `ProfileManager`
 
-- [ ] 13.1 Update `schemas/profile.v1.json`: add optional `provider` top-level field; remove the `enum: ['sonnet','opus','haiku']` on `ProfileAgent.model` (replace with a pattern that accepts any non-empty string — runtime check enforces the catalog)
-- [ ] 13.2 `validateProfile` keeps the AJV pass; `validateStructural` resolves `getAdapter(profile.provider ?? 'claude')` and asserts every `agents[i].model ∈ adapter.modelCatalog().map(m => m.value)`; baseline check uses `adapter.baselineAgents()`
-- [ ] 13.3 `resolveProfile(projectPath, explicit, project)`: signature gains the project arg so the resolver can default `profile.provider` to `project.provider` in-memory (file on disk stays untouched)
-- [ ] 13.4 `snapshotForJob` writes the materialised in-memory profile (with `provider` field present) so specrails-core skills receive the explicit provider id
-- [ ] 13.5 Update `server/profile-manager.test.ts`: codex models accepted on codex profiles, cross-provider rejection, defaulting from project, schema not enumerating models
-- [ ] 13.6 Extend `client/src/pages/AgentsPage.tsx` Profiles tab: model dropdown for each agent calls `adapter.modelCatalog()` derived from `project.provider`; banner text changes when project provider is codex AND core < 4.6.0
+- [x] 13.1 Update `schemas/profile.v1.json`: add optional `provider` top-level field; remove the `enum: ['sonnet','opus','haiku']` on `ProfileAgent.model` (replace with a pattern that accepts any non-empty string — runtime check enforces the catalog)
+- [x] 13.2 `validateProfile` keeps the AJV pass; `validateStructural` resolves `getAdapter(profile.provider ?? 'claude')` and asserts every `agents[i].model ∈ adapter.modelCatalog().map(m => m.value)`; baseline check uses `adapter.baselineAgents()`
+- [x] 13.3 `resolveProfile(projectPath, explicit, project)`: signature gains the project arg so the resolver can default `profile.provider` to `project.provider` in-memory (file on disk stays untouched)
+- [x] 13.4 `snapshotForJob` writes the materialised in-memory profile (with `provider` field present) so specrails-core skills receive the explicit provider id
+- [x] 13.5 Update `server/profile-manager.test.ts`: codex models accepted on codex profiles, cross-provider rejection, defaulting from project, schema not enumerating models
+- [x] 13.6 Extend `client/src/pages/AgentsPage.tsx` Profiles tab: model dropdown for each agent calls `adapter.modelCatalog()` derived from `project.provider`; banner text changes when project provider is codex AND core < 4.6.0
 
 ## 14. Extend `PluginManager`
 

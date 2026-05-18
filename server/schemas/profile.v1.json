@@ -23,6 +23,11 @@
       "maxLength": 512,
       "description": "Optional short summary of when to use this profile."
     },
+    "provider": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Optional provider id (e.g. `claude`, `codex`). When set, the profile's model values are validated against that provider's adapter catalog. When omitted, validation falls back to the project's resolved provider."
+    },
     "orchestrator": {
       "type": "object",
       "required": ["model"],
@@ -30,7 +35,7 @@
       "properties": {
         "model": {
           "$ref": "#/$defs/modelAlias",
-          "description": "Model used to run the top-level implement orchestrator."
+          "description": "Model used to run the top-level implement orchestrator. The JSON schema accepts any non-empty string; provider-specific validation runs at the structural-check layer (see profile-manager.validateStructural)."
         }
       }
     },
@@ -84,8 +89,9 @@
   "$defs": {
     "modelAlias": {
       "type": "string",
-      "enum": ["sonnet", "opus", "haiku"],
-      "description": "Accepted model alias. Resolved to the current concrete model ID by the pipeline."
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Accepted model alias. JSON schema accepts any non-empty string; provider-specific catalog enforcement runs at runtime (see profile-manager.validateStructural)."
     },
     "agentEntry": {
       "type": "object",

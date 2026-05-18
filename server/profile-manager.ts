@@ -5,12 +5,17 @@ import Ajv2020 from 'ajv/dist/2020'
 import type { ValidateFunction } from 'ajv'
 import type { DbInstance } from './db'
 import profileSchema from './schemas/profile.v1.json'
+import { getAdapter, hasAdapter } from './providers'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+/** A model alias accepted by the profile. JSON schema permits any non-empty
+ *  string; the structural validator enforces the per-provider catalog. */
+export type ProfileModelAlias = string
+
 export interface ProfileAgent {
   id: string
-  model?: 'sonnet' | 'opus' | 'haiku'
+  model?: ProfileModelAlias
   required?: boolean
 }
 
@@ -30,7 +35,12 @@ export interface Profile {
   schemaVersion: 1
   name: string
   description?: string
-  orchestrator: { model: 'sonnet' | 'opus' | 'haiku' }
+  /** Optional provider id. When set the profile's models are validated
+   *  against `getAdapter(provider).modelCatalog()`. When omitted the caller
+   *  passes `expectedProvider` to the validator (typically the project's
+   *  resolved provider). */
+  provider?: string
+  orchestrator: { model: ProfileModelAlias }
   agents: ProfileAgent[]
   routing: ProfileRoutingRule[]
 }
@@ -107,17 +117,51 @@ function assertValidName(name: string): void {
 
 // ─── Structural extra checks (beyond JSON schema) ────────────────────────────
 
-function validateStructural(profile: Profile): void {
+/**
+ * Provider-aware structural validation.
+ *
+ * @param profile   the candidate profile (already JSON-schema-clean)
+ * @param expectedProvider the project's resolved provider id when the
+ *                  profile itself omits the `provider` field. Defaults to
+ *                  `'claude'` so legacy callsites stay backwards compatible.
+ */
+function validateStructural(profile: Profile, expectedProvider: string = 'claude'): void {
+  const providerId = profile.provider ?? expectedProvider
+  if (!hasAdapter(providerId)) {
+    throw new ProfileValidationError([
+      `profile references unknown provider '${providerId}'`,
+    ])
+  }
+  const adapter = getAdapter(providerId)
+  const baseline = adapter.baselineAgents()
+  const validModels = new Set(adapter.modelCatalog().map((m) => m.value))
+
   const agentIds = new Set(profile.agents.map((a) => a.id))
 
   // Baseline is required on every profile — default and custom alike. The
-  // pipeline depends on all four agents existing in the chain.
-  const baseline = ['sr-architect', 'sr-developer', 'sr-reviewer', 'sr-merge-resolver']
+  // pipeline depends on the baseline agents existing in the chain. The set is
+  // adapter-driven so future providers can declare their own baseline.
   const missing = baseline.filter((id) => !agentIds.has(id))
   if (missing.length > 0) {
     throw new ProfileValidationError([
-      `profile must include baseline agents: missing ${missing.join(', ')}`,
+      `profile must include baseline agents for provider '${providerId}': missing ${missing.join(', ')}`,
     ])
+  }
+
+  // Orchestrator model must be in the adapter's catalog.
+  if (!validModels.has(profile.orchestrator.model)) {
+    throw new ProfileValidationError([
+      `orchestrator.model '${profile.orchestrator.model}' is not valid for provider '${providerId}'. Valid models: ${[...validModels].join(', ')}`,
+    ])
+  }
+
+  // Per-agent model (when set) must also be in the catalog.
+  for (const agent of profile.agents) {
+    if (agent.model !== undefined && !validModels.has(agent.model)) {
+      throw new ProfileValidationError([
+        `agent '${agent.id}' uses model '${agent.model}' which is not valid for provider '${providerId}'. Valid models: ${[...validModels].join(', ')}`,
+      ])
+    }
   }
 
   // Routing: at most one default rule, last if present, targets must exist.
@@ -154,7 +198,7 @@ function validateStructural(profile: Profile): void {
   }
 }
 
-export function validateProfile(raw: unknown): Profile {
+export function validateProfile(raw: unknown, expectedProvider: string = 'claude'): Profile {
   const validate = getValidator()
   if (!validate(raw)) {
     const msgs = (validate.errors || []).map(
@@ -163,7 +207,7 @@ export function validateProfile(raw: unknown): Profile {
     throw new ProfileValidationError(msgs)
   }
   const profile = raw as Profile
-  validateStructural(profile)
+  validateStructural(profile, expectedProvider)
   return profile
 }
 
