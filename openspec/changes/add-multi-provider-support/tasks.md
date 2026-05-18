@@ -57,13 +57,13 @@
 - [x] 5.3 Implement the 10 MB cap shared with the existing OTLP receiver path: after the receiver returns `logs_truncated`, the bridge stops sending log payloads but continues traces/metrics
 - [x] 5.4 Resource attributes: `specrails.job_id`, `specrails.project_id`, `specrails.provider=codex`, `specrails.codex.thread_id` (from session-started), `specrails.codex.cli_version` (best-effort)
 - [x] 5.5 Write `server/codex-otel-bridge.test.ts`: feed a recorded JSONL fixture, assert the receiver was called with expected payloads (mock fetch / mock POST)
-- [ ] 5.6 Wire `QueueManager` to instantiate the bridge when `adapter.capabilities.nativeOtelEnv === false` and telemetry is ON; consume every parsed `AdapterEvent`; call `bridge.finalize` on process close
+- [x] 5.6 Wire `QueueManager` to instantiate the bridge when `adapter.capabilities.nativeOtelEnv === false` and telemetry is ON; consume every parsed `AdapterEvent`; call `bridge.finalize` on process close
 
 ## 6. Refactor `result-event.ts`
 
 - [x] 6.1 Replace the legacy `normaliseResultEvent(event, provider)` with `normaliseResultEvent(adapter, events): NormalisedResult` that delegates to `adapter.extractResult(events)`
 - [x] 6.2 After result extraction, if `adapter.capabilities.nativeCostUsd === false`, invoke `estimateCostUsd(adapter.id, normalised.model, normalised)` and set `total_cost_usd` + carry forward an `estimated: true` flag in the returned shape
-- [ ] 6.3 Update every callsite (`queue-manager.ts`, `chat-manager.ts`, `agent-refine-manager.ts`) to pass the adapter + events array
+- [x] 6.3 Update every callsite (`queue-manager.ts`, `chat-manager.ts`, `agent-refine-manager.ts`) to pass the adapter + events array
 - [x] 6.4 Update `server/result-event.test.ts` for both providers
 
 ## 7. Refactor `ChatManager`
@@ -79,14 +79,14 @@
 
 ## 8. Refactor `QueueManager`
 
-- [ ] 8.1 Inject the adapter; remove `provider: 'claude' | 'codex'` constructor option (now derived)
-- [ ] 8.2 Replace argv-build branches with `adapter.buildArgs('rail-job', { prompt, systemAppend, model, attachments, ... })`
-- [ ] 8.3 Stream-parse using `adapter.parseStreamLine`; accumulate events for `adapter.extractResult`
-- [ ] 8.4 Telemetry: when `adapter.capabilities.nativeOtelEnv` AND telemetry ON → inject env vars (unchanged claude path); else when telemetry ON → instantiate the bridge from §5
-- [ ] 8.5 Profile injection: replace `this._provider === 'claude' &&` gate with `adapter.capabilities.profileEnvSupport &&`
-- [ ] 8.6 Plugin injection (env var path): same — gate on adapter capability (the `cli-add` path doesn't need env injection; the spawn already has its `<PROVIDER>_HOME` set per §13)
-- [ ] 8.7 `recordInvocation` call passes `provider: adapter.id`; pricing fallback applied at result-normalise step (§6.2)
-- [ ] 8.8 Extend `server/queue-manager.test.ts` codex suite: real tokens captured, estimated cost present, OTEL bridge invoked when telemetry ON
+- [x] 8.1 Inject the adapter; remove `provider: 'claude' | 'codex'` constructor option (now derived)
+- [x] 8.2 Replace argv-build branches with `adapter.buildArgs('rail-job', { prompt, systemAppend, model, attachments, ... })`
+- [x] 8.3 Stream-parse using `adapter.parseStreamLine`; accumulate events for `adapter.extractResult`
+- [x] 8.4 Telemetry: when `adapter.capabilities.nativeOtelEnv` AND telemetry ON → inject env vars (unchanged claude path); else when telemetry ON → instantiate the bridge from §5
+- [x] 8.5 Profile injection: replace `this._provider === 'claude' &&` gate with `adapter.capabilities.profileEnvSupport &&`
+- [x] 8.6 Plugin injection (env var path): same — gate on adapter capability (the `cli-add` path doesn't need env injection; the spawn already has its `<PROVIDER>_HOME` set per §13)
+- [x] 8.7 `recordInvocation` call passes `provider: adapter.id`; pricing fallback applied at result-normalise step (§6.2)
+- [x] 8.8 Extend `server/queue-manager.test.ts` codex suite: real tokens captured, estimated cost present, OTEL bridge invoked when telemetry ON
 
 ## 9. Refactor `AgentRefineManager`
 

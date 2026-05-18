@@ -1518,7 +1518,8 @@ describe('QueueManager', () => {
 
       const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
       expect(spawnCall[0]).toBe('codex')
-      const promptArg = spawnCall[1][1] as string
+      // codex rail-job argv: ['exec','--json','--sandbox','workspace-write','--skip-git-repo-check', <prompt>, '--model', <model>]
+      const promptArg = (spawnCall[1] as string[])[5] as string
       // systemAppend (headless mode instructions) should be embedded before the prompt
       expect(promptArg).toContain('FULLY AUTONOMOUS MODE')
       expect(promptArg).toContain('---')
@@ -1534,7 +1535,8 @@ describe('QueueManager', () => {
       qmCodex.enqueue('/specrails:implement #42')
 
       const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
-      const promptArg = spawnCall[1][1] as string
+      // codex rail-job argv: ['exec','--json','--sandbox','workspace-write','--skip-git-repo-check', <prompt>, '--model', <model>]
+      const promptArg = (spawnCall[1] as string[])[5] as string
       expect(promptArg).toContain('local-tickets.json')
     })
 
@@ -1551,7 +1553,8 @@ describe('QueueManager', () => {
       qmCodex.enqueue('/specrails:implement #42')
 
       const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
-      const promptArg = spawnCall[1][1] as string
+      // codex rail-job argv: ['exec','--json','--sandbox','workspace-write','--skip-git-repo-check', <prompt>, '--model', <model>]
+      const promptArg = (spawnCall[1] as string[])[5] as string
       expect(promptArg).toContain('PROJECT PRE-PROMPT')
       expect(promptArg).toContain('Always prefer additive schema changes.')
     })
@@ -1632,7 +1635,8 @@ describe('QueueManager', () => {
         qmCodex.enqueue('/specrails:implement #42')
 
         const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
-        const promptArg = spawnCall[1][1] as string
+        // codex rail-job argv: ['exec','--json','--sandbox','workspace-write','--skip-git-repo-check', <prompt>, '--model', <model>]
+      const promptArg = (spawnCall[1] as string[])[5] as string
         expect(listSpy).toHaveBeenCalledWith('proj', 42)
         expect(blocksSpy).toHaveBeenCalledWith('proj', 42, ['att-1'])
         expect(promptArg).toContain('Ticket #42 Attached Resources')
@@ -1642,7 +1646,7 @@ describe('QueueManager', () => {
       }
     })
 
-    it('creates synthetic result event when codex exits code=0 with no result event', async () => {
+    it('captures real codex token usage and estimates cost from pricing table', async () => {
       vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
@@ -1652,11 +1656,18 @@ describe('QueueManager', () => {
       const qmCodex = new QueueManager(broadcast, db, undefined, undefined, {
         provider: 'codex',
         resolvedModel: 'gpt-5.4-mini',
+        projectId: 'p1',
+        projectSlug: 'proj',
       })
       qmCodex.enqueue('/specrails:implement #1')
 
-      // Codex outputs plain text, not JSON result events
-      child.stdout.push('Some output from codex\n')
+      // Real codex JSONL stream — thread_id captured, tokens reported via
+      // turn.completed.usage, cost estimated downstream from pricing.ts.
+      child.stdout.push(
+        '{"type":"thread.started","thread_id":"019e1111-2222-7333-bbbb-cccccccccccc"}\n' +
+        '{"type":"item.completed","item":{"type":"agent_message","text":"done"}}\n' +
+        '{"type":"turn.completed","usage":{"input_tokens":1000,"output_tokens":500,"cached_input_tokens":0,"reasoning_output_tokens":0}}\n'
+      )
       child.stdout.push(null)
       await new Promise((r) => setImmediate(r))
       child.emit('close', 0)
@@ -1666,13 +1677,33 @@ describe('QueueManager', () => {
       const job = jobs.find((j) => j.id === 'codex-result-job')
       expect(job?.status).toBe('completed')
 
-      // Cost tracking: job row in DB should have total_cost_usd = 0
-      const row = db.prepare('SELECT total_cost_usd, model FROM jobs WHERE id = ?').get('codex-result-job') as
-        | { total_cost_usd: number | null; model: string | null }
-        | undefined
+      const row = db.prepare(`
+        SELECT total_cost_usd, model, session_id, tokens_in, tokens_out
+        FROM jobs WHERE id = ?
+      `).get('codex-result-job') as {
+        total_cost_usd: number | null
+        model: string | null
+        session_id: string | null
+        tokens_in: number | null
+        tokens_out: number | null
+      } | undefined
       expect(row).toBeDefined()
-      expect(row?.total_cost_usd).toBe(0)
+      // codex:gpt-5.4-mini → 1M*0.25 + 500K*2.00 / 1M = 0.25 + 1.00 = 1.25
+      expect(row?.total_cost_usd).toBeCloseTo(1.25 / 1000, 6)
       expect(row?.model).toBe('gpt-5.4-mini')
+      expect(row?.session_id).toBe('019e1111-2222-7333-bbbb-cccccccccccc')
+      expect(row?.tokens_in).toBe(1000)
+      expect(row?.tokens_out).toBe(500)
+
+      // ai_invocations row: provider stamped, estimated flag set
+      const inv = db.prepare(`
+        SELECT provider, total_cost_usd_estimated
+        FROM ai_invocations WHERE surface_ref_id = ?
+      `).get('codex-result-job') as
+        | { provider: string; total_cost_usd_estimated: number }
+        | undefined
+      expect(inv?.provider).toBe('codex')
+      expect(inv?.total_cost_usd_estimated).toBe(1)
     })
 
     it('output chaining: embeds parent resultText in codex prompt via systemAppend', () => {
@@ -1704,7 +1735,7 @@ describe('QueueManager', () => {
       const spawnCalls = vi.mocked(mockSpawn).mock.calls
       const secondSpawnArgs = spawnCalls[spawnCalls.length - 1]?.[1] as string[] | undefined
       if (secondSpawnArgs) {
-        const prompt = secondSpawnArgs[1] as string
+        const prompt = secondSpawnArgs[5] as string
         expect(prompt).toContain('Parent result text')
       }
     })
