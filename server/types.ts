@@ -208,6 +208,7 @@ export interface ChatConversationRow {
   created_at: string
   updated_at: string
   kind: 'sidebar' | 'explore'
+  context_scope: string | null
 }
 
 export interface ChatMessageRow {

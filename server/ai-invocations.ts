@@ -1,7 +1,7 @@
 import type { DbInstance } from './db'
 import type { NormalisedResult } from './result-event'
 
-export type Surface = 'job' | 'quick-spec' | 'explore-spec' | 'ai-edit'
+export type Surface = 'job' | 'quick-spec' | 'explore-spec' | 'ai-edit' | 'smash'
 export type InvocationStatus = 'success' | 'failed' | 'aborted'
 
 const ALLOWED_SURFACES: ReadonlySet<Surface> = new Set([
@@ -9,6 +9,7 @@ const ALLOWED_SURFACES: ReadonlySet<Surface> = new Set([
   'quick-spec',
   'explore-spec',
   'ai-edit',
+  'smash',
 ])
 
 export interface RecordInput extends NormalisedResult {
@@ -146,6 +147,7 @@ export function getTicketSpendingSummary(
     'quick-spec': { count: 0, costUsd: 0 },
     'explore-spec': { count: 0, costUsd: 0 },
     'ai-edit': { count: 0, costUsd: 0 },
+    smash: { count: 0, costUsd: 0 },
   }
   let totalCostUsd = 0
   let totalTurns = 0

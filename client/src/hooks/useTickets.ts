@@ -245,6 +245,10 @@ export function useTickets() {
     isLoading: loading,
     error,
     newTicketIds,
+    // Placeholder until the per-ticket contract-refine WIP lands. Consumers
+    // (SpecsBoard, DashboardPage) read it as a Set<number> to decorate
+    // tickets that are mid-refine; an empty set means "no refining state".
+    contractRefiningIds: new Set<number>(),
     refetch,
     refresh: refetch,
     deleteTicket,

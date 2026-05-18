@@ -59,6 +59,10 @@ export interface ExploreSpecShellProps {
     labels: string[]
     acceptanceCriteria: string[]
   }>
+  /** Optional Add-Spec context scope, frozen at conversation creation
+   *  time. The shell forwards it to the server on first turn so the
+   *  `chat_conversations.context_scope` column gets populated. */
+  contextScope?: import('../../types/context-scope').ContextScope
   onClose: () => void
   /** Optional minimize affordance — when present a `—` button in the header
    *  fires this callback. Receives the current conversation id so the caller

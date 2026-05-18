@@ -378,6 +378,7 @@ export function getSpending(
           'quick-spec': { count: 0, costUsd: 0 },
           'explore-spec': { count: 0, costUsd: 0 },
           'ai-edit': { count: 0, costUsd: 0 },
+          smash: { count: 0, costUsd: 0 },
         },
         isUnattributed: r.ticket_id === null ? true : undefined,
       })

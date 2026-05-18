@@ -430,6 +430,22 @@ const MIGRATIONS: Migration[] = [
         ADD COLUMN total_cost_usd_estimated INTEGER NOT NULL DEFAULT 0;
     `)
   },
+
+  // Migration 20: chat_conversations.context_scope — per-conversation JSON
+  // freezing the Add Spec context scope at creation time. NULL means "legacy
+  // behavior" so existing rows behave unchanged.
+  //
+  // Idempotent: an earlier WIP branch shipped this column under a different
+  // migration number, so on machines where the column already exists we
+  // swallow the "duplicate column" SqliteError and move on.
+  (db) => {
+    try {
+      db.exec(`ALTER TABLE chat_conversations ADD COLUMN context_scope TEXT;`)
+    } catch (err) {
+      const msg = (err as Error).message ?? ''
+      if (!/duplicate column name/i.test(msg)) throw err
+    }
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {
@@ -698,11 +714,12 @@ export function getProjectActivity(db: DbInstance, opts: ActivityQueryOpts): Act
 
 export function createConversation(
   db: DbInstance,
-  opts: { id: string; model: string; kind?: 'sidebar' | 'explore' }
+  opts: { id: string; model: string; kind?: 'sidebar' | 'explore'; contextScope?: unknown }
 ): void {
+  const scopeJson = opts.contextScope != null ? JSON.stringify(opts.contextScope) : null
   db.prepare(
-    'INSERT INTO chat_conversations (id, model, kind) VALUES (?, ?, ?)'
-  ).run(opts.id, opts.model, opts.kind ?? 'sidebar')
+    'INSERT INTO chat_conversations (id, model, kind, context_scope) VALUES (?, ?, ?, ?)'
+  ).run(opts.id, opts.model, opts.kind ?? 'sidebar', scopeJson)
 }
 
 export function listConversations(db: DbInstance): ChatConversationRow[] {
@@ -958,6 +975,30 @@ export function getExploreMcpEnabled(db: DbInstance): boolean {
 export function setExploreMcpEnabled(db: DbInstance, enabled: boolean): void {
   db.prepare(
     `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.explore_mcp_enabled', ?)`
+  ).run(enabled ? 'true' : 'false')
+}
+
+/**
+ * Per-project last-used value for the Quick mode Contract Refine toggle in
+ * the Add Spec modal. Default `false` when never set.
+ */
+export function getQuickContractRefineLast(db: DbInstance): boolean {
+  const row = db.prepare(
+    `SELECT value FROM queue_state WHERE key = 'config.add_spec_quick_contract_refine_last'`
+  ).get() as { value: string } | undefined
+  return row?.value === 'true'
+}
+
+export function hasQuickContractRefineLast(db: DbInstance): boolean {
+  const row = db.prepare(
+    `SELECT 1 FROM queue_state WHERE key = 'config.add_spec_quick_contract_refine_last'`
+  ).get() as { 1: number } | undefined
+  return !!row
+}
+
+export function setQuickContractRefineLast(db: DbInstance, enabled: boolean): void {
+  db.prepare(
+    `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.add_spec_quick_contract_refine_last', ?)`
   ).run(enabled ? 'true' : 'false')
 }
 
