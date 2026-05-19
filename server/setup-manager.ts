@@ -700,6 +700,13 @@ export class SetupManager {
     }
 
     this._projectTiers.set(projectId, 'quick')
+    // Stamp the provider on the in-memory map so the install-complete
+    // summary computation (computeSummary → tile labels) can branch on it
+    // without reading install-config.yaml back from disk.
+    const providerFromConfig = installConfig.provider
+    if (providerFromConfig === 'claude' || providerFromConfig === 'codex') {
+      this._projectProviders.set(projectId, providerFromConfig)
+    }
     this._initCheckpoints(projectId)
 
     // Write install-config.yaml to .specrails/ for specrails-core to consume
@@ -879,6 +886,22 @@ export class SetupManager {
     const parsedConfig = hasConfig ? readInstallConfig(projectPath) : null
     const tier = parsedConfig?.tier ?? 'full'
     this._projectTiers.set(projectId, tier)
+    // Pull provider out of the just-written install-config.yaml so the
+    // completion-summary path can label tiles correctly (codex → "Skills"
+    // etc.). Without this, summary.provider stays undefined and the client
+    // renders the claude labels with 0/0/0 counts because the codex skill
+    // walker never gets selected.
+    if (hasConfig) {
+      try {
+        const text = readFileSync(configPath, 'utf-8')
+        const m = text.match(/^provider:\s*(\w+)/m)
+        if (m && (m[1] === 'claude' || m[1] === 'codex')) {
+          this._projectProviders.set(projectId, m[1])
+        }
+      } catch {
+        // Ignore — falls back to claude default downstream.
+      }
+    }
     this._initCheckpoints(projectId)
 
     const missingPrerequisites = formatMissingSetupPrerequisites()

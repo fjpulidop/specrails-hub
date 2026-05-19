@@ -494,12 +494,13 @@ export class ChatManager {
       ? 'chat-resume' as const
       : 'chat-turn' as const
     // Translate the per-conversation Explore scope into provider-native
-    // tool-gating flags. Adapter is the single source of truth for whether
-    // those flags travel as argv (claude `--disallowedTools …`) or as a
-    // config override (codex `-c features.…`). When no scope is set, the
-    // claude path keeps its legacy `--tools default` behaviour via the
-    // adapter; codex ignores it.
-    const scopeFlags = conversationScope
+    // tool-gating flags. `toolFlagsForScope` emits claude-shape argv
+    // (`--disallowedTools …`); codex's `exec` would reject those with an
+    // "unexpected argument" error and crash the turn. The scope's tool
+    // gating is therefore claude-only today — codex inherits its sandbox
+    // and approval policy from the project's `.codex/config.toml` (or the
+    // `-c sandbox_mode=` override the adapter already attaches on resume).
+    const scopeFlags = conversationScope && this._adapter.id === 'claude'
       ? toolFlagsForScope(conversationScope).args
       : []
     let args = this._adapter.buildArgs(action, {
