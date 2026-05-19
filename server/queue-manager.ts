@@ -603,14 +603,20 @@ export class QueueManager {
     }
 
     const binary = this._adapter.binary
-    // Adapters that lack a system-prompt flag (codex today) cannot accept
-    // slash commands from Claude's CLI either — they want the resolved prompt
-    // text. For adapters with systemPromptArg we keep passing the slash
-    // command unresolved so Claude resolves it natively (preserves the
-    // skills-resolution priority over CLAUDE.md).
-    const railPrompt = this._adapter.capabilities.systemPromptArg
-      ? commandToRun
-      : this._resolveCommand(commandToRun)
+    // Adapter-specific slash-command syntax:
+    //  - claude: native `/specrails:foo` recognised by Claude CLI directly,
+    //    so we pass the command verbatim and the system prompt rides along
+    //    via `--system-prompt`.
+    //  - codex: there is no `/namespace:cmd` parser; instead codex uses
+    //    `$skill_name` to invoke a skill from `.codex/skills/<name>/SKILL.md`.
+    //    Translate `/specrails:<name>` → `$<name>` so codex picks up the
+    //    matching skill natively (which our scaffold writes for every
+    //    claude slash command — propose-spec, implement, batch-implement,
+    //    explore-spec, retry, …). This is the rail equivalent of the
+    //    user typing `$implement #1 --yes` themselves in `codex`.
+    const railPrompt = this._adapter.id === 'codex'
+      ? commandToRun.replace(/^\/(specrails|sr):([\w-]+)/, '$$$2')
+      : commandToRun
     const railModel = this._adapter.id === 'claude' && this._db
       ? getProjectSettings(this._db).orchestratorModel
       : (this._resolvedModel ?? this._adapter.defaultModel())

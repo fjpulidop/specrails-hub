@@ -1590,6 +1590,55 @@ describe('QueueManager', () => {
       expect(spawnArgs).toContain('gpt-5.4-mini')
     })
 
+    it('translates /specrails:<name> → $<name> when targeting codex', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('codex-slash-translate' as any)
+
+      const qmCodex = new QueueManager(broadcast, undefined, [], undefined, { provider: 'codex' })
+      qmCodex.enqueue('/specrails:implement #1 --yes')
+
+      // Codex folds the system prompt into the user prompt as a single argv
+      // string; assert the resolved prompt contains the `$implement` skill
+      // reference and never carries the `/specrails:` legacy form.
+      const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      const promptArg = spawnArgs.find((a) => a.includes('$implement'))
+      expect(promptArg).toBeDefined()
+      expect(promptArg).toContain('$implement #1 --yes')
+      expect(spawnArgs.some((a) => a.includes('/specrails:implement'))).toBe(false)
+    })
+
+    it('translates /sr:<name> → $<name> for the codex prompt', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('codex-sr-alias' as any)
+
+      const qmCodex = new QueueManager(broadcast, undefined, [], undefined, { provider: 'codex' })
+      qmCodex.enqueue('/sr:batch-implement #2 #3')
+
+      const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      expect(spawnArgs.some((a) => a.includes('$batch-implement'))).toBe(true)
+    })
+
+    it('keeps /specrails:<name> verbatim for claude rails (no translation)', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('claude-slash-untouched' as any)
+
+      const qm = new QueueManager(broadcast, undefined, [], undefined, { provider: 'claude' })
+      qm.enqueue('/specrails:implement #1')
+
+      const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      // Claude argv contains the prompt as the value after `-p`.
+      const pIdx = spawnArgs.indexOf('-p')
+      expect(pIdx).toBeGreaterThanOrEqual(0)
+      expect(spawnArgs[pIdx + 1]).toContain('/specrails:implement')
+      expect(spawnArgs[pIdx + 1]).not.toContain('$implement')
+    })
+
     it('embeds referenced ticket attachments in the codex prompt', () => {
       vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
       const child = createMockChildProcess()
