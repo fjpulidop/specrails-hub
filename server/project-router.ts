@@ -1982,8 +1982,12 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
           // Quick mode Contract Refine: when toggle is on in the request body
           // AND the project setting + kill switch permit it, fire the no-resume
-          // Quick refine path asynchronously.
-          if (quickContractRefine && created) {
+          // Quick refine path asynchronously. Claude-only today — codex
+          // contract refine isn't wired (the spawn hardcodes the `claude`
+          // binary). Skip silently on codex projects so the ticket lands
+          // without the misleading "Contract layer skipped — model_error"
+          // toast that the refine kill-switch would otherwise emit.
+          if (quickContractRefine && created && provider === 'claude') {
             const refineTicketId = created.id
             const refineTitle = created.title
             const refineDescription = created.description
@@ -2006,6 +2010,11 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
                 console.error('[project-router] runContractRefineForQuick error:', err)
               })
             })
+          } else if (quickContractRefine && created && provider === 'codex') {
+            console.log(
+              `[project-router] quick contract refine skipped for codex project (ticket #${created.id}); ` +
+                `feature is claude-only today`,
+            )
           }
         } catch (err) {
           console.error('[project-router] generate-spec ticket creation error:', err)
@@ -2362,10 +2371,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       res.status(201).json({ ticket: created!, revision: store.revision })
 
       // Fire Contract Refine post-commit (fire-and-forget). Toggle + kill-switch
-      // are checked inside runContractRefine; this call is safe to make
-      // unconditionally. We schedule via process.nextTick so the HTTP response
-      // is flushed before the spawn runs.
-      if (conversationId && created) {
+      // are checked inside runContractRefine. Claude-only today — codex
+      // contract refine isn't wired (the spawn hardcodes the `claude`
+      // binary). Skip silently on codex projects.
+      if (conversationId && created && project.provider === 'claude') {
         const createdTicketId = created.id
         const convoId = conversationId
         console.log(`[project-router] from-draft hook: scheduling refine ticket=${createdTicketId} conv=${convoId}`)
@@ -2385,6 +2394,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
             console.error('[project-router] runContractRefine error:', err)
           })
         })
+      } else if (conversationId && created && project.provider === 'codex') {
+        console.log(
+          `[project-router] from-draft contract refine skipped for codex project (ticket #${created.id})`,
+        )
       }
     } catch (err) {
       console.error('[project-router] from-draft create error:', err)
@@ -2401,6 +2414,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const { project, db, broadcast } = ctx(req)
     if (isExploreContractRefineKillSwitchActive()) {
       res.status(409).json({ error: 'feature_disabled_by_env' }); return
+    }
+    if (project.provider === 'codex') {
+      res.status(409).json({ error: 'contract_refine_unsupported_for_codex' }); return
     }
     // Validate the ticket exists.
     try {
