@@ -17,6 +17,7 @@ import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import type { JobSummary, EventRow, PhaseDefinition } from '../types'
 import type { PhaseMap, PhaseState } from '../hooks/usePipeline'
 import { useHub } from '../hooks/useHub'
+import { formatCommandForProvider } from '../lib/format-command'
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'running' | 'queued' | 'failed' | 'canceled'
 
@@ -30,7 +31,8 @@ const STATUS_BADGE: Record<string, { variant: BadgeVariant; label: string; toolt
 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { activeProjectId } = useHub()
+  const { activeProjectId, projects } = useHub()
+  const activeProvider = projects.find((p) => p.id === activeProjectId)?.provider
   const navigate = useNavigate()
   const { openTicketDetail } = useTicketDetailModal()
   const [job, setJob] = useState<JobSummary | null>(null)
@@ -325,7 +327,7 @@ export default function JobDetailPage() {
                   hasTicketHeader ? 'text-xs text-muted-foreground' : 'text-sm',
                 )}
               >
-                {job.command}
+                {formatCommandForProvider(job.command, activeProvider)}
               </code>
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">

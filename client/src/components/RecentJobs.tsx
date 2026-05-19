@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { JobComparisonModal } from './JobComparisonModal'
 import type { JobSummary, JobStatus, JobPriority } from '../types'
+import { useHub } from '../hooks/useHub'
+import { formatCommandForProvider } from '../lib/format-command'
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'running' | 'queued' | 'failed' | 'canceled'
 
@@ -79,6 +81,8 @@ const PAGE_SIZE = 10
 
 export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, onProposalDelete }: RecentJobsProps) {
   const navigate = useNavigate()
+  const { activeProjectId, projects } = useHub()
+  const activeProvider = projects.find((p) => p.id === activeProjectId)?.provider
   const [statusFilter, setStatusFilter] = useState<JobStatus | null>(null)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -380,7 +384,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                   </Tooltip>
                 )}
                 <code className="text-xs text-foreground/80 truncate">
-                  {job.command}
+                  {formatCommandForProvider(job.command, activeProvider)}
                 </code>
               </div>
 
