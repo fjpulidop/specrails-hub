@@ -1751,9 +1751,31 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         ? `- Do NOT explore the project codebase. The resources inside <user-attachment> blocks below are pre-loaded context the user intentionally provided — read and use them freely.`
         : `- Do NOT read any files or explore the codebase. Work purely from the user's description.`
 
+    // Always inject a lightweight summary of existing tickets so the model
+    // can't propose a duplicate of something already in the backlog. This is
+    // independent of `quickScope.specrails` (which injects a richer block):
+    // even when the user opts out of the rich context, the dedup guard runs.
+    // Titles + status + priority only — under 2 KB for normal backlogs.
+    let existingTicketsBlock = ''
+    try {
+      const store = readStore(filePath)
+      const ticketsList = Object.values(store.tickets ?? {})
+      if (ticketsList.length > 0) {
+        const lines = ticketsList
+          .slice(0, 50) // cap to avoid bloating the prompt on big backlogs
+          .map((t) => `- #${t.id} [${t.status}] ${t.title}`)
+          .join('\n')
+        existingTicketsBlock =
+          `EXISTING TICKETS (do NOT propose any duplicate or near-duplicate of these — if the user's idea is already in the backlog, surface that fact in your spec instead of inventing a new one):\n${lines}\n\n`
+      }
+    } catch {
+      // Missing or unreadable store — no dedup context. Continue.
+    }
+
     let baseSystemPrompt =
       `You are a senior product engineer generating a structured spec proposal.\n\n` +
       (specsPrefix ? `${specsPrefix}\n\n` : '') +
+      existingTicketsBlock +
       `RULES:\n` +
       `${codebaseRule}\n` +
       `- Do NOT create files, tickets, or issues.\n` +
