@@ -199,7 +199,7 @@ export function RailRow({
         onMouseLeave={handleMouseUp}
         onClick={handleClick}
         style={railJiggleStyle}
-        className={`group relative flex flex-col gap-1.5 rounded-xl border bg-card/80 backdrop-blur p-2.5 transition-all ${
+        className={`group relative flex flex-col gap-1.5 rounded-xl border bg-card p-2.5 transition-all ${
           isOver
             ? 'border-accent-info/60 shadow-[0_0_0_1px_hsl(var(--accent-info)/0.35),0_0_14px_hsl(var(--accent-info)/0.18)]'
             : isRunning
@@ -394,9 +394,11 @@ export function RailRow({
         </div>
       )}
 
-      {/* Main rail content (slides left on swipe) */}
+      {/* Main rail content (slides left on swipe). Solid `bg-card`
+          background (no backdrop-blur) so the card looks identical
+          regardless of the page-background gradient behind it. */}
       <div
-        className={`relative z-10 flex flex-col rounded-xl border overflow-hidden ${
+        className={`relative z-10 flex flex-col rounded-xl border overflow-hidden bg-card ${
           jiggleMode && canDelete ? 'animate-jiggle' : ''
         } ${
           isOver
@@ -406,7 +408,6 @@ export function RailRow({
         style={{
           transform: swipeX < 0 ? `translateX(${swipeX}px)` : undefined,
           transition: swiping ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1)',
-          backdropFilter: 'blur(8px)',
           ...(railJigglePhaseMs !== undefined ? { animationDelay: `${railJigglePhaseMs}ms` } : {}),
         }}
       >

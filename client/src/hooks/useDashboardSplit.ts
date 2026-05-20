@@ -250,14 +250,19 @@ export function useDashboardSplit(
 
   const resetToDefault = useCallback(() => {
     if (typeof window === 'undefined') return
-    const v = window.innerWidth
+    // Use the container's own clientWidth (same source the project-switch
+    // effect uses) so a double-click restores the EXACT same width the user
+    // sees on first paint. Falling back to window.innerWidth without this
+    // produced a wider value than the container could fit when outer
+    // sidebars were open — the initial view and the double-click view
+    // visibly diverged.
+    const el = containerRef?.current
+    const v = el?.clientWidth || window.innerWidth
     if (v < DISABLE_BELOW_VIEWPORT_PX) return
-    // Always restore the canonical "postit + compact rails" default, even
-    // when the user had a different value persisted from a prior session.
     const next = computeDefaultLeftWidth(v)
     setLeftWidth(next)
     saveStored(projectId, next)
-  }, [projectId])
+  }, [projectId, containerRef])
 
   const enabled = leftWidth !== null && viewport >= DISABLE_BELOW_VIEWPORT_PX
   const tier: SpecsBoardTier = leftWidth === null ? 'row' : tierForWidth(leftWidth)
