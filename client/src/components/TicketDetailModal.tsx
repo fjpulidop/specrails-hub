@@ -79,13 +79,20 @@ export function TicketDetailModal({
   onRemoveFromRail,
   embedded = false,
 }: TicketDetailModalProps) {
-  const { activeProjectId } = useHub()
+  const { activeProjectId, projects } = useHub()
   const { enterSplit, state: splitState } = useTicketDetailModal()
   const inSplit = splitState.originSide !== null
   // Feature flag for SMASH. Server gates with `SPECRAILS_SMASH=0` returning
   // 409 from endpoints; the UI optimistically shows the affordance and lets
-  // the server reject if disabled. A future pass can hydrate from GET /state.
-  const smashFlagOn = true
+  // the server reject if disabled.
+  //
+  // Also disabled on codex projects: SMASH's pipeline depends on claude's
+  // multi-agent fan-out (architect/developer/reviewer in parallel via
+  // subagent_type), which codex's spawn_agent doesn't support the same
+  // way. Hiding the affordance here keeps the modal clean rather than
+  // surfacing a feature that would 409 / fail on a codex spawn.
+  const activeProvider = projects.find((p) => p.id === activeProjectId)?.provider
+  const smashFlagOn = activeProvider !== 'codex'
   const childrenList = useMemo(
     () => (allTickets ?? []).filter((t) => t.parent_epic_id === ticket.id),
     [allTickets, ticket.id],
