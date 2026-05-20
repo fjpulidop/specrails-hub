@@ -1751,33 +1751,22 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         ? `- Do NOT explore the project codebase. The resources inside <user-attachment> blocks below are pre-loaded context the user intentionally provided — read and use them freely.`
         : `- Do NOT read any files or explore the codebase. Work purely from the user's description.`
 
-    // Always inject a lightweight summary of existing tickets so the model
-    // can't propose a duplicate of something already in the backlog. This is
-    // independent of `quickScope.specrails` (which injects a richer block):
-    // even when the user opts out of the rich context, the dedup guard runs.
-    // Titles + status + priority only — under 2 KB for normal backlogs.
-    let existingTicketsBlock = ''
-    try {
-      const store = readStore(filePath)
-      const ticketsList = Object.values(store.tickets ?? {})
-      if (ticketsList.length > 0) {
-        const lines = ticketsList
-          .slice(0, 50) // cap to avoid bloating the prompt on big backlogs
-          .map((t) => `- #${t.id} [${t.status}] ${t.title}`)
-          .join('\n')
-        existingTicketsBlock =
-          `EXISTING TICKETS (do NOT propose any duplicate or near-duplicate of these — if the user's idea is already in the backlog, surface that fact in your spec instead of inventing a new one):\n${lines}\n\n`
-      }
-    } catch {
-      // Missing or unreadable store — no dedup context. Continue.
-    }
+    // The specrails-tickets prefix (when scope.specrails is toggled on)
+    // dumps every ticket into the prompt as informational context. Without
+    // an explicit dedup instruction the model treats it as background and
+    // still proposes a near-duplicate of something already in the backlog.
+    // Adding the rule here, gated on `quickScope.specrails`, keeps the
+    // "toggle is the only gate" contract the user asked for.
+    const dedupRule = quickScope.specrails
+      ? `- The "Specrails Tickets" section above lists every ticket already in the backlog. Do NOT propose a duplicate or a near-duplicate of any of them. If the user's idea is already covered by an existing ticket, say so in "Problem Statement" and pick a *different* angle / sub-feature / next step that builds on the existing one — do not repeat it.\n`
+      : ''
 
     let baseSystemPrompt =
       `You are a senior product engineer generating a structured spec proposal.\n\n` +
       (specsPrefix ? `${specsPrefix}\n\n` : '') +
-      existingTicketsBlock +
       `RULES:\n` +
       `${codebaseRule}\n` +
+      dedupRule +
       `- Do NOT create files, tickets, or issues.\n` +
       `- Output ONLY the structured markdown below. No preamble, no explanation.\n\n` +
       `REQUIRED FORMAT:\n` +

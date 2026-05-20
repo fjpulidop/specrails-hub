@@ -25,8 +25,17 @@ export function ProjectRightSidebar() {
   // agent model maps to Claude Code's `.claude/agents/<id>.md` mechanic.
   // Codex's `spawn_agent` tool uses a fixed enum of agent_types and runs
   // skills as a single-agent loop, so the per-agent UI doesn't apply.
+  //
+  // Integrations (plugins / MCP servers) is also claude-only today: the
+  // plugin manager registers MCP servers via `.mcp.json` (claude's
+  // convention). Codex uses `codex mcp add` against an isolated
+  // CODEX_HOME — the hub wires that flow but the UI hasn't been adapted
+  // yet, so we hide the tab on codex projects to avoid presenting a
+  // claude-only surface.
   const activeProject = projects.find((p) => p.id === activeProjectId)
-  const showAgentsTab = FEATURE_AGENTS_SECTION && activeProject?.provider !== 'codex'
+  const isCodex = activeProject?.provider === 'codex'
+  const showAgentsTab = FEATURE_AGENTS_SECTION && !isCodex
+  const showIntegrationsTab = !isCodex
 
   const navItems = [
     { to: '/', end: true, icon: LayoutDashboard, label: 'Dashboard' },
@@ -35,7 +44,9 @@ export function ProjectRightSidebar() {
     ...(showAgentsTab
       ? [{ to: '/agents', end: false, icon: Bot, label: 'Agents' }]
       : []),
-    { to: '/integrations', end: false, icon: Puzzle, label: 'Integrations' },
+    ...(showIntegrationsTab
+      ? [{ to: '/integrations', end: false, icon: Puzzle, label: 'Integrations' }]
+      : []),
     { to: '/settings', end: false, icon: Settings, label: 'Settings' },
   ]
 
