@@ -1,26 +1,93 @@
-/**
- * Normalises the terminal `result` event from claude (`--output-format stream-json`)
- * and codex (`codex exec`) into a uniform payload used by the ai_invocations
- * capture sites. Codex generally lacks token-level billing — fields it cannot
- * report are returned as `undefined` (NULL when persisted).
- */
+// Result-event normalisation and finalisation for AI CLI invocations.
+//
+// Two coexisting APIs during the multi-provider migration window:
+//
+//   - finaliseInvocationResult(adapter, events, opts) — new contract used by
+//     post-adapter managers. Walks an AdapterEvent stream, calls
+//     `adapter.extractResult`, and falls back to the local pricing table when
+//     the adapter declares `capabilities.nativeCostUsd === false`. Returns
+//     both the NormalisedResult and an `estimated` flag for the
+//     `total_cost_usd_estimated` DB column.
+//
+//   - normaliseResultEvent(event, provider) — legacy single-event shape kept
+//     so non-migrated managers (queue-manager, chat-manager,
+//     agent-refine-manager pre-refactor) keep working. Will be removed after
+//     all callsites migrate (tasks §7–10).
+//
+// Spec: openspec/specs/multi-provider-architecture/spec.md
+// Spec: openspec/changes/add-multi-provider-support/specs/project-spending/spec.md
 
-export interface NormalisedResult {
-  tokens_in?: number
-  tokens_out?: number
-  tokens_cache_read?: number
-  tokens_cache_create?: number
-  total_cost_usd?: number
-  num_turns?: number
-  model?: string
-  duration_ms?: number
-  duration_api_ms?: number
-  session_id?: string
+import type { AdapterEvent, NormalisedResult, ProviderAdapter } from './providers/types'
+import { estimateCostUsd } from './pricing'
+
+export type { NormalisedResult } from './providers/types'
+
+export interface FinaliseOptions {
+  /** Fallback model when the adapter's extractResult cannot determine it (e.g.
+   *  codex does not surface the model in its stream events; the manager-level
+   *  caller already knows it from the spawn args). */
+  fallbackModel?: string
+  /** Optional override for cost estimation (testing hook). When omitted, the
+   *  module-level `estimateCostUsd` is used. */
+  estimator?: typeof estimateCostUsd
 }
+
+export interface FinalisedInvocation {
+  result: NormalisedResult
+  /** True when `total_cost_usd` was filled in from the local pricing table
+   *  rather than from a provider's native cost field. Drives the DB
+   *  `total_cost_usd_estimated` flag and the analytics `~` badge. */
+  estimated: boolean
+}
+
+/**
+ * Finalise an AI invocation by walking the adapter's parsed events, stamping
+ * the model when the adapter does not report one, and applying the local
+ * pricing-table fallback when the adapter does not report `total_cost_usd`.
+ */
+export function finaliseInvocationResult(
+  adapter: ProviderAdapter,
+  events: readonly AdapterEvent[],
+  opts: FinaliseOptions = {},
+): FinalisedInvocation {
+  const result = adapter.extractResult(events) as NormalisedResult & { __dontFreeze?: never }
+  const cloned: NormalisedResult = { ...result }
+
+  // Stamp the model from the caller when the adapter did not derive one. The
+  // adapter contract permits leaving `model` undefined; the manager knows the
+  // model it spawned with.
+  if (!cloned.model && opts.fallbackModel) {
+    cloned.model = opts.fallbackModel
+  }
+
+  let estimated = false
+  if (!adapter.capabilities.nativeCostUsd) {
+    const estimator = opts.estimator ?? estimateCostUsd
+    const computed = estimator(adapter.id, cloned.model, {
+      tokens_in: cloned.tokens_in,
+      tokens_out: cloned.tokens_out,
+      tokens_cache_read: cloned.tokens_cache_read,
+      tokens_cache_create: cloned.tokens_cache_create,
+    })
+    if (computed !== null) {
+      cloned.total_cost_usd = computed
+      estimated = true
+    }
+  }
+
+  return { result: cloned, estimated }
+}
+
+// ─── Legacy single-event API ─────────────────────────────────────────────────
+//
+// Pre-adapter managers still call this with the single terminal event payload
+// they captured. Behaviour identical to the implementation that lived here
+// before; provider-specific branches preserved. Once all callsites migrate to
+// `finaliseInvocationResult`, delete this and remove the import.
 
 export function normaliseResultEvent(
   event: Record<string, unknown> | null | undefined,
-  provider: 'claude' | 'codex' = 'claude'
+  provider: 'claude' | 'codex' = 'claude',
 ): NormalisedResult {
   if (!event) return {}
   if (provider === 'claude') {
@@ -38,8 +105,20 @@ export function normaliseResultEvent(
       session_id: event.session_id as string | undefined,
     }
   }
-  // codex: minimal payload synthesised by callers (cost=0 by convention)
+  // Codex path: callers may pass either a `turn.completed` event (with a
+  // nested `usage` block) or a synthesised result-like object with
+  // pre-flattened fields. Read whichever shape is present.
+  const usage = event.usage as Record<string, number> | undefined
+  // Codex folds reasoning_output_tokens into the billed output token count
+  // (OpenAI bills reasoning tokens at output-token rates), so we collapse
+  // them here to keep cost estimation consistent with the adapter.
+  const outputTokens = usage
+    ? (usage.output_tokens ?? 0) + (usage.reasoning_output_tokens ?? 0)
+    : undefined
   return {
+    tokens_in: usage?.input_tokens,
+    tokens_out: outputTokens,
+    tokens_cache_read: usage?.cached_input_tokens,
     total_cost_usd: typeof event.total_cost_usd === 'number' ? event.total_cost_usd : undefined,
     num_turns: typeof event.num_turns === 'number' ? event.num_turns : undefined,
     model: typeof event.model === 'string' ? event.model : undefined,

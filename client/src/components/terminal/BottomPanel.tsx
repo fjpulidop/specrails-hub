@@ -19,13 +19,15 @@ import { EmptyTerminalPlaceholder } from './EmptyTerminalPlaceholder'
 
 interface BottomPanelProps {
   projectId: string
+  /** Project's CLI provider — drives the Sparkles shortcut (claude vs codex). */
+  provider?: 'claude' | 'codex'
   state: ProjectPanelState
   /** Full project viewport height in px — used for maximize computation. */
   viewportHeight: number
   statusBarHeight: number
 }
 
-export function BottomPanel({ projectId, state, viewportHeight, statusBarHeight }: BottomPanelProps) {
+export function BottomPanel({ projectId, provider = 'claude', state, viewportHeight, statusBarHeight }: BottomPanelProps) {
   const t = useTerminals()
   const navigate = useNavigate()
   const panelRef = useRef<HTMLDivElement | null>(null)
@@ -104,16 +106,16 @@ export function BottomPanel({ projectId, state, viewportHeight, statusBarHeight 
     void t.create(projectId)
   }, [canCreate, projectId, t])
 
-  const handleOpenClaude = useCallback(() => {
+  const handleOpenCli = useCallback(() => {
     if (!canCreate) return
-    // Auto-number "claude", "claude (2)", "claude (3)" so multiple Claude
-    // terminals are easy to tell apart in the sidebar.
-    const claudeMatches = state.sessions.filter(
-      (s) => s.name === 'claude' || /^claude \(\d+\)$/.test(s.name),
+    const baseName = provider === 'codex' ? 'codex' : 'claude'
+    const numberSuffix = new RegExp(`^${baseName} \\(\\d+\\)$`)
+    const matches = state.sessions.filter(
+      (s) => s.name === baseName || numberSuffix.test(s.name),
     )
-    const name = claudeMatches.length === 0 ? 'claude' : `claude (${claudeMatches.length + 1})`
-    void t.createAndType(projectId, 'claude\n', { name })
-  }, [canCreate, projectId, state.sessions, t])
+    const name = matches.length === 0 ? baseName : `${baseName} (${matches.length + 1})`
+    void t.createAndType(projectId, `${baseName}\n`, { name })
+  }, [canCreate, projectId, provider, state.sessions, t])
 
   const handleOpenBrowser = useCallback(() => {
     void openExternalUrl(settings.browserShortcutUrl)
@@ -178,8 +180,9 @@ export function BottomPanel({ projectId, state, viewportHeight, statusBarHeight 
         visibility={state.visibility}
         canCreate={canCreate}
         hasActive={hasActive}
+        provider={provider}
         onCreate={handleCreate}
-        onOpenClaude={handleOpenClaude}
+        onOpenCli={handleOpenCli}
         onOpenBrowser={handleOpenBrowser}
         onPasteScript={handlePasteScript}
         pasteScriptDisabled={!hasActive || !settings.quickScript}

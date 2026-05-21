@@ -6,7 +6,7 @@ import { TerminalTopBar } from '../TerminalTopBar'
 function renderBar(overrides: Partial<Parameters<typeof TerminalTopBar>[0]> = {}) {
   const handlers = {
     onCreate: vi.fn(),
-    onOpenClaude: vi.fn(),
+    onOpenCli: vi.fn(),
     onOpenBrowser: vi.fn(),
     onPasteScript: vi.fn(),
     onConfigureBrowser: vi.fn(),
@@ -74,5 +74,15 @@ describe('TerminalTopBar', () => {
   it('shows Restore button when maximized', () => {
     const { getByLabelText } = renderBar({ visibility: 'maximized' })
     expect(getByLabelText(/restore panel/i)).toBeDefined()
+  })
+
+  it('labels the CLI shortcut "Open Claude" by default', () => {
+    const { getByLabelText } = renderBar()
+    expect(getByLabelText(/open claude in new terminal/i)).toBeDefined()
+  })
+
+  it('labels the CLI shortcut "Open Codex" when provider is codex', () => {
+    const { getByLabelText } = renderBar({ provider: 'codex' })
+    expect(getByLabelText(/open codex in new terminal/i)).toBeDefined()
   })
 })

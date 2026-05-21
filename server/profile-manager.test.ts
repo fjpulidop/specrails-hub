@@ -133,6 +133,56 @@ describe('validateProfile', () => {
     expect(() => validateProfile(p)).toThrow(ProfileValidationError)
   })
 
+  it('accepts a profile with provider: codex and codex models', () => {
+    const p = baseProfile('codex-default')
+    p.provider = 'codex'
+    p.orchestrator.model = 'gpt-5.4-mini'
+    p.agents = p.agents.map((a) => ({ ...a, model: 'gpt-5.4-mini' }))
+    expect(() => validateProfile(p)).not.toThrow()
+  })
+
+  it('rejects claude models on a codex profile', () => {
+    const p = baseProfile('codex-bad')
+    p.provider = 'codex'
+    p.orchestrator.model = 'sonnet' // claude alias, not in codex catalog
+    expect(() => validateProfile(p)).toThrow(ProfileValidationError)
+    try { validateProfile(p) } catch (err) {
+      expect((err as ProfileValidationError).message).toContain('not valid for provider')
+    }
+  })
+
+  it('rejects codex models on a claude profile (when expectedProvider=claude)', () => {
+    const p = baseProfile('claude-bad')
+    p.orchestrator.model = 'gpt-5.4-mini'
+    expect(() => validateProfile(p)).toThrow(ProfileValidationError)
+  })
+
+  it('per-agent model validated against the resolved provider catalog', () => {
+    const p = baseProfile('codex-agent-mix')
+    p.provider = 'codex'
+    p.orchestrator.model = 'gpt-5.4-mini'
+    // One agent slips a claude alias — should be rejected
+    p.agents[0].model = 'sonnet'
+    expect(() => validateProfile(p)).toThrow(ProfileValidationError)
+  })
+
+  it('rejects a profile naming an unregistered provider', () => {
+    const p = baseProfile('ghost')
+    p.provider = 'turbofake'
+    expect(() => validateProfile(p)).toThrow(/unknown provider/)
+  })
+
+  it('expectedProvider arg drives validation when profile.provider is absent', () => {
+    const p = baseProfile('codex-implicit')
+    delete p.provider
+    p.orchestrator.model = 'gpt-5.4-mini'
+    p.agents = p.agents.map((a) => ({ ...a, model: 'gpt-5.4-mini' }))
+    // Default expectedProvider is 'claude' — gpt-5.4-mini is not in claude catalog
+    expect(() => validateProfile(p)).toThrow(ProfileValidationError)
+    // With explicit codex, it passes
+    expect(() => validateProfile(p, 'codex')).not.toThrow()
+  })
+
   it('accepts default routing rule when agent is sr-developer', () => {
     const p = baseProfile()
     p.routing = [{ default: true, agent: 'sr-developer' }]

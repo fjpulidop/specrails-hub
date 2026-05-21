@@ -25,6 +25,8 @@ interface SetupSummary {
   specrailsCommands: number
   opsxCommands: number
   legacySrRemoved: number
+  tier: 'quick' | 'full'
+  provider?: 'claude' | 'codex'
 }
 
 const EMPTY_SUMMARY: SetupSummary = {
@@ -32,6 +34,8 @@ const EMPTY_SUMMARY: SetupSummary = {
   specrailsCommands: 0,
   opsxCommands: 0,
   legacySrRemoved: 0,
+  tier: 'quick',
+  provider: 'claude',
 }
 
 // ─── Install config ───────────────────────────────────────────────────────────
@@ -318,15 +322,21 @@ function CompleteStep({
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
             <div className="text-2xl font-bold text-accent-primary">{summary.agents}</div>
-            <div className="text-[10px] text-muted-foreground">Agents</div>
+            <div className="text-[10px] text-muted-foreground">
+              {summary.provider === 'codex' ? 'Agent skills' : 'Agents'}
+            </div>
           </div>
           <div>
             <div className="text-2xl font-bold text-accent-success">{summary.specrailsCommands}</div>
-            <div className="text-[10px] text-muted-foreground">/specrails:*</div>
+            <div className="text-[10px] text-muted-foreground">
+              {summary.provider === 'codex' ? 'Skills' : '/specrails:*'}
+            </div>
           </div>
           <div>
             <div className="text-2xl font-bold text-accent-info">{summary.opsxCommands}</div>
-            <div className="text-[10px] text-muted-foreground">/opsx:*</div>
+            <div className="text-[10px] text-muted-foreground">
+              {summary.provider === 'codex' ? 'OpenSpec skills' : '/opsx:*'}
+            </div>
           </div>
         </div>
 

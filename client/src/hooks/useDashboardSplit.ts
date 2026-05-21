@@ -18,22 +18,12 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 export const MIN_LEFT_PX = 320
 export const MIN_RIGHT_PX = 280
 export const DISABLE_BELOW_VIEWPORT_PX = 900
-export const TIER_BREAKPOINTS_PX = [600, 900] as const
-export const SNAP_TOLERANCE_PX = 30
 /**
  * The canonical default ratio is the strongest magnet on the splitter — a wider
- * tolerance than `SNAP_TOLERANCE_PX` so the user feels the splitter "stick"
- * to its starting position when they drag close to it.
+ * tolerance than any other snap so the user feels the splitter "stick" to its
+ * starting position when they drag close to it.
  */
 export const DEFAULT_SNAP_TOLERANCE_PX = 48
-
-export type SpecsBoardTier = 'row' | 'card' | 'postit'
-
-export function tierForWidth(width: number): SpecsBoardTier {
-  if (width <= 600) return 'row'
-  if (width <= 900) return 'card'
-  return 'postit'
-}
 
 function storageKey(projectId: string | null): string | null {
   return projectId ? `specrails-hub:dashboard-split:${projectId}` : null
@@ -67,41 +57,32 @@ function clampToViewport(width: number, viewport: number): number {
   return Math.min(Math.max(width, MIN_LEFT_PX), maxLeft)
 }
 
-/** Default rails-panel width in pixels (right side of the dashboard split). */
-export const DEFAULT_RIGHT_PX = 360
+/** Default dashboard split ratio — left (Specs) share of the viewport. */
+export const DEFAULT_LEFT_RATIO = 0.6
 
 /**
  * Default splitter position the first time a project is opened (no stored
- * value). Reserves `DEFAULT_RIGHT_PX` for the rails panel — wide enough that
- * the header row ("Rails" + "N running" badge) stays on a single line and
- * the compact-density mini-cards remain in play (≥ `RAILS_COMPACT_THRESHOLD_PX`
- * = 320 ⇒ normal density; we sit just above the threshold by default).
- * Floors at 901 px on the left so we never default below the postit tier
- * when there's room.
+ * value). Uses the `DEFAULT_LEFT_RATIO` 70/30 split so the rails panel gets
+ * roughly a third of the dashboard regardless of viewport size. Clamped to
+ * `[MIN_LEFT_PX, viewport - MIN_RIGHT_PX]` so very narrow viewports still
+ * honour the minimum gutters.
  */
 export function computeDefaultLeftWidth(viewport: number): number {
-  const preferred = Math.max(901, viewport - DEFAULT_RIGHT_PX)
+  const preferred = Math.round(viewport * DEFAULT_LEFT_RATIO)
   return clampToViewport(preferred, viewport)
 }
 
-function snapToBreakpoint(width: number, viewport: number): number {
-  // 1. Canonical default snaps first with the widest tolerance so the splitter
-  //    "sticks" to the initial position the user sees on first paint.
+function snapToDefault(width: number, viewport: number): number {
+  // Canonical default is the only magnet — sticks the splitter to the position
+  // the user sees on first paint when they drag close to it.
   const defaultWidth = computeDefaultLeftWidth(viewport)
   if (Math.abs(width - defaultWidth) <= DEFAULT_SNAP_TOLERANCE_PX) return defaultWidth
-  // 2. Tier breakpoints retain a smaller magnetic feel for users who want to
-  //    align with the row / card / postit visual transitions.
-  for (const bp of TIER_BREAKPOINTS_PX) {
-    if (Math.abs(width - bp) <= SNAP_TOLERANCE_PX) return bp
-  }
   return width
 }
 
 interface UseDashboardSplitResult {
   /** Current left-panel width in pixels. `null` while the splitter is disabled. */
   leftWidth: number | null
-  /** Active tier derived from `leftWidth` (or `'row'` while disabled). */
-  tier: SpecsBoardTier
   /** Whether the splitter is rendered for the current viewport. */
   enabled: boolean
   /** Begin tracking a pointer drag — call from the splitter handle's `onPointerDown`. */
@@ -222,7 +203,7 @@ export function useDashboardSplit(
     window.removeEventListener('pointercancel', handleUp)
     setLeftWidth((prev) => {
       if (prev === null) return prev
-      const snapped = snapToBreakpoint(prev, viewport)
+      const snapped = snapToDefault(prev, viewport)
       const clamped = clampToViewport(snapped, viewport)
       saveStored(projectId, clamped)
       return clamped
@@ -250,17 +231,21 @@ export function useDashboardSplit(
 
   const resetToDefault = useCallback(() => {
     if (typeof window === 'undefined') return
-    const v = window.innerWidth
+    // Use the container's own clientWidth (same source the project-switch
+    // effect uses) so a double-click restores the EXACT same width the user
+    // sees on first paint. Falling back to window.innerWidth without this
+    // produced a wider value than the container could fit when outer
+    // sidebars were open — the initial view and the double-click view
+    // visibly diverged.
+    const el = containerRef?.current
+    const v = el?.clientWidth || window.innerWidth
     if (v < DISABLE_BELOW_VIEWPORT_PX) return
-    // Always restore the canonical "postit + compact rails" default, even
-    // when the user had a different value persisted from a prior session.
     const next = computeDefaultLeftWidth(v)
     setLeftWidth(next)
     saveStored(projectId, next)
-  }, [projectId])
+  }, [projectId, containerRef])
 
   const enabled = leftWidth !== null && viewport >= DISABLE_BELOW_VIEWPORT_PX
-  const tier: SpecsBoardTier = leftWidth === null ? 'row' : tierForWidth(leftWidth)
 
-  return { leftWidth, tier, enabled, beginDrag, resetToDefault }
+  return { leftWidth, enabled, beginDrag, resetToDefault }
 }

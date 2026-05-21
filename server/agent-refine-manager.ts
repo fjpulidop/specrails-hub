@@ -4,10 +4,11 @@ import { ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import { createHash, randomUUID } from 'crypto'
 import treeKill from 'tree-kill'
-import { spawnClaude } from './util/cli-prompt'
+import { spawnAiCli } from './util/cli-prompt'
 import { testCustomAgent } from './agent-generator'
 import { recordInvocation } from './ai-invocations'
-import { normaliseResultEvent } from './result-event'
+import { finaliseInvocationResult } from './result-event'
+import { getAdapter, type ProviderAdapter, type AdapterEvent } from './providers'
 import type { DbInstance } from './db'
 import type {
   WsMessage,
@@ -60,6 +61,7 @@ export class AgentRefineManager {
   private _db: DbInstance
   private _projectPath: string
   private _projectId: string | undefined
+  private _adapter: ProviderAdapter
   private _activeProcesses = new Map<string, ChildProcess>()
   private _bodyBuffers = new Map<string, string>()
 
@@ -68,11 +70,13 @@ export class AgentRefineManager {
     db: DbInstance,
     projectPath: string,
     projectId?: string,
+    provider?: 'claude' | 'codex',
   ) {
     this._broadcast = broadcast
     this._db = db
     this._projectPath = projectPath
     this._projectId = projectId
+    this._adapter = getAdapter(provider ?? 'claude')
   }
 
   isActive(refineId: string): boolean {
@@ -188,7 +192,15 @@ export class AgentRefineManager {
   // ─── Private ──────────────────────────────────────────────────────────────
 
   private _agentFile(agentId: string): string {
-    return path.join(this._projectPath, '.claude', 'agents', `${agentId}.md`)
+    // Per-provider on-disk layout:
+    //   claude → <project>/.claude/agents/<agentId>.md
+    //   codex  → <project>/.codex/skills/<agentId>/SKILL.md
+    // Future providers add their own branch via the adapter; the projectDir
+    // is already provider-aware.
+    if (this._adapter.id === 'codex') {
+      return path.join(this._projectPath, this._adapter.projectDirName, 'skills', agentId, 'SKILL.md')
+    }
+    return path.join(this._projectPath, this._adapter.projectDirName, 'agents', `${agentId}.md`)
   }
 
   private _currentVersion(agentId: string): number {
@@ -224,19 +236,18 @@ export class AgentRefineManager {
         })
       : instruction
 
-    const args: string[] = [
-      '--dangerously-skip-permissions',
-      '--tools', 'default',
-      '--output-format', 'stream-json',
-      '--verbose',
-    ]
-    if (!isFirst && session.session_id) {
-      args.push('--resume', session.session_id)
-    }
-    args.push('-p', prompt)
+    const action = !isFirst && session.session_id && this._adapter.capabilities.nativeResume
+      ? 'chat-resume' as const
+      : 'agent-refine' as const
+    const refineModel = this._adapter.defaultModel()
+    const args = this._adapter.buildArgs(action, {
+      prompt,
+      model: refineModel,
+      sessionId: session.session_id ?? undefined,
+    })
 
     let drafted = false
-    const child = spawnClaude(args, {
+    const child = spawnAiCli(this._adapter.binary, args, {
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: this._projectPath,
@@ -245,67 +256,54 @@ export class AgentRefineManager {
     this._bodyBuffers.set(refineId, '')
 
     let capturedSessionId: string | null = null
-    let lastResultEvent: Record<string, unknown> | null = null
+    const adapterEvents: AdapterEvent[] = []
     const turnStartedAt = new Date().toISOString()
     const reader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
 
     reader.on('line', (line) => {
-      let parsed: Record<string, unknown> | null = null
-      try { parsed = JSON.parse(line) } catch { return }
-      if (!parsed) return
-      const eventType = parsed.type as string
+      const ev = this._adapter.parseStreamLine(line)
+      if (!ev) return
+      adapterEvents.push(ev)
 
-      if (eventType === 'system' || eventType === 'init') {
-        const sid = (parsed.session_id ?? (parsed.session as { id?: string })?.id) as string | undefined
-        if (sid && !capturedSessionId) capturedSessionId = sid
-      }
-      if (eventType === 'result') {
-        lastResultEvent = parsed
-        const sid = parsed.session_id as string | undefined
-        if (sid && !capturedSessionId) capturedSessionId = sid
-      }
-
-      if (eventType === 'assistant') {
-        const msg = parsed.message as { content?: Array<{ type: string; text?: string; name?: string }> } | undefined
-        const blocks = msg?.content ?? []
-
-        const newText = blocks
-          .filter((c) => c.type === 'text')
-          .map((c) => c.text ?? '')
-          .join('')
-        if (newText) {
+      switch (ev.kind) {
+        case 'session-started':
+          if (!capturedSessionId) capturedSessionId = ev.sessionId
+          break
+        case 'result': {
+          const sid = (ev.payload as { session_id?: string }).session_id
+          if (sid && !capturedSessionId) capturedSessionId = sid
+          break
+        }
+        case 'text-delta': {
           if (!drafted) {
             drafted = true
             updateRefineSession(this._db, refineId, { phase: 'drafting' })
             this._emitPhase(refineId, 'drafting')
           }
           const prev = this._bodyBuffers.get(refineId) ?? ''
-          const next = prev + newText
+          const next = prev + ev.text
           this._bodyBuffers.set(refineId, next)
           this._broadcast({
             type: 'agent_refine_stream',
             projectId: '',
             refineId,
-            delta: newText,
+            delta: ev.text,
             timestamp: new Date().toISOString(),
           })
-          // Persist incrementally so reconnects can show partial draft.
           updateRefineSession(this._db, refineId, { draft_body: next })
+          break
         }
-
-        // Emit tool_use markers as zero-width activity hints (kept for parity
-        // with ProposalManager's UX; client may render or ignore).
-        for (const block of blocks) {
-          if (block.type === 'tool_use' && block.name) {
-            this._broadcast({
-              type: 'agent_refine_stream',
-              projectId: '',
-              refineId,
-              delta: `<!--tool:${block.name}-->`,
-              timestamp: new Date().toISOString(),
-            })
-          }
-        }
+        case 'tool-use':
+          this._broadcast({
+            type: 'agent_refine_stream',
+            projectId: '',
+            refineId,
+            delta: `<!--tool:${ev.name}-->`,
+            timestamp: new Date().toISOString(),
+          })
+          break
+        case 'other':
+          break
       }
     })
 
@@ -329,15 +327,21 @@ export class AgentRefineManager {
         if (this._projectId) {
           try {
             const invStatus = code === 0 && fullDraft.trim() ? 'success' : 'failed'
-            const normalised = lastResultEvent ? normaliseResultEvent(lastResultEvent, 'claude') : {}
+            const { result: normalised, estimated } = finaliseInvocationResult(
+              this._adapter,
+              adapterEvents,
+              { fallbackModel: refineModel },
+            )
             recordInvocation(this._db, {
               id: randomUUID(),
               project_id: this._projectId,
+              provider: this._adapter.id,
               surface: 'ai-edit',
               surface_ref_id: refineId,
               status: invStatus,
               started_at: turnStartedAt,
               finished_at: new Date().toISOString(),
+              total_cost_usd_estimated: estimated,
               ...normalised,
             })
             this._broadcast({ type: 'spending.invalidated', projectId: this._projectId })
@@ -362,7 +366,7 @@ export class AgentRefineManager {
         updateRefineSession(this._db, refineId, { phase: 'validating' })
         this._emitPhase(refineId, 'validating')
         const stripped = stripToolMarkers(fullDraft)
-        const validation = validateAgentBody(stripped)
+        const validation = validateAgentBody(stripped, this._adapter.id)
         if (!validation.ok) {
           this._emitError(refineId, `Frontmatter invalid: ${validation.error}`)
           updateRefineSession(this._db, refineId, { status: 'error', phase: 'idle', draft_body: stripped })
@@ -493,7 +497,7 @@ interface ValidationResult {
   error?: string
 }
 
-export function validateAgentBody(body: string): ValidationResult {
+export function validateAgentBody(body: string, providerId: string = 'claude'): ValidationResult {
   const trimmed = body.trim()
   if (!trimmed.startsWith('---')) return { ok: false, error: 'missing YAML frontmatter' }
   const fm = trimmed.match(/^---\r?\n([\s\S]*?)\r?\n---/)
@@ -501,7 +505,14 @@ export function validateAgentBody(body: string): ValidationResult {
   const block = fm[1]
   if (!/^name:\s*\S+/m.test(block)) return { ok: false, error: 'frontmatter must include `name:`' }
   if (!/^description:/m.test(block)) return { ok: false, error: 'frontmatter must include `description:`' }
-  if (!/^model:\s*(sonnet|opus|haiku)/m.test(block)) return { ok: false, error: 'frontmatter `model:` must be sonnet|opus|haiku' }
+  // Per-provider model field rules:
+  //   - claude: `.claude/agents/sr-*.md` frontmatter requires `model:` from
+  //     the short alias set (sonnet/opus/haiku) for the Task tool to resolve.
+  //   - codex: SKILL.md format has no `model:` field — model is decided at
+  //     spawn time via `--model`. Skip the model check entirely.
+  if (providerId === 'claude' && !/^model:\s*(sonnet|opus|haiku)/m.test(block)) {
+    return { ok: false, error: 'frontmatter `model:` must be sonnet|opus|haiku' }
+  }
   return { ok: true }
 }
 

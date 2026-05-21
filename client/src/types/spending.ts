@@ -53,9 +53,22 @@ export interface ByModeEntry {
   sparkline: number[]
 }
 
+export interface ByProviderEntry {
+  provider: string
+  count: number
+  /** Authoritative (provider-reported) cost. */
+  costUsd: number
+  /** Cost computed via the server-side pricing-table fallback (codex today). */
+  estimatedCostUsd: number
+}
+
 export interface SpendingResponse {
   summary: {
     totalCostUsd: number
+    /** Portion of `totalCostUsd` contributed by rows where the server
+     *  fell back to `server/pricing.ts` (codex, today). Drives the
+     *  "Includes estimated costs" Hero footnote. */
+    totalEstimatedCostUsd: number
     totalRuns: number
     failureRate: number
     prevTotalCostUsd: number
@@ -65,6 +78,7 @@ export interface SpendingResponse {
   bySurface: BySurfaceCount[]
   byModel: ByModelEntry[]
   byMode: ByModeEntry[]
+  byProvider: ByProviderEntry[]
   dailyTimeline: DailyEntry[]
   scatter: ScatterPoint[]
   topTickets: TopTicketEntry[]
@@ -91,6 +105,12 @@ export interface InvocationRow {
   tokens_cache_read: number | null
   tokens_cache_create: number | null
   total_cost_usd: number | null
+  /** 1 when cost came from the local pricing-table fallback (codex);
+   *  0 when it was the provider's authoritative `total_cost_usd`. */
+  total_cost_usd_estimated?: 0 | 1
+  /** Provider id from the resolved adapter (`claude`, `codex`, ...).
+   *  Optional only for backwards-compat with pre-migration rows. */
+  provider?: string | null
   num_turns: number | null
   session_id: string | null
   created_at: string

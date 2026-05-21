@@ -54,10 +54,15 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
     fetch('/api/hub/available-providers')
       .then((r) => r.json())
       .then((data) => {
-        // Codex support is coming soon (in lab) — force the UI to treat it as unavailable
-        // so the provider selector renders it non-selectable with a "Coming Soon" label.
-        setAvailableProviders({ claude: Boolean(data.claude), codex: false })
-        setSelectedProvider('claude')
+        // Honour the server's real availability. The emergency-rollback env
+        // var `SPECRAILS_HUB_CODEX_BETA=0` on the server reports codex:false
+        // even if the binary is installed.
+        setAvailableProviders({ claude: Boolean(data.claude), codex: Boolean(data.codex) })
+        // Default selection: prefer claude when both are available (historical
+        // default), pick codex when it's the only usable one, otherwise leave
+        // on whichever was selected last.
+        if (data.claude) setSelectedProvider('claude')
+        else if (data.codex) setSelectedProvider('codex')
       })
       .catch(() => { /* ignore — defaults to claude */ })
   }, [open])
@@ -71,11 +76,6 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
 
     setIsAdding(true)
     try {
-      if (selectedProvider !== 'claude') {
-        toast.error('Codex support is coming soon')
-        return
-      }
-
       const data = await addProject(trimmedPath, projectName.trim() || undefined, selectedProvider)
       if (!data) return
       const { project } = data
@@ -218,21 +218,22 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
               </button>
 
               <button
-                disabled
-                aria-disabled="true"
-                title="Codex (OpenAI) — Coming Soon. Currently being tested in our lab."
-                onClick={(e) => e.preventDefault()}
+                disabled={!availableProviders.codex}
+                onClick={() => setSelectedProvider('codex')}
                 className={cn(
                   'flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-left transition-colors text-xs',
                   'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                  'border-border/30 text-muted-foreground opacity-50 cursor-not-allowed'
+                  selectedProvider === 'codex' && availableProviders.codex
+                    ? 'border-accent-primary/60 bg-accent-primary/10 text-foreground'
+                    : 'border-border/30 text-muted-foreground hover:border-border/60',
+                  !availableProviders.codex && 'opacity-40 cursor-not-allowed'
                 )}
               >
                 <span>⚡</span>
                 <span className="font-medium">Codex</span>
-                <span className="text-[9px] font-semibold uppercase tracking-wider text-accent-warning/80">
-                  Coming Soon
-                </span>
+                {!availableProviders.codex && (
+                  <span className="text-[9px] text-muted-foreground/60">not found</span>
+                )}
               </button>
             </div>
             <p className="text-[9px] text-muted-foreground/70">

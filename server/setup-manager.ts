@@ -8,6 +8,8 @@ import type { WsMessage } from './types'
 import { findCoreContract, detectCLISync, CLIProvider } from './core-compat'
 import { spawnAiCli } from './util/cli-prompt'
 import { formatMissingSetupPrerequisites } from './setup-prerequisites'
+import { getAdapter } from './providers'
+import type { ProviderAdapter, SpawnAction } from './providers/types'
 
 /**
  * specrails-core's installer (Node-native from v4.2.0 onward, bash
@@ -301,6 +303,35 @@ function hasFiles(dir: string, pattern: RegExp): boolean {
   }
 }
 
+// ─── Enrich.md content resolver (shared by start + resume enrich paths) ─────
+
+/**
+ * Reads the enrich command's body from the project's specrails dir, falling
+ * back across the three known locations:
+ *   1. `.claude/commands/sr/enrich.md`        (modern; written by core ≥ 4.2)
+ *   2. `.claude/commands/specrails/enrich.md` (legacy; written by core 4.1.x)
+ *   3. `.claude/commands/setup.md`            (very legacy; before enrich rename)
+ *
+ * For codex projects the .codex/skills/<name>/SKILL.md layout is read by the
+ * codex CLI directly when the slash command is forwarded — when the legacy
+ * codex flow needs the literal content (synthetic-session resume), the same
+ * .claude/ paths are consulted because specrails-core scaffolds both trees.
+ *
+ * Returns an empty string when no file is found; callers fall back to passing
+ * the literal slash command and let the CLI surface the missing-command error.
+ */
+function readEnrichMdContent(projectPath: string): string {
+  const enrichMdPathSr = join(projectPath, SPECRAILS_DIR, 'commands', 'sr', 'enrich.md')
+  const enrichMdPathSpecrails = join(projectPath, SPECRAILS_DIR, 'commands', 'specrails', 'enrich.md')
+  const legacyMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'setup.md')
+  for (const p of [enrichMdPathSr, enrichMdPathSpecrails, legacyMdPath]) {
+    try {
+      return readFileSync(p, 'utf-8')
+    } catch { /* try next */ }
+  }
+  return ''
+}
+
 // ─── Stream-based checkpoint detection ───────────────────────────────────────
 
 export function detectCheckpointFromText(
@@ -348,14 +379,32 @@ export function detectCheckpointFromText(
   if (text.includes('/agents/personas/') && text.includes('.md')) {
     hits.push({ key: 'product_discovery', detail: 'Writing personas...' })
   }
+  // Claude path: .claude/agents/sr-<name>.md
   if (/\/agents\/sr-[^/]+\.md/.test(text)) {
     hits.push({ key: 'agent_generation', detail: 'Writing agents...' })
+  }
+  // Codex path: .codex/skills/sr-<name>/SKILL.md (rail skills ship in
+  // specrails-core 4.6.0+ — see openspec/.../specs/setup-wizard… for the
+  // checkpoint protocol shared across providers).
+  if (/\.codex\/skills\/sr-[^/]+\/SKILL\.md/.test(text)) {
+    hits.push({ key: 'agent_generation', detail: 'Writing agent skills...' })
   }
   if ((text.includes('/commands/sr/') || text.includes('/commands/specrails/')) && text.includes('.md')) {
     hits.push({ key: 'command_config', detail: 'Writing commands...' })
   }
+  // Codex enrich/doctor skills (the non-rail commands) also indicate
+  // command_config progress.
+  if (/\.codex\/skills\/(enrich|doctor)\/SKILL\.md/.test(text)) {
+    hits.push({ key: 'command_config', detail: 'Writing codex command skills...' })
+  }
   if (text.includes('/rules/') && text.includes('.md')) {
     hits.push({ key: 'stack_conventions', detail: 'Writing conventions...' })
+  }
+  // Codex sandbox / approval policy lives inside .codex/config.toml
+  // (top-level `sandbox_mode` + `approval_policy` keys, per codex
+  // 0.128.0+). There is no separate Starlark rules file.
+  if (/\.codex\/config\.toml/.test(text)) {
+    hits.push({ key: 'stack_conventions', detail: 'Writing codex sandbox config...' })
   }
   if (text.includes('.specrails-manifest.json') || text.includes('specrails/specrails-manifest.json')) {
     hits.push({ key: 'final_verification' })
@@ -373,6 +422,11 @@ export interface SetupSummary {
   personas: number
   legacySrRemoved: number
   tier: 'quick' | 'full'
+  /** Provider used during the install — drives label phrasing on the
+   *  completion screen (codex shows "Skills" instead of "/specrails:*",
+   *  "OpenSpec" instead of "/opsx:*"). Optional for back-compat with
+   *  callers that haven't been updated; defaults to 'claude' on read. */
+  provider?: CLIProvider
 }
 
 export const EMPTY_SUMMARY: SetupSummary = {
@@ -382,6 +436,7 @@ export const EMPTY_SUMMARY: SetupSummary = {
   personas: 0,
   legacySrRemoved: 0,
   tier: 'quick',
+  provider: 'claude',
 }
 
 const MIN_NODE_NATIVE_CORE_VERSION = '4.1.0'
@@ -452,36 +507,71 @@ function formatLegacyInstallError(reasons: string[]): string {
   ].join('\n')
 }
 
-export function computeSummary(projectPath: string, tier: 'quick' | 'full'): SetupSummary {
-  const dir = SPECRAILS_DIR
+export function computeSummary(
+  projectPath: string,
+  tier: 'quick' | 'full',
+  provider: CLIProvider = 'claude',
+): SetupSummary {
   let agents = 0
   let personas = 0
   let specrailsCommands = 0
   let opsxCommands = 0
 
   try {
-    const agentsDir = join(projectPath, dir, 'agents')
-    if (existsSync(agentsDir)) {
-      const files = readdirSync(agentsDir) as string[]
-      agents = files.filter((f) => /^sr-.*\.md$/.test(f)).length
-      const personasDir = join(agentsDir, 'personas')
-      if (existsSync(personasDir)) {
-        personas = (readdirSync(personasDir) as string[]).filter((f) => f.endsWith('.md')).length
+    if (provider === 'codex') {
+      // Codex layout: every artefact ships as a SKILL under `.codex/skills/`.
+      // - agents  = rail personas (`skills/rails/sr-*/SKILL.md`) + orchestrator
+      //             skills at the root with an `sr-` prefix (sr-implement,
+      //             sr-batch-implement, …)
+      // - opsxCommands     = `skills/openspec-*/SKILL.md`
+      // - specrailsCommands = everything else under `skills/` (ported claude
+      //   slash commands like propose-spec, explore-spec, retry, doctor,
+      //   enrich, vpc-drift, …)
+      // - personas = 0 today; codex VPC pass not implemented yet.
+      const skillsDir = join(projectPath, '.codex', 'skills')
+      if (existsSync(skillsDir)) {
+        // Rails (always counted as agents).
+        const railsDir = join(skillsDir, 'rails')
+        if (existsSync(railsDir)) {
+          for (const entry of readdirSync(railsDir) as string[]) {
+            if (existsSync(join(railsDir, entry, 'SKILL.md'))) agents++
+          }
+        }
+        // Top-level skill dirs.
+        for (const entry of readdirSync(skillsDir) as string[]) {
+          if (entry === 'rails') continue
+          if (!existsSync(join(skillsDir, entry, 'SKILL.md'))) continue
+          if (/^sr-/.test(entry)) agents++
+          else if (/^openspec-/.test(entry)) opsxCommands++
+          else specrailsCommands++
+        }
       }
-    }
-    const commandsDirSpecrails = join(projectPath, dir, 'commands', 'specrails')
-    const commandsDirOpsx = join(projectPath, dir, 'commands', 'opsx')
-    if (existsSync(commandsDirSpecrails)) {
-      specrailsCommands = (readdirSync(commandsDirSpecrails) as string[]).filter((f) => f.endsWith('.md')).length
-    }
-    if (existsSync(commandsDirOpsx)) {
-      opsxCommands = (readdirSync(commandsDirOpsx) as string[]).filter((f) => f.endsWith('.md')).length
+    } else {
+      // Claude layout (unchanged).
+      const dir = SPECRAILS_DIR
+      const agentsDir = join(projectPath, dir, 'agents')
+      if (existsSync(agentsDir)) {
+        const files = readdirSync(agentsDir) as string[]
+        agents = files.filter((f) => /^sr-.*\.md$/.test(f)).length
+        const personasDir = join(agentsDir, 'personas')
+        if (existsSync(personasDir)) {
+          personas = (readdirSync(personasDir) as string[]).filter((f) => f.endsWith('.md')).length
+        }
+      }
+      const commandsDirSpecrails = join(projectPath, dir, 'commands', 'specrails')
+      const commandsDirOpsx = join(projectPath, dir, 'commands', 'opsx')
+      if (existsSync(commandsDirSpecrails)) {
+        specrailsCommands = (readdirSync(commandsDirSpecrails) as string[]).filter((f) => f.endsWith('.md')).length
+      }
+      if (existsSync(commandsDirOpsx)) {
+        opsxCommands = (readdirSync(commandsDirOpsx) as string[]).filter((f) => f.endsWith('.md')).length
+      }
     }
   } catch {
     // non-fatal
   }
 
-  return { agents, specrailsCommands, opsxCommands, personas, legacySrRemoved: 0, tier }
+  return { agents, specrailsCommands, opsxCommands, personas, legacySrRemoved: 0, tier, provider }
 }
 
 /**
@@ -610,6 +700,13 @@ export class SetupManager {
     }
 
     this._projectTiers.set(projectId, 'quick')
+    // Stamp the provider on the in-memory map so the install-complete
+    // summary computation (computeSummary → tile labels) can branch on it
+    // without reading install-config.yaml back from disk.
+    const providerFromConfig = installConfig.provider
+    if (providerFromConfig === 'claude' || providerFromConfig === 'codex') {
+      this._projectProviders.set(projectId, providerFromConfig)
+    }
     this._initCheckpoints(projectId)
 
     // Write install-config.yaml to .specrails/ for specrails-core to consume
@@ -754,7 +851,7 @@ export class SetupManager {
         this._completeCheckpoint(projectId, 'quick_complete')
         const legacySrRemoved = sweepLegacySrCommands(projectPath)
         const tier = this._projectTiers.get(projectId) ?? 'quick'
-        const summary: SetupSummary = { ...computeSummary(projectPath, tier), legacySrRemoved }
+        const summary: SetupSummary = { ...computeSummary(projectPath, tier, this._projectProviders.get(projectId) ?? 'claude'), legacySrRemoved }
         this._broadcast({
           type: 'setup_install_done',
           projectId,
@@ -789,6 +886,22 @@ export class SetupManager {
     const parsedConfig = hasConfig ? readInstallConfig(projectPath) : null
     const tier = parsedConfig?.tier ?? 'full'
     this._projectTiers.set(projectId, tier)
+    // Pull provider out of the just-written install-config.yaml so the
+    // completion-summary path can label tiles correctly (codex → "Skills"
+    // etc.). Without this, summary.provider stays undefined and the client
+    // renders the claude labels with 0/0/0 counts because the codex skill
+    // walker never gets selected.
+    if (hasConfig) {
+      try {
+        const text = readFileSync(configPath, 'utf-8')
+        const m = text.match(/^provider:\s*(\w+)/m)
+        if (m && (m[1] === 'claude' || m[1] === 'codex')) {
+          this._projectProviders.set(projectId, m[1])
+        }
+      } catch {
+        // Ignore — falls back to claude default downstream.
+      }
+    }
     this._initCheckpoints(projectId)
 
     const missingPrerequisites = formatMissingSetupPrerequisites()
@@ -882,7 +995,7 @@ export class SetupManager {
         this._advanceCheckpoint(projectId, 'base_install')
         this._completeCheckpoint(projectId, 'base_install')
         const legacySrRemoved = sweepLegacySrCommands(projectPath)
-        const summary: SetupSummary = { ...computeSummary(projectPath, tier), legacySrRemoved }
+        const summary: SetupSummary = { ...computeSummary(projectPath, tier, this._projectProviders.get(projectId) ?? 'claude'), legacySrRemoved }
         this._broadcast({
           type: 'setup_install_done',
           projectId,
@@ -936,15 +1049,11 @@ export class SetupManager {
     const hasConfig = existsSync(configPath)
     const enrichCmd = hasConfig ? '/specrails:enrich --from-config' : '/specrails:enrich'
 
-    const args = [
-      '-p', enrichCmd,
-      '--dangerously-skip-permissions',
-      '--tools', 'default',
-      '--output-format', 'stream-json',
-      '--verbose',
-    ]
-
-    this._spawnSetup(projectId, projectPath, args, provider)
+    this._spawnSetupWithAdapter(projectId, projectPath, {
+      action: 'setup-enrich',
+      prompt: enrichCmd,
+      provider,
+    })
   }
 
   /** @deprecated Use startEnrich() instead */
@@ -960,47 +1069,35 @@ export class SetupManager {
 
     if (provider) this._projectProviders.set(projectId, provider)
 
-    const resolvedProvider = provider ?? this._projectProviders.get(projectId)
+    const resolvedProvider = (provider ?? this._projectProviders.get(projectId)) as 'claude' | 'codex' | undefined
+    const adapter = getAdapter(resolvedProvider ?? 'claude')
 
-    if (resolvedProvider === 'codex') {
-      // Codex doesn't support --resume.  Build a continuation prompt that
-      // includes the original enrich instructions so the new exec run can
-      // pick up where the previous one left off.
-      const enrichMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'sr', 'enrich.md')
-      const enrichMdPathSpecrails = join(projectPath, SPECRAILS_DIR, 'commands', 'specrails', 'enrich.md')
-      // Fallback to legacy setup.md if enrich.md not yet installed
-      const legacyMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'setup.md')
-      let enrichContent = ''
-      try {
-        enrichContent = readFileSync(enrichMdPath, 'utf-8')
-      } catch {
-        try {
-          enrichContent = readFileSync(enrichMdPathSpecrails, 'utf-8')
-        } catch {
-          try {
-            enrichContent = readFileSync(legacyMdPath, 'utf-8')
-          } catch { /* will fall back to just the user message */ }
-        }
-      }
+    // Synthetic codex session ids (from before §10) can't be resumed against
+    // a real codex thread — detect and fall back to a fresh enrich respawn
+    // that folds enrich.md content + the user reply, matching the legacy UX.
+    const isSyntheticSession = sessionId.startsWith('codex-') && !/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(sessionId)
 
+    if (adapter.id === 'codex' && isSyntheticSession) {
+      const enrichContent = readEnrichMdContent(projectPath)
       const prompt = enrichContent
         ? `${enrichContent}\n\n---\nIMPORTANT: This is a continuation of a previous enrich run. Check which artifacts already exist in the project before regenerating anything. The user responded to your question with:\n\n${userMessage}`
         : userMessage
-
-      this._spawnSetup(projectId, projectPath, ['-p', prompt], resolvedProvider)
+      this._spawnSetupWithAdapter(projectId, projectPath, {
+        action: 'setup-enrich',
+        prompt,
+        provider: resolvedProvider,
+      })
       return
     }
 
-    const args = [
-      '--resume', sessionId,
-      '--dangerously-skip-permissions',
-      '--tools', 'default',
-      '--output-format', 'stream-json',
-      '--verbose',
-      '-p', userMessage,
-    ]
-
-    this._spawnSetup(projectId, projectPath, args, provider)
+    // Modern path: real session id (claude or post-§10 codex) — use the
+    // adapter's resume action.
+    this._spawnSetupWithAdapter(projectId, projectPath, {
+      action: 'setup-enrich-resume',
+      prompt: userMessage,
+      sessionId,
+      provider: resolvedProvider,
+    })
   }
 
   /** @deprecated Use resumeEnrich() instead */
@@ -1027,65 +1124,61 @@ export class SetupManager {
     }
   }
 
-  private _spawnSetup(projectId: string, projectPath: string, args: string[], projectProvider?: 'claude' | 'codex'): void {
-    // Use the project's chosen provider; only fall back to PATH detection if none was set
-    const provider = projectProvider ?? detectCLISync()
-    const isCodex = provider === 'codex'
-
-    let binary: string
-    let resolvedArgs: string[]
-    if (isCodex) {
-      // Codex doesn't share Claude Code's custom-command system — "/specrails:enrich" is
-      // just literal text.  Read the enrich command file installed by specrails-core
-      // and pass its full content as the prompt so Codex gets the real instructions.
-      binary = 'codex'
-      const promptIdx = args.indexOf('-p')
-      let prompt = promptIdx >= 0 ? args[promptIdx + 1] : '/specrails:enrich'
-
-      if (prompt === '/specrails:enrich' || prompt === '/specrails:enrich --from-config') {
-        const enrichMdPathSr = join(projectPath, SPECRAILS_DIR, 'commands', 'sr', 'enrich.md')
-        const enrichMdPathSpecrails = join(projectPath, SPECRAILS_DIR, 'commands', 'specrails', 'enrich.md')
-        // Fallback to legacy setup.md if enrich.md not yet installed
-        const legacyMdPath = join(projectPath, SPECRAILS_DIR, 'commands', 'setup.md')
-        try {
-          prompt = readFileSync(enrichMdPathSr, 'utf-8')
-        } catch {
-          try {
-            prompt = readFileSync(enrichMdPathSpecrails, 'utf-8')
-          } catch {
-            try {
-              prompt = readFileSync(legacyMdPath, 'utf-8')
-            } catch {
-              console.warn(`[SetupManager] Could not read enrich.md or setup.md — falling back to literal prompt`)
-            }
-          }
-        }
-      }
-
-      // Prepend project context header so codex knows which project/cwd it is
-      // enriching (codex has no CLAUDE.md awareness or file-system context by
-      // default when spawned in --full-auto mode).
-      // Only injected when projectName was provided — callers that don't pass it
-      // get the plain prompt (backward-compatible with existing tests).
-      const projectName = this._projectNames.get(projectId)
-      const finalPrompt = projectName
-        ? `PROJECT: ${projectName}\nCWD: ${projectPath}\n\n---\n\n${prompt}`
-        : prompt
-      resolvedArgs = ['exec', '--full-auto', finalPrompt]
-    } else {
-      // Default to claude (also covers null — warns and tries claude as fallback)
-      if (provider === null) {
-        console.warn('[SetupManager] No AI CLI detected (claude/codex). Falling back to claude.')
-      }
-      binary = 'claude'
-      resolvedArgs = args
+  /**
+   * Adapter-driven enrich spawn. Provider-aware prompt resolution
+   * (slash command for claude vs file-content fold for codex), real
+   * thread_id capture from `session-started` events (no more synthetic
+   * `codex-<id>-<ts>` ids), uniform stream parsing via
+   * `adapter.parseStreamLine`.
+   */
+  private _spawnSetupWithAdapter(
+    projectId: string,
+    projectPath: string,
+    opts: {
+      action: 'setup-enrich' | 'setup-enrich-resume'
+      prompt: string
+      sessionId?: string
+      provider?: 'claude' | 'codex'
+    },
+  ): void {
+    const resolvedProvider = opts.provider ?? detectCLISync()
+    if (resolvedProvider === null) {
+      console.warn('[SetupManager] No AI CLI detected. Falling back to claude.')
     }
+    const adapter: ProviderAdapter = getAdapter(resolvedProvider ?? 'claude')
+
+    // Provider-aware prompt resolution:
+    //   - claude: pass the slash command unresolved so the CLI looks up
+    //     `.claude/commands/specrails/enrich.md` natively. Honours the
+    //     skills-resolution priority over CLAUDE.md.
+    //   - codex: no slash-command support; fold the enrich.md content into
+    //     the prompt with the PROJECT context header so codex knows the cwd.
+    let effectivePrompt = opts.prompt
+    if (
+      !adapter.capabilities.systemPromptArg &&
+      (opts.prompt === '/specrails:enrich' || opts.prompt === '/specrails:enrich --from-config')
+    ) {
+      const enrichContent = readEnrichMdContent(projectPath)
+      if (enrichContent) {
+        const projectName = this._projectNames.get(projectId)
+        effectivePrompt = projectName
+          ? `PROJECT: ${projectName}\nCWD: ${projectPath}\n\n---\n\n${enrichContent}`
+          : enrichContent
+      } else {
+        console.warn(`[SetupManager] Could not read enrich.md or setup.md — falling back to literal prompt`)
+      }
+    }
+
+    const args = adapter.buildArgs(opts.action as SpawnAction, {
+      prompt: effectivePrompt,
+      model: adapter.defaultModel(),
+      sessionId: opts.sessionId,
+    })
 
     // No OTEL env injection here — SetupManager spawns drive the initial project
     // setup wizard, not repeatable pipeline jobs. Telemetry is scoped to
     // QueueManager pipeline runs only.
-    // spawnAiCli reroutes multi-line argv values through stdin on Windows.
-    const child = spawnAiCli(binary, resolvedArgs, {
+    const child = spawnAiCli(adapter.binary, args, {
       cwd: projectPath,
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -1095,13 +1188,13 @@ export class SetupManager {
 
     /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
     child.on('error', (err) => {
-      console.error(`[SetupManager] ${binary} spawn failed for ${projectId}: ${err.message}`)
+      console.error(`[SetupManager] ${adapter.binary} spawn failed for ${projectId}: ${err.message}`)
       this._setupProcesses.delete(projectId)
       this._stopFilesystemPoll(projectId)
       this._broadcast({
         type: 'setup_error',
         projectId,
-        error: `Failed to launch ${binary}: ${err.message}`,
+        error: `Failed to launch ${adapter.binary}: ${err.message}`,
       })
     })
     /* c8 ignore stop */
@@ -1111,61 +1204,64 @@ export class SetupManager {
 
     let capturedSessionId: string | null = null
 
-    // Codex has no session concept (no stream-json `result` event).  Generate a
-    // synthetic session ID so the wizard can enable its chat input and the
-    // setup/message endpoint accepts follow-up messages.
-    if (isCodex) {
-      capturedSessionId = `codex-${projectId}-${Date.now()}`
-      this._onSessionCaptured?.(projectId, capturedSessionId)
-    }
-
     const stdoutReader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
     const stderrReader = createInterface({ input: child.stderr!, crlfDelay: Infinity })
 
     stdoutReader.on('line', (line) => {
-      if (isCodex) {
-        // Codex outputs plain text — broadcast as log and run checkpoint detection
-        if (line) {
-          this._broadcast({ type: 'setup_log', projectId, line, stream: 'stdout' })
-          this._broadcast({ type: 'setup_chat', projectId, text: line + '\n', role: 'assistant' })
-          const hits = detectCheckpointFromText(line)
-          for (const hit of hits) {
-            this._advanceCheckpoint(projectId, hit.key, hit.detail)
-          }
-        }
+      const ev = adapter.parseStreamLine(line)
+      if (!ev) {
+        // Non-parseable line — emit as raw log.
+        if (line) this._broadcast({ type: 'setup_log', projectId, line, stream: 'stdout' })
         return
       }
 
-      // Claude: parse stream-json output
-      let parsed: Record<string, unknown> | null = null
-      try { parsed = JSON.parse(line) } catch { /* plain text */ }
-
-      if (parsed) {
-        this._handleSetupStreamEvent(projectId, projectPath, parsed)
-
-        if ((parsed.type as string) === 'result') {
-          const sid = parsed.session_id as string | undefined
-          if (sid) {
+      switch (ev.kind) {
+        case 'session-started': {
+          if (!capturedSessionId) {
+            capturedSessionId = ev.sessionId
+            this._onSessionCaptured?.(projectId, ev.sessionId)
+          }
+          break
+        }
+        case 'text-delta': {
+          // Run checkpoint detection over the assistant text and surface it
+          // both to the collapsible log viewer and the wizard chat panel.
+          this._broadcast({ type: 'setup_log', projectId, line: ev.text, stream: 'stdout' })
+          this._broadcast({ type: 'setup_chat', projectId, text: ev.text, role: 'assistant' })
+          const hits = detectCheckpointFromText(ev.text)
+          for (const hit of hits) {
+            this._advanceCheckpoint(projectId, hit.key, hit.detail)
+          }
+          // Also sync filesystem (cheap mtime/exists checks, see helper).
+          this._syncFilesystemCheckpoints(projectId, projectPath)
+          break
+        }
+        case 'tool-use': {
+          this._broadcast({ type: 'setup_log', projectId, line: `[tool] ${ev.name}`, stream: 'stdout' })
+          // Tool inputs commonly mention the paths being written — feed the
+          // input preview into the checkpoint detector so writes to
+          // .claude/agents/sr-*.md or .codex/skills/sr-*/SKILL.md advance
+          // the checkpoint state immediately.
+          const hits = detectCheckpointFromText(ev.inputPreview)
+          for (const hit of hits) {
+            this._advanceCheckpoint(projectId, hit.key, hit.detail)
+          }
+          break
+        }
+        case 'result': {
+          // Claude's `result` event also carries session_id; use it as a
+          // backstop if `session-started` wasn't observed earlier.
+          const sid = (ev.payload as { session_id?: string }).session_id
+          if (sid && !capturedSessionId) {
             capturedSessionId = sid
             this._onSessionCaptured?.(projectId, sid)
           }
+          break
         }
-
-        // Also broadcast as raw log for the collapsible log viewer
-        const eventType = parsed.type as string
-        if (eventType === 'assistant') {
-          const message = parsed.message as { content?: Array<{ type: string; text?: string; name?: string }> } | undefined
-          for (const block of message?.content ?? []) {
-            if (block.type === 'text' && block.text) {
-              this._broadcast({ type: 'setup_log', projectId, line: block.text, stream: 'stdout' })
-            } else if (block.type === 'tool_use' && block.name) {
-              this._broadcast({ type: 'setup_log', projectId, line: `[tool] ${block.name}`, stream: 'stdout' })
-            }
-          }
-        }
-      } else {
-        // Plain text line — broadcast as log
-        this._broadcast({ type: 'setup_log', projectId, line, stream: 'stdout' })
+        case 'other':
+          // Other event types (system progress markers) — already broadcast
+          // implicitly through the line itself if useful. Skip.
+          break
       }
     })
 
@@ -1196,7 +1292,7 @@ export class SetupManager {
         if (isComplete) {
           const legacySrRemoved = sweepLegacySrCommands(projectPath)
           const tier = this._projectTiers.get(projectId) ?? 'full'
-          const summary: SetupSummary = { ...computeSummary(projectPath, tier), legacySrRemoved }
+          const summary: SetupSummary = { ...computeSummary(projectPath, tier, this._projectProviders.get(projectId) ?? 'claude'), legacySrRemoved }
           this._onSetupDone?.(projectId)
           this._broadcast({
             type: 'setup_complete',
@@ -1218,48 +1314,10 @@ export class SetupManager {
         this._broadcast({
           type: 'setup_error',
           projectId,
-          error: `${binary} enrich exited with code ${code ?? 'unknown'}`,
+          error: `${adapter.binary} enrich exited with code ${code ?? 'unknown'}`,
         })
       }
     })
-  }
-
-  private _handleSetupStreamEvent(
-    projectId: string,
-    projectPath: string,
-    event: Record<string, unknown>
-  ): void {
-    const eventType = event.type as string
-
-    // Extract text for chat messages + detect checkpoints from content
-    if (eventType === 'assistant') {
-      const message = event.message as { content?: Array<{ type: string; text?: string }> } | undefined
-      const texts = (message?.content ?? [])
-        .filter((c) => c.type === 'text')
-        .map((c) => c.text ?? '')
-      const text = texts.join('')
-      if (text) {
-        this._broadcast({ type: 'setup_chat', projectId, text, role: 'assistant' })
-
-        // Detect phase transitions from Claude's output text
-        const hits = detectCheckpointFromText(text)
-        for (const hit of hits) {
-          this._advanceCheckpoint(projectId, hit.key, hit.detail)
-        }
-      }
-    }
-
-    // Tool use events — check if writing to checkpoint-relevant paths
-    if (eventType === 'tool_use') {
-      const inputStr = JSON.stringify(event.input ?? {})
-      const hits = detectCheckpointFromText(inputStr)
-      for (const hit of hits) {
-        this._advanceCheckpoint(projectId, hit.key, hit.detail)
-      }
-    }
-
-    // After any event, sync filesystem checkpoints
-    this._syncFilesystemCheckpoints(projectId, projectPath)
   }
 
   private _initCheckpoints(projectId: string): void {
@@ -1405,6 +1463,18 @@ export class SetupManager {
   getSummary(projectPath: string): SetupSummary {
     const config = readInstallConfig(projectPath)
     const tier = config?.tier ?? 'quick'
-    return computeSummary(projectPath, tier)
+    // Provider is authoritative from install-config.yaml when present; we
+    // do NOT fall back to filesystem heuristics because both `.codex/` and
+    // `.claude/` can legitimately coexist (e.g. a project that's been
+    // re-init'd) and a generic `existsSync` probe would mis-route.
+    let provider: CLIProvider = 'claude'
+    try {
+      const text = readFileSync(join(projectPath, '.specrails', 'install-config.yaml'), 'utf-8')
+      const m = text.match(/^provider:\s*(\w+)/m)
+      if (m && m[1] === 'codex') provider = 'codex'
+    } catch {
+      // Missing install-config — stay on claude default.
+    }
+    return computeSummary(projectPath, tier, provider)
   }
 }

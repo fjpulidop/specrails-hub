@@ -285,7 +285,7 @@ export class ProjectRegistry {
       (pid) => clearProjectSetupSession(this._hubDb, pid)
     )
     const proposalManager = new ProposalManager(boundBroadcast, db, project.path)
-    const agentRefineManager = new AgentRefineManager(boundBroadcast, db, project.path, project.id)
+    const agentRefineManager = new AgentRefineManager(boundBroadcast, db, project.path, project.id, project.provider ?? 'claude')
     // Retention prune: drop stale/abandoned refine sessions on project load.
     try { pruneStaleRefineSessions(db) } catch (err) {
       console.error('[project-registry] prune refine sessions failed:', err)

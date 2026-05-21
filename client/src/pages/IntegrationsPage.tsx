@@ -105,7 +105,7 @@ export default function IntegrationsPage() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full">
       <div className="flex-shrink-0 border-b border-border px-6 pt-4 pb-3 flex items-center gap-2">
         <Puzzle className="w-4 h-4 text-accent-primary" />
         <div className="flex-1">

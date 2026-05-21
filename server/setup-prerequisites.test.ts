@@ -28,6 +28,10 @@ describe('setup prerequisites', () => {
       if (cmd === 'npm') return { status: 0, stdout: '10.2.4\n', stderr: '' } as any
       if (cmd === 'npx') return { status: 0, stdout: '10.2.4\n', stderr: '' } as any
       if (cmd === 'git') return { status: 0, stdout: 'git version 2.42.1\n', stderr: '' } as any
+      // Providers: claude has no minVersion (any executable version is fine);
+      // codex has min 0.128.0, so feed something ≥ that.
+      if (cmd === 'claude') return { status: 0, stdout: '1.2.3\n', stderr: '' } as any
+      if (cmd === 'codex') return { status: 0, stdout: 'codex-cli 0.128.0\n', stderr: '' } as any
       return { status: 0, stdout: '', stderr: '' } as any
     })
 
@@ -35,12 +39,16 @@ describe('setup prerequisites', () => {
 
     expect(status.ok).toBe(true)
     expect(status.missingRequired).toEqual([])
-    expect(status.prerequisites).toHaveLength(4)
-    expect(status.prerequisites.map((item) => item.command)).toEqual(['node', 'npm', 'npx', 'git'])
-    expect(status.prerequisites.every((item) => item.installed)).toBe(true)
-    expect(status.prerequisites.every((item) => item.executable)).toBe(true)
-    expect(status.prerequisites.every((item) => item.meetsMinimum)).toBe(true)
-    expect(status.prerequisites.find((item) => item.command === 'git')?.version).toBe('git version 2.42.1')
+    const tools = status.prerequisites.filter((p) => p.kind === 'tool')
+    expect(tools).toHaveLength(4)
+    expect(tools.map((item) => item.command)).toEqual(['node', 'npm', 'npx', 'git'])
+    expect(tools.every((item) => item.installed)).toBe(true)
+    expect(tools.every((item) => item.executable)).toBe(true)
+    expect(tools.every((item) => item.meetsMinimum)).toBe(true)
+    expect(tools.find((item) => item.command === 'git')?.version).toBe('git version 2.42.1')
+    // At least one provider is usable, satisfying the at-least-one-provider rule
+    const providers = status.prerequisites.filter((p) => p.kind === 'provider')
+    expect(providers.some((p) => p.installed && p.executable && p.meetsMinimum)).toBe(true)
   })
 
   it('reports platform field matching process.platform', () => {
@@ -96,6 +104,11 @@ describe('setup prerequisites', () => {
       if (cmd === 'node') return { status: 0, stdout: 'v20.0.0\n', stderr: '' } as any
       if (cmd === 'npm') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
       if (cmd === 'npx') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      // Ensure at least one provider is usable so the at-least-one-provider
+      // rule does NOT add the providers to missingRequired (we want this test
+      // to assert that git alone is missing).
+      if (cmd === 'claude') return { status: 0, stdout: '1.0.0\n', stderr: '' } as any
+      if (cmd === 'codex') return { status: 0, stdout: '0.128.0\n', stderr: '' } as any
       return { status: 0, stdout: '', stderr: '' } as any
     })
 
@@ -176,6 +189,10 @@ describe('setup prerequisites', () => {
         if (cmd === 'C:\\nodejs\\node.cmd') return { status: 0, stdout: 'v20.11.0\n', stderr: '' } as any
         if (cmd === 'C:\\nodejs\\npm.cmd') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
         if (cmd === 'C:\\nodejs\\npx.cmd') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+        // Provider CLIs on win32 — keep at least one usable so this test (which
+        // is about path-quoting for tools) is not gated by the provider rule.
+        if (cmd === 'C:\\nodejs\\claude.cmd') return { status: 0, stdout: '1.0.0\n', stderr: '' } as any
+        if (cmd === 'C:\\nodejs\\codex.cmd') return { status: 0, stdout: '0.128.0\n', stderr: '' } as any
         return { status: 1, stdout: '', stderr: 'unquoted path' } as any
       })
 
@@ -187,6 +204,49 @@ describe('setup prerequisites', () => {
     } finally {
       Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
     }
+  })
+
+  it('marks all providers missingRequired when zero provider CLIs are usable', () => {
+    mockSpawnSync.mockImplementation((cmd: any) => {
+      if (cmd === 'which' || cmd === 'where') return { status: 0 } as any
+      if (cmd === 'node') return { status: 0, stdout: 'v20.0.0\n', stderr: '' } as any
+      if (cmd === 'npm') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (cmd === 'npx') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (cmd === 'git') return { status: 0, stdout: 'git version 2.42.1\n', stderr: '' } as any
+      // Both providers fail their version probe → unusable
+      if (cmd === 'claude' || cmd === 'codex') return { status: 1, stdout: '', stderr: 'auth missing' } as any
+      return { status: 0, stdout: '', stderr: '' } as any
+    })
+
+    const status = getSetupPrerequisitesStatus()
+    expect(status.ok).toBe(false)
+    const missingProviders = status.missingRequired
+      .filter((p) => p.kind === 'provider')
+      .map((p) => p.key)
+      .sort()
+    expect(missingProviders).toEqual(['claude', 'codex'])
+  })
+
+  it('does NOT block when at least one provider is usable', () => {
+    mockSpawnSync.mockImplementation((cmd: any) => {
+      if (cmd === 'which' || cmd === 'where') return { status: 0 } as any
+      if (cmd === 'node') return { status: 0, stdout: 'v20.0.0\n', stderr: '' } as any
+      if (cmd === 'npm') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (cmd === 'npx') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (cmd === 'git') return { status: 0, stdout: 'git version 2.42.1\n', stderr: '' } as any
+      if (cmd === 'claude') return { status: 0, stdout: '1.2.3\n', stderr: '' } as any
+      // Codex too old → not usable
+      if (cmd === 'codex') return { status: 0, stdout: '0.100.0\n', stderr: '' } as any
+      return { status: 0, stdout: '', stderr: '' } as any
+    })
+
+    const status = getSetupPrerequisitesStatus()
+    expect(status.ok).toBe(true)
+    expect(status.missingRequired).toEqual([])
+    const codex = status.prerequisites.find((p) => p.key === 'codex')
+    expect(codex?.installed).toBe(true)
+    expect(codex?.executable).toBe(true)
+    expect(codex?.meetsMinimum).toBe(false)
   })
 
   it('formats missing prerequisite guidance and returns null when ready', () => {
@@ -202,6 +262,7 @@ describe('setup prerequisites', () => {
       missingRequired: [
         {
           key: 'git',
+          kind: 'tool',
           label: 'Git',
           command: 'git',
           required: true,

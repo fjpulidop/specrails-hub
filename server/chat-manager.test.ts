@@ -559,10 +559,17 @@ describe('ChatManager', () => {
 
       const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
       expect(spawnCall[0]).toBe('codex')
-      const promptArg = spawnCall[1][1] as string
-      // The system prompt containing project name should be embedded
+      const args = spawnCall[1] as string[]
+      // Codex argv shape: ['exec', '--json', '--sandbox', 'workspace-write',
+      // '--skip-git-repo-check', <folded prompt>, '--model', <model>]
+      expect(args[0]).toBe('exec')
+      expect(args).toContain('--json')
+      expect(args).toContain('--sandbox')
+      expect(args).toContain('workspace-write')
+      // The folded prompt (system + ---  + user) is the first positional after the flags
+      const promptArg = args.find((a) => a.includes('Hello codex')) as string
+      expect(promptArg).toBeDefined()
       expect(promptArg).toContain('MyProject')
-      // Followed by the separator and user message
       expect(promptArg).toContain('---')
       expect(promptArg).toContain('Hello codex')
     })
@@ -582,18 +589,82 @@ describe('ChatManager', () => {
       expect(spawnArgs).toContain('gpt-5.4-mini')
     })
 
-    it('persists synthetic session_id with codex- prefix on successful close', async () => {
+    it('captures real thread_id from codex thread.started event on successful close', async () => {
       createConversation(dbCodex, { id: 'codex-conv-session', model: 'gpt-5.4-mini' })
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
       const sendPromise = cmCodex.sendMessage('codex-conv-session', 'Hello')
-      child.stdout.push('Some response\n')
+      // Real codex JSONL stream: thread.started → turn.started → item.completed → turn.completed
+      child.stdout.push(
+        '{"type":"thread.started","thread_id":"019e37c6-3bd4-7120-992f-6f96dc82eda1"}\n' +
+        '{"type":"turn.started"}\n' +
+        '{"type":"item.completed","item":{"type":"agent_message","text":"Hi"}}\n' +
+        '{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":2,"cached_input_tokens":0,"reasoning_output_tokens":0}}\n'
+      )
       await finishProcess(child, 0)
       await sendPromise
 
       const conv = getConversation(dbCodex, 'codex-conv-session')
-      expect(conv?.session_id).toMatch(/^codex-codex-conv-session-\d+$/)
+      expect(conv?.session_id).toBe('019e37c6-3bd4-7120-992f-6f96dc82eda1')
+    })
+
+    it('uses codex exec resume <thread_id> on follow-up turn after thread.started captured', async () => {
+      createConversation(dbCodex, { id: 'codex-conv-resume', model: 'gpt-5.4-mini' })
+
+      // Lightweight mode skips auto-title so we get exactly one spawn per turn
+      // and the test's mocks line up with the test's expectations.
+      const child1 = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValueOnce(child1 as any)
+      const firstSend = cmCodex.sendMessage('codex-conv-resume', 'Hi', { lightweight: true })
+      child1.stdout.push(
+        '{"type":"thread.started","thread_id":"019e1111-2222-7333-bbbb-cccccccccccc"}\n' +
+        '{"type":"item.completed","item":{"type":"agent_message","text":"Hi back"}}\n' +
+        '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}\n'
+      )
+      await finishProcess(child1, 0)
+      await firstSend
+
+      // Confirm session_id stored
+      const convAfter1 = getConversation(dbCodex, 'codex-conv-resume')
+      expect(convAfter1?.session_id).toBe('019e1111-2222-7333-bbbb-cccccccccccc')
+
+      // Second turn: argv should begin with `exec resume <UUID>` and include `--json`
+      const child2 = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValueOnce(child2 as any)
+      const secondSend = cmCodex.sendMessage('codex-conv-resume', 'Follow-up', { lightweight: true })
+      child2.stdout.push(
+        '{"type":"item.completed","item":{"type":"agent_message","text":"OK"}}\n' +
+        '{"type":"turn.completed","usage":{}}\n'
+      )
+      await finishProcess(child2, 0)
+      await secondSend
+
+      const resumeCall = vi.mocked(mockSpawn).mock.calls[1]
+      expect(resumeCall[0]).toBe('codex')
+      const args = resumeCall[1] as string[]
+      expect(args[0]).toBe('exec')
+      expect(args[1]).toBe('resume')
+      expect(args).toContain('--json')
+      expect(args).toContain('019e1111-2222-7333-bbbb-cccccccccccc')
+    })
+
+    it('leaves session_id null when codex stream emits no thread.started (defensive)', async () => {
+      createConversation(dbCodex, { id: 'codex-conv-no-thread', model: 'gpt-5.4-mini' })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      const sendPromise = cmCodex.sendMessage('codex-conv-no-thread', 'Hello')
+      child.stdout.push(
+        '{"type":"item.completed","item":{"type":"agent_message","text":"Hi"}}\n' +
+        '{"type":"turn.completed","usage":{}}\n'
+      )
+      await finishProcess(child, 0)
+      await sendPromise
+
+      const conv = getConversation(dbCodex, 'codex-conv-no-thread')
+      // Old behaviour: synthesised `codex-<convId>-<ts>`. New behaviour: null.
+      expect(conv?.session_id).toBeNull()
     })
 
     it('auto-title for codex: spawns codex exec with title prompt and sets title', async () => {
@@ -606,17 +677,24 @@ describe('ChatManager', () => {
         .mockReturnValueOnce(titleChild as any)
 
       const sendPromise = cmCodex.sendMessage('codex-conv-title', 'What is specrails?')
-      mainChild.stdout.push('Specrails is a pipeline framework\n')
+      // Feed real codex JSONL so text-delta accumulates and triggers auto-title
+      mainChild.stdout.push(
+        '{"type":"thread.started","thread_id":"019e0000-0000-0000-0000-000000000000"}\n' +
+        '{"type":"item.completed","item":{"type":"agent_message","text":"Specrails is a pipeline framework"}}\n' +
+        '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}\n'
+      )
       await finishProcess(mainChild, 0)
       await sendPromise
 
       // The title spawn should be codex exec
       const titleSpawnCall = vi.mocked(mockSpawn).mock.calls[1]
       expect(titleSpawnCall[0]).toBe('codex')
-      expect(titleSpawnCall[1][0]).toBe('exec')
+      expect((titleSpawnCall[1] as string[])[0]).toBe('exec')
 
-      // Simulate title process returning a title
-      titleChild.stdout.push('SpecRails Pipeline Framework\n')
+      // Simulate title process returning JSONL with a single agent_message text
+      titleChild.stdout.push(
+        '{"type":"item.completed","item":{"type":"agent_message","text":"SpecRails Pipeline Framework"}}\n'
+      )
       await finishProcess(titleChild, 0)
       await new Promise((r) => setTimeout(r, 30))
 

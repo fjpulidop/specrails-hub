@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"019e37c6-3bd4-7120-992f-6f96dc82eda1"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"See ya"}}
+{"type":"turn.completed","usage":{"input_tokens":11923,"cached_input_tokens":2432,"output_tokens":45,"reasoning_output_tokens":42}}

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useDroppable } from '@dnd-kit/core'
+import { useDroppable, useDndContext } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { GripVertical, Trash2, ArrowLeft } from 'lucide-react'
 import { RailControls, type RailMode, type RailStatus } from './RailControls'
@@ -71,6 +71,11 @@ export function RailRow({
     }
   }, [ticketCtxMenu])
   const { isOver, setNodeRef } = useDroppable({ id })
+  // True whenever a ticket (numeric id) is being dragged anywhere in the
+  // dashboard's DndContext — used to surface a subtle "available drop target"
+  // hint on every rail body, not just the one under the cursor.
+  const { active } = useDndContext()
+  const ticketDragActive = typeof active?.id === 'number'
   const [swipeX, setSwipeX] = useState(0)
   const [swiping, setSwiping] = useState(false)
   const [showSwipeDelete, setShowSwipeDelete] = useState(false)
@@ -199,12 +204,14 @@ export function RailRow({
         onMouseLeave={handleMouseUp}
         onClick={handleClick}
         style={railJiggleStyle}
-        className={`group relative flex flex-col gap-1.5 rounded-xl border bg-card/80 backdrop-blur p-2.5 transition-all ${
+        className={`group relative flex flex-col gap-1.5 rounded-xl border bg-card p-2.5 transition-all ${
           isOver
             ? 'border-accent-info/60 shadow-[0_0_0_1px_hsl(var(--accent-info)/0.35),0_0_14px_hsl(var(--accent-info)/0.18)]'
-            : isRunning
-              ? 'border-accent-success/40 shadow-sm'
-              : 'border-border/40 hover:border-accent-info/30 hover:shadow-md'
+            : ticketDragActive
+              ? 'border-dashed border-accent-info/35'
+              : isRunning
+                ? 'border-accent-success/40 shadow-sm'
+                : 'border-border/40 hover:border-accent-info/30 hover:shadow-md'
         } ${jiggleMode && canDelete ? 'animate-jiggle' : ''}`}
       >
         {/* Header line: drag grip + status dot + label */}
@@ -394,9 +401,11 @@ export function RailRow({
         </div>
       )}
 
-      {/* Main rail content (slides left on swipe) */}
+      {/* Main rail content (slides left on swipe). Solid `bg-card`
+          background (no backdrop-blur) so the card looks identical
+          regardless of the page-background gradient behind it. */}
       <div
-        className={`relative z-10 flex flex-col rounded-xl border overflow-hidden ${
+        className={`relative z-10 flex flex-col rounded-xl border overflow-hidden bg-card ${
           jiggleMode && canDelete ? 'animate-jiggle' : ''
         } ${
           isOver
@@ -406,7 +415,6 @@ export function RailRow({
         style={{
           transform: swipeX < 0 ? `translateX(${swipeX}px)` : undefined,
           transition: swiping ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1)',
-          backdropFilter: 'blur(8px)',
           ...(railJigglePhaseMs !== undefined ? { animationDelay: `${railJigglePhaseMs}ms` } : {}),
         }}
       >
@@ -498,19 +506,26 @@ export function RailRow({
         {/* Droppable body */}
         <div
           ref={setNodeRef}
+          data-drop-target={ticketDragActive ? 'available' : undefined}
           className={`min-h-[56px] px-3 py-2 space-y-1.5 transition-colors duration-150 ${
-            isOver ? 'bg-primary/[0.04]' : 'bg-card/20'
+            isOver
+              ? 'bg-accent-info/[0.06]'
+              : ticketDragActive
+                ? 'bg-accent-info/[0.02]'
+                : 'bg-card/20'
           }`}
         >
           {tickets.length === 0 ? (
             <div
               className={`h-10 flex items-center justify-center rounded-lg border border-dashed transition-all duration-150 ${
                 isOver
-                  ? 'border-primary/40 text-primary/50 bg-primary/[0.04]'
-                  : 'border-border/25 text-muted-foreground/30'
+                  ? 'border-accent-info/60 text-accent-info/80 bg-accent-info/[0.06]'
+                  : ticketDragActive
+                    ? 'border-accent-info/35 text-accent-info/60'
+                    : 'border-border/25 text-muted-foreground/30'
               }`}
             >
-              <span className="text-[10px] select-none">{isOver ? 'Drop here' : 'Drag specs here'}</span>
+              <span className="text-[10px] select-none">{isOver ? 'Drop here' : ticketDragActive ? 'Drop on this rail' : 'Drag specs here'}</span>
             </div>
           ) : (
             <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>

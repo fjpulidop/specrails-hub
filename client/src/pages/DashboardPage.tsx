@@ -3,13 +3,16 @@ import {
   DndContext,
   DragOverlay,
   closestCorners,
+  pointerWithin,
+  rectIntersection,
+  getFirstCollision,
   PointerSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragStartEvent,
   type DragEndEvent,
-  type UniqueIdentifier,
 } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import { toast } from 'sonner'
@@ -28,6 +31,12 @@ import type { LocalTicket } from '../types'
 import type { RailMode, RailStatus } from '../components/RailControls'
 import type { SpecSortMode, SpecSortDir } from '../types/spec-sort'
 import { applySpecSort, loadSpecSort, saveSpecSort } from '../lib/spec-sort'
+import {
+  loadSpecsViewTier,
+  saveSpecsViewTier,
+  type SpecsViewTier,
+} from '../lib/specs-view-tier'
+import { insertAt, resolveDestContainer } from '../lib/dashboard-dnd'
 
 const INITIAL_RAILS: RailState[] = [
   { id: 'rail-1', label: 'Rail 1', ticketIds: [], mode: 'implement', status: 'idle' },
@@ -103,20 +112,27 @@ export default function DashboardPage() {
   const initialSort = loadSpecSort(activeProjectId)
   const [sortMode, setSortMode] = useState<SpecSortMode>(initialSort.mode)
   const [sortDir, setSortDir] = useState<SpecSortDir>(initialSort.dir)
+  const [viewTier, setViewTier] = useState<SpecsViewTier>(() => loadSpecsViewTier(activeProjectId))
 
-  // Reset spec order, rails, and sort when active project changes
+  // Reset spec order, rails, sort, and view tier when active project changes
   useEffect(() => {
     setSpecOrderIds(loadSpecOrder(activeProjectId))
     setRails(loadRails(activeProjectId) ?? INITIAL_RAILS)
     const s = loadSpecSort(activeProjectId)
     setSortMode(s.mode)
     setSortDir(s.dir)
+    setViewTier(loadSpecsViewTier(activeProjectId))
   }, [activeProjectId])
 
   const handleSortChange = useCallback((mode: SpecSortMode, dir: SpecSortDir) => {
     setSortMode(mode)
     setSortDir(dir)
     saveSpecSort(activeProjectId, mode, dir)
+  }, [activeProjectId])
+
+  const handleViewTierChange = useCallback((tier: SpecsViewTier) => {
+    setViewTier(tier)
+    saveSpecsViewTier(activeProjectId, tier)
   }, [activeProjectId])
 
   // ── Reconcile stale 'running' rails on mount / project switch / WS reconnect ─
@@ -280,6 +296,31 @@ export default function DashboardPage() {
     useSensor(KeyboardSensor),
   )
 
+  // Custom collision detection. Two drag domains share the same DndContext:
+  //   - Rail reorder (active.id starts with `__rail:`) — only other rail-sort
+  //     wrappers should be considered as drop targets.
+  //   - Ticket drag (active.id is a number) — only spec/rail body droppables
+  //     and ticket items should be considered. Rail-sort wrappers (which
+  //     overlap their inner rail body) must be excluded or `over.id` resolves
+  //     to a prefixed string and the drop is dropped on the floor.
+  // pointerWithin is the most natural fit for cross-container drops; rect /
+  // closest-corners are fallbacks for edge-of-window or scroll situations.
+  const collisionDetection: CollisionDetection = useCallback((args) => {
+    const activeIsRailSort = typeof args.active.id === 'string' && isRailSortId(args.active.id)
+    const filtered = args.droppableContainers.filter((c) => {
+      const id = c.id
+      if (typeof id === 'string' && isRailSortId(id)) return activeIsRailSort
+      return !activeIsRailSort
+    })
+    const scoped = { ...args, droppableContainers: filtered }
+    if (activeIsRailSort) return closestCorners(scoped)
+    const pointerCols = pointerWithin(scoped)
+    if (getFirstCollision(pointerCols)) return pointerCols
+    const rectCols = rectIntersection(scoped)
+    if (getFirstCollision(rectCols)) return rectCols
+    return closestCorners(scoped)
+  }, [])
+
   // ── Derived maps ─────────────────────────────────────────────────────────────
   const ticketMap = useMemo(() => new Map(tickets.map((t) => [t.id, t])), [tickets])
 
@@ -391,17 +432,6 @@ export default function DashboardPage() {
     [specTickets, doneSpecTickets, rails],
   )
 
-  /** Insert itemId before beforeId in arr; if beforeId not found, append. */
-  function insertAt(arr: number[], itemId: number, beforeId: UniqueIdentifier): number[] {
-    if (typeof beforeId === 'number' && arr.includes(beforeId)) {
-      const idx = arr.indexOf(beforeId)
-      const next = [...arr]
-      next.splice(idx, 0, itemId)
-      return next
-    }
-    return [...arr, itemId]
-  }
-
   // ── DnD handlers ─────────────────────────────────────────────────────────────
   function handleDragStart({ active }: DragStartEvent) {
     if (isRailSortId(active.id)) {
@@ -439,11 +469,14 @@ export default function DashboardPage() {
     const sourceContainer = findContainer(draggedId)
     if (!sourceContainer) return
 
-    // Destination: if over a known container id, use it; else find the container of the hovered item
-    const destContainer =
-      typeof overId === 'string' && containerIds.has(overId)
-        ? overId
-        : (findContainer(overId as number) ?? sourceContainer)
+    const destContainer = resolveDestContainer(
+      overId,
+      containerIds,
+      findContainer,
+      isRailSortId,
+      extractRailId,
+    ) ?? sourceContainer
+    if (!containerIds.has(destContainer)) return
 
     if (sourceContainer === destContainer) {
       // ── Reorder within same container ─────────────────────────────────────
@@ -490,6 +523,7 @@ export default function DashboardPage() {
       }
       // Specs → Rail
       else if (sourceContainer === 'specs') {
+        const targetRail = rails.find((r) => r.id === destContainer)
         updateSpecOrder((prev) => (prev ?? specTickets.map((t) => t.id)).filter((id) => id !== draggedId))
         updateRails((prev) =>
           prev.map((r) => {
@@ -497,9 +531,21 @@ export default function DashboardPage() {
             return { ...r, ticketIds: insertAt(r.ticketIds, draggedId, overId) }
           }),
         )
+        if (targetRail) {
+          if (targetRail.status === 'running') {
+            toast.info(`Queued on ${targetRail.label}`, { description: 'Rail is currently running' })
+          } else {
+            toast.success(`Moved to ${targetRail.label}`)
+          }
+        }
       }
       // Rail → Specs
       else if (destContainer === 'specs') {
+        const sourceRail = rails.find((r) => r.id === sourceContainer)
+        if (sourceRail?.status === 'running') {
+          toast.error(`${sourceRail.label} is running — stop it before removing`)
+          return
+        }
         updateRails((prev) =>
           prev.map((r) => {
             if (r.id !== sourceContainer) return r
@@ -510,6 +556,7 @@ export default function DashboardPage() {
           const current = prev ?? specTickets.map((t) => t.id)
           return insertAt(current, draggedId, overId)
         })
+        if (sourceRail) toast.success(`Removed from ${sourceRail.label}`)
       }
       // Done → Rail (revert to todo then add to rail)
       else if (sourceContainer === 'done-specs') {
@@ -630,11 +677,11 @@ export default function DashboardPage() {
   const activeTicket = activeId !== null ? ticketMap.get(activeId) : undefined
 
   const dashboardContainerRef = useRef<HTMLDivElement | null>(null)
-  const { leftWidth, tier, enabled: splitterEnabled, beginDrag, resetToDefault } = useDashboardSplit(activeProjectId, dashboardContainerRef)
+  const { leftWidth, enabled: splitterEnabled, beginDrag, resetToDefault } = useDashboardSplit(activeProjectId, dashboardContainerRef)
   const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div ref={dashboardContainerRef} className="flex h-full overflow-hidden">
         {/* Left panel: Specs board */}
         <div
@@ -657,7 +704,8 @@ export default function DashboardPage() {
             sortMode={sortMode}
             sortDir={sortDir}
             onSortChange={handleSortChange}
-            tier={tier}
+            viewTier={viewTier}
+            onViewTierChange={handleViewTierChange}
             rails={rails}
             onMoveToRail={handleMoveTicketToRail}
           />
@@ -693,11 +741,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Drag overlay — renders a floating ghost while dragging. Matches the
-          tier so a postit dragged from the postit grid keeps looking like a
-          postit instead of collapsing back to a compact row. */}
+          active view tier so a postit dragged from the postit grid keeps
+          looking like a postit instead of collapsing back to a compact row. */}
       <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
         {activeTicket ? (
-          tier === 'postit' ? (
+          viewTier === 'postit' ? (
             <div className="flex flex-col gap-2 rounded-xl border border-accent-info/40 bg-card/95 shadow-xl shadow-black/30 backdrop-blur-sm p-3 rotate-1 scale-[1.02] pointer-events-none w-[260px] min-h-[180px]">
               <div className="flex items-start justify-between gap-2">
                 <span className="text-[10px] font-mono text-muted-foreground/60">#{activeTicket.id}</span>

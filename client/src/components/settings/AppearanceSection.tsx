@@ -4,8 +4,9 @@ import { useThemeOptional } from '../../context/ThemeContext'
 import { THEME_IDS, THEMES, type ThemeId } from '../../lib/themes'
 
 /**
- * Hub-wide theme picker. Three cards, one per built-in theme. Click to
- * apply optimistically and persist to the server. Failure reverts to the
+ * Hub-wide theme picker. One card per built-in theme — rendered from the
+ * `THEME_IDS` registry so adding a theme requires zero changes here. Click
+ * to apply optimistically and persist to the server. Failure reverts to the
  * previously active theme. No live preview on hover (intentional v1
  * decision — see openspec/changes/add-hub-theme-system/design.md D7).
  */
@@ -33,7 +34,7 @@ export function AppearanceSection() {
         Appearance
       </h3>
       <div
-        className="grid grid-cols-1 sm:grid-cols-3 gap-2"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2"
         role="radiogroup"
         aria-label="Theme"
       >

@@ -51,7 +51,7 @@ export default function AgentsPage() {
   const showUpgradeBanner = coreStatus !== null && !coreStatus.profileAware
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full">
       {showUpgradeBanner && (
         <div className="flex-shrink-0 flex items-start gap-3 px-6 py-3 border-b border-yellow-500/30 bg-yellow-500/10">
           <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />

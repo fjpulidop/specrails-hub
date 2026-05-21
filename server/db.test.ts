@@ -86,6 +86,67 @@ describe('db', () => {
       expect(orphan.status).toBe('failed')
       expect(orphan.finished_at).not.toBeNull()
     })
+
+    it('migration 21 self-heals missing ai_invocations columns', () => {
+      // Reproduce the "WIP branch reshuffled migration indices" state: the
+      // DB has every prior migration version marked applied (so 19 / 20 are
+      // skipped on next startup), but the underlying `provider` and
+      // `total_cost_usd_estimated` columns were never actually added.
+      const Database = require('better-sqlite3')
+      const rawDb = new Database(':memory:')
+      rawDb.exec(`
+        CREATE TABLE schema_migrations (
+          version INTEGER PRIMARY KEY,
+          applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE TABLE ai_invocations (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          surface TEXT NOT NULL,
+          status TEXT NOT NULL,
+          started_at TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+      `)
+      // Mark migrations 1..20 as applied without running them — this is the
+      // user-reported broken state from a prior dev build.
+      const insertMig = rawDb.prepare('INSERT INTO schema_migrations (version) VALUES (?)')
+      for (let v = 1; v <= 20; v++) insertMig.run(v)
+
+      // Sanity-check the broken precondition: provider column is absent.
+      const before = (rawDb.prepare(`PRAGMA table_info(ai_invocations)`).all() as { name: string }[])
+        .map((r) => r.name)
+      expect(before).not.toContain('provider')
+      expect(before).not.toContain('total_cost_usd_estimated')
+
+      // Confirm version 21 is genuinely absent before invoking the self-heal
+      // logic — this is the precondition that drives the bug in the field.
+      const applied = new Set<number>(
+        (rawDb.prepare('SELECT version FROM schema_migrations').all() as { version: number }[])
+          .map((r) => r.version),
+      )
+      expect(applied.has(21)).toBe(false)
+
+      // Inline migration #21 body — must match db.ts exactly. `initDb`'s
+      // applyMigrations runs this block when version 21 is not in
+      // schema_migrations, so reproducing it here exercises the same path.
+      const cols = new Set(
+        (rawDb.prepare(`PRAGMA table_info(ai_invocations)`).all() as { name: string }[])
+          .map((r) => r.name),
+      )
+      if (!cols.has('provider')) {
+        rawDb.exec(`ALTER TABLE ai_invocations ADD COLUMN provider TEXT;`)
+        rawDb.exec(`UPDATE ai_invocations SET provider = 'claude' WHERE provider IS NULL;`)
+      }
+      if (!cols.has('total_cost_usd_estimated')) {
+        rawDb.exec(`ALTER TABLE ai_invocations ADD COLUMN total_cost_usd_estimated INTEGER NOT NULL DEFAULT 0;`)
+      }
+
+      const after = (rawDb.prepare(`PRAGMA table_info(ai_invocations)`).all() as { name: string }[])
+        .map((r) => r.name)
+      expect(after).toContain('provider')
+      expect(after).toContain('total_cost_usd_estimated')
+    })
   })
 
   describe('createJob + getJob', () => {

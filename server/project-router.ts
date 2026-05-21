@@ -20,6 +20,7 @@ import { ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError, DEFAULT
 import type { JobPriority } from './types'
 import { VALID_PRIORITIES } from './types'
 import { resolveCommand } from './command-resolver'
+import { getAdapter } from './providers'
 import { createHooksRouter, getPhaseStates } from './hooks'
 import { getConfig, fetchIssues } from './config'
 import { runContractRefine, runContractRefineForQuick } from './contract-refine-runner'
@@ -1750,11 +1751,22 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         ? `- Do NOT explore the project codebase. The resources inside <user-attachment> blocks below are pre-loaded context the user intentionally provided — read and use them freely.`
         : `- Do NOT read any files or explore the codebase. Work purely from the user's description.`
 
+    // The specrails-tickets prefix (when scope.specrails is toggled on)
+    // dumps every ticket into the prompt as informational context. Without
+    // an explicit dedup instruction the model treats it as background and
+    // still proposes a near-duplicate of something already in the backlog.
+    // Adding the rule here, gated on `quickScope.specrails`, keeps the
+    // "toggle is the only gate" contract the user asked for.
+    const dedupRule = quickScope.specrails
+      ? `- The "Specrails Tickets" section above lists every ticket already in the backlog. Do NOT propose a duplicate or a near-duplicate of any of them. If the user's idea is already covered by an existing ticket, say so in "Problem Statement" and pick a *different* angle / sub-feature / next step that builds on the existing one — do not repeat it.\n`
+      : ''
+
     let baseSystemPrompt =
       `You are a senior product engineer generating a structured spec proposal.\n\n` +
       (specsPrefix ? `${specsPrefix}\n\n` : '') +
       `RULES:\n` +
       `${codebaseRule}\n` +
+      dedupRule +
       `- Do NOT create files, tickets, or issues.\n` +
       `- Output ONLY the structured markdown below. No preamble, no explanation.\n\n` +
       `REQUIRED FORMAT:\n` +
@@ -1773,27 +1785,24 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const systemPrompt = baseSystemPrompt
     const userPrompt = baseUserPrompt
 
-    let binary: string
-    let args: string[]
-
-    if (provider === 'codex') {
-      binary = 'codex'
-      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', resolvedModel]
-    } else {
-      binary = 'claude'
-      const toolFlags = toolFlagsForScope(quickScope)
-      args = [
-        '--dangerously-skip-permissions',
-        ...toolFlags.args,
-        '--output-format', 'stream-json',
-        '--verbose',
-        '--max-turns', quickScope.full ? '6' : (hasAttachments ? '3' : '1'),
-        '--model', resolvedModel,
-        ...imageFlags,
-        '--system-prompt', systemPrompt,
-        '-p', userPrompt,
-      ]
-    }
+    // Generate-spec spawn args are adapter-driven. For Claude the `--tools`
+    // flag set comes from `toolFlagsForScope(quickScope)` which the adapter
+    // doesn't model — pass them through `extraArgs` so they slot in after
+    // the standard COMMON_FLAGS. `imageFlags` (also Claude-only) goes the
+    // same way. For codex the system prompt folds into the user prompt
+    // (no --system-prompt flag) and the extra Claude-only flags are ignored
+    // by the codex adapter (it doesn't read extraArgs that don't apply).
+    const adapter = getAdapter(provider)
+    const toolFlags = provider === 'claude' ? toolFlagsForScope(quickScope) : { args: [] }
+    const claudeMaxTurns = quickScope.full ? 6 : (hasAttachments ? 3 : 1)
+    const args = adapter.buildArgs('spec-gen', {
+      prompt: userPrompt,
+      systemPrompt,
+      model: resolvedModel,
+      maxTurns: provider === 'claude' ? claudeMaxTurns : undefined,
+      extraArgs: provider === 'claude' ? [...toolFlags.args, ...imageFlags] : undefined,
+    })
+    const binary = adapter.binary
 
     // spawnAiCli reroutes multi-line argv values through stdin on Windows;
     // POSIX argv path unchanged.
@@ -1837,38 +1846,54 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const stdoutReader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
 
     stdoutReader.on('line', (line) => {
+      let parsed: Record<string, unknown> | null = null
+      try { parsed = JSON.parse(line) } catch { /* skip */ }
+      if (!parsed) return
+
       if (provider === 'codex') {
-        if (line) {
-          buffer += line + '\n'
-          const msg: SpecGenStreamMessage = {
-            type: 'spec_gen_stream', projectId, requestId,
-            delta: line + '\n', timestamp: new Date().toISOString(),
-          }
-          broadcast(msg)
-        }
-      } else {
-        let parsed: Record<string, unknown> | null = null
-        try { parsed = JSON.parse(line) } catch { /* skip */ }
-        if (!parsed) return
-
-        if ((parsed.type as string) === 'result') {
+        // Codex `exec --json` emits one event per line. Capture the final
+        // `turn.completed` for usage extraction, and accumulate ONLY the
+        // assistant_message text — never the command_execution items or
+        // wrapper events, otherwise the raw JSONL ends up in the ticket
+        // description.
+        if ((parsed.type as string) === 'turn.completed') {
           lastResultEvent = parsed
+          return
         }
+        if ((parsed.type as string) !== 'item.completed') return
+        const item = parsed.item as { type?: string; text?: string } | undefined
+        if (!item || item.type !== 'agent_message') return
+        const newText = (item.text ?? '').trim()
+        if (!newText) return
+        // Each agent_message is a complete chunk — separate with a blank
+        // line so the parser regexes match cleanly across chunks.
+        buffer += (buffer.endsWith('\n') || buffer.length === 0 ? '' : '\n') + newText + '\n'
+        const msg: SpecGenStreamMessage = {
+          type: 'spec_gen_stream', projectId, requestId,
+          delta: newText + '\n', timestamp: new Date().toISOString(),
+        }
+        broadcast(msg)
+        return
+      }
 
-        if ((parsed.type as string) === 'assistant') {
-          const msg = parsed.message as { content?: Array<{ type: string; text?: string }> } | undefined
-          const texts = (msg?.content ?? [])
-            .filter((c) => c.type === 'text')
-            .map((c) => c.text ?? '')
-          const newText = texts.join('')
-          if (newText) {
-            buffer += newText
-            const wsMsg: SpecGenStreamMessage = {
-              type: 'spec_gen_stream', projectId, requestId,
-              delta: newText, timestamp: new Date().toISOString(),
-            }
-            broadcast(wsMsg)
+      // Claude path.
+      if ((parsed.type as string) === 'result') {
+        lastResultEvent = parsed
+      }
+
+      if ((parsed.type as string) === 'assistant') {
+        const msg = parsed.message as { content?: Array<{ type: string; text?: string }> } | undefined
+        const texts = (msg?.content ?? [])
+          .filter((c) => c.type === 'text')
+          .map((c) => c.text ?? '')
+        const newText = texts.join('')
+        if (newText) {
+          buffer += newText
+          const wsMsg: SpecGenStreamMessage = {
+            type: 'spec_gen_stream', projectId, requestId,
+            delta: newText, timestamp: new Date().toISOString(),
           }
+          broadcast(wsMsg)
         }
       }
     })
@@ -1968,8 +1993,12 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
           // Quick mode Contract Refine: when toggle is on in the request body
           // AND the project setting + kill switch permit it, fire the no-resume
-          // Quick refine path asynchronously.
-          if (quickContractRefine && created) {
+          // Quick refine path asynchronously. Claude-only today — codex
+          // contract refine isn't wired (the spawn hardcodes the `claude`
+          // binary). Skip silently on codex projects so the ticket lands
+          // without the misleading "Contract layer skipped — model_error"
+          // toast that the refine kill-switch would otherwise emit.
+          if (quickContractRefine && created && provider === 'claude') {
             const refineTicketId = created.id
             const refineTitle = created.title
             const refineDescription = created.description
@@ -1992,6 +2021,11 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
                 console.error('[project-router] runContractRefineForQuick error:', err)
               })
             })
+          } else if (quickContractRefine && created && provider === 'codex') {
+            console.log(
+              `[project-router] quick contract refine skipped for codex project (ticket #${created.id}); ` +
+                `feature is claude-only today`,
+            )
           }
         } catch (err) {
           console.error('[project-router] generate-spec ticket creation error:', err)
@@ -2035,6 +2069,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         recordInvocation(ctx(req).db, {
           id: randomUUID(),
           project_id: projectId,
+          provider: cliProvider,
           surface: 'quick-spec',
           surface_ref_id: requestId,
           ticket_id: createdTicketId,
@@ -2347,10 +2382,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       res.status(201).json({ ticket: created!, revision: store.revision })
 
       // Fire Contract Refine post-commit (fire-and-forget). Toggle + kill-switch
-      // are checked inside runContractRefine; this call is safe to make
-      // unconditionally. We schedule via process.nextTick so the HTTP response
-      // is flushed before the spawn runs.
-      if (conversationId && created) {
+      // are checked inside runContractRefine. Claude-only today — codex
+      // contract refine isn't wired (the spawn hardcodes the `claude`
+      // binary). Skip silently on codex projects.
+      if (conversationId && created && project.provider === 'claude') {
         const createdTicketId = created.id
         const convoId = conversationId
         console.log(`[project-router] from-draft hook: scheduling refine ticket=${createdTicketId} conv=${convoId}`)
@@ -2370,6 +2405,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
             console.error('[project-router] runContractRefine error:', err)
           })
         })
+      } else if (conversationId && created && project.provider === 'codex') {
+        console.log(
+          `[project-router] from-draft contract refine skipped for codex project (ticket #${created.id})`,
+        )
       }
     } catch (err) {
       console.error('[project-router] from-draft create error:', err)
@@ -2386,6 +2425,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const { project, db, broadcast } = ctx(req)
     if (isExploreContractRefineKillSwitchActive()) {
       res.status(409).json({ error: 'feature_disabled_by_env' }); return
+    }
+    if (project.provider === 'codex') {
+      res.status(409).json({ error: 'contract_refine_unsupported_for_codex' }); return
     }
     // Validate the ticket exists.
     try {

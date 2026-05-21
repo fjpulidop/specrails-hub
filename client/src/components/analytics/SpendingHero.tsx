@@ -54,8 +54,13 @@ export function SpendingHero({ data, loading }: Props) {
 
   const total = data.summary.totalCostUsd
   const totalRuns = data.summary.totalRuns
+  const totalEstimated = data.summary.totalEstimatedCostUsd ?? 0
   const delta = data.summary.deltaPct
   const trackingStartedAt = data.trackingStartedAt
+  // Hero footnote: surface when any row in the window came from the local
+  // pricing-table fallback (currently codex; future providers without a
+  // native cost field will trigger this too).
+  const hasEstimatedCost = totalEstimated > 0
   const segments = SURFACES.map((s) => {
     const row = data.bySurface.find((b) => b.surface === s)
     return { surface: s, costUsd: row?.costUsd ?? 0, count: row?.count ?? 0 }
@@ -81,8 +86,16 @@ export function SpendingHero({ data, loading }: Props) {
               </span>
             )}
           </div>
-          <div className="text-xs text-muted-foreground mt-1 tabular-nums">
-            {totalRuns} invocation{totalRuns === 1 ? '' : 's'}
+          <div className="text-xs text-muted-foreground mt-1 tabular-nums flex items-center gap-2">
+            <span>{totalRuns} invocation{totalRuns === 1 ? '' : 's'}</span>
+            {hasEstimatedCost && (
+              <span
+                className="text-[10px] text-muted-foreground/70 italic"
+                title={`Includes ${fmtUsd(totalEstimated)} of estimated cost from providers without a native cost field (e.g. codex via the local pricing table).`}
+              >
+                · includes ~{fmtUsd(totalEstimated)} estimated
+              </span>
+            )}
           </div>
         </div>
         {totalRuns === 0 && trackingStartedAt && (

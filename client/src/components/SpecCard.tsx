@@ -144,7 +144,7 @@ export function SpecCard({
       onKeyDown={(e) => e.key === 'Enter' && !jiggleMode && onClick(ticket)}
     >
       <span className="text-[10px] font-mono text-foreground shrink-0">#{ticket.id}</span>
-      <span className="flex-1 text-sm truncate">{ticket.title}</span>
+      <span className="flex-1 text-sm truncate text-foreground">{ticket.title}</span>
       {ticket.is_epic ? (
         <Badge
           variant="outline"

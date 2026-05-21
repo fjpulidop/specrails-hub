@@ -14,7 +14,7 @@
       (function () {
         try {
           var k = 'specrails-hub:ui-theme'
-          var allowed = ['dracula', 'aurora-light', 'obsidian-dark']
+          var allowed = ['dracula', 'aurora-light', 'obsidian-dark', 'matrix']
           var v = localStorage.getItem(k)
           document.documentElement.dataset.theme =
             v && allowed.indexOf(v) !== -1 ? v : 'dracula'
@@ -51,6 +51,13 @@
         --splash-primary: #b78cf5;
         --splash-secondary: #f48fc7;
         --splash-muted: #8b8fa3;
+      }
+      html[data-theme="matrix"] {
+        --splash-bg: #08120e;
+        --splash-fg: #b8ffd9;
+        --splash-primary: #00ff66;
+        --splash-secondary: #4fd1c5;
+        --splash-muted: #4a8f6e;
       }
       html, body {
         margin: 0;

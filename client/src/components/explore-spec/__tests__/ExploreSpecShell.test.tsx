@@ -305,8 +305,14 @@ describe('ExploreSpecShell', () => {
       },
     ]
 
-    fireEvent.click(screen.getByTestId('explore-spec-minimize'))
-    expect(onMinimize).toHaveBeenCalledWith('conv-1', expect.any(String))
+    // Wait for the startWithMessage promise to resolve and propagate the
+    // conversation id into component state before clicking minimize. Without
+    // this the click can race the promise resolution under CI scheduling
+    // and onMinimize fires with a null id.
+    await waitFor(() => {
+      fireEvent.click(screen.getByTestId('explore-spec-minimize'))
+      expect(onMinimize).toHaveBeenCalledWith('conv-1', expect.any(String))
+    })
     expect(screen.queryByText(/Discard conversation/i)).toBeNull()
     expect(onClose).not.toHaveBeenCalled()
   })

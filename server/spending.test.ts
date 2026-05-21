@@ -9,6 +9,7 @@ function seed(db: DbInstance, rows: Array<Partial<Parameters<typeof recordInvoca
     recordInvocation(db, {
       id: `id-${i++}`,
       project_id: 'p1',
+      provider: 'claude',
       surface: 'job',
       status: 'success',
       started_at: new Date().toISOString(),
@@ -86,6 +87,36 @@ describe('getSpending', () => {
     expect(r.byMode.find((m) => m.mode === 'explore')!.ticketsCreated).toBe(1)
   })
 
+  it('byProvider splits authoritative vs estimated cost', () => {
+    const now = new Date().toISOString()
+    seed(db, [
+      { id: 'a', provider: 'claude', surface: 'job', status: 'success', total_cost_usd: 1.0, total_cost_usd_estimated: false, started_at: now },
+      { id: 'b', provider: 'claude', surface: 'job', status: 'success', total_cost_usd: 0.5, total_cost_usd_estimated: false, started_at: now },
+      { id: 'c', provider: 'codex',  surface: 'job', status: 'success', total_cost_usd: 0.02, total_cost_usd_estimated: true,  started_at: now },
+      { id: 'd', provider: 'codex',  surface: 'job', status: 'success', total_cost_usd: 0.03, total_cost_usd_estimated: true,  started_at: now },
+    ])
+    const r = getSpending(db, 'p1', { period: 'all' })
+    const claude = r.byProvider.find((p) => p.provider === 'claude')!
+    expect(claude.count).toBe(2)
+    expect(claude.costUsd).toBeCloseTo(1.5)
+    expect(claude.estimatedCostUsd).toBe(0)
+    const codex = r.byProvider.find((p) => p.provider === 'codex')!
+    expect(codex.count).toBe(2)
+    expect(codex.costUsd).toBe(0)
+    expect(codex.estimatedCostUsd).toBeCloseTo(0.05)
+    // totalEstimatedCostUsd surfaced on summary for the Hero footnote
+    expect(r.summary.totalEstimatedCostUsd).toBeCloseTo(0.05)
+  })
+
+  it('summary.totalEstimatedCostUsd is 0 when no estimated rows', () => {
+    const now = new Date().toISOString()
+    seed(db, [
+      { id: 'a', provider: 'claude', surface: 'job', total_cost_usd: 1.0, total_cost_usd_estimated: false, started_at: now },
+    ])
+    const r = getSpending(db, 'p1', { period: 'all' })
+    expect(r.summary.totalEstimatedCostUsd).toBe(0)
+  })
+
   it('aggregates smash surface rows alongside other surfaces', () => {
     const now = new Date().toISOString()
     seed(db, [
@@ -140,7 +171,7 @@ describe('getInvocations', () => {
   it('paginates results', () => {
     for (let i = 0; i < 5; i++) {
       recordInvocation(db, {
-        id: `r${i}`, project_id: 'p1', surface: 'job', status: 'success',
+        id: `r${i}`, project_id: 'p1', provider: 'claude', surface: 'job', status: 'success',
         started_at: new Date(Date.now() - i * 1000).toISOString(),
       })
     }
@@ -157,11 +188,11 @@ describe('getInvocations', () => {
     db.prepare(`INSERT INTO chat_messages (conversation_id, role, content) VALUES (?, ?, ?)`)
       .run('conv-2', 'user', '/specrails:explore-spec\n\nAdd a dark mode toggle to settings')
     recordInvocation(db, {
-      id: 'i1', project_id: 'p1', surface: 'explore-spec', status: 'success',
+      id: 'i1', project_id: 'p1', provider: 'claude', surface: 'explore-spec', status: 'success',
       conversation_id: 'conv-1', started_at: new Date().toISOString(),
     })
     recordInvocation(db, {
-      id: 'i2', project_id: 'p1', surface: 'explore-spec', status: 'success',
+      id: 'i2', project_id: 'p1', provider: 'claude', surface: 'explore-spec', status: 'success',
       conversation_id: 'conv-2', started_at: new Date(Date.now() - 1000).toISOString(),
     })
     const r = getInvocations(db, 'p1', { period: 'all' })
@@ -173,7 +204,7 @@ describe('getInvocations', () => {
   it('applies cap and sets truncated flag', () => {
     for (let i = 0; i < 10; i++) {
       recordInvocation(db, {
-        id: `r${i}`, project_id: 'p1', surface: 'job', status: 'success',
+        id: `r${i}`, project_id: 'p1', provider: 'claude', surface: 'job', status: 'success',
         started_at: new Date(Date.now() - i * 1000).toISOString(),
       })
     }

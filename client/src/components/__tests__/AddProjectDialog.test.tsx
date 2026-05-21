@@ -227,11 +227,14 @@ describe('AddProjectDialog', () => {
     expect(screen.getByRole('button', { name: /Codex/i })).toBeInTheDocument()
   })
 
-  it('Codex button is disabled with "Coming Soon" label (coming soon — in lab)', async () => {
+  it('Codex button is disabled with "not found" when codex is not on PATH', async () => {
+    // Default fetch mock (in beforeEach) reports claude:true, codex:false.
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
-    const codexBtn = screen.getByRole('button', { name: /Codex/i })
-    expect(codexBtn).toBeDisabled()
-    expect(codexBtn).toHaveTextContent(/Coming Soon/i)
+    await waitFor(() => {
+      const codexBtn = screen.getByRole('button', { name: /Codex/i })
+      expect(codexBtn).toBeDisabled()
+      expect(codexBtn).toHaveTextContent(/not found/i)
+    })
   })
 
   it('shows Add Project dialog title', async () => {
@@ -239,8 +242,8 @@ describe('AddProjectDialog', () => {
     expect(screen.getByRole('heading', { name: /Add Project/i })).toBeInTheDocument()
   })
 
-  it('when only codex is reported by server, codex remains disabled (forced to false client-side)', async () => {
-    // Server may say codex=true, but client forces it to unavailable until the lab feature ships.
+  it('Codex button is enabled when the server reports codex available (Stage C)', async () => {
+    // Post-Stage-C: client honours the server's real codex availability.
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ claude: true, codex: true }),
@@ -250,7 +253,9 @@ describe('AddProjectDialog', () => {
 
     await waitFor(() => {
       const codexBtn = screen.getByRole('button', { name: /Codex/i })
-      expect(codexBtn).toBeDisabled()
+      expect(codexBtn).not.toBeDisabled()
+      // "not found" label is hidden when codex is available
+      expect(codexBtn).not.toHaveTextContent(/not found/i)
     })
   })
 })

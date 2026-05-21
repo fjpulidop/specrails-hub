@@ -7,8 +7,10 @@ interface TerminalTopBarProps {
   visibility: PanelVisibility
   canCreate: boolean
   hasActive: boolean
+  /** CLI to launch from the Sparkles shortcut: 'claude' (default) or 'codex'. */
+  provider?: 'claude' | 'codex'
   onCreate: () => void
-  onOpenClaude: () => void
+  onOpenCli: () => void
   onOpenBrowser: () => void
   onPasteScript: () => void
   pasteScriptDisabled: boolean
@@ -20,10 +22,12 @@ interface TerminalTopBarProps {
 }
 
 export function TerminalTopBar({
-  visibility, canCreate, hasActive, onCreate, onOpenClaude, onOpenBrowser, onPasteScript, pasteScriptDisabled,
+  visibility, canCreate, hasActive, provider = 'claude',
+  onCreate, onOpenCli, onOpenBrowser, onPasteScript, pasteScriptDisabled,
   onConfigureBrowser, onConfigureScript,
   onKillActive, onToggleMaximize, onCollapse,
 }: TerminalTopBarProps) {
+  const cliDisplayName = provider === 'codex' ? 'Codex' : 'Claude'
   return (
     <div
       className={cn(
@@ -38,9 +42,9 @@ export function TerminalTopBar({
       </div>
       <div className="flex items-center gap-0.5">
         <ActionButton
-          label={canCreate ? 'Open Claude in new terminal' : 'Max 10 terminals per project'}
+          label={canCreate ? `Open ${cliDisplayName} in new terminal` : 'Max 10 terminals per project'}
           disabled={!canCreate}
-          onClick={onOpenClaude}
+          onClick={onOpenCli}
         >
           <Sparkles className="h-3.5 w-3.5" />
         </ActionButton>

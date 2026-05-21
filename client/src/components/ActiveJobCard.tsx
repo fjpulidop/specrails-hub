@@ -9,6 +9,8 @@ import { Badge } from './ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import type { PhaseMap, PhaseState, QueueJob } from '../hooks/usePipeline'
 import type { PhaseDefinition } from '../types'
+import { useHub } from '../hooks/useHub'
+import { formatCommandForProvider } from '../lib/format-command'
 
 interface ActiveJobCardProps {
   activeJob: QueueJob | null
@@ -26,6 +28,8 @@ function formatDuration(startedAt: string): string {
 
 export function ActiveJobCard({ activeJob, phases, phaseDefinitions }: ActiveJobCardProps) {
   const [elapsed, setElapsed] = useState<string>('')
+  const { activeProjectId, projects } = useHub()
+  const activeProvider = projects.find((p) => p.id === activeProjectId)?.provider
 
   useEffect(() => {
     if (!activeJob?.startedAt) return
@@ -75,7 +79,7 @@ export function ActiveJobCard({ activeJob, phases, phaseDefinitions }: ActiveJob
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
-            <code className="text-xs font-mono text-foreground truncate">{activeJob.command}</code>
+            <code className="text-xs font-mono text-foreground truncate">{formatCommandForProvider(activeJob.command, activeProvider)}</code>
           </div>
           <Badge variant="running" className="shrink-0">running</Badge>
         </div>

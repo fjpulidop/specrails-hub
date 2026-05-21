@@ -169,9 +169,11 @@ export function TicketPostitCard({
 
   const tone = isDraft
     ? 'bg-accent-secondary/10 border-accent-secondary/40'
-    : isEpic
-      ? 'bg-card/80 border-accent-highlight/40'
-      : 'bg-card/80 border-border/40'
+    : contractRefining
+      ? 'bg-card/70 border-accent-highlight/70 shadow-lg shadow-accent-highlight/20 animate-pulse'
+      : isEpic
+        ? 'bg-card/80 border-accent-highlight/40'
+        : 'bg-card/80 border-border/40'
 
   return (
     <>

@@ -60,9 +60,22 @@ export interface ByModeEntry {
   sparkline: number[] // last N days, total cost per day
 }
 
+export interface ByProviderEntry {
+  provider: string
+  count: number
+  /** Authoritative (provider-reported) cost, in USD. */
+  costUsd: number
+  /** Cost computed via local pricing-table fallback. */
+  estimatedCostUsd: number
+}
+
 export interface SpendingResponse {
   summary: {
     totalCostUsd: number
+    /** Of `totalCostUsd`, the portion contributed by rows where
+     *  `total_cost_usd_estimated === 1` (currently codex). Drives the
+     *  "Includes estimated costs" footnote in the AnalyticsPage Hero. */
+    totalEstimatedCostUsd: number
     totalRuns: number
     failureRate: number
     prevTotalCostUsd: number
@@ -72,6 +85,7 @@ export interface SpendingResponse {
   bySurface: BySurfaceCount[]
   byModel: ByModelEntry[]
   byMode: ByModeEntry[]
+  byProvider: ByProviderEntry[]
   dailyTimeline: DailyEntry[]
   scatter: ScatterPoint[]
   topTickets: TopTicketEntry[]
@@ -207,12 +221,14 @@ export function getSpending(
   const summaryRow = db.prepare(`
     SELECT
       COALESCE(SUM(total_cost_usd), 0) AS totalCost,
+      COALESCE(SUM(CASE WHEN total_cost_usd_estimated = 1 THEN total_cost_usd ELSE 0 END), 0) AS totalEstimatedCost,
       COUNT(*) AS totalRuns,
       SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
       AVG(CASE WHEN status = 'success' THEN total_cost_usd END) AS avgCost
     FROM ai_invocations WHERE ${where.sql}
   `).get(...where.params) as {
     totalCost: number
+    totalEstimatedCost: number
     totalRuns: number
     failed: number | null
     avgCost: number | null
@@ -384,9 +400,36 @@ export function getSpending(
     SELECT MIN(started_at) AS first FROM ai_invocations WHERE project_id = ?
   `).get(projectId) as { first: string | null }
 
+  // byProvider — split authoritative vs estimated cost so the UI can render
+  // the `~` tilde + Hero footnote without re-querying. Rows persisted with
+  // NULL provider (pre-migration backfill missed somehow) coalesce to
+  // `claude` to match the migration default.
+  const providerRows = db.prepare(`
+    SELECT
+      COALESCE(provider, 'claude') AS provider,
+      COUNT(*) AS cnt,
+      COALESCE(SUM(CASE WHEN total_cost_usd_estimated = 0 THEN total_cost_usd ELSE 0 END), 0) AS authoritativeCost,
+      COALESCE(SUM(CASE WHEN total_cost_usd_estimated = 1 THEN total_cost_usd ELSE 0 END), 0) AS estimatedCost
+    FROM ai_invocations WHERE ${where.sql}
+    GROUP BY provider
+    ORDER BY (authoritativeCost + estimatedCost) DESC
+  `).all(...where.params) as Array<{
+    provider: string
+    cnt: number
+    authoritativeCost: number
+    estimatedCost: number
+  }>
+  const byProvider: ByProviderEntry[] = providerRows.map((r) => ({
+    provider: r.provider,
+    count: r.cnt,
+    costUsd: r.authoritativeCost,
+    estimatedCostUsd: r.estimatedCost,
+  }))
+
   return {
     summary: {
       totalCostUsd: summaryRow.totalCost,
+      totalEstimatedCostUsd: summaryRow.totalEstimatedCost,
       totalRuns: summaryRow.totalRuns,
       failureRate: summaryRow.totalRuns > 0 ? (summaryRow.failed ?? 0) / summaryRow.totalRuns : 0,
       prevTotalCostUsd: prevRow.totalCost,
@@ -396,6 +439,7 @@ export function getSpending(
     bySurface,
     byModel,
     byMode,
+    byProvider,
     dailyTimeline,
     scatter,
     topTickets,

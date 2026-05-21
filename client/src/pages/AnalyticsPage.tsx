@@ -9,6 +9,7 @@ import type {
 } from '../types/spending'
 import { ExportDropdown } from '../components/ExportDropdown'
 import { SpendingHero } from '../components/analytics/SpendingHero'
+import { ProviderBreakdownCard } from '../components/analytics/ProviderBreakdownCard'
 import { SpendingTimeline } from '../components/analytics/SpendingTimeline'
 import { QuickVsExploreCard } from '../components/analytics/QuickVsExploreCard'
 import { ModelBreakdown } from '../components/analytics/ModelBreakdown'
@@ -245,6 +246,9 @@ export default function AnalyticsPage() {
 
       {/* Block 1: Hero */}
       <SpendingHero data={data} loading={loading} />
+
+      {/* Block 1b: Provider breakdown (renders only on multi-provider projects) */}
+      <ProviderBreakdownCard data={data} loading={loading} />
 
       {/* Block 2: Timeline */}
       <SpendingTimeline data={data} loading={loading} />

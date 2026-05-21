@@ -2,32 +2,88 @@ import fs from 'fs'
 import path from 'path'
 import type { PluginLifecycleContext } from '../../types'
 import { PluginManager } from '../../plugin-manager'
-import { SERENA_MCP_ENTRY } from './manifest'
+import { SERENA_MCP_ENTRY, serenaManifest } from './manifest'
 import { SERENA_INSTRUCTIONS_MD } from './instructions-content'
+import { codexMcpAdd, codexMcpRemove, codexMcpList } from '../codex-mcp'
+import { getAdapter, hasAdapter } from '../../providers'
 
-const FRAGMENT_REL = '.claude/agents/custom-serena.md'
+/** Claude fragment lives in the core-protected `.claude/agents/custom-*.md`
+ *  namespace; only written on claude projects. Codex doesn't honour that
+ *  file convention, and the per-project AGENTS.md block (written by the
+ *  shared-file contributor in plugin-manager) is the codex equivalent. */
+const CLAUDE_FRAGMENT_REL = '.claude/agents/custom-serena.md'
+
+function isCodex(ctx: PluginLifecycleContext): boolean {
+  if (!ctx.providerId) return false
+  if (!hasAdapter(ctx.providerId)) return false
+  return getAdapter(ctx.providerId).mcpRegistration === 'cli-add'
+}
+
+/** Project slug used by codex-mcp helpers — derived from the project path's
+ *  basename. The hub maintains the canonical slug elsewhere (ProjectRegistry);
+ *  for the install context we don't have the registry, but the basename is a
+ *  stable per-project identifier sufficient for CODEX_HOME isolation. */
+function slugFromProjectPath(projectPath: string): string {
+  return path.basename(projectPath)
+}
 
 export async function installSerena(ctx: PluginLifecycleContext): Promise<void> {
+  if (isCodex(ctx)) {
+    // Codex path: `codex mcp add` against per-project CODEX_HOME. The
+    // declarative entry comes from the manifest's providerSupport.codex
+    // so future plugins can declare their own without touching this file.
+    const entry = serenaManifest.providerSupport?.codex?.mcpEntry
+    if (!entry) {
+      throw new Error('serena manifest is missing providerSupport.codex.mcpEntry')
+    }
+    const slug = slugFromProjectPath(ctx.projectPath)
+    ctx.log(`Registering serena MCP via 'codex mcp add' (CODEX_HOME=~/.specrails/projects/${slug}/codex-home/)`)
+    const result = codexMcpAdd(slug, 'serena', entry)
+    if (!result.ok) {
+      const detail = result.stderr.trim() || result.stdout.trim() || '(no output)'
+      throw new Error(`codex mcp add serena failed: ${detail}`)
+    }
+    return
+  }
+
+  // Claude path: surgical merge of project's `.mcp.json` + custom agent
+  // fragment. Unchanged from the pre-§14 behaviour.
   ctx.log('Adding mcpServers.serena to .mcp.json')
   await PluginManager.mergeMcpServers(ctx.projectPath, { serena: SERENA_MCP_ENTRY })
 
-  // Fragment lives in the core-protected `.claude/agents/custom-*.md` namespace.
-  // Content is embedded at compile time so we don't depend on a sibling .md
-  // file surviving bundling or sidecar packaging.
-  ctx.log(`Writing ${FRAGMENT_REL}`)
-  const fragmentDest = path.join(ctx.projectPath, FRAGMENT_REL)
+  ctx.log(`Writing ${CLAUDE_FRAGMENT_REL}`)
+  const fragmentDest = path.join(ctx.projectPath, CLAUDE_FRAGMENT_REL)
   fs.mkdirSync(path.dirname(fragmentDest), { recursive: true })
   fs.writeFileSync(fragmentDest, SERENA_INSTRUCTIONS_MD, 'utf8')
-  ctx.recordInstalledFile(FRAGMENT_REL)
+  ctx.recordInstalledFile(CLAUDE_FRAGMENT_REL)
 }
 
 export async function uninstallSerena(ctx: PluginLifecycleContext): Promise<void> {
+  if (isCodex(ctx)) {
+    const slug = slugFromProjectPath(ctx.projectPath)
+    // Probe first so removing an already-removed server doesn't surface as an
+    // error (e.g. the user uninstalled via terminal then via the hub).
+    const listing = codexMcpList(slug)
+    if (listing.ok && !listing.servers.includes('serena')) {
+      ctx.log('serena not present in codex mcp list — nothing to remove')
+      return
+    }
+    ctx.log(`Removing serena via 'codex mcp remove' (CODEX_HOME=~/.specrails/projects/${slug}/codex-home/)`)
+    const result = codexMcpRemove(slug, 'serena')
+    if (!result.ok) {
+      // Removal failures are warnings — the state.json entry is gone either
+      // way and a subsequent install will overwrite. Don't block uninstall.
+      ctx.log(`codex mcp remove warning: ${result.stderr.trim() || '(no output)'}`)
+    }
+    return
+  }
+
   ctx.log('Removing mcpServers.serena from .mcp.json')
   await PluginManager.removeMcpServers(ctx.projectPath, ['serena'])
 
-  const fragmentDest = path.join(ctx.projectPath, FRAGMENT_REL)
+  const fragmentDest = path.join(ctx.projectPath, CLAUDE_FRAGMENT_REL)
   if (fs.existsSync(fragmentDest)) {
-    ctx.log(`Removing ${FRAGMENT_REL}`)
+    ctx.log(`Removing ${CLAUDE_FRAGMENT_REL}`)
     try { fs.unlinkSync(fragmentDest) } catch { /* best-effort */ }
   }
 }

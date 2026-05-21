@@ -26,6 +26,8 @@ export interface ExploreLaunchPayload {
   /** Model picked at Add Spec — locked for the lifetime of the explore flow.
    *  No downstream UI changes it. */
   model: string
+  /** Add Spec context scope frozen at launch time. Forwarded to the
+   *  ExploreSpecShell so the server-side conversation row carries it. */
   contextScope: ContextScope
 }
 

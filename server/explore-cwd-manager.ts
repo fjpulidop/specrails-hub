@@ -1,20 +1,25 @@
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
+import { getAdapter } from './providers'
+import type { ProviderAdapter } from './providers/types'
 
 /**
- * ExploreCwdManager owns the per-project hub-managed cwd used to spawn `claude`
- * for Explore Spec turns. See openspec/changes/accelerate-spec-chat-first-token/
- * design.md decisions D1–D3 + D9 for the rationale.
+ * ExploreCwdManager owns the per-project hub-managed cwd used to spawn the
+ * provider CLI for Explore Spec turns. See openspec/changes/accelerate-spec-
+ * chat-first-token/design.md decisions D1–D3 + D9, and openspec/changes/
+ * add-multi-provider-support/specs/explore-spec/spec.md for the multi-
+ * provider behaviour (instructions file is adapter-driven: CLAUDE.md for
+ * claude, AGENTS.md for codex).
  *
  * Layout under `~/.specrails/projects/<slug>/explore-cwd/`:
- *   ├── CLAUDE.md           — embedded mini-prompt, hub-owned
- *   ├── project             — symlink (or junction on Windows) → <project.path>
- *   └── project-path.txt    — fallback when symlink/junction creation fails
+ *   ├── <adapter.instructionsFilename>  — embedded mini-prompt, hub-owned
+ *   ├── project                          — symlink/junction → <project.path>
+ *   └── project-path.txt                 — fallback when symlink creation fails
  */
 
-/** Embedded Explore CLAUDE.md template. Interpolates {{projectName}}. */
-const EXPLORE_CLAUDE_MD_TEMPLATE = `# Explore Spec assistant for "{{projectName}}"
+/** Embedded Explore instructions template. Interpolates {{projectName}}. */
+const EXPLORE_INSTRUCTIONS_TEMPLATE = `# Explore Spec assistant for "{{projectName}}"
 
 You are running inside the **Explore Spec** experience of specrails-hub. The
 user has opened a thinking-partner conversation to shape a single backlog
@@ -68,8 +73,14 @@ The user's first message follows. Begin the conversation.
  * Render the embedded template for a given project name.
  * Exported for testing.
  */
+export function renderExploreInstructions(projectName: string): string {
+  return EXPLORE_INSTRUCTIONS_TEMPLATE.replace(/\{\{projectName\}\}/g, projectName)
+}
+
+/** @deprecated Use `renderExploreInstructions` — kept as a thin wrapper so
+ *  any external callsite continues to compile. */
 export function renderExploreClaudeMd(projectName: string): string {
-  return EXPLORE_CLAUDE_MD_TEMPLATE.replace(/\{\{projectName\}\}/g, projectName)
+  return renderExploreInstructions(projectName)
 }
 
 export interface ExploreCwdInput {
@@ -77,8 +88,11 @@ export interface ExploreCwdInput {
   slug: string
   /** Absolute path to the user's project. Symlink target. */
   projectPath: string
-  /** Project display name interpolated into the embedded CLAUDE.md. */
+  /** Project display name interpolated into the embedded instructions file. */
   projectName: string
+  /** Provider id from the project row. Defaults to claude for backwards
+   *  compatibility with callers that haven't been threaded the project yet. */
+  provider?: 'claude' | 'codex'
 }
 
 /**
@@ -107,16 +121,30 @@ export function ensureExploreCwd(input: ExploreCwdInput, baseDir?: string): stri
   const cwd = exploreCwdPathFor(input.slug, baseDir)
   fs.mkdirSync(cwd, { recursive: true })
 
-  const claudeMdPath = path.join(cwd, 'CLAUDE.md')
-  const desiredClaudeMd = renderExploreClaudeMd(input.projectName)
-  let currentClaudeMd: string | null = null
+  const adapter: ProviderAdapter = getAdapter(input.provider ?? 'claude')
+  const instructionsPath = path.join(cwd, adapter.instructionsFilename)
+  const desiredInstructions = renderExploreInstructions(input.projectName)
+  let currentInstructions: string | null = null
   try {
-    currentClaudeMd = fs.readFileSync(claudeMdPath, 'utf-8')
+    currentInstructions = fs.readFileSync(instructionsPath, 'utf-8')
   } catch {
     /* file may not exist yet */
   }
-  if (currentClaudeMd !== desiredClaudeMd) {
-    fs.writeFileSync(claudeMdPath, desiredClaudeMd, 'utf-8')
+  if (currentInstructions !== desiredInstructions) {
+    fs.writeFileSync(instructionsPath, desiredInstructions, 'utf-8')
+  }
+
+  // If the project switched providers since the last materialise (defensive
+  // — provider is immutable post-creation but the lifecycle code MUST handle
+  // the edge per spec), remove any stale instructions file authored by a
+  // different provider so the explore-cwd doesn't carry both.
+  const STALE_INSTRUCTION_FILES = ['CLAUDE.md', 'AGENTS.md']
+  for (const stale of STALE_INSTRUCTION_FILES) {
+    if (stale === adapter.instructionsFilename) continue
+    const stalePath = path.join(cwd, stale)
+    if (fs.existsSync(stalePath)) {
+      try { fs.unlinkSync(stalePath) } catch { /* best-effort */ }
+    }
   }
 
   ensureProjectLink(cwd, input.projectPath)

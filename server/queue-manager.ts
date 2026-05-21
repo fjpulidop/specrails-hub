@@ -10,8 +10,10 @@ import { resolveCommand } from './command-resolver'
 import { spawnAiCli } from './util/cli-prompt'
 import { resetPhases, setActivePhases } from './hooks'
 import { recordInvocation } from './ai-invocations'
-import { normaliseResultEvent } from './result-event'
+import { finaliseInvocationResult } from './result-event'
 import { randomUUID } from 'crypto'
+import { getAdapter, type ProviderAdapter, type AdapterEvent } from './providers'
+import { createCodexOtelBridge, type CodexOtelBridge } from './codex-otel-bridge'
 import { createJob, finishJob, appendEvent, skipJob, getProjectSettings } from './db'
 import type { JobResult } from './db'
 import type { CommandInfo } from './config'
@@ -128,6 +130,7 @@ function codexOnPath(): boolean {
 
 function extractDisplayText(event: Record<string, unknown>): string | null {
   const type = event.type as string
+  // ── Claude `--output-format stream-json` ───────────────────────────────
   if (type === 'assistant') {
     const content = event.message as { content?: Array<{ type: string; text?: string }> } | undefined
     const texts = (content?.content ?? [])
@@ -141,6 +144,37 @@ function extractDisplayText(event: Record<string, unknown>): string | null {
     return `[tool: ${name}] ${input.slice(0, 120)}`
   }
   if (type === 'tool_result' || type === 'system_prompt' || type === 'user' || type === 'system' || type === 'result') {
+    return null
+  }
+  // ── Codex `exec --json` event types ───────────────────────────────────
+  // Codex shape differs from claude: items are nested under `item` with a
+  // discriminator at `item.type`. Without explicit handling the Job Detail
+  // log shows only the spawn preamble and exit notice — exactly the
+  // "2 / 2 lines" symptom that masks 200k+ tokens of real work.
+  if (type === 'item.completed' || type === 'item.started') {
+    const item = event.item as Record<string, unknown> | undefined
+    if (!item) return null
+    const itemType = item.type as string | undefined
+    if (itemType === 'agent_message') {
+      const text = (item.text as string | undefined)?.trim()
+      return text && text.length > 0 ? text : null
+    }
+    if (itemType === 'command_execution') {
+      // Only surface the completed line so the log isn't doubled with the
+      // matching `item.started` placeholder.
+      if (type !== 'item.completed') return null
+      const cmd = (item.command as string | undefined) ?? ''
+      const exitCode = item.exit_code as number | null | undefined
+      const exitStr = typeof exitCode === 'number' ? ` → exit ${exitCode}` : ''
+      return `[exec]${exitStr} ${cmd.slice(0, 200)}`
+    }
+    if (itemType === 'agent_reasoning') {
+      const text = (item.text as string | undefined)?.trim()
+      return text && text.length > 0 ? `[reasoning] ${text.slice(0, 200)}` : null
+    }
+    return null
+  }
+  if (type === 'thread.started' || type === 'turn.started' || type === 'turn.completed') {
     return null
   }
   return null
@@ -178,8 +212,11 @@ export class QueueManager {
 
   private _getCostAlertThreshold: (() => number | null) | null
   private _getHubDailyBudget: (() => { budget: number | null; totalSpend: number }) | null
-  private _provider: 'claude' | 'codex'
-  /** Effective model to use when spawning codex processes. Ignored for claude (reads from .claude/ config). */
+  private _adapter: ProviderAdapter
+  /** Effective model to use when spawning processes. For Claude the adapter
+   *  reads its own config; this is the override that gets passed via `--model`.
+   *  For codex it controls the catalog model used at spawn time and as the
+   *  fallback model name stamped onto the ai_invocations row. */
   private _resolvedModel: string | null
   private _onJobFinished: ((jobId: string, status: Job['status'], costUsd?: number) => void) | null
   /** Project ID used for OTEL resource attributes (hub mode only) */
@@ -228,7 +265,7 @@ export class QueueManager {
 
     this._getCostAlertThreshold = options?.getCostAlertThreshold ?? null
     this._getHubDailyBudget = options?.getHubDailyBudget ?? null
-    this._provider = options?.provider ?? 'claude'
+    this._adapter = getAdapter(options?.provider ?? 'claude')
     this._resolvedModel = options?.resolvedModel ?? null
     this._onJobFinished = options?.onJobFinished ?? null
     this._projectId = options?.projectId ?? null
@@ -271,10 +308,19 @@ export class QueueManager {
       resolvedOpts = priorityOrOpts
     }
 
-    if (this._provider === 'codex') {
+    if (this._adapter.id === 'codex') {
       if (!codexOnPath()) throw new CodexNotFoundError()
-    } else {
+    } else if (this._adapter.id === 'claude') {
       if (!claudeOnPath()) throw new ClaudeNotFoundError()
+    } else {
+      // Future providers reuse the same pattern: a quick `which` probe via
+      // the adapter's binary. We don't throw a typed *NotFoundError because
+      // none has been declared; the adapter's id surfaces in the error.
+      try {
+        execSync(`${_WHICH_CMD} ${this._adapter.binary}`, { stdio: 'ignore' })
+      } catch {
+        throw new Error(`${this._adapter.binary} binary not found`)
+      }
     }
 
     const id = uuidv4()
@@ -588,48 +634,41 @@ export class QueueManager {
       }
     }
 
-    let binary: string
-    let args: string[]
-    if (this._provider === 'codex') {
-      binary = 'codex'
-      // Codex doesn't support slash commands — resolve the prompt.
-      // Codex also has no --append-system-prompt flag: embed systemAppend directly
-      // in the prompt so headless-mode instructions, output-chaining context, and
-      // local-tickets reminders are preserved end-to-end.
-      const resolved = this._resolveCommand(commandToRun)
-      const fullPrompt = systemAppend ? `${systemAppend}\n\n---\n\n${resolved}` : resolved
-      const resolvedModel = this._resolvedModel ?? 'gpt-5.4-mini'
-      args = ['exec', fullPrompt, '--model', resolvedModel]
-    } else {
-      binary = 'claude'
-      args = [
-        '--dangerously-skip-permissions',
-        '--tools', 'default',
-        '--output-format', 'stream-json',
-        '--verbose',
-      ]
-      // Read orchestratorModel at spawn time so changes take effect on next job.
-      if (this._db) {
-        const { orchestratorModel } = getProjectSettings(this._db)
-        args.push('--model', orchestratorModel)
-      }
-      if (systemAppend) {
-        args.push('--append-system-prompt', systemAppend)
-      }
-      // Pass the raw command to Claude CLI so it resolves skills natively.
-      // This ensures skills get proper execution priority over CLAUDE.md
-      // instructions — pre-resolving to plain text caused the project's
-      // CLAUDE.md to override the pipeline prompt.
-      args.push('-p', commandToRun)
-    }
+    const binary = this._adapter.binary
+    // Adapter-specific slash-command syntax:
+    //  - claude: native `/specrails:foo` recognised by Claude CLI directly,
+    //    so we pass the command verbatim and the system prompt rides along
+    //    via `--system-prompt`.
+    //  - codex: there is no `/namespace:cmd` parser; instead codex uses
+    //    `$skill_name` to invoke a skill from `.codex/skills/<name>/SKILL.md`.
+    //    Translate `/specrails:<name>` → `$<name>` so codex picks up the
+    //    matching skill natively (which our scaffold writes for every
+    //    claude slash command — propose-spec, implement, batch-implement,
+    //    explore-spec, retry, …). This is the rail equivalent of the
+    //    user typing `$implement #1 --yes` themselves in `codex`.
+    const railPrompt = this._adapter.id === 'codex'
+      ? commandToRun.replace(/^\/(specrails|sr):([\w-]+)/, '$$$2')
+      : commandToRun
+    const railModel = this._adapter.id === 'claude' && this._db
+      ? getProjectSettings(this._db).orchestratorModel
+      : (this._resolvedModel ?? this._adapter.defaultModel())
+    const args = this._adapter.buildArgs('rail-job', {
+      prompt: railPrompt,
+      systemPrompt: systemAppend || undefined,
+      model: railModel,
+    })
 
     // Resolve agent profile (if any) and snapshot per-job before spawn.
     // Hub mode only (projectId + projectSlug + cwd all present).
-    // Profile injection is skipped in codex mode, and when the project's
-    // installed specrails-core is older than 4.1.0 (legacy fallback).
+    // Skipped when the adapter does not honour `SPECRAILS_PROFILE_PATH` AND
+    // when the project's installed specrails-core is older than the
+    // provider's minimum core version (legacy fallback). Codex skill rails
+    // ship in specrails-core 4.6.0+; the projectSupportsProfiles probe today
+    // checks the claude minimum (4.1.0) — extending it per-provider is
+    // tracked in OpenSpec change task §13.
     let profileSnapshotPath: string | null = null
     let profileName: string | null = null
-    if (this._provider === 'claude' && this._projectId && this._projectSlug && this._cwd) {
+    if (this._adapter.capabilities.profileEnvSupport && this._projectId && this._projectSlug && this._cwd) {
       try {
         const selection = this._jobProfileSelection.get(jobId) // undefined|null|string
         this._jobProfileSelection.delete(jobId)
@@ -659,21 +698,22 @@ export class QueueManager {
 
     // Read pipelineTelemetryEnabled at spawn time (not constructor time) so
     // toggling the setting takes effect on the next job without restarting.
-    // Only inject for claude provider in hub mode (projectId is only set there).
+    // OTEL env injection is gated on `adapter.capabilities.nativeOtelEnv`:
+    // claude honours OTEL_* env vars natively; codex does not and instead
+    // gets signals synthesised by the codex-otel-bridge attached below.
     let spawnEnv: NodeJS.ProcessEnv = process.env
-    if (this._provider === 'claude' && this._projectId && this._db) {
-      const settings = getProjectSettings(this._db)
-      if (settings.pipelineTelemetryEnabled) {
-        const extra: Record<string, string> = {}
-        if (profileName) extra['specrails.profile_name'] = profileName
-        if (profileName) extra['specrails.profile_schema_version'] = '1'
-        spawnEnv = {
-          ...process.env,
-          ...buildTelemetryEnv(jobId, this._projectId, this._hubPort, extra),
-        }
+    const telemetryEnabled = !!(this._projectId && this._db && getProjectSettings(this._db).pipelineTelemetryEnabled)
+    if (telemetryEnabled && this._adapter.capabilities.nativeOtelEnv && this._projectId) {
+      const extra: Record<string, string> = {}
+      if (profileName) extra['specrails.profile_name'] = profileName
+      if (profileName) extra['specrails.profile_schema_version'] = '1'
+      spawnEnv = {
+        ...process.env,
+        ...buildTelemetryEnv(jobId, this._projectId, this._hubPort, extra),
       }
     }
-    // Inject the profile path for claude even when telemetry is off.
+    // Inject the profile path whenever the adapter honours it (was: claude-
+    // only). The codex skill rails read SPECRAILS_PROFILE_PATH the same way.
     if (profileSnapshotPath) {
       spawnEnv = { ...spawnEnv, SPECRAILS_PROFILE_PATH: profileSnapshotPath }
     }
@@ -682,10 +722,15 @@ export class QueueManager {
     // Active = installed + verify ok; degraded = installed but verify failed
     // or timed out. Degraded does NOT block spawn — rail proceeds, UI gets
     // a `plugin.degraded` event so the user can reinstall.
+    //
+    // Today PluginManager only supports the `project-json` MCP registration
+    // (claude). Codex (`cli-add`) is covered by tasks §14 — until that lands
+    // we skip plugin resolution for non-`project-json` adapters so the rail
+    // spawns cleanly without errors.
     let pluginActive: Array<{ name: string; version: string }> = []
     let pluginDegraded: Array<{ name: string; reason: string }> = []
     let pluginSnapshotPath: string | null = null
-    if (this._provider === 'claude' && this._projectId && this._projectSlug && this._cwd) {
+    if (this._adapter.mcpRegistration === 'project-json' && this._projectId && this._projectSlug && this._cwd) {
       try {
         const { resolvePluginsForSpawn, snapshotPluginsForJob } =
           require('./plugins/rail-integration') as typeof import('./plugins/rail-integration')
@@ -718,8 +763,10 @@ export class QueueManager {
         SPECRAILS_PLUGINS_SNAPSHOT: pluginSnapshotPath,
       }
     }
-    // Add OTEL attrs when telemetry already on.
-    if (this._provider === 'claude' && this._projectId && this._db) {
+    // Add OTEL attrs when telemetry already on AND the adapter accepts env
+    // injection. Codex spawns receive these attributes via the bridge's
+    // resource attribute block instead (see codex-otel-bridge.ts).
+    if (this._adapter.capabilities.nativeOtelEnv && this._projectId && this._db) {
       const settings = getProjectSettings(this._db)
       if (settings.pipelineTelemetryEnabled && (pluginActive.length > 0 || pluginDegraded.length > 0)) {
         const extra: Record<string, string> = {}
@@ -767,6 +814,21 @@ export class QueueManager {
 
     let eventSeq = 0
     let lastResultEvent: Record<string, unknown> | null = null
+
+    // Accumulator of parsed AdapterEvent for finaliseInvocationResult on close.
+    const adapterEvents: AdapterEvent[] = []
+
+    // Synthetic OTEL bridge for providers whose CLI does not honour OTEL_*
+    // env vars (codex today). Lifecycle bound to the spawn's close handler.
+    let otelBridge: CodexOtelBridge | null = null
+    if (telemetryEnabled && !this._adapter.capabilities.nativeOtelEnv && this._projectId) {
+      otelBridge = createCodexOtelBridge({
+        jobId,
+        projectId: this._projectId,
+        hubPort: this._hubPort,
+        model: railModel,
+      })
+    }
 
     if (this._db) {
       createJob(this._db, {
@@ -824,6 +886,17 @@ export class QueueManager {
       let parsed: Record<string, unknown> | null = null
       try { parsed = JSON.parse(line) } catch { /* plain text */ }
 
+      // Feed the adapter for the canonical event shape used by
+      // finaliseInvocationResult and (optionally) the OTEL bridge. Done
+      // alongside the raw event persistence below, NOT in place of it: the
+      // raw event log is what feeds the live Job Detail UI and the
+      // telemetry export ZIP for non-bridge providers.
+      const adapterEv = this._adapter.parseStreamLine(line)
+      if (adapterEv) {
+        adapterEvents.push(adapterEv)
+        otelBridge?.consumeEvent(adapterEv)
+      }
+
       if (parsed) {
         const eventType = (parsed.type as string) ?? 'unknown'
         if (this._db) {
@@ -864,7 +937,14 @@ export class QueueManager {
             payload: JSON.stringify({ line }),
           })
         }
-        emitLine('stdout', line)
+        // For adapters whose stream is JSONL (claude, codex), a non-parseable
+        // line is unexpected noise. For future plain-text adapters this is
+        // their normal output. emitLine surfaces it either way.
+        if (adapterEv?.kind === 'text-delta') {
+          emitLine('stdout', adapterEv.text)
+        } else {
+          emitLine('stdout', line)
+        }
       }
     })
 
@@ -882,25 +962,15 @@ export class QueueManager {
     child.on('close', (code) => {
       flushPending() // flush any remaining batched messages before job exit
 
-      // Codex doesn't emit a `result` JSON event — synthesise one so token/cost
-      // tracking and cost alerts behave consistently for both providers.
-      // cost is always 0 for codex (no token-level billing API exposed); this is
-      // intentional so cost-threshold alerts remain inactive rather than firing
-      // spuriously with a zero value.
-      if (this._provider === 'codex' && lastResultEvent === null && code === 0) {
-        const durationMs = job.startedAt
-          ? Date.now() - new Date(job.startedAt).getTime()
-          : 0
-        lastResultEvent = {
-          type: 'result',
-          total_cost_usd: 0,
-          model: this._resolvedModel ?? 'gpt-5.4-mini',
-          duration_ms: durationMs,
-          num_turns: 1,
-        }
+      // Finalise the OTEL bridge (best-effort, async). The bridge POSTs to
+      // the in-process OTLP receiver; failures are warned, not thrown.
+      if (otelBridge) {
+        otelBridge.finalize({ exitCode: code }).catch((err) => {
+          console.warn('[queue-manager] otel bridge finalize failed:', err)
+        })
       }
 
-      this._onJobExit(jobId, code, lastResultEvent, emitLine)
+      this._onJobExit(jobId, code, lastResultEvent, emitLine, adapterEvents, railModel)
     })
 
     this._broadcastQueueState()
@@ -910,7 +980,9 @@ export class QueueManager {
     jobId: string,
     code: number | null,
     lastResultEvent: Record<string, unknown> | null,
-    emitLine: (source: 'stdout' | 'stderr', line: string) => void
+    emitLine: (source: 'stdout' | 'stderr', line: string) => void,
+    adapterEvents: readonly AdapterEvent[] = [],
+    spawnedModel?: string,
   ): void {
     this._clearZombieTimer()
 
@@ -951,22 +1023,27 @@ export class QueueManager {
     this._activeJobId = null
 
     if (this._db) {
-      let tokenData: Partial<JobResult> = {}
-      if (lastResultEvent) {
-        const usage = lastResultEvent.usage as Record<string, number> | undefined
-        tokenData = {
-          tokens_in: usage?.input_tokens,
-          tokens_out: usage?.output_tokens,
-          tokens_cache_read: usage?.cache_read_input_tokens,
-          tokens_cache_create: usage?.cache_creation_input_tokens,
-          total_cost_usd: lastResultEvent.total_cost_usd as number | undefined,
-          num_turns: lastResultEvent.num_turns as number | undefined,
-          model: lastResultEvent.model as string | undefined,
-          duration_ms: lastResultEvent.duration_ms as number | undefined,
-          duration_api_ms: lastResultEvent.api_duration_ms as number | undefined,
-          session_id: lastResultEvent.session_id as string | undefined,
-        }
-      }
+      // Adapter-driven result finalisation handles tokens, cost (or pricing-
+      // table estimate for non-native-cost providers), and session_id stamping.
+      const { result: normalised, estimated } = finaliseInvocationResult(
+        this._adapter,
+        adapterEvents,
+        { fallbackModel: spawnedModel },
+      )
+      const tokenData: Partial<JobResult> = lastResultEvent || adapterEvents.length > 0
+        ? {
+            tokens_in: normalised.tokens_in,
+            tokens_out: normalised.tokens_out,
+            tokens_cache_read: normalised.tokens_cache_read,
+            tokens_cache_create: normalised.tokens_cache_create,
+            total_cost_usd: normalised.total_cost_usd,
+            num_turns: normalised.num_turns,
+            model: normalised.model,
+            duration_ms: normalised.duration_ms,
+            duration_api_ms: normalised.duration_api_ms,
+            session_id: normalised.session_id,
+          }
+        : {}
       finishJob(this._db, jobId, {
         exit_code: code ?? -1,
         status: finalStatus,
@@ -982,19 +1059,17 @@ export class QueueManager {
               ? 'aborted'
               : 'failed'
           const ticketIds = this._extractTicketIds(job.command)
-          const provider: 'claude' | 'codex' = this._provider === 'codex' ? 'codex' : 'claude'
-          const normalised = lastResultEvent
-            ? normaliseResultEvent(lastResultEvent as Record<string, unknown>, provider)
-            : {}
           recordInvocation(this._db, {
             id: randomUUID(),
             project_id: this._projectId,
+            provider: this._adapter.id,
             surface: 'job',
             surface_ref_id: jobId,
             ticket_id: ticketIds[0] ?? null,
             status: invStatus,
             started_at: job.startedAt ?? new Date().toISOString(),
             finished_at: job.finishedAt,
+            total_cost_usd_estimated: estimated,
             ...normalised,
           })
           this._broadcast({ type: 'spending.invalidated', projectId: this._projectId })
@@ -1003,8 +1078,13 @@ export class QueueManager {
         }
       }
 
-      const jobCost = lastResultEvent?.total_cost_usd as number | undefined
-      const costStr = jobCost != null ? ` | cost: $${jobCost.toFixed(4)}` : ''
+      // Cost comes from the normalised result so providers without a native
+      // total_cost_usd field (codex today) still trigger cost alerts based on
+      // the pricing-table estimate. When `estimated`, the figure is best-
+      // effort — alerts still fire because the user opted into the threshold
+      // explicitly and a noisy alert is better than a missed one.
+      const jobCost = normalised.total_cost_usd
+      const costStr = jobCost != null ? ` | cost: ${estimated ? '~' : ''}$${jobCost.toFixed(4)}` : ''
       emitLine('stdout', `[process exited with code ${code ?? 'unknown'}${costStr}]`)
 
       // Cost alert: check per-job threshold (hub-level, then per-project)

@@ -57,6 +57,34 @@ describe('explore-cwd-manager', () => {
     expect(fs.readFileSync(path.join(linkPath, 'src', 'foo.ts'), 'utf-8')).toContain('foo = 1')
   })
 
+  it('codex project: instructions file is AGENTS.md (not CLAUDE.md)', () => {
+    const cwd = ensureExploreCwd(
+      { slug: 'codex-proj', projectPath: projectRoot, projectName: 'Codex Project', provider: 'codex' },
+      baseDir,
+    )
+    expect(fs.existsSync(path.join(cwd, 'AGENTS.md'))).toBe(true)
+    expect(fs.existsSync(path.join(cwd, 'CLAUDE.md'))).toBe(false)
+    const agentsMd = fs.readFileSync(path.join(cwd, 'AGENTS.md'), 'utf-8')
+    expect(agentsMd).toContain('"Codex Project"')
+  })
+
+  it('clears stale instructions file when provider switches (defensive)', () => {
+    // Pretend a previous claude run created CLAUDE.md; now the project's
+    // provider is reported as codex. The next materialise should drop the
+    // stale CLAUDE.md and write AGENTS.md only.
+    const cwd = exploreCwdPathFor('switcher', baseDir)
+    fs.mkdirSync(cwd, { recursive: true })
+    fs.writeFileSync(path.join(cwd, 'CLAUDE.md'), 'stale claude content', 'utf-8')
+
+    ensureExploreCwd(
+      { slug: 'switcher', projectPath: projectRoot, projectName: 'Switcher', provider: 'codex' },
+      baseDir,
+    )
+
+    expect(fs.existsSync(path.join(cwd, 'CLAUDE.md'))).toBe(false)
+    expect(fs.existsSync(path.join(cwd, 'AGENTS.md'))).toBe(true)
+  })
+
   it('second call is idempotent and does not rewrite the unchanged CLAUDE.md', () => {
     const cwd = ensureExploreCwd(
       { slug: 'proj1', projectPath: projectRoot, projectName: 'Project 1' },

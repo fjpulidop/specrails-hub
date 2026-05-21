@@ -3,18 +3,8 @@ import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, Briefcase, BarChart3, Bot, Puzzle, Settings, PanelRight } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useSidebarPin } from '../context/SidebarPinContext'
+import { useHub } from '../hooks/useHub'
 import { FEATURE_AGENTS_SECTION } from '../lib/feature-flags'
-
-const navItems = [
-  { to: '/', end: true, icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/jobs', end: false, icon: Briefcase, label: 'Jobs' },
-  { to: '/analytics', end: false, icon: BarChart3, label: 'Analytics' },
-  ...(FEATURE_AGENTS_SECTION
-    ? [{ to: '/agents', end: false, icon: Bot, label: 'Agents' }]
-    : []),
-  { to: '/integrations', end: false, icon: Puzzle, label: 'Integrations' },
-  { to: '/settings', end: false, icon: Settings, label: 'Settings' },
-]
 
 const RIGHT_PIN_LABEL: Record<'pinned-open' | 'pinned-collapsed' | 'unpinned', string> = {
   'pinned-open': 'Collapse right sidebar (keep pinned)',
@@ -24,10 +14,41 @@ const RIGHT_PIN_LABEL: Record<'pinned-open' | 'pinned-collapsed' | 'unpinned', s
 
 export function ProjectRightSidebar() {
   const { rightMode, cycleRightMode } = useSidebarPin()
+  const { projects, activeProjectId } = useHub()
   const [hovered, setHovered] = useState(false)
   const expanded = rightMode === 'pinned-open' || (rightMode === 'unpinned' && hovered)
   const lit = rightMode !== 'unpinned'
   const pinLabel = RIGHT_PIN_LABEL[rightMode]
+
+  // Agents section is claude-only: the agent-profile catalogue, model
+  // overrides per agent, and the `sr-architect/developer/reviewer` sub-
+  // agent model maps to Claude Code's `.claude/agents/<id>.md` mechanic.
+  // Codex's `spawn_agent` tool uses a fixed enum of agent_types and runs
+  // skills as a single-agent loop, so the per-agent UI doesn't apply.
+  //
+  // Integrations (plugins / MCP servers) is also claude-only today: the
+  // plugin manager registers MCP servers via `.mcp.json` (claude's
+  // convention). Codex uses `codex mcp add` against an isolated
+  // CODEX_HOME — the hub wires that flow but the UI hasn't been adapted
+  // yet, so we hide the tab on codex projects to avoid presenting a
+  // claude-only surface.
+  const activeProject = projects.find((p) => p.id === activeProjectId)
+  const isCodex = activeProject?.provider === 'codex'
+  const showAgentsTab = FEATURE_AGENTS_SECTION && !isCodex
+  const showIntegrationsTab = !isCodex
+
+  const navItems = [
+    { to: '/', end: true, icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/jobs', end: false, icon: Briefcase, label: 'Jobs' },
+    { to: '/analytics', end: false, icon: BarChart3, label: 'Analytics' },
+    ...(showAgentsTab
+      ? [{ to: '/agents', end: false, icon: Bot, label: 'Agents' }]
+      : []),
+    ...(showIntegrationsTab
+      ? [{ to: '/integrations', end: false, icon: Puzzle, label: 'Integrations' }]
+      : []),
+    { to: '/settings', end: false, icon: Settings, label: 'Settings' },
+  ]
 
   return (
     <div

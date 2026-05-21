@@ -10,13 +10,13 @@ It's a local-first companion to [specrails-core](https://github.com/fjpulidop/sp
 
 ## What you can do with it
 
-- **Draft a spec by talking to Claude** — open Explore, describe what you want; the live draft updates each turn. Save it as a draft and come back later, or commit when it looks right.
+- **Draft a spec by talking to Claude or Codex** — open Explore, describe what you want; the live draft updates each turn. Save it as a draft and come back later, or commit when it looks right.
 - **Generate a spec in one shot** — Quick mode for when you already know what you want. Optionally enrich it with a "Contract Layer" of names, shapes, invariants, and a file touch list.
 - **Drag specs onto execution rails** — each rail is an independent lane. Run multiple specs in parallel, with different agent profiles per rail.
 - **Compare two specs side by side** — drag any spec modal to the edge of the screen; a picker of your todo specs appears on the other side. Pick one and they live next to each other. Tablet-style.
 - **Split a big epic** — SMASH a parent spec into a family of sub-specs in one click; the children carry short summaries on their cards.
 - **Refine a spec in place** — *Continue Editing* reopens any draft / todo / backlog spec in Explore, with the original conversation resumed if there was one.
-- **Track every AI cost** — every Claude CLI invocation across rails, Quick spec, Explore turns, and AI edits is recorded. The Analytics page shows your burn rate, top tickets, and lets you export CSV.
+- **Track every AI cost** — every AI CLI invocation across rails, Quick spec, Explore turns, and AI edits is recorded — across **both** Claude and Codex. Codex cost is estimated from a local rate-card since the CLI doesn't report it natively. The Analytics page shows your burn rate, top tickets, breaks down spend per provider, and lets you export CSV.
 - **Customise everything** — three themes, font sizes, terminal preferences, agent profiles, plugin integrations (Serena bundled today).
 
 ## How specrails-hub looks
@@ -61,12 +61,20 @@ If the project doesn't have specrails-core yet, the setup wizard walks you throu
 
 ## Prerequisites
 
-- **Node.js 20+**
-- **`claude` CLI** ([Claude Code](https://claude.com/claude-code))
+- **Node.js 20+** (specrails-core ≥ 4.6.0 for codex projects; ≥ 4.2.0 for claude-only)
+- **At least one AI CLI** on your PATH:
+  - **[Claude Code](https://claude.com/claude-code)** — `claude` binary. Set `ANTHROPIC_API_KEY` to authenticate.
+  - **[Codex CLI](https://developers.openai.com/codex)** ≥ 0.128.0 — `codex` binary. Run `codex login` or set `OPENAI_API_KEY`.
 - **`git`**
 - (Optional) **`uv`** if you want to use the Serena plugin
 
-Set `ANTHROPIC_API_KEY` in your shell so the Claude CLI can authenticate. On macOS, the desktop app handles Homebrew/Volta/nvm paths automatically — see [docs/platforms/macos.md](docs/platforms/macos.md).
+The provider is chosen per-project at install time and is immutable after
+creation. On macOS, the desktop app handles Homebrew/Volta/nvm paths
+automatically — see [docs/platforms/macos.md](docs/platforms/macos.md).
+**Windows users:** see [docs/windows.md](docs/windows.md) for Windows
+10/11 specifics. For Codex-specific topics — auth, sandbox config,
+estimated cost caveats, plugin support, and emergency rollback — see
+[docs/codex.md](docs/codex.md).
 
 ## Documentation
 

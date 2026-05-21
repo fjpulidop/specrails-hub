@@ -5,13 +5,14 @@ import type { WsMessage } from './types'
 import type { DbInstance } from './db'
 import { getConversation, addMessage, updateConversation, getStats, listJobs } from './db'
 import { resolveCommand } from './command-resolver'
-import { spawnAiCli, spawnClaude, spawnCodex } from './util/cli-prompt'
+import { spawnAiCli } from './util/cli-prompt'
 import { ensureExploreCwd } from './explore-cwd-manager'
 import { recordInvocation } from './ai-invocations'
-import { normaliseResultEvent } from './result-event'
+import { finaliseInvocationResult } from './result-event'
 import { randomUUID } from 'crypto'
 import { parseSpecDraftBlocks, applyBlocks, type ConversationDraftState } from './spec-draft-parser'
 import { attachmentManager, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
+import { getAdapter, type ProviderAdapter, type AdapterEvent } from './providers'
 import {
   buildScopedSystemPromptPrefix, toolFlagsForScope, normalizeContextScope,
   defaultBootScope, type ContextScope,
@@ -25,55 +26,13 @@ const COMMAND_INSTRUCTION =
 // Windows has no `which`; probe via `where` instead.
 const _WHICH_CMD = process.platform === 'win32' ? 'where' : 'which'
 
-function claudeOnPath(): boolean {
+function binaryOnPath(binary: string): boolean {
   try {
-    execSync(`${_WHICH_CMD} claude`, { stdio: 'ignore' })
+    execSync(`${_WHICH_CMD} ${binary}`, { stdio: 'ignore' })
     return true
   } catch {
     return false
   }
-}
-
-function codexOnPath(): boolean {
-  try {
-    execSync(`${_WHICH_CMD} codex`, { stdio: 'ignore' })
-    return true
-  } catch {
-    return false
-  }
-}
-
-function normalizeClaudeCodeModel(model: string | null | undefined): string {
-  switch (model) {
-    case 'claude-sonnet-4-6':
-    case 'claude-sonnet-4-5':
-    case 'claude-sonnet-4-0':
-    case 'claude-sonnet-4-20250514':
-      return 'sonnet'
-    case 'claude-opus-4-7':
-    case 'claude-opus-4-5':
-    case 'claude-opus-4-1-20250805':
-    case 'claude-opus-4-20250514':
-      return 'opus'
-    case 'claude-haiku-4-5-20251001':
-    case 'claude-3-5-haiku-20241022':
-    case 'claude-3-5-haiku-latest':
-      return 'haiku'
-    default:
-      return model || 'sonnet'
-  }
-}
-
-function extractTextFromEvent(event: Record<string, unknown>): string | null {
-  const type = event.type as string
-  if (type === 'assistant') {
-    const content = event.message as { content?: Array<{ type: string; text?: string }> } | undefined
-    const texts = (content?.content ?? [])
-      .filter((c) => c.type === 'text')
-      .map((c) => c.text ?? '')
-    return texts.join('') || null
-  }
-  return null
 }
 
 function extractCommandProposals(text: string): string[] {
@@ -152,7 +111,7 @@ export class ChatManager {
 
   private _cwd: string | undefined
   private _projectName: string | undefined
-  private _provider: 'claude' | 'codex'
+  private _adapter: ProviderAdapter
   private _projectId: string | undefined
   private _projectSlug: string | undefined
 
@@ -169,7 +128,7 @@ export class ChatManager {
     this._db = db
     this._cwd = cwd
     this._projectName = projectName
-    this._provider = provider ?? 'claude'
+    this._adapter = getAdapter(provider ?? 'claude')
     this._projectId = projectId
     this._projectSlug = projectSlug
     this._activeProcesses = new Map()
@@ -180,6 +139,11 @@ export class ChatManager {
     this._streamFilters = new Map()
     this._exploreLifecycle = new Map()
     this._exploreQueue = []
+  }
+
+  /** Compatibility accessor for tests that introspect the resolved provider. */
+  get provider(): string {
+    return this._adapter.id
   }
 
   // ─── Explore lifecycle helpers ──────────────────────────────────────────────
@@ -323,6 +287,7 @@ export class ChatManager {
         slug: this._projectSlug,
         projectPath: this._cwd,
         projectName: this._projectName,
+        provider: this._adapter.id as 'claude' | 'codex',
       })
       console.log(`[chat-manager] explore spawn cwd=${cwd} (mcp=off)`)
       return cwd
@@ -449,26 +414,14 @@ export class ChatManager {
       return
     }
 
-    if (this._provider === 'codex') {
-      if (!codexOnPath()) {
-        this._broadcast({
-          type: 'chat_error',
-          conversationId,
-          error: 'CODEX_NOT_FOUND',
-          timestamp: new Date().toISOString(),
-        })
-        return
-      }
-    } else {
-      if (!claudeOnPath()) {
-        this._broadcast({
-          type: 'chat_error',
-          conversationId,
-          error: 'CLAUDE_NOT_FOUND',
-          timestamp: new Date().toISOString(),
-        })
-        return
-      }
+    if (!binaryOnPath(this._adapter.binary)) {
+      this._broadcast({
+        type: 'chat_error',
+        conversationId,
+        error: `${this._adapter.id.toUpperCase()}_NOT_FOUND`,
+        timestamp: new Date().toISOString(),
+      })
+      return
     }
 
     const conversation = getConversation(this._db, conversationId)
@@ -525,59 +478,41 @@ export class ChatManager {
       }
     }
 
-    // Build spawn args based on provider
-    let binary: string
-    let args: string[]
-
+    // Build spawn args via the resolved adapter. System prompt placement
+    // (--system-prompt flag vs prompt-fold) and resume vs fresh-turn are both
+    // adapter-driven via capability flags.
+    const lightweight = options?.lightweight ?? false
     const conversationScope = this._resolveConversationScope(conversation)
+    let systemPrompt = lightweight
+      ? this._buildLightweightSystemPrompt(conversationScope)
+      : this._buildSystemPrompt()
+    if (hasAttachments) systemPrompt = `${systemPrompt}\n\n${USER_ATTACHMENT_SYSTEM_NOTE}`
 
-    if (this._provider === 'codex') {
-      binary = 'codex'
-      // Codex: single-turn exec with model selection.
-      // Default to gpt-5.4-mini (matches the budget preset default).
-      const model = conversation.model || 'gpt-5.4-mini'
-      // Embed the system prompt directly in the prompt (codex has no --system-prompt flag).
-      // This ensures project context, local-tickets permission, and COMMAND_INSTRUCTION
-      // are honoured on every codex chat turn.
-      const lightweight = options?.lightweight ?? false
-      let systemPrompt = lightweight
-        ? this._buildLightweightSystemPrompt(conversationScope)
-        : this._buildSystemPrompt()
-      if (hasAttachments) systemPrompt = `${systemPrompt}\n\n${USER_ATTACHMENT_SYSTEM_NOTE}`
-      const fullPrompt = `${systemPrompt}\n\n---\n\n${resolvedText}`
-      args = ['exec', fullPrompt, '--model', model]
-    } else {
-      binary = 'claude'
-      const lightweight = options?.lightweight ?? false
-      let systemPrompt = lightweight
-        ? this._buildLightweightSystemPrompt(conversationScope)
-        : this._buildSystemPrompt()
-      if (hasAttachments) systemPrompt = `${systemPrompt}\n\n${USER_ATTACHMENT_SYSTEM_NOTE}`
-      args = [
-        '--model', normalizeClaudeCodeModel(conversation.model),
-        '--dangerously-skip-permissions',
-        '--output-format', 'stream-json',
-        '--verbose',
-        '--system-prompt', systemPrompt,
-        '-p', resolvedText,
-      ]
-      // Apply per-conversation context scope tool flags (Explore only).
-      // When a scope is present we own the tool surface explicitly — do NOT
-      // also pass `--tools default`, which can conflict with --disallowedTools.
-      if (conversationScope) {
-        const toolFlags = toolFlagsForScope(conversationScope)
-        args.push(...toolFlags.args)
-        console.log(`[chat-manager] scope=${JSON.stringify(conversationScope)} flags=${toolFlags.args.join(' ')} promptBytes=${Buffer.byteLength(systemPrompt)}`)
-      } else {
-        args.push('--tools', 'default')
-      }
-      if (conversation.session_id) {
-        args.push('--resume', conversation.session_id)
-      }
-      const maxTurns = options?.maxTurns
-      if (maxTurns != null) {
-        args.push('--max-turns', String(maxTurns))
-      }
+    const binary = this._adapter.binary
+    const model = conversation.model || this._adapter.defaultModel()
+    const action = conversation.session_id && this._adapter.capabilities.nativeResume
+      ? 'chat-resume' as const
+      : 'chat-turn' as const
+    // Translate the per-conversation Explore scope into provider-native
+    // tool-gating flags. `toolFlagsForScope` emits claude-shape argv
+    // (`--disallowedTools …`); codex's `exec` would reject those with an
+    // "unexpected argument" error and crash the turn. The scope's tool
+    // gating is therefore claude-only today — codex inherits its sandbox
+    // and approval policy from the project's `.codex/config.toml` (or the
+    // `-c sandbox_mode=` override the adapter already attaches on resume).
+    const scopeFlags = conversationScope && this._adapter.id === 'claude'
+      ? toolFlagsForScope(conversationScope).args
+      : []
+    let args = this._adapter.buildArgs(action, {
+      prompt: resolvedText,
+      systemPrompt,
+      model,
+      sessionId: conversation.session_id ?? undefined,
+      maxTurns: options?.maxTurns,
+      extraArgs: scopeFlags,
+    })
+    if (conversationScope) {
+      console.log(`[chat-manager] scope=${JSON.stringify(conversationScope)} flags=${scopeFlags.join(' ')} promptBytes=${Buffer.byteLength(systemPrompt)}`)
     }
 
     // No OTEL env injection here — ChatManager spawns are interactive user sessions,
@@ -620,7 +555,11 @@ export class ChatManager {
     /* c8 ignore stop */
 
     let capturedSessionId: string | null = null
-    let lastResultEvent: Record<string, unknown> | null = null
+    // Accumulator of parsed events for finaliseInvocationResult at close.
+    const adapterEvents: AdapterEvent[] = []
+    /** True iff a kind:'result' event has arrived; mirrors the legacy
+     *  `lastResultEvent !== null` check that the crash-respawn guard uses. */
+    let sawResult = false
     const turnStartedAt = new Date().toISOString()
 
     const stdoutReader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
@@ -663,25 +602,34 @@ export class ChatManager {
     }
 
     const readerHandler = (line: string) => {
-      if (this._provider === 'codex') {
-        // Codex outputs plain text
-        if (line) emitDelta(line + '\n')
-      } else {
-        // Claude outputs JSON stream
-        let parsed: Record<string, unknown> | null = null
-        try { parsed = JSON.parse(line) } catch { /* skip non-JSON */ }
-        if (!parsed) return
-
-        const eventType = parsed.type as string
-
-        if (eventType === 'result') {
-          lastResultEvent = parsed
-          const sid = parsed.session_id as string | undefined
-          if (sid) capturedSessionId = sid
-        }
-
-        const newText = extractTextFromEvent(parsed)
-        if (newText) emitDelta(newText)
+      const ev = this._adapter.parseStreamLine(line)
+      if (!ev) return
+      adapterEvents.push(ev)
+      switch (ev.kind) {
+        case 'text-delta':
+          emitDelta(ev.text)
+          break
+        case 'session-started':
+          // Last-wins: Claude rotates session ids across --resume, and only the
+          // id present at result-time is persisted on disk. Capturing the first
+          // one leaves DB with a ghost id that fails the next --resume.
+          if (ev.sessionId) capturedSessionId = ev.sessionId
+          break
+        case 'result':
+          sawResult = true
+          // Claude's result event carries the canonical (post-rotation)
+          // session_id; codex captures from thread.started but mirroring here
+          // is harmless.
+          {
+            const sid = (ev.payload as { session_id?: string }).session_id
+            if (sid) capturedSessionId = sid
+          }
+          break
+        case 'tool-use':
+        case 'other':
+          // No-op for ChatManager — adapter parses tool_use into the unified
+          // event shape but the chat UI does not currently surface them.
+          break
       }
     }
     stdoutReader.on('line', readerHandler)
@@ -690,35 +638,46 @@ export class ChatManager {
     void currentChild // keep reference live for crash respawn
     return new Promise<void>((resolve) => {
       const onClose = (code: number | null) => {
-        console.log(`[chat-manager] claude exited code=${code} conv=${conversationId}`)
+        console.log(`[chat-manager] ${this._adapter.id} exited code=${code} conv=${conversationId}`)
         const fullText = this._buffers.get(conversationId) ?? ''
         const wasAborting = this._abortingConversations.has(conversationId)
 
         // Crash auto-respawn for Explore: if the child exited non-zero before
         // emitting a `result` event, the user did not explicitly abort, and
-        // we have not yet retried, respawn the same turn once with --resume.
+        // we have not yet retried, respawn the same turn once via chat-resume
+        // when the adapter supports it and a session id was captured.
         // See design.md D7.
         if (
           conversation.kind === 'explore' &&
           !wasAborting &&
           code !== 0 &&
-          !lastResultEvent
+          !sawResult
         ) {
           const life = this._exploreLifecycle.get(conversationId)
           if (life && life.crashCount === 0) {
             life.crashCount = 1
-            // Refresh --resume from any session id captured before the crash.
-            if (capturedSessionId && this._provider !== 'codex' && !args.includes('--resume')) {
-              args.push('--resume', capturedSessionId)
-            }
+            // Rebuild argv as chat-resume when the adapter supports native
+            // resume AND we captured a session id before the crash. Otherwise
+            // re-issue the original chat-turn argv so the spawn still happens.
+            const respawnArgs =
+              capturedSessionId && this._adapter.capabilities.nativeResume
+                ? this._adapter.buildArgs('chat-resume', {
+                    prompt: resolvedText,
+                    systemPrompt,
+                    model,
+                    sessionId: capturedSessionId,
+                    maxTurns: options?.maxTurns,
+                  })
+                : args
             console.warn(`[chat-manager] explore crash respawn for ${conversationId}`)
             try {
-              const newChild = spawnAiCli(binary, args, {
+              const newChild = spawnAiCli(binary, respawnArgs, {
                 env: process.env,
                 stdio: ['ignore', 'pipe', 'pipe'],
                 cwd: spawnCwd,
               })
               currentChild = newChild
+              args = respawnArgs
               this._activeProcesses.set(conversationId, newChild)
               newChild.stderr?.on('data', (chunk: Buffer) => {
                 const text = chunk.toString()
@@ -764,20 +723,21 @@ export class ChatManager {
               : code === 0
                 ? 'success'
                 : 'failed'
-            const provider: 'claude' | 'codex' = this._provider === 'codex' ? 'codex' : 'claude'
-            const normalised = lastResultEvent
-              ? normaliseResultEvent(lastResultEvent, provider)
-              : {}
+            const { result, estimated } = finaliseInvocationResult(this._adapter, adapterEvents, {
+              fallbackModel: model,
+            })
             recordInvocation(this._db, {
               id: randomUUID(),
               project_id: this._projectId,
+              provider: this._adapter.id,
               surface: 'explore-spec',
               surface_ref_id: conversationId,
               conversation_id: conversationId,
               status: invStatus,
               started_at: turnStartedAt,
               finished_at: new Date().toISOString(),
-              ...normalised,
+              total_cost_usd_estimated: estimated,
+              ...result,
             })
             this._broadcast({ type: 'spending.invalidated', projectId: this._projectId })
           } catch (err) {
@@ -817,12 +777,10 @@ export class ChatManager {
             addMessage(this._db, { conversation_id: conversationId, role: 'assistant', content: persistedText })
           }
 
-          // Update session_id.
-          // For codex: generate a synthetic session ID so that subsequent refreshes
-          // can still resolve the conversation. Pattern mirrors setup-manager.ts:810.
-          if (!capturedSessionId && this._provider === 'codex') {
-            capturedSessionId = `codex-${conversationId}-${Date.now()}`
-          }
+          // Update session_id from the real thread/session captured during
+          // streaming. No more synthetic codex-<convId>-<timestamp> fallback —
+          // codex's `thread.started` event already gives us a real UUID, and
+          // claude's `system`/`result` events carry the canonical session_id.
           if (capturedSessionId) {
             updateConversation(this._db, conversationId, { session_id: capturedSessionId })
           }
@@ -877,48 +835,11 @@ export class ChatManager {
         `Generate a 4-6 word title for this conversation. Output ONLY the title text, no quotes or punctuation.\n\n` +
         `User: ${firstUserMsg.slice(0, 200)}\nAssistant: ${firstResponse.slice(0, 300)}`
 
-      if (this._provider === 'codex') {
-        // Codex outputs plain text — spawn codex exec and take the first non-empty line
-        const child = spawnCodex([
-          'exec', titlePrompt,
-          '--model', 'gpt-5.4-mini',
-        ], {
-          env: process.env,
-          stdio: ['ignore', 'pipe', 'pipe'],
-          cwd: this._cwd,
-        })
-
-        let titleText = ''
-        const reader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
-
-        reader.on('line', (line) => {
-          // Take the first non-empty output line as the title
-          if (!titleText && line.trim()) {
-            titleText = line.trim()
-          }
-        })
-
-        child.on('close', (code) => {
-          if (code === 0 && titleText) {
-            updateConversation(this._db, conversationId, { title: titleText })
-            this._broadcast({
-              type: 'chat_title_update',
-              conversationId,
-              title: titleText,
-              timestamp: new Date().toISOString(),
-            })
-          }
-        })
-        return
-      }
-
-      // Claude: JSON stream parsing
-      const child = spawnClaude([
-        '--dangerously-skip-permissions',
-        '--output-format', 'stream-json',
-        '--verbose',
-        '-p', titlePrompt,
-      ], {
+      const args = this._adapter.buildArgs('auto-title', {
+        prompt: titlePrompt,
+        model: this._adapter.defaultModel(),
+      })
+      const child = spawnAiCli(this._adapter.binary, args, {
         env: process.env,
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd: this._cwd,
@@ -928,14 +849,11 @@ export class ChatManager {
       const reader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
 
       reader.on('line', (line) => {
-        let parsed: Record<string, unknown> | null = null
-        try { parsed = JSON.parse(line) } catch { return }
-        if (!parsed) return
-
-        // Take only the first assistant event's text
-        if (!titleText) {
-          const text = extractTextFromEvent(parsed)
-          if (text) titleText = text.trim()
+        if (titleText) return
+        const ev = this._adapter.parseStreamLine(line)
+        if (ev?.kind === 'text-delta') {
+          const trimmed = ev.text.trim()
+          if (trimmed) titleText = trimmed
         }
       })
 

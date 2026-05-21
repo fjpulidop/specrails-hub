@@ -76,14 +76,14 @@ describe('SpecsBoard', () => {
     expect(screen.getByText(/Click "\+ Add" to get started/i)).toBeInTheDocument()
   })
 
-  it('renders the postit grid when tier=postit and onMoveToRail is provided', () => {
+  it('renders the postit grid when viewTier=postit and onMoveToRail is provided', () => {
     const tickets = [makeTicket({ id: 1, title: 'A' }), makeTicket({ id: 2, title: 'B' })]
     render(
       <SpecsBoard
         tickets={tickets}
         isLoading={false}
         onTicketClick={onTicketClick}
-        tier="postit"
+        viewTier="postit"
         rails={[]}
         onMoveToRail={vi.fn()}
       />,
@@ -92,14 +92,14 @@ describe('SpecsBoard', () => {
     expect(screen.queryByTestId('specs-board-list')).not.toBeInTheDocument()
   })
 
-  it('falls back to the row list when tier=row', () => {
+  it('falls back to the row list when viewTier=row', () => {
     const tickets = [makeTicket({ id: 1 })]
     render(
       <SpecsBoard
         tickets={tickets}
         isLoading={false}
         onTicketClick={onTicketClick}
-        tier="row"
+        viewTier="row"
         rails={[]}
         onMoveToRail={vi.fn()}
       />,
@@ -109,18 +109,40 @@ describe('SpecsBoard', () => {
     expect(list).toHaveAttribute('data-tier', 'row')
   })
 
-  it('uses the row list when tier=postit but no onMoveToRail handler is provided', () => {
+  it('uses the row list when viewTier=postit but no onMoveToRail handler is provided', () => {
     const tickets = [makeTicket({ id: 1 })]
     render(
       <SpecsBoard
         tickets={tickets}
         isLoading={false}
         onTicketClick={onTicketClick}
-        tier="postit"
+        viewTier="postit"
       />,
     )
     expect(screen.queryByTestId('specs-board-postit-grid')).not.toBeInTheDocument()
     expect(screen.getByTestId('specs-board-list')).toBeInTheDocument()
+  })
+
+  it('renders the view tier toggle when onViewTierChange is provided', () => {
+    const onViewTierChange = vi.fn()
+    render(
+      <SpecsBoard
+        tickets={[]}
+        isLoading={false}
+        onTicketClick={onTicketClick}
+        viewTier="postit"
+        onViewTierChange={onViewTierChange}
+      />,
+    )
+    const rowBtn = screen.getByTestId('specs-view-tier-row')
+    expect(rowBtn).toBeInTheDocument()
+    fireEvent.click(rowBtn)
+    expect(onViewTierChange).toHaveBeenCalledWith('row')
+  })
+
+  it('omits the view tier toggle when onViewTierChange is absent', () => {
+    render(<SpecsBoard tickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
+    expect(screen.queryByTestId('specs-view-tier-row')).toBeNull()
   })
 
   it('shows loading skeletons when isLoading is true', () => {

@@ -411,10 +411,84 @@ const MIGRATIONS: Migration[] = [
   // Migration 18: chat_conversations.context_scope — per-conversation JSON
   // freezing the Add Spec context scope at creation time. NULL means "legacy
   // behavior" so existing rows behave unchanged.
+  //
+  // Idempotent: a parallel WIP branch shipped this column under migration #20,
+  // so on machines where it already exists we swallow the duplicate-column
+  // error rather than crash on a re-run.
   (db) => {
+    try {
+      db.exec(`ALTER TABLE chat_conversations ADD COLUMN context_scope TEXT;`)
+    } catch (err) {
+      const msg = (err as Error).message ?? ''
+      if (!/duplicate column name/i.test(msg)) throw err
+    }
+  },
+
+  // Migration 19: ai_invocations.provider — provider id stamped at insert.
+  // Existing rows backfill to 'claude' since pre-migration that was the only
+  // path. New rows MUST be populated from the resolved adapter's id (see
+  // openspec/changes/add-multi-provider-support/specs/project-spending/spec.md).
+  //
+  // Idempotent: same dual-WIP concern — multi-provider branch originally
+  // numbered this #18, so on machines that ran the pre-merge multi-provider
+  // build the column already exists.
+  (db) => {
+    try {
+      db.exec(`ALTER TABLE ai_invocations ADD COLUMN provider TEXT;`)
+    } catch (err) {
+      const msg = (err as Error).message ?? ''
+      if (!/duplicate column name/i.test(msg)) throw err
+    }
+    db.exec(`UPDATE ai_invocations SET provider = 'claude' WHERE provider IS NULL;`)
     db.exec(`
-      ALTER TABLE chat_conversations ADD COLUMN context_scope TEXT;
+      CREATE INDEX IF NOT EXISTS idx_ai_inv_project_provider
+        ON ai_invocations(project_id, provider);
     `)
+  },
+
+  // Migration 20: ai_invocations.total_cost_usd_estimated — 1 when the cost
+  // came from server/pricing.ts (estimated fallback for non-native-cost
+  // providers); 0 when authoritative from the provider's terminal event.
+  //
+  // Idempotent for the same reason as #18/#19.
+  (db) => {
+    try {
+      db.exec(`
+        ALTER TABLE ai_invocations
+          ADD COLUMN total_cost_usd_estimated INTEGER NOT NULL DEFAULT 0;
+      `)
+    } catch (err) {
+      const msg = (err as Error).message ?? ''
+      if (!/duplicate column name/i.test(msg)) throw err
+    }
+  },
+
+  // Migration 21: self-heal `ai_invocations.provider` and
+  // `ai_invocations.total_cost_usd_estimated` for projects whose
+  // `schema_migrations` table marked versions 19 / 20 as applied without the
+  // corresponding ALTER actually running (parallel WIP branches reshuffled
+  // migration indices during development, leaving some on-disk DBs with the
+  // applied row but no column). Uses `PRAGMA table_info` so we only ALTER
+  // when the column is genuinely missing — safe to re-run.
+  (db) => {
+    const cols = new Set(
+      (db.prepare(`PRAGMA table_info(ai_invocations)`).all() as { name: string }[])
+        .map((r) => r.name),
+    )
+    if (!cols.has('provider')) {
+      db.exec(`ALTER TABLE ai_invocations ADD COLUMN provider TEXT;`)
+      db.exec(`UPDATE ai_invocations SET provider = 'claude' WHERE provider IS NULL;`)
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_ai_inv_project_provider
+          ON ai_invocations(project_id, provider);
+      `)
+    }
+    if (!cols.has('total_cost_usd_estimated')) {
+      db.exec(`
+        ALTER TABLE ai_invocations
+          ADD COLUMN total_cost_usd_estimated INTEGER NOT NULL DEFAULT 0;
+      `)
+    }
   },
 ]
 
