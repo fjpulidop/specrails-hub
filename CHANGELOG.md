@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.55.0](https://github.com/fjpulidop/specrails-hub/compare/v1.54.3...v1.55.0) (2026-05-21)
+
+
+### Features
+
+* **providers:** multi-provider (Claude + Codex CLI) support end-to-end ([#313](https://github.com/fjpulidop/specrails-hub/issues/313)) ([0815a54](https://github.com/fjpulidop/specrails-hub/commit/0815a54b1b090c70c292a2e7079faeb2339b2882))
+
 ## [1.54.3](https://github.com/fjpulidop/specrails-hub/compare/v1.54.2...v1.54.3) (2026-05-17)
 
 
