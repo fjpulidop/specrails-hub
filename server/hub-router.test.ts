@@ -1118,6 +1118,26 @@ describe('hub-router', () => {
       expect(getHubSetting(hubDb, 'ui_theme')).toBe('obsidian-dark')
     })
 
+    it('persists the matrix theme', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .patch('/api/hub/theme')
+        .send({ theme: 'matrix' })
+      expect(res.status).toBe(200)
+      expect(res.body.theme).toBe('matrix')
+      expect(getHubSetting(hubDb, 'ui_theme')).toBe('matrix')
+    })
+
+    it('rejects a near-miss matrix typo with 400', async () => {
+      const { app } = createApp()
+      const res = await request(app)
+        .patch('/api/hub/theme')
+        .send({ theme: 'matricks' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toBe('invalid_theme')
+      expect(getHubSetting(hubDb, 'ui_theme')).toBe('dracula')
+    })
+
     it('rejects unknown theme with 400', async () => {
       const { app } = createApp()
       const res = await request(app)

@@ -288,7 +288,7 @@ export default function JobDetailPage() {
   } : null
 
   return (
-    <div className="flex flex-col h-full max-w-5xl mx-auto w-full">
+    <div data-job-detail-surface className="flex flex-col h-full max-w-5xl mx-auto w-full">
       {/* Header */}
       <div className="px-4 py-4 border-b border-border space-y-3">
         {/* Breadcrumb */}

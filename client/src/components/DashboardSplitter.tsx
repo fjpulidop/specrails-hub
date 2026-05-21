@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { MIN_LEFT_PX, MIN_RIGHT_PX, SNAP_TOLERANCE_PX, TIER_BREAKPOINTS_PX } from '../hooks/useDashboardSplit'
+import { MIN_LEFT_PX, MIN_RIGHT_PX } from '../hooks/useDashboardSplit'
 
 interface DashboardSplitterProps {
   /** Current left-panel width in pixels. */
@@ -15,9 +15,7 @@ interface DashboardSplitterProps {
 /**
  * Vertical splitter handle between the SpecsBoard (left) and RailsBoard
  * (right) on the dashboard. The handle is a 6px-wide hit area with a 1px
- * visible rule that lifts to `accent-info/40` on hover. Snap-zone markers
- * appear at the tier breakpoints when the user is dragging in their
- * vicinity (rendered as faint 1px columns over the dashboard).
+ * visible rule that lifts to `accent-info/40` on hover.
  */
 export function DashboardSplitter({ leftWidth, onPointerDown, onReset, viewport }: DashboardSplitterProps) {
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -63,19 +61,6 @@ export function DashboardSplitter({ leftWidth, onPointerDown, onReset, viewport 
         <div className="w-1 h-1 rounded-full bg-accent-info/60" />
         <div className="w-1 h-1 rounded-full bg-accent-info/60" />
       </div>
-      {/* Snap-zone markers (subtle) */}
-      {TIER_BREAKPOINTS_PX.map((bp) => {
-        const inZone = Math.abs(leftWidth - bp) <= SNAP_TOLERANCE_PX
-        if (!inZone) return null
-        return (
-          <div
-            key={bp}
-            aria-hidden
-            className="absolute -translate-x-1/2 inset-y-0 w-px bg-accent-info/30"
-            style={{ left: `${bp - leftWidth + 3}px` }}
-          />
-        )
-      })}
     </div>
   )
 }

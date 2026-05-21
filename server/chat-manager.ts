@@ -610,16 +610,19 @@ export class ChatManager {
           emitDelta(ev.text)
           break
         case 'session-started':
-          if (!capturedSessionId) capturedSessionId = ev.sessionId
+          // Last-wins: Claude rotates session ids across --resume, and only the
+          // id present at result-time is persisted on disk. Capturing the first
+          // one leaves DB with a ghost id that fails the next --resume.
+          if (ev.sessionId) capturedSessionId = ev.sessionId
           break
         case 'result':
           sawResult = true
-          // Claude's result event also carries session_id; for codex the
-          // session_id was already captured from thread.started. Either way
-          // mirror it into capturedSessionId for the close handler.
+          // Claude's result event carries the canonical (post-rotation)
+          // session_id; codex captures from thread.started but mirroring here
+          // is harmless.
           {
             const sid = (ev.payload as { session_id?: string }).session_id
-            if (sid && !capturedSessionId) capturedSessionId = sid
+            if (sid) capturedSessionId = sid
           }
           break
         case 'tool-use':

@@ -9,6 +9,7 @@ import { Dialog, DialogContent } from './components/ui/dialog'
 import { useKeyboardShortcuts, useCheatsheetState } from './hooks/useKeyboardShortcuts'
 import { KeyboardShortcutsCheatsheet } from './components/KeyboardShortcutsCheatsheet'
 import { TitleBar } from './components/TitleBar'
+import { ThemeEffectLayer } from './components/theme-effects/ThemeEffectLayer'
 
 // Lazy-loaded pages — never visible at initial render
 const JobDetailPage = lazy(() => import('./pages/JobDetailPage'))
@@ -179,7 +180,7 @@ function HubApp() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full bg-background">
+      <div className="flex h-full">
         <div className="w-11 border-r border-border bg-card/50 animate-pulse flex-shrink-0" />
         <div className="flex-1 flex items-center justify-center">
           <p className="text-sm text-muted-foreground">Loading...</p>
@@ -189,7 +190,7 @@ function HubApp() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden bg-background font-sans">
+    <div className="flex h-full overflow-hidden font-sans">
       {/* Arc-style collapsible sidebar */}
       <ArcSidebar
         onAddProject={() => setAddDialogOpen(true)}
@@ -295,6 +296,13 @@ function TerminalsProviderWithHub({ children }: { children: React.ReactNode }) {
 // add a subtle status-coloured left border so the type still reads at a
 // glance without breaking visual harmony.
 
+function ToastLoadingSpinner() {
+  // Loading toasts use a rotating halo around the whole card (see globals.css
+  // `[data-sonner-toast][data-type='loading']`) instead of an inline spinner.
+  // Returning an empty span suppresses sonner's default pinwheel.
+  return <span aria-hidden style={{ display: 'none' }} />
+}
+
 function ThemedToaster() {
   const { theme } = useTheme()
   const accent = theme.previewSwatches.accents[0]
@@ -309,6 +317,7 @@ function ThemedToaster() {
       gap={8}
       closeButton
       visibleToasts={6}
+      icons={{ loading: <ToastLoadingSpinner /> }}
       style={{
         '--accent':                accent,
         '--toast-success-border': `color-mix(in srgb, ${success} 38%, transparent)`,
@@ -321,6 +330,8 @@ function ThemedToaster() {
         classNames: {
           toast:
             'glass-card border border-border/30 text-foreground text-xs p-3 rounded-lg flex items-start gap-2 w-[356px] max-w-[356px] overflow-hidden shadow-lg',
+          content: 'flex-1 min-w-0 flex flex-col gap-0.5',
+          icon: 'shrink-0 mt-[2px] flex items-center justify-center',
           title: 'font-medium text-sm',
           description: 'text-muted-foreground mt-0.5',
           actionButton:
@@ -333,7 +344,7 @@ function ThemedToaster() {
           error: 'border-l-4 border-l-[var(--toast-error-border)]',
           warning: 'border-l-4 border-l-[var(--toast-warning-border)]',
           info: 'border-l-4 border-l-[var(--toast-info-border)]',
-          loading: 'border-l-4 border-l-[var(--accent)]',
+          loading: '',
         },
       }}
     />
@@ -365,6 +376,10 @@ export default function App() {
       >
         <SharedWebSocketProvider url={WS_URL}>
           <ThemeProvider>
+            {/* Theme-scoped decorative effects (e.g. matrix rain). Dispatcher
+                renders the matching effect or nothing. See
+                `components/theme-effects/ThemeEffectLayer.tsx`. */}
+            <ThemeEffectLayer />
             <HubProvider>
               {/* Custom frameless titlebar inside HubProvider so it can read active project */}
               <TitleBar />

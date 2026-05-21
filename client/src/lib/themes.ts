@@ -12,7 +12,7 @@
  * No component code changes required (OCP).
  */
 
-export const THEME_IDS = ['dracula', 'aurora-light', 'obsidian-dark'] as const
+export const THEME_IDS = ['dracula', 'aurora-light', 'obsidian-dark', 'matrix'] as const
 export type ThemeId = (typeof THEME_IDS)[number]
 
 /**
@@ -264,12 +264,76 @@ const OBSIDIAN_DARK: ThemeDescriptor = {
   },
 }
 
+// ─── Matrix ────────────────────────────────────────────────────────────────
+
+const MATRIX_PALETTE = {
+  bg:        'hsl(154 30% 5%)',     // near-black, green-tinted (deep terminal)
+  fg:        'hsl(150 100% 86%)',   // mint phosphor — soft, AAA contrast on bg
+  surface:   'hsl(154 28% 9%)',     // raised panels
+  muted:     'hsl(150 40% 55%)',    // medium-green secondary text
+  // Accents — spread across hue families so the six semantic slots stay
+  // visually distinct (see design.md). primary / secondary / success sit in
+  // the green band but with ≥0.17 lightness deltas; info is teal; warning,
+  // highlight and destructive are warm sentinels.
+  primary:     'hsl(144 100% 50%)', // canonical phosphor green (#00FF66 family)
+  info:        'hsl(174 56% 56%)',  // teal (#4FD1C5)
+  success:     'hsl(145 100% 70%)', // bright mint-green (#5BFFA0)
+  secondary:   'hsl(153 100% 33%)', // deep terminal green — pill backgrounds
+  warning:     'hsl(35 100% 64%)',  // amber (#FFB347)
+  highlight:   'hsl(51 100% 50%)',  // gold (#FFD700)
+  destructive: 'hsl(351 100% 65%)', // rose (#FF4D6D — the red pill)
+} as const
+
+const MATRIX: ThemeDescriptor = {
+  id: 'matrix',
+  displayName: 'Matrix',
+  tagline: 'Phosphor terminal — soft mint on green-tinted near-black',
+  scheme: 'dark',
+  previewSwatches: {
+    background: MATRIX_PALETTE.bg,
+    foreground: MATRIX_PALETTE.fg,
+    accents: [MATRIX_PALETTE.primary, MATRIX_PALETTE.info, MATRIX_PALETTE.highlight, MATRIX_PALETTE.destructive],
+  },
+  xterm: {
+    background: MATRIX_PALETTE.bg,
+    foreground: MATRIX_PALETTE.fg,
+    cursor: MATRIX_PALETTE.primary,
+    cursorAccent: MATRIX_PALETTE.bg,
+    selectionBackground: 'hsl(154 40% 22%)',
+    black: 'hsl(154 30% 10%)',
+    red: MATRIX_PALETTE.destructive,
+    green: MATRIX_PALETTE.primary,
+    yellow: MATRIX_PALETTE.warning,
+    blue: MATRIX_PALETTE.info,
+    magenta: MATRIX_PALETTE.highlight,
+    cyan: MATRIX_PALETTE.info,
+    white: MATRIX_PALETTE.fg,
+    brightBlack: MATRIX_PALETTE.muted,
+    brightRed: 'hsl(351 100% 78%)',
+    brightGreen: MATRIX_PALETTE.success,
+    brightYellow: 'hsl(35 100% 78%)',
+    brightBlue: 'hsl(174 56% 72%)',
+    brightMagenta: 'hsl(51 100% 70%)',
+    brightCyan: 'hsl(174 56% 78%)',
+    brightWhite: 'hsl(150 100% 96%)',
+  },
+  chart: [MATRIX_PALETTE.primary, MATRIX_PALETTE.info, MATRIX_PALETTE.warning, MATRIX_PALETTE.highlight, MATRIX_PALETTE.destructive],
+  status: {
+    completed: MATRIX_PALETTE.primary,
+    failed:    MATRIX_PALETTE.destructive,
+    canceled:  MATRIX_PALETTE.warning,
+    running:   MATRIX_PALETTE.info,
+    queued:    MATRIX_PALETTE.muted,
+  },
+}
+
 // ─── Public registry ───────────────────────────────────────────────────────
 
 export const THEMES: Record<ThemeId, ThemeDescriptor> = {
   'dracula':       DRACULA,
   'aurora-light':  AURORA_LIGHT,
   'obsidian-dark': OBSIDIAN_DARK,
+  'matrix':        MATRIX,
 }
 
 export function getTheme(id: ThemeId): ThemeDescriptor {

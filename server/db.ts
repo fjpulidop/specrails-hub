@@ -462,6 +462,34 @@ const MIGRATIONS: Migration[] = [
       if (!/duplicate column name/i.test(msg)) throw err
     }
   },
+
+  // Migration 21: self-heal `ai_invocations.provider` and
+  // `ai_invocations.total_cost_usd_estimated` for projects whose
+  // `schema_migrations` table marked versions 19 / 20 as applied without the
+  // corresponding ALTER actually running (parallel WIP branches reshuffled
+  // migration indices during development, leaving some on-disk DBs with the
+  // applied row but no column). Uses `PRAGMA table_info` so we only ALTER
+  // when the column is genuinely missing — safe to re-run.
+  (db) => {
+    const cols = new Set(
+      (db.prepare(`PRAGMA table_info(ai_invocations)`).all() as { name: string }[])
+        .map((r) => r.name),
+    )
+    if (!cols.has('provider')) {
+      db.exec(`ALTER TABLE ai_invocations ADD COLUMN provider TEXT;`)
+      db.exec(`UPDATE ai_invocations SET provider = 'claude' WHERE provider IS NULL;`)
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_ai_inv_project_provider
+          ON ai_invocations(project_id, provider);
+      `)
+    }
+    if (!cols.has('total_cost_usd_estimated')) {
+      db.exec(`
+        ALTER TABLE ai_invocations
+          ADD COLUMN total_cost_usd_estimated INTEGER NOT NULL DEFAULT 0;
+      `)
+    }
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {

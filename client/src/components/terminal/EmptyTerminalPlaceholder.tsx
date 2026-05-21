@@ -6,7 +6,7 @@ interface EmptyTerminalPlaceholderProps {
 
 export function EmptyTerminalPlaceholder({ onCreate }: EmptyTerminalPlaceholderProps) {
   return (
-    <div className="flex-1 flex items-center justify-center text-center px-6 bg-[#282a36]">
+    <div className="flex-1 flex items-center justify-center text-center px-6 bg-background-deep">
       <div className="flex flex-col items-center gap-3 text-muted-foreground">
         <TerminalIcon className="h-8 w-8 opacity-50" />
         <p className="text-xs">No terminals yet for this project.</p>

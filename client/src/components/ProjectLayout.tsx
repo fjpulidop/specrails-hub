@@ -110,6 +110,7 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
         {FEATURE_TERMINAL_PANEL && (
           <BottomPanel
             projectId={project.id}
+            provider={project.provider}
             state={panelState}
             viewportHeight={viewportHeight}
             statusBarHeight={STATUSBAR_HEIGHT_PX}

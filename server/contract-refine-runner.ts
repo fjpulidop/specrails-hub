@@ -147,6 +147,14 @@ export function readRefineChildOutput(
       resolve({ fullText, resultEvent, code: -1, timedOut: false })
       return
     }
+    let stderrBuf = ''
+    if (child.stderr) {
+      child.stderr.on('data', (chunk: Buffer | string) => {
+        const s = typeof chunk === 'string' ? chunk : chunk.toString('utf-8')
+        stderrBuf += s
+        if (stderrBuf.length > 8192) stderrBuf = stderrBuf.slice(-8192)
+      })
+    }
     const reader = createInterface({ input: child.stdout, crlfDelay: Infinity })
     reader.on('line', (line: string) => {
       let parsed: Record<string, unknown> | null = null
@@ -175,10 +183,14 @@ export function readRefineChildOutput(
       clearTimeout(timer)
       if (settled) return
       settled = true
+      if (code !== 0 && stderrBuf) {
+        console.log(`[contract-refine-runner] child stderr: ${JSON.stringify(stderrBuf.slice(-2000))}`)
+      }
       resolve({ fullText, resultEvent, code, timedOut })
     })
-    child.on('error', () => {
+    child.on('error', (err) => {
       clearTimeout(timer)
+      console.log(`[contract-refine-runner] child error: ${(err as Error).message}; stderr=${JSON.stringify(stderrBuf.slice(-2000))}`)
       if (settled) return
       settled = true
       resolve({ fullText, resultEvent, code: -1, timedOut })
@@ -315,6 +327,14 @@ export async function runContractRefine(
     return { ok: false, reason: 'timeout', ticketId, conversationId }
   }
   if (result.code !== 0 || !result.resultEvent) {
+    const r = result.resultEvent as Record<string, unknown> | null
+    console.log(
+      `[contract-refine-runner] non-zero exit code=${result.code} ` +
+      `subtype=${r?.subtype ?? '-'} is_error=${r?.is_error ?? '-'} ` +
+      `num_turns=${r?.num_turns ?? '-'} ` +
+      `textTail=${JSON.stringify(result.fullText.slice(-400))}`,
+    )
+    if (r) console.log(`[contract-refine-runner] result event: ${JSON.stringify(r).slice(0, 2000)}`)
     recordSafely(deps, conversationId, ticketId, conversation.model, startedAt, finishedAt, 'failed', result.resultEvent)
     deps.broadcast({
       type: 'explore.contract_refine_failed',
@@ -466,6 +486,13 @@ export async function runContractRefineForQuick(
     return { ok: false, reason: 'timeout', ticketId, conversationId: '' }
   }
   if (result.code !== 0 || !result.resultEvent) {
+    const r = result.resultEvent as Record<string, unknown> | null
+    console.log(
+      `[contract-refine-runner] quick non-zero exit code=${result.code} ` +
+      `subtype=${r?.subtype ?? '-'} is_error=${r?.is_error ?? '-'} ` +
+      `num_turns=${r?.num_turns ?? '-'} ` +
+      `textTail=${JSON.stringify(result.fullText.slice(-400))}`,
+    )
     recordSafelyQuick(deps, ticketId, model, startedAt, finishedAt, 'failed', result.resultEvent)
     deps.broadcast({
       type: 'explore.contract_refine_failed',

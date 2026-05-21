@@ -1,8 +1,5 @@
-# hub-theme-system Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change add-hub-theme-system. Update Purpose after archive.
-## Requirements
 ### Requirement: Hub-wide theme catalog
 
 The hub SHALL ship with exactly four built-in themes selectable by the user: `dracula` (default), `aurora-light`, `obsidian-dark`, and `matrix`. Each theme MUST define a complete palette covering background, foreground, surfaces, semantic accents (primary, secondary, info, success, warning, danger, highlight), borders, and muted variants. Theme identifiers MUST be kebab-case strings drawn from a closed allow-list enforced on both client and server.
@@ -27,86 +24,6 @@ The hub SHALL ship with exactly four built-in themes selectable by the user: `dr
 - **WHEN** the active theme is `matrix`
 - **THEN** the background is a near-black green-tinted hue distinct from both Dracula's purple-tinted and Obsidian Dark's blue-tinted dark surfaces, and the primary accent is an unmistakable phosphor green (hue in the green band, lightness ≥ 50%), differentiated enough that a user can tell the four dark themes apart side-by-side
 
-### Requirement: Semantic CSS-variable token system
-
-All client component code SHALL reference colors exclusively through semantic Tailwind tokens (e.g. `accent-primary`, `accent-success`, `surface`, `background-deep`). Brand-named tokens (`dracula-*`) MUST NOT appear in any source file under `client/src/` after this change ships. Adding a new theme MUST require zero changes to component code.
-
-#### Scenario: No brand-named tokens leak into components
-- **WHEN** a regression check runs `grep -rn "dracula-" client/src --include="*.ts" --include="*.tsx" --include="*.css"`
-- **THEN** the command returns zero matches
-
-#### Scenario: Adding a fourth theme touches only theme files
-- **WHEN** a developer adds a hypothetical `solarized-dawn` theme by appending one entry to the theme registry, one CSS override block, and one xterm/chart palette
-- **THEN** the theme is selectable in Settings and renders correctly without modifying any component file
-
-### Requirement: Theme persistence in hub settings
-
-The active theme SHALL be persisted in the `hub_settings` table under the key `ui_theme`. The server SHALL expose endpoints to read and update this value. The persisted value SHALL survive server restarts and be the authoritative source in cross-device usage.
-
-#### Scenario: GET returns the persisted theme
-- **WHEN** a client issues `GET /api/hub/theme`
-- **THEN** the server responds with `{ "theme": "<persisted-value>" }` and HTTP 200
-
-#### Scenario: PATCH updates the persisted theme
-- **WHEN** a client issues `PATCH /api/hub/theme` with body `{ "theme": "obsidian-dark" }`
-- **THEN** the server persists the value to `hub_settings`, responds with HTTP 200 and the new value, and a subsequent GET returns the same value
-
-#### Scenario: Theme survives server restart
-- **WHEN** the user sets theme to `aurora-light` and the server is restarted
-- **THEN** on the next boot the persisted theme remains `aurora-light` and is returned by `GET /api/hub/theme`
-
-### Requirement: Theme switching is instantaneous and re-render-free
-
-Theme switches SHALL be applied by mutating `data-theme` on the document root element. The CSS-variable resolution mechanism MUST update all themed surfaces in a single repaint without remounting React subtrees, recreating xterm instances, or re-issuing chart computations beyond a single palette refresh.
-
-#### Scenario: Switching theme does not unmount terminals
-- **WHEN** the user switches theme while a terminal session is open with active scrollback
-- **THEN** the terminal scrollback, command marks, and shell-integration state are preserved, and the terminal instance is the same JavaScript object before and after the switch
-
-#### Scenario: Switching theme repaints CSS in one frame
-- **WHEN** the theme is changed
-- **THEN** within the next paint frame all CSS-var-driven surfaces (cards, text, borders, backgrounds) reflect the new theme, with no visible flash of an intermediate state
-
-### Requirement: No flash of wrong theme on hub boot
-
-On every hub page load, the document root SHALL have its `data-theme` attribute set to the user's chosen theme before the React application hydrates. The chosen theme value SHALL be cached in `localStorage` under a documented key whenever the server-side value changes.
-
-#### Scenario: Returning user sees their theme on first paint
-- **WHEN** a user with `ui_theme = 'aurora-light'` loads the hub UI
-- **THEN** the very first painted frame shows Aurora Light styling, with no Dracula flash
-
-#### Scenario: localStorage cache mirrors server value
-- **WHEN** the user changes theme via Settings
-- **THEN** `localStorage.getItem('specrails-hub:ui-theme')` returns the new theme identifier before the next page reload
-
-#### Scenario: Corrupt localStorage value falls back to default
-- **WHEN** `localStorage` contains a value not in the theme allow-list (or throws on access)
-- **THEN** the boot script applies `dracula` and the application proceeds without error
-
-#### Scenario: Server value wins over stale cache
-- **WHEN** the cached localStorage value differs from the server-persisted value (e.g. user changed theme on another machine)
-- **THEN** after the React app fetches the server value it updates `data-theme` and overwrites the localStorage cache
-
-### Requirement: Theme propagates to non-CSS rendering surfaces
-
-The active theme SHALL be applied consistently to surfaces that render outside the CSS-variable cascade: xterm.js terminals, Recharts analytics charts, the LogViewer syntax highlighting, and the demo-mode tour overlay.
-
-#### Scenario: Terminal palette matches active theme
-- **WHEN** the active theme changes
-- **THEN** every open xterm session updates its background, foreground, cursor, and ANSI 16 palette to the new theme's terminal palette without losing scrollback or shell-integration marks
-
-#### Scenario: Charts repaint in the new palette
-- **WHEN** the active theme changes while an analytics page is mounted
-- **THEN** all Recharts series, axes, gridlines, and tooltips repaint using the new theme's chart palette
-
-#### Scenario: Log syntax highlighting follows theme
-- **WHEN** the active theme is `aurora-light` and a log file is rendered in `LogViewer`
-- **THEN** keyword, string, comment, and error tokens use the light-theme syntax palette and remain legible against the light background
-
-#### Scenario: Demo tour overlay matches theme
-- **WHEN** the user starts the demo tour under any active theme
-- **THEN** the tour overlay backdrop, callout cards, and highlight rings render in colors consistent with the active theme
-
 ### Requirement: Appearance section in hub global settings
 
 The `GlobalSettingsPage` modal SHALL expose an "Appearance" section that lists the four built-in themes as selectable, visually rich preview cards. The currently active theme MUST be visually marked. Selecting a card MUST persist the choice and apply the theme immediately. The section MUST NOT offer hover-based live preview in v1.
@@ -127,13 +44,7 @@ The `GlobalSettingsPage` modal SHALL expose an "Appearance" section that lists t
 - **WHEN** the user selects a theme and the server PATCH fails (network error or rejection)
 - **THEN** the UI reverts the visual selection to the previously active theme and displays a recoverable error message
 
-### Requirement: Theme system is hub-wide only
-
-The active theme SHALL apply uniformly across all projects within a single hub instance. Projects MUST NOT be able to override the theme. Switching the active project MUST NOT change the theme.
-
-#### Scenario: Theme persists across project switches
-- **WHEN** the user sets theme to `obsidian-dark` and then switches between projects in the hub
-- **THEN** every project's UI renders under `obsidian-dark` and no theme change occurs during the project switch
+## ADDED Requirements
 
 ### Requirement: Matrix palette readability and contrast
 
@@ -190,4 +101,3 @@ The `matrix` theme MAY apply a subtle drop-shadow glow effect to interactive sur
 #### Scenario: Component code does not branch on theme identifier
 - **WHEN** a regression check runs `grep -rn "'matrix'\|\"matrix\"" client/src --include="*.tsx" --include="*.ts"` excluding `client/src/lib/themes.ts`, `client/src/lib/theme-palettes.ts`, the Appearance settings card, and the theme-effects directory (`client/src/components/theme-effects/`)
 - **THEN** the command returns zero matches in component code (the theme identifier appears only in the theme registry, palette maps, the Settings selector, and the dedicated theme-effects directory whose dispatcher contains the single registry entry per theme)
-

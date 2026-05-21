@@ -4,10 +4,11 @@
 /* ─────────────────────────────────────────────────────────────────────────────
  * Theme system
  *
- * Three first-class themes selectable via `<html data-theme="...">`:
+ * Four first-class themes selectable via `<html data-theme="...">`:
  *   - dracula        (default — legacy palette, byte-equivalent visuals)
  *   - aurora-light   (premium light, Linear-ish frío profesional)
  *   - obsidian-dark  (premium dark, Tokyo-Night-ish negro-azulado)
+ *   - matrix         (phosphor terminal — green-tinted near-black)
  *
  * Components use SEMANTIC tokens only (e.g. `text-accent-primary`,
  * `bg-surface`, `border-border`). Brand-named tokens (`dracula-*`) MUST NOT
@@ -109,6 +110,62 @@
   --color-prose-table-header:    hsl(220 18% 92% / 0.8);
   --color-toast-shadow:          hsl(225 30% 30% / 0.18);
   --glass-card-opacity:          92%;
+}
+
+/* ─── Matrix (phosphor terminal — green-tinted near-black) ─── */
+[data-theme="matrix"] {
+  --color-background:             hsl(154 30% 5%);    /* near-black, green-tinted */
+  --color-foreground:             hsl(150 100% 86%);  /* mint phosphor — high contrast on bg */
+  --color-card:                   hsl(154 26% 12%);
+  --color-card-foreground:        hsl(150 100% 86%);
+  --color-popover:                hsl(154 30% 5%);
+  --color-popover-foreground:     hsl(150 100% 86%);
+  --color-primary:                hsl(144 100% 50%);  /* canonical phosphor green */
+  --color-primary-foreground:     hsl(154 30% 5%);
+  --color-secondary:              hsl(154 22% 16%);
+  --color-secondary-foreground:   hsl(150 100% 86%);
+  --color-muted:                  hsl(154 22% 16%);
+  --color-muted-foreground:       hsl(150 40% 55%);
+  --color-accent:                 hsl(154 22% 16%);
+  --color-accent-foreground:      hsl(150 100% 86%);
+  --color-destructive:            hsl(351 100% 65%);  /* rose — the red pill */
+  --color-destructive-foreground: hsl(150 100% 96%);
+  --color-border:                 hsl(154 40% 28% / 0.55);
+  --color-input:                  hsl(154 22% 16%);
+  --color-ring:                   hsl(144 100% 50%);
+
+  --color-accent-primary:    hsl(144 100% 50%);   /* phosphor green */
+  --color-accent-info:       hsl(174 56% 56%);    /* teal */
+  --color-accent-success:    hsl(145 100% 70%);   /* light mint-green */
+  --color-accent-secondary:  hsl(153 100% 33%);   /* deep terminal green */
+  --color-accent-warning:    hsl(35 100% 64%);    /* amber */
+  --color-accent-highlight:  hsl(51 100% 50%);    /* gold */
+  --color-surface:           hsl(154 28% 9%);
+  --color-background-deep:   hsl(154 30% 3%);
+
+  --color-scrollbar-thumb:       hsl(150 40% 35% / 0.45);
+  --color-scrollbar-thumb-hover: hsl(150 60% 50% / 0.65);
+  --color-prose-table-stripe:    hsl(154 26% 12% / 0.5);
+  --color-prose-table-header:    hsl(154 26% 12% / 0.85);
+  --color-toast-shadow:          hsl(150 60% 2% / 0.65);
+  --glass-card-opacity:          32%;
+
+  /* Signature glow — phosphor halo on the primary accent. Resolved by the
+   * `filter:` rule below so component code stays theme-agnostic. */
+  --matrix-glow: drop-shadow(0 0 10px hsl(144 100% 50% / 0.4));
+}
+
+/* Apply the matrix glow only when the user has not requested reduced motion.
+ * Scoped to `:focus-visible` (keyboard-driven affordances) on interactive
+ * elements — keeps the phosphor halo where it matters without taxing every
+ * surface or fighting Tailwind's `ring-*` utilities. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="matrix"] button:focus-visible,
+  [data-theme="matrix"] a:focus-visible,
+  [data-theme="matrix"] [role="button"]:focus-visible,
+  [data-theme="matrix"] [role="radio"]:focus-visible {
+    filter: var(--matrix-glow);
+  }
 }
 
 /* ─── Obsidian Dark (premium dark theme — distinct from Dracula) ─── */
@@ -420,3 +477,124 @@
   }
   .portfolio-page .text-accent-primary { color: #1f4ed8 !important; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Theme-effects plumbing (unlayered — must beat Tailwind v4's `@layer base`
+ * priority semantics).
+ *
+ * The matrix-rain canvas (see `client/src/components/theme-effects/`) sits
+ * at `z-index: -1` inside `#root`. For the negative z-index to render above
+ * the body's painted background, `#root` must establish a stacking context.
+ * The App.tsx root wrappers intentionally do NOT paint `bg-background`
+ * themselves — the body's own `background-color: var(--color-background)`
+ * supplies the deep theme background, so panels-inside-pages keep using
+ * `bg-background` freely without competing for the rain layer.
+ * ──────────────────────────────────────────────────────────────────────────── */
+#root {
+  position: relative;
+  z-index: 0;
+}
+
+/* Matrix theme only: collapse translucent `bg-card/N` panel utilities to a
+ * fully opaque card paint so cross-cutting pages (Analytics, Jobs, Agents,
+ * Integrations) read cleanly above the rain canvas. Without this the canvas
+ * bleeds through every glass-style panel and the data becomes hard to scan.
+ * Other themes keep their glass feel — these overrides are tightly scoped
+ * to the `matrix` data-theme attribute. */
+[data-theme="matrix"] .bg-card\/30,
+[data-theme="matrix"] .bg-card\/40,
+[data-theme="matrix"] .bg-card\/50,
+[data-theme="matrix"] .bg-card\/60,
+[data-theme="matrix"] .bg-card\/70,
+[data-theme="matrix"] .bg-card\/80 {
+  background-color: var(--color-card);
+}
+
+/* Same intent as the `.bg-card/N` opaque-collapse, applied to elements that
+ * use translucent gradient color stops (e.g. SpendingHero's
+ * `bg-gradient-to-br from-card/80 to-card/40`). Substring match on the
+ * class attribute catches every `from-card/*` and `to-card/*` variant. */
+[data-theme="matrix"] [class*="from-card/"],
+[data-theme="matrix"] [class*="to-card/"] {
+  background-image: none;
+  background-color: var(--color-card);
+}
+
+/* Collapse common translucent tint utilities used by status panels (e.g.
+ * JobStatusPanel uses bg-emerald-500/5, bg-accent-info/5, bg-red-500/5) and
+ * the muted track used by LogViewer. Without this the rain canvas bleeds
+ * through and the log/status content is unreadable. Rain still shows
+ * through unpainted areas (page padding, gaps between cards). */
+[data-theme="matrix"] .bg-emerald-500\/5,
+[data-theme="matrix"] .bg-accent-info\/5,
+[data-theme="matrix"] .bg-red-500\/5,
+[data-theme="matrix"] .bg-muted\/5,
+[data-theme="matrix"] .bg-muted\/10,
+[data-theme="matrix"] .bg-muted\/20,
+[data-theme="matrix"] .bg-muted\/30 {
+  background-color: var(--color-card);
+}
+
+/* LogViewer scroll area + Job Detail container: paint an opaque card so the
+ * stream of text reads cleanly above the rain canvas. The route container
+ * itself stays transparent so the rain remains visible in page padding. */
+[data-theme="matrix"] [data-job-detail-surface] {
+  background-color: var(--color-background);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Toast loading halo. Sonner's default loading state shows an inline spinner
+ * inside the toast; we suppress that (see App.tsx `ToastLoadingSpinner`) and
+ * instead spin a conic-gradient ring around the entire toast card. The ring
+ * is painted via a ::before pseudo, masked to a thin border to keep the
+ * glass-card chrome visible underneath.
+ * ──────────────────────────────────────────────────────────────────────────── */
+/* Toast loading halo. Sonner's default loading state shows an inline spinner
+ * inside the toast; we suppress that (see App.tsx `ToastLoadingSpinner`) and
+ * instead spin a conic-gradient ring around the entire toast card. */
+[data-sonner-toast][data-type="loading"] {
+  position: relative;
+  overflow: visible !important;
+}
+[data-sonner-toast][data-type="loading"] [data-icon] {
+  display: none;
+}
+@property --toast-halo-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+[data-sonner-toast][data-type="loading"]::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 0.65rem;
+  padding: 2px;
+  background: conic-gradient(from var(--toast-halo-angle), transparent 0deg, var(--accent) 80deg, transparent 160deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  animation: toast-halo-spin 1.4s linear infinite;
+  pointer-events: none;
+}
+[data-sonner-toast][data-type="loading"]::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: 0.65rem;
+  border: 1px solid var(--accent);
+  opacity: 0.25;
+  pointer-events: none;
+}
+@keyframes toast-halo-spin {
+  to { --toast-halo-angle: 360deg; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-sonner-toast][data-type="loading"]::before {
+    animation: none;
+    background: var(--accent);
+    opacity: 0.4;
+  }
+}
+

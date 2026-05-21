@@ -11,6 +11,8 @@ import type { RailState } from './RailsBoard'
 import { SpecLabelFilterDropdown } from './SpecLabelFilterDropdown'
 import { SpecStatusFilter, type SpecStatusFilterValue } from './SpecStatusFilter'
 import { SpecSortControl } from './SpecSortControl'
+import { SpecsViewTierToggle } from './SpecsViewTierToggle'
+import type { SpecsViewTier } from '../lib/specs-view-tier'
 import type { SpecSortMode, SpecSortDir } from '../types/spec-sort'
 import { ProposeSpecModal, type ExploreLaunchPayload } from './ProposeSpecModal'
 import { ExploreSpecShell } from './explore-spec/ExploreSpecShell'
@@ -42,12 +44,13 @@ interface SpecsBoardProps {
   sortDir?: SpecSortDir
   onSortChange?: (mode: SpecSortMode, dir: SpecSortDir) => void
   /**
-   * Current visual tier derived from the dashboard splitter. When `'postit'`,
-   * the active spec list uses square `TicketPostitCard`s in an auto-fill
-   * grid; `'card'` is the same component with denser CSS; `'row'` is the
-   * default compact list.
+   * Current view: `'postit'` renders a grid of square `TicketPostitCard`s;
+   * `'row'` renders the compact list. User-controlled via the in-toolbar
+   * toggle; persisted per project by the parent.
    */
-  tier?: 'row' | 'card' | 'postit'
+  viewTier?: SpecsViewTier
+  /** Called when the user clicks the row/post-it toggle in the toolbar. */
+  onViewTierChange?: (tier: SpecsViewTier) => void
   /** Rails available in the project — required for the postit Move-to-Rail popover. */
   rails?: RailState[]
   /** Handler invoked when the user picks a rail from the Move-to-Rail popover. */
@@ -135,7 +138,8 @@ export function SpecsBoard({
   sortMode = 'default',
   sortDir = 'desc',
   onSortChange = () => {},
-  tier = 'row',
+  viewTier = 'postit',
+  onViewTierChange,
   rails = [],
   onMoveToRail,
   onTicketStatusChange,
@@ -403,6 +407,9 @@ export function SpecsBoard({
           onChange={onSortChange}
           className="ml-auto"
         />
+        {onViewTierChange && (
+          <SpecsViewTierToggle tier={viewTier} onChange={onViewTierChange} />
+        )}
         <Button
           size="sm"
           variant="outline"
@@ -452,7 +459,7 @@ export function SpecsBoard({
                   <p className="text-xs mt-1 opacity-60">Click "+ Add" to get started</p>
                 )}
               </div>
-            ) : tier === 'postit' && onMoveToRail ? (
+            ) : viewTier === 'postit' && onMoveToRail ? (
               <SortableContext items={filteredTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                 <div
                   data-testid="specs-board-postit-grid"
@@ -488,9 +495,8 @@ export function SpecsBoard({
               <SortableContext items={filteredTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                 <div
                   data-testid="specs-board-list"
-                  data-tier={tier}
-                  className={tier === 'card' ? 'grid gap-2' : 'space-y-1.5'}
-                  style={tier === 'card' ? { gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' } : undefined}
+                  data-tier="row"
+                  className="space-y-1.5"
                 >
                   {filteredTickets.map((ticket) => (
                     <MaybeContextMenu
