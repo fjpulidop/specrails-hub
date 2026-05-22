@@ -546,7 +546,7 @@ describe('ChatManager', () => {
       cmCodex = new ChatManager(codexBroadcast, dbCodex, '/some/project', 'MyProject', 'codex')
     })
 
-    it('embeds system prompt in codex exec prompt (project name appears in args)', async () => {
+    it('passes only the user prompt to codex chat-turn (system prompt deferred to AGENTS.md)', async () => {
       createConversation(dbCodex, { id: 'codex-conv-1', model: 'gpt-5.4-mini' })
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
@@ -561,17 +561,19 @@ describe('ChatManager', () => {
       expect(spawnCall[0]).toBe('codex')
       const args = spawnCall[1] as string[]
       // Codex argv shape: ['exec', '--json', '--sandbox', 'workspace-write',
-      // '--skip-git-repo-check', <folded prompt>, '--model', <model>]
+      // '--skip-git-repo-check', <user prompt>, '--model', <model>]
       expect(args[0]).toBe('exec')
       expect(args).toContain('--json')
       expect(args).toContain('--sandbox')
       expect(args).toContain('workspace-write')
-      // The folded prompt (system + ---  + user) is the first positional after the flags
+      // chat-turn must NOT fold the hub system prompt — AGENTS.md in
+      // explore-cwd carries the framing; argv stays user-text-only so codex
+      // doesn't mistake the system prompt for the user request.
       const promptArg = args.find((a) => a.includes('Hello codex')) as string
       expect(promptArg).toBeDefined()
-      expect(promptArg).toContain('MyProject')
-      expect(promptArg).toContain('---')
-      expect(promptArg).toContain('Hello codex')
+      expect(promptArg).toBe('Hello codex')
+      expect(promptArg).not.toContain('MyProject')
+      expect(promptArg).not.toContain('---')
     })
 
     it('defaults to gpt-5.4-mini when conversation.model is empty string', async () => {
