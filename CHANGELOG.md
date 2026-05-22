@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.55.1](https://github.com/fjpulidop/specrails-hub/compare/v1.55.0...v1.55.1) (2026-05-22)
+
+
+### Bug Fixes
+
+* Codex rail routing on Windows ([#315](https://github.com/fjpulidop/specrails-hub/issues/315)) ([57c8328](https://github.com/fjpulidop/specrails-hub/commit/57c8328f21d82f090a5a237079c1ed749e72257f))
+
 ## [1.55.0](https://github.com/fjpulidop/specrails-hub/compare/v1.54.3...v1.55.0) (2026-05-21)
 
 
