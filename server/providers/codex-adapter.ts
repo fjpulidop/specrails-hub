@@ -37,6 +37,7 @@ const CODEX_MODELS = [
 ] as const
 
 const SANDBOX_FLAGS = ['--sandbox', 'workspace-write'] as const
+const RAIL_SANDBOX_FLAGS = ['--sandbox', 'danger-full-access'] as const
 // `codex exec resume` does NOT accept `--sandbox` (the flag only exists on
 // `codex exec`); pass the policy as a `-c` config override instead so the
 // resumed session honours workspace-write even when the per-project
@@ -54,7 +55,20 @@ function buildCodexArgs(action: SpawnAction, opts: SpawnOptions): string[] {
   const args: string[] = []
 
   switch (action) {
-    case 'chat-turn':
+    case 'chat-turn': {
+      // chat-turn (Explore) spawns codex from the hub-managed explore-cwd,
+      // which already ships an AGENTS.md with the Explore stance. Folding the
+      // hub's system prompt into the positional argv would double-inject the
+      // framing AND, because the user message in Explore is often very short
+      // ("quiero hacer un tetris"), the long system text dominates the prompt
+      // and codex responds to the system instructions instead of the user.
+      // Trust AGENTS.md and pass only the user prompt.
+      args.push('exec', '--json', ...SANDBOX_FLAGS, SKIP_GIT_CHECK)
+      args.push(opts.prompt)
+      args.push('--model', opts.model)
+      if (opts.extraArgs) args.push(...opts.extraArgs)
+      return args
+    }
     case 'spec-gen':
     case 'agent-refine':
     case 'auto-title':
@@ -65,7 +79,20 @@ function buildCodexArgs(action: SpawnAction, opts: SpawnOptions): string[] {
       if (opts.extraArgs) args.push(...opts.extraArgs)
       return args
     }
-    case 'chat-resume':
+    case 'chat-resume': {
+      if (!opts.sessionId) {
+        throw new Error(`${action} requires sessionId`)
+      }
+      // See chat-turn note: AGENTS.md in explore-cwd carries the Explore
+      // framing; the per-turn argv must stay user-text-only so codex doesn't
+      // mistake the system prompt for the user request.
+      args.push('exec', 'resume', '--json', ...SANDBOX_RESUME_FLAGS, SKIP_GIT_CHECK)
+      args.push(opts.sessionId)
+      args.push(opts.prompt)
+      args.push('--model', opts.model)
+      if (opts.extraArgs) args.push(...opts.extraArgs)
+      return args
+    }
     case 'setup-enrich-resume': {
       if (!opts.sessionId) {
         throw new Error(`${action} requires sessionId`)
@@ -78,10 +105,12 @@ function buildCodexArgs(action: SpawnAction, opts: SpawnOptions): string[] {
       return args
     }
     case 'rail-job': {
-      // Rail-job runs in the project root (a git repo). Sandbox still
-      // workspace-write so codex can apply file changes; skip-git-check kept
-      // for symmetry — harmless when a git repo IS present.
-      args.push('exec', '--json', ...SANDBOX_FLAGS, SKIP_GIT_CHECK)
+      // Rail jobs are headless implementation pipelines. They must run repo
+      // inspection, edits, tests, and git probes without interactive approval.
+      // On Windows, Codex's workspace-write sandbox can fail before the first
+      // shell command with `windows sandbox: spawn setup refresh`; full access
+      // matches the existing fully-autonomous rail contract.
+      args.push('exec', '--json', ...RAIL_SANDBOX_FLAGS, SKIP_GIT_CHECK)
       args.push(fold(opts.systemPrompt, opts.prompt))
       args.push('--model', opts.model)
       if (opts.extraArgs) args.push(...opts.extraArgs)

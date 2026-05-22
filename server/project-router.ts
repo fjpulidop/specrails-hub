@@ -255,6 +255,22 @@ export function extractShortSummary(buffer: string): string | null {
   return body.length > 0 ? body : null
 }
 
+export function deriveFallbackShortSummary(title: string, description: string): string | null {
+  const plain = description
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/^#{1,6}\s+.*$/gm, ' ')
+    .replace(/^\s*[-*]\s+/gm, '')
+    .replace(/\[[^\]]+\]\([^)]+\)/g, (m) => m.match(/\[([^\]]+)\]/)?.[1] ?? '')
+    .replace(/[`*_>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const source = plain || title.trim()
+  if (!source) return null
+  const sentence = source.match(/^(.{24,}?[.!?])(?:\s|$)/)?.[1] ?? source
+  const capped = sentence.length > 160 ? `${sentence.slice(0, 157).trimEnd()}...` : sentence
+  return clampShortSummary(capped)
+}
+
 /**
  * Fold an `acceptanceCriteria` array into a ticket description body, writing
  * (or replacing) a `## Acceptance Criteria` section.
@@ -1761,12 +1777,17 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       ? `- The "Specrails Tickets" section above lists every ticket already in the backlog. Do NOT propose a duplicate or a near-duplicate of any of them. If the user's idea is already covered by an existing ticket, say so in "Problem Statement" and pick a *different* angle / sub-feature / next step that builds on the existing one — do not repeat it.\n`
       : ''
 
+    const backlogRecommendationRule = quickScope.specrails
+      ? `- If the user's idea asks for the "next best spec" or a backlog recommendation, use the existing tickets and OpenSpec context to choose one concrete next spec. Do not respond with generic product directions.\n`
+      : ''
+
     let baseSystemPrompt =
       `You are a senior product engineer generating a structured spec proposal.\n\n` +
       (specsPrefix ? `${specsPrefix}\n\n` : '') +
       `RULES:\n` +
       `${codebaseRule}\n` +
       dedupRule +
+      backlogRecommendationRule +
       `- Do NOT create files, tickets, or issues.\n` +
       `- Output ONLY the structured markdown below. No preamble, no explanation.\n\n` +
       `REQUIRED FORMAT:\n` +
@@ -2259,6 +2280,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
           .replace(/##\s*Short Summary\s*\n+(?:[^\n]+(?:\n(?!##)[^\n]+)*)\n*/i, '')
           .trim()
       }
+    }
+    if (bodyShortSummary === null) {
+      bodyShortSummary = deriveFallbackShortSummary(rawTitle, descriptionForStore)
     }
 
     try {

@@ -75,7 +75,7 @@ describe('codexAdapter._compareSemver', () => {
 })
 
 describe('codexAdapter.buildArgs', () => {
-  it('chat-turn folds system prompt into the user prompt', () => {
+  it('chat-turn passes user prompt as-is, ignoring systemPrompt (AGENTS.md carries the framing)', () => {
     const args = codexAdapter.buildArgs('chat-turn', {
       prompt: 'user msg',
       systemPrompt: 'sys',
@@ -86,13 +86,12 @@ describe('codexAdapter.buildArgs', () => {
     expect(args).toContain('--sandbox')
     expect(args[args.indexOf('--sandbox') + 1]).toBe('workspace-write')
     expect(args).toContain('--skip-git-repo-check')
-    // The combined prompt is somewhere in argv between the flags and --model
     const modelIdx = args.indexOf('--model')
-    const promptArg = args.find((a) => a.startsWith('sys') && a.includes('user msg'))
-    expect(promptArg).toBeDefined()
-    expect(promptArg).toBe('sys\n\n---\n\nuser msg')
     expect(args[modelIdx + 1]).toBe('gpt-5.4-mini')
-    // No --system-prompt flag
+    // User prompt MUST appear verbatim — no fold, no system text leaking in
+    expect(args).toContain('user msg')
+    expect(args.some((a) => a.includes('sys\n\n---\n\n'))).toBe(false)
+    expect(args.some((a) => a === 'sys')).toBe(false)
     expect(args).not.toContain('--system-prompt')
   })
 
@@ -104,13 +103,28 @@ describe('codexAdapter.buildArgs', () => {
     expect(args.find((a) => a === 'just user')).toBe('just user')
   })
 
-  it('chat-resume produces exec resume <UUID> <prompt> --model <m>', () => {
+  it('chat-turn preserves short user prompts verbatim even with a long systemPrompt', () => {
+    // Regression: a short Explore turn ("quiero hacer un tetris") was being
+    // drowned out by a long system prompt that codex echoed back instead of
+    // responding to. The argv must carry ONLY the user text.
+    const longSys = 'You have explicit permission to read and write .specrails/local-tickets.json — '.repeat(20)
+    const args = codexAdapter.buildArgs('chat-turn', {
+      prompt: 'quiero hacer un tetris',
+      systemPrompt: longSys,
+      model: 'gpt-5.4-mini',
+    })
+    expect(args).toContain('quiero hacer un tetris')
+    expect(args.some((a) => a.includes('local-tickets.json'))).toBe(false)
+  })
+
+  it('chat-resume produces exec resume <UUID> <prompt> --model <m> with no folded systemPrompt', () => {
     expect(() =>
       codexAdapter.buildArgs('chat-resume', { prompt: 'x', model: 'gpt-5.4-mini' }),
     ).toThrow(/sessionId/)
 
     const args = codexAdapter.buildArgs('chat-resume', {
       prompt: 'next msg',
+      systemPrompt: 'sys',
       sessionId: '019e37c6-3bd4-7120-992f-6f96dc82eda1',
       model: 'gpt-5.4-mini',
     })
@@ -120,6 +134,10 @@ describe('codexAdapter.buildArgs', () => {
     expect(args).toContain('019e37c6-3bd4-7120-992f-6f96dc82eda1')
     expect(args.find((a) => a === 'next msg')).toBe('next msg')
     expect(args[args.indexOf('--model') + 1]).toBe('gpt-5.4-mini')
+    // systemPrompt is intentionally dropped for resume turns too (AGENTS.md
+    // in explore-cwd is the system context).
+    expect(args.some((a) => a.includes('sys\n\n---\n\n'))).toBe(false)
+    expect(args.some((a) => a === 'sys')).toBe(false)
     // `codex exec resume` rejects `--sandbox`; the policy must travel as a
     // `-c` config override instead. Asserting both: no bare `--sandbox`,
     // sandbox_mode override present.
@@ -128,7 +146,7 @@ describe('codexAdapter.buildArgs', () => {
     expect(args).toContain('sandbox_mode="workspace-write"')
   })
 
-  it('rail-job uses the same exec shape with sandbox workspace-write', () => {
+  it('rail-job uses full-access sandbox for headless implementation rails', () => {
     const args = codexAdapter.buildArgs('rail-job', {
       prompt: '/specrails:implement #1',
       systemPrompt: 'pipeline ctx',
@@ -136,7 +154,7 @@ describe('codexAdapter.buildArgs', () => {
     })
     expect(args[0]).toBe('exec')
     expect(args).toContain('--sandbox')
-    expect(args[args.indexOf('--sandbox') + 1]).toBe('workspace-write')
+    expect(args[args.indexOf('--sandbox') + 1]).toBe('danger-full-access')
     expect(args.find((a) => a.startsWith('pipeline ctx'))).toBe(
       'pipeline ctx\n\n---\n\n/specrails:implement #1',
     )

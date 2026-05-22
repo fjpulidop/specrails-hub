@@ -181,13 +181,16 @@ describe('POST /tickets/from-draft', () => {
     expect(res.body.ticket.description).toContain('Problem Statement')
   })
 
-  it('persists short_summary = null when neither body nor description provide one', async () => {
+  it('derives short_summary when neither body nor description provide an explicit one', async () => {
     const app = createApp(ctx)
     const res = await request(app)
       .post('/api/projects/proj-1/tickets/from-draft')
-      .send({ title: 'No summary', description: '## Problem Statement\nfoo' })
+      .send({
+        title: 'No explicit summary',
+        description: '## Problem Statement\nUsers need a clear postit summary immediately after creation.',
+      })
     expect(res.status).toBe(201)
-    expect(res.body.ticket.short_summary).toBeNull()
+    expect(res.body.ticket.short_summary).toBe('Users need a clear postit summary immediately after creation.')
   })
 
   it('accepts pendingSpecId without crashing when no attachments exist', async () => {

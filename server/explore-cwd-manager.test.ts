@@ -189,9 +189,9 @@ describe('explore-cwd-manager', () => {
 
       ## What you must do
 
-      - Act as an interactive thinking partner, same stance as
-        \`/specrails:explore-spec\`: investigate just enough, ask only the
-        questions you need, surface trade-offs, propose a concrete shape.
+      - Act as an interactive thinking partner for this ticket draft: investigate
+        just enough, ask only the questions you need, surface trade-offs, propose a
+        concrete shape.
       - Maintain the structured live draft via fenced \`spec-draft\` JSON blocks at
         the end of every turn that updates draft state. The hub parses these blocks
         and updates the user's draft pane; the block itself is stripped from the

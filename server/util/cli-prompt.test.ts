@@ -132,6 +132,30 @@ describe('transformCodexArgsForWindows', () => {
     expect(out.stdinPayload).toBe('system\nuser combined')
   })
 
+  it('treats --sandbox as a value-bearing flag before the prompt', () => {
+    const out = transformCodexArgsForWindows([
+      'exec',
+      '--json',
+      '--sandbox',
+      'workspace-write',
+      '--skip-git-repo-check',
+      'system\nuser combined',
+      '--model',
+      'gpt-x',
+    ])
+    expect(out.args).toEqual([
+      'exec',
+      '--json',
+      '--sandbox',
+      'workspace-write',
+      '--skip-git-repo-check',
+      '-',
+      '--model',
+      'gpt-x',
+    ])
+    expect(out.stdinPayload).toBe('system\nuser combined')
+  })
+
   it('treats --model as a value-bearing flag (does not consume as prompt)', () => {
     const out = transformCodexArgsForWindows([
       'exec',
@@ -151,6 +175,34 @@ describe('transformCodexArgsForWindows', () => {
     ])
     expect(out.args).toEqual(['exec', '-', 'extra-positional'])
     expect(out.stdinPayload).toBe('multi\nline')
+  })
+
+  it('routes multiline exec resume prompt through stdin after session id', () => {
+    const out = transformCodexArgsForWindows([
+      'exec',
+      'resume',
+      '--json',
+      '-c',
+      'sandbox_mode="workspace-write"',
+      '--skip-git-repo-check',
+      'thread-123',
+      'next\nturn',
+      '--model',
+      'gpt-x',
+    ])
+    expect(out.args).toEqual([
+      'exec',
+      'resume',
+      '--json',
+      '-c',
+      'sandbox_mode="workspace-write"',
+      '--skip-git-repo-check',
+      'thread-123',
+      '-',
+      '--model',
+      'gpt-x',
+    ])
+    expect(out.stdinPayload).toBe('next\nturn')
   })
 })
 
