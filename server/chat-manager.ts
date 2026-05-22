@@ -398,10 +398,14 @@ export class ChatManager {
       `When creating or updating tickets, write directly to this JSON file.\n\n` +
       `IMPORTANT: Be efficient. Minimize tool calls. Only read files that are directly relevant. ` +
       `Do not explore broadly — focus on the specific task.`
-    if (!scope || !this._cwd) return base
+    const scopedBase =
+      `${base}\n\n` +
+      `When "Specrails Tickets" or "OpenSpec Specs" sections are present below, treat them as authoritative project context. ` +
+      `For roadmap-style requests like "suggest the next best spec", ground the answer in that context, avoid duplicates, and propose one concrete next spec instead of generic directions.`
+    if (!scope || !this._cwd) return scopedBase
     const prefix = buildScopedSystemPromptPrefix(scope, this._cwd)
-    if (!prefix) return base
-    return `${base}\n\n${prefix}`
+    if (!prefix) return scopedBase
+    return `${scopedBase}\n\n${prefix}`
   }
 
   isActive(conversationId: string): boolean {
@@ -503,8 +507,18 @@ export class ChatManager {
     const scopeFlags = conversationScope && this._adapter.id === 'claude'
       ? toolFlagsForScope(conversationScope).args
       : []
+    let promptForAdapter = resolvedText
+    if (conversation.kind === 'explore' && this._adapter.id === 'codex' && conversationScope && this._cwd) {
+      const scopedContext = buildScopedSystemPromptPrefix(conversationScope, this._cwd)
+      if (scopedContext) {
+        promptForAdapter =
+          `Project context selected in Add Spec. Use it to avoid duplicate specs and to make project-specific recommendations.\n\n` +
+          `${scopedContext}\n\n` +
+          `## User turn\n\n${resolvedText}`
+      }
+    }
     let args = this._adapter.buildArgs(action, {
-      prompt: resolvedText,
+      prompt: promptForAdapter,
       systemPrompt,
       model,
       sessionId: conversation.session_id ?? undefined,

@@ -59,20 +59,25 @@ export function transformClaudeArgsForWindows(args: string[]): WindowsTransform 
 
 // Codex `exec` flags we currently use that take a value (rest are
 // boolean). Update if we ever pass new value-bearing flags.
-const CODEX_EXEC_VALUE_FLAGS = new Set(['--model'])
+const CODEX_EXEC_VALUE_FLAGS = new Set(['--model', '--sandbox', '-c'])
 
 export function transformCodexArgsForWindows(args: string[]): WindowsTransform {
-  // Expected shape: `exec [...flags] <prompt> [...flags]`.
+  // Expected shapes:
+  //   exec [...flags] <prompt> [...flags]
+  //   exec resume [...flags] <sessionId> <prompt> [...flags]
   if (args.length === 0 || args[0] !== 'exec') {
     return { args, stdinPayload: null }
   }
   const out: string[] = ['exec']
+  const isResume = args[1] === 'resume'
+  if (isResume) out.push('resume')
   let stdin: string | null = null
   let promptReplacedIdx = -1
-  let i = 1
+  let positionalCount = 0
+  let i = isResume ? 2 : 1
   while (i < args.length) {
     const a = args[i]
-    if (a.startsWith('--')) {
+    if (a.startsWith('-') && a !== '-') {
       out.push(a)
       if (CODEX_EXEC_VALUE_FLAGS.has(a) && i + 1 < args.length) {
         out.push(args[i + 1])
@@ -82,8 +87,9 @@ export function transformCodexArgsForWindows(args: string[]): WindowsTransform {
       i += 1
       continue
     }
-    // First non-flag positional is the prompt.
-    if (stdin === null) {
+    positionalCount += 1
+    const isPrompt = isResume ? positionalCount === 2 : positionalCount === 1
+    if (isPrompt && stdin === null) {
       stdin = a
       promptReplacedIdx = out.length
       out.push('-')

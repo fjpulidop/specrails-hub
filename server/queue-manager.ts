@@ -619,7 +619,9 @@ export class QueueManager {
     if (/\/(specrails|sr):(implement|batch-implement)\b/.test(commandToRun)) {
       systemAppend += '\n\nIMPORTANT: The ticket/spec data for this project is stored locally in .specrails/local-tickets.json. ' +
         'You MUST read specs from this file. Do NOT attempt to fetch tickets from Jira, Linear, GitHub Issues, or any other external tracker. ' +
-        'The #<id> references in the command correspond to ticket IDs inside .specrails/local-tickets.json.'
+        'The #<id> references in the command correspond to ticket IDs inside .specrails/local-tickets.json. ' +
+        'Do NOT require jq to inspect this file; on Windows or when jq is unavailable, use PowerShell (`Get-Content .specrails/local-tickets.json -Raw | ConvertFrom-Json`) or Node.js built-ins. ' +
+        'When running tests, use the project-defined scripts and package manager commands as-is; do NOT add Jest-only flags such as --runInBand to Vitest commands.'
 
       const attachmentContext = this._buildImplementAttachmentContext(commandToRun)
       if (attachmentContext) {

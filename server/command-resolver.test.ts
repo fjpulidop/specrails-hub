@@ -36,6 +36,16 @@ describe('resolveCommand', () => {
     expect(result).toBe('/specrails:missing-command hello')
   })
 
+  it('uses a built-in Explore Spec fallback when the command file is unavailable', () => {
+    const dir = createTempDir()
+    const result = resolveCommand('/specrails:explore-spec quiero el juego del tetris', dir)
+    expect(result).toContain('Explore Spec experience')
+    expect(result).toContain('Do not use any local skill')
+    expect(result).toContain('```spec-draft')
+    expect(result).toContain('quiero el juego del tetris')
+    expect(result).not.toBe('/specrails:explore-spec quiero el juego del tetris')
+  })
+
   it('reads command file, strips frontmatter, substitutes $ARGUMENTS', () => {
     const dir = createTempDir()
     writeCommandFile(

@@ -1518,7 +1518,7 @@ describe('QueueManager', () => {
 
       const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
       expect(spawnCall[0]).toBe('codex')
-      // codex rail-job argv: ['exec','--json','--sandbox','workspace-write','--skip-git-repo-check', <prompt>, '--model', <model>]
+      // codex rail-job argv: ['exec','--json','--sandbox','danger-full-access','--skip-git-repo-check', <prompt>, '--model', <model>]
       const promptArg = (spawnCall[1] as string[])[5] as string
       // systemAppend (headless mode instructions) should be embedded before the prompt
       expect(promptArg).toContain('FULLY AUTONOMOUS MODE')
@@ -1535,9 +1535,12 @@ describe('QueueManager', () => {
       qmCodex.enqueue('/specrails:implement #42')
 
       const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
-      // codex rail-job argv: ['exec','--json','--sandbox','workspace-write','--skip-git-repo-check', <prompt>, '--model', <model>]
+      // codex rail-job argv: ['exec','--json','--sandbox','danger-full-access','--skip-git-repo-check', <prompt>, '--model', <model>]
       const promptArg = (spawnCall[1] as string[])[5] as string
       expect(promptArg).toContain('local-tickets.json')
+      expect(promptArg).toContain('Do NOT require jq')
+      expect(promptArg).toContain('ConvertFrom-Json')
+      expect(promptArg).toContain('do NOT add Jest-only flags such as --runInBand')
     })
 
     it('embeds project pre-prompt in codex prompt for implement commands', () => {
@@ -1553,7 +1556,7 @@ describe('QueueManager', () => {
       qmCodex.enqueue('/specrails:implement #42')
 
       const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
-      // codex rail-job argv: ['exec','--json','--sandbox','workspace-write','--skip-git-repo-check', <prompt>, '--model', <model>]
+      // codex rail-job argv: ['exec','--json','--sandbox','danger-full-access','--skip-git-repo-check', <prompt>, '--model', <model>]
       const promptArg = (spawnCall[1] as string[])[5] as string
       expect(promptArg).toContain('PROJECT PRE-PROMPT')
       expect(promptArg).toContain('Always prefer additive schema changes.')
@@ -1684,7 +1687,7 @@ describe('QueueManager', () => {
         qmCodex.enqueue('/specrails:implement #42')
 
         const spawnCall = vi.mocked(mockSpawn).mock.calls[0]
-        // codex rail-job argv: ['exec','--json','--sandbox','workspace-write','--skip-git-repo-check', <prompt>, '--model', <model>]
+        // codex rail-job argv: ['exec','--json','--sandbox','danger-full-access','--skip-git-repo-check', <prompt>, '--model', <model>]
       const promptArg = (spawnCall[1] as string[])[5] as string
         expect(listSpy).toHaveBeenCalledWith('proj', 42)
         expect(blocksSpy).toHaveBeenCalledWith('proj', 42, ['att-1'])
