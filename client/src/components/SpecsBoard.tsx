@@ -618,14 +618,16 @@ export function SpecsBoard({
                   ? `${visibleDoneTickets.length}/${doneTickets.length}`
                   : doneTickets.length}
               </span>
-              <div className="ml-auto flex items-center gap-2">
-                <SpecSortControl
-                  mode={doneSort.mode}
-                  dir={doneSort.dir}
-                  onChange={handleDoneSortChange}
-                />
-                <SpecsViewTierToggle tier={doneViewTier} onChange={handleDoneViewTierChange} />
-              </div>
+              {doneTickets.length > 0 && (
+                <div className="ml-auto flex items-center gap-2">
+                  <SpecSortControl
+                    mode={doneSort.mode}
+                    dir={doneSort.dir}
+                    onChange={handleDoneSortChange}
+                  />
+                  <SpecsViewTierToggle tier={doneViewTier} onChange={handleDoneViewTierChange} />
+                </div>
+              )}
             </div>
             {visibleDoneTickets.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
