@@ -8,11 +8,19 @@ import path from 'path'
 
 // Mock child_process spawn but keep execSync working (used by file-provenance
 // for git invocations against the real on-disk repo). The queue-manager spawn
-// path uses spawn(), not execSync, so the two coexist cleanly.
+// path uses spawn(), not execSync, so the two coexist cleanly. We also wrap
+// execSync so `which/where claude` resolves on CI runners that lack the binary.
 vi.mock('child_process', async () => {
   const actual = await vi.importActual<typeof import('child_process')>('child_process')
+  const wrappedExecSync = ((cmd: string, opts?: unknown) => {
+    const s = String(cmd)
+    if (s.includes('which claude') || s.includes('where claude')) return Buffer.from('/usr/local/bin/claude\n')
+    if (s.includes('which codex') || s.includes('where codex')) return Buffer.from('/usr/local/bin/codex\n')
+    return (actual.execSync as (c: string, o?: unknown) => Buffer)(cmd, opts)
+  }) as typeof actual.execSync
   return {
     ...actual,
+    execSync: wrappedExecSync,
     spawn: vi.fn(),
   }
 })
