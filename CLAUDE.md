@@ -286,7 +286,7 @@ Per-project unified tracking of every billable AI CLI invocation (model, tokens,
 
 **WebSocket:** `recordInvocation` callsites broadcast `spending.invalidated` (project-scoped, no payload). Open dashboards debounce 500 ms then refetch.
 
-**Client (`client/src/pages/AnalyticsPage.tsx`):** seven blocks — sticky filter header (period + surface chips, both URL-synced), Hero burn meter (with `vs prev` delta), daily stacked timeline, Quick vs Explore card (sparse-data CTA when Explore < 5 runs), top-N model breakdown (click-to-filter), cost-vs-turns scatter, top tickets cross-surface, raw invocations table with secondary filters scoped to that block only. Surface colour mapping: `job=accent-info`, `quick-spec=accent-secondary`, `explore-spec=accent-highlight`, `ai-edit=accent-success`. Lives in `client/src/components/analytics/`.
+**Client (`client/src/pages/AnalyticsPage.tsx`):** seven blocks — sticky filter header (period + surface chips, both URL-synced), Hero burn meter (with `vs prev` delta), daily stacked timeline, Quick vs Explore card (sparse-data CTA when Explore < 5 runs), top-N model breakdown (click-to-filter), cost-vs-turns scatter, top tickets cross-surface, raw invocations table with secondary filters scoped to that block only. Surface colour mapping: `job=accent-info`, `quick-spec=accent-secondary`, `explore-spec=accent-highlight`, `ai-edit=accent-success`, `file-summary=accent-warning` (see the "Code explorer" section). Lives in `client/src/components/analytics/`.
 
 **Ticket → Analytics deep link:** `client/src/components/TicketSpendingLine.tsx` renders a single line under the modal title (`$X · N turns · Tm Ts active · breakdown`) when the ticket has any invocations, linking to `/analytics?ticketId=<id>`.
 
@@ -336,3 +336,26 @@ Per-project opt-in feature that injects OpenTelemetry env vars into `claude` CLI
 **Export**: `GET /api/projects/:projectId/jobs/:jobId/diagnostic` streams a ZIP containing `job-metadata.json`, `telemetry.ndjson`, `logs.txt`, and `summary.md`. Export button on job cards visible iff a `telemetry_blobs` row exists (`active` or `compacted` state).
 
 **specrails-core**: This feature is entirely hub-side. The `specrails-core` repository is intentionally not modified — the Claude CLI subprocess emits OTEL signals by reading env vars set by QueueManager.
+
+### Code explorer (read-only)
+
+A read-only **Code** section per project for non-developers: virtualised file tree on the left (provenance chips per file), Monaco viewer on the right with a plain-language AI summary header. Gated by `VITE_FEATURE_CODE_EXPLORER` (client, default OFF in v1) and `SPECRAILS_CODE_EXPLORER` (server, default ON; set `"false"` to disable). Read-only — no in-app editing in v1.
+
+**Server modules:**
+- `server/file-provenance.ts` — `snapshotWorkingTree` / `diffAgainstSnapshot` / `recordProvenanceForJob` / `listProvenanceByTicket` / `listProvenanceByPath` / `broadcastProvenanceUpdated`. Per-project SQLite table `file_provenance(id, file_path, ticket_id, job_id, kind, at)` (migration 22), indexed on `file_path`, `ticket_id`, `at DESC`.
+- `server/file-summary-manager.ts` — `FileSummaryManager` class. Hash-gated regeneration (sha256 of file contents is the invalidation key), per-project concurrency 2, hub-wide 8, per-job cap 50, monthly budget cap (hub setting `summary_monthly_budget_usd`, default $5; user-initiated `overrideBudget` bypasses), chokidar stale-marking (no auto-regenerate on user edits), orphan sweep capped at 200/pass. Summaries live at `<project>/.specrails/file-summaries/<sha256-of-relative-path>.json`. Schema validated by `server/schemas/file-summary.v1.json`. `.gitignore` line `.specrails/file-summaries/` appended idempotently on first write (commit to share with team if desired).
+- `server/code-explorer-router.ts` — mounted under `/api/projects/:projectId/code`, returns 404 when `SPECRAILS_CODE_EXPLORER=false`. Endpoints: `GET /tree?withProvenance=1&filter=touched-by-ai|all&cursor=…` (pagination cap 2000, deny-list, `.gitignore` respect), `GET /file?path=…` (binary refusal, 2 MB cap, path-traversal guard), `GET /summary?path=…`, `POST /file/regenerate-summary?path=…` (body `{ overrideBudget? }` → 202 `{ enqueued: true }`), `GET /provenance?ticketId=…`. **Reserved paths (hub-managed)**: `<project>/.specrails/file-summaries/**`.
+
+**QueueManager hook**: pre-spawn `snapshotWorkingTree(cwd)` (stored on `_snapshotRefs: Map<jobId,ref>`), post-exit `diffAgainstSnapshot` → `recordProvenanceForJob` (primary ticket = first id from `tickets[]` extraction) → broadcast per row. Both gated by `isCodeExplorerEnabled()`. Per-job warning `provenance.large_job` when >50 paths (still inserts all rows; the 50-cap applies only to summary enqueues).
+
+**ai_invocations integration**: every `FileSummaryManager` model call writes a row with `surface='file-summary'`, surfacing cost on `/analytics` (Hero, By Surface, Daily Timeline use `accent-warning`). `spending.invalidated` is broadcast on each row. Cross-reference: the Project spending analytics section now lists `file-summary` alongside `job`, `quick-spec`, `explore-spec`, `ai-edit`, `smash`.
+
+**WebSocket events** (project-scoped via `boundBroadcast`): `file.provenance_updated`, `file.summary_updated`, `file.summary_failed`, `file.summary_skipped` (`reason: 'budget'|'per-job-cap'|'ttl'|'not-found'`).
+
+**Hub settings** (`GET/PATCH /api/hub/code-explorer-settings`): `summary_language` (`'en'`|`'es'`, default `'en'`), `summary_monthly_budget_usd` (default `5.00`). Surfaced in `GlobalSettingsPage` under "Code section", hidden when client flag is off.
+
+**Client**: `client/src/pages/CodePage.tsx` (two-pane), `client/src/components/code-explorer/` (`FileTree`, `FileViewer`, `SummaryHeader`, `CodeViewerMonaco`, `TicketFilesTouched`). Monaco loaded via dynamic `import()` so the main route chunk is unaffected when the flag is off; web workers configured via `client/src/lib/monaco-setup.ts` (Vite `?worker` imports, no `monaco-editor-vite-plugin`). Theme bound to `useActiveTheme()`. URL-synced selection (`?path=<rel>`). Filter `Tocado por IA` (default) ⇄ `All files` persisted to `localStorage['specrails-hub:code-tree-filter:<projectId>']`. Chip clicks open `TicketDetailModal` via `TicketDetailModalProvider`. `TicketDetailModal` adds a "Files touched by this ticket" section (lazy-fetched, hidden when empty; row click navigates to `/code` and closes the modal).
+
+**v1 limitations (out of scope)**: in-app editing, per-symbol summaries, narrative diff view, conversational "ask the AI about this file", directory-level summaries, multi-ticket attribution (primary ticket only). The Monaco viewer surfaces an "Edit in external editor" button that copies the absolute path as a stopgap.
+
+**Rollback**: set both flags off. `file_provenance` rows and `<project>/.specrails/file-summaries/` files remain on disk; migrations are additive.

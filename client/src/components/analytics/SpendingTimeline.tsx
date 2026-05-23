@@ -18,9 +18,10 @@ export function SpendingTimeline({ data, loading }: Props) {
     Explore: d.exploreCostUsd,
     Quick: d.quickCostUsd,
     Refine: d.aiEditCostUsd,
+    'File summaries': d.fileSummaryCostUsd ?? 0,
   }))
 
-  const isEmpty = chartData.every((d) => d.Jobs + d.Explore + d.Quick + d.Refine === 0)
+  const isEmpty = chartData.every((d) => d.Jobs + d.Explore + d.Quick + d.Refine + d['File summaries'] === 0)
 
   return (
     <div className="rounded-xl border border-border/50 bg-card/40 p-4">
@@ -47,6 +48,7 @@ export function SpendingTimeline({ data, loading }: Props) {
               <Bar dataKey="Explore" stackId="a" fill="var(--accent-highlight, #c084fc)" />
               <Bar dataKey="Quick" stackId="a" fill="var(--accent-secondary, #f7768e)" />
               <Bar dataKey="Refine" stackId="a" fill="var(--accent-success, #50fa7b)" />
+              <Bar dataKey="File summaries" stackId="a" fill="var(--accent-warning, #f1fa8c)" />
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -17,6 +17,7 @@ const JobsPage = lazy(() => import('./pages/JobsPage'))
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'))
 const ActivityFeedPage = lazy(() => import('./pages/ActivityFeedPage'))
 const AgentsPage = lazy(() => import('./pages/AgentsPage'))
+const CodePage = lazy(() => import('./pages/CodePage'))
 const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage'))
 const HubAnalyticsPage = lazy(() => import('./pages/HubAnalyticsPage'))
 const DocsPage = lazy(() => import('./pages/DocsPage'))
@@ -44,7 +45,7 @@ import { MinimizedChatsProvider } from './context/MinimizedChatsContext'
 import { TicketDetailModalProvider } from './context/TicketDetailModalContext'
 import { useCompareUrlSync } from './hooks/useCompareUrlSync'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
-import { FEATURE_AGENTS_SECTION, FEATURE_TERMINAL_PANEL } from './lib/feature-flags'
+import { FEATURE_AGENTS_SECTION, FEATURE_CODE_EXPLORER, FEATURE_TERMINAL_PANEL } from './lib/feature-flags'
 
 // ─── Per-project route memory (in-memory only — resets on app restart) ───────
 
@@ -139,9 +140,15 @@ function HubApp() {
 
   // Keyboard shortcuts
   const { cheatsheetOpen, setCheatsheetOpen, openCheatsheet } = useCheatsheetState()
-  const PROJECT_PAGES = FEATURE_AGENTS_SECTION
-    ? ['/', '/jobs', '/analytics', '/agents', '/integrations', '/settings']
-    : ['/', '/jobs', '/analytics', '/integrations', '/settings']
+  const PROJECT_PAGES = [
+    '/',
+    '/jobs',
+    '/analytics',
+    ...(FEATURE_AGENTS_SECTION ? ['/agents'] : []),
+    ...(FEATURE_CODE_EXPLORER ? ['/code'] : []),
+    '/integrations',
+    '/settings',
+  ]
   useKeyboardShortcuts({
     onOpenCheatsheet: openCheatsheet,
     onToggleLeftSidebar: cycleLeftMode,
@@ -238,6 +245,7 @@ function HubApp() {
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/activity" element={<ActivityFeedPage />} />
                     <Route path="/agents" element={<AgentsPage />} />
+                    <Route path="/code" element={FEATURE_CODE_EXPLORER ? <CodePage /> : <Navigate to="/" replace />} />
                     <Route path="/integrations" element={<IntegrationsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />

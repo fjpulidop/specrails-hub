@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '../../test-utils'
+import { render, screen, fireEvent, within } from '../../test-utils'
 import { SpecsBoard } from '../SpecsBoard'
 import type { LocalTicket } from '../../types'
 
@@ -110,5 +110,23 @@ describe('SpecsBoard status filter', () => {
     )
     expect(screen.getByText('Done one')).toBeInTheDocument()
     expect(screen.getByTestId('specs-board-done-bucket')).toBeInTheDocument()
+  })
+
+  it('renders independent sort and view controls inside the Done bucket', () => {
+    const doneTickets = [makeTicket(10, 'Done one', 'done')]
+    render(
+      <SpecsBoard
+        tickets={[]}
+        doneTickets={doneTickets}
+        isLoading={false}
+        onTicketClick={onTicketClick}
+        onMoveToRail={() => {}}
+      />,
+    )
+
+    const doneBucket = screen.getByTestId('specs-board-done-bucket')
+    expect(within(doneBucket).getByLabelText('Sort mode')).toHaveTextContent('Default')
+    fireEvent.click(within(doneBucket).getByLabelText('Post-it view'))
+    expect(within(doneBucket).getByTestId('specs-board-done-postit-grid')).toBeInTheDocument()
   })
 })

@@ -10,6 +10,14 @@ import { resolveCommand } from './command-resolver'
 import { spawnAiCli } from './util/cli-prompt'
 import { resetPhases, setActivePhases } from './hooks'
 import { recordInvocation } from './ai-invocations'
+import { isCodeExplorerEnabled } from './feature-flags'
+import {
+  snapshotWorkingTree,
+  diffAgainstSnapshot,
+  collectDiffPatches,
+  recordProvenanceForJob,
+  broadcastProvenanceUpdated,
+} from './file-provenance'
 import { finaliseInvocationResult } from './result-event'
 import { randomUUID } from 'crypto'
 import { getAdapter, type ProviderAdapter, type AdapterEvent } from './providers'
@@ -227,6 +235,9 @@ export class QueueManager {
   private _projectSlug: string | null
   /** Pending profile selection keyed by jobId — read at spawn time */
   private _jobProfileSelection: Map<string, string | null>
+  /** Pre-spawn working-tree snapshot refs keyed by jobId — read at exit time
+   *  by the Code-Explorer provenance hook. Cleared on job exit. */
+  private _snapshotRefs: Map<string, string>
 
   constructor(
     broadcast: (msg: WsMessage) => void,
@@ -272,6 +283,7 @@ export class QueueManager {
     this._hubPort = options?.hubPort ?? 4200
     this._projectSlug = options?.projectSlug ?? null
     this._jobProfileSelection = new Map()
+    this._snapshotRefs = new Map()
 
     const envTimeout = process.env.WM_ZOMBIE_TIMEOUT_MS !== undefined
       ? parseInt(process.env.WM_ZOMBIE_TIMEOUT_MS, 10)
@@ -788,6 +800,18 @@ export class QueueManager {
       }
     }
 
+    // Code-Explorer pre-spawn snapshot. Captures the working-tree state via
+    // `git stash create --include-untracked` so the post-exit hook can diff
+    // against it. Gated by SPECRAILS_CODE_EXPLORER — when off, no-op.
+    if (isCodeExplorerEnabled() && this._cwd) {
+      try {
+        const ref = snapshotWorkingTree(this._cwd)
+        this._snapshotRefs.set(jobId, ref)
+      } catch (err) {
+        console.warn(`[queue-manager] provenance snapshot failed: ${(err as Error).message}`)
+      }
+    }
+
     // spawnAiCli reroutes multi-line argv values through stdin on Windows.
     const child = spawnAiCli(binary, args, {
       env: spawnEnv,
@@ -1077,6 +1101,37 @@ export class QueueManager {
           this._broadcast({ type: 'spending.invalidated', projectId: this._projectId })
         } catch (err) {
           console.error('[queue-manager] recordInvocation failed:', err)
+        }
+      }
+
+      // Code-Explorer post-exit provenance hook. Diffs the working tree against
+      // the pre-spawn snapshot and inserts one row per touched path. Gated by
+      // SPECRAILS_CODE_EXPLORER (re-checked at each completion so the flag can
+      // be flipped off mid-session without leaving partial writes).
+      if (isCodeExplorerEnabled() && this._cwd && this._projectId) {
+        const ref = this._snapshotRefs.get(jobId) ?? ''
+        this._snapshotRefs.delete(jobId)
+        try {
+          const diff = diffAgainstSnapshot(this._cwd, ref)
+          const patches = collectDiffPatches(this._cwd, ref, diff)
+          if (diff.length > 50) {
+            console.warn(`[provenance.large_job] job=${jobId} files=${diff.length}`)
+          }
+          const ticketIds = this._extractTicketIds(job.command)
+          const rows = recordProvenanceForJob(
+            this._db,
+            this._projectId,
+            jobId,
+            ticketIds[0] ?? null,
+            diff,
+            Date.now(),
+            patches,
+          )
+          for (const row of rows) {
+            broadcastProvenanceUpdated(this._broadcast, this._projectId, row)
+          }
+        } catch (err) {
+          console.warn(`[queue-manager] provenance recording failed: ${(err as Error).message}`)
         }
       }
 

@@ -31,6 +31,7 @@ const SURFACE_CHIPS: { value: Surface | 'all'; label: string }[] = [
   { value: 'quick-spec', label: 'Quick' },
   { value: 'ai-edit', label: 'Refine' },
   { value: 'smash', label: 'SMASH' },
+  { value: 'file-summary', label: 'File summaries' },
 ]
 
 function buildQuery(filters: SpendingFilters): string {

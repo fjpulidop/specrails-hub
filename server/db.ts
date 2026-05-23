@@ -490,6 +490,37 @@ const MIGRATIONS: Migration[] = [
       `)
     }
   },
+
+  // Migration 22: file_provenance — per-project file ⇄ ticket tracking,
+  // populated by the QueueManager post-job hook and consumed by the Code
+  // Explorer router + TicketDetailModal.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS file_provenance (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_path   TEXT    NOT NULL,
+        ticket_id   INTEGER,
+        job_id      TEXT,
+        kind        TEXT    NOT NULL CHECK(kind IN ('created','modified','deleted')),
+        at          INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_fp_path   ON file_provenance(file_path);
+      CREATE INDEX IF NOT EXISTS idx_fp_ticket ON file_provenance(ticket_id);
+      CREATE INDEX IF NOT EXISTS idx_fp_at     ON file_provenance(at DESC);
+    `)
+  },
+
+  // Migration 23: optional per-job file patch storage for Code Explorer
+  // provenance. Older provenance rows remain valid without a patch.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS file_provenance_diffs (
+        provenance_id INTEGER PRIMARY KEY REFERENCES file_provenance(id) ON DELETE CASCADE,
+        patch         TEXT NOT NULL,
+        truncated     INTEGER NOT NULL DEFAULT 0
+      );
+    `)
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {

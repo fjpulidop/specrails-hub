@@ -369,11 +369,10 @@ export default function DashboardPage() {
     return result
   }, [allSpecTickets, specOrderIds, sortMode, sortDir])
 
-  // Done specs — sort applies same comparator; default mode keeps API order.
+  // Done specs own their sort/view controls inside the Done pane.
   const doneSpecTickets = useMemo(() => {
-    const filtered = allSpecTickets.filter((t) => t.status === 'done')
-    return sortMode === 'default' ? filtered : applySpecSort(filtered, sortMode, sortDir)
-  }, [allSpecTickets, sortMode, sortDir])
+    return allSpecTickets.filter((t) => t.status === 'done')
+  }, [allSpecTickets])
 
   // Shared assignment helper. Used both by the drag-and-drop ticket→rail
   // path (`handleDragEnd`) and by the `Move to Rail` popover on the

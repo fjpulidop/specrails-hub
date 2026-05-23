@@ -105,7 +105,7 @@ export interface InvocationWithTicket extends InvocationRow {
   ticket_title: string | null
 }
 
-const ALL_SURFACES: Surface[] = ['job', 'quick-spec', 'explore-spec', 'ai-edit', 'smash']
+const ALL_SURFACES: Surface[] = ['job', 'quick-spec', 'explore-spec', 'ai-edit', 'smash', 'file-summary']
 
 interface ResolvedRange {
   from: string
@@ -381,6 +381,7 @@ export function getSpending(
           'explore-spec': { count: 0, costUsd: 0 },
           'ai-edit': { count: 0, costUsd: 0 },
           smash: { count: 0, costUsd: 0 },
+          'file-summary': { count: 0, costUsd: 0 },
         },
         isUnattributed: r.ticket_id === null ? true : undefined,
       })

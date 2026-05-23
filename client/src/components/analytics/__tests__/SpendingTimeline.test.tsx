@@ -47,6 +47,6 @@ describe('SpendingTimeline', () => {
     ])
     render(<SpendingTimeline data={data} loading={false} />)
     expect(screen.getByTestId('bar-chart')).toBeInTheDocument()
-    expect(screen.getAllByTestId('bar').length).toBe(4)
+    expect(screen.getAllByTestId('bar').length).toBe(5)
   })
 })

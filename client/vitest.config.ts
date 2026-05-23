@@ -52,6 +52,9 @@ export default defineConfig({
         'src/components/terminal/TerminalSearchOverlay.tsx',
         'src/components/terminal/ShortcutContextMenu.tsx',
         'src/components/settings/TerminalSettingsSection.tsx',
+        // monaco-editor loaded dynamically; not testable in jsdom
+        'src/lib/monaco-setup.ts',
+        'src/components/code-explorer/CodeViewerMonaco.tsx',
       ],
       thresholds: {
         lines: 80,

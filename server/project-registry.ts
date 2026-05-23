@@ -8,6 +8,10 @@ import { ChatManager } from './chat-manager'
 import { SetupManager } from './setup-manager'
 import { ProposalManager } from './proposal-manager'
 import { AgentRefineManager } from './agent-refine-manager'
+import { FileSummaryManager } from './file-summary-manager'
+import { createFileSummaryGenerator } from './file-summary-generator'
+import { getAdapter } from './providers'
+import { isCodeExplorerEnabled } from './feature-flags'
 import { pruneStaleRefineSessions } from './agent-refine-db'
 import { SpecLauncherManager } from './spec-launcher-manager'
 import { WebhookManager } from './webhook-manager'
@@ -43,6 +47,7 @@ export interface ProjectContext {
   setupManager: SetupManager
   proposalManager: ProposalManager
   agentRefineManager: AgentRefineManager
+  fileSummaryManager: FileSummaryManager
   specLauncherManager: SpecLauncherManager
   ticketWatcher: TicketWatcher
   broadcast: (msg: WsMessage) => void
@@ -96,6 +101,8 @@ export class ProjectRegistry {
       try { getTerminalManager().killAllForProject(id) } catch { /* ignore */ }
       // Close the ticket file watcher
       ctx.ticketWatcher.close().catch(() => { /* ignore */ })
+      // Detach the code-explorer file watcher
+      try { ctx.fileSummaryManager.detachWatcher(id) } catch { /* ignore */ }
       // Delete telemetry blob files for this project
       try {
         const telemetryDir = path.join(os.homedir(), '.specrails', 'projects', ctx.project.slug, 'telemetry')
@@ -292,6 +299,40 @@ export class ProjectRegistry {
     }
     const specLauncherManager = new SpecLauncherManager(boundBroadcast, project.path)
 
+    // FileSummaryManager — code-explorer. The class is constructed for every
+    // project regardless of the feature flag; the router 404s when the flag
+    // is off, so no spawn can occur. Budget reader queries `ai_invocations`
+    // for the current calendar month.
+    const fileSummaryAdapter = getAdapter(project.provider ?? 'claude')
+    const fileSummaryGenerate = createFileSummaryGenerator({ adapter: fileSummaryAdapter, cwd: project.path })
+    const fileSummaryManager = new FileSummaryManager({
+      db,
+      broadcast: boundBroadcast,
+      generate: fileSummaryGenerate,
+      monthToDateSpend: (projectId: string) => {
+        const row = db.prepare(
+          `SELECT COALESCE(SUM(total_cost_usd), 0) AS total FROM ai_invocations
+           WHERE project_id = ? AND surface = 'file-summary'
+             AND started_at >= strftime('%Y-%m-01', 'now')`
+        ).get(projectId) as { total: number } | undefined
+        return row?.total ?? 0
+      },
+      monthlyBudgetUsd: () => {
+        const raw = getHubSetting(this._hubDb, 'summary_monthly_budget_usd')
+        const n = parseFloat(raw ?? '5.00')
+        return isNaN(n) ? 5.0 : n
+      },
+      language: () => {
+        const raw = getHubSetting(this._hubDb, 'summary_language')
+        return raw === 'es' ? 'es' : 'en'
+      },
+    })
+    if (isCodeExplorerEnabled()) {
+      try { fileSummaryManager.attachWatcher(project.id, project.path) } catch (err) {
+        console.warn(`[project-registry] fileSummaryManager.attachWatcher failed: ${(err as Error).message}`)
+      }
+    }
+
     // Load commands for this project
     try {
       const config = getConfig(project.path, db, project.name)
@@ -303,7 +344,7 @@ export class ProjectRegistry {
     const ticketWatcher = new TicketWatcher(project.path, project.id, boundBroadcast)
     ticketWatcher.start()
 
-    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, agentRefineManager, specLauncherManager, ticketWatcher, broadcast: boundBroadcast, railJobs }
+    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, agentRefineManager, fileSummaryManager, specLauncherManager, ticketWatcher, broadcast: boundBroadcast, railJobs }
     this._contexts.set(project.id, ctx)
     return ctx
   }
