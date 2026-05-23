@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.56.0](https://github.com/fjpulidop/specrails-hub/compare/v1.55.1...v1.56.0) (2026-05-23)
+
+
+### Features
+
+* **code-explorer:** read-only Code section with provenance + AI summaries ([#317](https://github.com/fjpulidop/specrails-hub/issues/317)) ([c78ba31](https://github.com/fjpulidop/specrails-hub/commit/c78ba31181701cbd78629b893cb9cfe7554e822b))
+
 ## [1.55.1](https://github.com/fjpulidop/specrails-hub/compare/v1.55.0...v1.55.1) (2026-05-22)
 
 
