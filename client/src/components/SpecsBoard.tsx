@@ -13,6 +13,7 @@ import { SpecStatusFilter, type SpecStatusFilterValue } from './SpecStatusFilter
 import { SpecSortControl } from './SpecSortControl'
 import { SpecsViewTierToggle } from './SpecsViewTierToggle'
 import type { SpecsViewTier } from '../lib/specs-view-tier'
+import { applySpecSort } from '../lib/spec-sort'
 import type { SpecSortMode, SpecSortDir } from '../types/spec-sort'
 import { ProposeSpecModal, type ExploreLaunchPayload } from './ProposeSpecModal'
 import { ExploreSpecShell } from './explore-spec/ExploreSpecShell'
@@ -99,6 +100,61 @@ interface ExploreState {
   contextScope?: import('../types/context-scope').ContextScope
 }
 
+const DONE_SORT_MODE_KEY = (projectId: string) => `specrails-hub:done-spec-sort-mode:${projectId}`
+const DONE_SORT_DIR_KEY = (projectId: string) => `specrails-hub:done-spec-sort-dir:${projectId}`
+const DONE_VIEW_TIER_KEY = (projectId: string) => `specrails-hub:done-spec-view-tier:${projectId}`
+
+function isSpecSortMode(value: unknown): value is SpecSortMode {
+  return value === 'default' || value === 'ticket-id' || value === 'priority'
+}
+
+function isSpecSortDir(value: unknown): value is SpecSortDir {
+  return value === 'asc' || value === 'desc'
+}
+
+function isSpecsViewTier(value: unknown): value is SpecsViewTier {
+  return value === 'row' || value === 'postit'
+}
+
+function loadDoneSort(projectId: string | null): { mode: SpecSortMode; dir: SpecSortDir } {
+  if (!projectId) return { mode: 'default', dir: 'desc' }
+  try {
+    const mode = localStorage.getItem(DONE_SORT_MODE_KEY(projectId))
+    const dir = localStorage.getItem(DONE_SORT_DIR_KEY(projectId))
+    return {
+      mode: isSpecSortMode(mode) ? mode : 'default',
+      dir: isSpecSortDir(dir) ? dir : 'desc',
+    }
+  } catch {
+    return { mode: 'default', dir: 'desc' }
+  }
+}
+
+function saveDoneSort(projectId: string | null, mode: SpecSortMode, dir: SpecSortDir): void {
+  if (!projectId) return
+  try {
+    localStorage.setItem(DONE_SORT_MODE_KEY(projectId), mode)
+    localStorage.setItem(DONE_SORT_DIR_KEY(projectId), dir)
+  } catch {}
+}
+
+function loadDoneViewTier(projectId: string | null): SpecsViewTier {
+  if (!projectId) return 'row'
+  try {
+    const tier = localStorage.getItem(DONE_VIEW_TIER_KEY(projectId))
+    return isSpecsViewTier(tier) ? tier : 'row'
+  } catch {
+    return 'row'
+  }
+}
+
+function saveDoneViewTier(projectId: string | null, tier: SpecsViewTier): void {
+  if (!projectId) return
+  try {
+    localStorage.setItem(DONE_VIEW_TIER_KEY(projectId), tier)
+  } catch {}
+}
+
 /** Returns true when at least one draft field carries a meaningful value. */
 function hasOverrides(o: DraftOverrides): boolean {
   if (o.title?.trim()) return true
@@ -168,6 +224,8 @@ export function SpecsBoard({
   const [activeLabels, setActiveLabels] = useState<Set<string>>(new Set())
   const [statusFilter, setStatusFilter] = useState<SpecStatusFilterValue>('all')
   const { activeProjectId } = useHub()
+  const [doneSort, setDoneSort] = useState(() => loadDoneSort(activeProjectId))
+  const [doneViewTier, setDoneViewTier] = useState<SpecsViewTier>(() => loadDoneViewTier(activeProjectId))
   const { minimize } = useMinimizedChats()
   // SMASH: build lookup maps so each SpecCard renders the épica badge / child
   // pill without re-scanning the full ticket list per render.
@@ -195,11 +253,23 @@ export function SpecsBoard({
 
   useEffect(() => {
     setActiveLabels(new Set())
+    setDoneSort(loadDoneSort(activeProjectId))
+    setDoneViewTier(loadDoneViewTier(activeProjectId))
   }, [activeProjectId])
 
   const handleLabelsChange = useCallback((next: Set<string>) => {
     setActiveLabels(next)
   }, [])
+
+  const handleDoneSortChange = useCallback((mode: SpecSortMode, dir: SpecSortDir) => {
+    setDoneSort({ mode, dir })
+    saveDoneSort(activeProjectId, mode, dir)
+  }, [activeProjectId])
+
+  const handleDoneViewTierChange = useCallback((tier: SpecsViewTier) => {
+    setDoneViewTier(tier)
+    saveDoneViewTier(activeProjectId, tier)
+  }, [activeProjectId])
 
   const filteredTickets = useMemo(() => {
     if (activeLabels.size === 0) return tickets
@@ -210,6 +280,12 @@ export function SpecsBoard({
     if (activeLabels.size === 0) return doneTickets
     return doneTickets.filter((t) => (t.labels ?? []).some((l) => activeLabels.has(l)))
   }, [doneTickets, activeLabels])
+
+  const visibleDoneTickets = useMemo(() => {
+    return doneSort.mode === 'default'
+      ? filteredDoneTickets
+      : applySpecSort(filteredDoneTickets, doneSort.mode, doneSort.dir)
+  }, [filteredDoneTickets, doneSort])
 
   // Snapshot of the live shell so we can auto-minimize the current session
   // before restoring another (mutual-exclusion: only one shell visible at
@@ -539,11 +615,21 @@ export function SpecsBoard({
               <span className="text-[11px] font-medium text-muted-foreground">Done</span>
               <span className="text-[10px] text-muted-foreground/60 bg-muted/20 rounded-full px-1.5 py-0.5">
                 {activeLabels.size > 0
-                  ? `${filteredDoneTickets.length}/${doneTickets.length}`
+                  ? `${visibleDoneTickets.length}/${doneTickets.length}`
                   : doneTickets.length}
               </span>
+              {doneTickets.length > 0 && (
+                <div className="ml-auto flex items-center gap-2">
+                  <SpecSortControl
+                    mode={doneSort.mode}
+                    dir={doneSort.dir}
+                    onChange={handleDoneSortChange}
+                  />
+                  <SpecsViewTierToggle tier={doneViewTier} onChange={handleDoneViewTierChange} />
+                </div>
+              )}
             </div>
-            {filteredDoneTickets.length === 0 ? (
+            {visibleDoneTickets.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
                 <CheckCircle2 className="w-6 h-6 mb-2 opacity-15" />
                 <p className="text-xs opacity-60">
@@ -554,9 +640,41 @@ export function SpecsBoard({
                       : 'No completed specs yet'}
                 </p>
               </div>
+            ) : doneViewTier === 'postit' && onMoveToRail ? (
+              <SortableContext items={visibleDoneTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                <div
+                  data-testid="specs-board-done-postit-grid"
+                  className="grid gap-3"
+                  style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}
+                >
+                  {visibleDoneTickets.map((ticket) => (
+                    <MaybeContextMenu
+                      key={ticket.id}
+                      ticket={ticket}
+                      onTicketDelete={onTicketDelete}
+                      onTicketStatusChange={onTicketStatusChange}
+                      onTicketPriorityChange={onTicketPriorityChange}
+                    >
+                      <TicketPostitCard
+                        ticket={ticket}
+                        rails={rails}
+                        onClick={onTicketClick}
+                        onMoveToRail={onMoveToRail}
+                        contractRefining={contractRefiningIds.has(ticket.id)}
+                        epicChildrenCount={ticket.is_epic ? epicChildCounts.get(ticket.id) ?? 0 : undefined}
+                        parentEpicTitle={ticket.parent_epic_id != null ? (epicTitles.get(ticket.parent_epic_id) ?? null) : null}
+                        onOpenParentEpic={handleOpenParentEpic}
+                        jiggleMode={jiggleMode}
+                        onLongPress={onTicketDelete ? enterJiggle : undefined}
+                        onDelete={onTicketDelete ? handleCardDelete : undefined}
+                      />
+                    </MaybeContextMenu>
+                  ))}
+                </div>
+              </SortableContext>
             ) : (
-              <SortableContext items={filteredDoneTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-                {filteredDoneTickets.map((ticket) => (
+              <SortableContext items={visibleDoneTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                {visibleDoneTickets.map((ticket) => (
                   <MaybeContextMenu
                     key={ticket.id}
                     ticket={ticket}

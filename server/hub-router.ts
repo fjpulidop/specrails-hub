@@ -682,5 +682,49 @@ export function createHubRouter(
     res.json({ theme: next })
   })
 
+  // ─── Code Explorer settings (summary language + monthly budget) ───────────
+  router.get('/code-explorer-settings', (_req, res) => {
+    const langRaw = getHubSetting(registry.hubDb, 'summary_language')
+    const language = langRaw === 'es' ? 'es' : 'en'
+    const budgetRaw = getHubSetting(registry.hubDb, 'summary_monthly_budget_usd')
+    const parsed = budgetRaw !== undefined ? Number(budgetRaw) : NaN
+    const monthlyBudgetUsd = Number.isFinite(parsed) && parsed >= 0 ? parsed : 5.0
+    res.json({ language, monthlyBudgetUsd })
+  })
+
+  router.patch('/code-explorer-settings', (req, res) => {
+    const body = (req.body ?? {}) as { language?: unknown; monthlyBudgetUsd?: unknown }
+    if (body.language !== undefined) {
+      if (body.language !== 'en' && body.language !== 'es') {
+        res.status(400).json({
+          error: 'invalid_language',
+          message: "language must be one of: 'en', 'es'",
+        })
+        return
+      }
+    }
+    if (body.monthlyBudgetUsd !== undefined) {
+      if (typeof body.monthlyBudgetUsd !== 'number' || !Number.isFinite(body.monthlyBudgetUsd) || body.monthlyBudgetUsd < 0) {
+        res.status(400).json({
+          error: 'invalid_monthly_budget_usd',
+          message: 'monthlyBudgetUsd must be a non-negative number',
+        })
+        return
+      }
+    }
+    if (body.language !== undefined) {
+      setHubSetting(registry.hubDb, 'summary_language', body.language as string)
+    }
+    if (body.monthlyBudgetUsd !== undefined) {
+      setHubSetting(registry.hubDb, 'summary_monthly_budget_usd', String(body.monthlyBudgetUsd))
+    }
+    const langRaw = getHubSetting(registry.hubDb, 'summary_language')
+    const language = langRaw === 'es' ? 'es' : 'en'
+    const budgetRaw = getHubSetting(registry.hubDb, 'summary_monthly_budget_usd')
+    const parsed = budgetRaw !== undefined ? Number(budgetRaw) : NaN
+    const monthlyBudgetUsd = Number.isFinite(parsed) && parsed >= 0 ? parsed : 5.0
+    res.json({ language, monthlyBudgetUsd })
+  })
+
   return router
 }

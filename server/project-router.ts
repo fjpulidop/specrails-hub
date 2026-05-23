@@ -63,6 +63,7 @@ import multer from 'multer'
 import { createRailsRouter } from './rails-router'
 import { createProfilesRouter } from './profiles-router'
 import { createPluginsRouter } from './plugins-router'
+import { createCodeExplorerRouter } from './code-explorer-router'
 import {
   getHubTerminalSettings,
   getProjectOverride,
@@ -388,6 +389,19 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   // Mount plugins router under each project (per-project marketplace)
   const pluginsRouter = createPluginsRouter()
   router.use('/:projectId/plugins', pluginsRouter)
+
+  // Mount Code-Explorer router. FileSummaryManager comes from ProjectContext.
+  router.use('/:projectId/code', (req: Request, res: Response, next: NextFunction) => {
+    const projectCtx = ctx(req)
+    const codeRouter = createCodeExplorerRouter({
+      db: projectCtx.db,
+      projectPath: projectCtx.project.path,
+      projectId: projectCtx.project.id,
+      broadcast: projectCtx.broadcast,
+      fileSummaryManager: projectCtx.fileSummaryManager,
+    })
+    codeRouter(req, res, next)
+  })
 
   // ─── Queue / Spawn routes ────────────────────────────────────────────────────
 

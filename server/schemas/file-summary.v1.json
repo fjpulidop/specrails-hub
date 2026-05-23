@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/fjpulidop/specrails-hub/main/server/schemas/file-summary.v1.json",
+  "title": "specrails-hub file summary (v1)",
+  "description": "On-disk JSON shape for an AI-generated file summary persisted under <project>/.specrails/file-summaries/<sha256-of-rel-path>.json.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "path",
+    "fileHash",
+    "summary",
+    "language",
+    "generatedAt",
+    "generatedBy",
+    "triggeredBy"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fileHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "language": {
+      "type": "string",
+      "enum": ["en", "es"]
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "generatedBy": {
+      "type": "object",
+      "required": ["model", "promptVersion"],
+      "additionalProperties": false,
+      "properties": {
+        "model": { "type": "string", "minLength": 1 },
+        "promptVersion": { "const": 1 },
+        "truncated": { "type": "boolean" }
+      }
+    },
+    "triggeredBy": {
+      "type": "object",
+      "required": ["kind", "id", "ticketId"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["job", "user"] },
+        "id": { "type": "string", "minLength": 1 },
+        "ticketId": { "type": ["integer", "null"] }
+      }
+    }
+  }
+}

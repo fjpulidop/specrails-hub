@@ -990,6 +990,41 @@ export type WsMessage =
   | SpendingInvalidatedMessage
   | SmashStartedMessage | SmashProgressMessage | SmashCompletedMessage
   | SmashFailedMessage | SmashUndoneMessage
+  | FileProvenanceUpdatedMessage
+  | FileSummaryUpdatedMessage | FileSummaryFailedMessage | FileSummarySkippedMessage
+
+export interface FileProvenanceUpdatedMessage {
+  type: 'file.provenance_updated'
+  projectId: string
+  path: string
+  kind: 'created' | 'modified' | 'deleted'
+  ticketId: number | null
+  jobId: string | null
+  at: number
+}
+
+export interface FileSummaryUpdatedMessage {
+  type: 'file.summary_updated'
+  projectId: string
+  path: string
+  summaryAvailable: boolean
+  stale: boolean
+  generatedAt: string | null
+}
+
+export interface FileSummaryFailedMessage {
+  type: 'file.summary_failed'
+  projectId: string
+  path: string
+  reason: string
+}
+
+export interface FileSummarySkippedMessage {
+  type: 'file.summary_skipped'
+  projectId: string
+  path: string
+  reason: 'budget' | 'per-job-cap' | 'ttl' | 'not-found'
+}
 
 export interface SpendingInvalidatedMessage {
   type: 'spending.invalidated'

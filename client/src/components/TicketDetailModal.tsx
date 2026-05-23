@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
 import { AttachmentsSection } from './AttachmentsSection'
+import { TicketFilesTouched } from './code-explorer/TicketFilesTouched'
 import { TicketSpendingLine } from './TicketSpendingLine'
 import { useMinimizedChats } from '../context/MinimizedChatsContext'
 import { useTicketDetailModal } from '../context/TicketDetailModalContext'
@@ -456,6 +457,9 @@ export function TicketDetailModal({
                 attachments={attachments}
                 onChange={setAttachments}
               />
+
+              {/* Files touched by AI rails (code-explorer feature) */}
+              <TicketFilesTouched ticketId={ticket.id} onClose={onClose} />
 
               {/* Prerequisites */}
               {ticket.prerequisites && ticket.prerequisites.length > 0 && (

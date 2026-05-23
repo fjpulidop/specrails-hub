@@ -15,3 +15,10 @@ export const FEATURE_AGENTS_SECTION = (() => {
   if (typeof override === 'string') return override !== 'false'
   return true
 })()
+
+export const FEATURE_CODE_EXPLORER = (() => {
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+  const override = env?.VITE_FEATURE_CODE_EXPLORER
+  if (typeof override === 'string') return override === 'true'
+  return false
+})()

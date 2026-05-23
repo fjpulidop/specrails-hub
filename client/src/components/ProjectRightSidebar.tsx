@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Briefcase, BarChart3, Bot, Puzzle, Settings, PanelRight } from 'lucide-react'
+import { LayoutDashboard, Briefcase, BarChart3, Bot, Code2, Puzzle, Settings, PanelRight } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useSidebarPin } from '../context/SidebarPinContext'
 import { useHub } from '../hooks/useHub'
-import { FEATURE_AGENTS_SECTION } from '../lib/feature-flags'
+import { FEATURE_AGENTS_SECTION, FEATURE_CODE_EXPLORER } from '../lib/feature-flags'
 
 const RIGHT_PIN_LABEL: Record<'pinned-open' | 'pinned-collapsed' | 'unpinned', string> = {
   'pinned-open': 'Collapse right sidebar (keep pinned)',
@@ -43,6 +43,9 @@ export function ProjectRightSidebar() {
     { to: '/analytics', end: false, icon: BarChart3, label: 'Analytics' },
     ...(showAgentsTab
       ? [{ to: '/agents', end: false, icon: Bot, label: 'Agents' }]
+      : []),
+    ...(FEATURE_CODE_EXPLORER
+      ? [{ to: '/code', end: false, icon: Code2, label: 'Code' }]
       : []),
     ...(showIntegrationsTab
       ? [{ to: '/integrations', end: false, icon: Puzzle, label: 'Integrations' }]

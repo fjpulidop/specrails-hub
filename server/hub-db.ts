@@ -157,6 +157,13 @@ function applyHubMigrations(db: DbInstance): void {
         'ui_theme', 'dracula',
       )
     },
+    // Migration 9: seed code-explorer hub settings — summary language + monthly
+    // budget cap. Enforced by FileSummaryManager + hub-router.
+    () => {
+      const seed = db.prepare('INSERT OR IGNORE INTO hub_settings (key, value) VALUES (?, ?)')
+      seed.run('summary_language', 'en')
+      seed.run('summary_monthly_budget_usd', '5.00')
+    },
   ]
 
   for (let i = 0; i < migrations.length; i++) {
