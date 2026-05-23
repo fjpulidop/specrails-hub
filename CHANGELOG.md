@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.57.0](https://github.com/fjpulidop/specrails-hub/compare/v1.56.0...v1.57.0) (2026-05-23)
+
+
+### Features
+
+* **agents:** enable Agents section by default ([#319](https://github.com/fjpulidop/specrails-hub/issues/319)) ([afe597c](https://github.com/fjpulidop/specrails-hub/commit/afe597c198d7a0c10cfc822ed2b8b78cff9213d1))
+
 ## [1.56.0](https://github.com/fjpulidop/specrails-hub/compare/v1.55.1...v1.56.0) (2026-05-23)
 
 
