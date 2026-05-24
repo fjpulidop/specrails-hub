@@ -362,16 +362,36 @@ async function main() {
     console.log(`  ${shellSrc} → ${shellDest}`)
   }
 
-  // Step 3a.bis: Copy Ask-the-Hub bundled embedding model (multilingual-e5-small
-  // ONNX quantized + tokenizer + config). Tracked via Git LFS; absent on CI runs
-  // without LFS — degrades gracefully to the deterministic fallback at runtime.
+  // Step 3a.bis: Ensure Ask-the-Hub bundled embedding model is materialised
+  // (multilingual-e5-small ONNX quantized + tokenizer + config). Tracked via
+  // Git LFS — when checked out without LFS the files are tiny pointer stubs
+  // ("version https://git-lfs.github.com/spec/v1\noid sha256:..."). We
+  // detect that and run `git lfs pull` automatically so a fresh clone +
+  // `npm run build:desktop` Just Works.
   const embedSrc = path.join(BINARIES_DIR, 'embeddings')
-  if (fs.existsSync(embedSrc) && fs.existsSync(path.join(embedSrc, 'config.json'))) {
-    // The directory already lives inside BINARIES_DIR — no copy needed for the
-    // sidecar layout, but log presence so build logs reflect bundle state.
+  const modelOnnx = path.join(embedSrc, 'multilingual-e5-small', 'onnx', 'model_quantized.onnx')
+  const modelPresent = fs.existsSync(modelOnnx) && fs.statSync(modelOnnx).size > 1024 * 1024 // > 1MB → real file
+  if (modelPresent) {
     console.log(`  ✓ embeddings model present at ${embedSrc}`)
+  } else if (fs.existsSync(path.join(ROOT, '.git'))) {
+    console.log(`  ⤵ embeddings model is an LFS pointer; pulling via \`git lfs pull\`…`)
+    try {
+      const { execSync } = await import('node:child_process')
+      execSync('git lfs pull --include "src-tauri/binaries/embeddings/**"', {
+        cwd: ROOT,
+        stdio: 'inherit',
+      })
+      if (fs.existsSync(modelOnnx) && fs.statSync(modelOnnx).size > 1024 * 1024) {
+        console.log(`  ✓ embeddings model materialised at ${embedSrc}`)
+      } else {
+        console.log(`  ⚠ git lfs pull completed but model still missing — Ask-the-Hub will run in degraded mode.`)
+      }
+    } catch (err) {
+      console.log(`  ⚠ git lfs pull failed (${err.message}); Ask-the-Hub will run in degraded mode.`)
+      console.log(`    Install git-lfs once with: \`git lfs install\``)
+    }
   } else {
-    console.log(`  ⚠ embeddings model not bundled (Ask-the-Hub will run in degraded mode). Place files under ${embedSrc}.`)
+    console.log(`  ⚠ embeddings model not bundled and no .git directory — Ask-the-Hub will run in degraded mode.`)
   }
 
   // Step 3b: Copy node-pty package externally so its spawn-helper resolves on real fs.
