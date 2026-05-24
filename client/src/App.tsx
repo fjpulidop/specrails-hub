@@ -391,27 +391,31 @@ export default function App() {
                 `components/theme-effects/ThemeEffectLayer.tsx`. */}
             <ThemeEffectLayer />
             <HubProvider>
-              {/* Custom frameless titlebar inside HubProvider so it can read active project */}
-              <TitleBar />
-              <SpecGenTrackerProvider>
-                <ContractRefineTrackerProvider>
-                <SmashTrackerProvider>
-                <SidebarPinProvider>
-                  <TerminalsProviderWithHub>
-                    <MinimizedChatsProvider>
-                      <TicketDetailModalProvider>
-                        <AskHubProvider>
+              {/* AskHubProvider wraps the TitleBar so the sparkle pill in
+                  the macOS titlebar can read the `enabled` flag via the
+                  context. Must live INSIDE HubProvider (needs project list)
+                  and OUTSIDE TitleBar. */}
+              <AskHubProvider>
+                {/* Custom frameless titlebar — sparkle pill lives here. */}
+                <TitleBar />
+                <SpecGenTrackerProvider>
+                  <ContractRefineTrackerProvider>
+                  <SmashTrackerProvider>
+                  <SidebarPinProvider>
+                    <TerminalsProviderWithHub>
+                      <MinimizedChatsProvider>
+                        <TicketDetailModalProvider>
                           <HubApp />
                           <AskHubModal />
                           <ThemedToaster />
-                        </AskHubProvider>
-                      </TicketDetailModalProvider>
-                    </MinimizedChatsProvider>
-                  </TerminalsProviderWithHub>
-                </SidebarPinProvider>
-                </SmashTrackerProvider>
-                </ContractRefineTrackerProvider>
-              </SpecGenTrackerProvider>
+                        </TicketDetailModalProvider>
+                      </MinimizedChatsProvider>
+                    </TerminalsProviderWithHub>
+                  </SidebarPinProvider>
+                  </SmashTrackerProvider>
+                  </ContractRefineTrackerProvider>
+                </SpecGenTrackerProvider>
+              </AskHubProvider>
             </HubProvider>
           </ThemeProvider>
         </SharedWebSocketProvider>
