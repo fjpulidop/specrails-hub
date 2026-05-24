@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { Minus, Search, Sparkles, Square, X } from 'lucide-react'
 import { useHub } from '../hooks/useHub'
-import { useAskHub } from './ask/AskHubProvider'
+import { useAskHubOptional } from './ask/AskHubProvider'
 
 // ─── Detect Tauri environment ─────────────────────────────────────────────────
 
@@ -65,7 +65,10 @@ function WinButton({
 
 function AskPill() {
   const [hovered, setHovered] = useState(false)
-  const { enabled } = useAskHub()
+  const ctx = useAskHubOptional()
+  // Rendered outside the AskHubProvider tree (isolated tests) → just no-op.
+  if (!ctx) return null
+  const { enabled } = ctx
   function handleClick() {
     if (!enabled) return
     window.dispatchEvent(

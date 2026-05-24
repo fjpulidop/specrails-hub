@@ -104,3 +104,10 @@ export function useAskHub(): AskHubContextValue {
   if (!v) throw new Error('useAskHub must be used within AskHubProvider')
   return v
 }
+
+/** Soft variant for UI bits (AskPill, TitleBar) that may render outside the
+ *  provider tree (snapshot tests, isolated stories). Returns `null` when the
+ *  provider isn't mounted — caller is expected to no-op gracefully. */
+export function useAskHubOptional(): AskHubContextValue | null {
+  return useContext(AskHubContext)
+}
