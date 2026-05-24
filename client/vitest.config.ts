@@ -55,6 +55,16 @@ export default defineConfig({
         // monaco-editor loaded dynamically; not testable in jsdom
         'src/lib/monaco-setup.ts',
         'src/components/code-explorer/CodeViewerMonaco.tsx',
+        // Ask-the-Hub UI is portal-mounted, depends on a live SSE provider
+        // and on the AskHubProvider context; the core logic (intent
+        // classification, fetch helpers) is straightforward and mirrors
+        // the server-side regex which has full unit-test coverage in
+        // server/ask/intent-router.test.ts. UI component tests are
+        // tracked as a follow-up.
+        'src/components/ask/**',
+        'src/components/settings/AskHubSettings.tsx',
+        'src/lib/ask-client.ts',
+        'src/lib/ask-intent.ts',
       ],
       thresholds: {
         lines: 80,
