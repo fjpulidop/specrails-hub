@@ -55,6 +55,9 @@
     "tree-kill": "^1.2.2",
     "ws": "^8.16.0"
   },
+  "overrides": {
+    "sharp": "^0.33.5"
+  },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
     "@types/better-sqlite3": "^7.6.0",
