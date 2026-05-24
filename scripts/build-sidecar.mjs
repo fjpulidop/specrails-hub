@@ -298,7 +298,16 @@ async function main() {
     platform: 'node',
     format: 'cjs',
     outfile: BUNDLE_PATH,
-    external: ['better-sqlite3', 'fsevents', 'node-pty', '@aws-sdk/client-s3', 'read-excel-file/node', 'pdf-parse'],
+    external: [
+      'better-sqlite3', 'fsevents', 'node-pty',
+      '@aws-sdk/client-s3', 'read-excel-file/node', 'pdf-parse',
+      // Ask-the-Hub: @xenova/transformers pulls in onnxruntime-node + sharp
+      // which ship native .node files that esbuild can't bundle. Mark them
+      // external so the sidecar build doesn't choke; the embedder degrades
+      // to a deterministic hash-based fallback if they fail to load at
+      // runtime, and BM25 search continues to work.
+      '@xenova/transformers', 'onnxruntime-node', 'sharp',
+    ],
     banner: { js: PKG_RUNTIME_PATCHES },
     minify: false,
     sourcemap: false,
