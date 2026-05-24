@@ -382,6 +382,7 @@ export function getSpending(
           'ai-edit': { count: 0, costUsd: 0 },
           smash: { count: 0, costUsd: 0 },
           'file-summary': { count: 0, costUsd: 0 },
+          ask: { count: 0, costUsd: 0 },
         },
         isUnattributed: r.ticket_id === null ? true : undefined,
       })

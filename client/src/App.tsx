@@ -43,6 +43,8 @@ import { WS_URL } from './lib/ws-url'
 import { TerminalsProvider, useTerminals } from './context/TerminalsContext'
 import { MinimizedChatsProvider } from './context/MinimizedChatsContext'
 import { TicketDetailModalProvider } from './context/TicketDetailModalContext'
+import { AskHubProvider } from './components/ask/AskHubProvider'
+import { AskHubModal } from './components/ask/AskHubModal'
 import { useCompareUrlSync } from './hooks/useCompareUrlSync'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { FEATURE_AGENTS_SECTION, FEATURE_CODE_EXPLORER, FEATURE_TERMINAL_PANEL } from './lib/feature-flags'
@@ -398,8 +400,11 @@ export default function App() {
                   <TerminalsProviderWithHub>
                     <MinimizedChatsProvider>
                       <TicketDetailModalProvider>
-                        <HubApp />
-                        <ThemedToaster />
+                        <AskHubProvider>
+                          <HubApp />
+                          <AskHubModal />
+                          <ThemedToaster />
+                        </AskHubProvider>
                       </TicketDetailModalProvider>
                     </MinimizedChatsProvider>
                   </TerminalsProviderWithHub>

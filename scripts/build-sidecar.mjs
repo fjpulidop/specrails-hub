@@ -353,6 +353,18 @@ async function main() {
     console.log(`  ${shellSrc} → ${shellDest}`)
   }
 
+  // Step 3a.bis: Copy Ask-the-Hub bundled embedding model (multilingual-e5-small
+  // ONNX quantized + tokenizer + config). Tracked via Git LFS; absent on CI runs
+  // without LFS — degrades gracefully to the deterministic fallback at runtime.
+  const embedSrc = path.join(BINARIES_DIR, 'embeddings')
+  if (fs.existsSync(embedSrc) && fs.existsSync(path.join(embedSrc, 'config.json'))) {
+    // The directory already lives inside BINARIES_DIR — no copy needed for the
+    // sidecar layout, but log presence so build logs reflect bundle state.
+    console.log(`  ✓ embeddings model present at ${embedSrc}`)
+  } else {
+    console.log(`  ⚠ embeddings model not bundled (Ask-the-Hub will run in degraded mode). Place files under ${embedSrc}.`)
+  }
+
   // Step 3b: Copy node-pty package externally so its spawn-helper resolves on real fs.
   // We load node-pty via createRequire from this location at runtime (see server/index.ts).
   console.log('\n[3b] Copying node-pty package and native addon...')

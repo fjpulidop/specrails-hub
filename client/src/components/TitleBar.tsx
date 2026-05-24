@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { Minus, Search, Square, X } from 'lucide-react'
+import { Minus, Search, Sparkles, Square, X } from 'lucide-react'
 import { useHub } from '../hooks/useHub'
+import { useAskHub } from './ask/AskHubProvider'
 
 // ─── Detect Tauri environment ─────────────────────────────────────────────────
 
@@ -56,6 +57,55 @@ function WinButton({
       } as React.CSSProperties}
     >
       {icon}
+    </button>
+  )
+}
+
+// ─── Ask the Hub sparkle button ───────────────────────────────────────────────
+
+function AskPill() {
+  const [hovered, setHovered] = useState(false)
+  const { enabled } = useAskHub()
+  function handleClick() {
+    if (!enabled) return
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'K', metaKey: true, ctrlKey: true, shiftKey: true, bubbles: true }),
+    )
+  }
+  const accent = enabled ? 'var(--color-accent-primary)' : 'var(--color-muted-foreground)'
+  return (
+    <button
+      onClick={handleClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      disabled={!enabled}
+      aria-label={enabled ? 'Ask the Hub (⌘⇧K)' : 'Ask the Hub — add a project to enable'}
+      title={enabled ? 'Ask the Hub (⌘⇧K)' : 'Add a project to enable Ask the Hub'}
+      style={{
+        position: 'absolute',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        right: 'calc(50% - 200px)',
+        width: 22,
+        height: 22,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 9999,
+        border: `1px solid color-mix(in srgb, ${accent} ${enabled ? '60%' : '30%'}, transparent)`,
+        cursor: enabled ? 'pointer' : 'not-allowed',
+        background: enabled && hovered
+          ? 'color-mix(in srgb, var(--color-accent-primary) 30%, transparent)'
+          : enabled
+            ? 'color-mix(in srgb, var(--color-accent-primary) 12%, transparent)'
+            : 'transparent',
+        color: accent,
+        opacity: enabled ? 1 : 0.5,
+        transition: 'background 0.12s ease',
+        WebkitAppRegion: 'no-drag',
+      } as React.CSSProperties}
+    >
+      <Sparkles size={12} />
     </button>
   )
 }
@@ -171,6 +221,7 @@ function MacTitleBar() {
       }}
     >
       <SearchPill projectName={activeProject?.name ?? null} />
+      <AskPill />
     </div>
   )
 }
@@ -210,6 +261,7 @@ function DefaultTitleBar() {
       }}
     >
       <SearchPill projectName={activeProject?.name ?? null} />
+      <AskPill />
 
       <div data-tauri-drag-region style={{ minWidth: 116, height: '100%' }} />
 

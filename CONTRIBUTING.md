@@ -8,6 +8,7 @@ Thank you for your interest in contributing to specrails-hub. This document cove
 - **npm** >= 10
 - **claude** CLI on your PATH ([Claude Code](https://claude.ai/claude-code)) — needed to test job spawning
 - **OS:** macOS, Linux, or Windows 10/11 (1809+). The hub is cross-platform; the desktop build ships as `.dmg` (macOS) and `.exe`/`.msi` (Windows). See [docs/windows.md](docs/windows.md) for Windows-specific notes.
+- **Git LFS** — required to pull the bundled embedding model used by Ask the Hub (`src-tauri/binaries/embeddings/`, ~118 MB). Install once via `git lfs install`, then `git lfs pull` after cloning. CI runs for unit tests do not need LFS; the desktop-release workflow does.
 
 ## Local Setup
 

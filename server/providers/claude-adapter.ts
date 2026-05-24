@@ -132,6 +132,22 @@ function buildClaudeArgs(action: SpawnAction, opts: SpawnOptions): string[] {
       args.push('-p', opts.prompt)
       return args
     }
+    case 'ask-answer': {
+      // Ask-the-Hub answer LLM: one-shot, no resume. Mirrors the contract-
+      // refine-runner flag set (known-working in production) — we just need
+      // a single JSON text response with no tool use.
+      args.push(
+        '--dangerously-skip-permissions',
+        '--output-format', 'stream-json',
+        '--verbose',
+        '--disallowedTools', 'Read,Grep,Glob,Bash',
+      )
+      args.push('--model', model)
+      if (opts.systemPrompt) args.push('--system-prompt', opts.systemPrompt)
+      args.push('-p', opts.prompt)
+      if (opts.extraArgs) args.push(...opts.extraArgs)
+      return args
+    }
   }
 }
 

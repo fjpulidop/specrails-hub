@@ -21,6 +21,7 @@ import { cleanupStaleShimDirs } from './terminal-shell-integration'
 import { createTelemetryRouter } from './telemetry-receiver'
 import { runCompactionForAll } from './telemetry-compactor'
 import { resolveStartupPath, augmentPathFromLoginShell, getPathDiagnostic } from './path-resolver'
+import { isAskHubEnabled } from './feature-flags'
 // Side-effect import: registers every bundled ProviderAdapter (claude, codex,
 // future providers) so `getAdapter`/`hasAdapter`/`listAdapters` are populated
 // before any manager constructs a project context. See
@@ -385,6 +386,17 @@ server.listen(port, '127.0.0.1', () => {
     const source = process.stdin.isTTY ? 'terminal' : 'gui'
     console.log(`[path-resolver] inherited=${inheritedPathBeforeResolve} augmented=${Math.max(0, augmented)} loginShell=${diag.loginShellStatus} source=${source}`)
   })
+
+  // Ask-the-Hub embedder warm-up. Scheduled 5s after listen so it doesn't
+  // delay first-paint of the dashboard. Failure is non-fatal — search-only
+  // mode still works without embeddings.
+  if (isAskHubEnabled()) {
+    setTimeout(() => {
+      import('./ask/embedder').then((m) => m.warmup()).catch((err) => {
+        console.warn('[ask] embedder warmup failed:', err instanceof Error ? err.message : err)
+      })
+    }, 5000).unref()
+  }
 })
 
 // ─── Clean shutdown ───────────────────────────────────────────────────────────

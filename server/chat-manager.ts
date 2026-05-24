@@ -789,6 +789,8 @@ export class ChatManager {
           // Persist assistant message (stripped of draft blocks for non-noisy DB).
           if (persistedText) {
             addMessage(this._db, { conversation_id: conversationId, role: 'assistant', content: persistedText })
+            // Ask-the-Hub: re-index this explore turn (debounced, fire-and-forget).
+            this._scheduleAskTurnReindex(conversationId)
           }
 
           // Update session_id from the real thread/session captured during
@@ -884,6 +886,55 @@ export class ChatManager {
       })
     } catch {
       // auto-title is fire-and-forget; failure is silent
+    }
+  }
+
+  // ─── Ask-the-Hub: debounced explore-turn re-index ─────────────────────────
+  private _askReindexTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+
+  private _scheduleAskTurnReindex(conversationId: string): void {
+    const existing = this._askReindexTimers.get(conversationId)
+    if (existing) clearTimeout(existing)
+    const t = setTimeout(() => {
+      this._askReindexTimers.delete(conversationId)
+      void this._reindexExploreConversation(conversationId)
+    }, 5000)
+    t.unref?.()
+    this._askReindexTimers.set(conversationId, t)
+  }
+
+  private async _reindexExploreConversation(conversationId: string): Promise<void> {
+    try {
+      const { isAskHubEnabled } = await import('./feature-flags')
+      if (!isAskHubEnabled()) return
+      const conv = this._db
+        .prepare("SELECT kind FROM chat_conversations WHERE id = ?")
+        .get(conversationId) as { kind?: string } | undefined
+      if (!conv || conv.kind !== 'explore') return
+      const projectId = this._projectName
+      if (!projectId) return
+      const indexer = await import('./ask/indexer')
+      const chunker = await import('./ask/chunker')
+      const msgs = this._db
+        .prepare(`SELECT id, role, content, created_at FROM chat_messages WHERE conversation_id = ? ORDER BY id ASC`)
+        .all(conversationId) as Array<{ id: number; role: string; content: string; created_at: string }>
+      let pendingUser: { id: number; content: string; created_at: string } | null = null
+      for (const m of msgs) {
+        if (m.role === 'user') pendingUser = m
+        else if (m.role === 'assistant' && pendingUser) {
+          const doc = chunker.chunkExploreTurn({
+            conversation_id: conversationId,
+            turn_index: pendingUser.id,
+            user_text: pendingUser.content,
+            assistant_text: m.content,
+            ts: m.created_at,
+          })
+          if (doc) await indexer.upsertDoc(this._db, projectId, doc)
+          pendingUser = null
+        }
+      }
+    } catch {
+      // best-effort
     }
   }
 }

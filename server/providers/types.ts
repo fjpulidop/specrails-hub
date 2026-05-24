@@ -18,6 +18,7 @@ export type SpawnAction =
   | 'setup-enrich'
   | 'setup-enrich-resume'
   | 'auto-title'
+  | 'ask-answer'
 
 export interface SpawnOptions {
   prompt: string

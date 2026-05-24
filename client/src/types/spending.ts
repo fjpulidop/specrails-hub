@@ -1,4 +1,4 @@
-export type Surface = 'job' | 'quick-spec' | 'explore-spec' | 'ai-edit' | 'smash' | 'file-summary'
+export type Surface = 'job' | 'quick-spec' | 'explore-spec' | 'ai-edit' | 'smash' | 'file-summary' | 'ask'
 export type SurfaceFilter = Surface | 'all'
 export type Period = '7d' | '30d' | '90d' | 'all' | 'custom'
 
@@ -140,6 +140,7 @@ export const SURFACE_LABEL: Record<Surface, string> = {
   'ai-edit': 'Refine',
   smash: 'SMASH',
   'file-summary': 'File summaries',
+  ask: 'Ask the Hub',
 }
 
 /** Surface → semantic accent token (Tailwind class name) used across the dashboard. */
@@ -179,5 +180,11 @@ export const SURFACE_ACCENT: Record<Surface, { bg: string; text: string; ring: s
     text: 'text-accent-warning',
     ring: 'ring-accent-warning/40',
     dot: 'bg-accent-warning',
+  },
+  ask: {
+    bg: 'bg-accent-primary/15',
+    text: 'text-accent-primary',
+    ring: 'ring-accent-primary/40',
+    dot: 'bg-accent-primary',
   },
 }

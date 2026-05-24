@@ -79,6 +79,18 @@ function buildCodexArgs(action: SpawnAction, opts: SpawnOptions): string[] {
       if (opts.extraArgs) args.push(...opts.extraArgs)
       return args
     }
+    case 'ask-answer': {
+      // Ask-the-Hub: prompt is fed via stdin from spawn-one-shot — no
+      // positional prompt here. Codex non-TTY mode always opens stdin,
+      // and any positional prompt confuses parsing when stdin is also live.
+      // We intentionally DO NOT pass --model: ChatGPT-subscription codex
+      // rejects model overrides not available on the user's plan with a
+      // silent exit. The user's default model (configured via `codex
+      // config`) is used instead.
+      args.push('exec', '--json', ...SANDBOX_FLAGS, SKIP_GIT_CHECK)
+      if (opts.extraArgs) args.push(...opts.extraArgs)
+      return args
+    }
     case 'chat-resume': {
       if (!opts.sessionId) {
         throw new Error(`${action} requires sessionId`)

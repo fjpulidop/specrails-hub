@@ -47,10 +47,11 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
   const navigate = useNavigate()
   const fetchedRef = useRef(false)
 
-  // Global Cmd+K / Ctrl+K listener
+  // Global Cmd+K / Ctrl+K listener. Excludes the shifted variant which is
+  // reserved for Ask the Hub (Cmd+Shift+K).
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
         e.preventDefault()
         setOpen((prev) => !prev)
       }

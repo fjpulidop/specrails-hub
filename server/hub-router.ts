@@ -726,5 +726,92 @@ export function createHubRouter(
     res.json({ language, monthlyBudgetUsd })
   })
 
+  // ─── Ask-the-Hub settings ─────────────────────────────────────────────────
+  // Provider / model / reranker / hotkey / auto-index / monthly budget.
+  const ASK_PROVIDERS = ['claude', 'codex', 'none'] as const
+  const ASK_RERANKERS = ['llm', 'heuristic', 'none'] as const
+  type AskProvider = (typeof ASK_PROVIDERS)[number]
+  type AskReranker = (typeof ASK_RERANKERS)[number]
+
+  function readAskSettings() {
+    const provider = (getHubSetting(registry.hubDb, 'ask_answer_provider') ?? '') as AskProvider | ''
+    const modelClaude = getHubSetting(registry.hubDb, 'ask_answer_model_claude') ?? 'claude-haiku-4-5'
+    const modelCodex = getHubSetting(registry.hubDb, 'ask_answer_model_codex') ?? 'gpt-4o-mini'
+    const reranker = (getHubSetting(registry.hubDb, 'ask_reranker') ?? 'heuristic') as AskReranker
+    const autoIndexRaw = getHubSetting(registry.hubDb, 'ask_auto_index_on_first_open')
+    const autoIndex = autoIndexRaw === undefined ? true : autoIndexRaw === '1' || autoIndexRaw === 'true'
+    const hotkey = getHubSetting(registry.hubDb, 'ask_hotkey') ?? ''
+    const budgetRaw = getHubSetting(registry.hubDb, 'ask_monthly_budget_usd')
+    const parsedBudget = budgetRaw !== undefined ? Number(budgetRaw) : NaN
+    const monthlyBudgetUsd = Number.isFinite(parsedBudget) && parsedBudget >= 0 ? parsedBudget : 5.0
+    return {
+      provider: provider || null,
+      answerModel: { claude: modelClaude, codex: modelCodex },
+      reranker,
+      autoIndexOnFirstOpen: autoIndex,
+      hotkey: hotkey || null,
+      monthlyBudgetUsd,
+    }
+  }
+
+  router.get('/ask-settings', (_req, res) => {
+    res.json(readAskSettings())
+  })
+
+  router.patch('/ask-settings', (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>
+
+    if (body.provider !== undefined && body.provider !== null) {
+      if (typeof body.provider !== 'string' || !ASK_PROVIDERS.includes(body.provider as AskProvider)) {
+        res.status(400).json({ error: 'invalid_provider', message: `provider must be one of: ${ASK_PROVIDERS.join(', ')}` })
+        return
+      }
+    }
+    if (body.reranker !== undefined) {
+      if (typeof body.reranker !== 'string' || !ASK_RERANKERS.includes(body.reranker as AskReranker)) {
+        res.status(400).json({ error: 'invalid_reranker', message: `reranker must be one of: ${ASK_RERANKERS.join(', ')}` })
+        return
+      }
+    }
+    if (body.answerModelClaude !== undefined && typeof body.answerModelClaude !== 'string') {
+      res.status(400).json({ error: 'invalid_answer_model_claude' })
+      return
+    }
+    if (body.answerModelCodex !== undefined && typeof body.answerModelCodex !== 'string') {
+      res.status(400).json({ error: 'invalid_answer_model_codex' })
+      return
+    }
+    if (body.hotkey !== undefined && body.hotkey !== null && typeof body.hotkey !== 'string') {
+      res.status(400).json({ error: 'invalid_hotkey' })
+      return
+    }
+    if (body.autoIndexOnFirstOpen !== undefined && typeof body.autoIndexOnFirstOpen !== 'boolean') {
+      res.status(400).json({ error: 'invalid_auto_index' })
+      return
+    }
+    if (body.monthlyBudgetUsd !== undefined) {
+      if (typeof body.monthlyBudgetUsd !== 'number' || !Number.isFinite(body.monthlyBudgetUsd) || body.monthlyBudgetUsd < 0) {
+        res.status(400).json({ error: 'invalid_monthly_budget_usd' })
+        return
+      }
+    }
+
+    if (body.provider !== undefined) {
+      if (body.provider === null) registry.hubDb.prepare('DELETE FROM hub_settings WHERE key = ?').run('ask_answer_provider')
+      else setHubSetting(registry.hubDb, 'ask_answer_provider', body.provider as string)
+    }
+    if (body.reranker !== undefined) setHubSetting(registry.hubDb, 'ask_reranker', body.reranker as string)
+    if (body.answerModelClaude !== undefined) setHubSetting(registry.hubDb, 'ask_answer_model_claude', body.answerModelClaude as string)
+    if (body.answerModelCodex !== undefined) setHubSetting(registry.hubDb, 'ask_answer_model_codex', body.answerModelCodex as string)
+    if (body.hotkey !== undefined) {
+      if (body.hotkey === null || body.hotkey === '') registry.hubDb.prepare('DELETE FROM hub_settings WHERE key = ?').run('ask_hotkey')
+      else setHubSetting(registry.hubDb, 'ask_hotkey', body.hotkey as string)
+    }
+    if (body.autoIndexOnFirstOpen !== undefined) setHubSetting(registry.hubDb, 'ask_auto_index_on_first_open', body.autoIndexOnFirstOpen ? '1' : '0')
+    if (body.monthlyBudgetUsd !== undefined) setHubSetting(registry.hubDb, 'ask_monthly_budget_usd', String(body.monthlyBudgetUsd))
+
+    res.json(readAskSettings())
+  })
+
   return router
 }

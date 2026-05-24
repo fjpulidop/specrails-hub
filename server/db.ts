@@ -521,6 +521,71 @@ const MIGRATIONS: Migration[] = [
       );
     `)
   },
+
+  // Migration 24: Ask-the-Hub semantic index. Per-project docs table with
+  // BM25 (FTS5) sidecar + embeddings stored as BLOBs. ask_query_log captures
+  // every query for analytics + thumbs feedback.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ask_docs (
+        rowid            INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind             TEXT NOT NULL,
+        source_id        TEXT NOT NULL,
+        ticket_id        TEXT,
+        job_id           TEXT,
+        conversation_id  TEXT,
+        file_path        TEXT,
+        title            TEXT NOT NULL,
+        body             TEXT NOT NULL,
+        body_hash        TEXT NOT NULL,
+        ts               INTEGER NOT NULL,
+        model            TEXT NOT NULL,
+        schema_version   INTEGER NOT NULL DEFAULT 1,
+        embedding        BLOB,
+        UNIQUE(kind, source_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ask_docs_kind   ON ask_docs(kind);
+      CREATE INDEX IF NOT EXISTS idx_ask_docs_ticket ON ask_docs(ticket_id);
+      CREATE INDEX IF NOT EXISTS idx_ask_docs_ts     ON ask_docs(ts DESC);
+
+      CREATE VIRTUAL TABLE IF NOT EXISTS ask_docs_fts USING fts5(
+        title,
+        body,
+        content='ask_docs',
+        content_rowid='rowid'
+      );
+
+      CREATE TRIGGER IF NOT EXISTS ask_docs_ai AFTER INSERT ON ask_docs BEGIN
+        INSERT INTO ask_docs_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
+      END;
+      CREATE TRIGGER IF NOT EXISTS ask_docs_ad AFTER DELETE ON ask_docs BEGIN
+        INSERT INTO ask_docs_fts(ask_docs_fts, rowid, title, body) VALUES('delete', old.rowid, old.title, old.body);
+      END;
+      CREATE TRIGGER IF NOT EXISTS ask_docs_au AFTER UPDATE ON ask_docs BEGIN
+        INSERT INTO ask_docs_fts(ask_docs_fts, rowid, title, body) VALUES('delete', old.rowid, old.title, old.body);
+        INSERT INTO ask_docs_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
+      END;
+
+      CREATE TABLE IF NOT EXISTS ask_query_log (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        query           TEXT NOT NULL,
+        scope           TEXT,
+        intent          TEXT,
+        model           TEXT,
+        provider        TEXT,
+        sources_count   INTEGER NOT NULL DEFAULT 0,
+        cost_usd        REAL,
+        latency_ms      INTEGER,
+        status          TEXT NOT NULL DEFAULT 'success',
+        rated           INTEGER,
+        rating_comment  TEXT,
+        ts              INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ask_query_log_ts ON ask_query_log(ts DESC);
+    `)
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {
