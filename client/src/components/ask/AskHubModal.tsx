@@ -7,7 +7,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useAskHub } from './AskHubProvider'
 import { useHub } from '../../hooks/useHub'
-import { askSearch, askQuery, askProviders, type AskSource, type AskStreamEvent, type AskProvidersInfo } from '../../lib/ask-client'
+import { useSharedWebSocket } from '../../hooks/useSharedWebSocket'
+import { askSearch, askQuery, askProviders, askIndexStatus, askIndexRebuild, type AskSource, type AskStreamEvent, type AskProvidersInfo } from '../../lib/ask-client'
 import { API_ORIGIN } from '../../lib/origin'
 import { CitationChip } from './CitationChip'
 import { FirstRunProviderPicker } from './FirstRunProviderPicker'
@@ -26,6 +27,8 @@ export function AskHubModal() {
   const { open, closeModal, recent, pushRecent } = useAskHub()
   const { projects, activeProjectId } = useHub()
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? null
+  const { registerHandler, unregisterHandler } = useSharedWebSocket()
+  const [indexing, setIndexing] = useState<{ current: number; total: number } | null>(null)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<AskSource[]>([])
   const [answering, setAnswering] = useState(false)
@@ -58,6 +61,43 @@ export function AskHubModal() {
     if (!open || providers !== null) return
     askProviders().then(setProviders).catch(() => { /* silent */ })
   }, [open, providers])
+
+  // First-open backfill: if the index is empty, kick off a rebuild silently
+  // so the user gets results without having to discover the Settings button.
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    askIndexStatus().then((status) => {
+      if (cancelled) return
+      if (status.total === 0) {
+        setIndexing({ current: 0, total: 1 })
+        askIndexRebuild().catch(() => setIndexing(null))
+      }
+    }).catch(() => { /* silent */ })
+    return () => { cancelled = true }
+  }, [open])
+
+  // Subscribe to indexing progress so the modal shows a live progress hint
+  // and re-runs the current search once the index is ready.
+  useEffect(() => {
+    if (!open) return
+    const handler = (raw: unknown) => {
+      const m = raw as { type?: string; phase?: string; current?: number; total?: number }
+      if (m.type === 'ask.indexing') {
+        if (typeof m.current === 'number' && typeof m.total === 'number') {
+          setIndexing({ current: m.current, total: m.total })
+        }
+        if (m.phase === 'done') setIndexing(null)
+      } else if (m.type === 'ask.index_updated') {
+        setIndexing(null)
+        if (query.trim() && !answering && answer.length === 0) {
+          askSearch(query).then(setResults).catch(() => { /* silent */ })
+        }
+      }
+    }
+    registerHandler('ask-modal', handler)
+    return () => unregisterHandler('ask-modal')
+  }, [open, query, answering, answer.length, registerHandler, unregisterHandler])
 
   // First-run picker: 2+ usable providers AND setting unset
   useEffect(() => {
@@ -253,6 +293,12 @@ export function AskHubModal() {
               }}
             />
             <kbd className="text-xs text-foreground/40 px-1.5 py-0.5 rounded bg-background-deep border border-surface">Esc</kbd>
+          </div>
+        )}
+        {indexing && (
+          <div className="px-4 py-2 border-b border-background-deep flex items-center gap-2 text-[11px] text-accent-info">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent-info animate-pulse" />
+            <span>Indexing project… {indexing.total > 0 ? `${Math.round((indexing.current / indexing.total) * 100)}%` : ''}</span>
           </div>
         )}
 
