@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.57.1](https://github.com/fjpulidop/specrails-hub/compare/v1.57.0...v1.57.1) (2026-05-25)
+
+
+### Bug Fixes
+
+* **desktop:** allow wasm-unsafe-eval in CSP for Monaco ([#322](https://github.com/fjpulidop/specrails-hub/issues/322)) ([c755369](https://github.com/fjpulidop/specrails-hub/commit/c75536908858b28c9cd24ea4afdf4b669732605b))
+
 ## [1.57.0](https://github.com/fjpulidop/specrails-hub/compare/v1.56.0...v1.57.0) (2026-05-23)
 
 
