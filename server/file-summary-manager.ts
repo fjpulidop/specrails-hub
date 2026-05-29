@@ -391,6 +391,20 @@ export class FileSummaryManager {
       }
       this.deps.broadcast(buildSummaryUpdated(req.projectId, payload, false))
       this.deps.broadcast({ type: 'spending.invalidated', projectId: req.projectId })
+      // Ask-the-Hub: incremental re-index of this file summary.
+      void (async () => {
+        try {
+          const { isAskHubEnabled } = await import('./feature-flags')
+          if (!isAskHubEnabled()) return
+          const ask = await import('./ask/indexer')
+          const chunker = await import('./ask/chunker')
+          await ask.upsertDoc(this.deps.db, req.projectId, chunker.chunkFileSummary({
+            file_path: payload.path,
+            summary: payload.summary,
+            updated_at: payload.generatedAt,
+          }))
+        } catch { /* best effort */ }
+      })()
       entry.resolve('enqueued')
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err)

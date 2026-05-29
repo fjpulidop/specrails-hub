@@ -510,12 +510,22 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
   it('adds a webhook successfully and reloads list', async () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })            // GET settings
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })     // GET webhooks (initial)
-      .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })         // GET budget
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhook: mockWebhook }) }) // POST webhook
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [mockWebhook] }) }) // GET webhooks (reload)
+    // URL-routed mock so the test doesn't break each time a new settings
+    // section is added to GlobalSettingsPage (each mounts its own fetch).
+    let webhookReloaded = false
+    global.fetch = vi.fn((url: string, init?: { method?: string }) => {
+      const u = String(url)
+      if (u.includes('/api/hub/webhooks')) {
+        if (init?.method === 'POST') return Promise.resolve({ ok: true, json: async () => ({ webhook: mockWebhook }) })
+        webhookReloaded = true
+        return Promise.resolve({ ok: true, json: async () => ({ webhooks: webhookReloaded ? [mockWebhook] : [] }) })
+      }
+      if (u.includes('/api/hub/budget')) return Promise.resolve({ ok: true, json: async () => budgetResponse })
+      if (u.includes('/api/hub/terminal-settings')) return Promise.resolve({ ok: true, json: async () => defaultTerminalSettings })
+      if (u.includes('/api/hub/ask-settings')) return Promise.resolve({ ok: true, json: async () => ({ provider: null, answerModel: { claude: 'x', codex: 'y' }, reranker: 'heuristic', autoIndexOnFirstOpen: true, hotkey: null, monthlyBudgetUsd: 5 }) })
+      if (u.includes('/api/hub/code-explorer-settings')) return Promise.resolve({ ok: true, json: async () => ({ language: 'en', monthlyBudgetUsd: 5 }) })
+      return Promise.resolve({ ok: true, json: async () => hubSettings })
+    })
 
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
@@ -531,12 +541,18 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
   it('shows error when adding webhook fails with server message', async () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })
-      .mockResolvedValueOnce({ ok: true, json: async () => defaultTerminalSettings })
-      .mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'Invalid URL' }) })
+    global.fetch = vi.fn((url: string, init?: { method?: string }) => {
+      const u = String(url)
+      if (u.includes('/api/hub/webhooks')) {
+        if (init?.method === 'POST') return Promise.resolve({ ok: false, json: async () => ({ error: 'Invalid URL' }) })
+        return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
+      }
+      if (u.includes('/api/hub/budget')) return Promise.resolve({ ok: true, json: async () => budgetResponse })
+      if (u.includes('/api/hub/terminal-settings')) return Promise.resolve({ ok: true, json: async () => defaultTerminalSettings })
+      if (u.includes('/api/hub/ask-settings')) return Promise.resolve({ ok: true, json: async () => ({ provider: null, answerModel: { claude: 'x', codex: 'y' }, reranker: 'heuristic', autoIndexOnFirstOpen: true, hotkey: null, monthlyBudgetUsd: 5 }) })
+      if (u.includes('/api/hub/code-explorer-settings')) return Promise.resolve({ ok: true, json: async () => ({ language: 'en', monthlyBudgetUsd: 5 }) })
+      return Promise.resolve({ ok: true, json: async () => hubSettings })
+    })
 
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {

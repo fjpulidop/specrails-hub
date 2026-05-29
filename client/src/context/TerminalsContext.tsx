@@ -680,8 +680,8 @@ function ensureXtermForSession(
       event.preventDefault()
       return false
     }
-    // Cmd+K — clear scrollback.
-    if (key === 'k' || key === 'K') {
+    // Cmd+K — clear scrollback. Excludes Cmd+Shift+K which opens Ask the Hub.
+    if ((key === 'k' || key === 'K') && !event.shiftKey) {
       try { term.clear() } catch { /* ignore */ }
       event.preventDefault()
       return false

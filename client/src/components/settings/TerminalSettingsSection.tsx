@@ -54,7 +54,7 @@ export function TerminalSettingsSection({ mode }: Props) {
       try {
         if (mode === 'hub') {
           const res = await fetch('/api/hub/terminal-settings')
-          if (!res.ok) throw new Error('hub fetch failed')
+          if (!res || !res.ok) throw new Error('hub fetch failed')
           const body = (await res.json()) as TerminalSettings
           if (!cancelled && body && typeof body === 'object' && 'fontSize' in body) {
             setHub(body); setSavedResolved(body); setDraft(body)
@@ -63,7 +63,7 @@ export function TerminalSettingsSection({ mode }: Props) {
           if (!cancelled) setLoading(false)
         } else if (activeProjectId) {
           const res = await fetch(`/api/projects/${activeProjectId}/terminal-settings`)
-          if (!res.ok) throw new Error('project fetch failed')
+          if (!res || !res.ok) throw new Error('project fetch failed')
           const body = (await res.json()) as ProjectResponse
           if (!cancelled && body && typeof body === 'object' && body.resolved && body.hubDefaults) {
             setHub(body.hubDefaults); setOverride(body.override ?? {}); setSavedResolved(body.resolved); setDraft(body.resolved)

@@ -10,7 +10,7 @@ import { resolveCommand } from './command-resolver'
 import { spawnAiCli } from './util/cli-prompt'
 import { resetPhases, setActivePhases } from './hooks'
 import { recordInvocation } from './ai-invocations'
-import { isCodeExplorerEnabled } from './feature-flags'
+import { isCodeExplorerEnabled, isAskHubEnabled as isAskHubEnabledLocal } from './feature-flags'
 import {
   snapshotWorkingTree,
   diffAgainstSnapshot,
@@ -1133,6 +1133,41 @@ export class QueueManager {
         } catch (err) {
           console.warn(`[queue-manager] provenance recording failed: ${(err as Error).message}`)
         }
+      }
+
+      // Ask-the-Hub incremental index — upsert a `job` doc plus any newly
+      // touched ticket docs. Fire-and-forget; failures never affect the rail.
+      if (isAskHubEnabledLocal() && this._cwd && this._projectId) {
+        const projectId = this._projectId
+        const projectPath = this._cwd
+        const db = this._db
+        const command = job.command
+        const broadcast = this._broadcast as unknown as (m: Record<string, unknown>) => void
+        void (async () => {
+          try {
+            const ask = await import('./ask/indexer')
+            const chunker = await import('./ask/chunker')
+            const enumerator = await import('./ask/enumerator')
+            // Job doc
+            await ask.upsertDoc(db, projectId, chunker.chunkJob({
+              id: jobId, command, status: finalStatus, finished_at: new Date().toISOString(),
+            }))
+            // Touched tickets
+            const ticketIds = this._extractTicketIds(command)
+            if (ticketIds.length > 0) {
+              const ctx = { db, projectPath, projectStateDir: '' }
+              const tickets = enumerator.enumerateTickets(ctx)
+              for (const t of tickets) {
+                if (t.ticket_id != null && ticketIds.includes(Number(t.ticket_id))) {
+                  await ask.upsertDoc(db, projectId, t)
+                }
+              }
+            }
+            broadcast({ type: 'ask.index_updated', added: 0, updated: 1 })
+          } catch (err) {
+            console.warn(`[queue-manager] ask reindex failed: ${(err as Error).message}`)
+          }
+        })()
       }
 
       // Cost comes from the normalised result so providers without a native

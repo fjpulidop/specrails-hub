@@ -1,0 +1,6 @@
+# Ask-the-Hub bundled embedding model (multilingual-e5-small ONNX, ~118MB
+# quantized). Tracked via Git LFS so it ships with the desktop installer
+# without bloating regular git ops. CI for unit tests does NOT need LFS
+# files since the embedder is mocked at module boundary; set `lfs: true`
+# on the desktop-release workflow checkout step only.
+src-tauri/binaries/embeddings/** filter=lfs diff=lfs merge=lfs -text

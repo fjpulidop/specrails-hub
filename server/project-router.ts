@@ -1,4 +1,5 @@
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
 import { Router, Request, Response, NextFunction } from 'express'
 import { newId as uuidv4 } from './ids'
@@ -64,6 +65,7 @@ import { createRailsRouter } from './rails-router'
 import { createProfilesRouter } from './profiles-router'
 import { createPluginsRouter } from './plugins-router'
 import { createCodeExplorerRouter } from './code-explorer-router'
+import { createAskRouter } from './ask-router'
 import {
   getHubTerminalSettings,
   getProjectOverride,
@@ -401,6 +403,21 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       fileSummaryManager: projectCtx.fileSummaryManager,
     })
     codeRouter(req, res, next)
+  })
+
+  // Mount Ask-the-Hub router (project-scoped).
+  router.use('/:projectId/ask', (req: Request, res: Response, next: NextFunction) => {
+    const projectCtx = ctx(req)
+    const askRouter = createAskRouter({
+      db: projectCtx.db,
+      hubDb: registry.hubDb,
+      projectId: projectCtx.project.id,
+      projectPath: projectCtx.project.path,
+      projectStateDir: path.join(os.homedir(), '.specrails', 'projects', projectCtx.project.id),
+      projectProvider: projectCtx.project.provider ?? 'claude',
+      broadcast: projectCtx.broadcast as unknown as (msg: Record<string, unknown>) => void,
+    })
+    askRouter(req, res, next)
   })
 
   // ─── Queue / Spawn routes ────────────────────────────────────────────────────
