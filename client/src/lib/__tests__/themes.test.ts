@@ -11,8 +11,8 @@ import {
 
 describe('themes', () => {
   describe('THEME_IDS allow-list', () => {
-    it('contains the four documented built-in themes', () => {
-      expect([...THEME_IDS]).toEqual(['dracula', 'aurora-light', 'obsidian-dark', 'matrix'])
+    it('contains the five documented built-in themes', () => {
+      expect([...THEME_IDS]).toEqual(['dracula', 'aurora-light', 'obsidian-dark', 'matrix', 'specrails'])
     })
 
     it('THEMES has an entry for every ThemeId', () => {
@@ -42,8 +42,8 @@ describe('themes', () => {
   })
 
   describe('DEFAULT_THEME', () => {
-    it('is dracula', () => {
-      expect(DEFAULT_THEME).toBe('dracula')
+    it('is specrails', () => {
+      expect(DEFAULT_THEME).toBe('specrails')
     })
 
     it('is in the allow-list', () => {

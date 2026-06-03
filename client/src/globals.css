@@ -207,6 +207,45 @@
   --glass-card-opacity:          30%;
 }
 
+/* ─── SpecRails (brand theme — deep navy-indigo, saturated cyan) ─── */
+[data-theme="specrails"] {
+  --color-background:             hsl(240 35% 4%);    /* deep navy-indigo */
+  --color-foreground:             hsl(240 20% 94%);
+  --color-card:                   hsl(238 30% 9%);
+  --color-card-foreground:        hsl(240 20% 94%);
+  --color-popover:                hsl(240 35% 4%);
+  --color-popover-foreground:     hsl(240 20% 94%);
+  --color-primary:                hsl(187 100% 41%);  /* saturated cyan */
+  --color-primary-foreground:     hsl(240 35% 4%);
+  --color-secondary:              hsl(238 26% 13%);
+  --color-secondary-foreground:   hsl(240 20% 94%);
+  --color-muted:                  hsl(238 26% 13%);
+  --color-muted-foreground:       hsl(240 12% 58%);
+  --color-accent:                 hsl(238 26% 13%);
+  --color-accent-foreground:      hsl(240 20% 94%);
+  --color-destructive:            hsl(12 78% 52%);
+  --color-destructive-foreground: hsl(240 35% 4%);
+  --color-border:                 hsl(240 20% 100% / 0.08);
+  --color-input:                  hsl(238 26% 13%);
+  --color-ring:                   hsl(187 100% 41%);
+
+  --color-accent-primary:    hsl(187 100% 41%);  /* cyan */
+  --color-accent-info:       hsl(191 97% 50%);   /* electric cyan */
+  --color-accent-success:    hsl(152 80% 44%);   /* emerald */
+  --color-accent-secondary:  hsl(280 38% 57%);   /* violet */
+  --color-accent-warning:    hsl(42 90% 56%);    /* amber */
+  --color-accent-highlight:  hsl(248 70% 63%);   /* indigo */
+  --color-surface:           hsl(238 30% 9%);
+  --color-background-deep:   hsl(240 38% 2%);
+
+  --color-scrollbar-thumb:       hsl(240 20% 50% / 0.35);
+  --color-scrollbar-thumb-hover: hsl(240 20% 60% / 0.55);
+  --color-prose-table-stripe:    hsl(238 30% 9% / 0.5);
+  --color-prose-table-header:    hsl(238 30% 9% / 0.8);
+  --color-toast-shadow:          hsl(240 38% 1% / 0.65);
+  --glass-card-opacity:          28%;
+}
+
 @layer base {
   *,
   *::before,

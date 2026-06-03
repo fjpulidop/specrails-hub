@@ -12,7 +12,7 @@
  * No component code changes required (OCP).
  */
 
-export const THEME_IDS = ['dracula', 'aurora-light', 'obsidian-dark', 'matrix'] as const
+export const THEME_IDS = ['dracula', 'aurora-light', 'obsidian-dark', 'matrix', 'specrails'] as const
 export type ThemeId = (typeof THEME_IDS)[number]
 
 /**
@@ -25,7 +25,7 @@ export function isThemeId(v: unknown): v is ThemeId {
   return typeof v === 'string' && (THEME_IDS as readonly string[]).includes(v)
 }
 
-export const DEFAULT_THEME: ThemeId = 'dracula'
+export const DEFAULT_THEME: ThemeId = 'specrails'
 
 /**
  * Full xterm.js theme. Mirrors `ITheme` from xterm — duplicated to avoid a
@@ -327,6 +327,66 @@ const MATRIX: ThemeDescriptor = {
   },
 }
 
+// ─── SpecRails ─────────────────────────────────────────────────────────────
+
+const SPECRAILS_PALETTE = {
+  bg:          'hsl(240 35% 4%)',
+  card:        'hsl(238 30% 9%)',
+  bgDeep:      'hsl(240 38% 2%)',
+  fg:          'hsl(240 20% 94%)',
+  muted:       'hsl(240 12% 58%)',
+  primary:     'hsl(187 100% 41%)',   // cyan
+  secondary:   'hsl(280 38% 57%)',    // violet
+  success:     'hsl(152 80% 44%)',    // emerald
+  info:        'hsl(191 97% 50%)',    // electric cyan
+  warning:     'hsl(42 90% 56%)',     // amber
+  highlight:   'hsl(248 70% 63%)',    // indigo
+  destructive: 'hsl(12 78% 52%)',     // tomato-red
+} as const
+
+const SPECRAILS: ThemeDescriptor = {
+  id: 'specrails',
+  displayName: 'SpecRails',
+  tagline: 'Brand theme — deep navy-indigo with saturated cyan accents',
+  scheme: 'dark',
+  previewSwatches: {
+    background: SPECRAILS_PALETTE.bg,
+    foreground: SPECRAILS_PALETTE.fg,
+    accents: [SPECRAILS_PALETTE.primary, SPECRAILS_PALETTE.highlight, SPECRAILS_PALETTE.secondary, SPECRAILS_PALETTE.success],
+  },
+  xterm: {
+    background:          SPECRAILS_PALETTE.bg,
+    foreground:          SPECRAILS_PALETTE.fg,
+    cursor:              SPECRAILS_PALETTE.primary,
+    cursorAccent:        SPECRAILS_PALETTE.bg,
+    selectionBackground: 'hsl(240 30% 22%)',
+    black:               'hsl(240 35% 8%)',
+    red:                 SPECRAILS_PALETTE.destructive,
+    green:               SPECRAILS_PALETTE.success,
+    yellow:              SPECRAILS_PALETTE.warning,
+    blue:                SPECRAILS_PALETTE.highlight,
+    magenta:             SPECRAILS_PALETTE.secondary,
+    cyan:                SPECRAILS_PALETTE.primary,
+    white:               SPECRAILS_PALETTE.fg,
+    brightBlack:         SPECRAILS_PALETTE.muted,
+    brightRed:           'hsl(12 78% 66%)',
+    brightGreen:         'hsl(152 80% 58%)',
+    brightYellow:        'hsl(42 90% 70%)',
+    brightBlue:          'hsl(248 70% 76%)',
+    brightMagenta:       'hsl(280 38% 70%)',
+    brightCyan:          'hsl(191 97% 65%)',
+    brightWhite:         'hsl(240 20% 100%)',
+  },
+  chart: [SPECRAILS_PALETTE.primary, SPECRAILS_PALETTE.info, SPECRAILS_PALETTE.success, SPECRAILS_PALETTE.secondary, SPECRAILS_PALETTE.warning],
+  status: {
+    completed: SPECRAILS_PALETTE.primary,
+    failed:    SPECRAILS_PALETTE.destructive,
+    canceled:  SPECRAILS_PALETTE.warning,
+    running:   SPECRAILS_PALETTE.info,
+    queued:    SPECRAILS_PALETTE.muted,
+  },
+}
+
 // ─── Public registry ───────────────────────────────────────────────────────
 
 export const THEMES: Record<ThemeId, ThemeDescriptor> = {
@@ -334,6 +394,7 @@ export const THEMES: Record<ThemeId, ThemeDescriptor> = {
   'aurora-light':  AURORA_LIGHT,
   'obsidian-dark': OBSIDIAN_DARK,
   'matrix':        MATRIX,
+  'specrails':     SPECRAILS,
 }
 
 export function getTheme(id: ThemeId): ThemeDescriptor {

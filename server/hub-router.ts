@@ -27,7 +27,7 @@ function slugify(name: string): string {
 
 // Theme allow-list. Mirror of THEME_IDS in `client/src/lib/themes.ts` —
 // kept duplicated to avoid pulling client code into the server bundle.
-const THEME_ID_ALLOWLIST = new Set<string>(['dracula', 'aurora-light', 'obsidian-dark', 'matrix'])
+const THEME_ID_ALLOWLIST = new Set<string>(['dracula', 'aurora-light', 'obsidian-dark', 'matrix', 'specrails'])
 
 // LOW-04: Deny registration of system-critical directory paths.
 const DENIED_PATH_PREFIXES = [

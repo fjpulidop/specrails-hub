@@ -23,13 +23,14 @@ describe('AppearanceSection', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders all four theme cards', () => {
+  it('renders all five theme cards', () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(ok({ theme: 'dracula' }))
     render(<ThemeProvider><AppearanceSection /></ThemeProvider>)
     expect(screen.getByTestId('theme-card-dracula')).toBeInTheDocument()
     expect(screen.getByTestId('theme-card-aurora-light')).toBeInTheDocument()
     expect(screen.getByTestId('theme-card-obsidian-dark')).toBeInTheDocument()
     expect(screen.getByTestId('theme-card-matrix')).toBeInTheDocument()
+    expect(screen.getByTestId('theme-card-specrails')).toBeInTheDocument()
   })
 
   it('matrix card is selectable and updates the active theme', async () => {
@@ -100,6 +101,6 @@ describe('AppearanceSection', () => {
     render(<ThemeProvider><AppearanceSection /></ThemeProvider>)
     const group = screen.getByRole('radiogroup', { name: /theme/i })
     expect(group).toBeInTheDocument()
-    expect(screen.getAllByRole('radio')).toHaveLength(4)
+    expect(screen.getAllByRole('radio')).toHaveLength(5)
   })
 })
