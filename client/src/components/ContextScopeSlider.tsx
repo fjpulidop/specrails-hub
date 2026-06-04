@@ -105,6 +105,9 @@ interface ContextScopeSliderProps {
   maxPresetId?: Preset['id']
   /** Optional callback to expose the active preset id (or 'custom') to the parent. */
   onPresetChange?: (presetId: Preset['id'] | 'custom') => void
+  /** When false, the SMASH-capable hint is not rendered even if contractRefine is
+   *  on. Defaults to true for backward compatibility with all existing call sites. */
+  smashCapable?: boolean
 }
 
 function formatTokens(n: number): string {
@@ -125,6 +128,7 @@ export function ContextScopeSlider({
   model = 'sonnet',
   maxPresetId = 'hub',
   onPresetChange,
+  smashCapable = true,
 }: ContextScopeSliderProps) {
   const railRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -282,7 +286,7 @@ export function ContextScopeSlider({
       <p className="text-[10px] text-muted-foreground" data-testid="scope-cost-line">
         {costLine} · {numericLine}
       </p>
-      {value.contractRefine && (
+      {value.contractRefine && smashCapable && (
         <div
           className="flex items-start gap-1.5 rounded-md border border-accent-highlight/40 bg-accent-highlight/10 px-2 py-1.5 text-[10px] text-foreground/80"
           data-testid="scope-smash-hint"

@@ -78,6 +78,7 @@ import {
   TerminalLimitExceededError,
   TerminalNotFoundError,
   TerminalNameInvalidError,
+  TerminalSpawnError,
   TERMINAL_MAX_PER_PROJECT,
 } from './terminal-manager'
 
@@ -647,6 +648,54 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     }
   })
 
+  // Must be registered BEFORE /:projectId/jobs/:id, otherwise Express matches
+  // the parameterized route first with id='compare' and this never runs (the
+  // Job Comparison feature would always 404).
+  router.get('/:projectId/jobs/compare', (req: Request, res: Response) => {
+    const raw = req.query.jobIds as string | undefined
+    if (!raw) {
+      res.status(400).json({ error: 'jobIds query param required (comma-separated, exactly 2)' })
+      return
+    }
+    const ids = raw.split(',').map((s) => s.trim()).filter(Boolean)
+    if (ids.length !== 2) {
+      res.status(400).json({ error: 'Exactly 2 jobIds are required' })
+      return
+    }
+    const { db } = ctx(req)
+    const rows = ids.map((id) => {
+      const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as {
+        id: string; command: string; status: string; started_at: string; finished_at: string | null
+        duration_ms: number | null; tokens_in: number | null; tokens_out: number | null
+        tokens_cache_read: number | null; total_cost_usd: number | null; model: string | null
+      } | undefined
+      if (!job) return null
+      const phases = db.prepare(
+        "SELECT phase FROM job_phases WHERE job_id = ? AND state = 'done' ORDER BY updated_at ASC"
+      ).all(id) as Array<{ phase: string }>
+      return {
+        id: job.id,
+        command: job.command,
+        status: job.status,
+        startedAt: job.started_at,
+        finishedAt: job.finished_at,
+        durationMs: job.duration_ms,
+        tokensIn: job.tokens_in,
+        tokensOut: job.tokens_out,
+        tokensCacheRead: job.tokens_cache_read,
+        totalCostUsd: job.total_cost_usd,
+        model: job.model,
+        phasesCompleted: phases.map((p) => p.phase),
+      }
+    })
+    const missing = ids.filter((_, i) => rows[i] === null)
+    if (missing.length > 0) {
+      res.status(404).json({ error: `Jobs not found: ${missing.join(', ')}` })
+      return
+    }
+    res.json({ jobs: rows })
+  })
+
   router.get('/:projectId/jobs/:id', (req: Request, res: Response) => {
     const { db, queueManager, project } = ctx(req)
     const jobId = req.params.id as string
@@ -911,51 +960,6 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       : s
   }
 
-  router.get('/:projectId/jobs/compare', (req: Request, res: Response) => {
-    const raw = req.query.jobIds as string | undefined
-    if (!raw) {
-      res.status(400).json({ error: 'jobIds query param required (comma-separated, exactly 2)' })
-      return
-    }
-    const ids = raw.split(',').map((s) => s.trim()).filter(Boolean)
-    if (ids.length !== 2) {
-      res.status(400).json({ error: 'Exactly 2 jobIds are required' })
-      return
-    }
-    const { db } = ctx(req)
-    const rows = ids.map((id) => {
-      const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as {
-        id: string; command: string; status: string; started_at: string; finished_at: string | null
-        duration_ms: number | null; tokens_in: number | null; tokens_out: number | null
-        tokens_cache_read: number | null; total_cost_usd: number | null; model: string | null
-      } | undefined
-      if (!job) return null
-      const phases = db.prepare(
-        "SELECT phase FROM job_phases WHERE job_id = ? AND state = 'done' ORDER BY updated_at ASC"
-      ).all(id) as Array<{ phase: string }>
-      return {
-        id: job.id,
-        command: job.command,
-        status: job.status,
-        startedAt: job.started_at,
-        finishedAt: job.finished_at,
-        durationMs: job.duration_ms,
-        tokensIn: job.tokens_in,
-        tokensOut: job.tokens_out,
-        tokensCacheRead: job.tokens_cache_read,
-        totalCostUsd: job.total_cost_usd,
-        model: job.model,
-        phasesCompleted: phases.map((p) => p.phase),
-      }
-    })
-    const missing = ids.filter((_, i) => rows[i] === null)
-    if (missing.length > 0) {
-      res.status(404).json({ error: `Jobs not found: ${missing.join(', ')}` })
-      return
-    }
-    res.json({ jobs: rows })
-  })
-
   router.get('/:projectId/config', (req: Request, res: Response) => {
     const { project, db } = ctx(req)
     try {
@@ -1104,7 +1108,14 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     let scope: ContextScope | undefined
     if (kind === 'explore') {
       const fallback = getLastContextScope(db, 'explore')
-      scope = normalizeContextScope(rawScope ?? fallback, fallback)
+      // Defence-in-depth: SMASH is Claude-only. Strip contractRefine from the scope
+      // when the project uses a non-Claude provider so no downstream code (Contract
+      // Refine Runner, SMASH eligibility) sees a mismatched flag.
+      const safeRawScope =
+        provider !== 'claude' && rawScope != null
+          ? { ...rawScope, contractRefine: false }
+          : rawScope
+      scope = normalizeContextScope(safeRawScope ?? fallback, fallback)
       setLastContextScope(db, scope)
       console.log(`[project-router] new explore conv ${id} scope=${JSON.stringify(scope)} rawScope=${JSON.stringify(rawScope)}`)
     }
@@ -1128,6 +1139,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     if (!conversation) { res.status(404).json({ error: 'Conversation not found' }); return }
     deleteConversation(db, convId)
     chatManager?.forgetSpecDraft(convId)
+    chatManager?.forgetExploreLifecycle(convId)
     // Cascade-clear origin_conversation_id on any ticket that referenced this
     // conversation (application-level "ON DELETE SET NULL").
     try {
@@ -1848,6 +1860,28 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       cwd: project.path,
     })
 
+    // Watchdog: unlike ai-edit, generate-spec keeps no cancellable handle, so a
+    // hung CLI (network stall, model never emitting a terminating event) would
+    // otherwise leak this child + its readline for the hub's lifetime. Cap is
+    // generous — the 'full' scope can legitimately run minutes and --max-turns
+    // bounds turns, not wall-clock. Cleared on close/error.
+    const GENERATE_SPEC_TIMEOUT_MS = 8 * 60 * 1000
+    let specGenWatchdog: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      specGenWatchdog = null
+      if (child.pid) {
+        try { treeKill(child.pid, 'SIGTERM') } catch { /* best-effort */ }
+      }
+      broadcast({
+        type: 'spec_gen_error', projectId, requestId,
+        error: `Spec generation timed out after ${Math.round(GENERATE_SPEC_TIMEOUT_MS / 1000)}s`,
+        timestamp: new Date().toISOString(),
+      } as SpecGenErrorMessage)
+    }, GENERATE_SPEC_TIMEOUT_MS)
+    if (typeof specGenWatchdog.unref === 'function') specGenWatchdog.unref()
+    const clearSpecGenWatchdog = () => {
+      if (specGenWatchdog) { clearTimeout(specGenWatchdog); specGenWatchdog = null }
+    }
+
     // Capture stderr so failures (auth missing, model errors, etc.) surface
     // in the server log instead of being swallowed.
     let stderrBuf = ''
@@ -1863,6 +1897,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     // an unhandled 'error' event and crashes the entire hub process.
     /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
     child.on('error', (err) => {
+      clearSpecGenWatchdog()
       console.error(`[project-router] spec-gen spawn failed (${binary}): ${err.message}`)
       const errMsg: SpecGenErrorMessage = {
         type: 'spec_gen_error', projectId, requestId,
@@ -1934,6 +1969,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     })
 
     child.on('close', async (code) => {
+      clearSpecGenWatchdog()
       let createdTicketId: number | null = null
 
       if (code === 0 && buffer.trim()) {
@@ -2599,7 +2635,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     try {
       const filePath = ticketPath(req)
       const result = applyDeleteEpicChildren(filePath, ticketId)
-      ticketWatcher.notifyHubWrite(0)
+      // Pass the real post-write revision (not 0) so the chokidar echo is
+      // suppressed; a hardcoded 0 never matches the on-disk revision and
+      // triggers a spurious full-refresh broadcast to every client.
+      ticketWatcher.notifyHubWrite(result.revision)
       const now = new Date().toISOString()
       for (const id of result.deletedChildren) {
         broadcast({
@@ -3020,6 +3059,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
           if (conv && (conv as { kind?: string }).kind === 'explore') {
             deleteConversation(db, orphanedConversationId)
             chatManager?.forgetSpecDraft(orphanedConversationId)
+            chatManager?.forgetExploreLifecycle(orphanedConversationId)
           }
         } catch (err) {
           console.error('[project-router] orphan conversation cleanup failed:', err)
@@ -3132,7 +3172,15 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       return
     }
     res.setHeader('Content-Type', meta.mimeType)
-    res.setHeader('Content-Disposition', `inline; filename="${meta.filename.replace(/"/g, '')}"`)
+    // Strip quotes AND CR/LF: a newline in the stored (raw) original filename
+    // makes Node's setHeader throw ERR_INVALID_CHAR after Content-Type is
+    // already set, 500-ing the download. Also emit an RFC 5987 filename* so
+    // non-ASCII names survive.
+    const asciiName = meta.filename.replace(/[\r\n"]/g, '_')
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(meta.filename)}`,
+    )
     fs.createReadStream(abs).pipe(res)
   })
 
@@ -3215,6 +3263,14 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       }
       if (err instanceof TerminalNameInvalidError) {
         res.status(400).json({ error: 'terminal_name_invalid' })
+        return
+      }
+      if (err instanceof TerminalSpawnError) {
+        // The shell failed to spawn (commonly the host running out of file
+        // descriptors). Surface a concrete, actionable reason — a bare 500 hid
+        // this and made the "+" button look like it did nothing.
+        console.error('[project-router] terminal spawn failed:', err.reason, err.message)
+        res.status(502).json({ error: 'terminal_spawn_failed', reason: err.reason })
         return
       }
       console.error('[project-router] terminal create error:', err)

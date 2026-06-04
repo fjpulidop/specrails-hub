@@ -124,6 +124,27 @@ describe('ContextScopeSlider', () => {
     expect(screen.getByTestId('scope-smash-hint')).toBeInTheDocument()
   })
 
+  it('hides the SMASH hint when smashCapable=false even if contractRefine is true', () => {
+    render(<ContextScopeSlider value={MAX_SCOPE} onChange={() => {}} smashCapable={false} />)
+    expect(screen.queryByTestId('scope-smash-hint')).not.toBeInTheDocument()
+  })
+
+  it('hides the SMASH hint when smashCapable=false with Hub preset', () => {
+    render(<ContextScopeSlider value={HUB} onChange={() => {}} smashCapable={false} />)
+    expect(screen.queryByTestId('scope-smash-hint')).not.toBeInTheDocument()
+  })
+
+  it('shows the SMASH hint when both contractRefine and smashCapable are true', () => {
+    render(<ContextScopeSlider value={MAX_SCOPE} onChange={() => {}} smashCapable={true} />)
+    expect(screen.getByTestId('scope-smash-hint')).toBeInTheDocument()
+  })
+
+  it('defaults smashCapable to true (backward-compatible with existing callers)', () => {
+    // Omitting smashCapable must still show the hint when contractRefine is on
+    render(<ContextScopeSlider value={HUB} onChange={() => {}} />)
+    expect(screen.getByTestId('scope-smash-hint')).toBeInTheDocument()
+  })
+
   it('can cap the visible scale at Max', () => {
     const onChange = vi.fn()
     render(<ContextScopeSlider value={STANDARD} onChange={onChange} maxPresetId="max" />)

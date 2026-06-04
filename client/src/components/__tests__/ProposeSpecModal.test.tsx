@@ -376,6 +376,45 @@ describe('ProposeSpecModal', () => {
     })
   })
 
+  it('hides scope-smash-hint for a codex project at Max and Hub presets', async () => {
+    // Override the fetch mock so the default-spec-model endpoint returns provider='codex'
+    ;(global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/default-spec-model')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            model: 'codex-mini',
+            provider: 'codex',
+            allowed: [{ value: 'codex-mini', label: 'Codex Mini' }],
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) })
+    })
+
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    await waitFor(() => expect(screen.getByTestId('context-scope-slider')).toBeInTheDocument())
+
+    // Max preset — contractRefine=true but provider is codex → smash hint must NOT appear
+    fireEvent.click(screen.getByTestId('scope-stop-max'))
+    expect(screen.queryByTestId('scope-smash-hint')).not.toBeInTheDocument()
+
+    // Switch to Explore mode — Hub preset (also contractRefine=true) still no hint
+    const exploreTab = screen.getAllByRole('tab').find((t) => t.textContent?.toLowerCase().includes('explore'))!
+    fireEvent.click(exploreTab)
+    await waitFor(() => expect(screen.getByTestId('scope-stop-hub')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('scope-stop-hub'))
+    expect(screen.queryByTestId('scope-smash-hint')).not.toBeInTheDocument()
+  })
+
+  it('shows scope-smash-hint for a claude project at Max preset', async () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    await waitFor(() => expect(screen.getByTestId('context-scope-slider')).toBeInTheDocument())
+    // Move to Max preset (contractRefine=true) — provider defaults to claude in beforeEach
+    fireEvent.click(screen.getByTestId('scope-stop-max'))
+    expect(screen.getByTestId('scope-smash-hint')).toBeInTheDocument()
+  })
+
   it('registers fast spec with tracker when explore codebase is unchecked', async () => {
     ;(global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       if (typeof url === 'string' && url.includes('/default-spec-model')) {
