@@ -33,7 +33,7 @@ function normaliseModel(model: string | null | undefined): string {
     case 'claude-sonnet-4-0':
     case 'claude-sonnet-4-20250514':
       return 'sonnet'
-    case 'claude-opus-4-7':
+    case 'claude-opus-4-8':
     case 'claude-opus-4-5':
     case 'claude-opus-4-1-20250805':
     case 'claude-opus-4-20250514':

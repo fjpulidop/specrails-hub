@@ -301,7 +301,7 @@ export function formatDescriptionWithCriteria(body: string, criteria: string[]):
  * Order:
  *   1. `models.defaults.model` from `<project>/.specrails/install-config.yaml`,
  *      if it parses AND is in the provider allow-list.
- *   2. Provider default from `PROVIDER_DEFAULT_MODEL` (`sonnet` / `gpt-5.4-mini`).
+ *   2. Provider default from `PROVIDER_DEFAULT_MODEL` (`sonnet` / `gpt-5.5`).
  *
  * Logs a warning when the configured value exists but is not valid for the
  * project's provider.
@@ -2879,8 +2879,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
     if (provider === 'codex') {
       binary = 'codex'
-      // Use gpt-5.4-mini (balanced preset default for Codex per CODEX_MODELS/PRESET_DEFAULTS in ModelSelector); never hardcode o4-mini
-      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'gpt-5.4-mini']
+      // Use gpt-5.5 (default for Codex per CODEX_MODELS/PRESET_DEFAULTS in ModelSelector); never hardcode o4-mini
+      args = ['exec', `${systemPrompt}\n\n${userPrompt}`, '--model', 'gpt-5.5']
     } else {
       binary = 'claude'
       args = [

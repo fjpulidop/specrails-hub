@@ -3127,8 +3127,8 @@ describe('project-router', () => {
       const res = await request(app).get('/api/projects/proj-1/default-spec-model')
       expect(res.status).toBe(200)
       expect(res.body.provider).toBe('codex')
-      expect(res.body.model).toBe('gpt-5.4-mini')
-      expect(res.body.allowed.map((m: { value: string }) => m.value)).toEqual(['gpt-5.4-mini', 'gpt-5.4', 'gpt-5.3-codex'])
+      expect(res.body.model).toBe('gpt-5.5')
+      expect(res.body.allowed.map((m: { value: string }) => m.value)).toEqual(['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex'])
     })
 
     it('honors install-config defaults.model when valid', async () => {

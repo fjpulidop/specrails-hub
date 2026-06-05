@@ -38,8 +38,8 @@ describe('getDefaultModel', () => {
     expect(getDefaultModel('sr-developer', 'budget', 'codex')).toBe('gpt-5.4-mini')
   })
 
-  it('returns gpt-5.4-mini for architect in balanced preset (codex)', () => {
-    expect(getDefaultModel('sr-architect', 'balanced', 'codex')).toBe('gpt-5.4-mini')
+  it('returns gpt-5.5 for architect in balanced preset (codex)', () => {
+    expect(getDefaultModel('sr-architect', 'balanced', 'codex')).toBe('gpt-5.5')
   })
 
   it('returns o3 for sr-architect in max preset (codex)', () => {
@@ -50,8 +50,8 @@ describe('getDefaultModel', () => {
     expect(getDefaultModel('sr-product-manager', 'max', 'codex')).toBe('gpt-5.3-codex')
   })
 
-  it('returns gpt-5.4-mini for sr-developer in max preset (codex)', () => {
-    expect(getDefaultModel('sr-developer', 'max', 'codex')).toBe('gpt-5.4-mini')
+  it('returns gpt-5.5 for sr-developer in max preset (codex)', () => {
+    expect(getDefaultModel('sr-developer', 'max', 'codex')).toBe('gpt-5.5')
   })
 
   it('returns gpt-5.4-mini for any agent in budget preset (codex)', () => {
@@ -165,6 +165,6 @@ describe('ModelSelector', () => {
       />
     )
     // Codex model names should appear (GPT-5.x lineup)
-    expect(screen.getAllByText(/GPT-5\.4 Mini/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/GPT-5\.5/i).length).toBeGreaterThan(0)
   })
 })

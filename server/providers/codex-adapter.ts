@@ -30,9 +30,9 @@ const WHICH_CMD = process.platform === 'win32' ? 'where' : 'which'
 const CODEX_MIN_VERSION = '0.128.0'
 
 const CODEX_MODELS = [
-  { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini', default: true as const },
+  { value: 'gpt-5.5', label: 'GPT-5.5', default: true as const },
   { value: 'gpt-5.4', label: 'GPT-5.4' },
-  { value: 'gpt-5.5', label: 'GPT-5.5' },
+  { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
   { value: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
 ] as const
 
@@ -258,7 +258,7 @@ export const codexAdapter: ProviderAdapter = {
     systemPromptArg: false,
   },
   modelCatalog: () => CODEX_MODELS,
-  defaultModel: () => 'gpt-5.4-mini',
+  defaultModel: () => 'gpt-5.5',
   buildArgs: buildCodexArgs,
   parseStreamLine: parseCodexStreamLine,
   extractResult: extractCodexResult,

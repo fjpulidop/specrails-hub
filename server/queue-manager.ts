@@ -252,7 +252,7 @@ export class QueueManager {
       getCostAlertThreshold?: () => number | null
       getHubDailyBudget?: () => { budget: number | null; totalSpend: number }
       provider?: 'claude' | 'codex'
-      /** Effective model for codex spawns. If omitted, falls back to 'gpt-5.4-mini'. */
+      /** Effective model for codex spawns. If omitted, falls back to 'gpt-5.5'. */
       resolvedModel?: string
       onJobFinished?: (jobId: string, status: Job['status'], costUsd?: number) => void
       projectId?: string

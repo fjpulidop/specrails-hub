@@ -23,16 +23,17 @@ export const CLAUDE_MODELS = [
 ]
 
 export const CODEX_MODELS = [
-  { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
+  { value: 'gpt-5.5', label: 'GPT-5.5' },
   { value: 'gpt-5.4', label: 'GPT-5.4' },
+  { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
   { value: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
 ]
 
 // Preset → default model per provider (matches specrails-core MODEL_PRESETS)
 export const PRESET_DEFAULTS: Record<ModelPreset, { claude: string; codex: string }> = {
-  balanced: { claude: 'sonnet', codex: 'gpt-5.4-mini' },
+  balanced: { claude: 'sonnet', codex: 'gpt-5.5' },
   budget: { claude: 'haiku', codex: 'gpt-5.4-mini' },
-  max: { claude: 'sonnet', codex: 'gpt-5.4-mini' },
+  max: { claude: 'sonnet', codex: 'gpt-5.5' },
 }
 
 // "max" preset: Opus for architect + PM, Sonnet for rest (matches specrails-core)

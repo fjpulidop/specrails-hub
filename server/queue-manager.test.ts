@@ -1579,7 +1579,7 @@ describe('QueueManager', () => {
       expect(spawnArgs).toContain('gpt-5.3-codex')
     })
 
-    it('defaults to gpt-5.4-mini model when no resolvedModel is set', () => {
+    it('defaults to gpt-5.5 model when no resolvedModel is set', () => {
       vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
@@ -1590,7 +1590,7 @@ describe('QueueManager', () => {
 
       const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
       expect(spawnArgs).toContain('--model')
-      expect(spawnArgs).toContain('gpt-5.4-mini')
+      expect(spawnArgs).toContain('gpt-5.5')
     })
 
     it('translates /specrails:<name> → $<name> when targeting codex', () => {

@@ -140,17 +140,17 @@ describe('ChatInput', () => {
     expect(onModelChange).toHaveBeenCalledWith('opus')
   })
 
-  it('when provider=codex, dropdown lists gpt-5.4-mini as the first option', () => {
+  it('when provider=codex, dropdown lists gpt-5.5 as the first option', () => {
     render(
       <ChatInput
         {...defaultProps}
         provider="codex"
-        model="gpt-5.4-mini"
+        model="gpt-5.5"
       />
     )
     const select = screen.getByRole('combobox') as HTMLSelectElement
     const options = Array.from(select.options).map((o) => o.value)
-    expect(options[0]).toBe('gpt-5.4-mini')
+    expect(options[0]).toBe('gpt-5.5')
     expect(options).toContain('gpt-5.4')
     expect(options).toContain('gpt-5.3-codex')
   })

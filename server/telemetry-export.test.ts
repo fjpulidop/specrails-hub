@@ -27,7 +27,7 @@ function makeJob(overrides: Partial<JobRow> = {}): JobRow {
     tokens_cache_create: 10,
     total_cost_usd: 0.0123,
     num_turns: 5,
-    model: 'claude-opus-4-7',
+    model: 'claude-opus-4-8',
     duration_ms: 300000,
     duration_api_ms: 250000,
     session_id: 'sess-abc',
