@@ -53,6 +53,14 @@ const COMMON_FLAGS = [
   '--tools', 'default',
   '--output-format', 'stream-json',
   '--verbose',
+  // Isolate hub-spawned claude from the *user's* global Claude config. Without
+  // this, the child loads ~/.claude (user CLAUDE.md memory, plugins like
+  // claude-mem, SessionStart hooks). That bled cross-project memory into
+  // Explore turns (e.g. an unrelated "fighting game" surfaced for a fresh
+  // project) and inflated spec-gen tool usage past --max-turns. `project,local`
+  // still loads the target repo's own .claude settings + CLAUDE.md, which is
+  // exactly the context a hub run should see.
+  '--setting-sources', 'project,local',
 ] as const
 
 function buildClaudeArgs(action: SpawnAction, opts: SpawnOptions): string[] {
