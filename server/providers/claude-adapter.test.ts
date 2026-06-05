@@ -95,6 +95,7 @@ describe('claudeAdapter.buildArgs', () => {
       '--tools', 'default',
       '--output-format', 'stream-json',
       '--verbose',
+      '--setting-sources', 'project,local',
       '--system-prompt', 'be brief',
       '-p', 'hello',
     ])

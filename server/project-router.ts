@@ -1841,7 +1841,11 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     // by the codex adapter (it doesn't read extraArgs that don't apply).
     const adapter = getAdapter(provider)
     const toolFlags = provider === 'claude' ? toolFlagsForScope(quickScope) : { args: [] }
-    const claudeMaxTurns = quickScope.full ? 6 : (hasAttachments ? 3 : 1)
+    // Full scope grants Read/Grep/Glob. The model spends turns exploring the
+    // repo before it writes the spec; 6 was too tight (a few tool calls on a
+    // sparse/empty repo hit error_max_turns → exit 1 → opaque failure). 15
+    // leaves comfortable headroom while --max-turns still bounds runaway loops.
+    const claudeMaxTurns = quickScope.full ? 15 : (hasAttachments ? 3 : 1)
     const args = adapter.buildArgs('spec-gen', {
       prompt: userPrompt,
       systemPrompt,
@@ -1972,7 +1976,21 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       clearSpecGenWatchdog()
       let createdTicketId: number | null = null
 
-      if (code === 0 && buffer.trim()) {
+      // When claude burns its whole --max-turns budget it exits non-zero with
+      // a result event of subtype:error_max_turns — but it may already have
+      // emitted a complete spec. Salvage that usable output instead of failing
+      // the whole request on an exit code.
+      const resultSubtype = (lastResultEvent?.subtype as string | undefined) ?? null
+      const hasUsableSpec = buffer.trim().length > 0 && /##\s*Spec Title/i.test(buffer)
+      const salvageMaxTurns = code !== 0 && resultSubtype === 'error_max_turns' && hasUsableSpec
+
+      if ((code === 0 && buffer.trim()) || salvageMaxTurns) {
+        if (salvageMaxTurns) {
+          console.warn(
+            `[project-router] spec-gen salvaged partial output after error_max_turns (${requestId}); ` +
+              `consider raising --max-turns if this recurs`,
+          )
+        }
         // Extract title from generated spec
         const titleMatch = buffer.match(/##\s*Spec Title\s*\n+(.+)/)
         const specTitle = titleMatch ? titleMatch[1].trim() : idea.trim().slice(0, 80)
@@ -2107,7 +2125,11 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
           broadcast(errMsg)
         }
       } else {
-        const reason = code === 0 ? 'Empty response from AI' : `Process exited with code ${code}`
+        const reason = code === 0
+          ? 'Empty response from AI'
+          : resultSubtype === 'error_max_turns'
+            ? 'AI hit its turn limit before finishing the spec. Try again, or narrow the idea / turn off full-codebase context.'
+            : `Process exited with code ${code}`
         console.error(
           `[project-router] spec-gen failed (${requestId}): ${reason}` +
             (stderrBuf.trim() ? `\n  stderr: ${stderrBuf.trim()}` : '') +
