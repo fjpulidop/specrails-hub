@@ -1099,6 +1099,23 @@ describe('SetupManager', () => {
       expect(() => sm.abort('p1')).not.toThrow()
       expect(treeKill).not.toHaveBeenCalled()
     })
+
+    it('escalates SIGTERM to SIGKILL after the grace window for a child that ignores SIGTERM', () => {
+      vi.useFakeTimers()
+      try {
+        const child = createMockChildProcess()
+        vi.mocked(mockSpawn).mockReturnValue(child as any)
+        sm.startInstall('p1', '/path/to/project')
+        sm.abort('p1')
+        expect(treeKill).toHaveBeenCalledWith(child.pid, 'SIGTERM')
+        // No SIGKILL before the grace window.
+        expect(vi.mocked(treeKill).mock.calls.some((c) => c[1] === 'SIGKILL')).toBe(false)
+        vi.advanceTimersByTime(5000)
+        expect(vi.mocked(treeKill).mock.calls.some((c) => c[1] === 'SIGKILL')).toBe(true)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 
   // ─── Stderr handling ───────────────────────────────────────────────────────

@@ -1,0 +1,40 @@
+{
+  "schema_version": "1",
+  "feature": "demote-sr-merge-resolver-optional",
+  "started_at": "2026-06-03T12:44:09.405Z",
+  "updated_at": "2026-06-03T13:23:08.396Z",
+  "phases": {
+    "architect": "done",
+    "developer": "done",
+    "test-writer": "skipped",
+    "doc-sync": "skipped",
+    "reviewer": "done",
+    "ship": "skipped",
+    "ci": "skipped"
+  },
+  "last_successful_phase": "reviewer",
+  "failed_phase": null,
+  "error_context": null,
+  "openspec_artifacts": "openspec/changes/demote-sr-merge-resolver-optional/",
+  "implemented_files": [
+    "client/src/components/AgentSelector.tsx",
+    "server/providers/claude-adapter.ts",
+    "server/providers/codex-adapter.ts",
+    "server/profiles-router.ts",
+    "server/schemas/profile.v1.json",
+    "server/providers/claude-adapter.test.ts",
+    "server/providers/codex-adapter.test.ts",
+    "server/profile-manager.test.ts",
+    "server/profiles-router.test.ts"
+  ],
+  "input": {
+    "issues": [
+      2
+    ],
+    "flags": {
+      "dry_run": false,
+      "apply_mode": false,
+      "single_mode": true
+    }
+  }
+}

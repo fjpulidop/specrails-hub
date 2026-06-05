@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { SharedWebSocketContext } from '../../hooks/useSharedWebSocket'
@@ -19,6 +19,7 @@ const fakeWs = {
 }
 
 const STORAGE_KEY = 'specrails-hub:minimized-chats'
+const PENDING_KEY = 'specrails-hub:minimized-chats-pending'
 
 // ─── Hub mock ────────────────────────────────────────────────────────────
 
@@ -45,7 +46,14 @@ vi.mock('../../hooks/useHub', () => ({
 
 // ─── Test harness ────────────────────────────────────────────────────────
 
-function MinimizeButton({ kind = 'explore-spec' as const, projectId = 'p1', label = 'Test spec', restoreRoute = '/' }) {
+function MinimizeButton({
+  kind = 'explore-spec' as const,
+  projectId = 'p1',
+  label = 'Test spec',
+  restoreRoute = '/',
+  resumeConversationId = 'conv-1' as string | undefined,
+  resumeRefineId = 'ref-1' as string | undefined,
+}) {
   const { minimize } = useMinimizedChats()
   return (
     <button
@@ -62,9 +70,9 @@ function MinimizeButton({ kind = 'explore-spec' as const, projectId = 'p1', labe
                   initialIdea: 'idea',
                   pendingSpecId: 'pending-1',
                   initialAttachmentIds: [],
-                  resumeConversationId: 'conv-1',
+                  resumeConversationId,
                 }
-              : { agentId: 'sr-developer', baseBody: '---\nname: x\n---\n', resumeRefineId: 'ref-1' },
+              : { agentId: 'sr-developer', baseBody: '---\nname: x\n---\n', resumeRefineId },
         })
       }
     >
@@ -73,22 +81,23 @@ function MinimizeButton({ kind = 'explore-spec' as const, projectId = 'p1', labe
   )
 }
 
-function Dock() {
-  const { chats, restore, close } = useMinimizedChats()
+/** Drives context internals WITHOUT rendering chat labels, so label assertions
+ *  stay unambiguous against the provider-rendered dock. */
+function Probe() {
+  const { chats, restore, close, updateLabel } = useMinimizedChats()
   return (
-    <ul data-testid="dock">
-      {chats.map((c) => (
-        <li key={c.id} data-testid={`chip-${c.id}`}>
-          <span>{c.label}</span>
-          <button data-testid={`restore-${c.id}`} onClick={() => restore(c.id)}>
-            restore
-          </button>
-          <button data-testid={`close-${c.id}`} onClick={() => close(c.id)}>
-            close
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div>
+      <span data-testid="chat-count">{chats.length}</span>
+      <button data-testid="probe-restore-first" onClick={() => chats[0] && restore(chats[0].id)}>
+        restore-first
+      </button>
+      <button data-testid="probe-close-first" onClick={() => chats[0] && close(chats[0].id)}>
+        close-first
+      </button>
+      <button data-testid="probe-rename-first" onClick={() => chats[0] && updateLabel(chats[0].id, 'Renamed live')}>
+        rename-first
+      </button>
+    </div>
   )
 }
 
@@ -120,6 +129,14 @@ function renderWithProvider(ui: React.ReactNode, route = '/') {
   )
 }
 
+function dockLabels(): string[] {
+  const dock = screen.queryByTestId('minimized-chats-dock')
+  if (!dock) return []
+  return Array.from(dock.querySelectorAll('[data-testid^="minimized-chat-chip-"]')).map(
+    (el) => (el.querySelector('.truncate')?.textContent ?? '').trim(),
+  )
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────
 
 describe('MinimizedChatsContext', () => {
@@ -139,19 +156,15 @@ describe('MinimizedChatsContext', () => {
     vi.clearAllMocks()
   })
 
-  it('minimize adds a chip and persists to localStorage', async () => {
+  it('minimize adds a chip to the dock and persists synchronously to localStorage', async () => {
     const user = userEvent.setup()
-    renderWithProvider(
-      <>
-        <MinimizeButton />
-        <Dock />
-      </>,
-    )
+    renderWithProvider(<MinimizeButton />)
 
     await user.click(screen.getByTestId('do-minimize'))
 
     expect(screen.getByText('Test spec')).toBeTruthy()
-
+    // Synchronous durability: the entry is in localStorage immediately (the
+    // minimize() callback writes before yielding, not only via the effect).
     const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]') as MinimizedChat[]
     expect(persisted).toHaveLength(1)
     expect(persisted[0].label).toBe('Test spec')
@@ -160,16 +173,11 @@ describe('MinimizedChatsContext', () => {
 
   it('close drops the chip from the dock and from localStorage', async () => {
     const user = userEvent.setup()
-    renderWithProvider(
-      <>
-        <MinimizeButton />
-        <Dock />
-      </>,
-    )
+    renderWithProvider(<><MinimizeButton /><Probe /></>)
     await user.click(screen.getByTestId('do-minimize'))
-    const chip = screen.getByText('Test spec').closest('li')!
-    const closeBtn = chip.querySelector('[data-testid^="close-"]') as HTMLButtonElement
-    await user.click(closeBtn)
+    expect(screen.getByText('Test spec')).toBeTruthy()
+
+    await user.click(screen.getByTestId('probe-close-first'))
 
     expect(screen.queryByText('Test spec')).toBeNull()
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')).toEqual([])
@@ -180,17 +188,15 @@ describe('MinimizedChatsContext', () => {
     renderWithProvider(
       <>
         <MinimizeButton kind="ai-edit" projectId="p2" label="AI Edit · sr-developer" restoreRoute="/agents" />
-        <Dock />
+        <Probe />
         <PendingRestoreSpy kind="ai-edit" projectId="p2" />
       </>,
       '/',
     )
 
     await user.click(screen.getByTestId('do-minimize'))
-    const restoreBtn = screen.getByTestId(/^restore-/)
-    // active project changes; spy callback should fire
     await act(async () => {
-      restoreBtn.click()
+      screen.getByTestId('probe-restore-first').click()
     })
 
     expect(setActiveProjectIdSpy).toHaveBeenCalledWith('p2')
@@ -200,37 +206,23 @@ describe('MinimizedChatsContext', () => {
       kind: 'ai-edit',
       params: { agentId: 'sr-developer', resumeRefineId: 'ref-1' },
     })
-    // Chip removed from dock after restore
+    // Chip removed from dock after restore (consumed → not re-added).
     expect(screen.queryByText('AI Edit · sr-developer')).toBeNull()
   })
 
   it('drops chips silently when the owning project disappears', async () => {
     const user = userEvent.setup()
-    const { rerender } = renderWithProvider(
-      <>
-        <MinimizeButton projectId="p2" />
-        <Dock />
-      </>,
-    )
+    const { rerender } = renderWithProvider(<MinimizeButton projectId="p2" />)
     await user.click(screen.getByTestId('do-minimize'))
     expect(screen.getByText('Test spec')).toBeTruthy()
 
-    // Project p2 disappears
     hubState.projects = [{ id: 'p1', name: 'Alpha' }]
     rerender(
       <SharedWebSocketContext.Provider value={fakeWs}>
         <MemoryRouter initialEntries={['/']}>
           <MinimizedChatsProvider>
             <Routes>
-              <Route
-                path="*"
-                element={
-                  <>
-                    <MinimizeButton projectId="p2" />
-                    <Dock />
-                  </>
-                }
-              />
+              <Route path="*" element={<MinimizeButton projectId="p2" />} />
             </Routes>
           </MinimizedChatsProvider>
         </MemoryRouter>
@@ -240,7 +232,7 @@ describe('MinimizedChatsContext', () => {
     expect(screen.queryByText('Test spec')).toBeNull()
   })
 
-  it('hydrates from localStorage on mount', () => {
+  it('hydrates from localStorage on mount and renders the chip in the dock', () => {
     const seed: MinimizedChat[] = [
       {
         id: 'seed-1',
@@ -254,9 +246,139 @@ describe('MinimizedChatsContext', () => {
     ]
     localStorage.setItem(STORAGE_KEY, JSON.stringify(seed))
 
-    renderWithProvider(<Dock />)
+    renderWithProvider(<span />)
 
     expect(screen.getByText('Resumed spec')).toBeTruthy()
+  })
+
+  it('recovers orphaned pending restores into the dock on mount and clears the pending store', async () => {
+    // Simulates a refresh that landed AFTER a restore click but BEFORE the
+    // trigger consumed it: the pending store holds the only copy.
+    const orphan: MinimizedChat[] = [
+      {
+        id: 'orphan-1',
+        kind: 'explore-spec',
+        projectId: 'p1',
+        label: 'Orphaned spec',
+        restoreRoute: '/',
+        createdAt: 5,
+        params: { initialIdea: 'i', pendingSpecId: 'p', initialAttachmentIds: [], resumeConversationId: 'c-orphan' },
+      },
+    ]
+    localStorage.setItem(PENDING_KEY, JSON.stringify(orphan))
+
+    renderWithProvider(<span />)
+
+    await waitFor(() => expect(screen.getByText('Orphaned spec')).toBeTruthy())
+    // Pending store cleared; chat folded into the durable dock store.
+    expect(JSON.parse(localStorage.getItem(PENDING_KEY) ?? '[]')).toEqual([])
+    const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]') as MinimizedChat[]
+    expect(persisted.map((c) => c.id)).toContain('orphan-1')
+  })
+
+  it('watchdog re-adds a restored chip to the dock if no trigger consumes it', async () => {
+    vi.useFakeTimers()
+    try {
+      // No PendingRestoreSpy → nothing consumes the pending restore.
+      render(
+        <SharedWebSocketContext.Provider value={fakeWs}>
+          <MemoryRouter initialEntries={['/']}>
+            <MinimizedChatsProvider>
+              <MinimizeButton label="Stranded spec" />
+              <Probe />
+            </MinimizedChatsProvider>
+          </MemoryRouter>
+        </SharedWebSocketContext.Provider>,
+      )
+
+      act(() => {
+        screen.getByTestId('do-minimize').click()
+      })
+      expect(screen.getByText('Stranded spec')).toBeTruthy()
+
+      act(() => {
+        screen.getByTestId('probe-restore-first').click()
+      })
+      // Optimistically removed from the dock, parked in the pending store.
+      expect(screen.queryByText('Stranded spec')).toBeNull()
+      expect(JSON.parse(localStorage.getItem(PENDING_KEY) ?? '[]')).toHaveLength(1)
+
+      // Watchdog fires → chip comes back, never lost.
+      act(() => {
+        vi.advanceTimersByTime(8000)
+      })
+      expect(screen.getByText('Stranded spec')).toBeTruthy()
+      expect(JSON.parse(localStorage.getItem(PENDING_KEY) ?? '[]')).toEqual([])
+      expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('dedupes re-parked sessions: same conversation id yields a single chip', async () => {
+    const user = userEvent.setup()
+    renderWithProvider(<><MinimizeButton resumeConversationId="dup-conv" /><Probe /></>)
+
+    await user.click(screen.getByTestId('do-minimize'))
+    await user.click(screen.getByTestId('do-minimize'))
+
+    expect(screen.getByTestId('chat-count').textContent).toBe('1')
+    expect(dockLabels()).toEqual(['Test spec'])
+    const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]') as MinimizedChat[]
+    expect(persisted).toHaveLength(1)
+  })
+
+  it('dedupes fresh sessions with no conversation id by their pendingSpecId', async () => {
+    const user = userEvent.setup()
+    renderWithProvider(<><MinimizeButton resumeConversationId={undefined} /><Probe /></>)
+    await user.click(screen.getByTestId('do-minimize'))
+    await user.click(screen.getByTestId('do-minimize'))
+    expect(screen.getByTestId('chat-count').textContent).toBe('1')
+  })
+
+  it('restore is a no-op for a chip whose project no longer exists (chip stays put)', async () => {
+    const user = userEvent.setup()
+    renderWithProvider(
+      <>
+        <MinimizeButton projectId="p3-gone" label="Ghost spec" resumeConversationId={undefined} />
+        <Probe />
+      </>,
+    )
+    await user.click(screen.getByTestId('do-minimize'))
+    expect(screen.getByText('Ghost spec')).toBeTruthy()
+
+    await act(async () => {
+      screen.getByTestId('probe-restore-first').click()
+    })
+    // Project gone → restore() bails out, chip is NOT dropped into a dead queue.
+    expect(screen.getByText('Ghost spec')).toBeTruthy()
+    expect(setActiveProjectIdSpy).not.toHaveBeenCalled()
+  })
+
+  it('keeps distinct chips when conversation ids differ', async () => {
+    function TwoButtons() {
+      const { minimize } = useMinimizedChats()
+      const park = (label: string, conv: string) =>
+        minimize({
+          kind: 'explore-spec',
+          projectId: 'p1',
+          label,
+          restoreRoute: '/',
+          params: { initialIdea: 'i', pendingSpecId: conv, initialAttachmentIds: [], resumeConversationId: conv },
+        })
+      return (
+        <>
+          <button data-testid="park-a" onClick={() => park('Spec A', 'conv-a')}>a</button>
+          <button data-testid="park-b" onClick={() => park('Spec B', 'conv-b')}>b</button>
+        </>
+      )
+    }
+    const user = userEvent.setup()
+    renderWithProvider(<><TwoButtons /><Probe /></>)
+    await user.click(screen.getByTestId('park-a'))
+    await user.click(screen.getByTestId('park-b'))
+    expect(screen.getByTestId('chat-count').textContent).toBe('2')
+    await waitFor(() => expect(dockLabels().sort()).toEqual(['Spec A', 'Spec B']))
   })
 
   it('saveToStorage caps at 50 entries (drops oldest)', () => {
@@ -272,7 +394,6 @@ describe('MinimizedChatsContext', () => {
     saveToStorage(many)
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]') as MinimizedChat[]
     expect(stored).toHaveLength(50)
-    // oldest 10 dropped → first remaining is createdAt 10
     expect(stored[0].createdAt).toBe(10)
   })
 
@@ -305,32 +426,63 @@ describe('MinimizedChatsContext', () => {
 
   it('updateLabel changes the chip label without re-creating the entry', async () => {
     const user = userEvent.setup()
-    function Updater() {
-      const { chats, updateLabel } = useMinimizedChats()
-      return (
-        <button
-          data-testid="do-update"
-          onClick={() => chats[0] && updateLabel(chats[0].id, 'Renamed live')}
-        >
-          update
-        </button>
-      )
-    }
-    renderWithProvider(
-      <>
-        <MinimizeButton />
-        <Updater />
-        <Dock />
-      </>,
-    )
+    renderWithProvider(<><MinimizeButton /><Probe /></>)
     await user.click(screen.getByTestId('do-minimize'))
     expect(screen.getByText('Test spec')).toBeTruthy()
-    await user.click(screen.getByTestId('do-update'))
+    await user.click(screen.getByTestId('probe-rename-first'))
     expect(screen.getByText('Renamed live')).toBeTruthy()
     expect(screen.queryByText('Test spec')).toBeNull()
-    // Persisted with new label
     const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]') as MinimizedChat[]
     expect(persisted[0].label).toBe('Renamed live')
+  })
+
+  it('hides the dock during the active project setup-wizard takeover', async () => {
+    const user = userEvent.setup()
+    const { rerender } = renderWithProvider(<MinimizeButton />)
+    await user.click(screen.getByTestId('do-minimize'))
+    expect(screen.getByTestId('minimized-chats-dock')).toBeTruthy()
+
+    // Active project enters setup → dock hidden (chat preserved in storage).
+    hubState.setupProjectIds = new Set(['p1'])
+    rerender(
+      <SharedWebSocketContext.Provider value={fakeWs}>
+        <MemoryRouter initialEntries={['/']}>
+          <MinimizedChatsProvider>
+            <Routes>
+              <Route path="*" element={<MinimizeButton />} />
+            </Routes>
+          </MinimizedChatsProvider>
+        </MemoryRouter>
+      </SharedWebSocketContext.Provider>,
+    )
+    expect(screen.queryByTestId('minimized-chats-dock')).toBeNull()
+    // Still durably persisted — never dropped, just not rendered.
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')).toHaveLength(1)
+  })
+
+  it('reflects an updated project name in the chip without a chats change', async () => {
+    const user = userEvent.setup()
+    const { rerender } = renderWithProvider(<MinimizeButton />)
+    await user.click(screen.getByTestId('do-minimize'))
+    expect(screen.getByText(/Alpha/)).toBeTruthy()
+
+    // Project renamed in the hub — dock reads projects reactively.
+    hubState.projects = [
+      { id: 'p1', name: 'Alpha Renamed' },
+      { id: 'p2', name: 'Beta' },
+    ]
+    rerender(
+      <SharedWebSocketContext.Provider value={fakeWs}>
+        <MemoryRouter initialEntries={['/']}>
+          <MinimizedChatsProvider>
+            <Routes>
+              <Route path="*" element={<MinimizeButton />} />
+            </Routes>
+          </MinimizedChatsProvider>
+        </MemoryRouter>
+      </SharedWebSocketContext.Provider>,
+    )
+    await waitFor(() => expect(screen.getByText(/Alpha Renamed/)).toBeTruthy())
   })
 
   it('live-updates a chip label from a `spec_draft.update` WS event', async () => {
@@ -370,7 +522,6 @@ describe('MinimizedChatsContext', () => {
         <MemoryRouter>
           <MinimizedChatsProvider>
             <Seed />
-            <Dock />
           </MinimizedChatsProvider>
         </MemoryRouter>
       </SharedWebSocketContext.Provider>,

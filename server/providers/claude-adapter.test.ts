@@ -48,7 +48,6 @@ describe('claudeAdapter — identity', () => {
     expect([...claudeAdapter.baselineAgents()].sort()).toEqual([
       'sr-architect',
       'sr-developer',
-      'sr-merge-resolver',
       'sr-reviewer',
     ])
   })

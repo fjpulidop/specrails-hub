@@ -262,7 +262,7 @@ export const codexAdapter: ProviderAdapter = {
   buildArgs: buildCodexArgs,
   parseStreamLine: parseCodexStreamLine,
   extractResult: extractCodexResult,
-  baselineAgents: () => ['sr-architect', 'sr-developer', 'sr-reviewer', 'sr-merge-resolver'],
+  baselineAgents: () => ['sr-architect', 'sr-developer', 'sr-reviewer'],
   detectInstalled: detectCodexInstalled,
 }
 

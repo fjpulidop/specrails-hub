@@ -4,6 +4,7 @@ import { Router, Request, Response } from 'express'
 import type { DbInstance } from './db'
 import type { WsMessage } from './types'
 import { isCodeExplorerEnabled } from './feature-flags'
+import { BUILD_DIRS } from './build-dirs'
 import {
   listProvenanceByPath,
   listProvenanceByTicket,
@@ -28,13 +29,14 @@ const MAX_FILE_BYTES = 2 * 1024 * 1024
 const BINARY_PROBE_BYTES = 8 * 1024
 
 // Hard-coded hub deny-list (mirrors design D8). Dotfiles are excluded by name
-// prefix; extensions handled below.
-const DENY_DIRS = new Set(['node_modules', 'dist', '.git', 'coverage'])
+// prefix; build/dep dirs come from the shared BUILD_DIRS set (node_modules, dist,
+// build, out, coverage, target, vendor) so the on-demand tree walk skips the same
+// heavy trees the file-summary watcher prunes; extensions handled below.
 const DENY_EXTS = new Set(['.lock', '.log'])
 
 function isDenied(entryName: string): boolean {
   if (entryName.startsWith('.')) return true
-  if (DENY_DIRS.has(entryName)) return true
+  if (BUILD_DIRS.has(entryName)) return true
   const ext = path.extname(entryName).toLowerCase()
   if (DENY_EXTS.has(ext)) return true
   // common lockfile names whose extension is .json/.yaml are excluded by
@@ -287,7 +289,7 @@ export interface CodeExplorerDeps {
   projectPath: string
   projectId: string
   broadcast: (msg: WsMessage) => void
-  fileSummaryManager: Pick<FileSummaryManager, 'enqueue'>
+  fileSummaryManager: Pick<FileSummaryManager, 'enqueue' | 'attachWatcher'>
   listProvenanceByPath?: (db: DbInstance, projectId: string, filePath: string) => ProvenanceRow[]
   listProvenanceByTicket?: (db: DbInstance, projectId: string, ticketId: number) => ProvenanceRow[]
 }
@@ -304,6 +306,11 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
       res.status(404).end()
       return
     }
+    // Lazily attach the file-summary watcher on first Code-Explorer use. It is
+    // not attached at registry load (that recursive watcher caused the fd leak
+    // that broke terminals); attachWatcher is idempotent, so this is cheap on
+    // every subsequent request.
+    try { deps.fileSummaryManager.attachWatcher(deps.projectId, deps.projectPath) } catch { /* non-fatal */ }
     next()
   })
 

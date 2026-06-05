@@ -1,7 +1,12 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, act } from '@testing-library/react'
+import { toast } from 'sonner'
 import { TerminalsProvider, useTerminals, tryLoadWebgl, webgl2Available, DEFAULT_USER_HEIGHT, PANEL_MIN_HEIGHT, TERMINAL_MAX_PER_PROJECT } from '../TerminalsContext'
+
+// Capture sonner toasts so error surfacing can be asserted.
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), custom: vi.fn(), dismiss: vi.fn() } }))
+const mockToastError = vi.mocked(toast.error)
 
 // Stub xterm so we don't need a DOM renderer
 // Mock the @xterm/xterm Terminal class with the surface area
@@ -47,17 +52,19 @@ vi.mock('@xterm/xterm/css/xterm.css', () => ({}))
 
 // Stub WebSocket globally
 class MockWebSocket extends EventTarget {
+  static OPEN = 1
+  static instances: MockWebSocket[] = []
   readyState = 0
   binaryType = 'arraybuffer'
   url: string
   sent: Array<unknown> = []
-  static OPEN = 1
-  constructor(url: string) { super(); this.url = url }
+  constructor(url: string) { super(); this.url = url; MockWebSocket.instances.push(this) }
   send(data: unknown) { this.sent.push(data) }
   close() { this.readyState = 3 }
   // Required properties for WebSocket typing
+  onopen: (() => void) | null = null
   onmessage: ((e: MessageEvent) => void) | null = null
-  onclose: (() => void) | null = null
+  onclose: ((e: { code?: number; reason?: string }) => void) | null = null
   onerror: (() => void) | null = null
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -85,6 +92,8 @@ describe('TerminalsContext', () => {
   beforeEach(() => {
     // Reset localStorage and fetch mock
     localStorage.clear()
+    MockWebSocket.instances = []
+    mockToastError.mockClear()
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ sessions: [], limit: 10 }),
@@ -316,6 +325,100 @@ describe('TerminalsContext', () => {
     let result: boolean | null = null
     await act(async () => { result = await captured.ctx!.rename('proj-A', 'no-such', 'new') })
     expect(result).toBe(false)
+  })
+
+  it('create surfaces a limit toast and returns null on terminal_limit_exceeded', async () => {
+    global.fetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return { ok: false, json: async () => ({ error: 'terminal_limit_exceeded', limit: 10 }) }
+      return { ok: true, json: async () => ({ sessions: [], limit: 10 }) }
+    })
+    const captured = mountProvider('proj-A')
+    let result: unknown = 'unset'
+    await act(async () => { result = await captured.ctx!.create('proj-A') })
+    expect(result).toBeNull()
+    expect(mockToastError).toHaveBeenCalledTimes(1)
+    expect(String(mockToastError.mock.calls[0][0])).toMatch(/limit reached/i)
+  })
+
+  it('create surfaces a spawn-failure toast on terminal_spawn_failed', async () => {
+    global.fetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return { ok: false, status: 502, json: async () => ({ error: 'terminal_spawn_failed', reason: 'out-of-file-descriptors' }) }
+      return { ok: true, json: async () => ({ sessions: [], limit: 10 }) }
+    })
+    const captured = mountProvider('proj-A')
+    await act(async () => { await captured.ctx!.create('proj-A') })
+    expect(mockToastError).toHaveBeenCalledTimes(1)
+    expect(String(mockToastError.mock.calls[0][0])).toMatch(/file descriptors/i)
+  })
+
+  it('create surfaces a generic toast when the server is unreachable', async () => {
+    global.fetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') throw new Error('network down')
+      return { ok: true, json: async () => ({ sessions: [], limit: 10 }) }
+    })
+    const captured = mountProvider('proj-A')
+    let result: unknown = 'unset'
+    await act(async () => { result = await captured.ctx!.create('proj-A') })
+    expect(result).toBeNull()
+    expect(mockToastError).toHaveBeenCalledTimes(1)
+    expect(String(mockToastError.mock.calls[0][0])).toMatch(/server/i)
+  })
+
+  it('an early exit frame surfaces a "failed to start" toast', async () => {
+    global.fetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return { ok: true, json: async () => ({ session: { id: 'die-1', projectId: 'proj-A', name: 'zsh', cols: 80, rows: 24, createdAt: 1 } }) }
+      return { ok: true, json: async () => ({ sessions: [], limit: 10 }) }
+    })
+    const captured = mountProvider('proj-A')
+    await act(async () => { await captured.ctx!.create('proj-A') })
+    const ws = MockWebSocket.instances.find((w) => w.url.includes('die-1'))
+    expect(ws).toBeTruthy()
+    mockToastError.mockClear()
+    act(() => { ws!.onmessage?.({ data: JSON.stringify({ type: 'exit', code: 1, early: true }) } as MessageEvent) })
+    expect(mockToastError).toHaveBeenCalledTimes(1)
+    expect(String(mockToastError.mock.calls[0][0])).toMatch(/exited immediately/i)
+  })
+
+  it('a normal (non-early) exit frame does not toast', async () => {
+    global.fetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return { ok: true, json: async () => ({ session: { id: 'bye-1', projectId: 'proj-A', name: 'zsh', cols: 80, rows: 24, createdAt: 1 } }) }
+      return { ok: true, json: async () => ({ sessions: [], limit: 10 }) }
+    })
+    const captured = mountProvider('proj-A')
+    await act(async () => { await captured.ctx!.create('proj-A') })
+    const ws = MockWebSocket.instances.find((w) => w.url.includes('bye-1'))
+    mockToastError.mockClear()
+    act(() => { ws!.onmessage?.({ data: JSON.stringify({ type: 'exit', code: 0, early: false }) } as MessageEvent) })
+    expect(mockToastError).not.toHaveBeenCalled()
+  })
+
+  it('an unexpected early close (pty_exit_early) surfaces a toast; a deliberate dispose does not', async () => {
+    global.fetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return { ok: true, json: async () => ({ session: { id: 'drop-1', projectId: 'proj-A', name: 'zsh', cols: 80, rows: 24, createdAt: 1 } }) }
+      if (init?.method === 'DELETE') return { ok: true, json: async () => ({ ok: true }) }
+      return { ok: true, json: async () => ({ sessions: [], limit: 10 }) }
+    })
+    const captured = mountProvider('proj-A')
+    await act(async () => { await captured.ctx!.create('proj-A') })
+    const ws = MockWebSocket.instances.find((w) => w.url.includes('drop-1'))
+    mockToastError.mockClear()
+    act(() => { ws!.onclose?.({ code: 1000, reason: 'pty_exit_early' }) })
+    expect(mockToastError).toHaveBeenCalledTimes(1)
+
+    // A second create + deliberate kill must NOT toast (disposing flag set).
+    const ws2Url = 'drop-2'
+    global.fetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return { ok: true, json: async () => ({ session: { id: ws2Url, projectId: 'proj-A', name: 'zsh', cols: 80, rows: 24, createdAt: 2 } }) }
+      if (init?.method === 'DELETE') return { ok: true, json: async () => ({ ok: true }) }
+      return { ok: true, json: async () => ({ sessions: [], limit: 10 }) }
+    })
+    await act(async () => { await captured.ctx!.create('proj-A') })
+    const ws2 = MockWebSocket.instances.find((w) => w.url.includes(ws2Url))
+    mockToastError.mockClear()
+    await act(async () => { await captured.ctx!.kill('proj-A', ws2Url) })
+    // kill() disposes the handle (disposing=true) before closing the socket.
+    act(() => { ws2!.onclose?.({ code: 1000, reason: 'client_dispose' }) })
+    expect(mockToastError).not.toHaveBeenCalled()
   })
 
   it('kill removes session and advances active', async () => {

@@ -84,7 +84,22 @@ export function SharedWebSocketProvider({ url, children }: { url: string; childr
     return () => {
       disposed = true
       if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
-      wsRef.current?.close()
+      const ws = wsRef.current
+      if (!ws) return
+      // Detach handlers so this (now-orphaned) socket stays silent — important
+      // under React StrictMode's mount→unmount→mount cycle in dev.
+      ws.onmessage = null
+      ws.onclose = null
+      ws.onerror = null
+      if (ws.readyState === WebSocket.CONNECTING) {
+        // Calling close() on a CONNECTING socket logs the noisy
+        // "WebSocket is closed before the connection is established" warning.
+        // Instead, close it cleanly once it finishes opening.
+        ws.onopen = () => { try { ws.close() } catch { /* ignore */ } }
+      } else {
+        ws.onopen = null
+        try { ws.close() } catch { /* ignore */ }
+      }
     }
   }, [url])
 

@@ -14,7 +14,9 @@ export interface ResolvedPlugins {
  * in `state.json`, runs `verify` (timeout-bounded) and classifies into
  * `active` (verify ok) or `degraded` (verify failed / timed out / threw).
  *
- * Read-only — does not mutate any project file. Safe to call any time.
+ * Side effect: `verify` persists a plugin's health to `state.json` only when it
+ * actually changed since the last check (no churn on the steady-state path).
+ * Otherwise this performs no project-file mutation.
  */
 export async function resolvePluginsForSpawn(
   projectPath: string,

@@ -270,7 +270,7 @@ export const claudeAdapter: ProviderAdapter = {
   buildArgs: buildClaudeArgs,
   parseStreamLine: parseClaudeStreamLine,
   extractResult: extractClaudeResult,
-  baselineAgents: () => ['sr-architect', 'sr-developer', 'sr-reviewer', 'sr-merge-resolver'],
+  baselineAgents: () => ['sr-architect', 'sr-developer', 'sr-reviewer'],
   detectInstalled: detectClaudeInstalled,
 }
 

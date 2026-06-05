@@ -426,12 +426,22 @@ describe('POST /profiles/migrate-from-settings', () => {
     const res = await request(app).post('/api/projects/proj-test/profiles/migrate-from-settings')
     expect(res.status).toBe(201)
     expect(res.body.profile.name).toBe('default')
-    // Order: trio first, merge-resolver pinned last
+    // Order: baseline trio first; sr-merge-resolver is optional, sorts alphabetically among optional agents
     const ids = res.body.profile.agents.map((a: { id: string }) => a.id)
-    expect(ids[ids.length - 1]).toBe('sr-merge-resolver')
-    // merge-resolver required
+    expect(ids.slice(0, 3)).toEqual(['sr-architect', 'sr-developer', 'sr-reviewer'])
+    // sr-merge-resolver is optional (not a baseline agent)
     const merge = res.body.profile.agents.find((a: { id: string }) => a.id === 'sr-merge-resolver')
-    expect(merge.required).toBe(true)
+    expect(merge.required).toBe(false)
+  })
+
+  it('creates default profile when only the baseline trio is present (no sr-merge-resolver)', async () => {
+    writeAgent('sr-architect', 'opus')
+    writeAgent('sr-developer')
+    writeAgent('sr-reviewer')
+    const res = await request(app).post('/api/projects/proj-test/profiles/migrate-from-settings')
+    expect(res.status).toBe(201)
+    const ids = res.body.profile.agents.map((a: { id: string }) => a.id)
+    expect(ids).toEqual(['sr-architect', 'sr-developer', 'sr-reviewer'])
   })
 
   it('400 when no .claude/agents directory', async () => {
@@ -439,13 +449,12 @@ describe('POST /profiles/migrate-from-settings', () => {
     expect(res.status).toBe(400)
   })
 
-  it('400 when baseline is incomplete (missing sr-merge-resolver)', async () => {
+  it('400 when baseline is incomplete (missing sr-reviewer)', async () => {
     writeAgent('sr-architect')
     writeAgent('sr-developer')
-    writeAgent('sr-reviewer')
     const res = await request(app).post('/api/projects/proj-test/profiles/migrate-from-settings')
     expect(res.status).toBe(400)
-    expect(res.body.error).toContain('sr-merge-resolver')
+    expect(res.body.error).toContain('sr-reviewer')
   })
 
   it('409 when default already exists', async () => {

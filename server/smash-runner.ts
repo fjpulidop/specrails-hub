@@ -370,9 +370,9 @@ export function applySmashUndo(
 export function applyDeleteEpicChildren(
   filePath: string,
   epicId: number,
-): { deletedChildren: number[] } {
+): { deletedChildren: number[]; revision: number } {
   const deletedChildren: number[] = []
-  mutateStore(filePath, (s: TicketStore) => {
+  const store = mutateStore(filePath, (s: TicketStore) => {
     for (const idStr of Object.keys(s.tickets)) {
       const t = s.tickets[idStr]
       if (t.parent_epic_id === epicId) {
@@ -381,7 +381,7 @@ export function applyDeleteEpicChildren(
       }
     }
   })
-  return { deletedChildren }
+  return { deletedChildren, revision: store.revision }
 }
 
 // ─── recordInvocation wrapper ────────────────────────────────────────────────

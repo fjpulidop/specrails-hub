@@ -114,11 +114,41 @@ pub fn run() {
             // --- Spawn sidecar ---
             let parent_pid_arg = format!("--parent-pid={}", std::process::id());
 
+            // Resolve the bundled runtimes path from Tauri's resource directory.
+            // On macOS: <app>.app/Contents/Resources/runtimes
+            // On Windows: <install-dir>/resources/runtimes
+            let runtimes_path = app_handle
+                .path()
+                .resource_dir()
+                .ok()
+                .map(|p| p.join("runtimes").to_string_lossy().into_owned())
+                .unwrap_or_default();
+
+            // Only enter desktop bundled-runtimes mode when a bundled Node binary is
+            // actually present (not just a `.gitkeep` placeholder). A build that ships
+            // no runtimes (e.g. an architecture without bundled binaries, or a corrupted
+            // resource copy) then runs as a normal server: the sidecar's path-resolver /
+            // setup-prerequisites fall back to system PATH discovery instead of
+            // dead-ending Add Project with a "bundle corrupted" error the user can't fix.
+            let runtimes_root = std::path::Path::new(&runtimes_path);
+            let has_runtimes = runtimes_root.join("node").join("bin").join("node").exists()
+                || runtimes_root.join("node").join("node.exe").exists();
+
             let sidecar = app_handle
                 .shell()
                 .sidecar("specrails-server")
                 .expect("specrails-server sidecar not configured")
                 .args([&parent_pid_arg]);
+            let sidecar = if has_runtimes {
+                // Bundled node/git win: server/path-resolver.ts prepends the bundled bin
+                // dirs ahead of the macOS login-shell PATH set below, so a system
+                // homebrew/nvm node or git can never shadow the bundled runtimes.
+                sidecar
+                    .env("SPECRAILS_IS_DESKTOP", "1")
+                    .env("SPECRAILS_BUNDLED_RUNTIMES_PATH", &runtimes_path)
+            } else {
+                sidecar
+            };
 
             // On macOS, GUI apps launched from Finder/Dock inherit a minimal PATH
             // from launchd that omits user tool dirs (homebrew, cargo, bun,

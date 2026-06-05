@@ -36,16 +36,33 @@ function shellBasename(shell: string): string {
 
 /** Source of bundled shims; overridable for tests/packaging. */
 export function locateBundledShim(name: string): string | null {
+  const execDir = path.dirname(process.execPath)
   const candidates = [
     path.resolve(__dirname, 'shell-integration', name),
-    path.resolve(process.execPath, '..', 'shell-integration', name),
-    path.resolve(process.execPath, '..', '..', 'shell-integration', name),
+    // Desktop bundle: shims ship under binaries/shell-integration (declared in
+    // tauri.conf.json resources). Windows/Linux install vs macOS .app layout.
+    path.resolve(execDir, 'binaries', 'shell-integration', name),
+    path.resolve(execDir, '..', 'Resources', 'binaries', 'shell-integration', name),
+    // Legacy / sibling layouts (kept as existence-gated fallbacks).
+    path.resolve(execDir, 'shell-integration', name),
+    path.resolve(execDir, '..', 'shell-integration', name),
     path.resolve(process.cwd(), 'server', 'shell-integration', name),
   ]
   for (const c of candidates) {
     try { if (fs.existsSync(c)) return c } catch { /* ignore */ }
   }
+  // Observability: a packaging regression that drops the shims would otherwise
+  // silently disable shell integration (no marks/cwd) with no clue why. Warn
+  // once per shim name so it's diagnosable from the server log.
+  warnShimMissingOnce(name)
   return null
+}
+
+const _warnedShims = new Set<string>()
+function warnShimMissingOnce(name: string): void {
+  if (_warnedShims.has(name)) return
+  _warnedShims.add(name)
+  console.warn(`[terminal-shell-integration] bundled shim not found: ${name} — shell integration disabled for this shell`)
 }
 
 function projectsRoot(): string {
@@ -84,7 +101,10 @@ export function composeShellIntegrationSpawn(
     writeFile(userZdotdirZshrc, shimContent)
     return {
       args: [],
-      env: { ZDOTDIR: shimDir },
+      // Pass the user's real ZDOTDIR (default $HOME) so the shim can still source
+      // their ~/.zshenv/.zprofile/.zshrc/.zlogin — the override alone would make
+      // zsh skip the login files and lose PATH/Homebrew/nvm setup.
+      env: { ZDOTDIR: shimDir, SPECRAILS_REAL_ZDOTDIR: process.env.ZDOTDIR ?? '' },
       shimDir,
       shimPath: userZdotdirZshrc,
     }
@@ -107,15 +127,17 @@ export function composeShellIntegrationSpawn(
   if (base === 'fish') {
     const bundled = locateBundledShim('fish-shim.fish')
     if (!bundled) return NO_SHELL_INTEGRATION
-    const xdgConfig = shimDir
-    const confTarget = path.join(xdgConfig, 'fish', 'conf.d', 'specrails-shim.fish')
-    const shimContent = `# SpecRails Hub auto-generated fish conf.d entry — do not edit\nsource '${bundled.replace(/'/g, `'\\''`)}'\n`
-    writeFile(confTarget, shimContent)
+    // Use fish's -C/--init-command, which runs AFTER the user's config.fish and
+    // conf.d, so the user's real fish config is preserved. The previous approach
+    // repointed XDG_CONFIG_HOME at the shim dir, which made fish resolve its
+    // ENTIRE config tree (config.fish, functions, completions) from the shim dir
+    // and silently dropped the user's configuration.
     return {
-      args: [],
-      env: { XDG_CONFIG_HOME: xdgConfig },
-      shimDir,
-      shimPath: confTarget,
+      args: ['-C', `source '${bundled.replace(/'/g, `'\\''`)}'`],
+      env: {},
+      // No per-session dir is written; shimPath (non-null) activates OSC parsing.
+      shimDir: null,
+      shimPath: bundled,
     }
   }
 

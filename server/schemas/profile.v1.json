@@ -43,7 +43,7 @@
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/agentEntry" },
-      "description": "Ordered chain of agents that participate in the pipeline when this profile is active. Every profile (default + custom) must include the baseline quartet (sr-architect, sr-developer, sr-reviewer, sr-merge-resolver) — the pipeline depends on all four. Custom profiles add optional agents on top of the baseline.",
+      "description": "Ordered chain of agents that participate in the pipeline when this profile is active. Every profile (default + custom) must include the baseline trio (sr-architect, sr-developer, sr-reviewer) — the pipeline depends on all three. Custom profiles add optional agents on top of the baseline. sr-merge-resolver is an optional utility agent and is no longer required.",
       "allOf": [
         {
           "description": "Required baseline agent: sr-architect",
@@ -66,14 +66,6 @@
           "contains": {
             "type": "object",
             "properties": { "id": { "const": "sr-reviewer" } },
-            "required": ["id"]
-          }
-        },
-        {
-          "description": "Required baseline agent: sr-merge-resolver",
-          "contains": {
-            "type": "object",
-            "properties": { "id": { "const": "sr-merge-resolver" } },
             "required": ["id"]
           }
         }
@@ -110,7 +102,7 @@
         "required": {
           "type": "boolean",
           "default": false,
-          "description": "If true, the agent cannot be routed past. Baseline agents (sr-architect, sr-developer, sr-reviewer) SHOULD be marked required."
+          "description": "If true, the agent cannot be routed past. Baseline agents (sr-architect, sr-developer, sr-reviewer) SHOULD be marked required. sr-merge-resolver is optional and defaults to required: false."
         }
       }
     },

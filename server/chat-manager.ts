@@ -229,9 +229,18 @@ export class ChatManager {
   }
 
   private _drainExploreQueue(): void {
-    while (this._exploreQueue.length > 0 && this._countStreamingExplore() < EXPLORE_MAX_CONCURRENCY) {
+    // A released waiter does NOT flip its `isStreaming` flag synchronously — it
+    // does so only when its awaiting sendMessage continuation runs as a later
+    // microtask. So `_countStreamingExplore()` stays stale across this fully
+    // synchronous loop. Track the genuinely-free slots with a local counter so
+    // we release at most that many waiters per drain pass; otherwise a single
+    // freed slot could release every queued turn at once and blow past
+    // EXPLORE_MAX_CONCURRENCY (an unbounded burst of CLI processes).
+    let freed = EXPLORE_MAX_CONCURRENCY - this._countStreamingExplore()
+    while (this._exploreQueue.length > 0 && freed > 0) {
       const next = this._exploreQueue.shift()!
       clearTimeout(next.timeoutTimer)
+      freed--
       next.onSlot()
     }
   }
@@ -698,6 +707,35 @@ export class ChatManager {
                 stderrBuf += text
                 console.error(`[chat-manager] ${binary} stderr (${conversationId}):`, text.trim())
               })
+              // The respawn is a brand-new ChildProcess; it does NOT inherit
+              // the original child's 'error' listener. Without one, an async
+              // spawn 'error' (ENOENT/EAGAIN — the very class of failure that
+              // can recur right after a crash) would be an unhandled 'error'
+              // event and crash the entire hub. Mirror the original handler.
+              /* c8 ignore start -- respawn spawn-failure path; exercised manually, not in CI */
+              newChild.on('error', (err) => {
+                console.error(`[chat-manager] explore crash-respawn spawn failed for ${conversationId}: ${err.message}`)
+                this._activeProcesses.delete(conversationId)
+                this._buffers.delete(conversationId)
+                this._emittedProposals.delete(conversationId)
+                this._abortingConversations.delete(conversationId)
+                this._streamFilters.delete(conversationId)
+                const life = this._exploreLifecycle.get(conversationId)
+                if (life) {
+                  life.isStreaming = false
+                  life.lastActivityAt = Date.now()
+                  if (life.isMinimized) this._startIdleTimer(conversationId)
+                }
+                this._drainExploreQueue()
+                this._broadcast({
+                  type: 'chat_error',
+                  conversationId,
+                  error: `Failed to launch ${binary}: ${err.message}`,
+                  timestamp: new Date().toISOString(),
+                })
+                resolve()
+              })
+              /* c8 ignore stop */
               const newReader = createInterface({ input: newChild.stdout!, crlfDelay: Infinity })
               newReader.on('line', readerHandler)
               newChild.on('close', onClose)
@@ -841,6 +879,51 @@ export class ChatManager {
       error: 'aborted',
       timestamp: new Date().toISOString(),
     })
+  }
+
+  /**
+   * Drop all Explore-lifecycle bookkeeping for a conversation: cancel its
+   * pending idle-kill timer, remove it from the wait queue (clearing that
+   * waiter's timeout timer), and delete the lifecycle entry. Called when a
+   * conversation is deleted so minimized-but-never-resumed entries (and their
+   * armed timers) don't accumulate for the lifetime of the project.
+   */
+  forgetExploreLifecycle(conversationId: string): void {
+    this._clearIdleTimer(conversationId)
+    const idx = this._exploreQueue.findIndex((q) => q.conversationId === conversationId)
+    if (idx >= 0) {
+      clearTimeout(this._exploreQueue[idx].timeoutTimer)
+      this._exploreQueue.splice(idx, 1)
+    }
+    this._exploreLifecycle.delete(conversationId)
+  }
+
+  /**
+   * Tear down the manager on shutdown / project removal: terminate every
+   * active chat child (SIGTERM), cancel all Explore idle timers and queued
+   * waiter timeouts, and clear all per-conversation tracking. Without this,
+   * in-flight claude/codex children are orphaned (reparented to init) when the
+   * hub exits and keep consuming API quota/CPU. Idempotent.
+   */
+  shutdown(): void {
+    for (const child of this._activeProcesses.values()) {
+      if (child?.pid) {
+        try { treeKill(child.pid, 'SIGTERM') } catch { /* best-effort */ }
+      }
+    }
+    for (const id of this._exploreLifecycle.keys()) {
+      this._clearIdleTimer(id)
+    }
+    for (const q of this._exploreQueue) {
+      clearTimeout(q.timeoutTimer)
+    }
+    this._exploreQueue = []
+    this._activeProcesses.clear()
+    this._buffers.clear()
+    this._emittedProposals.clear()
+    this._abortingConversations.clear()
+    this._streamFilters.clear()
+    this._exploreLifecycle.clear()
   }
 
   private _autoTitle(conversationId: string, firstUserMsg: string, firstResponse: string): void {

@@ -1011,6 +1011,77 @@ describe('ChatManager', () => {
       const errs = getBroadcastedByType(broadcast, 'chat_error')
       expect(errs.some((e) => e.conversationId === convId)).toBe(true)
     })
+
+    it('drain releases at most the freed slots — cap holds with multiple queued waiters', async () => {
+      const cmL = new ChatManager(broadcast, db, '/tmp/proj', 'P', 'claude', 'pid-drain', 'sl-drain')
+      const children: any[] = []
+      for (let i = 0; i < 7; i++) {
+        children.push(createMockChildProcess())
+        vi.mocked(mockSpawn).mockReturnValueOnce(children[i] as any)
+      }
+      // 5 streaming explore turns (no result; they never close).
+      for (let i = 0; i < 5; i++) {
+        const cid = `conv-drain-${i}`
+        createConversation(db, { id: cid, model: 'sonnet', kind: 'explore', contextScope: MCP_SCOPE })
+        void cmL.sendMessage(cid, 'hi', { lightweight: true })
+        await Promise.resolve(); await Promise.resolve()
+      }
+      expect(vi.mocked(mockSpawn)).toHaveBeenCalledTimes(5)
+
+      // Two more turns must PARK (cap is 5, all 5 streaming).
+      createConversation(db, { id: 'conv-drain-q1', model: 'sonnet', kind: 'explore', contextScope: MCP_SCOPE })
+      createConversation(db, { id: 'conv-drain-q2', model: 'sonnet', kind: 'explore', contextScope: MCP_SCOPE })
+      void cmL.sendMessage('conv-drain-q1', 'hi', { lightweight: true })
+      void cmL.sendMessage('conv-drain-q2', 'hi', { lightweight: true })
+      await Promise.resolve(); await Promise.resolve()
+      expect(vi.mocked(mockSpawn)).toHaveBeenCalledTimes(5)
+
+      // Close ONE streaming turn → exactly one slot frees. The drain must
+      // release exactly one waiter, not both (pre-fix it released all queued).
+      await finishProcess(children[0], 0)
+      await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+      expect(vi.mocked(mockSpawn)).toHaveBeenCalledTimes(6)
+
+      // Settle remaining spawns.
+      for (let i = 1; i < 7; i++) {
+        await finishProcess(children[i], 0)
+        await Promise.resolve(); await Promise.resolve()
+      }
+    })
+
+    it('forgetExploreLifecycle clears the lifecycle entry and its idle timer', () => {
+      vi.useFakeTimers()
+      const cmL = new ChatManager(broadcast, db, '/tmp/proj', 'P', 'claude', 'pid-forget', 'sl-forget')
+      const convId = 'conv-forget'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      cmL.notifyMinimized(convId)
+      expect((cmL as unknown as { _exploreLifecycle: Map<string, unknown> })._exploreLifecycle.has(convId)).toBe(true)
+      cmL.forgetExploreLifecycle(convId)
+      expect((cmL as unknown as { _exploreLifecycle: Map<string, unknown> })._exploreLifecycle.has(convId)).toBe(false)
+      // Idle timer was cleared → crossing the 2-min mark fires nothing.
+      vi.advanceTimersByTime(3 * 60 * 1000)
+      vi.useRealTimers()
+    })
+
+    it('shutdown terminates active children and clears all tracking', async () => {
+      const cmL = new ChatManager(broadcast, db, '/tmp/proj', 'P', 'claude', 'pid-sd', 'sl-sd')
+      const convId = 'conv-sd'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore', contextScope: MCP_SCOPE })
+      const c = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValueOnce(c as any)
+      const sendPromise = cmL.sendMessage(convId, 'hi', { lightweight: true })
+      await Promise.resolve(); await Promise.resolve()
+      expect((cmL as unknown as { _activeProcesses: Map<string, unknown> })._activeProcesses.size).toBe(1)
+
+      cmL.shutdown()
+      expect(vi.mocked(treeKill)).toHaveBeenCalledWith(c.pid, 'SIGTERM')
+      expect((cmL as unknown as { _activeProcesses: Map<string, unknown> })._activeProcesses.size).toBe(0)
+      expect((cmL as unknown as { _exploreLifecycle: Map<string, unknown> })._exploreLifecycle.size).toBe(0)
+
+      // Settle the dangling turn.
+      await finishProcess(c, 0)
+      await sendPromise
+    })
   })
 
   // ─── Lightweight system prompt byte stability ─────────────────────────────

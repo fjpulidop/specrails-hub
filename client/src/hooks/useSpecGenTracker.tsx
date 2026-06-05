@@ -15,6 +15,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from 'react'
@@ -316,8 +317,13 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
 
   const clearSpecToOpen = useCallback(() => setSpecToOpen(null), [])
 
+  const value = useMemo(
+    () => ({ registerFastSpec, registerExploreSpec, specToOpen, clearSpecToOpen }),
+    [registerFastSpec, registerExploreSpec, specToOpen, clearSpecToOpen],
+  )
+
   return (
-    <SpecGenTrackerContext.Provider value={{ registerFastSpec, registerExploreSpec, specToOpen, clearSpecToOpen }}>
+    <SpecGenTrackerContext.Provider value={value}>
       {children}
     </SpecGenTrackerContext.Provider>
   )

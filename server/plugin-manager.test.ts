@@ -265,6 +265,48 @@ describe('PluginManager.install', () => {
     await m.install(tmpDir, 'pid', 'serena', broadcast)
     await expect(m.install(tmpDir, 'pid', 'serena', broadcast)).rejects.toBeInstanceOf(PluginAlreadyInstalledError)
   })
+
+  it('rejects with PluginInstallError (not a raw SyntaxError → 500) when .mcp.json is malformed', async () => {
+    fs.writeFileSync(path.join(tmpDir, '.mcp.json'), '{ this is : not valid json')
+    const m = new PluginManager([makeSerena()], { claudeApprovalChecker: () => 'enabled' })
+    await expect(m.install(tmpDir, 'pid', 'serena', broadcast)).rejects.toBeInstanceOf(PluginInstallError)
+  })
+
+  it('rolls back an agent-fragment file byte-identically even with non-UTF8 bytes', async () => {
+    const fragRel = '.claude/agents/custom-serena.md'
+    const frag = path.join(tmpDir, fragRel)
+    fs.mkdirSync(path.dirname(frag), { recursive: true })
+    // '# ' followed by bytes that are NOT valid UTF-8, then a newline.
+    const original = Buffer.from([0x23, 0x20, 0xff, 0xfe, 0x0a])
+    fs.writeFileSync(frag, original)
+
+    const m = new PluginManager([makeSerena({ verifyOk: false, verifyReason: 'x' })])
+    await expect(m.install(tmpDir, 'pid', 'serena', broadcast)).rejects.toThrow(/verify failed/)
+
+    // Pre-fix the rollback round-tripped through toString('utf8') and corrupted
+    // the bytes to U+FFFD; the Buffer write must restore them exactly.
+    expect(fs.readFileSync(frag).equals(original)).toBe(true)
+  })
+})
+
+describe('PluginManager.verify health caching', () => {
+  it('does not re-broadcast health_changed when verify result is unchanged', async () => {
+    const m = new PluginManager([makeSerena()], { claudeApprovalChecker: () => 'enabled' })
+    await m.install(tmpDir, 'pid', 'serena', broadcast)
+    captured.length = 0
+    await m.verify(tmpDir, 'pid', 'serena', broadcast) // still ok → unchanged
+    expect(captured.some((msg) => msg.type === 'plugin.health_changed')).toBe(false)
+  })
+
+  it('broadcasts health_changed when verify result flips to degraded', async () => {
+    const m = new PluginManager([makeSerena()], { claudeApprovalChecker: () => 'enabled' })
+    await m.install(tmpDir, 'pid', 'serena', broadcast)
+    captured.length = 0
+    // Swap in a plugin whose verify now fails for the same name.
+    const m2 = new PluginManager([makeSerena({ verifyOk: false, verifyReason: 'uv-gone' })])
+    await m2.verify(tmpDir, 'pid', 'serena', broadcast)
+    expect(captured.some((msg) => msg.type === 'plugin.health_changed')).toBe(true)
+  })
 })
 
 describe('PluginManager.uninstall', () => {

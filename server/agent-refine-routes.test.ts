@@ -147,12 +147,32 @@ describe('POST /catalog/:agentId/refine', () => {
 // ─── POST /refine/:refineId/turn ─────────────────────────────────────────────
 
 describe('POST /catalog/:agentId/refine/:refineId/turn', () => {
+  beforeEach(() => {
+    // The /turn route now verifies the session belongs to :agentId, so the
+    // row must exist (matching the GET/PATCH/DELETE/apply sibling routes).
+    createRefineSession(db, {
+      id: 'r-1',
+      agentId: 'custom-foo',
+      baseVersion: 0,
+      baseBodyHash: 'h',
+      autoTest: true,
+    })
+  })
+
   it('proxies to manager.sendTurn and returns 200', async () => {
     const res = await request(app)
       .post(`${BASE}/custom-foo/refine/r-1/turn`)
       .send({ instruction: 'tighter' })
     expect(res.status).toBe(200)
     expect(mgrStub.sendTurn).toHaveBeenCalledWith({ refineId: 'r-1', instruction: 'tighter' })
+  })
+
+  it('returns 404 when the session belongs to a different agent', async () => {
+    const res = await request(app)
+      .post(`${BASE}/custom-bar/refine/r-1/turn`)
+      .send({ instruction: 'x' })
+    expect(res.status).toBe(404)
+    expect(mgrStub.sendTurn).not.toHaveBeenCalled()
   })
 
   it('rejects empty instruction with 400', async () => {

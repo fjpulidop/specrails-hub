@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { getApiBase } from '../lib/api'
 import { ProfilesTab } from '../components/agents/ProfilesTab'
 import { AgentsCatalogTab } from '../components/agents/AgentsCatalogTab'
 import { ProfileAnalyticsCard } from '../components/agents/ProfileAnalyticsCard'
+import { useMinimizedChats } from '../context/MinimizedChatsContext'
+import { useHub } from '../hooks/useHub'
 
 type Tab = 'profiles' | 'usage' | 'catalog'
 
@@ -32,6 +34,28 @@ export default function AgentsPage() {
     try { localStorage.setItem(TAB_MEMORY_KEY, next) } catch { /* ignore */ }
   }
   const [coreStatus, setCoreStatus] = useState<CoreVersionStatus | null>(null)
+  const { activeProjectId } = useHub()
+  const { pendingRestores } = useMinimizedChats()
+
+  // The ai-edit restore trigger (usePendingRestore) lives inside
+  // AgentsCatalogTab, which only mounts on the 'catalog' tab. When an AI-Edit
+  // chip is restored while this page is on another tab, force the Catalog tab
+  // once so the trigger mounts and consumes the pending restore. EDGE-triggered
+  // (only on the rising edge of "a pending ai-edit appeared") so it never
+  // fights the user manually leaving the tab afterwards.
+  const hadAiEditPendingRef = useRef(false)
+  useEffect(() => {
+    if (!activeProjectId) return
+    const hasAiEditPending = pendingRestores.some(
+      (c) => c.kind === 'ai-edit' && c.projectId === activeProjectId,
+    )
+    if (hasAiEditPending && !hadAiEditPendingRef.current && tab !== 'catalog') {
+      setTab('catalog')
+    }
+    hadAiEditPendingRef.current = hasAiEditPending
+    // setTab is stable enough for this purpose; only react to queue/project/tab.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRestores, activeProjectId, tab])
 
   useEffect(() => {
     let cancelled = false

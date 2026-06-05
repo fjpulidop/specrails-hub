@@ -217,6 +217,9 @@ export class QueueManager {
   private _cwd: string | undefined
   private _zombieTimeoutMs: number
   private _inactivityTimer: ReturnType<typeof setTimeout> | null
+  /** Set by shutdown(); once disposed the manager spawns no new jobs and never
+   *  touches the (now possibly closed) DB from late child 'close' callbacks. */
+  private _disposed: boolean
 
   private _getCostAlertThreshold: (() => number | null) | null
   private _getHubDailyBudget: (() => { budget: number | null; totalSpend: number }) | null
@@ -273,6 +276,7 @@ export class QueueManager {
     this._commands = commands ?? []
     this._cwd = cwd
     this._inactivityTimer = null
+    this._disposed = false
 
     this._getCostAlertThreshold = options?.getCostAlertThreshold ?? null
     this._getHubDailyBudget = options?.getHubDailyBudget ?? null
@@ -306,6 +310,49 @@ export class QueueManager {
     if (this._activeJobId) {
       this._resetZombieTimer()
     }
+  }
+
+  /**
+   * Tear down the manager: clear pending timers, terminate any active child
+   * (SIGTERM, then SIGKILL after a grace period), and drop the DB handle so a
+   * late child 'close' event cannot run prepared statements against a closed
+   * connection (which would throw uncaught inside the EventEmitter listener and
+   * crash the whole hub). Idempotent. Must be called BEFORE the per-project DB
+   * is closed (e.g. in ProjectRegistry.removeProject) and on graceful shutdown.
+   */
+  shutdown(): void {
+    if (this._disposed) return
+    this._disposed = true
+
+    if (this._inactivityTimer !== null) {
+      clearTimeout(this._inactivityTimer)
+      this._inactivityTimer = null
+    }
+    if (this._killTimer !== null) {
+      clearTimeout(this._killTimer)
+      this._killTimer = null
+    }
+
+    const proc = this._activeProcess
+    if (proc && proc.pid) {
+      const pid = proc.pid
+      try {
+        treeKill(pid, 'SIGTERM')
+      } catch { /* best-effort */ }
+      const grace = setTimeout(() => {
+        try {
+          treeKill(pid, 'SIGKILL', () => { /* ignore */ })
+        } catch { /* best-effort */ }
+      }, 5000)
+      // Do not let the grace timer keep the process alive on real shutdown.
+      if (typeof grace.unref === 'function') grace.unref()
+    }
+
+    this._activeProcess = null
+    this._activeJobId = null
+    // Drop the DB reference last so any in-flight 'close' callback sees null
+    // and skips all DB work via the existing `if (this._db)` guards.
+    this._db = null
   }
 
   // ─── Public API ─────────────────────────────────────────────────────────────
@@ -559,6 +606,7 @@ export class QueueManager {
   }
 
   private _drainQueue(): void {
+    if (this._disposed) return
     if (this._activeJobId !== null) return
     if (this._paused) return
     if (this._queue.length === 0) return
@@ -694,7 +742,7 @@ export class QueueManager {
             snapshotForJob,
             persistJobProfile,
           } = require('./profile-manager') as typeof import('./profile-manager')
-          const resolved = resolveProfile(this._cwd, selection ?? undefined)
+          const resolved = resolveProfile(this._cwd, selection ?? undefined, this._adapter.id)
           if (resolved) {
             profileSnapshotPath = snapshotForJob(this._projectSlug, jobId, resolved)
             profileName = resolved.name
@@ -1017,6 +1065,11 @@ export class QueueManager {
       this._killTimer = null
     }
 
+    // The manager was torn down (e.g. project removed) while the child was
+    // still running. The DB may be closed; skip all bookkeeping to avoid an
+    // uncaught throw inside this EventEmitter 'close' listener.
+    if (this._disposed) return
+
     const job = this._jobs.get(jobId)
     if (!job) return
 
@@ -1070,11 +1123,17 @@ export class QueueManager {
             session_id: normalised.session_id,
           }
         : {}
-      finishJob(this._db, jobId, {
-        exit_code: code ?? -1,
-        status: finalStatus,
-        ...tokenData,
-      })
+      try {
+        finishJob(this._db, jobId, {
+          exit_code: code ?? -1,
+          status: finalStatus,
+          ...tokenData,
+        })
+      } catch (err) {
+        // Defense-in-depth: the DB may have been closed underneath us mid-job.
+        // Never let a write throw uncaught inside the child 'close' listener.
+        console.error('[queue-manager] finishJob failed (db unavailable?):', err)
+      }
 
       // ai_invocations capture (surface='job'). One row per job exit.
       if (this._projectId) {
@@ -1144,57 +1203,63 @@ export class QueueManager {
       const costStr = jobCost != null ? ` | cost: ${estimated ? '~' : ''}$${jobCost.toFixed(4)}` : ''
       emitLine('stdout', `[process exited with code ${code ?? 'unknown'}${costStr}]`)
 
-      // Cost alert: check per-job threshold (hub-level, then per-project)
+      // Cost alert: check per-job threshold (hub-level, then per-project).
+      // These prepared statements touch the DB, which may have been closed
+      // mid-job; guard so a throw never escapes the child 'close' listener.
       if (jobCost != null && finalStatus === 'completed') {
-        const hubThreshold = this._getCostAlertThreshold?.() ?? null
-        if (hubThreshold != null && jobCost >= hubThreshold) {
-          this._broadcast({ type: 'cost_alert', projectId: '', jobId, cost: jobCost, threshold: hubThreshold })
-        }
-
-        // Per-project job cost threshold (alerts independently of hub threshold)
-        const projectThresholdRow = this._db.prepare(
-          `SELECT value FROM queue_state WHERE key = 'config.job_cost_threshold_usd'`
-        ).get() as { value: string } | undefined
-        if (projectThresholdRow) {
-          const projectThreshold = parseFloat(projectThresholdRow.value)
-          if (projectThreshold > 0 && jobCost >= projectThreshold) {
-            this._broadcast({ type: 'cost_alert', projectId: '', jobId, cost: jobCost, threshold: projectThreshold })
+        try {
+          const hubThreshold = this._getCostAlertThreshold?.() ?? null
+          if (hubThreshold != null && jobCost >= hubThreshold) {
+            this._broadcast({ type: 'cost_alert', projectId: '', jobId, cost: jobCost, threshold: hubThreshold })
           }
-        }
 
-        // Per-project daily budget: check total spend for today
-        const dailyBudgetRow = this._db.prepare(
-          `SELECT value FROM queue_state WHERE key = 'config.daily_budget_usd'`
-        ).get() as { value: string } | undefined
-        if (dailyBudgetRow) {
-          const dailyBudget = parseFloat(dailyBudgetRow.value)
-          if (dailyBudget > 0) {
-            const spendRow = this._db.prepare(
-              `SELECT COALESCE(SUM(total_cost_usd), 0) as total FROM jobs WHERE status = 'completed' AND total_cost_usd IS NOT NULL AND started_at >= date('now')`
-            ).get() as { total: number }
-            const dailySpend = spendRow.total
-            if (dailySpend >= dailyBudget) {
+          // Per-project job cost threshold (alerts independently of hub threshold)
+          const projectThresholdRow = this._db.prepare(
+            `SELECT value FROM queue_state WHERE key = 'config.job_cost_threshold_usd'`
+          ).get() as { value: string } | undefined
+          if (projectThresholdRow) {
+            const projectThreshold = parseFloat(projectThresholdRow.value)
+            if (projectThreshold > 0 && jobCost >= projectThreshold) {
+              this._broadcast({ type: 'cost_alert', projectId: '', jobId, cost: jobCost, threshold: projectThreshold })
+            }
+          }
+
+          // Per-project daily budget: check total spend for today
+          const dailyBudgetRow = this._db.prepare(
+            `SELECT value FROM queue_state WHERE key = 'config.daily_budget_usd'`
+          ).get() as { value: string } | undefined
+          if (dailyBudgetRow) {
+            const dailyBudget = parseFloat(dailyBudgetRow.value)
+            if (dailyBudget > 0) {
+              const spendRow = this._db.prepare(
+                `SELECT COALESCE(SUM(total_cost_usd), 0) as total FROM jobs WHERE status = 'completed' AND total_cost_usd IS NOT NULL AND started_at >= date('now')`
+              ).get() as { total: number }
+              const dailySpend = spendRow.total
+              if (dailySpend >= dailyBudget) {
+                const wasPaused = this._paused
+                this._paused = true
+                if (!wasPaused) {
+                  this._db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('paused', 'true')`).run()
+                }
+                this._broadcast({ type: 'daily_budget_exceeded', projectId: '', dailySpend, budget: dailyBudget, queuePaused: true })
+              }
+            }
+          }
+
+          // Hub-level daily budget enforcement
+          if (this._getHubDailyBudget) {
+            const { budget: hubBudget, totalSpend: hubTotalSpend } = this._getHubDailyBudget()
+            if (hubBudget != null && hubBudget > 0 && hubTotalSpend >= hubBudget) {
               const wasPaused = this._paused
               this._paused = true
               if (!wasPaused) {
                 this._db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('paused', 'true')`).run()
               }
-              this._broadcast({ type: 'daily_budget_exceeded', projectId: '', dailySpend, budget: dailyBudget, queuePaused: true })
+              this._broadcast({ type: 'hub_daily_budget_exceeded', projectId: '', hubDailySpend: hubTotalSpend, hubBudget, queuePaused: true })
             }
           }
-        }
-
-        // Hub-level daily budget enforcement
-        if (this._getHubDailyBudget) {
-          const { budget: hubBudget, totalSpend: hubTotalSpend } = this._getHubDailyBudget()
-          if (hubBudget != null && hubBudget > 0 && hubTotalSpend >= hubBudget) {
-            const wasPaused = this._paused
-            this._paused = true
-            if (!wasPaused) {
-              this._db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('paused', 'true')`).run()
-            }
-            this._broadcast({ type: 'hub_daily_budget_exceeded', projectId: '', hubDailySpend: hubTotalSpend, hubBudget, queuePaused: true })
-          }
+        } catch (err) {
+          console.error('[queue-manager] cost-alert bookkeeping failed (db unavailable?):', err)
         }
       }
     } else {
@@ -1203,9 +1268,14 @@ export class QueueManager {
 
     // Notify webhook handler (if any) about job completion/failure/cancellation
     if (this._onJobFinished && (finalStatus === 'completed' || finalStatus === 'failed' || finalStatus === 'canceled')) {
-      const costUsd = this._db
-        ? (this._db.prepare('SELECT total_cost_usd FROM jobs WHERE id = ?').get(jobId) as { total_cost_usd: number | null } | undefined)?.total_cost_usd ?? undefined
-        : undefined
+      let costUsd: number | undefined
+      try {
+        costUsd = this._db
+          ? (this._db.prepare('SELECT total_cost_usd FROM jobs WHERE id = ?').get(jobId) as { total_cost_usd: number | null } | undefined)?.total_cost_usd ?? undefined
+          : undefined
+      } catch (err) {
+        console.error('[queue-manager] cost read for webhook failed (db unavailable?):', err)
+      }
       this._onJobFinished(jobId, finalStatus, costUsd ?? undefined)
     }
 
@@ -1275,6 +1345,13 @@ export class QueueManager {
     if (!this._activeProcess || !this._activeProcess.pid) return
 
     this._clearZombieTimer()
+    // A second cancel()/zombie-kill of the same still-running job would
+    // otherwise overwrite (and leak) the in-flight SIGKILL timer, which could
+    // later fire treeKill(SIGKILL) against a recycled PID. Clear it first.
+    if (this._killTimer !== null) {
+      clearTimeout(this._killTimer)
+      this._killTimer = null
+    }
     this._cancelingJobs.add(jobId)
     treeKill(this._activeProcess.pid, 'SIGTERM')
 

@@ -1,0 +1,22 @@
+{
+  "schema_version": "1",
+  "change": "bundle-runtimes-desktop",
+  "agent": "reviewer",
+  "scored_at": "2026-06-03T16:12:00Z",
+  "overall": 91,
+  "aspects": {
+    "type_correctness": 95,
+    "pattern_adherence": 93,
+    "test_coverage": 88,
+    "security": 90,
+    "architectural_alignment": 92
+  },
+  "notes": {
+    "type_correctness": "SetupPrerequisite interface correctly uses `bundled?: true` (optional) for backward compat. PathSource union extended with 'bundled'. All signatures match existing patterns.",
+    "pattern_adherence": "Desktop-mode guard pattern (check SPECRAILS_IS_DESKTOP first, early return) is consistent across resolveStartupPath and augmentPathFromLoginShell. Follows existing module-level diagnostic state pattern.",
+    "test_coverage": "Desktop mode covered in both path-resolver.test.ts and setup-prerequisites.test.ts — invariants 1 and 3 explicitly tested. Client-side PrerequisitesPanel and InstallInstructionsModal desktop branches not directly unit-tested but covered indirectly.",
+    "security": "Bundled runtime path from env var is used directly for path construction — no traversal risk since it's set by the Tauri process, not user input. spawnSync uses the bundled path as executable, not user-controlled.",
+    "architectural_alignment": "Desktop-mode branching is cleanly isolated behind env var gates in server-only modules. Client type extension is additive. Tauri sets env vars before sidecar spawn — correct integration point. No component code changes required."
+  },
+  "flags": []
+}

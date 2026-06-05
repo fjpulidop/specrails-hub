@@ -333,6 +333,10 @@ describe('applyDeleteEpicChildren', () => {
     // Épica remains; only children removed.
     expect(Object.keys(store.tickets)).toHaveLength(1)
     expect(store.tickets['1'].is_epic).toBe(true)
+    // Returns the post-write revision so the route can suppress the chokidar
+    // echo (passing 0 caused a spurious full-refresh broadcast).
+    expect(r.revision).toBe(store.revision)
+    expect(r.revision).toBeGreaterThan(0)
   })
 })
 

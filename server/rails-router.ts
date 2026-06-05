@@ -51,7 +51,15 @@ export function createRailsRouter(): Router {
 
     const c = ctx(req)
     try {
-      const rail = setRailTickets(c.db, railIndex, ticketIds as number[])
+      // setRailTickets does delete-then-reinsert; without forwarding the rail's
+      // current mode/profileName they would reset to defaults ('implement' /
+      // null) on every ticket reassignment, silently wiping a configured
+      // per-rail profile. Preserve them (an explicit body value still wins).
+      const current = getRail(c.db, railIndex)
+      const body = req.body ?? {}
+      const mode = typeof body.mode === 'string' ? body.mode : current.mode
+      const profileName = 'profileName' in body ? body.profileName : current.profileName
+      const rail = setRailTickets(c.db, railIndex, ticketIds as number[], mode, profileName)
       res.json({ rail })
     } catch (err) {
       console.error('[rails-router] set rail tickets error:', err)

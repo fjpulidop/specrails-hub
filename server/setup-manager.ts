@@ -953,6 +953,24 @@ export class SetupManager {
     this._installProcesses.set(projectId, child)
     this._installLogBuffer.set(projectId, [])
 
+    // spawnCoreInit uses shell:false on POSIX, so a spawn failure emits 'error'
+    // (and NOT 'close') — without this handler the temp config file leaks and
+    // the unhandled 'error' event would crash the hub.
+    /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
+    child.on('error', (err) => {
+      console.error(`[SetupManager] core spawn failed for ${projectId}: ${err.message}`)
+      this._installProcesses.delete(projectId)
+      if (spawnConfigPath) {
+        try { rmSync(spawnConfigPath, { force: true }) } catch { /* non-fatal */ }
+      }
+      this._broadcast({
+        type: 'setup_error',
+        projectId,
+        error: `Failed to launch specrails-core: ${err.message}`,
+      })
+    })
+    /* c8 ignore stop */
+
     const stdoutReader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
     const stderrReader = createInterface({ input: child.stderr!, crlfDelay: Infinity })
 
@@ -1432,15 +1450,30 @@ export class SetupManager {
 
     const installChild = this._installProcesses.get(projectId)
     if (installChild?.pid) {
-      treeKill(installChild.pid, 'SIGTERM')
+      this._terminateWithEscalation(installChild.pid)
       this._installProcesses.delete(projectId)
     }
 
     const setupChild = this._setupProcesses.get(projectId)
     if (setupChild?.pid) {
-      treeKill(setupChild.pid, 'SIGTERM')
+      this._terminateWithEscalation(setupChild.pid)
       this._setupProcesses.delete(projectId)
     }
+  }
+
+  /**
+   * SIGTERM a process tree, then escalate to SIGKILL after a grace window if it
+   * is still alive — mirroring QueueManager._kill. The Map entry is deleted
+   * immediately by the caller, so the pid is captured locally here; without the
+   * escalation a child that ignores SIGTERM (npm/npx scaffolding, a hung CLI)
+   * would be orphaned for the host's lifetime with no remaining handle.
+   */
+  private _terminateWithEscalation(pid: number): void {
+    try { treeKill(pid, 'SIGTERM') } catch { /* best-effort */ }
+    const grace = setTimeout(() => {
+      try { treeKill(pid, 'SIGKILL', () => { /* ignore */ }) } catch { /* best-effort */ }
+    }, 5000)
+    if (typeof grace.unref === 'function') grace.unref()
   }
 
   isInstalling(projectId: string): boolean {

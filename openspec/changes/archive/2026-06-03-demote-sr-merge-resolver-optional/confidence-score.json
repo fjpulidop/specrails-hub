@@ -1,0 +1,22 @@
+{
+  "schema_version": "1",
+  "change": "demote-sr-merge-resolver-optional",
+  "agent": "reviewer",
+  "scored_at": "2026-06-03T15:10:00Z",
+  "overall": 95,
+  "aspects": {
+    "type_correctness": 98,
+    "pattern_adherence": 97,
+    "test_coverage": 92,
+    "security": 98,
+    "architectural_alignment": 95
+  },
+  "notes": {
+    "type_correctness": "All four modified files compile with zero TypeScript errors. The Set<string> type annotation on pinnedLast is correct and consistent with the existing codebase style.",
+    "pattern_adherence": "Changes follow the existing pattern precisely: CORE_AGENTS drives client behavior, baselineAgents() drives server validation, and both adapters are kept in sync. The profiles-router migration path correctly uses the empty pinnedLast set with no changes to the three downstream filter calls.",
+    "test_coverage": "Adapter tests updated for 3-element arrays. profile-manager.test.ts flipped to accept trio-only profiles. profiles-router.test.ts has a new trio-only test. The 2 pre-existing GlobalSettingsPage webhook failures are unrelated to this change.",
+    "security": "No new attack surface. The change removes an agent requirement constraint — it does not add capabilities or modify authentication/authorization paths.",
+    "architectural_alignment": "sr-merge-resolver correctly demoted to optional without any component-level changes. The invariant that ALL_AGENTS retains sr-merge-resolver as a Utilities catalog entry is preserved. Existing installations are unaffected because profile validation now accepts (not rejects) profiles without sr-merge-resolver."
+  },
+  "flags": []
+}

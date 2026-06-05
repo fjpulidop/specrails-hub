@@ -1,0 +1,22 @@
+{
+  "schema_version": "1",
+  "change": "add-specrails-theme",
+  "agent": "reviewer",
+  "scored_at": "2026-06-03T10:24:31Z",
+  "overall": 92,
+  "aspects": {
+    "type_correctness": 97,
+    "pattern_adherence": 95,
+    "test_coverage": 85,
+    "security": 95,
+    "architectural_alignment": 95
+  },
+  "notes": {
+    "type_correctness": "THEME_IDS tuple, ThemeId union, THEMES record, and THEME_ID_ALLOWLIST are all consistent. TypeScript build passes with no new errors. XtermTheme interface enforces all 21 required fields at compile time.",
+    "pattern_adherence": "Implementation follows the established theme-extension pattern exactly: PALETTE const → ThemeDescriptor const → THEMES registry entry → CSS block → server allowlist. Comment separators, field ordering, and naming conventions match all other themes.",
+    "test_coverage": "4 theme-related tests needed updating due to the new theme count and DEFAULT_THEME change; all fixed and passing. 2 pre-existing GlobalSettingsPage webhook failures (unrelated to this change) and 1 pre-existing flaky benchmark test remain — confirmed pre-existing via git stash check.",
+    "security": "Server allowlist correctly gates PATCH /api/hub/theme. No new API surface. No user-supplied data flows through the theme CSS block. Bogus-value 400 path is unchanged.",
+    "architectural_alignment": "Change is purely additive — no existing code mutated beyond extending the two data structures and changing one constant. DEFAULT_THEME change is intentional per spec. CSS block respects the semantic-token contract with no brand-named (dracula-*) tokens."
+  },
+  "flags": []
+}

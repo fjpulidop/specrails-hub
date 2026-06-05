@@ -510,12 +510,26 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
   it('adds a webhook successfully and reloads list', async () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })            // GET settings
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })     // GET webhooks (initial)
-      .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })         // GET budget
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhook: mockWebhook }) }) // POST webhook
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [mockWebhook] }) }) // GET webhooks (reload)
+    // URL+method keyed mock (not a brittle mockResolvedValueOnce sequence): the
+    // component fires several settings fetches on mount, so a fixed sequence
+    // misaligns and the POST response lands on the wrong call.
+    let posted = false
+    global.fetch = vi.fn().mockImplementation((url: string, opts?: { method?: string }) => {
+      if (typeof url === 'string' && url === '/api/hub/webhooks') {
+        if (opts?.method === 'POST') {
+          posted = true
+          return Promise.resolve({ ok: true, json: async () => ({ webhook: mockWebhook }) })
+        }
+        return Promise.resolve({ ok: true, json: async () => ({ webhooks: posted ? [mockWebhook] : [] }) })
+      }
+      if (typeof url === 'string' && url.includes('/api/hub/budget')) {
+        return Promise.resolve({ ok: true, json: async () => budgetResponse })
+      }
+      if (typeof url === 'string' && url.includes('/api/hub/terminal-settings')) {
+        return Promise.resolve({ ok: true, json: async () => defaultTerminalSettings })
+      }
+      return Promise.resolve({ ok: true, json: async () => hubSettings })
+    })
 
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
@@ -531,12 +545,21 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
   it('shows error when adding webhook fails with server message', async () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })
-      .mockResolvedValueOnce({ ok: true, json: async () => defaultTerminalSettings })
-      .mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'Invalid URL' }) })
+    global.fetch = vi.fn().mockImplementation((url: string, opts?: { method?: string }) => {
+      if (typeof url === 'string' && url === '/api/hub/webhooks') {
+        if (opts?.method === 'POST') {
+          return Promise.resolve({ ok: false, json: async () => ({ error: 'Invalid URL' }) })
+        }
+        return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
+      }
+      if (typeof url === 'string' && url.includes('/api/hub/budget')) {
+        return Promise.resolve({ ok: true, json: async () => budgetResponse })
+      }
+      if (typeof url === 'string' && url.includes('/api/hub/terminal-settings')) {
+        return Promise.resolve({ ok: true, json: async () => defaultTerminalSettings })
+      }
+      return Promise.resolve({ ok: true, json: async () => hubSettings })
+    })
 
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {

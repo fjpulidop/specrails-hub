@@ -239,19 +239,19 @@ export function listProfiles(projectPath: string): ProfileListEntry[] {
   return entries.sort((a, b) => a.name.localeCompare(b.name))
 }
 
-export function getProfile(projectPath: string, name: string): Profile {
+export function getProfile(projectPath: string, name: string, expectedProvider: string = 'claude'): Profile {
   assertValidName(name)
   const full = profilePath(projectPath, name)
   if (!fs.existsSync(full)) {
     throw new ProfileNotFoundError(name)
   }
   const raw = JSON.parse(fs.readFileSync(full, 'utf8'))
-  return validateProfile(raw)
+  return validateProfile(raw, expectedProvider)
 }
 
-export function createProfile(projectPath: string, profile: Profile): void {
+export function createProfile(projectPath: string, profile: Profile, expectedProvider: string = 'claude'): void {
   assertValidName(profile.name)
-  validateProfile(profile)
+  validateProfile(profile, expectedProvider)
   const full = profilePath(projectPath, profile.name)
   if (fs.existsSync(full)) {
     throw new ProfileConflictError(profile.name)
@@ -260,9 +260,9 @@ export function createProfile(projectPath: string, profile: Profile): void {
   fs.writeFileSync(full, JSON.stringify(profile, null, 2) + '\n', 'utf8')
 }
 
-export function updateProfile(projectPath: string, profile: Profile): void {
+export function updateProfile(projectPath: string, profile: Profile, expectedProvider: string = 'claude'): void {
   assertValidName(profile.name)
-  validateProfile(profile)
+  validateProfile(profile, expectedProvider)
   const full = profilePath(projectPath, profile.name)
   if (!fs.existsSync(full)) {
     throw new ProfileNotFoundError(profile.name)
@@ -286,10 +286,11 @@ export function duplicateProfile(
   projectPath: string,
   sourceName: string,
   newName: string,
+  expectedProvider: string = 'claude',
 ): Profile {
-  const source = getProfile(projectPath, sourceName)
+  const source = getProfile(projectPath, sourceName, expectedProvider)
   const copy: Profile = { ...source, name: newName }
-  createProfile(projectPath, copy)
+  createProfile(projectPath, copy, expectedProvider)
   return copy
 }
 
@@ -297,16 +298,28 @@ export function renameProfile(
   projectPath: string,
   fromName: string,
   toName: string,
+  expectedProvider: string = 'claude',
 ): Profile {
-  const source = getProfile(projectPath, fromName)
+  const source = getProfile(projectPath, fromName, expectedProvider)
   assertValidName(toName)
   if (fs.existsSync(profilePath(projectPath, toName))) {
     throw new ProfileConflictError(toName)
   }
   const renamed: Profile = { ...source, name: toName }
-  validateProfile(renamed)
-  fs.writeFileSync(profilePath(projectPath, toName), JSON.stringify(renamed, null, 2) + '\n', 'utf8')
-  fs.unlinkSync(profilePath(projectPath, fromName))
+  validateProfile(renamed, expectedProvider)
+  // Atomic publish: write to a temp file in the same dir, fsync-rename into
+  // place, THEN remove the old file. A crash/unlink failure can no longer
+  // leave both files on disk (which listProfiles would surface as duplicates).
+  const dest = profilePath(projectPath, toName)
+  const tmp = `${dest}.tmp-${process.pid}`
+  fs.writeFileSync(tmp, JSON.stringify(renamed, null, 2) + '\n', 'utf8')
+  fs.renameSync(tmp, dest)
+  try {
+    fs.unlinkSync(profilePath(projectPath, fromName))
+  } catch {
+    // The new file is fully published; a stale source is at worst a transient
+    // duplicate, never data loss.
+  }
   return renamed
 }
 
@@ -330,10 +343,11 @@ export interface ResolvedProfile {
 export function resolveProfile(
   projectPath: string,
   explicit?: string | null,
+  expectedProvider: string = 'claude',
 ): ResolvedProfile | null {
   const tryName = (n: string): ResolvedProfile | null => {
     try {
-      return { name: n, profile: getProfile(projectPath, n) }
+      return { name: n, profile: getProfile(projectPath, n, expectedProvider) }
     } catch (e) {
       if (e instanceof ProfileNotFoundError) return null
       throw e

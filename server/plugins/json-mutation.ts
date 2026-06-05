@@ -31,11 +31,16 @@ export async function withFileLock<T>(filePath: string, fn: () => Promise<T>): P
   }
 }
 
-/** Atomically replace a file's bytes by writing a sibling temp file and renaming. */
-export function atomicWriteFileSync(filePath: string, body: string, mode?: number): void {
+/** Atomically replace a file's bytes by writing a sibling temp file and renaming.
+ *  Accepts a raw Buffer for byte-identical restores (rollback of snapshots that
+ *  may contain non-UTF8 bytes); a string is written as UTF-8. */
+export function atomicWriteFileSync(filePath: string, body: string | Buffer, mode?: number): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true })
   const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`
-  const opts: fs.WriteFileOptions = mode != null ? { encoding: 'utf8', mode } : { encoding: 'utf8' }
+  // Node ignores the encoding option for Buffer payloads; only set it for strings.
+  const opts: fs.WriteFileOptions = Buffer.isBuffer(body)
+    ? (mode != null ? { mode } : {})
+    : (mode != null ? { encoding: 'utf8', mode } : { encoding: 'utf8' })
   fs.writeFileSync(tmp, body, opts)
   fs.renameSync(tmp, filePath)
 }

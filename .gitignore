@@ -19,5 +19,15 @@ src-tauri/binaries/pty.node
 src-tauri/binaries/node-pty/
 src-tauri/binaries/shell-integration/
 
+# Bundled runtimes — populated by CI at build time, not checked in
+# The .gitkeep placeholder keeps the directory tracked so Tauri's
+# resource glob resolves without error in local development builds.
+src-tauri/runtimes/*
+!src-tauri/runtimes/.gitkeep
+
 # Sidecar build intermediates (esbuild output + sqlite prebuild cache)
 build/
+
+# specrails
+.claude/agent-memory/
+.specrails/

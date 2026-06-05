@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
 
 vi.mock('child_process', () => ({
   spawnSync: vi.fn(),
@@ -9,6 +12,7 @@ import {
   compareVersions,
   formatMissingSetupPrerequisites,
   getSetupPrerequisitesStatus,
+  __resetSetupPrerequisitesCacheForTest,
   parseSemver,
   type SetupPrerequisitesStatus,
 } from './setup-prerequisites'
@@ -18,6 +22,7 @@ const mockSpawnSync = vi.mocked(spawnSync)
 describe('setup prerequisites', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    __resetSetupPrerequisitesCacheForTest()
   })
 
   it('reports all required tools as installed with versions when versions meet minimums', () => {
@@ -278,6 +283,262 @@ describe('setup prerequisites', () => {
     expect(formatMissingSetupPrerequisites(ready)).toBeNull()
     expect(formatMissingSetupPrerequisites(missing)).toContain('Git (git) is not on PATH')
     expect(formatMissingSetupPrerequisites(missing)).toContain('restart SpecRails Hub')
+  })
+})
+
+describe('getSetupPrerequisitesStatus — desktop mode', () => {
+  const ORIGINAL_PLATFORM = process.platform
+  let runtimesBase: string
+  let tmpRoot: string
+
+  /** Create a temp runtimes tree containing the requested tool files so the
+   *  existence-gate in getSetupPrerequisitesStatus sees them on disk. The dir
+   *  name ends in `runtimes` so the spawnSync mocks can substring-match
+   *  `runtimes/node/bin/node` etc. */
+  function makeRuntimes(tools: Partial<Record<'node' | 'npm' | 'npx' | 'git', boolean>> = {
+    node: true, npm: true, npx: true, git: true,
+  }): string {
+    const base = path.join(tmpRoot, 'runtimes')
+    fs.mkdirSync(path.join(base, 'node', 'bin'), { recursive: true })
+    fs.mkdirSync(path.join(base, 'git', 'bin'), { recursive: true })
+    fs.mkdirSync(path.join(base, 'git', 'cmd'), { recursive: true })
+    fs.mkdirSync(path.join(base, 'node'), { recursive: true })
+    const touch = (p: string) => fs.writeFileSync(p, '#!/bin/sh\n')
+    if (tools.node) touch(path.join(base, 'node', 'bin', 'node'))
+    if (tools.npm) touch(path.join(base, 'node', 'bin', 'npm'))
+    if (tools.npx) touch(path.join(base, 'node', 'bin', 'npx'))
+    if (tools.git) touch(path.join(base, 'git', 'bin', 'git'))
+    return base
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+    __resetSetupPrerequisitesCacheForTest()
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'sprq-'))
+    process.env.SPECRAILS_IS_DESKTOP = '1'
+    runtimesBase = makeRuntimes()
+    process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH = runtimesBase
+  })
+
+  afterEach(() => {
+    delete process.env.SPECRAILS_IS_DESKTOP
+    delete process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH
+    Object.defineProperty(process, 'platform', { value: ORIGINAL_PLATFORM, configurable: true })
+    fs.rmSync(tmpRoot, { recursive: true, force: true })
+  })
+
+  it('all bundled tools return bundled: true, installed: true, executable: true on success', () => {
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+    // Desktop mode calls probeVersion with the absolute bundled path directly (no which call)
+    mockSpawnSync.mockImplementation((cmd: any) => {
+      if (cmd === 'which' || cmd === 'where') return { status: 1 } as any // should not be called for bundled tools
+      // bundled paths are probed directly
+      if (typeof cmd === 'string' && cmd.includes('runtimes/node/bin/node')) return { status: 0, stdout: 'v22.0.0\n', stderr: '' } as any
+      if (typeof cmd === 'string' && cmd.includes('runtimes/node/bin/npm')) return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (typeof cmd === 'string' && cmd.includes('runtimes/node/bin/npx')) return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (typeof cmd === 'string' && cmd.includes('runtimes/git/bin/git')) return { status: 0, stdout: 'git version 2.49.0\n', stderr: '' } as any
+      // Providers (claude, codex) are probed via system path
+      if (cmd === 'which') return { status: 0, stdout: '/usr/local/bin/claude\n', stderr: '' } as any
+      if (cmd === 'claude') return { status: 0, stdout: '1.0.0\n', stderr: '' } as any
+      if (cmd === 'codex') return { status: 0, stdout: '0.128.0\n', stderr: '' } as any
+      return { status: 0, stdout: '', stderr: '' } as any
+    })
+
+    const status = getSetupPrerequisitesStatus()
+    const tools = status.prerequisites.filter((p) => p.kind === 'tool' && p.key !== 'uv')
+    expect(tools.every((t) => t.bundled === true)).toBe(true)
+    expect(tools.every((t) => t.installed === true)).toBe(true)
+    expect(tools.every((t) => t.executable === true)).toBe(true)
+    expect(tools.every((t) => t.error === undefined)).toBe(true)
+  })
+
+  it('resolvedPath is the bundled binary path, not a system which result', () => {
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+    mockSpawnSync.mockImplementation((cmd: any) => {
+      if (typeof cmd === 'string' && cmd.includes('runtimes')) return { status: 0, stdout: 'v22.0.0\n', stderr: '' } as any
+      if (cmd === 'claude') return { status: 0, stdout: '1.0.0\n', stderr: '' } as any
+      if (cmd === 'codex') return { status: 0, stdout: '0.128.0\n', stderr: '' } as any
+      return { status: 0, stdout: '', stderr: '' } as any
+    })
+
+    const status = getSetupPrerequisitesStatus()
+    const node = status.prerequisites.find((p) => p.key === 'node')
+    expect(node?.resolvedPath).toContain('runtimes/node/bin/node')
+    const git = status.prerequisites.find((p) => p.key === 'git')
+    expect(git?.resolvedPath).toContain('runtimes/git/bin/git')
+  })
+
+  it('meetsMinimum is true when version meets threshold', () => {
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+    mockSpawnSync.mockImplementation((cmd: any) => {
+      if (typeof cmd === 'string' && cmd.includes('runtimes/node/bin/node')) return { status: 0, stdout: 'v22.0.0\n', stderr: '' } as any
+      if (typeof cmd === 'string' && cmd.includes('runtimes/node/bin/npm')) return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (typeof cmd === 'string' && cmd.includes('runtimes/node/bin/npx')) return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (typeof cmd === 'string' && cmd.includes('runtimes/git/bin/git')) return { status: 0, stdout: 'git version 2.49.0\n', stderr: '' } as any
+      if (cmd === 'claude') return { status: 0, stdout: '1.0.0\n', stderr: '' } as any
+      if (cmd === 'codex') return { status: 0, stdout: '0.128.0\n', stderr: '' } as any
+      return { status: 0, stdout: '', stderr: '' } as any
+    })
+
+    const status = getSetupPrerequisitesStatus()
+    const tools = status.prerequisites.filter((p) => p.kind === 'tool' && p.key !== 'uv')
+    expect(tools.every((t) => t.meetsMinimum === true)).toBe(true)
+  })
+
+  it('corrupted-bundle: executable: false, error: corrupted-bundle when probe fails (file present)', () => {
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+    mockSpawnSync.mockImplementation((cmd: any) => {
+      // node binary EXISTS on disk (makeRuntimes) but its --version probe fails → genuine corruption
+      if (typeof cmd === 'string' && cmd.includes('runtimes/node/bin/node')) {
+        return { error: Object.assign(new Error('ENOENT'), { code: 'ENOENT' }) } as any
+      }
+      if (typeof cmd === 'string' && cmd.includes('runtimes')) return { status: 0, stdout: 'v22.0.0\n', stderr: '' } as any
+      if (cmd === 'claude') return { status: 0, stdout: '1.0.0\n', stderr: '' } as any
+      if (cmd === 'codex') return { status: 0, stdout: '0.128.0\n', stderr: '' } as any
+      return { status: 0, stdout: '', stderr: '' } as any
+    })
+
+    const status = getSetupPrerequisitesStatus()
+    const node = status.prerequisites.find((p) => p.key === 'node')
+    expect(node?.bundled).toBe(true)
+    expect(node?.executable).toBe(false)
+    expect(node?.error).toBe('corrupted-bundle')
+    expect(node?.installed).toBe(true)
+    expect(node?.meetsMinimum).toBe(false)
+  })
+
+  it('corrupted-bundle: installHint is Bundle corrupted — reinstall...', () => {
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+    mockSpawnSync.mockImplementation((cmd: any) => {
+      if (typeof cmd === 'string' && cmd.includes('runtimes/node/bin/node')) {
+        return { error: Object.assign(new Error('ENOENT'), { code: 'ENOENT' }) } as any
+      }
+      if (typeof cmd === 'string' && cmd.includes('runtimes')) return { status: 0, stdout: 'v22.0.0\n', stderr: '' } as any
+      if (cmd === 'claude') return { status: 0, stdout: '1.0.0\n', stderr: '' } as any
+      if (cmd === 'codex') return { status: 0, stdout: '0.128.0\n', stderr: '' } as any
+      return { status: 0, stdout: '', stderr: '' } as any
+    })
+
+    const status = getSetupPrerequisitesStatus()
+    const node = status.prerequisites.find((p) => p.key === 'node')
+    expect(node?.installHint).toContain('Bundle corrupted')
+    expect(node?.installHint).toContain('reinstall')
+  })
+
+  it('corrupted-bundle: entry appears in missingRequired', () => {
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+    mockSpawnSync.mockImplementation((cmd: any) => {
+      if (typeof cmd === 'string' && cmd.includes('runtimes/node/bin/node')) {
+        return { error: Object.assign(new Error('ENOENT'), { code: 'ENOENT' }) } as any
+      }
+      if (typeof cmd === 'string' && cmd.includes('runtimes')) return { status: 0, stdout: 'v22.0.0\n', stderr: '' } as any
+      if (cmd === 'claude') return { status: 0, stdout: '1.0.0\n', stderr: '' } as any
+      if (cmd === 'codex') return { status: 0, stdout: '0.128.0\n', stderr: '' } as any
+      return { status: 0, stdout: '', stderr: '' } as any
+    })
+
+    const status = getSetupPrerequisitesStatus()
+    expect(status.ok).toBe(false)
+    expect(status.missingRequired.map((m) => m.key)).toContain('node')
+    const missing = status.missingRequired.find((m) => m.key === 'node')
+    expect(missing?.error).toBe('corrupted-bundle')
+  })
+
+  it('bundle absent (no runtimes files) → falls back to system probe, no corrupted-bundle, no bundled flag', () => {
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+    // Point at an empty runtimes dir: the bundled binary FILES do not exist, so
+    // the existence-gate must fall through to the system `which` probe rather
+    // than reporting corrupted-bundle (the Windows-ARM64 / partial-extraction case).
+    const emptyBase = path.join(tmpRoot, 'empty', 'runtimes')
+    fs.mkdirSync(emptyBase, { recursive: true })
+    process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH = emptyBase
+    mockSpawnSync.mockImplementation((cmd: any) => {
+      if (cmd === 'which' || cmd === 'where') return { status: 0, stdout: '/usr/local/bin/node\n', stderr: '' } as any
+      if (cmd === '/usr/local/bin/node' || cmd === 'node') return { status: 0, stdout: 'v22.0.0\n', stderr: '' } as any
+      if (cmd === '/usr/local/bin/npm' || cmd === 'npm') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (cmd === '/usr/local/bin/npx' || cmd === 'npx') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (cmd === '/usr/local/bin/git' || cmd === 'git') return { status: 0, stdout: 'git version 2.49.0\n', stderr: '' } as any
+      if (cmd === 'claude' || cmd === '/usr/local/bin/claude') return { status: 0, stdout: '1.0.0\n', stderr: '' } as any
+      if (cmd === 'codex' || cmd === '/usr/local/bin/codex') return { status: 0, stdout: '0.128.0\n', stderr: '' } as any
+      return { status: 0, stdout: '', stderr: '' } as any
+    })
+
+    const status = getSetupPrerequisitesStatus()
+    const tools = status.prerequisites.filter((p) => p.kind === 'tool' && p.key !== 'uv')
+    expect(tools.every((t) => t.bundled === undefined)).toBe(true)
+    expect(tools.every((t) => t.error === undefined)).toBe(true)
+    expect(tools.every((t) => t.installed === true)).toBe(true)
+    // which (system probe) WAS used — proving fallback, not the bundled path
+    const node = status.prerequisites.find((p) => p.key === 'node')
+    expect(node?.resolvedPath).toBe('/usr/local/bin/node')
+  })
+
+  it('windows git falls back to git/bin/git.exe when git/cmd/git.exe is absent', () => {
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    // Build a win-style runtimes tree with node.exe + npm.cmd + npx.cmd and git
+    // present ONLY at git/bin/git.exe (no cmd/git.exe) to exercise the alt-subpath.
+    const winBase = path.join(tmpRoot, 'win', 'runtimes')
+    fs.mkdirSync(path.join(winBase, 'node'), { recursive: true })
+    fs.mkdirSync(path.join(winBase, 'git', 'bin'), { recursive: true })
+    fs.writeFileSync(path.join(winBase, 'node', 'node.exe'), 'x')
+    fs.writeFileSync(path.join(winBase, 'node', 'npm.cmd'), 'x')
+    fs.writeFileSync(path.join(winBase, 'node', 'npx.cmd'), 'x')
+    fs.writeFileSync(path.join(winBase, 'git', 'bin', 'git.exe'), 'x')
+    process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH = winBase
+    mockSpawnSync.mockImplementation((cmd: any) => {
+      if (typeof cmd === 'string' && cmd.toLowerCase().includes('git.exe')) return { status: 0, stdout: 'git version 2.49.0\n', stderr: '' } as any
+      if (typeof cmd === 'string' && cmd.toLowerCase().includes('node.exe')) return { status: 0, stdout: 'v22.0.0\n', stderr: '' } as any
+      if (typeof cmd === 'string' && cmd.toLowerCase().includes('npm.cmd')) return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (typeof cmd === 'string' && cmd.toLowerCase().includes('npx.cmd')) return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (cmd === 'claude') return { status: 0, stdout: '1.0.0\n', stderr: '' } as any
+      if (cmd === 'codex') return { status: 0, stdout: '0.128.0\n', stderr: '' } as any
+      return { status: 0, stdout: '', stderr: '' } as any
+    })
+
+    const status = getSetupPrerequisitesStatus()
+    const git = status.prerequisites.find((p) => p.key === 'git')
+    expect(git?.bundled).toBe(true)
+    expect(git?.executable).toBe(true)
+    expect(git?.resolvedPath?.replace(/\\/g, '/')).toContain('git/bin/git.exe')
+  })
+
+  it('provider CLIs (claude/codex) are still probed via system path in desktop mode', () => {
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+    mockSpawnSync.mockImplementation((cmd: any) => {
+      if (typeof cmd === 'string' && cmd.includes('runtimes')) return { status: 0, stdout: 'v22.0.0\n', stderr: '' } as any
+      // Providers probed via which + version
+      if (cmd === 'which' || cmd === 'where') return { status: 0, stdout: '/usr/local/bin/claude\n', stderr: '' } as any
+      if (cmd === 'claude' || cmd === '/usr/local/bin/claude') return { status: 0, stdout: '1.0.0\n', stderr: '' } as any
+      if (cmd === 'codex' || cmd === '/usr/local/bin/codex') return { status: 0, stdout: '0.128.0\n', stderr: '' } as any
+      return { status: 0, stdout: '', stderr: '' } as any
+    })
+
+    const status = getSetupPrerequisitesStatus()
+    const providers = status.prerequisites.filter((p) => p.kind === 'provider')
+    // Providers must not have bundled flag
+    expect(providers.every((p) => p.bundled === undefined)).toBe(true)
+  })
+
+  it('non-desktop mode unchanged: uses which, no bundled field', () => {
+    delete process.env.SPECRAILS_IS_DESKTOP
+    delete process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH
+
+    mockSpawnSync.mockImplementation((cmd: any) => {
+      if (cmd === 'which' || cmd === 'where') return { status: 0, stdout: '/usr/local/bin/node\n', stderr: '' } as any
+      if (cmd === '/usr/local/bin/node' || cmd === 'node') return { status: 0, stdout: 'v20.0.0\n', stderr: '' } as any
+      if (cmd === '/usr/local/bin/npm' || cmd === 'npm') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (cmd === '/usr/local/bin/npx' || cmd === 'npx') return { status: 0, stdout: '10.0.0\n', stderr: '' } as any
+      if (cmd === '/usr/local/bin/git' || cmd === 'git') return { status: 0, stdout: 'git version 2.42.1\n', stderr: '' } as any
+      if (cmd === 'claude' || cmd === '/usr/local/bin/claude') return { status: 0, stdout: '1.0.0\n', stderr: '' } as any
+      if (cmd === 'codex' || cmd === '/usr/local/bin/codex') return { status: 0, stdout: '0.128.0\n', stderr: '' } as any
+      return { status: 0, stdout: '', stderr: '' } as any
+    })
+
+    const status = getSetupPrerequisitesStatus()
+    const tools = status.prerequisites.filter((p) => p.kind === 'tool')
+    // No bundled field in non-desktop mode
+    expect(tools.every((t) => t.bundled === undefined)).toBe(true)
+    expect(tools.every((t) => t.error === undefined)).toBe(true)
   })
 })
 

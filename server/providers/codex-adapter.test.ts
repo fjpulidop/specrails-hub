@@ -50,7 +50,6 @@ describe('codexAdapter — identity', () => {
     expect([...codexAdapter.baselineAgents()].sort()).toEqual([
       'sr-architect',
       'sr-developer',
-      'sr-merge-resolver',
       'sr-reviewer',
     ])
   })

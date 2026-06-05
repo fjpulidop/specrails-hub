@@ -328,7 +328,12 @@ export function createHubRouter(
   router.put('/settings', (req, res) => {
     const { port, specrailsTechUrl, costAlertThresholdUsd } = req.body ?? {}
     if (port !== undefined) {
-      setHubSetting(registry.hubDb, 'port', String(port))
+      const n = Number(port)
+      if (!Number.isInteger(n) || n < 1 || n > 65535) {
+        res.status(400).json({ error: 'port must be an integer between 1 and 65535' })
+        return
+      }
+      setHubSetting(registry.hubDb, 'port', String(n))
     }
     if (specrailsTechUrl !== undefined && typeof specrailsTechUrl === 'string') {
       const normalized = validateHttpUrl(specrailsTechUrl.trim(), {

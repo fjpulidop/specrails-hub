@@ -1,0 +1,44 @@
+{
+  "schema_version": "1",
+  "feature": "bundle-runtimes-desktop",
+  "started_at": "2026-06-03T13:35:39Z",
+  "updated_at": "2026-06-03T14:21:34Z",
+  "phases": {
+    "architect": "done",
+    "developer": "done",
+    "test-writer": "skipped",
+    "doc-sync": "skipped",
+    "reviewer": "done",
+    "ship": "pending",
+    "ci": "pending"
+  },
+  "last_successful_phase": "reviewer",
+  "failed_phase": null,
+  "error_context": null,
+  "openspec_artifacts": "openspec/changes/bundle-runtimes-desktop/",
+  "implemented_files": [
+    "server/path-resolver.ts",
+    "server/path-resolver.test.ts",
+    "server/setup-prerequisites.ts",
+    "server/setup-prerequisites.test.ts",
+    "src-tauri/src/lib.rs",
+    "src-tauri/tauri.conf.json",
+    "src-tauri/runtimes/.gitkeep",
+    "client/src/hooks/usePrerequisites.ts",
+    "client/src/components/PrerequisitesPanel.tsx",
+    "client/src/components/InstallInstructionsModal.tsx",
+    ".github/workflows/desktop-release.yml",
+    ".gitignore",
+    "CLAUDE.md"
+  ],
+  "input": {
+    "issues": [
+      3
+    ],
+    "flags": {
+      "dry_run": false,
+      "apply_mode": false,
+      "single_mode": true
+    }
+  }
+}

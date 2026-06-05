@@ -5,6 +5,7 @@ import type { ProjectContext } from './project-registry'
 import { generateCustomAgent, testCustomAgent } from './agent-generator'
 import { getRefineSession, listRefineSessionsForAgent } from './agent-refine-db'
 import { refineSessionToJson } from './agent-refine-manager'
+import { getAdapter } from './providers'
 import {
   createProfile,
   deleteProfile,
@@ -92,7 +93,7 @@ export function createProfilesRouter(): Router {
         }
         agents.push({ id, model })
       }
-      const baseline = ['sr-architect', 'sr-developer', 'sr-reviewer', 'sr-merge-resolver']
+      const baseline = ['sr-architect', 'sr-developer', 'sr-reviewer']
       const missing = baseline.filter((id) => !agents.some((a) => a.id === id))
       if (missing.length > 0) {
         res.status(400).json({
@@ -101,9 +102,9 @@ export function createProfilesRouter(): Router {
         return
       }
       // Order: baseline trio first (architect, developer, reviewer), optional
-      // agents in the middle, sr-merge-resolver pinned last so rails' merge
-      // phase runs after everything else.
-      const pinnedLast = new Set(['sr-merge-resolver'])
+      // agents in the middle. sr-merge-resolver is no longer a baseline agent;
+      // it sorts among optional agents alphabetically when present.
+      const pinnedLast = new Set<string>()
       const baselineFirst = new Set(['sr-architect', 'sr-developer', 'sr-reviewer'])
       const orderedAgents = [
         ...agents.filter((a) => baselineFirst.has(a.id))
@@ -115,15 +116,23 @@ export function createProfilesRouter(): Router {
           .sort((a, b) => a.id.localeCompare(b.id)),
         ...agents.filter((a) => pinnedLast.has(a.id)),
       ]
-      // Build the default profile mirroring legacy routing.
+      // Build the default profile mirroring legacy routing. The frontmatter
+      // model aliases parsed above are claude-specific; for any other provider
+      // they are not in the adapter's catalog, so fall back to that provider's
+      // default model and stamp the provider so the persisted profile validates
+      // against the right catalog on every future read.
+      const provider = project.provider ?? 'claude'
+      const isClaude = provider === 'claude'
+      const fallbackModel = isClaude ? 'sonnet' : getAdapter(provider).defaultModel()
       const profile = {
         schemaVersion: 1 as const,
         name: 'default',
         description: 'Baseline profile migrated from your current agent frontmatters.',
-        orchestrator: { model: 'sonnet' as const },
+        ...(isClaude ? {} : { provider }),
+        orchestrator: { model: isClaude ? 'sonnet' : fallbackModel },
         agents: orderedAgents.map((a) => ({
           id: a.id,
-          model: a.model,
+          model: isClaude ? a.model : fallbackModel,
           required: baseline.includes(a.id),
         })),
         routing: [
@@ -137,7 +146,7 @@ export function createProfilesRouter(): Router {
         ],
       }
       try {
-        createProfile(project.path, profile as never)
+        createProfile(project.path, profile as never, provider)
       } catch (err) {
         if (err instanceof ProfileConflictError) {
           res.status(409).json({ error: "a profile named 'default' already exists; delete it first or edit it manually" })
@@ -519,11 +528,19 @@ export function createProfilesRouter(): Router {
 
   router.post('/catalog/:agentId/refine/:refineId/turn', async (req, res) => {
     try {
-      const { agentRefineManager } = ctx(req)
+      const { agentRefineManager, db } = ctx(req)
       const refineId = req.params.refineId
       const instruction = (req.body?.instruction ?? '').toString().trim()
       if (!instruction) {
         res.status(400).json({ error: 'instruction is required' })
+        return
+      }
+      // Verify the session belongs to the :agentId in the path, matching the
+      // sibling GET/PATCH/DELETE/apply routes — otherwise the path segment is
+      // meaningless and the resource-scoping invariant is broken.
+      const session = getRefineSession(db, refineId)
+      if (!session || session.agent_id !== req.params.agentId) {
+        res.status(404).json({ error: 'refine session not found' })
         return
       }
       try {
@@ -672,7 +689,7 @@ export function createProfilesRouter(): Router {
     try {
       const { project } = ctx(req)
       const explicit = typeof req.query.profile === 'string' ? req.query.profile : undefined
-      const resolved = resolveProfile(project.path, explicit)
+      const resolved = resolveProfile(project.path, explicit, project.provider ?? 'claude')
       if (!resolved) {
         res.json({ resolved: null })
         return
@@ -688,7 +705,7 @@ export function createProfilesRouter(): Router {
     try {
       const { project, broadcast } = ctx(req)
       const body = req.body as Profile
-      createProfile(project.path, body)
+      createProfile(project.path, body, project.provider ?? 'claude')
       broadcast({ type: 'profile.changed', projectId: project.id, name: body.name } as never)
       res.status(201).json({ profile: body })
     } catch (err) {
@@ -705,7 +722,7 @@ export function createProfilesRouter(): Router {
         res.status(400).json({ error: "body field 'name' is required" })
         return
       }
-      const copy = duplicateProfile(project.path, req.params.name, newName)
+      const copy = duplicateProfile(project.path, req.params.name, newName, project.provider ?? 'claude')
       broadcast({ type: 'profile.changed', projectId: project.id, name: newName } as never)
       res.status(201).json({ profile: copy })
     } catch (err) {
@@ -722,7 +739,7 @@ export function createProfilesRouter(): Router {
         res.status(400).json({ error: "body field 'name' is required" })
         return
       }
-      const renamed = renameProfile(project.path, req.params.name, newName)
+      const renamed = renameProfile(project.path, req.params.name, newName, project.provider ?? 'claude')
       broadcast({ type: 'profile.changed', projectId: project.id, name: newName } as never)
       res.json({ profile: renamed })
     } catch (err) {
@@ -734,7 +751,7 @@ export function createProfilesRouter(): Router {
   router.get('/:name', (req, res) => {
     try {
       const { project } = ctx(req)
-      res.json({ profile: getProfile(project.path, req.params.name) })
+      res.json({ profile: getProfile(project.path, req.params.name, project.provider ?? 'claude') })
     } catch (err) {
       handleError(res, err)
     }
@@ -749,7 +766,7 @@ export function createProfilesRouter(): Router {
         res.status(400).json({ error: "body.name must match path parameter (use /rename to change name)" })
         return
       }
-      updateProfile(project.path, body)
+      updateProfile(project.path, body, project.provider ?? 'claude')
       broadcast({ type: 'profile.changed', projectId: project.id, name: body.name } as never)
       res.json({ profile: body })
     } catch (err) {

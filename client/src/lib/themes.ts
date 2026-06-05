@@ -330,18 +330,18 @@ const MATRIX: ThemeDescriptor = {
 // ─── SpecRails ─────────────────────────────────────────────────────────────
 
 const SPECRAILS_PALETTE = {
-  bg:          'hsl(240 35% 4%)',
-  card:        'hsl(238 30% 9%)',
-  bgDeep:      'hsl(240 38% 2%)',
-  fg:          'hsl(240 20% 94%)',
-  muted:       'hsl(240 12% 58%)',
-  primary:     'hsl(187 100% 41%)',   // cyan
-  secondary:   'hsl(280 38% 57%)',    // violet
-  success:     'hsl(152 80% 44%)',    // emerald
-  info:        'hsl(191 97% 50%)',    // electric cyan
-  warning:     'hsl(42 90% 56%)',     // amber
-  highlight:   'hsl(248 70% 63%)',    // indigo
-  destructive: 'hsl(12 78% 52%)',     // tomato-red
+  bg:          'hsl(240 33% 4%)',     // near-black #06060c
+  card:        'hsl(240 30% 8%)',     // bg2 #0d0d1a
+  bgDeep:      'hsl(240 40% 2%)',
+  fg:          'hsl(240 20% 95%)',
+  muted:       'hsl(240 13% 62%)',
+  primary:     'hsl(187 100% 44%)',   // cyan #00C3D2
+  secondary:   'hsl(280 45% 62%)',    // violet
+  success:     'hsl(152 78% 48%)',    // emerald
+  info:        'hsl(191 97% 55%)',    // electric cyan
+  warning:     'hsl(42 92% 58%)',     // amber
+  highlight:   'hsl(248 75% 67%)',    // indigo
+  destructive: 'hsl(12 80% 55%)',     // tomato-red
 } as const
 
 const SPECRAILS: ThemeDescriptor = {

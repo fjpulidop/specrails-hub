@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertTriangle, RefreshCw, XCircle } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, RefreshCw, XCircle, Package } from 'lucide-react'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
 import type { SetupPrerequisite, SetupPrerequisitesStatus } from '../hooks/usePrerequisites'
@@ -12,6 +12,9 @@ interface Props {
 }
 
 function formatVersionLabel(item: SetupPrerequisite): string {
+  if (item.error === 'corrupted-bundle') {
+    return 'bundle corrupted — reinstall app'
+  }
   if (!item.installed) return 'not installed'
   if (item.executable === false) {
     const where = item.resolvedPath ? ` at ${item.resolvedPath}` : ''
@@ -88,27 +91,44 @@ export function PrerequisitesPanel({ status, isLoading, error, onRefresh, onMore
 
   // status.ok === false
   const missingCount = status.missingRequired?.length ?? 0
+  // In desktop mode all missing required tools are bundled. If every missing entry
+  // is a corrupted-bundle error, suppress the "More info" / install-instructions path
+  // because the fix is reinstalling the app, not installing system tools.
+  const allMissingAreCorrupted =
+    missingCount > 0 &&
+    (status.missingRequired ?? []).every((item) => item.error === 'corrupted-bundle')
+  const hasCorruptedBundle =
+    (status.missingRequired ?? []).some((item) => item.error === 'corrupted-bundle')
 
   return (
     <div
       data-testid="prerequisites-panel"
       data-state="missing"
-      className="rounded-lg border border-accent-primary/40 bg-accent-primary/10 px-3 py-2"
+      className={cn(
+        'rounded-lg border px-3 py-2',
+        hasCorruptedBundle
+          ? 'border-destructive/40 bg-destructive/10'
+          : 'border-accent-primary/40 bg-accent-primary/10',
+      )}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <AlertTriangle className="w-4 h-4 text-accent-primary flex-shrink-0" />
+          <AlertTriangle className={cn('w-4 h-4 flex-shrink-0', hasCorruptedBundle ? 'text-destructive' : 'text-accent-primary')} />
           <div className="min-w-0">
             <p className="text-xs font-medium text-foreground">
-              {missingCount} developer tool{missingCount === 1 ? '' : 's'} required
+              {allMissingAreCorrupted
+                ? 'App bundle corrupted'
+                : `${missingCount} developer tool${missingCount === 1 ? '' : 's'} required`}
             </p>
             <p className="text-[11px] text-muted-foreground">
-              Install the missing tools to continue.
+              {allMissingAreCorrupted
+                ? 'Reinstall the SpecRails Hub app to restore bundled tools.'
+                : 'Install the missing tools to continue.'}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          {onMoreInfo && (
+          {onMoreInfo && !allMissingAreCorrupted && (
             <Button
               type="button"
               variant="ghost"
@@ -138,26 +158,47 @@ export function PrerequisitesPanel({ status, isLoading, error, onRefresh, onMore
 
       <ul className="mt-2 space-y-1">
         {status.prerequisites.map((item) => {
-          const ok = item.installed && item.meetsMinimum
+          const isCorrupted = item.error === 'corrupted-bundle'
+          const isBundledOk = item.bundled === true && item.executable === true && !isCorrupted
+          const ok = !isCorrupted && item.installed && item.meetsMinimum
           return (
             <li
               key={item.key}
               data-testid={`prereq-row-${item.key}`}
               data-ok={ok ? 'true' : 'false'}
+              data-bundled={item.bundled ? 'true' : undefined}
+              data-corrupted={isCorrupted ? 'true' : undefined}
               className={cn(
                 'flex items-center gap-2 rounded-md border px-2 py-1.5 text-[11px]',
-                ok
-                  ? 'border-border/30 bg-background/30 text-muted-foreground'
-                  : 'border-accent-primary/30 bg-background/50 text-foreground',
+                isCorrupted
+                  ? 'border-destructive/40 bg-destructive/10 text-foreground'
+                  : ok
+                    ? 'border-border/30 bg-background/30 text-muted-foreground'
+                    : 'border-accent-primary/30 bg-background/50 text-foreground',
               )}
             >
-              {ok ? (
+              {isCorrupted ? (
+                <XCircle className="w-3.5 h-3.5 text-destructive flex-shrink-0" />
+              ) : isBundledOk ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-accent-success flex-shrink-0" />
+              ) : ok ? (
                 <CheckCircle2 className="w-3.5 h-3.5 text-accent-success flex-shrink-0" />
               ) : (
                 <XCircle className="w-3.5 h-3.5 text-accent-primary flex-shrink-0" />
               )}
               <span className="font-medium">{item.label}</span>
-              <span className="text-muted-foreground">— {formatVersionLabel(item)}</span>
+              {isBundledOk && (
+                <span
+                  data-testid={`prereq-bundled-badge-${item.key}`}
+                  className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium bg-accent-secondary/20 text-accent-secondary border border-accent-secondary/30"
+                >
+                  <Package className="w-2.5 h-2.5" />
+                  bundled
+                </span>
+              )}
+              <span className={cn('text-muted-foreground', isCorrupted && 'text-destructive/80')}>
+                — {formatVersionLabel(item)}
+              </span>
             </li>
           )
         })}

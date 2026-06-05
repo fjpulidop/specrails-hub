@@ -7,7 +7,10 @@ import {
   RingBuffer,
   TerminalLimitExceededError,
   TerminalNameInvalidError,
+  TerminalSpawnError,
+  mapSpawnError,
   resolveShell,
+  resolveShellFor,
   shellArgs,
   TERMINAL_SCROLLBACK_BYTES,
   TERMINAL_MAX_PER_PROJECT,
@@ -131,6 +134,60 @@ describe('shell resolution', () => {
   })
 })
 
+describe('resolveShellFor (injectable, cross-platform)', () => {
+  it('prefers $SHELL when set, on any platform', () => {
+    expect(resolveShellFor('win32', { SHELL: '/bin/fish' }, () => true)).toBe('/bin/fish')
+    expect(resolveShellFor('darwin', { SHELL: '  /bin/zsh  ' }, () => false)).toBe('/bin/zsh')
+  })
+
+  it('defaults to /bin/zsh on macOS and Linux', () => {
+    expect(resolveShellFor('darwin', {}, () => false)).toBe('/bin/zsh')
+    expect(resolveShellFor('linux', {}, () => false)).toBe('/bin/zsh')
+  })
+
+  it('on Windows prefers pwsh.exe found on PATH', () => {
+    const env = { PATH: 'C:\\bin;C:\\ps' }
+    const got = resolveShellFor('win32', env, (p) => p === 'C:\\ps\\pwsh.exe')
+    expect(got).toBe('C:\\ps\\pwsh.exe')
+  })
+
+  it('on Windows falls back to Windows PowerShell when pwsh is absent', () => {
+    const winPosh = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+    const got = resolveShellFor('win32', { PATH: 'C:\\bin', SystemRoot: 'C:\\Windows' }, (p) => p === winPosh)
+    expect(got).toBe(winPosh)
+  })
+
+  it('on Windows falls back to COMSPEC/cmd.exe as the last resort', () => {
+    expect(resolveShellFor('win32', { COMSPEC: 'C:\\Windows\\System32\\cmd.exe' }, () => false))
+      .toBe('C:\\Windows\\System32\\cmd.exe')
+    expect(resolveShellFor('win32', {}, () => false)).toBe('cmd.exe')
+  })
+})
+
+describe('TerminalSpawnError + mapSpawnError', () => {
+  it('carries the reason and a descriptive message', () => {
+    const e = new TerminalSpawnError('out-of-file-descriptors', 'EMFILE: too many open files')
+    expect(e).toBeInstanceOf(Error)
+    expect(e.reason).toBe('out-of-file-descriptors')
+    expect(e.message).toContain('out-of-file-descriptors')
+    expect(e.message).toContain('EMFILE')
+  })
+
+  it('maps EMFILE / ENFILE to out-of-file-descriptors', () => {
+    const emfile = Object.assign(new Error('too many open files'), { code: 'EMFILE' })
+    const enfile = Object.assign(new Error('file table overflow'), { code: 'ENFILE' })
+    expect(mapSpawnError(emfile).reason).toBe('out-of-file-descriptors')
+    expect(mapSpawnError(enfile).reason).toBe('out-of-file-descriptors')
+  })
+
+  it('maps any other error (or non-Error) to spawn-failed', () => {
+    expect(mapSpawnError(new Error('boom')).reason).toBe('spawn-failed')
+    expect(mapSpawnError(Object.assign(new Error('x'), { code: 'ENOENT' })).reason).toBe('spawn-failed')
+    expect(mapSpawnError('weird string').reason).toBe('spawn-failed')
+    expect(mapSpawnError(undefined).reason).toBe('spawn-failed')
+  })
+})
+
 describe('TerminalManager lifecycle', () => {
   let tm: TerminalManager
 
@@ -217,6 +274,34 @@ describe('TerminalManager lifecycle', () => {
     expect(snap.binary).toBe(true)
     expect((snap.data as Buffer).toString('utf8')).toContain('STILL-ALIVE')
   }, 10_000)
+
+  it('records a tombstone and sends an exit frame when the shell exits on its own', async () => {
+    const meta = tm.create('proj-T', { cwd: os.tmpdir() })
+    const ws = new FakeWs()
+    tm.attach(meta.id, asWs(ws))
+    tm.write(meta.id, 'exit\n')
+    const gone = await waitFor(() => tm.listForProject('proj-T').length === 0, 6000)
+    expect(gone).toBe(true)
+    // The attached client is told WHY it ended.
+    const exitFrame = ws.sent.find((f) => !f.binary && String(f.data).includes('"type":"exit"'))
+    expect(exitFrame).toBeTruthy()
+    // A late attach can discover the reason via the tombstone (scoped to project).
+    const tomb = tm.getTombstone(meta.id, 'proj-T')
+    expect(tomb).toBeTruthy()
+    expect(tomb!.projectId).toBe('proj-T')
+    expect(tm.getTombstone(meta.id, 'other-proj')).toBeUndefined()
+    // The socket close reason reflects natural vs early exit.
+    expect(ws.closed?.reason).toMatch(/^pty_exit(_early)?$/)
+  }, 12_000)
+
+  it('does NOT tombstone a deliberately killed session', async () => {
+    const meta = tm.create('proj-T', { cwd: os.tmpdir() })
+    tm.kill('proj-T', meta.id)
+    await waitFor(() => tm.listForProject('proj-T').length === 0, 6000)
+    // Give onExit a moment to (not) fire its tombstone path.
+    await sleep(200)
+    expect(tm.getTombstone(meta.id, 'proj-T')).toBeUndefined()
+  }, 12_000)
 
   it('resize propagates to PTY (stty size)', async () => {
     if (process.platform === 'win32') return

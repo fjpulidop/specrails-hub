@@ -226,6 +226,37 @@ export function InstallInstructionsModal({ open, onClose, status, onRecheck, isR
   const platform: Platform = status?.platform ?? 'darwin'
   const others = ALL_PLATFORMS.filter((p) => p !== platform)
 
+  // Defence-in-depth: if the missing tool has error='corrupted-bundle', it is a
+  // bundled tool that cannot be installed separately. Render a simplified error
+  // panel instead of OS install instructions.
+  const hasCorruptedBundle = status?.missingRequired?.some(
+    (item) => item.error === 'corrupted-bundle',
+  ) ?? false
+
+  if (hasCorruptedBundle) {
+    return (
+      <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
+        <DialogContent className="max-w-xl" data-testid="install-modal-corrupted-bundle">
+          <DialogHeader>
+            <DialogTitle>App bundle corrupted</DialogTitle>
+            <DialogDescription>
+              One or more bundled tools (Node.js, Git) could not be verified.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-foreground">
+            This tool is bundled with the SpecRails Hub app and cannot be installed separately.
+            If you see this message, the app bundle may be corrupted. Please reinstall SpecRails Hub.
+          </p>
+          <div className="flex justify-end mt-2">
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} data-testid="install-corrupted-close-button">
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-xl">

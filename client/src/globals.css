@@ -207,43 +207,48 @@
   --glass-card-opacity:          30%;
 }
 
-/* ─── SpecRails (brand theme — deep navy-indigo, saturated cyan) ─── */
+/* ─── SpecRails (brand theme — near-black #06060c, saturated cyan) ─────────────
+ * Palette mirrors specrails.dev: near-black bg (#06060c ≈ 240 33% 4%), bg2
+ * (#0d0d1a ≈ 240 30% 8%), bg3 (#131324 ≈ 238 28% 11%). Elevation is built by a
+ * widening lightness ladder (bg 4% → card 8% → secondary 16%) so dense
+ * dashboard chrome reads as distinct layers instead of one flat void; borders
+ * are lifted to ~11% white so panel edges survive on near-black. */
 [data-theme="specrails"] {
-  --color-background:             hsl(240 35% 4%);    /* deep navy-indigo */
-  --color-foreground:             hsl(240 20% 94%);
-  --color-card:                   hsl(238 30% 9%);
-  --color-card-foreground:        hsl(240 20% 94%);
-  --color-popover:                hsl(240 35% 4%);
-  --color-popover-foreground:     hsl(240 20% 94%);
-  --color-primary:                hsl(187 100% 41%);  /* saturated cyan */
-  --color-primary-foreground:     hsl(240 35% 4%);
-  --color-secondary:              hsl(238 26% 13%);
-  --color-secondary-foreground:   hsl(240 20% 94%);
-  --color-muted:                  hsl(238 26% 13%);
-  --color-muted-foreground:       hsl(240 12% 58%);
-  --color-accent:                 hsl(238 26% 13%);
-  --color-accent-foreground:      hsl(240 20% 94%);
-  --color-destructive:            hsl(12 78% 52%);
-  --color-destructive-foreground: hsl(240 35% 4%);
-  --color-border:                 hsl(240 20% 100% / 0.08);
-  --color-input:                  hsl(238 26% 13%);
-  --color-ring:                   hsl(187 100% 41%);
+  --color-background:             hsl(240 33% 4%);    /* near-black #06060c */
+  --color-foreground:             hsl(240 20% 95%);
+  --color-card:                   hsl(240 30% 8%);    /* bg2 #0d0d1a */
+  --color-card-foreground:        hsl(240 20% 95%);
+  --color-popover:                hsl(240 32% 6%);
+  --color-popover-foreground:     hsl(240 20% 95%);
+  --color-primary:                hsl(187 100% 44%);  /* saturated cyan #00C3D2 */
+  --color-primary-foreground:     hsl(240 33% 4%);
+  --color-secondary:              hsl(238 22% 16%);   /* interactive chrome — clearly above card */
+  --color-secondary-foreground:   hsl(240 20% 95%);
+  --color-muted:                  hsl(238 26% 12%);
+  --color-muted-foreground:       hsl(240 13% 62%);
+  --color-accent:                 hsl(238 22% 16%);   /* hover states match secondary */
+  --color-accent-foreground:      hsl(240 20% 95%);
+  --color-destructive:            hsl(12 80% 55%);
+  --color-destructive-foreground: hsl(240 33% 4%);
+  --color-border:                 hsl(240 25% 100% / 0.11);
+  --color-input:                  hsl(238 22% 15%);
+  --color-ring:                   hsl(187 100% 44%);
 
-  --color-accent-primary:    hsl(187 100% 41%);  /* cyan */
-  --color-accent-info:       hsl(191 97% 50%);   /* electric cyan */
-  --color-accent-success:    hsl(152 80% 44%);   /* emerald */
-  --color-accent-secondary:  hsl(280 38% 57%);   /* violet */
-  --color-accent-warning:    hsl(42 90% 56%);    /* amber */
-  --color-accent-highlight:  hsl(248 70% 63%);   /* indigo */
-  --color-surface:           hsl(238 30% 9%);
-  --color-background-deep:   hsl(240 38% 2%);
+  --color-accent-primary:    hsl(187 100% 44%);  /* cyan */
+  --color-accent-info:       hsl(191 97% 55%);   /* electric cyan */
+  --color-accent-success:    hsl(152 78% 48%);   /* emerald */
+  --color-accent-secondary:  hsl(280 45% 62%);   /* violet */
+  --color-accent-warning:    hsl(42 92% 58%);    /* amber */
+  --color-accent-highlight:  hsl(248 75% 67%);   /* indigo */
+  --color-surface:           hsl(238 28% 11%);   /* bg3 #131324 — elevated cards-on-card */
+  --color-background-deep:   hsl(240 40% 2%);
 
-  --color-scrollbar-thumb:       hsl(240 20% 50% / 0.35);
-  --color-scrollbar-thumb-hover: hsl(240 20% 60% / 0.55);
-  --color-prose-table-stripe:    hsl(238 30% 9% / 0.5);
-  --color-prose-table-header:    hsl(238 30% 9% / 0.8);
-  --color-toast-shadow:          hsl(240 38% 1% / 0.65);
-  --glass-card-opacity:          28%;
+  --color-scrollbar-thumb:       hsl(240 20% 55% / 0.40);
+  --color-scrollbar-thumb-hover: hsl(240 20% 65% / 0.60);
+  --color-prose-table-stripe:    hsl(238 28% 11% / 0.5);
+  --color-prose-table-header:    hsl(238 28% 11% / 0.85);
+  --color-toast-shadow:          hsl(240 40% 1% / 0.7);
+  --glass-card-opacity:          34%;
 }
 
 @layer base {

@@ -9,11 +9,10 @@ import {
   type ReactNode,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
 import { useHub } from '../hooks/useHub'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import { isSpecDraftUpdate } from '../lib/spec-draft'
-import { MinimizedChatChip } from '../components/minimized-chats/MinimizedChatChip'
+import { MinimizedChatsDock } from '../components/minimized-chats/MinimizedChatsDock'
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -51,6 +50,10 @@ export interface ExploreSpecParams {
     labels: string[]
     priority: 'low' | 'medium' | 'high' | 'critical' | null
     acceptanceCriteria: string[]
+    /** Current ticket status. `'draft'` makes the shell PUBLISH on commit
+     *  (flip draft → real spec) instead of PATCHing in place. Optional for
+     *  backward-compat; absent ⇒ treated as a real-spec edit. */
+    status?: 'draft' | 'todo' | 'in_progress' | 'done' | 'cancelled'
   }
 }
 
@@ -77,7 +80,9 @@ export type MinimizedChat =
 interface MinimizedChatsContextValue {
   chats: MinimizedChat[]
   /** Pending restores — exposed so `usePendingRestore` can react to changes.
-   *  Triggers MUST consume via `takePendingRestore`, not by reading this. */
+   *  Triggers MUST consume via `takePendingRestore`, not by reading this.
+   *  Surfaces that only want to know "is a restore in flight for me" (e.g.
+   *  AgentsPage switching to the Catalog tab) MAY read it. */
   pendingRestores: MinimizedChat[]
   /** Park a new minimized session and add it to the dock. Returns its id. */
   minimize: (input: Omit<MinimizedChat, 'id' | 'createdAt'>) => string
@@ -106,7 +111,7 @@ interface MinimizedChatsContextValue {
     projectId: string,
   ) => MinimizedChat | null
   /** Push a session into the pending-restore queue WITHOUT first parking it as
-   *  a minimized toast. Used by surfaces that want to open a shell from a
+   *  a minimized chip. Used by surfaces that want to open a shell from a
    *  durable record (e.g. a draft ticket's Continue Explore button). */
   triggerResume: (input: Omit<MinimizedChat, 'id' | 'createdAt'>) => void
 }
@@ -118,12 +123,36 @@ const MinimizedChatsContext = createContext<MinimizedChatsContextValue | null>(
 // ─── Persistence ──────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'specrails-hub:minimized-chats'
+// Pending restores are persisted too, so a refresh that lands BETWEEN a chip
+// click and the trigger consuming it never loses the session — on next mount
+// any leftover pending entry is folded back into the dock.
+const PENDING_STORAGE_KEY = 'specrails-hub:minimized-chats-pending'
 const MAX_PERSISTED = 50
+// If a queued restore is not consumed within this window (e.g. the trigger
+// surface never mounts), the chip is moved back into the dock so the session
+// can never be silently lost.
+const RESTORE_WATCHDOG_MS = 8000
 
 export function loadFromStorage(): MinimizedChat[] {
+  return readChatList(STORAGE_KEY)
+}
+
+export function saveToStorage(chats: MinimizedChat[]): void {
+  writeChatList(STORAGE_KEY, chats)
+}
+
+function loadPendingFromStorage(): MinimizedChat[] {
+  return readChatList(PENDING_STORAGE_KEY)
+}
+
+function savePendingToStorage(chats: MinimizedChat[]): void {
+  writeChatList(PENDING_STORAGE_KEY, chats)
+}
+
+function readChatList(key: string): MinimizedChat[] {
   if (typeof window === 'undefined') return []
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const raw = window.localStorage.getItem(key)
     if (!raw) return []
     const parsed = JSON.parse(raw) as unknown
     if (!Array.isArray(parsed)) return []
@@ -133,7 +162,7 @@ export function loadFromStorage(): MinimizedChat[] {
   }
 }
 
-export function saveToStorage(chats: MinimizedChat[]): void {
+function writeChatList(key: string, chats: MinimizedChat[]): void {
   if (typeof window === 'undefined') return
   try {
     // Cap at MAX_PERSISTED — drop oldest first so the dock can never grow
@@ -144,7 +173,7 @@ export function saveToStorage(chats: MinimizedChat[]): void {
         : [...chats]
             .sort((a, b) => a.createdAt - b.createdAt)
             .slice(chats.length - MAX_PERSISTED)
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(capped))
+    window.localStorage.setItem(key, JSON.stringify(capped))
   } catch {
     /* quota or storage unavailable — silent */
   }
@@ -170,6 +199,25 @@ function genId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
+/** Stable identity of the underlying server session behind a chip. Two chips
+ *  with the same key represent the SAME session and must never coexist
+ *  (re-parking would otherwise duplicate it forever). Falls back to the
+ *  client-stable handle (`pendingSpecId` / `agentId`) when the server session
+ *  id hasn't been assigned yet, so even a FRESH session deduplicates across
+ *  re-parks — `pendingSpecId` is unique per Explore launch and `agentId` is
+ *  unique per AI-Edit target, so distinct sessions never collide. */
+function sessionKey(c: MinimizedChat): string {
+  if (c.kind === 'explore-spec') {
+    return c.params.resumeConversationId ?? `pending:${c.params.pendingSpecId}`
+  }
+  return c.params.resumeRefineId ?? `agent:${c.params.agentId}`
+}
+
+function sameSession(a: MinimizedChat, b: MinimizedChat): boolean {
+  if (a.kind !== b.kind || a.projectId !== b.projectId) return false
+  return sessionKey(a) === sessionKey(b)
+}
+
 // ─── Provider ─────────────────────────────────────────────────────────────
 
 export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
@@ -180,19 +228,63 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
   const [chats, setChats] = useState<MinimizedChat[]>(() => loadFromStorage())
   // Pending restores live separately from `chats` so the chip is removed
   // from the dock immediately on click, but the trigger can still pick the
-  // entry up after a project switch + remount.
+  // entry up after a project switch + remount. Persisted to localStorage so a
+  // refresh mid-restore recovers instead of dropping the session.
   const [pendingRestores, setPendingRestores] = useState<MinimizedChat[]>([])
-  // Track which chats already have a sonner toast on screen so re-renders
-  // don't re-fire (sonner ignores duplicate ids but we also use this to
-  // dismiss on close/restore).
-  const toastedRef = useRef<Set<string>>(new Set())
+
+  // Synchronous snapshots — setState updaters can run asynchronously, so we
+  // read latest state via refs when consumers need a synchronous answer.
+  const chatsRef = useRef(chats)
+  chatsRef.current = chats
+  const pendingRestoresRef = useRef(pendingRestores)
+  pendingRestoresRef.current = pendingRestores
+
+  // Per-pending-restore watchdog timers (id → timeout handle).
+  const watchdogsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+
   const projectsRef = useRef(projects)
   projectsRef.current = projects
 
-  // Persist whenever chats list changes.
+  // Recover orphaned pending restores once on mount. A persisted pending entry
+  // means a previous session queued a restore that was never consumed (the
+  // trigger surface didn't mount, or the tab refreshed mid-restore). Fold them
+  // back into the dock so the session is never lost, then clear the store.
+  const recoveredRef = useRef(false)
+  useEffect(() => {
+    if (recoveredRef.current) return
+    recoveredRef.current = true
+    const orphans = loadPendingFromStorage()
+    savePendingToStorage([])
+    if (orphans.length === 0) return
+    setChats((prev) => {
+      const merged = [...prev]
+      for (const o of orphans) {
+        if (merged.some((c) => c.id === o.id || sameSession(c, o))) continue
+        merged.push(o)
+      }
+      saveToStorage(merged)
+      chatsRef.current = merged
+      return merged
+    })
+  }, [])
+
+  // Clear all watchdogs on unmount.
+  useEffect(() => {
+    const timers = watchdogsRef.current
+    return () => {
+      for (const t of timers.values()) clearTimeout(t)
+      timers.clear()
+    }
+  }, [])
+
+  // Persist whenever either list changes (backstop — the mutators below also
+  // write synchronously for durability against an immediate refresh).
   useEffect(() => {
     saveToStorage(chats)
   }, [chats])
+  useEffect(() => {
+    savePendingToStorage(pendingRestores)
+  }, [pendingRestores])
 
   // Live-update parked explore-spec chats when Claude pushes
   // `spec_draft.update` — title hits the chip's label, the rest of the
@@ -239,76 +331,43 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
     return () => unregisterHandler(handlerId)
   }, [registerHandler, unregisterHandler])
 
-  // Sync chats → sonner toasts. Each chat shows as a long-lived toast
-  // (`duration: Infinity`) keyed by chat id so it stacks alongside the
-  // project-level toasts. Re-firing `toast.custom` with the same id
-  // replaces the existing toast in place — used here to live-update the
-  // chip's label when Claude pushes a new draft title.
-  // Setup-wizard takeover hides chips to keep that flow clean.
-  // restore/close are referenced via refs because they're declared after
-  // this effect (TS hoisting rule for `const`).
-  const restoreRef = useRef<(id: string) => void>(() => {})
-  const closeRef = useRef<(id: string) => void>(() => {})
-  // Track the label we last rendered per chat so we only re-fire the toast
-  // when the label actually changes.
-  const lastRenderedLabelRef = useRef<Map<string, string>>(new Map())
-  useEffect(() => {
-    const isSetupActive =
-      activeProjectId !== null && setupProjectIds.has(activeProjectId)
-    if (isSetupActive) {
-      for (const id of toastedRef.current) {
-        toast.dismiss(id)
-      }
-      toastedRef.current.clear()
-      lastRenderedLabelRef.current.clear()
-      return
-    }
-    const aliveIds = new Set(chats.map((c) => c.id))
-    for (const id of toastedRef.current) {
-      if (!aliveIds.has(id)) {
-        toast.dismiss(id)
-        toastedRef.current.delete(id)
-        lastRenderedLabelRef.current.delete(id)
-      }
-    }
-    for (const chat of chats) {
-      const lastLabel = lastRenderedLabelRef.current.get(chat.id)
-      if (toastedRef.current.has(chat.id) && lastLabel === chat.label) continue
-      toastedRef.current.add(chat.id)
-      lastRenderedLabelRef.current.set(chat.id, chat.label)
-      const projectName =
-        projectsRef.current.find((p) => p.id === chat.projectId)?.name ??
-        'Unknown project'
-      toast.custom(
-        () => (
-          <MinimizedChatChip
-            chat={chat}
-            projectName={projectName}
-            onRestore={() => restoreRef.current(chat.id)}
-            onClose={() => closeRef.current(chat.id)}
-          />
-        ),
-        { id: chat.id, duration: Infinity },
-      )
-    }
-  }, [chats, activeProjectId, setupProjectIds])
-
-  // Drop chips for projects that no longer exist (silent cleanup).
+  // Drop chips for projects that no longer exist (silent cleanup). Skips while
+  // the project list is still loading (length 0) so a cold start never wipes
+  // chips before the registry is known.
   useEffect(() => {
     if (projects.length === 0) return
     const existing = new Set(projects.map((p) => p.id))
     setChats((prev) => {
       const filtered = prev.filter((c) => existing.has(c.projectId))
-      return filtered.length === prev.length ? prev : filtered
+      if (filtered.length === prev.length) return prev
+      saveToStorage(filtered)
+      chatsRef.current = filtered
+      return filtered
     })
-    setPendingRestores((prev) => prev.filter((c) => existing.has(c.projectId)))
+    setPendingRestores((prev) => {
+      const next = prev.filter((c) => existing.has(c.projectId))
+      if (next.length === prev.length) return prev
+      savePendingToStorage(next)
+      pendingRestoresRef.current = next
+      return next
+    })
   }, [projects])
 
   const minimize = useCallback(
     (input: Omit<MinimizedChat, 'id' | 'createdAt'>): string => {
       const id = genId()
       const chat = { ...input, id, createdAt: Date.now() } as MinimizedChat
-      setChats((prev) => [...prev, chat])
+      setChats((prev) => {
+        // Dedupe: re-parking a session that already has a chip must replace it,
+        // never stack a second chip for the same conversation.
+        const next = [...prev.filter((c) => !sameSession(c, chat)), chat]
+        // Synchronous durability — the caller (e.g. SpecsBoard) clears its own
+        // active-session store right after this returns, so the chip must be in
+        // localStorage BEFORE we yield, or an immediate refresh would lose it.
+        saveToStorage(next)
+        chatsRef.current = next
+        return next
+      })
       // Notify the server for Explore Spec lifecycle (idle-kill timer).
       // Best-effort; no UX dependency on success.
       if (input.kind === 'explore-spec') {
@@ -326,50 +385,74 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
     [],
   )
 
-  const close = useCallback((id: string) => {
-    toast.dismiss(id)
-    toastedRef.current.delete(id)
-    setChats((prev) => prev.filter((c) => c.id !== id))
-    setPendingRestores((prev) => prev.filter((c) => c.id !== id))
+  const clearWatchdog = useCallback((id: string) => {
+    const t = watchdogsRef.current.get(id)
+    if (t) {
+      clearTimeout(t)
+      watchdogsRef.current.delete(id)
+    }
   }, [])
+
+  const close = useCallback((id: string) => {
+    clearWatchdog(id)
+    setChats((prev) => {
+      const next = prev.filter((c) => c.id !== id)
+      saveToStorage(next)
+      chatsRef.current = next
+      return next
+    })
+    setPendingRestores((prev) => {
+      const next = prev.filter((c) => c.id !== id)
+      if (next.length === prev.length) return prev
+      savePendingToStorage(next)
+      pendingRestoresRef.current = next
+      return next
+    })
+  }, [clearWatchdog])
 
   const updateLabel = useCallback((id: string, label: string) => {
     const trimmed = label.trim()
     if (!trimmed) return
-    setChats((prev) =>
-      prev.map((c) => (c.id === id && c.label !== trimmed ? { ...c, label: trimmed } : c)),
-    )
+    setChats((prev) => {
+      const next = prev.map((c) =>
+        c.id === id && c.label !== trimmed ? { ...c, label: trimmed } : c,
+      )
+      if (next === prev) return prev
+      chatsRef.current = next
+      return next
+    })
   }, [])
 
   const patchExploreSpecDraft = useCallback(
     (id: string, patch: Partial<NonNullable<ExploreSpecParams['draftOverrides']>>) => {
-      setChats((prev) =>
-        prev.map((c) => {
+      setChats((prev) => {
+        const next = prev.map((c) => {
           if (c.id !== id || c.kind !== 'explore-spec') return c
           const merged: NonNullable<ExploreSpecParams['draftOverrides']> = {
             ...(c.params.draftOverrides ?? {}),
             ...patch,
           }
           return { ...c, params: { ...c.params, draftOverrides: merged } }
-        }),
-      )
+        })
+        chatsRef.current = next
+        return next
+      })
     },
     [],
   )
-
-  // Synchronous snapshots — setState updaters can run asynchronously, so
-  // we read latest state via refs when consumers need a synchronous answer.
-  const chatsRef = useRef(chats)
-  chatsRef.current = chats
-  const pendingRestoresRef = useRef(pendingRestores)
-  pendingRestoresRef.current = pendingRestores
 
   const restore = useCallback(
     (id: string) => {
       const target = chatsRef.current.find((c) => c.id === id)
       if (!target) return
-      toast.dismiss(id)
-      toastedRef.current.delete(id)
+      // If the owning project was deleted (registry already loaded and the id
+      // is gone), there is nowhere to restore into. Leave the chip in the dock
+      // for the cleanup effect to remove on its own rather than optimistically
+      // dropping it into a dead pending queue where it would vanish silently.
+      const projectsLoaded = projectsRef.current.length > 0
+      if (projectsLoaded && !projectsRef.current.some((p) => p.id === target.projectId)) {
+        return
+      }
       // Cancel the server-side idle-kill timer for Explore conversations.
       if (target.kind === 'explore-spec') {
         const params = target.params as ExploreSpecParams
@@ -385,13 +468,47 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
         setActiveProjectId(target.projectId)
       }
       navigate(target.restoreRoute)
-      setPendingRestores((q) => [...q, target])
-      setChats((prev) => prev.filter((c) => c.id !== id))
+      // Move chip → pending queue. Both writes are durable.
+      setPendingRestores((prev) => {
+        const next = [...prev.filter((c) => c.id !== id), target]
+        savePendingToStorage(next)
+        pendingRestoresRef.current = next
+        return next
+      })
+      setChats((prev) => {
+        const next = prev.filter((c) => c.id !== id)
+        saveToStorage(next)
+        chatsRef.current = next
+        return next
+      })
+      // Watchdog: if nobody consumes this restore (trigger surface never
+      // mounts), put the chip back so the session is never silently lost.
+      clearWatchdog(id)
+      const timer = setTimeout(() => {
+        watchdogsRef.current.delete(id)
+        if (!pendingRestoresRef.current.some((c) => c.id === id)) return
+        setPendingRestores((prev) => {
+          const next = prev.filter((c) => c.id !== id)
+          savePendingToStorage(next)
+          pendingRestoresRef.current = next
+          return next
+        })
+        setChats((prev) => {
+          if (prev.some((c) => c.id === id || sameSession(c, target))) return prev
+          const next = [...prev, target]
+          saveToStorage(next)
+          chatsRef.current = next
+          return next
+        })
+      }, RESTORE_WATCHDOG_MS)
+      watchdogsRef.current.set(id, timer)
     },
-    [activeProjectId, setActiveProjectId, navigate],
+    [activeProjectId, setActiveProjectId, navigate, clearWatchdog],
   )
 
+  const restoreRef = useRef(restore)
   restoreRef.current = restore
+  const closeRef = useRef(close)
   closeRef.current = close
   updateLabelRef.current = updateLabel
   patchExploreSpecDraftRef.current = patchExploreSpecDraft
@@ -404,12 +521,18 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
       )
       if (idx === -1) return null
       const taken = current[idx]
-      const next = [...current.slice(0, idx), ...current.slice(idx + 1)]
-      pendingRestoresRef.current = next
-      setPendingRestores(next)
+      clearWatchdog(taken.id)
+      // Functional update so a concurrent restore() (which appends) is never
+      // clobbered by a stale snapshot.
+      setPendingRestores((prev) => {
+        const next = prev.filter((c) => c.id !== taken.id)
+        savePendingToStorage(next)
+        return next
+      })
+      pendingRestoresRef.current = current.filter((c) => c.id !== taken.id)
       return taken
     },
-    [],
+    [clearWatchdog],
   )
 
   const triggerResume = useCallback(
@@ -420,9 +543,35 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
         setActiveProjectId(input.projectId)
       }
       navigate(input.restoreRoute)
-      setPendingRestores((q) => [...q, chat])
+      setPendingRestores((prev) => {
+        const next = [...prev, chat]
+        savePendingToStorage(next)
+        pendingRestoresRef.current = next
+        return next
+      })
+      // Watchdog parity with restore() — if the trigger never consumes the
+      // resume, surface it in the dock rather than dropping it.
+      clearWatchdog(id)
+      const timer = setTimeout(() => {
+        watchdogsRef.current.delete(id)
+        if (!pendingRestoresRef.current.some((c) => c.id === id)) return
+        setPendingRestores((prev) => {
+          const next = prev.filter((c) => c.id !== id)
+          savePendingToStorage(next)
+          pendingRestoresRef.current = next
+          return next
+        })
+        setChats((prev) => {
+          if (prev.some((c) => c.id === id || sameSession(c, chat))) return prev
+          const next = [...prev, chat]
+          saveToStorage(next)
+          chatsRef.current = next
+          return next
+        })
+      }, RESTORE_WATCHDOG_MS)
+      watchdogsRef.current.set(id, timer)
     },
-    [activeProjectId, setActiveProjectId, navigate],
+    [activeProjectId, setActiveProjectId, navigate, clearWatchdog],
   )
 
   const value = useMemo<MinimizedChatsContextValue>(
@@ -440,9 +589,22 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
     [chats, pendingRestores, minimize, updateLabel, patchExploreSpecDraft, close, restore, takePendingRestore, triggerResume],
   )
 
+  // Hide the dock entirely while the active project is mid-setup-wizard, to
+  // keep that flow clean (chips reappear once setup completes — they're never
+  // dropped, just not rendered).
+  const isSetupActive =
+    activeProjectId !== null && setupProjectIds.has(activeProjectId)
+
   return (
     <MinimizedChatsContext.Provider value={value}>
       {children}
+      <MinimizedChatsDock
+        chats={chats}
+        projects={projects}
+        hidden={isSetupActive}
+        onRestore={restore}
+        onClose={close}
+      />
     </MinimizedChatsContext.Provider>
   )
 }

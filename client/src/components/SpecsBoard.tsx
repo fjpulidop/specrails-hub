@@ -71,6 +71,11 @@ interface DraftOverrides {
 }
 
 interface ExploreState {
+  /** Project this session belongs to. Captured at open/restore time so that
+   *  parking it (e.g. when the user switches to another minimized session in a
+   *  different project) always tags the chip with the CORRECT project, never
+   *  the live `activeProjectId` which may already have switched. */
+  projectId: string
   idea: string
   pendingSpecId: string
   initialAttachmentIds: string[]
@@ -96,6 +101,10 @@ interface ExploreState {
     labels: string[]
     priority: 'low' | 'medium' | 'high' | 'critical' | null
     acceptanceCriteria: string[]
+    /** Current ticket status. `'draft'` makes the shell PUBLISH on commit
+     *  (flip draft → real spec) instead of PATCHing in place. Optional for
+     *  backward-compat; absent ⇒ treated as a real-spec edit. */
+    status?: 'draft' | 'todo' | 'in_progress' | 'done' | 'cancelled'
   }
   contextScope?: import('../types/context-scope').ContextScope
 }
@@ -312,10 +321,10 @@ export function SpecsBoard({
 
   const parkCurrentExplore = useCallback(() => {
     const cur = exploreRef.current
-    if (!cur || !activeProjectId) return
+    if (!cur || !cur.projectId) return
     minimize({
       kind: 'explore-spec',
-      projectId: activeProjectId,
+      projectId: cur.projectId,
       label: deriveExploreLabel(
         liveShellRef.current.draftTitle,
         cur.seedDraftTitle,
@@ -337,7 +346,7 @@ export function SpecsBoard({
     })
     // The chip's persistence takes over from here.
     clearActiveExploreSpec()
-  }, [activeProjectId, minimize])
+  }, [minimize])
 
   // Restore live session on mount if one was open at refresh time. Scoped
   // to the active project so refreshing while on a different project
@@ -353,6 +362,7 @@ export function SpecsBoard({
       draftOverrides: persisted.draftOverrides ?? {},
     })
     setExplore({
+      projectId: persisted.projectId,
       idea: persisted.idea,
       pendingSpecId: persisted.pendingSpecId,
       initialAttachmentIds: persisted.initialAttachmentIds,
@@ -390,14 +400,16 @@ export function SpecsBoard({
     // Mutual exclusion — opening a new explore session parks any current one.
     parkCurrentExplore()
     setLiveShell({ conversationId: null, draftTitle: '', composerText: '', draftOverrides: {} })
+    if (!activeProjectId) return
     setExplore({
+      projectId: activeProjectId,
       idea: payload.idea,
       pendingSpecId: payload.pendingSpecId,
       initialAttachmentIds: payload.initialAttachmentIds,
       initialModel: payload.model,
       contextScope: payload.contextScope,
     })
-  }, [parkCurrentExplore])
+  }, [parkCurrentExplore, activeProjectId])
 
   // Restore from a chip click → re-open the shell with the resumed
   // conversation. Carry forward the chip's label as `seedDraftTitle` so the
@@ -414,6 +426,7 @@ export function SpecsBoard({
       draftOverrides: chat.params.draftOverrides ?? {},
     })
     setExplore({
+      projectId: chat.projectId,
       idea: chat.params.initialIdea,
       pendingSpecId: chat.params.pendingSpecId,
       initialAttachmentIds: chat.params.initialAttachmentIds,
@@ -737,7 +750,7 @@ export function SpecsBoard({
             const live = liveShellRef.current
             minimize({
               kind: 'explore-spec',
-              projectId: activeProjectId,
+              projectId: explore.projectId,
               label: deriveExploreLabel(draftTitle, explore.seedDraftTitle, explore.idea),
               restoreRoute: '/',
               params: {

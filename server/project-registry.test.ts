@@ -11,6 +11,7 @@ vi.mock('./queue-manager', () => {
     getActiveJobId: vi.fn().mockReturnValue(null),
     isPaused: vi.fn().mockReturnValue(false),
     setCommands: vi.fn(),
+    shutdown: vi.fn(),
   }))
   return { QueueManager }
 })
@@ -20,6 +21,9 @@ vi.mock('./chat-manager', () => {
     sendMessage: vi.fn(),
     abort: vi.fn(),
     isActive: vi.fn().mockReturnValue(false),
+    shutdown: vi.fn(),
+    forgetSpecDraft: vi.fn(),
+    forgetExploreLifecycle: vi.fn(),
   }))
   return { ChatManager }
 })
@@ -160,6 +164,45 @@ describe('ProjectRegistry', () => {
 
     it('handles removing non-existent project gracefully', () => {
       expect(() => registry.removeProject('nonexistent')).not.toThrow()
+    })
+
+    it('tears down spawners: queueManager.shutdown + chatManager.shutdown + setupManager.abort', () => {
+      registry.addProject({ id: 'p1', slug: 'my-proj', name: 'My Proj', path: '/path/to/proj' })
+      const ctx = registry.getContext('p1')!
+      // afterEach(restoreAllMocks) strips the factory mockImplementation, so the
+      // context managers are bare objects here — attach fresh spies to assert
+      // removeProject invokes the teardown hooks (all are try/catch-wrapped in
+      // the source, so a missing method would silently pass otherwise).
+      const qmShutdown = vi.fn(); const cmShutdown = vi.fn(); const smAbort = vi.fn()
+      ;(ctx.queueManager as unknown as { shutdown: unknown }).shutdown = qmShutdown
+      ;(ctx.chatManager as unknown as { shutdown: unknown }).shutdown = cmShutdown
+      ;(ctx.setupManager as unknown as { abort: unknown }).abort = smAbort
+      registry.removeProject('p1')
+      expect(qmShutdown).toHaveBeenCalled()
+      expect(cmShutdown).toHaveBeenCalled()
+      expect(smAbort).toHaveBeenCalledWith('p1')
+    })
+  })
+
+  // ─── shutdown (process-level) ────────────────────────────────────────────────
+
+  describe('shutdown', () => {
+    it('tears down queue + chat managers for every loaded project', () => {
+      registry.addProject({ id: 'p1', slug: 's1', name: 'N1', path: '/p1' })
+      registry.addProject({ id: 'p2', slug: 's2', name: 'N2', path: '/p2' })
+      const c1 = registry.getContext('p1')!
+      const c2 = registry.getContext('p2')!
+      const spies = [c1.queueManager, c1.chatManager, c2.queueManager, c2.chatManager].map((m) => {
+        const fn = vi.fn()
+        ;(m as unknown as { shutdown: unknown }).shutdown = fn
+        return fn
+      })
+      registry.shutdown()
+      for (const s of spies) expect(s).toHaveBeenCalled()
+    })
+
+    it('is safe with no projects loaded', () => {
+      expect(() => registry.shutdown()).not.toThrow()
     })
   })
 

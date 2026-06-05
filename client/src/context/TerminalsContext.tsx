@@ -113,6 +113,16 @@ interface XtermHandle {
   ws: WebSocket | null
   attached: boolean
   disposers: Array<() => void>
+  /** Wall-clock ms when the PTY socket opened (0 until open). */
+  openedAt: number
+  /** True once any PTY output byte has arrived (distinguishes a live shell from a stillborn one). */
+  gotData: boolean
+  /** True once the user has typed into this terminal (suppresses false "failed to start" alarms). */
+  gotUserInput: boolean
+  /** Set when the client is deliberately disposing the session (kill / project switch). */
+  disposing: boolean
+  /** Guards against showing the "process exited" notice twice (exit frame + close). */
+  exitShown: boolean
   /** Latest CWD reported via OSC 1337 mark frame. */
   currentCwd: string | null
   /** Listeners attached to mark events (gutter, timing badge, notifications). */
@@ -333,7 +343,19 @@ export function TerminalsProvider({ children, activeProjectId }: ProviderProps) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cols, rows, name: opts?.name }),
       })
-      if (!res.ok) return null
+      if (!res.ok) {
+        // Surface WHY the terminal could not open instead of silently no-op'ing
+        // (the "+ button does nothing" symptom).
+        let reason = ''
+        try { reason = ((await res.json()) as { error?: string })?.error ?? '' } catch { /* non-JSON body */ }
+        toast.error(
+          reason === 'terminal_limit_exceeded' ? `Terminal limit reached (max ${TERMINAL_MAX_PER_PROJECT}).`
+            : reason === 'terminal_spawn_failed' ? 'The shell failed to start — the hub may be low on file descriptors. Try restarting the hub.'
+            : reason === 'terminal_name_invalid' ? 'Invalid terminal name.'
+            : 'Failed to open terminal.',
+        )
+        return null
+      }
       const body = await res.json() as { session: TerminalRef }
       const session = body.session
       // Bootstrap xterm + WS
@@ -349,7 +371,10 @@ export function TerminalsProvider({ children, activeProjectId }: ProviderProps) 
         activeId: session.id,
       }))
       return session
-    } catch { return null }
+    } catch {
+      toast.error('Could not reach the server to open a terminal.')
+      return null
+    }
   }, [updateProject])
 
   const createAndType = useCallback(async (projectId: string, text: string, opts?: { cols?: number; rows?: number; name?: string }): Promise<TerminalRef | null> => {
@@ -756,9 +781,17 @@ function ensureXtermForSession(
     if (typeof ev.data === 'string') {
       // Control frame
       try {
-        const msg = JSON.parse(ev.data) as { type?: string; name?: string; kind?: string; ts?: number; payload?: { exitCode?: number; path?: string } }
+        const msg = JSON.parse(ev.data) as { type?: string; name?: string; kind?: string; ts?: number; code?: number | null; signal?: number | null; early?: boolean; payload?: { exitCode?: number; path?: string } }
         if (msg?.type === 'ready') {
           // nothing to do — we already allocated xterm
+          return
+        }
+        if (msg?.type === 'exit') {
+          // The PTY ended; the server tells us why so we don't show a silent
+          // black pane. `early` means it died right after spawn (probable
+          // failed start), surfaced as an error toast unless the user typed.
+          const handle = handles.get(sessionId)
+          if (handle) showSessionEnded(handle, msg.code ?? null, !!msg.early)
           return
         }
         if (msg?.type === 'mark' && typeof msg.kind === 'string' && typeof msg.ts === 'number') {
@@ -801,17 +834,44 @@ function ensureXtermForSession(
       return
     }
     // Binary frame (scrollback or live)
+    const h = handles.get(sessionId)
+    if (h) h.gotData = true
     const buf = new Uint8Array(ev.data as ArrayBuffer)
     try { term.write(buf) } catch { /* ignore */ }
   }
 
-  ws.onclose = () => {
-    // Session ended on server (kill or exit). Don't reopen automatically;
-    // panel state will reconcile on next project focus.
+  /** Show a one-time "process exited" notice in the terminal, and (for an
+   *  early death the user did not provoke) an error toast. Idempotent via
+   *  handle.exitShown so the exit frame and the socket close don't double up. */
+  const showSessionEnded = (h: XtermHandle, code: number | null, early: boolean): void => {
+    if (h.exitShown) return
+    h.exitShown = true
+    try {
+      const codeStr = code === null ? '' : ` (code ${code})`
+      h.term.write(`\r\n\x1b[2m[process exited${codeStr}]\x1b[0m\r\n`)
+    } catch { /* ignore */ }
+    if (early && !h.gotUserInput) {
+      toast.error('Terminal exited immediately — the shell may have failed to start. If this keeps happening, restart the hub.')
+    }
+  }
+
+  ws.onclose = (ev) => {
+    // Distinguish a deliberate client teardown (kill / project switch) from an
+    // unexpected death. For the latter, surface a reason instead of leaving a
+    // silent black pane. The server sends an explicit `exit` frame before
+    // closing when it can; this close handler is the fallback (e.g. a raw drop).
+    const h = handles.get(sessionId)
+    if (!h || h.disposing || h.exitShown) return
+    const reason = typeof ev?.reason === 'string' ? ev.reason : ''
+    const earlyByReason = reason === 'pty_exit_early'
+    const earlyByTiming = h.openedAt > 0 && (Date.now() - h.openedAt) < 3000 && !h.gotData && !h.gotUserInput
+    showSessionEnded(h, null, earlyByReason || earlyByTiming)
   }
 
   // Forward user input to the server as binary
   const onDataSub = term.onData((data) => {
+    const h = handles.get(sessionId)
+    if (h) h.gotUserInput = true
     if (ws.readyState === WebSocket.OPEN) {
       try { ws.send(new TextEncoder().encode(data)) } catch { /* ignore */ }
     }
@@ -833,6 +893,14 @@ function ensureXtermForSession(
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => { debounceTimer = null; fitAndSend() }, RESIZE_DEBOUNCE_MS)
   }
+  ws.onopen = () => {
+    const h = handles.get(sessionId)
+    if (h) h.openedAt = Date.now()
+    // Sync the PTY size to the already-fitted viewport. notifyAdopted handles the
+    // adopt-after-open case; this handles open-after-adopt so the PTY never stays
+    // stuck at the 80x24 create-time default in a wide panel.
+    fitAndSend()
+  }
   const ro = new ResizeObserver(scheduleFit)
   ro.observe(container)
   disposers.push(() => {
@@ -843,6 +911,7 @@ function ensureXtermForSession(
   const handle: XtermHandle = {
     term, fit, webLinks, search, webgl: null, settings,
     container, ws, attached: false, disposers,
+    openedAt: 0, gotData: false, gotUserInput: false, disposing: false, exitShown: false,
     currentCwd: null,
     markListeners: new Set<(ev: MarkFrame) => void>(),
     openSearchListeners: new Set<() => void>(),
@@ -854,7 +923,6 @@ function ensureXtermForSession(
   // the user can read about it in the docs. No toast; the false positives in
   // tmux + restart scenarios were too noisy.
   void isFreshSpawn
-  void toast
   handles.set(sessionId, handle)
   owners.set(sessionId, projectId)
   return handle
@@ -901,6 +969,9 @@ export function webgl2Available(): boolean {
 }
 
 function disposeHandle(handle: XtermHandle): void {
+  // Mark intent first so the ws.onclose handler treats this as a deliberate
+  // teardown (no "process exited" notice / failure toast).
+  handle.disposing = true
   for (const d of handle.disposers) { try { d() } catch { /* ignore */ } }
   handle.disposers = []
   handle.markListeners.clear()
