@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.58.1](https://github.com/fjpulidop/specrails-hub/compare/v1.58.0...v1.58.1) (2026-06-05)
+
+
+### Bug Fixes
+
+* **desktop:** use NOSYSTEM+absent global config in Windows smoke test ([#328](https://github.com/fjpulidop/specrails-hub/issues/328)) ([e27e2c7](https://github.com/fjpulidop/specrails-hub/commit/e27e2c711de05b64f241f817415805e1b6e7bac0))
+
 ## [1.58.0](https://github.com/fjpulidop/specrails-hub/compare/v1.57.1...v1.58.0) (2026-06-05)
 
 
