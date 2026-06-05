@@ -1,4 +1,6 @@
 import { spawnSync } from 'child_process'
+import fs from 'fs'
+import path from 'path'
 import { listAdapters } from './providers'
 
 const WHICH_CMD = process.platform === 'win32' ? 'where' : 'which'
@@ -33,6 +35,10 @@ export interface SetupPrerequisite {
   meetsMinimum: boolean
   installUrl: string
   installHint: string
+  /** True when this tool is provided by the bundled runtime (desktop mode only). */
+  bundled?: true
+  /** Desktop mode: 'corrupted-bundle' when the bundled binary fails --version probe. */
+  error?: 'corrupted-bundle'
 }
 
 export interface SetupPrerequisitesStatus {
@@ -136,13 +142,79 @@ function brokenSymlinkHint(label: string, command: string, resolvedPath: string 
   return `${label} found${where} but failed to execute — possibly a broken symlink or a stale install. Reinstall ${command} or remove the stale link${resolvedPath ? ` at ${resolvedPath}` : ''}.`
 }
 
+// ─── Desktop-mode bundled runtime helpers ─────────────────────────────────
+
+type BundledToolKey = 'node' | 'npm' | 'npx' | 'git'
+const BUNDLED_TOOL_KEYS: ReadonlySet<string> = new Set(['node', 'npm', 'npx', 'git'])
+
+function isBundledTool(key: string): key is BundledToolKey {
+  return BUNDLED_TOOL_KEYS.has(key)
+}
+
+/** Candidate absolute paths for a bundled tool, in priority order. Windows git
+ *  ships the real binary at git/cmd/git.exe with a redirector at git/bin/git.exe
+ *  — we accept either so a layout shift in the PortableGit extractor degrades to
+ *  a working alternate rather than a false "corrupted-bundle". */
+function getBundledToolCandidates(runtimesBase: string, tool: BundledToolKey): string[] {
+  if (process.platform === 'win32') {
+    const map: Record<BundledToolKey, string[]> = {
+      node: [path.join(runtimesBase, 'node', 'node.exe')],
+      npm:  [path.join(runtimesBase, 'node', 'npm.cmd')],
+      npx:  [path.join(runtimesBase, 'node', 'npx.cmd')],
+      git:  [path.join(runtimesBase, 'git', 'cmd', 'git.exe'), path.join(runtimesBase, 'git', 'bin', 'git.exe')],
+    }
+    return map[tool]
+  }
+  const map: Record<BundledToolKey, string[]> = {
+    node: [path.join(runtimesBase, 'node', 'bin', 'node')],
+    npm:  [path.join(runtimesBase, 'node', 'bin', 'npm')],
+    npx:  [path.join(runtimesBase, 'node', 'bin', 'npx')],
+    git:  [path.join(runtimesBase, 'git', 'bin', 'git')],
+  }
+  return map[tool]
+}
+
+function fileExists(p: string): boolean {
+  try {
+    return fs.existsSync(p)
+  } catch {
+    return false
+  }
+}
+
 export interface PrerequisiteOptions {
   /** Optional: include `uv` (used by plugins like Serena). When false the
    *  setup wizard's `missingRequired` is not affected by uv's absence. */
   includeUv?: boolean
 }
 
+// Short-lived memo: probing involves up to ~12 synchronous spawnSync calls that
+// block the single Express event loop. The endpoint only fires from low-freq
+// setup flows, so a 30s TTL eliminates repeated probe storms (cold-cache
+// client, window-focus rechecks) without masking real PATH changes.
+let _statusCache: { key: string; at: number; value: SetupPrerequisitesStatus } | null = null
+const STATUS_CACHE_TTL_MS = 30_000
+
 export function getSetupPrerequisitesStatus(options: PrerequisiteOptions = {}): SetupPrerequisitesStatus {
+  const key = options.includeUv ? 'uv' : 'base'
+  const now = Date.now()
+  if (_statusCache && _statusCache.key === key && now - _statusCache.at < STATUS_CACHE_TTL_MS) {
+    return _statusCache.value
+  }
+  const value = computeSetupPrerequisitesStatus(options)
+  _statusCache = { key, at: now, value }
+  return value
+}
+
+/** Test-only: clear the short-lived prerequisites memo so each test re-probes. */
+export function __resetSetupPrerequisitesCacheForTest(): void {
+  _statusCache = null
+}
+
+function computeSetupPrerequisitesStatus(options: PrerequisiteOptions = {}): SetupPrerequisitesStatus {
+  const isDesktop = process.env.SPECRAILS_IS_DESKTOP === '1'
+  const runtimesBase = process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH ?? ''
+
   const platform: Platform = process.platform === 'darwin'
     ? 'darwin'
     : process.platform === 'win32'
@@ -231,6 +303,48 @@ export function getSetupPrerequisitesStatus(options: PrerequisiteOptions = {}): 
   }
 
   const prerequisites: SetupPrerequisite[] = definitions.map((definition) => {
+    // Desktop mode: probe bundled absolute paths for node/npm/npx/git.
+    // Provider CLIs (claude, codex) are always probed via system PATH regardless of mode.
+    if (isDesktop && definition.kind === 'tool' && isBundledTool(definition.key)) {
+      const candidates = getBundledToolCandidates(runtimesBase, definition.key as BundledToolKey)
+      const bundledPath = candidates.find(fileExists)
+      // Only treat as bundled when the binary FILE actually exists. A missing
+      // file means this build never shipped runtimes for this platform/arch
+      // (e.g. a runtimes-less Windows ARM64 build, or a partial CI extraction)
+      // — fall through to the system probe so a system-installed tool still
+      // satisfies the requirement, instead of dead-ending Add Project with a
+      // futile "reinstall the app" message. 'corrupted-bundle' is reserved for
+      // the case where the file EXISTS but fails its --version probe.
+      if (bundledPath) {
+        const probe = probeVersion(definition.key, bundledPath)
+        if (!probe.executed) {
+          return {
+            ...definition,
+            installed: true,
+            executable: false,
+            bundled: true as const,
+            error: 'corrupted-bundle' as const,
+            resolvedPath: bundledPath,
+            executionError: probe.error,
+            meetsMinimum: false,
+            installHint: 'Bundle corrupted — reinstall the SpecRails Hub app.',
+          }
+        }
+        return {
+          ...definition,
+          installed: true,
+          executable: true,
+          bundled: true as const,
+          version: probe.version,
+          resolvedPath: bundledPath,
+          meetsMinimum: meetsMinimumVersion(probe.version, definition.minVersion),
+          installHint: '',
+        }
+      }
+      // bundledPath not found → fall through to the system probe below.
+    }
+
+    // Non-desktop (or provider CLI in any mode, or desktop with bundle absent): system probe.
     const lookup = locateCommand(definition.command)
     const installed = lookup.found
     let executable = false

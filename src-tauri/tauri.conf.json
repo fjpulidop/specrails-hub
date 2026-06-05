@@ -40,7 +40,9 @@
     "resources": [
       "binaries/better_sqlite3.node",
       "binaries/pty.node",
-      "binaries/node-pty/**/*"
+      "binaries/node-pty/**/*",
+      "binaries/shell-integration/**/*",
+      "runtimes/**/*"
     ],
     "macOS": {
       "entitlements": "./entitlements.plist"

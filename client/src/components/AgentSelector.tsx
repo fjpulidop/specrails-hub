@@ -37,7 +37,6 @@ export const CORE_AGENTS = new Set([
   'sr-architect',
   'sr-developer',
   'sr-reviewer',
-  'sr-merge-resolver',
 ])
 
 // Default selection: core agents only

@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+env:
+  NODE_BUNDLE_VERSION: "22.x"
+  GIT_BUNDLE_VERSION: "2.49.0"
+
 jobs:
   build-macos:
     runs-on: macos-latest  # Apple Silicon (arm64)
@@ -31,6 +35,124 @@ jobs:
       - name: Install dependencies
         run: npm ci && cd client && npm ci
 
+      - name: Download and verify Node.js ${{ env.NODE_BUNDLE_VERSION }} (macOS arm64)
+        run: |
+          set -euo pipefail
+          # NOTE: macOS runners ship BSD grep (no -P). Use -oE (extended) for portability.
+          NODE_VERSION=$(curl -fsSL "https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt" \
+            | grep 'node-v.*-darwin-arm64\.tar\.gz$' | awk '{print $2}' \
+            | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+          TARBALL="node-${NODE_VERSION}-darwin-arm64.tar.gz"
+          URL="https://nodejs.org/dist/${NODE_VERSION}/${TARBALL}"
+          echo "Downloading Node.js ${NODE_VERSION} (macOS arm64)..."
+          curl -fsSL "${URL}" -o "${TARBALL}"
+          EXPECTED_SHA=$(curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/SHASUMS256.txt" \
+            | grep "${TARBALL}" | awk '{print $1}')
+          ACTUAL_SHA=$(shasum -a 256 "${TARBALL}" | awk '{print $1}')
+          if [[ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]]; then
+            echo "CHECKSUM MISMATCH: expected=${EXPECTED_SHA} actual=${ACTUAL_SHA}"
+            exit 1
+          fi
+          echo "Checksum OK: ${ACTUAL_SHA}"
+          mkdir -p src-tauri/runtimes/node
+          # Preserve symlinks on extraction (no -h / --dereference). We then REPLACE
+          # the npm/npx symlinks with wrapper scripts below — Tauri's resource bundler
+          # dereferences symlinks (tauri-apps/tauri#13219), which would otherwise turn
+          # bin/npm into a broken copy that throws "Cannot find module '../lib/cli.js'".
+          tar -xzf "${TARBALL}" --strip-components=1 -C src-tauri/runtimes/node
+          rm "${TARBALL}"
+          # Replace bin/npm and bin/npx (relative symlinks → ../lib/node_modules/npm/...)
+          # with relocation-robust POSIX wrapper scripts that invoke the bundled node by
+          # a path relative to their own location. Plain text → survives bundling; no
+          # symlink/PATH dependency; always uses the bundled node.
+          NB="src-tauri/runtimes/node/bin"
+          # IMPORTANT: rm the symlinks FIRST. `> file` onto a symlink follows the link
+          # and clobbers its TARGET (lib/node_modules/npm/bin/npm-cli.js), leaving the
+          # symlink intact — which corrupts npm. Deleting first makes printf create a
+          # fresh regular file.
+          rm -f "${NB}/npm" "${NB}/npx"
+          printf '%s\n' \
+            '#!/bin/sh' \
+            'DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"' \
+            'exec "$DIR/node" "$DIR/../lib/node_modules/npm/bin/npm-cli.js" "$@"' \
+            > "${NB}/npm"
+          printf '%s\n' \
+            '#!/bin/sh' \
+            'DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"' \
+            'exec "$DIR/node" "$DIR/../lib/node_modules/npm/bin/npx-cli.js" "$@"' \
+            > "${NB}/npx"
+          chmod 755 "${NB}/node" "${NB}/npm" "${NB}/npx"
+          echo "Extracted Node.js ${NODE_VERSION}; npm/npx replaced with bundled-node wrappers."
+
+      - name: Build relocatable Git ${{ env.GIT_BUNDLE_VERSION }} from source (macOS arm64)
+        run: |
+          set -euo pipefail
+          GIT_VERSION="${{ env.GIT_BUNDLE_VERSION }}"
+          GIT_SHA256="618190cf590b7e9f6c11f91f23b1d267cd98c3ab33b850416d8758f8b5a85628"  # git-2.49.0.tar.xz (kernel.org signed sha256sums)
+          TARBALL="git-${GIT_VERSION}.tar.xz"
+          curl -fsSL "https://mirrors.edge.kernel.org/pub/software/scm/git/${TARBALL}" -o "${TARBALL}"
+          ACTUAL_SHA=$(shasum -a 256 "${TARBALL}" | awk '{print $1}')
+          if [[ "${GIT_SHA256}" != "${ACTUAL_SHA}" ]]; then
+            echo "CHECKSUM MISMATCH for ${TARBALL}: expected=${GIT_SHA256} actual=${ACTUAL_SHA}"
+            exit 1
+          fi
+          echo "Checksum OK: ${ACTUAL_SHA}"
+          tar xf "${TARBALL}"
+          DEST="$PWD/src-tauri/runtimes/git"
+          rm -rf "${DEST}"; mkdir -p "${DEST}"
+          pushd "git-${GIT_VERSION}" >/dev/null
+          # RUNTIME_PREFIX makes git locate libexec/git-core + templates RELATIVE to bin/git,
+          # so the tree is relocatable. NO_GETTEXT + NO_OPENSSL + APPLE_COMMON_CRYPTO + omitting
+          # USE_LIBPCRE2 => the only dylib deps are macOS system libs (/usr/lib, /System) =>
+          # ZERO relocation/install_name_tool surgery needed. System /usr/bin/perl drives the
+          # handful of perl helpers (git add -p, rebase -i).
+          MAKE_FLAGS=(
+            prefix=/
+            RUNTIME_PREFIX=YesPlease
+            NO_GETTEXT=1 NO_OPENSSL=1 APPLE_COMMON_CRYPTO=1
+            NO_TCLTK=1 NO_GITWEB=1
+            gitexecdir=libexec/git-core
+            template_dir=share/git-core/templates
+          )
+          # git's Makefile links libcurl (https remote helpers) via curl-config. Only honor
+          # a SELF-CONTAINED system curl-config (prefix /usr) — a Homebrew curl-config
+          # (prefix /opt/homebrew) would make git link a non-system dylib and fail the
+          # otool self-containment assertion below. When no system curl-config exists, drop
+          # libcurl (+ expat): the hub only needs local git ops (init/add/commit), which
+          # require neither. This keeps the build deterministic regardless of runner PATH.
+          USE_CURL=0
+          if command -v curl-config >/dev/null 2>&1 && [[ "$(curl-config --prefix 2>/dev/null)" == "/usr" ]]; then
+            USE_CURL=1
+          fi
+          if [[ "${USE_CURL}" -eq 0 ]]; then
+            echo "No self-contained system curl-config — building git without libcurl/expat (local ops only)."
+            MAKE_FLAGS+=(NO_CURL=1 NO_EXPAT=1)
+          fi
+          make -j"$(sysctl -n hw.ncpu)" "${MAKE_FLAGS[@]}"
+          make "${MAKE_FLAGS[@]}" DESTDIR="${DEST}" install
+          popd >/dev/null
+          rm -rf "git-${GIT_VERSION}" "${TARBALL}"
+          # Collapse the libexec/git-core builtin hardlinks (each a full copy of git after a
+          # link-unaware resource copy) — git dispatches builtins internally and does not need
+          # them on disk. Keep the genuine helper binaries (git-http-*, git-remote-*, git-shell,
+          # scalar, ...) and templates, which are NOT hardlinks to git.
+          GITBIN="${DEST}/bin/git"
+          if [[ -d "${DEST}/libexec/git-core" ]]; then
+            find "${DEST}/libexec/git-core" -type f | while read -r f; do
+              if [[ "${f}" -ef "${GITBIN}" ]]; then rm -f "${f}"; fi
+            done
+          fi
+          # Assert the consumer contract (server/path-resolver.ts prepends git/bin) and self-containment.
+          test -x "${DEST}/bin/git"
+          test -d "${DEST}/libexec/git-core"
+          test -d "${DEST}/share/git-core/templates"
+          echo "=== otool -L git (must be system libs only) ==="
+          otool -L "${DEST}/bin/git"
+          if otool -L "${DEST}/bin/git" | awk 'NR>1{print $1}' | grep -E '(/opt/|/usr/local/|@rpath|@loader_path)'; then
+            echo "ERROR: bundled git links a non-system dylib — not self-contained"; exit 1
+          fi
+          echo "Built relocatable Git ${GIT_VERSION} → ${DEST}"
+
       - name: Import codesign certificate
         uses: apple-actions/import-codesign-certs@v3
         with:
@@ -43,6 +165,33 @@ jobs:
           echo "${{ secrets.APPLE_API_KEY_BASE64 }}" | base64 --decode \
             > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APPLE_API_KEY }}.p8
 
+      - name: Sign bundled runtimes (macOS arm64)
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${APPLE_SIGNING_IDENTITY:-}" ]]; then
+            echo "APPLE_SIGNING_IDENTITY not set — skipping runtimes signing (unsigned local build)."
+            exit 0
+          fi
+          ENT="src-tauri/entitlements.plist"
+          # Tauri does NOT codesign bundle.resources binaries, so the bundled node/git
+          # would fail notarization (or be killed by Gatekeeper) unsigned. Sign every
+          # Mach-O under runtimes/ with hardened runtime + the JIT/library-validation
+          # entitlements node's V8 needs. Signatures embed in the Mach-O and survive
+          # Tauri's copy into the .app, so the assembled bundle notarizes cleanly.
+          count=0
+          while IFS= read -r f; do
+            if file "$f" | grep -q "Mach-O"; then
+              codesign --force --timestamp --options runtime --entitlements "$ENT" \
+                --sign "$APPLE_SIGNING_IDENTITY" "$f"
+              count=$((count+1))
+            fi
+          done < <(find src-tauri/runtimes -type f)
+          echo "Signed ${count} Mach-O binaries under src-tauri/runtimes/"
+          codesign --verify --strict --verbose=2 src-tauri/runtimes/node/bin/node
+          codesign --verify --strict --verbose=2 src-tauri/runtimes/git/bin/git
+
       - name: Build desktop app
         run: npm run build:desktop
         env:
@@ -51,6 +200,36 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+
+      - name: Smoke test bundled runtimes — staging (macOS arm64)
+        run: |
+          set -euo pipefail
+          # Fast pre-bundle check against src-tauri/runtimes/ (the in-bundle copy is
+          # validated separately below). Scrub system Node/Git from PATH, then prepend
+          # the bundled node dir so the npm/npx wrappers resolve the BUNDLED node — this
+          # mirrors what server/path-resolver.ts does at runtime and proves the real chain.
+          CLEAN_PATH=$(echo "$PATH" | tr ':' '\n' \
+            | { grep -vE '(/usr/local/bin|/opt/homebrew|nvm|volta|nodenv|node|n/)' || true; } \
+            | tr '\n' ':' | sed 's/:$//')
+          export PATH="$(pwd)/src-tauri/runtimes/node/bin:${CLEAN_PATH}"
+          bash scripts/smoke-bundled-runtimes.sh "$(pwd)/src-tauri/runtimes"
+
+      - name: Smoke test bundled runtimes — inside .app (macOS arm64)
+        run: |
+          set -euo pipefail
+          APP=$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' | head -n1)
+          if [[ -z "${APP}" ]]; then echo "No .app bundle found"; exit 1; fi
+          RT="${APP}/Contents/Resources/runtimes"
+          echo "Validating the SHIPPED runtimes copy at: ${RT}"
+          CLEAN_PATH=$(echo "$PATH" | tr ':' '\n' \
+            | { grep -vE '(/usr/local/bin|/opt/homebrew|nvm|volta|nodenv|node|n/)' || true; } \
+            | tr '\n' ':' | sed 's/:$//')
+          export PATH="${RT}/node/bin:${CLEAN_PATH}"
+          bash scripts/smoke-bundled-runtimes.sh "${RT}"
+          # Confirm the shipped node is validly signed with hardened runtime.
+          codesign --verify --strict "${RT}/node/bin/node" || { echo "node sig invalid"; exit 1; }
+          codesign --verify --strict "${RT}/git/bin/git" || { echo "git sig invalid"; exit 1; }
+          echo "In-bundle smoke test PASSED."
 
       - name: Upload .dmg artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
@@ -94,12 +273,101 @@ jobs:
         shell: bash
         run: npm ci && cd client && npm ci
 
+      - name: Download and verify Node.js ${{ env.NODE_BUNDLE_VERSION }} (Windows x64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          NODE_VERSION=$(curl -fsSL "https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt" \
+            | grep 'node-v.*-win-x64\.zip$' | awk '{print $2}' \
+            | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+          ZIPFILE="node-${NODE_VERSION}-win-x64.zip"
+          URL="https://nodejs.org/dist/${NODE_VERSION}/${ZIPFILE}"
+          echo "Downloading Node.js ${NODE_VERSION} (Windows x64)..."
+          curl -fsSL "${URL}" -o "${ZIPFILE}"
+          EXPECTED_SHA=$(curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/SHASUMS256.txt" \
+            | grep "${ZIPFILE}" | awk '{print $1}')
+          ACTUAL_SHA=$(sha256sum "${ZIPFILE}" | awk '{print $1}')
+          if [[ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]]; then
+            echo "CHECKSUM MISMATCH: expected=${EXPECTED_SHA} actual=${ACTUAL_SHA}"
+            exit 1
+          fi
+          echo "Checksum OK: ${ACTUAL_SHA}"
+          mkdir -p src-tauri/runtimes/node
+          unzip -q "${ZIPFILE}" -d tmp_node
+          # The zip extracts to node-vX.Y.Z-win-x64/ — move contents up one level.
+          mv "tmp_node/node-${NODE_VERSION}-win-x64/"* src-tauri/runtimes/node/
+          rmdir "tmp_node/node-${NODE_VERSION}-win-x64" tmp_node
+          rm "${ZIPFILE}"
+          echo "Extracted Node.js ${NODE_VERSION} to src-tauri/runtimes/node/"
+
+      - name: Download and verify Git for Windows portable (x64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          GIT_VERSION="${{ env.GIT_BUNDLE_VERSION }}"
+          # Git for Windows portable: self-extracting 7z archive from GitHub releases.
+          ARCHIVE="PortableGit-${GIT_VERSION}-64-bit.7z.exe"
+          # SHA256 from the v2.49.0.windows.1 release body (Filename | SHA-256 table).
+          # Update this when bumping GIT_BUNDLE_VERSION.
+          GIT_SHA256="bc980a64e875304ea5aa88386fda37e8a0089d0f2023616b9995b1ca75b471dd"
+          URL="https://github.com/git-for-windows/git/releases/download/v${GIT_VERSION}.windows.1/${ARCHIVE}"
+          echo "Downloading Git for Windows ${GIT_VERSION} portable (x64)..."
+          curl -fsSL -L "${URL}" -o "${ARCHIVE}"
+          ACTUAL_SHA=$(sha256sum "${ARCHIVE}" | awk '{print $1}')
+          if [[ "${GIT_SHA256}" != "${ACTUAL_SHA}" ]]; then
+            echo "CHECKSUM MISMATCH for ${ARCHIVE}: expected=${GIT_SHA256} actual=${ACTUAL_SHA}"
+            exit 1
+          fi
+          echo "Checksum OK: ${ACTUAL_SHA}"
+          echo "Extracting Git for Windows..."
+          mkdir -p src-tauri/runtimes/git
+          # The portable 7z.exe is a self-extracting archive; -o<dir> sets the output dir
+          # (no space) and -y assumes yes for unattended extraction.
+          chmod +x "${ARCHIVE}"
+          ./"${ARCHIVE}" -o"src-tauri/runtimes/git" -y
+          rm "${ARCHIVE}"
+          test -f src-tauri/runtimes/git/cmd/git.exe
+          echo "Extracted Git for Windows to src-tauri/runtimes/git/"
+
       - name: Build desktop app
         shell: bash
         run: npm run build:desktop
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Smoke test bundled runtimes (Windows x64)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          # npm.cmd/npx.cmd resolve the adjacent node.exe via %~dp0 (self-contained,
+          # PATH-independent), so we invoke every tool by absolute path. We still scrub
+          # system Node/Git from PATH to prove the bundled tree stands alone.
+          $cleanPath = ($env:PATH -split ';') | Where-Object {
+            $_ -notmatch 'node' -and $_ -notmatch 'Git' -and $_ -notmatch 'nvm'
+          } | Join-String -Separator ';'
+          $env:PATH = $cleanPath
+
+          $node = "src-tauri\runtimes\node\node.exe"
+          $npm  = "src-tauri\runtimes\node\npm.cmd"
+          $npx  = "src-tauri\runtimes\node\npx.cmd"
+          $git  = "src-tauri\runtimes\git\cmd\git.exe"
+
+          foreach ($tool in @($node, $npm, $npx, $git)) {
+            Write-Host "Testing ${tool}..."
+            & $tool --version
+            if ($LASTEXITCODE -ne 0) { Write-Error "${tool} --version failed"; exit 1 }
+          }
+
+          # Functional git check: init + commit + log exercises git-core helpers/templates.
+          $tmp = Join-Path $env:TEMP ("smokegit-" + [guid]::NewGuid())
+          New-Item -ItemType Directory -Path $tmp | Out-Null
+          $env:GIT_CONFIG_GLOBAL = "NUL"; $env:GIT_CONFIG_SYSTEM = "NUL"
+          & $git -C $tmp init -q;  if ($LASTEXITCODE -ne 0) { Write-Error "git init failed"; exit 1 }
+          & $git -C $tmp -c user.email=ci@specrails.dev -c user.name=ci commit -q --allow-empty -m smoke; if ($LASTEXITCODE -ne 0) { Write-Error "git commit failed"; exit 1 }
+          & $git -C $tmp log --oneline; if ($LASTEXITCODE -ne 0) { Write-Error "git log failed"; exit 1 }
+          Remove-Item -Recurse -Force $tmp
+          Write-Host "Smoke test PASSED."
 
       - name: Upload Windows installer artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
@@ -145,12 +413,89 @@ jobs:
         shell: bash
         run: npm ci && cd client && npm ci
 
+      - name: Download and verify Node.js ${{ env.NODE_BUNDLE_VERSION }} (Windows arm64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          NODE_VERSION=$(curl -fsSL "https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt" \
+            | grep 'node-v.*-win-arm64\.zip$' | awk '{print $2}' \
+            | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+          ZIPFILE="node-${NODE_VERSION}-win-arm64.zip"
+          URL="https://nodejs.org/dist/${NODE_VERSION}/${ZIPFILE}"
+          echo "Downloading Node.js ${NODE_VERSION} (Windows arm64)..."
+          curl -fsSL "${URL}" -o "${ZIPFILE}"
+          EXPECTED_SHA=$(curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/SHASUMS256.txt" \
+            | grep "${ZIPFILE}" | awk '{print $1}')
+          ACTUAL_SHA=$(sha256sum "${ZIPFILE}" | awk '{print $1}')
+          if [[ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]]; then
+            echo "CHECKSUM MISMATCH: expected=${EXPECTED_SHA} actual=${ACTUAL_SHA}"
+            exit 1
+          fi
+          echo "Checksum OK: ${ACTUAL_SHA}"
+          mkdir -p src-tauri/runtimes/node
+          unzip -q "${ZIPFILE}" -d tmp_node
+          mv "tmp_node/node-${NODE_VERSION}-win-arm64/"* src-tauri/runtimes/node/
+          rmdir "tmp_node/node-${NODE_VERSION}-win-arm64" tmp_node
+          rm "${ZIPFILE}"
+          test -f src-tauri/runtimes/node/node.exe
+          echo "Extracted Node.js ${NODE_VERSION} (arm64) to src-tauri/runtimes/node/"
+
+      - name: Download and verify Git for Windows portable (arm64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          GIT_VERSION="${{ env.GIT_BUNDLE_VERSION }}"
+          ARCHIVE="PortableGit-${GIT_VERSION}-arm64.7z.exe"
+          # SHA256 from the v2.49.0.windows.1 release body. Update on version bump.
+          GIT_SHA256="8fa7e49b319b1109173a90a110aaeb0e9004600ff2ed44adc7dfe56ab21e4148"
+          URL="https://github.com/git-for-windows/git/releases/download/v${GIT_VERSION}.windows.1/${ARCHIVE}"
+          echo "Downloading Git for Windows ${GIT_VERSION} portable (arm64)..."
+          curl -fsSL -L "${URL}" -o "${ARCHIVE}"
+          ACTUAL_SHA=$(sha256sum "${ARCHIVE}" | awk '{print $1}')
+          if [[ "${GIT_SHA256}" != "${ACTUAL_SHA}" ]]; then
+            echo "CHECKSUM MISMATCH for ${ARCHIVE}: expected=${GIT_SHA256} actual=${ACTUAL_SHA}"
+            exit 1
+          fi
+          echo "Checksum OK: ${ACTUAL_SHA}"
+          mkdir -p src-tauri/runtimes/git
+          chmod +x "${ARCHIVE}"
+          ./"${ARCHIVE}" -o"src-tauri/runtimes/git" -y
+          rm "${ARCHIVE}"
+          test -f src-tauri/runtimes/git/cmd/git.exe
+          echo "Extracted Git for Windows (arm64) to src-tauri/runtimes/git/"
+
       - name: Build desktop app
         shell: bash
         run: npm run build:desktop
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Smoke test bundled runtimes (Windows arm64)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $cleanPath = ($env:PATH -split ';') | Where-Object {
+            $_ -notmatch 'node' -and $_ -notmatch 'Git' -and $_ -notmatch 'nvm'
+          } | Join-String -Separator ';'
+          $env:PATH = $cleanPath
+          $node = "src-tauri\runtimes\node\node.exe"
+          $npm  = "src-tauri\runtimes\node\npm.cmd"
+          $npx  = "src-tauri\runtimes\node\npx.cmd"
+          $git  = "src-tauri\runtimes\git\cmd\git.exe"
+          foreach ($tool in @($node, $npm, $npx, $git)) {
+            Write-Host "Testing ${tool}..."
+            & $tool --version
+            if ($LASTEXITCODE -ne 0) { Write-Error "${tool} --version failed"; exit 1 }
+          }
+          $tmp = Join-Path $env:TEMP ("smokegit-" + [guid]::NewGuid())
+          New-Item -ItemType Directory -Path $tmp | Out-Null
+          $env:GIT_CONFIG_GLOBAL = "NUL"; $env:GIT_CONFIG_SYSTEM = "NUL"
+          & $git -C $tmp init -q;  if ($LASTEXITCODE -ne 0) { Write-Error "git init failed"; exit 1 }
+          & $git -C $tmp -c user.email=ci@specrails.dev -c user.name=ci commit -q --allow-empty -m smoke; if ($LASTEXITCODE -ne 0) { Write-Error "git commit failed"; exit 1 }
+          & $git -C $tmp log --oneline; if ($LASTEXITCODE -ne 0) { Write-Error "git log failed"; exit 1 }
+          Remove-Item -Recurse -Force $tmp
+          Write-Host "Smoke test PASSED."
 
       - name: Upload Windows ARM64 installer artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2

@@ -741,6 +741,9 @@ function ContinueEditingButton({ ticket, title, description, priority, labels, o
           labels,
           priority,
           acceptanceCriteria: criteria,
+          // Drives publish-vs-update on commit: a draft PUBLISHES (flips to a
+          // real spec), a live spec PATCHes in place. See ExploreSpecShell.
+          status: ticket.status,
         },
       },
     })

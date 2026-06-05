@@ -188,6 +188,9 @@ function broadcast(msg: WsMessage): void {
 // ─── Health endpoint state (populated by hub bootstrap below) ────────────────
 
 let _getProjectCount: () => number = () => 0
+/** Captured by the hub bootstrap block so graceful shutdown can tear down every
+ *  project's spawners (rail/chat children) instead of orphaning them. */
+let _registry: ProjectRegistry | null = null
 
 server.on('upgrade', (request, socket, head) => {
   const urlStr = request.url ?? '/'
@@ -206,12 +209,33 @@ server.on('upgrade', (request, socket, head) => {
     const sessionId = termMatch[1]
     const tm = getTerminalManager()
     const session = tm.getUnsafe(sessionId)
-    if (!session) return rejectUpgrade(socket, 404, 'Not Found')
+    if (!session) {
+      // The session may have died right after POST /terminals returned (e.g. a
+      // shell that failed to acquire a controlling tty). If we have a tombstone,
+      // upgrade just long enough to tell the client WHY, then close — otherwise
+      // the client sees a bare 404 and a silent dead terminal.
+      if (projectId) {
+        const tomb = tm.getTombstone(sessionId, projectId)
+        if (tomb) {
+          terminalWss.handleUpgrade(request, socket, head, (ws) => {
+            try { ws.send(JSON.stringify({ type: 'exit', code: tomb.code, signal: tomb.signal, early: tomb.early })) } catch { /* ignore */ }
+            try { ws.close(1000, tomb.early ? 'pty_exit_early' : 'pty_exit') } catch { /* ignore */ }
+          })
+          return
+        }
+      }
+      return rejectUpgrade(socket, 404, 'Not Found')
+    }
     if (!projectId || session.projectId !== projectId) return rejectUpgrade(socket, 403, 'Forbidden')
     terminalWss.handleUpgrade(request, socket, head, (ws) => {
       const meta = tm.attach(sessionId, ws)
       if (!meta) {
-        try { ws.close(1011, 'attach_failed') } catch { /* ignore */ }
+        // Lost the race: the pty exited between the getUnsafe check and attach.
+        const tomb = tm.getTombstone(sessionId, projectId)
+        if (tomb) {
+          try { ws.send(JSON.stringify({ type: 'exit', code: tomb.code, signal: tomb.signal, early: tomb.early })) } catch { /* ignore */ }
+        }
+        try { ws.close(1000, tomb?.early ? 'pty_exit_early' : 'pty_exit') } catch { /* ignore */ }
         return
       }
       ws.on('message', (data, isBinary) => {
@@ -296,6 +320,7 @@ function applyWsRateLimiting(ws: WebSocket): void {
 {
   const registry = new ProjectRegistry(broadcast, undefined, port)
   registry.loadAll()
+  _registry = registry
   _getProjectCount = () => registry.listContexts().length
 
   // OTLP/JSON receiver — must be mounted before auth middleware would block it,
@@ -391,6 +416,9 @@ server.listen(port, '127.0.0.1', () => {
 
 async function shutdown(): Promise<void> {
   removePidFile()
+  try {
+    _registry?.shutdown()
+  } catch { /* ignore */ }
   try {
     await getTerminalManager().shutdown()
   } catch { /* ignore */ }

@@ -1579,7 +1579,7 @@ describe('QueueManager', () => {
       expect(spawnArgs).toContain('gpt-5.3-codex')
     })
 
-    it('defaults to gpt-5.4-mini model when no resolvedModel is set', () => {
+    it('defaults to gpt-5.5 model when no resolvedModel is set', () => {
       vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
@@ -1590,7 +1590,7 @@ describe('QueueManager', () => {
 
       const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
       expect(spawnArgs).toContain('--model')
-      expect(spawnArgs).toContain('gpt-5.4-mini')
+      expect(spawnArgs).toContain('gpt-5.5')
     })
 
     it('translates /specrails:<name> → $<name> when targeting codex', () => {
@@ -1864,6 +1864,90 @@ describe('QueueManager', () => {
         expect(spawnArgs[appendIdx + 1]).toContain('<user-attachment')
       } finally {
         fs.rmSync(projectDir, { recursive: true, force: true })
+      }
+    })
+  })
+
+  // ─── shutdown ───────────────────────────────────────────────────────────────
+
+  describe('shutdown', () => {
+    it('terminates the active child with SIGTERM and makes a late close a no-op on a closed DB', () => {
+      const db = initDb(':memory:')
+      const qm2 = new QueueManager(broadcast, db)
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('job-shutdown' as any)
+
+      qm2.enqueue('/implement #1')
+      qm2.shutdown()
+
+      expect(vi.mocked(treeKill)).toHaveBeenCalledWith(12345, 'SIGTERM')
+
+      // Close the DB out from under the manager, then deliver the late 'close'
+      // the dying child eventually emits. Pre-fix this threw "database
+      // connection is not open" inside the EventEmitter listener and crashed
+      // the hub; the _disposed guard must make it a silent no-op.
+      db.close()
+      expect(() => child.emit('close', 0)).not.toThrow()
+    })
+
+    it('is idempotent and safe with no active job', () => {
+      const qm2 = new QueueManager(broadcast)
+      expect(() => {
+        qm2.shutdown()
+        qm2.shutdown()
+      }).not.toThrow()
+    })
+
+    it('does not drain queued jobs after shutdown', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child1 = createMockChildProcess()
+      const child2 = createMockChildProcess()
+      vi.mocked(mockSpawn)
+        .mockReturnValueOnce(child1 as any)
+        .mockReturnValueOnce(child2 as any)
+      vi.mocked(mockUuidV4)
+        .mockReturnValueOnce('job-a' as any)
+        .mockReturnValueOnce('job-b' as any)
+
+      qm.enqueue('/implement #1') // running
+      qm.enqueue('/implement #2') // queued
+      qm.shutdown()
+
+      // The running child exits; _onJobExit must early-return (disposed) and
+      // never start the queued job.
+      child1.emit('close', 0)
+      expect(vi.mocked(mockSpawn)).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // ─── kill-timer safety (double cancel) ───────────────────────────────────────
+
+  describe('double cancel kill-timer', () => {
+    it('does not leak the SIGKILL timer when a running job is canceled twice', () => {
+      vi.useFakeTimers()
+      try {
+        vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+        const child = createMockChildProcess()
+        vi.mocked(mockSpawn).mockReturnValue(child as any)
+        vi.mocked(mockUuidV4).mockReturnValue('job-dbl' as any)
+
+        qm.enqueue('/implement #1')
+        qm.cancel('job-dbl')
+        qm.cancel('job-dbl') // status is still 'running' until close → re-kills
+
+        // SIGTERM sent on each cancel.
+        const sigtermCalls = vi.mocked(treeKill).mock.calls.filter((c) => c[1] === 'SIGTERM')
+        expect(sigtermCalls.length).toBe(2)
+
+        // Only the second (current) kill timer survives; advancing past the
+        // grace window must fire exactly ONE SIGKILL, not two.
+        vi.advanceTimersByTime(5000)
+        const sigkillCalls = vi.mocked(treeKill).mock.calls.filter((c) => c[1] === 'SIGKILL')
+        expect(sigkillCalls.length).toBe(1)
+      } finally {
+        vi.useRealTimers()
       }
     })
   })

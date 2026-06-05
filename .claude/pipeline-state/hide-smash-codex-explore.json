@@ -1,0 +1,39 @@
+{
+  "schema_version": "1",
+  "feature": "hide-smash-codex-explore",
+  "started_at": "2026-06-04T21:50:10.963686+00:00",
+  "updated_at": "2026-06-04T22:18:58.498885+00:00",
+  "phases": {
+    "architect": "done",
+    "developer": "done",
+    "test-writer": "skipped",
+    "doc-sync": "skipped",
+    "reviewer": "done",
+    "ship": "done",
+    "ci": "skipped"
+  },
+  "last_successful_phase": "ship",
+  "failed_phase": null,
+  "error_context": null,
+  "openspec_artifacts": "openspec/changes/hide-smash-codex-explore/",
+  "implemented_files": [
+    "client/src/lib/provider-capabilities.ts",
+    "client/src/lib/__tests__/provider-capabilities.test.ts",
+    "client/src/components/ContextScopeSlider.tsx",
+    "client/src/components/ProposeSpecModal.tsx",
+    "server/project-router.ts",
+    "client/src/components/__tests__/ContextScopeSlider.test.tsx",
+    "client/src/components/__tests__/ProposeSpecModal.test.tsx",
+    "server/project-router.test.ts"
+  ],
+  "input": {
+    "issues": [
+      4
+    ],
+    "flags": {
+      "dry_run": false,
+      "apply_mode": false,
+      "single_mode": true
+    }
+  }
+}

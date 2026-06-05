@@ -150,6 +150,9 @@ export function TicketPostitCard({
           labels: ticket.labels ?? [],
           priority: ticket.priority ?? 'medium',
           acceptanceCriteria: criteria,
+          // Drives publish-vs-update on commit: a draft PUBLISHES (flips to a
+          // real spec), a live spec PATCHes in place. See ExploreSpecShell.
+          status: ticket.status,
         },
       },
     })

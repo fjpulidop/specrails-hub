@@ -86,6 +86,14 @@ function patchMacApp(appPath) {
   codesignNodePty(dest)
 }
 
+// NOTE: This script is intentionally NOT wired into `build:desktop`. Running it
+// after `tauri build` would re-codesign node-pty AFTER notarization, invalidating
+// the notarized `.app.tar.gz` updater artifact, and the `.dmg` is already sealed
+// by then. Bundled native deps (node-pty, the sidecar, and the bundled Node/Git
+// runtimes) are instead chmod'd + codesigned in STAGING (build-sidecar.mjs and the
+// "Sign bundled runtimes" CI step) BEFORE `tauri build`, so Tauri assembles and
+// notarizes an already-valid bundle. Kept for manual/diagnostic use only.
+
 function main() {
   if (!fs.existsSync(NODE_PTY_SRC)) {
     log(`ERROR: ${NODE_PTY_SRC} does not exist — run build:sidecar first`)

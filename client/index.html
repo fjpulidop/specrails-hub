@@ -14,12 +14,12 @@
       (function () {
         try {
           var k = 'specrails-hub:ui-theme'
-          var allowed = ['dracula', 'aurora-light', 'obsidian-dark', 'matrix']
+          var allowed = ['dracula', 'aurora-light', 'obsidian-dark', 'matrix', 'specrails']
           var v = localStorage.getItem(k)
           document.documentElement.dataset.theme =
-            v && allowed.indexOf(v) !== -1 ? v : 'dracula'
+            v && allowed.indexOf(v) !== -1 ? v : 'specrails'
         } catch (_) {
-          document.documentElement.dataset.theme = 'dracula'
+          document.documentElement.dataset.theme = 'specrails'
         }
       })()
     </script>
@@ -58,6 +58,13 @@
         --splash-primary: #00ff66;
         --splash-secondary: #4fd1c5;
         --splash-muted: #4a8f6e;
+      }
+      html[data-theme="specrails"] {
+        --splash-bg: #08070f;
+        --splash-fg: #ededf5;
+        --splash-primary: #00c3d2;
+        --splash-secondary: #9a6fce;
+        --splash-muted: #6b6f8c;
       }
       html, body {
         margin: 0;

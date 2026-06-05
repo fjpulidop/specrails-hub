@@ -6,6 +6,7 @@ import express from 'express'
 import request from 'supertest'
 
 import { createProjectRouter } from './project-router'
+import { readStore } from './ticket-store'
 import { initDb } from './db'
 import { initHubDb } from './hub-db'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
@@ -507,6 +508,38 @@ describe('ticket endpoints', () => {
       expect(res.status).toBe(200)
       expect(res.body.tickets).toHaveLength(1)
       expect(res.body.tickets[0].title).toBe('From contract path')
+    })
+  })
+
+  describe('readStore per-entry resilience', () => {
+    it('drops a single corrupt ticket entry instead of discarding the whole store', () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ticket-store-corrupt-'))
+      const filePath = path.join(dir, 'local-tickets.json')
+      // Two valid tickets plus a null and a scalar value — pre-fix the `in`
+      // operator in normalizeTicket threw on these and the catch nuked
+      // everything, returning emptyStore().
+      fs.writeFileSync(
+        filePath,
+        JSON.stringify({
+          schema_version: '1.1',
+          revision: 3,
+          last_updated: new Date().toISOString(),
+          next_id: 10,
+          tickets: {
+            '1': { id: 1, title: 'Valid one', status: 'todo', priority: 'high' },
+            '2': null,
+            '3': 42,
+            '4': { id: 4, title: 'Valid two', status: 'todo', priority: 'low' },
+          },
+        }),
+        'utf-8',
+      )
+      const store = readStore(filePath)
+      const ids = Object.keys(store.tickets).sort()
+      expect(ids).toEqual(['1', '4'])
+      expect(store.tickets['1'].title).toBe('Valid one')
+      expect(store.tickets['4'].title).toBe('Valid two')
+      fs.rmSync(dir, { recursive: true, force: true })
     })
   })
 })

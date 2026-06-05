@@ -77,6 +77,7 @@ function makeChatManager(overrides: Partial<{
   sendMessage: () => Promise<void>
   abort: () => void
   forgetSpecDraft: (id: string) => void
+  forgetExploreLifecycle: (id: string) => void
   getSpecDraftState: (id: string) => unknown
 }> = {}) {
   return {
@@ -84,6 +85,7 @@ function makeChatManager(overrides: Partial<{
     sendMessage: overrides.sendMessage ?? vi.fn(async () => {}),
     abort: overrides.abort ?? vi.fn(),
     forgetSpecDraft: overrides.forgetSpecDraft ?? vi.fn(),
+    forgetExploreLifecycle: overrides.forgetExploreLifecycle ?? vi.fn(),
     getSpecDraftState: overrides.getSpecDraftState ?? vi.fn(() => null),
   }
 }
@@ -1555,9 +1557,49 @@ describe('project-router', () => {
     })
   })
 
-  // Note: GET /jobs/compare route is unreachable because GET /jobs/:id is
-  // defined first in the router and catches 'compare' as an :id param.
-  // This is a router ordering issue in the source code (not a test gap).
+  // ─── Jobs compare (must out-rank /jobs/:id) ──────────────────────────────
+
+  describe('GET /:projectId/jobs/compare', () => {
+    it('is reachable (not shadowed by /jobs/:id) and returns the two compared jobs', async () => {
+      db.prepare(
+        `INSERT INTO jobs (id, command, started_at, status) VALUES ('cmp-a', 'sr:a', '2025-01-01T10:00:00.000Z', 'completed')`
+      ).run()
+      db.prepare(
+        `INSERT INTO jobs (id, command, started_at, status) VALUES ('cmp-b', 'sr:b', '2025-01-02T10:00:00.000Z', 'completed')`
+      ).run()
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/jobs/compare?jobIds=cmp-a,cmp-b')
+      expect(res.status).toBe(200)
+      expect(Array.isArray(res.body.jobs)).toBe(true)
+      expect(res.body.jobs.map((j: any) => j.id).sort()).toEqual(['cmp-a', 'cmp-b'])
+    })
+
+    it('returns 400 when jobIds is missing', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/jobs/compare')
+      expect(res.status).toBe(400)
+    })
+
+    it('returns 400 when not exactly 2 jobIds', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/jobs/compare?jobIds=only-one')
+      expect(res.status).toBe(400)
+    })
+
+    it('returns 404 when a compared job does not exist', async () => {
+      db.prepare(
+        `INSERT INTO jobs (id, command, started_at, status) VALUES ('cmp-exists', 'sr:a', '2025-01-01T10:00:00.000Z', 'completed')`
+      ).run()
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/jobs/compare?jobIds=cmp-exists,cmp-missing')
+      expect(res.status).toBe(404)
+      expect(res.body.error).toContain('cmp-missing')
+    })
+  })
 
   // ─── Analytics export ────────────────────────────────────────────────────
 
@@ -2074,6 +2116,51 @@ describe('project-router', () => {
       const row = db.prepare('SELECT context_scope FROM chat_conversations WHERE id = ?')
         .get(res.body.conversation.id) as { context_scope: string }
       expect(JSON.parse(row.context_scope).openspec).toBe(true)
+    })
+
+    it('strips contractRefine from contextScope when project provider is codex', async () => {
+      // Codex does not support SMASH / Contract Layer. Even when the client sends
+      // contractRefine: true, the server must store false (defence-in-depth).
+      const codexCtx = makeContext(db, {
+        project: {
+          id: 'proj-1', slug: 'proj', name: 'Test Project', path: '/tmp',
+          db_path: ':memory:', added_at: '', last_seen_at: '',
+          provider: 'codex',
+        },
+      })
+      const { app } = createApp(new Map([['proj-1', codexCtx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/chat/conversations')
+        .send({
+          model: 'gpt-5.4-mini',
+          kind: 'explore',
+          contextScope: { specrails: true, openspec: true, full: true, mcp: false, contractRefine: true },
+        })
+      expect(res.status).toBe(201)
+      const row = db.prepare('SELECT context_scope FROM chat_conversations WHERE id = ?')
+        .get(res.body.conversation.id) as { context_scope: string }
+      const parsed = JSON.parse(row.context_scope)
+      expect(parsed.contractRefine).toBe(false)
+      // Other scope fields must be preserved
+      expect(parsed.specrails).toBe(true)
+      expect(parsed.openspec).toBe(true)
+      expect(parsed.full).toBe(true)
+    })
+
+    it('preserves contractRefine when project provider is claude', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/chat/conversations')
+        .send({
+          model: 'sonnet',
+          kind: 'explore',
+          contextScope: { specrails: true, openspec: true, full: true, mcp: false, contractRefine: true },
+        })
+      expect(res.status).toBe(201)
+      const row = db.prepare('SELECT context_scope FROM chat_conversations WHERE id = ?')
+        .get(res.body.conversation.id) as { context_scope: string }
+      expect(JSON.parse(row.context_scope).contractRefine).toBe(true)
     })
   })
 
@@ -3040,8 +3127,8 @@ describe('project-router', () => {
       const res = await request(app).get('/api/projects/proj-1/default-spec-model')
       expect(res.status).toBe(200)
       expect(res.body.provider).toBe('codex')
-      expect(res.body.model).toBe('gpt-5.4-mini')
-      expect(res.body.allowed.map((m: { value: string }) => m.value)).toEqual(['gpt-5.4-mini', 'gpt-5.4', 'gpt-5.3-codex'])
+      expect(res.body.model).toBe('gpt-5.5')
+      expect(res.body.allowed.map((m: { value: string }) => m.value)).toEqual(['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex'])
     })
 
     it('honors install-config defaults.model when valid', async () => {

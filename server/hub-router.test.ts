@@ -421,6 +421,19 @@ describe('hub-router', () => {
       expect(res.status).toBe(200)
       expect(res.body.ok).toBe(true)
     })
+
+    it('rejects a non-numeric port with 400 and does not persist garbage', async () => {
+      const { app } = createApp()
+      const res = await request(app).put('/api/hub/settings').send({ port: 'abc' })
+      expect(res.status).toBe(400)
+      expect(getHubSetting(hubDb, 'port')).toBeUndefined()
+    })
+
+    it('rejects an out-of-range port with 400', async () => {
+      const { app } = createApp()
+      const res = await request(app).put('/api/hub/settings').send({ port: 70000 })
+      expect(res.status).toBe(400)
+    })
   })
 
   // ─── GET /recent-jobs ───────────────────────────────────────────────────────

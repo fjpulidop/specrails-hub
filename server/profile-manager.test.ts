@@ -87,10 +87,10 @@ describe('validateProfile', () => {
     expect(() => validateProfile(p)).not.toThrow()
   })
 
-  it('rejects any profile missing sr-merge-resolver from baseline', () => {
+  it('accepts a profile that omits sr-merge-resolver (now optional)', () => {
     const p = baseProfile('custom-x')
     p.agents = p.agents.filter((a) => a.id !== 'sr-merge-resolver')
-    expect(() => validateProfile(p)).toThrow(ProfileValidationError)
+    expect(() => validateProfile(p)).not.toThrow()
   })
 
   it('rejects custom profiles that drop any baseline agent', () => {
@@ -234,6 +234,40 @@ describe('CRUD', () => {
     renameProfile(projectRoot, 'data-heavy', 'custom-data')
     expect(() => getProfile(projectRoot, 'data-heavy')).toThrow(ProfileNotFoundError)
     expect(getProfile(projectRoot, 'custom-data').name).toBe('custom-data')
+  })
+
+  it('rename publishes atomically and leaves no temp file behind', () => {
+    createProfile(projectRoot, baseProfile('data-heavy'))
+    renameProfile(projectRoot, 'data-heavy', 'custom-data')
+    const dir = path.join(projectRoot, '.specrails/profiles')
+    const files = fs.readdirSync(dir)
+    expect(files).toContain('custom-data.json')
+    expect(files).not.toContain('data-heavy.json')
+    expect(files.some((f) => f.includes('.tmp-'))).toBe(false)
+  })
+
+  it('threads expectedProvider through create/get for codex profiles', () => {
+    const codex: Profile = {
+      schemaVersion: 1,
+      name: 'codex-default',
+      description: 'c',
+      provider: 'codex',
+      orchestrator: { model: 'gpt-5.4-mini' },
+      agents: [
+        { id: 'sr-architect', required: true },
+        { id: 'sr-developer', required: true },
+        { id: 'sr-reviewer', required: true },
+      ],
+      routing: [{ default: true, agent: 'sr-developer' }],
+    }
+    createProfile(projectRoot, codex, 'codex')
+    expect(getProfile(projectRoot, 'codex-default', 'codex').orchestrator.model).toBe('gpt-5.4-mini')
+  })
+
+  it('rejects a claude-model profile when expectedProvider is codex (the silent-legacy-fallback root cause)', () => {
+    const p = baseProfile('codex-bad') // model 'sonnet' is a claude alias
+    delete p.provider
+    expect(() => createProfile(projectRoot, p, 'codex')).toThrow(ProfileValidationError)
   })
 
   it('rejects invalid profile names', () => {

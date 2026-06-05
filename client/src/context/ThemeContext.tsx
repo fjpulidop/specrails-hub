@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef, type ReactNode } from 'react'
 import {
   THEMES,
   DEFAULT_THEME,
@@ -129,12 +129,12 @@ export function ThemeProvider({ children, endpoint = '/api/hub/theme' }: ThemePr
     }
   }, [themeId, endpoint])
 
-  const value: ThemeContextValue = {
-    theme: THEMES[themeId],
-    themeId,
-    setTheme,
-    isUpdating,
-  }
+  // Memoise so the many useActiveTheme/useTheme consumers (charts, xterm, code
+  // explorer, …) only re-render on an actual theme/isUpdating change.
+  const value = useMemo<ThemeContextValue>(
+    () => ({ theme: THEMES[themeId], themeId, setTheme, isUpdating }),
+    [themeId, setTheme, isUpdating],
+  )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }

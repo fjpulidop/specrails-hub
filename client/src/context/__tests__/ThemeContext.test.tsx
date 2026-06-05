@@ -52,10 +52,10 @@ describe('ThemeContext', () => {
     expect(screen.getByTestId('current').textContent).toBe('obsidian-dark')
   })
 
-  it('falls back to dracula when both attribute and storage are absent', () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(okJson({ theme: 'dracula' }))
+  it('falls back to specrails (DEFAULT_THEME) when both attribute and storage are absent', () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(okJson({ theme: 'specrails' }))
     render(<ThemeProvider><Probe /></ThemeProvider>)
-    expect(screen.getByTestId('current').textContent).toBe('dracula')
+    expect(screen.getByTestId('current').textContent).toBe('specrails')
   })
 
   it('reconciles to server value when it differs from boot', async () => {

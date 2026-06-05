@@ -57,6 +57,7 @@ const MODEL_PRICE_PER_1K_INPUT_TOKENS: Record<string, number> = {
   sonnet: 0.003,
   opus: 0.015,
   haiku: 0.0008,
+  'gpt-5.5': 0.0015,
   'gpt-5.4-mini': 0.0006,
   'gpt-5.4': 0.005,
 }

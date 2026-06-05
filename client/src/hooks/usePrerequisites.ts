@@ -20,6 +20,10 @@ export interface SetupPrerequisite {
   meetsMinimum: boolean
   installUrl: string
   installHint: string
+  /** True when this tool is provided by the bundled runtime (desktop mode only). */
+  bundled?: true
+  /** Desktop mode: 'corrupted-bundle' when the bundled binary fails --version probe. */
+  error?: 'corrupted-bundle'
 }
 
 export interface SetupPrerequisitesStatus {

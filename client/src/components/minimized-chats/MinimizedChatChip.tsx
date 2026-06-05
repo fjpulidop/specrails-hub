@@ -13,9 +13,9 @@ function trimLabel(label: string): string {
   return flat.slice(0, MAX_LABEL_CHARS - 1).trimEnd() + '…'
 }
 
-/** Visual chip rendered inside a sonner `toast.custom(...)` slot so the
- *  minimized chats stack alongside the project's existing Quick-mode spec
- *  generation toasts (matching glass-card chrome). */
+/** Visual chip rendered by `MinimizedChatsDock` (a dedicated bottom-left dock,
+ *  NOT a sonner toast). The dock supplies the glass-card chrome; this component
+ *  owns the icon / label / restore / close layout. */
 export function MinimizedChatChip({
   chat,
   projectName,

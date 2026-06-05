@@ -12,14 +12,15 @@ export const CLAUDE_MODELS: SpecModelOption[] = [
 ]
 
 export const CODEX_MODELS: SpecModelOption[] = [
-  { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
+  { value: 'gpt-5.5', label: 'GPT-5.5' },
   { value: 'gpt-5.4', label: 'GPT-5.4' },
+  { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
   { value: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
 ]
 
 export const PROVIDER_DEFAULT_MODEL: Record<SpecProvider, string> = {
   claude: 'sonnet',
-  codex: 'gpt-5.4-mini',
+  codex: 'gpt-5.5',
 }
 
 export function getModelsForProvider(provider: SpecProvider): SpecModelOption[] {

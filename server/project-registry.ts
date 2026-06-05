@@ -11,7 +11,6 @@ import { AgentRefineManager } from './agent-refine-manager'
 import { FileSummaryManager } from './file-summary-manager'
 import { createFileSummaryGenerator } from './file-summary-generator'
 import { getAdapter } from './providers'
-import { isCodeExplorerEnabled } from './feature-flags'
 import { pruneStaleRefineSessions } from './agent-refine-db'
 import { SpecLauncherManager } from './spec-launcher-manager'
 import { WebhookManager } from './webhook-manager'
@@ -97,6 +96,16 @@ export class ProjectRegistry {
   removeProject(id: string): void {
     const ctx = this._contexts.get(id)
     if (ctx) {
+      // Tear down spawners BEFORE closing the DB. QueueManager.shutdown() drops
+      // its DB handle so a late child 'close' can't run prepared statements on
+      // the closed connection (which would crash the hub) and terminates any
+      // orphaned rail child + dangling zombie timer. ChatManager.shutdown()
+      // kills in-flight chat/Explore children and clears their idle timers.
+      // SetupManager.abort() stops the 3s install poll and kills install/enrich
+      // children. All are idempotent no-ops when nothing is running.
+      try { ctx.queueManager.shutdown() } catch { /* ignore */ }
+      try { ctx.chatManager.shutdown() } catch { /* ignore */ }
+      try { ctx.setupManager.abort(id) } catch { /* ignore */ }
       // Kill any terminal sessions belonging to this project
       try { getTerminalManager().killAllForProject(id) } catch { /* ignore */ }
       // Close the ticket file watcher
@@ -131,6 +140,24 @@ export class ProjectRegistry {
 
   listContexts(): ProjectContext[] {
     return Array.from(this._contexts.values())
+  }
+
+  /**
+   * Graceful process-level teardown: terminate every project's active rail and
+   * chat children so SIGTERM/SIGINT (or desktop parent-death) does not leave
+   * orphaned claude/codex processes reparented to init. Best-effort per project
+   * — one failure never blocks the rest. Does NOT close DBs (the process is
+   * exiting anyway).
+   */
+  shutdown(): void {
+    for (const ctx of this._contexts.values()) {
+      try { ctx.queueManager.shutdown() } catch { /* ignore */ }
+      try { ctx.chatManager.shutdown() } catch { /* ignore */ }
+      // Release chokidar watchers (fsevents/inotify handles) so a restart does
+      // not leak them — removeProject() does this per-project; mirror it here.
+      try { ctx.fileSummaryManager.detachWatcher(ctx.project.id) } catch { /* ignore */ }
+      ctx.ticketWatcher.close().catch(() => { /* ignore */ })
+    }
   }
 
   touchProject(id: string): void {
@@ -327,11 +354,13 @@ export class ProjectRegistry {
         return raw === 'es' ? 'es' : 'en'
       },
     })
-    if (isCodeExplorerEnabled()) {
-      try { fileSummaryManager.attachWatcher(project.id, project.path) } catch (err) {
-        console.warn(`[project-registry] fileSummaryManager.attachWatcher failed: ${(err as Error).message}`)
-      }
-    }
+    // NOTE: the chokidar watcher is NOT attached here. It is only needed to mark
+    // already-generated summaries stale, which is irrelevant until the user opens
+    // the Code section. Attaching at startup for every project — even ones that
+    // never use Code Explorer (the client flag is OFF by default) — added a
+    // persistent recursive watcher per project, the source of the fd leak that
+    // broke terminals. The watcher is now attached lazily on the first
+    // code-explorer request (see code-explorer-router.ts).
 
     // Load commands for this project
     try {

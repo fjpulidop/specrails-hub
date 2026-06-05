@@ -12,6 +12,7 @@ import { SpecModelPicker, useDefaultSpecModel } from './explore-spec/SpecModelPi
 import type { LocalTicket } from '../types'
 import { ContextScopeChecks } from './ContextScopeChecks'
 import { ContextScopeSlider } from './ContextScopeSlider'
+import { isSmashCapable } from '../lib/provider-capabilities'
 import { useContextScope } from '../hooks/useContextScope'
 import { useContextBudget } from '../hooks/useContextBudget'
 import { useQuickContractRefineLast } from '../hooks/useQuickContractRefineLast'
@@ -66,12 +67,13 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
   // Model picker — fetched on each open. Locked for the whole flow once the
   // user submits; no downstream surface changes it. See spec
   // `add-spec-model-selection`.
-  const { model, setModel, allowed, loading: modelLoading } = useDefaultSpecModel(activeProjectId, open)
+  const { model, setModel, allowed, loading: modelLoading, provider } = useDefaultSpecModel(activeProjectId, open)
 
   const { scope, setScope, persist: persistScope } = useContextScope(activeProjectId, mode, open)
   const quickRefine = useQuickContractRefineLast(activeProjectId, open)
   const { data: budget, isError: budgetError } = useContextBudget(activeProjectId, open)
   const tier = useMemo(() => tierFromScope(scope), [scope])
+  const smashCapable = isSmashCapable(provider)
 
   useEffect(() => {
     if (mode !== 'quick' || !quickRefine.loaded || scopeTouchedRef.current) return
@@ -237,6 +239,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                 budgetError={budgetError}
                 model={model ?? 'sonnet'}
                 maxPresetId={mode === 'quick' ? 'max' : 'hub'}
+                smashCapable={smashCapable}
               />
               <ContextScopeChecks scope={scope} mode={mode} onChange={handleScopeChange} label="Fine-tune" showSummary={false} />
             </div>

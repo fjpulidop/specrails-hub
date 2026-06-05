@@ -1,6 +1,6 @@
 # SpecRails Hub — fish shell-integration shim
-# Loaded via XDG_CONFIG_HOME pointing at our shim dir; fish picks up
-# conf.d/specrails-shim.fish after the user's own config.fish has run.
+# Sourced via `fish -C "source <this-file>"`, which runs after the user's
+# config.fish / conf.d, so the user's real fish config is preserved.
 
 set -gx SPECRAILS_SHELL_INTEGRATION_LOADED 1
 

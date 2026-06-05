@@ -1,4 +1,5 @@
 import { createInterface } from 'readline'
+import treeKill from 'tree-kill'
 import { spawnAiCli } from './util/cli-prompt'
 import { finaliseInvocationResult } from './result-event'
 import type { ProviderAdapter, AdapterEvent } from './providers/types'
@@ -83,10 +84,24 @@ export function createFileSummaryGenerator(opts: GeneratorOpts): (input: Generat
       let stderrBuf = ''
       let settled = false
 
+      let killGrace: ReturnType<typeof setTimeout> | null = null
       const timer = setTimeout(() => {
         if (settled) return
         settled = true
-        try { child.kill('SIGTERM') } catch { /* best effort */ }
+        // treeKill (not child.kill) so the whole process tree dies — on Windows
+        // the CLI is wrapped in cmd.exe; on POSIX the CLI may have grandchildren.
+        // Escalate to SIGKILL if SIGTERM is ignored (node CLIs mid-network-call),
+        // so a hung child is not orphaned. The grace timer is cleared on close.
+        const pid = child.pid
+        if (pid) {
+          try { treeKill(pid, 'SIGTERM') } catch { /* best effort */ }
+          killGrace = setTimeout(() => {
+            try { treeKill(pid, 'SIGKILL', () => { /* ignore */ }) } catch { /* best effort */ }
+          }, 2000)
+          if (typeof killGrace.unref === 'function') killGrace.unref()
+        } else {
+          try { child.kill('SIGTERM') } catch { /* best effort */ }
+        }
         reject(new Error(`file-summary generator timeout after ${timeoutMs}ms`))
       }, timeoutMs)
 
@@ -112,16 +127,20 @@ export function createFileSummaryGenerator(opts: GeneratorOpts): (input: Generat
       })
 
       child.on('error', (err) => {
+        clearTimeout(timer)
+        if (killGrace) { clearTimeout(killGrace); killGrace = null }
         if (settled) return
         settled = true
-        clearTimeout(timer)
         reject(err)
       })
 
       child.on('close', (code) => {
+        clearTimeout(timer)
+        // A child that exits after a timeout-triggered SIGTERM clears the
+        // escalation so no stray SIGKILL lands on a recycled pid.
+        if (killGrace) { clearTimeout(killGrace); killGrace = null }
         if (settled) return
         settled = true
-        clearTimeout(timer)
         if (code !== 0) {
           const tail = stderrBuf.slice(-500)
           reject(new Error(`${adapter.binary} exit code=${code}; ${tail ? `stderr=${tail}` : 'no stderr'}`))

@@ -102,6 +102,13 @@ export interface EditTicketSeed {
   labels: string[]
   priority: 'low' | 'medium' | 'high' | 'critical' | null
   acceptanceCriteria: string[]
+  /** Current ticket status. When `'draft'`, the primary commit PUBLISHES the
+   *  draft — it flips the ticket to a real spec (`status='todo'`) via
+   *  `from-draft` instead of PATCHing in place — and the button reads
+   *  "Create Spec". For any other status (todo/backlog) the commit PATCHes the
+   *  ticket and the button reads "Update Spec". Optional for backward-compat:
+   *  absent ⇒ treated as a real-spec edit (PATCH). */
+  status?: LocalTicket['status']
 }
 
 export function ExploreSpecShell({
@@ -145,6 +152,13 @@ export function ExploreSpecShell({
   // Tracks whether the current edit-mode shell session has already sent its
   // first wrapped turn. Resets on remount (each Continue Editing click).
   const editFirstSendRef = useRef(false)
+  // True only when editing a ticket that is ALREADY a real spec (todo/backlog).
+  // A draft opened via Continue Editing has `editTicket.status === 'draft'`, so
+  // it is NOT a "real spec edit": its primary commit PUBLISHES (flips draft →
+  // todo) rather than PATCHing in place, and the button reads "Create Spec".
+  // editTicket without a status (legacy callers / tests) ⇒ real-spec edit, so
+  // the prior PATCH behaviour is preserved unchanged.
+  const isRealSpecEdit = !!editTicket && editTicket.status !== 'draft'
   const composerRef = useRef<RichAttachmentEditorHandle | null>(null)
   const conversationScrollRef = useRef<HTMLDivElement | null>(null)
   const conversationBottomRef = useRef<HTMLDivElement | null>(null)
@@ -480,9 +494,10 @@ export function ExploreSpecShell({
     // Quick-mode flow's behaviour (handled by useSpecGenTracker).
     markSpecGenInFlight(activeProjectId)
     try {
-      if (editTicket) {
-        // Edit-existing-ticket path: PATCH the ticket in place. Status is NOT
-        // included (user editing text must never accidentally flip status).
+      if (isRealSpecEdit && editTicket) {
+        // Edit-an-already-real-spec path: PATCH the ticket in place. Status is
+        // NOT included (editing a live spec's text must never accidentally flip
+        // its status). Drafts do NOT take this branch — they publish below.
         // See design.md D4+D5.
         const res = await fetch(`${getApiBase()}/tickets/${editTicket.id}`, {
           method: 'PATCH',
@@ -522,6 +537,11 @@ export function ExploreSpecShell({
           // Lets the server back-fill ticket_id on prior ai_invocations rows
           // for this conversation, attributing all Explore turns to this ticket.
           conversationId,
+          // Publishing a draft opened via Continue Editing: flip THAT specific
+          // draft in place to a real spec (status='todo') rather than relying
+          // on the conversation-id lookup. editTicket is only set here when it
+          // is a draft — real-spec edits took the PATCH branch above.
+          ...(editTicket ? { draftTicketId: editTicket.id } : {}),
         }),
       })
       if (!res.ok) {
@@ -539,7 +559,7 @@ export function ExploreSpecShell({
       setIsCreating(false)
       unmarkSpecGenInFlight(activeProjectId)
     }
-  }, [isCreating, draft, activeProjectId, onTicketCreated, onClose, pendingSpecId, editTicket, conversationId])
+  }, [isCreating, draft, activeProjectId, onTicketCreated, onClose, pendingSpecId, editTicket, isRealSpecEdit, conversationId])
 
   // Esc -> request close. (⌘⏎ is handled inside RichAttachmentEditor.)
   useEffect(() => {
@@ -653,7 +673,7 @@ export function ExploreSpecShell({
             onClick={handleCreate}
             disabled={!draft.title.trim() || isCreating}
             className="gap-1.5"
-            aria-label={editTicket ? 'Update spec with current draft' : 'Create spec from current draft'}
+            aria-label={isRealSpecEdit ? 'Update spec with current draft' : 'Create spec from current draft'}
             data-testid="explore-spec-create"
             title={!draft.title.trim() ? 'A title is needed to commit' : undefined}
           >
@@ -664,7 +684,7 @@ export function ExploreSpecShell({
             ) : (
               <Check className="w-3.5 h-3.5" />
             )}
-            {editTicket ? 'Update Spec' : 'Create Spec'}
+            {isRealSpecEdit ? 'Update Spec' : 'Create Spec'}
           </Button>
           {onMinimize && (
             <Button
@@ -878,7 +898,7 @@ export function ExploreSpecShell({
             priority: draft.priority ?? null,
             acceptanceCriteria: draft.acceptanceCriteria ?? [],
           } satisfies ReviewProposed}
-          mode={editTicket ? 'edit' : 'create'}
+          mode={isRealSpecEdit ? 'edit' : 'create'}
           isCommitting={isCreating}
           onBack={() => setReviewOpen(false)}
           onCommit={async () => {

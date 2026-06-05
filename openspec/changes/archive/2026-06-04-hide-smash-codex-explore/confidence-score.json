@@ -1,0 +1,22 @@
+{
+  "schema_version": "1",
+  "change": "hide-smash-codex-explore",
+  "agent": "reviewer",
+  "scored_at": "2026-06-05T00:15:00Z",
+  "overall": 95,
+  "aspects": {
+    "type_correctness": 97,
+    "pattern_adherence": 95,
+    "test_coverage": 95,
+    "security": 95,
+    "architectural_alignment": 95
+  },
+  "notes": {
+    "type_correctness": "isSmashCapable accepts string | null | undefined matching the optional provider from useDefaultSpecModel. smashCapable prop has correct optional boolean with default=true maintaining backward compat.",
+    "pattern_adherence": "Pure utility in lib/, prop threading via component props, server-side defence-in-depth — all match existing patterns in the codebase.",
+    "test_coverage": "All five branches of isSmashCapable tested. ContextScopeSlider tests cover smashCapable=false with contractRefine=true, and the backward-compat default. ProposeSpecModal tests cover codex provider hiding at Max and Hub presets. Server test covers codex stripping and claude preservation.",
+    "security": "Server strips contractRefine:true from non-claude providers unconditionally, preventing any client-side bypass from triggering Contract Layer spawns against Codex projects.",
+    "architectural_alignment": "Capability guard lives in lib/ (pure, no React), threaded via props to ContextScopeSlider, wired at ProposeSpecModal (the single decision boundary). Server defence-in-depth at POST /chat/conversations matches the existing normalizeContextScope pattern."
+  },
+  "flags": []
+}

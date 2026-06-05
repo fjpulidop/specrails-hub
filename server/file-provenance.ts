@@ -25,12 +25,29 @@ export interface ProvenanceRow {
 
 const MAX_PATCH_BYTES = 512 * 1024
 
+// These git calls run synchronously on the main event loop (pre-spawn snapshot
+// and post-exit diff). Bound every one: a timeout so a stuck index.lock /
+// filesystem stall / credential prompt can't freeze the whole hub, a maxBuffer
+// cap, and an env that disables any interactive prompt. The existing try/catch
+// in each function degrades a timeout to empty provenance. Mirrors metrics.ts.
+const GIT_TIMEOUT_MS = 15_000
+const GIT_MAX_BUFFER = 16 * 1024 * 1024
+const GIT_EXEC_ENV = {
+  ...process.env,
+  GIT_TERMINAL_PROMPT: '0',
+  GIT_ASKPASS: 'echo',
+  GCM_INTERACTIVE: 'never',
+}
+
 export function snapshotWorkingTree(cwd: string): string {
   try {
     const out = execSync('git stash create --include-untracked', {
       cwd,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: GIT_TIMEOUT_MS,
+      maxBuffer: GIT_MAX_BUFFER,
+      env: GIT_EXEC_ENV,
     })
     return out.trim()
   } catch (err) {
@@ -51,6 +68,9 @@ export function diffAgainstSnapshot(cwd: string, snapshotRef: string): DiffEntry
       cwd,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: GIT_TIMEOUT_MS,
+      maxBuffer: GIT_MAX_BUFFER,
+      env: GIT_EXEC_ENV,
     })
   } catch {
     out = ''
@@ -99,6 +119,9 @@ export function diffAgainstSnapshot(cwd: string, snapshotRef: string): DiffEntry
         cwd,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: GIT_TIMEOUT_MS,
+        maxBuffer: GIT_MAX_BUFFER,
+        env: GIT_EXEC_ENV,
       })
     } catch {
       others = ''
@@ -169,6 +192,8 @@ export function collectDiffPatches(cwd: string, snapshotRef: string, diff: DiffE
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
         maxBuffer: MAX_PATCH_BYTES + 64 * 1024,
+        timeout: GIT_TIMEOUT_MS,
+        env: GIT_EXEC_ENV,
       })
     } catch (err) {
       patch = ((err as { stdout?: string }).stdout ?? '').toString()

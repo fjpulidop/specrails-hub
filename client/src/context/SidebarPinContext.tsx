@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 
 export type SidebarMode = 'pinned-open' | 'pinned-collapsed' | 'unpinned'
@@ -75,10 +75,16 @@ export function SidebarPinProvider({ children }: { children: ReactNode }) {
   const cycleLeftMode = useCallback(() => setLeftModeState((m) => nextMode(m)), [])
   const cycleRightMode = useCallback(() => setRightModeState((m) => nextMode(m)), [])
 
+  // Memoise so consumers don't re-render unless leftMode/rightMode actually change
+  // (the setters are stable). An inline object would re-render every consumer on
+  // every parent render.
+  const value = useMemo(
+    () => ({ leftMode, rightMode, setLeftMode, setRightMode, cycleLeftMode, cycleRightMode }),
+    [leftMode, rightMode, setLeftMode, setRightMode, cycleLeftMode, cycleRightMode],
+  )
+
   return (
-    <SidebarPinContext.Provider
-      value={{ leftMode, rightMode, setLeftMode, setRightMode, cycleLeftMode, cycleRightMode }}
-    >
+    <SidebarPinContext.Provider value={value}>
       {children}
     </SidebarPinContext.Provider>
   )

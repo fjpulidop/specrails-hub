@@ -353,7 +353,16 @@ export class PluginManager {
       const mcpFile = mcpJsonPath(projectPath)
       if (fs.existsSync(mcpFile)) {
         const raw = fs.readFileSync(mcpFile, 'utf8')
-        const parsed = raw.trim() ? (JSON.parse(raw) as Record<string, unknown>) : {}
+        let parsed: Record<string, unknown>
+        try {
+          parsed = raw.trim() ? (JSON.parse(raw) as Record<string, unknown>) : {}
+        } catch {
+          // A hand-edited / broken `.mcp.json` should yield an actionable 409,
+          // not an opaque 500 with a raw "Unexpected token" SyntaxError.
+          throw new PluginInstallError(
+            `cannot install '${name}': '${mcpJsonPath(projectPath)}' is not valid JSON; fix it first.`,
+          )
+        }
         const servers = (parsed.mcpServers as Record<string, unknown> | undefined) ?? {}
         for (const key of plugin.manifest.owns.mcpServers ?? []) {
           if (key in servers) {
@@ -371,6 +380,11 @@ export class PluginManager {
       mcpJsonPath(projectPath),
       stateFilePath(projectPath),
       ...(plugin.manifest.owns.agentFragments ?? []).map((f) => path.join(projectPath, f)),
+      // Include the shared instructions file (CLAUDE.md / AGENTS.md) so a failed
+      // install rolls it back too — otherwise an applyContributors write that
+      // survives a later failure leaves an orphaned managed block with no state
+      // entry, which uninstall can never remove (breaks byte-identical restore).
+      ...contributorPaths(plugin, providerId).map((rel) => path.join(projectPath, rel)),
     ]
     const preState = new Map<string, Buffer | null>()
     for (const p of targetPaths) {
@@ -439,7 +453,9 @@ export class PluginManager {
           if (bytes === null) {
             if (fs.existsSync(p)) fs.unlinkSync(p)
           } else {
-            atomicWriteFileSync(p, bytes.toString('utf8'))
+            // Write the raw Buffer (not .toString('utf8')) so a snapshot with
+            // non-UTF8 bytes restores byte-for-byte.
+            atomicWriteFileSync(p, bytes)
           }
         } catch {
           // Best-effort rollback; any failure here will surface via verify on
@@ -671,10 +687,11 @@ export class PluginManager {
     if (!entry) return
     const newHealth: PluginStateEntry['health'] = result.ok ? 'ok' : 'degraded'
     const changed = entry.health !== newHealth || entry.healthReason !== result.reason
+    if (!changed) return // nothing to persist — avoids per-spawn write churn (verify runs on every rail spawn)
     entry.health = newHealth
     entry.healthReason = result.reason
     await this._writeProjectState(projectPath, state)
-    if (changed && broadcast) {
+    if (broadcast) {
       const msg: PluginHealthChangedMessage = {
         type: 'plugin.health_changed',
         projectId,

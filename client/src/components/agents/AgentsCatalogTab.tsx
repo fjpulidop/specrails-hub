@@ -25,7 +25,7 @@ type StudioMode =
 
 type RefineMode =
   | { kind: 'closed' }
-  | { kind: 'open'; agentId: string; baseBody: string; resumeRefineId?: string }
+  | { kind: 'open'; projectId: string; agentId: string; baseBody: string; resumeRefineId?: string }
 
 export function AgentsCatalogTab() {
   const [agents, setAgents] = useState<CatalogAgent[]>([])
@@ -57,10 +57,10 @@ export function AgentsCatalogTab() {
 
   const parkCurrentRefine = useCallback(() => {
     const cur = refineRef.current
-    if (cur.kind !== 'open' || !activeProjectId) return
+    if (cur.kind !== 'open' || !cur.projectId) return
     minimize({
       kind: 'ai-edit',
-      projectId: activeProjectId,
+      projectId: cur.projectId,
       label: `AI Edit · ${cur.agentId}`,
       restoreRoute: '/agents',
       params: {
@@ -69,7 +69,7 @@ export function AgentsCatalogTab() {
         resumeRefineId: liveRefineRef.current.refineId ?? cur.resumeRefineId,
       },
     })
-  }, [activeProjectId, minimize])
+  }, [minimize])
 
   // Restore from a chip click → re-open the AI Refine overlay with the
   // previously parked refine session id. If a different refine is currently
@@ -80,6 +80,7 @@ export function AgentsCatalogTab() {
     liveRefineRef.current = { refineId: chat.params.resumeRefineId ?? null }
     setRefine({
       kind: 'open',
+      projectId: chat.projectId,
       agentId: chat.params.agentId,
       baseBody: chat.params.baseBody,
       resumeRefineId: chat.params.resumeRefineId,
@@ -174,9 +175,10 @@ export function AgentsCatalogTab() {
         }}
         onResumeRefine={(refineId, agentId, baseBody) => {
           setStudio({ kind: 'closed' })
+          if (!activeProjectId) return
           parkCurrentRefine()
           liveRefineRef.current = { refineId }
-          setRefine({ kind: 'open', agentId, baseBody, resumeRefineId: refineId })
+          setRefine({ kind: 'open', projectId: activeProjectId, agentId, baseBody, resumeRefineId: refineId })
         }}
       />
     )
@@ -195,7 +197,8 @@ export function AgentsCatalogTab() {
         onStateChange={(s) => { liveRefineRef.current = s }}
         onClose={() => setRefine({ kind: 'closed' })}
         onMinimize={(refineId) => {
-          if (!activeProjectId) {
+          const projectId = refine.kind === 'open' ? refine.projectId : activeProjectId
+          if (!projectId) {
             setRefine({ kind: 'closed' })
             return
           }
@@ -203,7 +206,7 @@ export function AgentsCatalogTab() {
           const baseBody = refine.kind === 'open' ? refine.baseBody : ''
           minimize({
             kind: 'ai-edit',
-            projectId: activeProjectId,
+            projectId,
             label: `AI Edit · ${agentId}`,
             restoreRoute: '/agents',
             params: {
@@ -692,6 +695,7 @@ export function AgentsCatalogTab() {
                     <Button
                       size="sm"
                       onClick={async () => {
+                        if (!activeProjectId) return
                         // Load fresh body from disk so the diff is accurate.
                         try {
                           const r = await fetch(`${getApiBase()}/profiles/catalog/${encodeURIComponent(selected.id)}`)
@@ -700,7 +704,7 @@ export function AgentsCatalogTab() {
                           // Mutual exclusion — opening a new AiEdit parks any current one.
                           parkCurrentRefine()
                           liveRefineRef.current = { refineId: null }
-                          setRefine({ kind: 'open', agentId: selected.id, baseBody: data.body })
+                          setRefine({ kind: 'open', projectId: activeProjectId, agentId: selected.id, baseBody: data.body })
                         } catch (e) {
                           setError((e as Error).message)
                         }

@@ -235,9 +235,21 @@ export function readStore(filePath: string): TicketStore {
       return emptyStore()
     }
     // Normalise per-ticket fields added in schema 1.1 without rewriting the
-    // file — version bump only happens on next write via writeStore.
+    // file — version bump only happens on next write via writeStore. Guard each
+    // entry so a single corrupt/non-object value (hand-edit, partial-write
+    // recovery, schema drift) drops only that ticket instead of discarding the
+    // ENTIRE store (which the next mutation would then persist permanently).
     for (const id of Object.keys(data.tickets)) {
-      data.tickets[id] = normalizeTicket(data.tickets[id])
+      const entry = data.tickets[id]
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        delete data.tickets[id]
+        continue
+      }
+      try {
+        data.tickets[id] = normalizeTicket(entry)
+      } catch {
+        delete data.tickets[id]
+      }
     }
     return data
   } catch {

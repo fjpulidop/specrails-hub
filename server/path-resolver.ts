@@ -1,9 +1,10 @@
 import { spawn } from 'child_process'
+import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import type { ChildProcess } from 'child_process'
 
-export type PathSource = 'inherited' | 'fast-path' | 'login-shell'
+export type PathSource = 'inherited' | 'fast-path' | 'login-shell' | 'bundled'
 export type LoginShellStatus = 'ok' | 'skipped' | 'timeout' | 'error'
 
 interface PathDiagnostic {
@@ -23,6 +24,45 @@ let diagnostic: PathDiagnostic = {
 }
 
 let warnedLoginShell = false
+
+/**
+ * True once `resolveStartupPath()` has actually prepended at least one bundled
+ * runtime dir that exists on disk. Gates the login-shell no-op: when a desktop
+ * build ships no runtimes (e.g. Windows ARM64, or a partial CI extraction) the
+ * bundle is NOT active, so we fall back to system discovery + login-shell
+ * augmentation instead of going dark.
+ */
+let bundledRuntimesActive = false
+
+function fileExists(p: string): boolean {
+  try {
+    return fs.existsSync(p)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Resolve the bin directory for each bundled tool family from the actual binary
+ * FILE (not just the directory), returning the dir to prepend or `null`. Keeping
+ * this file-level and symmetric with setup-prerequisites means "bundle active"
+ * means the same thing in both modules.
+ */
+function resolveBundledBinDirs(runtimesPath: string): { nodeBinDir: string | null; gitBinDir: string | null } {
+  const isWin = process.platform === 'win32'
+  const nodeBinDir = isWin
+    ? (fileExists(path.join(runtimesPath, 'node', 'node.exe')) ? path.join(runtimesPath, 'node') : null)
+    : (fileExists(path.join(runtimesPath, 'node', 'bin', 'node')) ? path.join(runtimesPath, 'node', 'bin') : null)
+  let gitBinDir: string | null = null
+  if (isWin) {
+    // PortableGit ships the real binary at git/cmd/git.exe with a redirector at git/bin/git.exe.
+    if (fileExists(path.join(runtimesPath, 'git', 'cmd', 'git.exe'))) gitBinDir = path.join(runtimesPath, 'git', 'cmd')
+    else if (fileExists(path.join(runtimesPath, 'git', 'bin', 'git.exe'))) gitBinDir = path.join(runtimesPath, 'git', 'bin')
+  } else if (fileExists(path.join(runtimesPath, 'git', 'bin', 'git'))) {
+    gitBinDir = path.join(runtimesPath, 'git', 'bin')
+  }
+  return { nodeBinDir, gitBinDir }
+}
 
 function getDelimiter(): string {
   return process.platform === 'win32' ? ';' : ':'
@@ -48,12 +88,63 @@ function fastPathDirectories(): string[] {
 }
 
 /**
+ * Returns the absolute path to the bundled runtimes directory.
+ * Only valid when SPECRAILS_IS_DESKTOP=1 and SPECRAILS_BUNDLED_RUNTIMES_PATH is set.
+ * Throws if the env var is missing.
+ */
+export function resolveBundledRuntimePath(): string {
+  const p = process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH
+  if (!p) {
+    throw new Error(
+      '[path-resolver] resolveBundledRuntimePath() called but SPECRAILS_BUNDLED_RUNTIMES_PATH is not set'
+    )
+  }
+  return p
+}
+
+/**
  * Synchronously prepend well-known package-manager bin directories to
  * `process.env.PATH` if they are missing. No-op on Windows.
  *
  * Records the resulting segments and their sources for diagnostic reporting.
  */
 export function resolveStartupPath(): void {
+  // Desktop mode: bundled runtimes win when present. We existence-gate every
+  // candidate dir so a runtimes-less or partially-extracted build degrades to
+  // normal system PATH discovery instead of prepending dead dirs and disabling
+  // all fallback (which would dead-end Add Project with "corrupted-bundle").
+  if (process.env.SPECRAILS_IS_DESKTOP === '1') {
+    const runtimesPath = process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH
+    if (runtimesPath) {
+      const { nodeBinDir, gitBinDir } = resolveBundledBinDirs(runtimesPath)
+      // Activate the bundle only when BOTH node and git are present. A partial
+      // bundle (one tool present, the other missing — a botched extraction) is
+      // treated as NOT active so the full system fallback (fast-path + login-shell)
+      // runs for every tool. Otherwise the missing tool would fall through to a
+      // system probe against an un-augmented PATH and be wrongly reported missing.
+      if (nodeBinDir && gitBinDir) {
+        const inherited = splitPath(process.env.PATH)
+        const inheritedSet = new Set(inherited)
+        const toAdd = [nodeBinDir, gitBinDir].filter((d) => !inheritedSet.has(d))
+        const merged = [...toAdd, ...inherited]
+        process.env.PATH = joinPath(merged)
+        bundledRuntimesActive = true
+        diagnostic = {
+          pathSegments: merged,
+          pathSources: [
+            ...toAdd.map(() => 'bundled' as PathSource),
+            ...inherited.map(() => 'inherited' as PathSource),
+          ],
+          loginShellStatus: 'skipped',
+        }
+        return
+      }
+      // Bundle absent or incomplete → fall through to system PATH discovery below
+      // so system node/git still resolve (graceful fallback).
+    }
+    // No runtimes path, or no/partial bundle present: fall through (do NOT return).
+  }
+
   const inherited = splitPath(process.env.PATH)
   const inheritedSet = new Set(inherited)
 
@@ -120,6 +211,15 @@ export async function augmentPathFromLoginShell(opts: AugmentOptions = {}): Prom
     return
   }
   if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') {
+    diagnostic.loginShellStatus = 'skipped'
+    return
+  }
+
+  // Desktop mode WITH an active bundle: login-shell augmentation must never run
+  // — it could prepend system node/git dirs ahead of bundled ones. But when the
+  // bundle is absent (runtimes-less build → system fallback), we DO want
+  // login-shell augmentation so nvm/volta/fnm shims are discovered.
+  if (process.env.SPECRAILS_IS_DESKTOP === '1' && bundledRuntimesActive) {
     diagnostic.loginShellStatus = 'skipped'
     return
   }
@@ -224,4 +324,5 @@ export function getPathDiagnostic(): PathDiagnostic {
 export function __resetPathResolverForTest(): void {
   diagnostic = { pathSegments: [], pathSources: [], loginShellStatus: 'skipped' }
   warnedLoginShell = false
+  bundledRuntimesActive = false
 }

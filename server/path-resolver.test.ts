@@ -1,10 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { EventEmitter } from 'events'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
 import {
   resolveStartupPath,
   augmentPathFromLoginShell,
   parseLoginShellOutput,
   getPathDiagnostic,
+  resolveBundledRuntimePath,
   __resetPathResolverForTest,
 } from './path-resolver'
 
@@ -13,6 +17,27 @@ const ORIGINAL_PLATFORM = process.platform
 
 function setPlatform(value: NodeJS.Platform): void {
   Object.defineProperty(process, 'platform', { value })
+}
+
+/** Create a real temp runtimes tree so the existence-gated desktop branch
+ *  prepends them. Returns the base dir plus the node/bin and git/{bin,cmd}
+ *  subdirs (all created on disk). */
+function makeRuntimesDir(): { base: string; nodeBin: string; gitBin: string; gitCmd: string } {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'prq-'))
+  const nodeBin = path.join(base, 'node', 'bin')
+  const gitBin = path.join(base, 'git', 'bin')
+  const gitCmd = path.join(base, 'git', 'cmd')
+  fs.mkdirSync(nodeBin, { recursive: true })
+  fs.mkdirSync(gitBin, { recursive: true })
+  fs.mkdirSync(gitCmd, { recursive: true })
+  // Create the actual binary files — the resolver gates on file existence, not
+  // just the directory. Touch both POSIX and Windows layouts so the helper works
+  // regardless of which platform a test mocks.
+  fs.writeFileSync(path.join(nodeBin, 'node'), '#!/bin/sh\n')
+  fs.writeFileSync(path.join(gitBin, 'git'), '#!/bin/sh\n')
+  fs.writeFileSync(path.join(base, 'node', 'node.exe'), 'x')
+  fs.writeFileSync(path.join(gitCmd, 'git.exe'), 'x')
+  return { base, nodeBin, gitBin, gitCmd }
 }
 
 describe('resolveStartupPath (fast path)', () => {
@@ -140,6 +165,238 @@ describe('augmentPathFromLoginShell', () => {
     await augmentPathFromLoginShell({ spawnFn: spawnFn as any })
     expect(spawnFn).not.toHaveBeenCalled()
     expect(process.env.PATH).toBe(before)
+  })
+})
+
+describe('resolveBundledRuntimePath', () => {
+  afterEach(() => {
+    delete process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH
+  })
+
+  it('returns env var value when set', () => {
+    process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH = '/tmp/runtimes'
+    expect(resolveBundledRuntimePath()).toBe('/tmp/runtimes')
+  })
+
+  it('throws when env var is missing', () => {
+    delete process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH
+    expect(() => resolveBundledRuntimePath()).toThrow('SPECRAILS_BUNDLED_RUNTIMES_PATH is not set')
+  })
+})
+
+describe('resolveStartupPath — desktop mode', () => {
+  const ORIGINAL_PATH = process.env.PATH
+  const ORIGINAL_PLATFORM = process.platform
+  let rt: ReturnType<typeof makeRuntimesDir>
+
+  beforeEach(() => {
+    __resetPathResolverForTest()
+    process.env.SPECRAILS_IS_DESKTOP = '1'
+    rt = makeRuntimesDir()
+    process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH = rt.base
+  })
+
+  afterEach(() => {
+    process.env.PATH = ORIGINAL_PATH
+    delete process.env.SPECRAILS_IS_DESKTOP
+    delete process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH
+    Object.defineProperty(process, 'platform', { value: ORIGINAL_PLATFORM })
+    fs.rmSync(rt.base, { recursive: true, force: true })
+  })
+
+  it('prepends node/bin and git/bin dirs on non-Windows (macOS/Linux)', () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    process.env.PATH = '/usr/bin:/bin'
+    resolveStartupPath()
+    expect(process.env.PATH).toContain(rt.nodeBin)
+    expect(process.env.PATH).toContain(rt.gitBin)
+    expect(process.env.PATH?.startsWith(rt.nodeBin)).toBe(true)
+  })
+
+  it('prepends node/ and git/cmd/ dirs on Windows (mock: platform=win32, path.sep stays /)', () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    // On macOS, path.join always uses '/' even when platform is mocked to win32.
+    // The getDelimiter() check does use the mocked platform so PATH uses ';'.
+    process.env.PATH = '/Windows/System32'
+    resolveStartupPath()
+    // PATH joined by ';' (Windows delimiter) because process.platform is mocked
+    const parts = (process.env.PATH ?? '').split(';')
+    expect(parts.length).toBeGreaterThanOrEqual(3)
+    expect(parts[0]).toContain('node')
+    expect(parts[1]).toContain('git')
+  })
+
+  it('marks prepended dirs as bundled in diagnostic', () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    process.env.PATH = '/usr/bin'
+    resolveStartupPath()
+    const diag = getPathDiagnostic()
+    expect(diag.pathSources[0]).toBe('bundled')
+    expect(diag.pathSources[1]).toBe('bundled')
+    // The inherited /usr/bin entry is after the bundled ones
+    const inheritedIdx = diag.pathSegments.indexOf('/usr/bin')
+    expect(inheritedIdx).toBeGreaterThan(0)
+    expect(diag.pathSources[inheritedIdx]).toBe('inherited')
+  })
+
+  it('does NOT run homebrew prepend when an active bundle is present on darwin', () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    process.env.PATH = '/usr/bin:/bin'
+    resolveStartupPath()
+    expect(process.env.PATH).not.toContain('/opt/homebrew/bin')
+  })
+
+  it('falls back to system resolution when SPECRAILS_BUNDLED_RUNTIMES_PATH is unset (graceful, not no-op)', () => {
+    delete process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    process.env.PATH = '/usr/bin:/bin'
+    expect(() => resolveStartupPath()).not.toThrow()
+    // No bundle → fall through to the macOS fast-path prepend so system tools resolve.
+    expect(process.env.PATH?.startsWith('/opt/homebrew/bin')).toBe(true)
+    expect(getPathDiagnostic().pathSources[0]).toBe('fast-path')
+  })
+
+  it('falls back to system resolution when the runtimes dir exists but has no node/git (e.g. Windows ARM64)', () => {
+    // Point at an empty runtimes base: candidate dirs do not exist → no 'bundled'
+    // prepend, and system discovery must still run (no dead PATH, no early return).
+    const emptyBase = fs.mkdtempSync(path.join(os.tmpdir(), 'prq-empty-'))
+    process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH = emptyBase
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    process.env.PATH = '/usr/bin:/bin'
+    resolveStartupPath()
+    const diag = getPathDiagnostic()
+    expect(diag.pathSources).not.toContain('bundled')
+    expect(process.env.PATH?.startsWith('/opt/homebrew/bin')).toBe(true)
+    fs.rmSync(emptyBase, { recursive: true, force: true })
+  })
+
+  it('treats a PARTIAL bundle (node present, git absent) as not-active → full system fallback', () => {
+    // Remove just the git binaries so only node remains. A partial bundle must NOT
+    // suppress system discovery, otherwise the missing tool (git) would fall through
+    // to a system probe against an un-augmented PATH and be wrongly reported missing.
+    fs.rmSync(path.join(rt.gitBin, 'git'), { force: true })
+    fs.rmSync(path.join(rt.gitCmd, 'git.exe'), { force: true })
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    process.env.PATH = '/usr/bin:/bin'
+    resolveStartupPath()
+    const diag = getPathDiagnostic()
+    // Bundle not active: no 'bundled' segments, homebrew fast-path prepended so
+    // system git resolves, and login-shell augmentation is left enabled.
+    expect(diag.pathSources).not.toContain('bundled')
+    expect(process.env.PATH?.startsWith('/opt/homebrew/bin')).toBe(true)
+    expect(process.env.PATH).not.toContain(rt.nodeBin)
+  })
+})
+
+describe('augmentPathFromLoginShell — desktop mode', () => {
+  const ORIGINAL_PATH = process.env.PATH
+  const ORIGINAL_PLATFORM = process.platform
+  let rt: ReturnType<typeof makeRuntimesDir>
+
+  beforeEach(() => {
+    __resetPathResolverForTest()
+    delete process.env.VITEST
+    process.env.NODE_ENV = 'production'
+    process.env.SPECRAILS_IS_DESKTOP = '1'
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    rt = makeRuntimesDir()
+    process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH = rt.base
+    process.env.PATH = '/usr/bin:/bin'
+  })
+
+  afterEach(() => {
+    process.env.PATH = ORIGINAL_PATH
+    process.env.VITEST = 'true'
+    process.env.NODE_ENV = 'test'
+    delete process.env.SPECRAILS_IS_DESKTOP
+    delete process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH
+    Object.defineProperty(process, 'platform', { value: ORIGINAL_PLATFORM })
+    fs.rmSync(rt.base, { recursive: true, force: true })
+  })
+
+  it('returns immediately without spawning when an active bundle was prepended', async () => {
+    resolveStartupPath() // activates the bundle
+    const spawnFn = vi.fn()
+    await augmentPathFromLoginShell({ spawnFn: spawnFn as any })
+    expect(spawnFn).not.toHaveBeenCalled()
+  })
+
+  it('sets loginShellStatus to skipped when an active bundle is present', async () => {
+    resolveStartupPath()
+    const spawnFn = vi.fn()
+    await augmentPathFromLoginShell({ spawnFn: spawnFn as any })
+    expect(getPathDiagnostic().loginShellStatus).toBe('skipped')
+  })
+
+  it('DOES run login-shell augmentation in desktop mode when no bundle is active (fallback)', async () => {
+    // Empty runtimes base → resolveStartupPath does not activate a bundle, so
+    // login-shell augmentation must still run to find nvm/volta/fnm shims.
+    const emptyBase = fs.mkdtempSync(path.join(os.tmpdir(), 'prq-empty-'))
+    process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH = emptyBase
+    resolveStartupPath()
+    const fakeSpawn = makeFakeSpawn({
+      stdout: '__SRH_PATH_BEGIN__/Users/me/.volta/bin:/usr/bin__SRH_PATH_END__',
+      exitCode: 0,
+    })
+    await augmentPathFromLoginShell({ spawnFn: fakeSpawn as any })
+    expect(process.env.PATH).toContain('/Users/me/.volta/bin')
+    expect(getPathDiagnostic().loginShellStatus).toBe('ok')
+    fs.rmSync(emptyBase, { recursive: true, force: true })
+  })
+})
+
+describe('path-resolver — integration: full desktop startup sequence', () => {
+  const ORIGINAL_PATH = process.env.PATH
+  const ORIGINAL_PLATFORM = process.platform
+  let rt: ReturnType<typeof makeRuntimesDir>
+
+  beforeEach(() => {
+    __resetPathResolverForTest()
+    delete process.env.VITEST
+    process.env.NODE_ENV = 'production'
+    process.env.SPECRAILS_IS_DESKTOP = '1'
+    rt = makeRuntimesDir()
+    process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH = rt.base
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    process.env.PATH = '/usr/bin:/bin'
+  })
+
+  afterEach(() => {
+    process.env.PATH = ORIGINAL_PATH
+    process.env.VITEST = 'true'
+    process.env.NODE_ENV = 'test'
+    delete process.env.SPECRAILS_IS_DESKTOP
+    delete process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH
+    Object.defineProperty(process, 'platform', { value: ORIGINAL_PLATFORM })
+    fs.rmSync(rt.base, { recursive: true, force: true })
+  })
+
+  it('full sequence: bundled dirs are first in PATH; spawn never called; loginShellStatus skipped', async () => {
+    const spawnFn = vi.fn()
+
+    // Phase 1: startup path resolution
+    resolveStartupPath()
+
+    // Phase 2: login shell augmentation (should be no-op in desktop mode with active bundle)
+    await augmentPathFromLoginShell({ spawnFn: spawnFn as any })
+
+    // Bundled dirs must be first
+    expect(process.env.PATH?.startsWith(rt.nodeBin)).toBe(true)
+    expect(process.env.PATH).toContain(rt.gitBin)
+
+    // System dirs preserved
+    expect(process.env.PATH).toContain('/usr/bin')
+
+    // Homebrew NOT prepended
+    expect(process.env.PATH).not.toContain('/opt/homebrew')
+
+    // spawn must not have been called
+    expect(spawnFn).not.toHaveBeenCalled()
+
+    // Diagnostic: bundled sources first, loginShellStatus skipped
+    const diag = getPathDiagnostic()
+    expect(diag.pathSources[0]).toBe('bundled')
+    expect(diag.loginShellStatus).toBe('skipped')
   })
 })
 

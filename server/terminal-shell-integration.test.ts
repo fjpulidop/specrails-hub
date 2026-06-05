@@ -31,10 +31,12 @@ describe('composeShellIntegrationSpawn', () => {
     expect(got).toEqual(NO_SHELL_INTEGRATION)
   })
 
-  it('zsh: writes ZDOTDIR/.zshrc and returns ZDOTDIR env', () => {
+  it('zsh: writes ZDOTDIR/.zshrc and returns ZDOTDIR + real-ZDOTDIR env', () => {
     const got = composeShellIntegrationSpawn('/bin/zsh', 's1', 'proj', ENABLED)
     expect(got.args).toEqual([])
     expect(got.env.ZDOTDIR).toBe(shimDirFor('proj', 's1'))
+    // The shim needs the user's real ZDOTDIR to re-source their login files.
+    expect(got.env.SPECRAILS_REAL_ZDOTDIR).toBe(process.env.ZDOTDIR ?? '')
     expect(got.shimPath).toBe(path.join(got.shimDir!, '.zshrc'))
     const content = fs.readFileSync(got.shimPath!, 'utf-8')
     expect(content).toMatch(/zsh-shim\.zsh/)
@@ -50,11 +52,16 @@ describe('composeShellIntegrationSpawn', () => {
     expect(fs.readFileSync(got.shimPath!, 'utf-8')).toMatch(/bash-shim\.bash/)
   })
 
-  it('fish: sets XDG_CONFIG_HOME and writes conf.d entry', () => {
+  it('fish: injects shim via -C init-command without hijacking XDG_CONFIG_HOME', () => {
     const got = composeShellIntegrationSpawn('/usr/local/bin/fish', 's3', 'proj', ENABLED)
-    expect(got.env.XDG_CONFIG_HOME).toBe(shimDirFor('proj', 's3'))
-    expect(got.shimPath).toMatch(/fish\/conf\.d\/specrails-shim\.fish$/)
-    expect(fs.readFileSync(got.shimPath!, 'utf-8')).toMatch(/fish-shim\.fish/)
+    // Must NOT repoint fish's whole config tree — the user's config.fish stays intact.
+    expect(got.env.XDG_CONFIG_HOME).toBeUndefined()
+    expect(got.args[0]).toBe('-C')
+    expect(got.args[1]).toMatch(/^source '.*fish-shim\.fish'$/)
+    // shimPath points at the bundled shim (non-null so OSC parsing activates);
+    // no per-session dir is written.
+    expect(got.shimPath).toMatch(/fish-shim\.fish$/)
+    expect(got.shimDir).toBeNull()
   })
 
   it('PowerShell: returns -NoLogo -NoExit -File and writes profile.ps1', () => {

@@ -2,6 +2,7 @@ import { createHash, randomUUID, randomBytes } from 'crypto'
 import * as fs from 'fs'
 import * as path from 'path'
 import chokidar, { type FSWatcher } from 'chokidar'
+import { isInBuildDir } from './build-dirs'
 import type { DbInstance } from './db'
 import type { WsMessage } from './types'
 import { recordInvocation, type Surface } from './ai-invocations'
@@ -71,6 +72,7 @@ export interface FileSummaryOpts {
 
 type EnqueueResult =
   | 'enqueued'
+  | 'failed'
   | 'skipped:hash'
   | 'skipped:budget'
   | 'skipped:per-job-cap'
@@ -213,6 +215,12 @@ export class FileSummaryManager {
   private hubInFlight = 0
   private readonly jobCounter = new Map<string, number>()
   private readonly watchers = new Map<string, WatcherState>()
+  // Per-project SUPERSET of relPaths that have a summary on disk. Seeded from
+  // the summaries dir at attachWatcher and only ever added to (on write), so a
+  // path absent from the set provably has no summary — letting the chokidar
+  // 'change' handler skip the readSummary disk hit for the common no-summary
+  // file. A stale entry (after sweep) just costs one harmless failed read.
+  private readonly knownSummaries = new Map<string, Set<string>>()
   // Tracks pending generation promises so flush() can await them in tests.
   private readonly pending = new Set<Promise<unknown>>()
 
@@ -362,6 +370,8 @@ export class FileSummaryManager {
         triggeredBy: req.triggeredBy,
       }
       writeSummary(req.projectPath, req.relPath, payload)
+      // Keep the watcher's negative-cache a correct superset.
+      this.knownSummaries.get(req.projectId)?.add(req.relPath)
 
       try {
         recordInvocation(this.deps.db, {
@@ -422,7 +432,9 @@ export class FileSummaryManager {
         path: req.relPath,
         reason,
       } as unknown as WsMessage)
-      entry.resolve('enqueued')
+      // Resolve with 'failed' (not 'enqueued') so a caller awaiting enqueue()
+      // can distinguish a failed generation from a successful one.
+      entry.resolve('failed')
     }
   }
 
@@ -434,17 +446,48 @@ export class FileSummaryManager {
 
   attachWatcher(projectId: string, projectPath: string): void {
     if (this.watchers.has(projectId)) return
+    this.knownSummaries.set(projectId, this.scanKnownSummaries(projectPath))
+    // CRITICAL: prune build/dep trees (node_modules, dist, target, src-tauri/target,
+    // dot-dirs, …) from the recursive watch. Watching a Rust/Tauri `target/` tree
+    // opened ~10k file descriptors and broke terminal spawning under fd pressure.
+    // The predicate is tested against each path relative to the project root so a
+    // dot-segment in the absolute prefix (the user's home dir) can't false-positive.
     const watcher = chokidar.watch(projectPath, {
-      ignored: [/(^|[\\/])\../, /node_modules/, /dist/, /coverage/],
+      ignored: (p: string) => {
+        const rel = path.relative(projectPath, p)
+        if (!rel || rel.startsWith('..')) return false // the root itself — never ignore
+        return isInBuildDir(rel)
+      },
       ignoreInitial: true,
       persistent: true,
+      // Coalesce partial-write churn so one logical edit fires one event.
+      awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 100 },
     })
     watcher.on('change', (changed: string) => {
       const rel = path.relative(projectPath, changed)
       if (!rel || rel.startsWith('..')) return
+      // Skip the readSummary disk hit when this file provably has no summary.
+      const known = this.knownSummaries.get(projectId)
+      if (known && !known.has(rel)) return
       this.markStale(projectPath, projectId, rel)
     })
     this.watchers.set(projectId, { projectPath, watcher })
+  }
+
+  /** Read the relPaths of every summary on disk into a set (one-time at attach). */
+  private scanKnownSummaries(projectPath: string): Set<string> {
+    const set = new Set<string>()
+    const dir = summariesDir(projectPath)
+    let files: string[] = []
+    try { files = fs.readdirSync(dir) } catch { return set }
+    for (const f of files) {
+      if (!f.endsWith('.json')) continue
+      try {
+        const payload = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as SummaryPayload
+        if (payload?.path) set.add(payload.path)
+      } catch { /* skip unreadable/partial files */ }
+    }
+    return set
   }
 
   detachWatcher(projectId: string): void {
@@ -452,6 +495,17 @@ export class FileSummaryManager {
     if (!state) return
     void state.watcher.close()
     this.watchers.delete(projectId)
+    this.knownSummaries.delete(projectId)
+  }
+
+  /** Close every watcher. Called on graceful server shutdown so chokidar's
+   *  underlying fsevents/inotify handles are released, never leaked. */
+  disposeAll(): void {
+    for (const [, state] of this.watchers) {
+      try { void state.watcher.close() } catch { /* best effort */ }
+    }
+    this.watchers.clear()
+    this.knownSummaries.clear()
   }
 
   async flush(): Promise<void> {

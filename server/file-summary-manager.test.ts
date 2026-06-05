@@ -375,7 +375,7 @@ describe('FileSummaryManager.enqueue', () => {
       }),
     })
     const mgr = new FileSummaryManager(deps)
-    await mgr.enqueue({
+    const result = await mgr.enqueue({
       projectPath,
       projectId: 'p1',
       projectSlug: 'p1',
@@ -383,6 +383,8 @@ describe('FileSummaryManager.enqueue', () => {
       triggeredBy: { kind: 'user', id: 'u1', ticketId: null },
     })
     await mgr.flush()
+    // The resolved value distinguishes a failed generation from a success.
+    expect(result).toBe('failed')
     const rows = db.prepare(`SELECT status FROM ai_invocations`).all() as Array<{ status: string }>
     expect(rows).toHaveLength(1)
     expect(rows[0].status).toBe('failed')

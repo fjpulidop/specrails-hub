@@ -48,7 +48,6 @@ describe('claudeAdapter — identity', () => {
     expect([...claudeAdapter.baselineAgents()].sort()).toEqual([
       'sr-architect',
       'sr-developer',
-      'sr-merge-resolver',
       'sr-reviewer',
     ])
   })
@@ -68,7 +67,7 @@ describe('claudeAdapter._normaliseClaudeModel', () => {
     expect(_normaliseClaudeModel('claude-sonnet-4-5')).toBe('sonnet')
   })
   it('normalises pinned opus ids to "opus"', () => {
-    expect(_normaliseClaudeModel('claude-opus-4-7')).toBe('opus')
+    expect(_normaliseClaudeModel('claude-opus-4-8')).toBe('opus')
   })
   it('normalises pinned haiku ids to "haiku"', () => {
     expect(_normaliseClaudeModel('claude-haiku-4-5-20251001')).toBe('haiku')
@@ -116,7 +115,7 @@ describe('claudeAdapter.buildArgs', () => {
   it('chat-turn normalises pinned model ids', () => {
     const args = claudeAdapter.buildArgs('chat-turn', {
       prompt: 'x',
-      model: 'claude-opus-4-7',
+      model: 'claude-opus-4-8',
     })
     expect(args[args.indexOf('--model') + 1]).toBe('opus')
   })

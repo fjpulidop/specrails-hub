@@ -55,9 +55,39 @@ ensureSpawnHelperExecutable()
 // ─── Shell resolution ─────────────────────────────────────────────────────────
 
 export function resolveShell(): string {
-  const envShell = process.env.SHELL
+  return resolveShellFor(
+    process.platform,
+    process.env,
+    (p) => { try { return fs.existsSync(p) } catch { return false } },
+  )
+}
+
+/**
+ * Pure, injectable shell resolver (testable on any platform).
+ * Order: explicit `$SHELL` → platform default.
+ * On Windows the default prefers PowerShell over cmd.exe: PowerShell 7 (`pwsh.exe`
+ * on PATH) → Windows PowerShell (`powershell.exe`, always present on Win10/11 at a
+ * known absolute path) → `COMSPEC`/cmd.exe as a last resort. cmd.exe is a poor
+ * default and has no shell-integration shim.
+ */
+export function resolveShellFor(
+  platform: NodeJS.Platform,
+  env: NodeJS.ProcessEnv,
+  exists: (p: string) => boolean,
+): string {
+  const envShell = env.SHELL
   if (envShell && envShell.trim().length > 0) return envShell.trim()
-  if (process.platform === 'win32') return process.env.COMSPEC || 'powershell.exe'
+  if (platform === 'win32') {
+    for (const dir of (env.PATH ?? '').split(';')) {
+      if (!dir) continue
+      const pwsh = `${dir.replace(/[\\/]$/, '')}\\pwsh.exe`
+      if (exists(pwsh)) return pwsh
+    }
+    const sysRoot = (env.SystemRoot || env.windir || 'C:\\Windows').replace(/[\\/]$/, '')
+    const winPosh = `${sysRoot}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`
+    if (exists(winPosh)) return winPosh
+    return env.COMSPEC || 'cmd.exe'
+  }
   return '/bin/zsh'
 }
 
@@ -143,12 +173,53 @@ export class TerminalNotFoundError extends Error {
 export class TerminalNameInvalidError extends Error {
   constructor() { super('terminal_name_invalid'); this.name = 'TerminalNameInvalidError' }
 }
+/** Thrown when node-pty fails to spawn the shell (e.g. the host is out of file
+ *  descriptors). Lets the REST layer return a concrete, actionable error instead
+ *  of an opaque 500. */
+export class TerminalSpawnError extends Error {
+  constructor(readonly reason: 'spawn-failed' | 'out-of-file-descriptors', detail?: string) {
+    super(`terminal_spawn_failed:${reason}${detail ? ` (${detail})` : ''}`)
+    this.name = 'TerminalSpawnError'
+  }
+}
+
+/** Map a node-pty spawn exception to a typed TerminalSpawnError. EMFILE/ENFILE
+ *  (the host is out of file descriptors — the failure mode that broke terminals
+ *  under the chokidar fd leak) get a distinct reason the client can act on. */
+export function mapSpawnError(err: unknown): TerminalSpawnError {
+  const e = err as NodeJS.ErrnoException
+  if (e?.code === 'EMFILE' || e?.code === 'ENFILE') {
+    return new TerminalSpawnError('out-of-file-descriptors', e.message)
+  }
+  return new TerminalSpawnError('spawn-failed', e?.message ?? String(err))
+}
+
+/** Short-lived record of a session that already exited, so a WS that attaches
+ *  just after an immediate/early exit can be told WHY instead of seeing a bare
+ *  404 / silent dead terminal. Keyed by sessionId, evicted after a TTL. */
+interface SessionTombstone {
+  projectId: string
+  exitedAt: number
+  code: number | null
+  signal: number | null
+  /** True when the shell died within the early-exit window (a likely failed
+   *  spawn rather than a user-initiated `exit`). */
+  early: boolean
+}
+
+/** A session that exits within this window of being created is treated as an
+ *  "early exit" (probable failed spawn — e.g. no controlling tty under fd
+ *  pressure) so the client can surface a clear failure instead of a blank pane. */
+export const TERMINAL_EARLY_EXIT_MS = 1_500
+const TOMBSTONE_TTL_MS = 30_000
 
 // ─── Manager ──────────────────────────────────────────────────────────────────
 
 export class TerminalManager {
   private sessions = new Map<string, TerminalSession>()
   private byProject = new Map<string, Set<string>>()
+  private tombstones = new Map<string, SessionTombstone>()
+  private tombstoneTimers = new Map<string, NodeJS.Timeout>()
 
   listForProject(projectId: string): TerminalSessionMeta[] {
     const set = this.byProject.get(projectId)
@@ -218,12 +289,17 @@ export class TerminalManager {
       ? [...shellIntegration.args, ...baseArgs]
       : baseArgs
 
-    const pty = ptySpawn(shell, args, {
-      cwd: opts.cwd,
-      cols, rows,
-      env,
-      name: 'xterm-256color',
-    })
+    let pty: IPty
+    try {
+      pty = ptySpawn(shell, args, {
+        cwd: opts.cwd,
+        cols, rows,
+        env,
+        name: 'xterm-256color',
+      })
+    } catch (err) {
+      throw mapSpawnError(err)
+    }
 
     const name = validateName(opts.name) ?? this.autoName(projectId, shell)
 
@@ -255,14 +331,28 @@ export class TerminalManager {
         if (events.length > 0) this.handleMarkEvents(session, events)
       }
     })
-    pty.onExit(() => {
+    pty.onExit((e: { exitCode: number; signal?: number }) => {
       session.exited = true
+      const now = Date.now()
+      const early = now - session.createdAt < TERMINAL_EARLY_EXIT_MS
       // Any open mark gets recorded as killed.
       if (session.projectDb) {
-        try { markOpenAsKilled(session.projectDb, session.id, Date.now()) } catch { /* ignore */ }
+        try { markOpenAsKilled(session.projectDb, session.id, now) } catch { /* ignore */ }
+      }
+      // Record a tombstone unless this is a deliberate kill (killSession removes
+      // the session from the registry first, so `!this.sessions.has` distinguishes
+      // an unexpected pty death from an intentional kill).
+      if (this.sessions.has(session.id)) {
+        this.recordTombstone(session.id, session.projectId, e?.exitCode ?? null, e?.signal ?? null, early)
+        // Tell attached clients WHY the session ended before closing the socket,
+        // so the UI shows a reason instead of a silent black pane.
+        const frame = JSON.stringify({ type: 'exit', code: e?.exitCode ?? null, signal: e?.signal ?? null, early })
+        for (const ws of session.clients) {
+          if (ws.readyState === WS_OPEN) { try { ws.send(frame) } catch { /* ignore */ } }
+        }
       }
       for (const ws of session.clients) {
-        try { ws.close(1000, 'pty_exit') } catch { /* ignore */ }
+        try { ws.close(1000, early ? 'pty_exit_early' : 'pty_exit') } catch { /* ignore */ }
       }
       cleanupSessionShim(session.projectSlug, session.id)
       this.removeFromRegistry(session)
@@ -298,6 +388,30 @@ export class TerminalManager {
     const s = this.sessions.get(sessionId)
     if (!s) return
     s.clients.delete(ws)
+  }
+
+  /** Returns the tombstone for a recently-exited session, scoped to projectId,
+   *  or undefined. Used by the WS upgrade/attach path to report why a session a
+   *  client is trying to reach has already gone. */
+  getTombstone(sessionId: string, projectId: string): SessionTombstone | undefined {
+    const t = this.tombstones.get(sessionId)
+    if (!t || t.projectId !== projectId) return undefined
+    return t
+  }
+
+  private recordTombstone(
+    sessionId: string, projectId: string, code: number | null, signal: number | null, early: boolean,
+  ): void {
+    this.tombstones.set(sessionId, { projectId, exitedAt: Date.now(), code, signal, early })
+    const prev = this.tombstoneTimers.get(sessionId)
+    if (prev) clearTimeout(prev)
+    const timer = setTimeout(() => {
+      this.tombstones.delete(sessionId)
+      this.tombstoneTimers.delete(sessionId)
+    }, TOMBSTONE_TTL_MS)
+    // Don't keep the event loop alive solely for tombstone eviction.
+    if (typeof timer.unref === 'function') timer.unref()
+    this.tombstoneTimers.set(sessionId, timer)
   }
 
   write(sessionId: string, data: Buffer | string): void {
@@ -360,6 +474,9 @@ export class TerminalManager {
       try { s.pty.kill('SIGKILL') } catch { /* ignore */ }
       this.removeFromRegistry(s)
     }
+    for (const timer of this.tombstoneTimers.values()) clearTimeout(timer)
+    this.tombstoneTimers.clear()
+    this.tombstones.clear()
   }
 
   sessionCount(): number { return this.sessions.size }

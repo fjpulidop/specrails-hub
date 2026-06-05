@@ -50,18 +50,17 @@ describe('codexAdapter — identity', () => {
     expect([...codexAdapter.baselineAgents()].sort()).toEqual([
       'sr-architect',
       'sr-developer',
-      'sr-merge-resolver',
       'sr-reviewer',
     ])
   })
 
-  it('reports a model catalog with gpt-5.4-mini default', () => {
+  it('reports a model catalog with gpt-5.5 default', () => {
     const cat = codexAdapter.modelCatalog()
     expect(cat.length).toBeGreaterThan(0)
     const defaults = cat.filter((m) => m.default === true)
     expect(defaults).toHaveLength(1)
-    expect(defaults[0].value).toBe('gpt-5.4-mini')
-    expect(codexAdapter.defaultModel()).toBe('gpt-5.4-mini')
+    expect(defaults[0].value).toBe('gpt-5.5')
+    expect(codexAdapter.defaultModel()).toBe('gpt-5.5')
   })
 })
 

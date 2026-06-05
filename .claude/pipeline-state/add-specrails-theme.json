@@ -1,0 +1,34 @@
+{
+  "schema_version": "1",
+  "feature": "add-specrails-theme",
+  "started_at": "2026-06-03T09:53:46.971Z",
+  "updated_at": "2026-06-03T10:26:39.535Z",
+  "phases": {
+    "architect": "done",
+    "developer": "done",
+    "test-writer": "skipped",
+    "doc-sync": "skipped",
+    "reviewer": "done",
+    "ship": "done",
+    "ci": "skipped"
+  },
+  "last_successful_phase": "ship",
+  "failed_phase": null,
+  "error_context": null,
+  "openspec_artifacts": "openspec/changes/add-specrails-theme/",
+  "implemented_files": [
+    "client/src/lib/themes.ts",
+    "client/src/globals.css",
+    "server/hub-router.ts"
+  ],
+  "input": {
+    "issues": [
+      1
+    ],
+    "flags": {
+      "dry_run": false,
+      "apply_mode": false,
+      "single_mode": true
+    }
+  }
+}
