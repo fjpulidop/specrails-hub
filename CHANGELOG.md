@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.58.2](https://github.com/fjpulidop/specrails-hub/compare/v1.58.1...v1.58.2) (2026-06-05)
+
+
+### Bug Fixes
+
+* **hub:** isolate hub-spawned claude from user global config + harden spec-gen turns ([#330](https://github.com/fjpulidop/specrails-hub/issues/330)) ([cd8b754](https://github.com/fjpulidop/specrails-hub/commit/cd8b7547cd7342572ee8816557b84b2ce263ecc2))
+
 ## [1.58.1](https://github.com/fjpulidop/specrails-hub/compare/v1.58.0...v1.58.1) (2026-06-05)
 
 
