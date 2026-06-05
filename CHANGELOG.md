@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.58.0](https://github.com/fjpulidop/specrails-hub/compare/v1.57.1...v1.58.0) (2026-06-05)
+
+
+### Features
+
+* release brand theme default, Codex GPT-5.5 and Opus 4.8 ([#326](https://github.com/fjpulidop/specrails-hub/issues/326)) ([fb7e508](https://github.com/fjpulidop/specrails-hub/commit/fb7e5081f573f44b94c9a608956b5b9f81f13e6e))
+
 ## [1.57.1](https://github.com/fjpulidop/specrails-hub/compare/v1.57.0...v1.57.1) (2026-05-25)
 
 
