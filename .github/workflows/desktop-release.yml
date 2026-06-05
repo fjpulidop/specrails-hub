@@ -362,7 +362,11 @@ jobs:
           # Functional git check: init + commit + log exercises git-core helpers/templates.
           $tmp = Join-Path $env:TEMP ("smokegit-" + [guid]::NewGuid())
           New-Item -ItemType Directory -Path $tmp | Out-Null
-          $env:GIT_CONFIG_GLOBAL = "NUL"; $env:GIT_CONFIG_SYSTEM = "NUL"
+          # Hermetic git config without the "NUL" device: GIT_CONFIG_SYSTEM=NUL throws
+          # "fatal: unable to access 'NUL': Invalid argument" on the Windows arm64
+          # PortableGit build. Disable system config via NOSYSTEM and point the global
+          # config at a path that doesn't exist (git treats a missing global config as empty).
+          $env:GIT_CONFIG_NOSYSTEM = "1"; $env:GIT_CONFIG_GLOBAL = (Join-Path $tmp ".gitconfig-absent")
           & $git -C $tmp init -q;  if ($LASTEXITCODE -ne 0) { Write-Error "git init failed"; exit 1 }
           & $git -C $tmp -c user.email=ci@specrails.dev -c user.name=ci commit -q --allow-empty -m smoke; if ($LASTEXITCODE -ne 0) { Write-Error "git commit failed"; exit 1 }
           & $git -C $tmp log --oneline; if ($LASTEXITCODE -ne 0) { Write-Error "git log failed"; exit 1 }
@@ -490,7 +494,11 @@ jobs:
           }
           $tmp = Join-Path $env:TEMP ("smokegit-" + [guid]::NewGuid())
           New-Item -ItemType Directory -Path $tmp | Out-Null
-          $env:GIT_CONFIG_GLOBAL = "NUL"; $env:GIT_CONFIG_SYSTEM = "NUL"
+          # Hermetic git config without the "NUL" device: GIT_CONFIG_SYSTEM=NUL throws
+          # "fatal: unable to access 'NUL': Invalid argument" on the Windows arm64
+          # PortableGit build. Disable system config via NOSYSTEM and point the global
+          # config at a path that doesn't exist (git treats a missing global config as empty).
+          $env:GIT_CONFIG_NOSYSTEM = "1"; $env:GIT_CONFIG_GLOBAL = (Join-Path $tmp ".gitconfig-absent")
           & $git -C $tmp init -q;  if ($LASTEXITCODE -ne 0) { Write-Error "git init failed"; exit 1 }
           & $git -C $tmp -c user.email=ci@specrails.dev -c user.name=ci commit -q --allow-empty -m smoke; if ($LASTEXITCODE -ne 0) { Write-Error "git commit failed"; exit 1 }
           & $git -C $tmp log --oneline; if ($LASTEXITCODE -ne 0) { Write-Error "git log failed"; exit 1 }
