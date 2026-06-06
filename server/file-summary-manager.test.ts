@@ -367,6 +367,114 @@ describe('FileSummaryManager.enqueue', () => {
     ).toBe(true)
   })
 
+  it('regenerates when the hub language changed even if the content hash matches', async () => {
+    writeFile(projectPath, 'src/foo.ts', 'console.log("hi")\n')
+    const hash = await computeFileHash(path.join(projectPath, 'src/foo.ts'))
+    writeSummary(projectPath, 'src/foo.ts', {
+      schemaVersion: 1,
+      path: 'src/foo.ts',
+      fileHash: hash,
+      summary: 'old english summary',
+      language: 'en',
+      generatedAt: '2026-05-22T00:00:00.000Z',
+      generatedBy: { model: 'claude-haiku-4-5', promptVersion: 1 },
+      triggeredBy: { kind: 'job', id: 'job_old', ticketId: 1 },
+    })
+    let observedLang: string | undefined
+    const gen = vi.fn(async (input: GenerateInput): Promise<GenerateOutput> => {
+      observedLang = input.language
+      return { summary: 'resumen', model: 'claude-haiku-4-5', provider: 'claude', costUsd: 0, tokensIn: 0, tokensOut: 0, durationMs: 0 }
+    })
+    const { deps } = makeDeps(db, { language: () => 'es', generate: gen })
+    const mgr = new FileSummaryManager(deps)
+    const result = await mgr.enqueue({
+      projectPath, projectId: 'p1', projectSlug: 'p1', relPath: 'src/foo.ts',
+      triggeredBy: { kind: 'job', id: 'job_new', ticketId: 1 }, jobId: 'job_new',
+    })
+    await mgr.flush()
+    expect(result).toBe('enqueued')
+    expect(gen).toHaveBeenCalledTimes(1)
+    expect(observedLang).toBe('es')
+    expect(readSummary(projectPath, 'src/foo.ts')?.language).toBe('es')
+  })
+
+  it('force bypasses the content-hash gate (explicit Regenerate of an unchanged file)', async () => {
+    writeFile(projectPath, 'src/foo.ts', 'console.log("hi")\n')
+    const hash = await computeFileHash(path.join(projectPath, 'src/foo.ts'))
+    writeSummary(projectPath, 'src/foo.ts', {
+      schemaVersion: 1,
+      path: 'src/foo.ts',
+      fileHash: hash,
+      summary: 'unchanged',
+      language: 'en',
+      generatedAt: '2026-05-22T00:00:00.000Z',
+      generatedBy: { model: 'claude-haiku-4-5', promptVersion: 1 },
+      triggeredBy: { kind: 'user', id: 'manual', ticketId: null },
+    })
+    const { deps, generate } = makeDeps(db)
+    const mgr = new FileSummaryManager(deps)
+    const result = await mgr.enqueue({
+      projectPath, projectId: 'p1', projectSlug: 'p1', relPath: 'src/foo.ts',
+      triggeredBy: { kind: 'user', id: 'manual', ticketId: null }, force: true,
+    })
+    await mgr.flush()
+    expect(result).toBe('enqueued')
+    expect(generate).toHaveBeenCalledTimes(1)
+  })
+
+  it('budget cap also applies to USER-triggered (manual) regenerate', async () => {
+    writeFile(projectPath, 'src/foo.ts', 'a\n')
+    const { deps, generate, broadcasts } = makeDeps(db, {
+      monthToDateSpend: () => 10,
+      monthlyBudgetUsd: () => 5,
+    })
+    const mgr = new FileSummaryManager(deps)
+    const result = await mgr.enqueue({
+      projectPath, projectId: 'p1', projectSlug: 'p1', relPath: 'src/foo.ts',
+      triggeredBy: { kind: 'user', id: 'manual', ticketId: null },
+    })
+    expect(result).toBe('skipped:budget')
+    expect(generate).not.toHaveBeenCalled()
+    expect(broadcasts.some((b) => b.type === 'file.summary_skipped' && b.reason === 'budget')).toBe(true)
+  })
+
+  it('attributes a failed invocation to the configured provider, not always claude', async () => {
+    writeFile(projectPath, 'src/foo.ts', 'x\n')
+    const { deps } = makeDeps(db, {
+      providerId: () => 'codex',
+      generate: vi.fn(async () => { throw new Error('boom') }),
+    })
+    const mgr = new FileSummaryManager(deps)
+    await mgr.enqueue({
+      projectPath, projectId: 'p1', projectSlug: 'p1', relPath: 'src/foo.ts',
+      triggeredBy: { kind: 'user', id: 'manual', ticketId: null },
+    })
+    await mgr.flush()
+    const rows = db.prepare(`SELECT provider, status FROM ai_invocations`).all() as Array<{ provider: string; status: string }>
+    expect(rows).toHaveLength(1)
+    expect(rows[0].status).toBe('failed')
+    expect(rows[0].provider).toBe('codex')
+  })
+
+  it('bounds the per-job counter map (evicts oldest beyond maxJobCounters)', async () => {
+    writeFile(projectPath, 'a.ts', '// a\n')
+    writeFile(projectPath, 'b.ts', '// b\n')
+    const { deps, generate } = makeDeps(db)
+    const mgr = new FileSummaryManager(deps, { maxJobCounters: 1, perProjectConcurrency: 8, hubConcurrency: 8 })
+    const r1 = await mgr.enqueue({
+      projectPath, projectId: 'p1', projectSlug: 'p1', relPath: 'a.ts',
+      triggeredBy: { kind: 'job', id: 'jA', ticketId: null }, jobId: 'jA',
+    })
+    const r2 = await mgr.enqueue({
+      projectPath, projectId: 'p1', projectSlug: 'p1', relPath: 'b.ts',
+      triggeredBy: { kind: 'job', id: 'jB', ticketId: null }, jobId: 'jB',
+    })
+    await mgr.flush()
+    expect(r1).toBe('enqueued')
+    expect(r2).toBe('enqueued')
+    expect(generate).toHaveBeenCalledTimes(2)
+  })
+
   it('failure path records a failed ai_invocations row and broadcasts file.summary_failed', async () => {
     writeFile(projectPath, 'src/foo.ts', 'x\n')
     const { deps, broadcasts } = makeDeps(db, {

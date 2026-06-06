@@ -2,7 +2,7 @@ import { execFileSync, execSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import type { DbInstance } from './db'
-import type { WsMessage } from './types'
+import type { WsMessage, FileProvenanceUpdatedMessage } from './types'
 
 export type DiffStatus = 'A' | 'M' | 'D' | 'R'
 
@@ -32,14 +32,56 @@ const MAX_PATCH_BYTES = 512 * 1024
 // in each function degrades a timeout to empty provenance. Mirrors metrics.ts.
 const GIT_TIMEOUT_MS = 15_000
 const GIT_MAX_BUFFER = 16 * 1024 * 1024
-const GIT_EXEC_ENV = {
-  ...process.env,
-  GIT_TERMINAL_PROMPT: '0',
-  GIT_ASKPASS: 'echo',
-  GCM_INTERACTIVE: 'never',
+// Bound on how many per-file patches we collect after a job. Each is a synchronous
+// git spawn on the event loop, so a job touching hundreds of files would otherwise
+// block the whole hub. Provenance ROWS are recorded for every path regardless; only
+// the on-demand diff patches beyond this cap are skipped (the UI shows "diff
+// unavailable" for them). Mirrors the existing large-job warn threshold (50).
+const MAX_PATCH_FILES = 50
+const GIT_EXEC_ENV = (() => {
+  // Inherit the parent env but STRIP git-location vars. If the hub process (or a
+  // parent) ever exports GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE, every cwd-scoped
+  // git call below would silently operate on that repo instead of the project —
+  // corrupting provenance. Always pin git to the cwd we pass.
+  const env: NodeJS.ProcessEnv = { ...process.env }
+  delete env.GIT_DIR
+  delete env.GIT_WORK_TREE
+  delete env.GIT_INDEX_FILE
+  delete env.GIT_COMMON_DIR
+  delete env.GIT_OBJECT_DIRECTORY
+  env.GIT_TERMINAL_PROMPT = '0'
+  env.GIT_ASKPASS = 'echo'
+  env.GCM_INTERACTIVE = 'never'
+  return env
+})()
+
+export interface WorkingTreeSnapshot {
+  /** `git stash create` ref, or '' when the tree was clean / git failed. */
+  ref: string
+  /** Untracked paths present at snapshot time (excluded from "created" later). */
+  untracked: string[]
 }
 
-export function snapshotWorkingTree(cwd: string): string {
+/** List untracked, non-ignored paths in the working tree. Best-effort: any git
+ *  failure (no git, no repo, timeout) degrades to []. */
+export function listUntracked(cwd: string): string[] {
+  try {
+    const out = execSync('git ls-files --others --exclude-standard -z', {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: GIT_TIMEOUT_MS,
+      maxBuffer: GIT_MAX_BUFFER,
+      env: GIT_EXEC_ENV,
+    })
+    return out.split('\0').filter((p) => p.length > 0)
+  } catch {
+    return []
+  }
+}
+
+export function snapshotWorkingTree(cwd: string): WorkingTreeSnapshot {
+  let ref = ''
   try {
     const out = execSync('git stash create --include-untracked', {
       cwd,
@@ -49,22 +91,31 @@ export function snapshotWorkingTree(cwd: string): string {
       maxBuffer: GIT_MAX_BUFFER,
       env: GIT_EXEC_ENV,
     })
-    return out.trim()
+    ref = out.trim()
   } catch (err) {
     const msg = (err as { message?: string }).message ?? ''
     if (/ENOENT|not found|command not found/i.test(msg)) {
       throw err
     }
-    return ''
+    ref = ''
   }
+  // Capture the untracked set NOW so the post-job diff can tell rail-created
+  // files apart from files that were already untracked before the job ran.
+  return { ref, untracked: listUntracked(cwd) }
 }
 
-export function diffAgainstSnapshot(cwd: string, snapshotRef: string): DiffEntry[] {
+export function diffAgainstSnapshot(
+  cwd: string,
+  snapshotRef: string,
+  untrackedBefore?: string[],
+): DiffEntry[] {
   const hasSnap = snapshotRef && snapshotRef.length > 0
   const ref = hasSnap ? snapshotRef : 'HEAD'
   let out = ''
   try {
-    out = execSync(`git diff --name-status -z ${ref} --`, {
+    // --find-renames so rename detection is deterministic regardless of the
+    // user's global `diff.renames` config (matches collectDiffPatches).
+    out = execSync(`git diff --name-status --find-renames -z ${ref} --`, {
       cwd,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -85,11 +136,16 @@ export function diffAgainstSnapshot(cwd: string, snapshotRef: string): DiffEntry
     while (i < tokens.length) {
       const raw = tokens[i]
       const code = raw[0]
-      if (code === 'R') {
+      if (code === 'R' || code === 'C') {
+        // Rename/copy: `<status>\0<old>\0<new>\0`.
         const oldPath = tokens[i + 1]
         const newPath = tokens[i + 2]
         if (oldPath !== undefined && newPath !== undefined && !seen.has(newPath)) {
-          entries.push({ path: newPath, status: 'R', renamedFrom: oldPath })
+          entries.push(
+            code === 'R'
+              ? { path: newPath, status: 'R', renamedFrom: oldPath }
+              : { path: newPath, status: 'A' },
+          )
           seen.add(newPath)
         }
         i += 3
@@ -104,35 +160,33 @@ export function diffAgainstSnapshot(cwd: string, snapshotRef: string): DiffEntry
         i += 2
         continue
       }
-      i += 1
+      if (code === 'T') {
+        // Typechange (file⇄symlink, regular⇄submodule). Record as modified.
+        const p = tokens[i + 1]
+        if (p !== undefined && !seen.has(p)) {
+          entries.push({ path: p, status: 'M' })
+          seen.add(p)
+        }
+        i += 2
+        continue
+      }
+      // Unknown single-letter status: `<status>\0<path>\0`. Consume the pair so
+      // the path token is never re-read as a status (which would corrupt the
+      // rest of the stream).
+      i += 2
     }
   }
 
-  // `git diff HEAD` only reports tracked-file changes. When the pre-spawn
-  // snapshot was empty (clean working tree) the diff above misses every NEW
-  // file the rail created. `git ls-files --others` surfaces untracked paths;
-  // we record them as 'A' (created) since they did not exist at snapshot time.
-  if (!hasSnap) {
-    let others = ''
-    try {
-      others = execSync('git ls-files --others --exclude-standard -z', {
-        cwd,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: GIT_TIMEOUT_MS,
-        maxBuffer: GIT_MAX_BUFFER,
-        env: GIT_EXEC_ENV,
-      })
-    } catch {
-      others = ''
-    }
-    if (others) {
-      for (const p of others.split('\0')) {
-        if (p && !seen.has(p)) {
-          entries.push({ path: p, status: 'A' })
-          seen.add(p)
-        }
-      }
+  // `git diff <ref>` only reports TRACKED-file deltas — it never lists untracked
+  // files. New files a rail creates are untracked, so without this pass they are
+  // silently lost whenever the tree was dirty at snapshot time (the common case).
+  // Always surface currently-untracked paths, minus those already untracked at
+  // snapshot time (which the rail did not create), as 'A' (created).
+  const before = new Set(untrackedBefore ?? [])
+  for (const p of listUntracked(cwd)) {
+    if (!seen.has(p) && !before.has(p)) {
+      entries.push({ path: p, status: 'A' })
+      seen.add(p)
     }
   }
 
@@ -165,8 +219,12 @@ function addedFilePatch(cwd: string, relPath: string): string {
   } catch {
     return ''
   }
+  const noTrailingNewline = content.length > 0 && !content.endsWith('\n')
   const lines = content.split('\n')
   if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
+  const body = lines.map((line) => `+${line}`)
+  // Mirror git's own unified-diff output for a file with no terminating newline.
+  if (noTrailingNewline) body.push('\\ No newline at end of file')
   return [
     `diff --git a/${relPath} b/${relPath}`,
     'new file mode 100644',
@@ -174,7 +232,7 @@ function addedFilePatch(cwd: string, relPath: string): string {
     '--- /dev/null',
     `+++ b/${relPath}`,
     `@@ -0,0 +1,${lines.length} @@`,
-    ...lines.map((line) => `+${line}`),
+    ...body,
     '',
   ].join('\n')
 }
@@ -184,10 +242,19 @@ export function collectDiffPatches(cwd: string, snapshotRef: string, diff: DiffE
   if (diff.length === 0) return patches
 
   const ref = snapshotRef && snapshotRef.length > 0 ? snapshotRef : 'HEAD'
-  for (const entry of diff) {
+  // Cap the number of per-file git spawns: each runs synchronously on the event
+  // loop. Beyond the cap, provenance rows are still recorded (by the caller) but
+  // patches are skipped — the UI renders "diff unavailable" for them.
+  const capped = diff.slice(0, MAX_PATCH_FILES)
+  for (const entry of capped) {
+    // For a rename, scope the diff to BOTH paths so git can pair them and emit a
+    // proper `rename from`/`rename to` patch instead of a delete + 100%-add.
+    const pathspec = entry.status === 'R' && entry.renamedFrom !== undefined
+      ? [entry.renamedFrom, entry.path]
+      : [entry.path]
     let patch = ''
     try {
-      patch = execFileSync('git', ['diff', '--no-ext-diff', '--find-renames', '--unified=80', ref, '--', entry.path], {
+      patch = execFileSync('git', ['diff', '--no-ext-diff', '--find-renames', '--unified=80', ref, '--', ...pathspec], {
         cwd,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -321,8 +388,8 @@ export function broadcastProvenanceUpdated(
   projectId: string,
   row: ProvenanceRow,
 ): void {
-  const msg = {
-    type: 'file.provenance_updated' as const,
+  const msg: FileProvenanceUpdatedMessage = {
+    type: 'file.provenance_updated',
     projectId,
     path: row.file_path,
     kind: row.kind,
@@ -330,6 +397,5 @@ export function broadcastProvenanceUpdated(
     jobId: row.job_id,
     at: row.at,
   }
-  // TODO: extend WsMessage union in server/types.ts with the 'file.provenance_updated' variant
-  ;(broadcast as (msg: unknown) => void)(msg)
+  broadcast(msg)
 }
