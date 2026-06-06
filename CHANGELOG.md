@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.58.3](https://github.com/fjpulidop/specrails-hub/compare/v1.58.2...v1.58.3) (2026-06-06)
+
+
+### Bug Fixes
+
+* **desktop:** make self-update restart reliable + premium update toast ([#333](https://github.com/fjpulidop/specrails-hub/issues/333)) ([0c166fd](https://github.com/fjpulidop/specrails-hub/commit/0c166fd73b75e82616403c373d628a5890ece25d))
+
 ## [1.58.2](https://github.com/fjpulidop/specrails-hub/compare/v1.58.1...v1.58.2) (2026-06-05)
 
 
