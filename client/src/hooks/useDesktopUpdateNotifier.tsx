@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { check, type DownloadEvent, type Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
+import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
+import { DownloadCloud, Cog, Check, AlertTriangle } from 'lucide-react'
 
 const DISMISSED_UPDATE_KEY = 'specrails-hub:dismissedDesktopUpdateVersion'
 const UPDATE_TOAST_ID = 'specrails-hub-desktop-update'
+const RECHECK_INTERVAL_MS = 6 * 60 * 60 * 1000 // 6h — surface releases published mid-session
 
 type UpdateToastState = 'available' | 'downloading' | 'installing' | 'ready' | 'error'
 
@@ -72,7 +75,70 @@ function dismissVersion(version: string): void {
   toast.dismiss(UPDATE_TOAST_ID)
 }
 
-function DesktopUpdateToast({ update }: { update: DesktopUpdate }) {
+// Per-state accent token (semantic theme tokens only — never brand-named).
+// `error` keeps the primary accent for chrome and conveys failure via icon + copy,
+// honouring the theme token contract (no destructive token in the allow-list).
+function accentFor(state: UpdateToastState): string {
+  switch (state) {
+    case 'downloading':
+      return 'var(--color-accent-info)'
+    case 'ready':
+      return 'var(--color-accent-success)'
+    default:
+      return 'var(--color-accent-primary)'
+  }
+}
+
+function StateIcon({ state }: { state: UpdateToastState }) {
+  const cls = 'h-[15px] w-[15px]'
+  if (state === 'installing') return <Cog className={`${cls} u-spin`} aria-hidden />
+  if (state === 'ready') return <Check className={`${cls} u-check`} aria-hidden />
+  if (state === 'error') return <AlertTriangle className={cls} aria-hidden />
+  return <DownloadCloud className={cls} aria-hidden />
+}
+
+/** Always-mounted progress track. Its inner fill/animation differs per state, but
+ * the row itself never unmounts — keeping the card height invariant so sonner's
+ * once-on-mount height measurement stays valid (no stacking jank / clipping). */
+function ProgressTrack({
+  state,
+  progress,
+}: {
+  state: UpdateToastState
+  progress: number | null
+}) {
+  const determinate = state === 'downloading' && progress != null
+  const indeterminate = state === 'installing' || (state === 'downloading' && progress == null)
+  const full = state === 'ready'
+
+  return (
+    <div className="relative h-1.5 w-full overflow-hidden rounded-full border border-border/30 bg-background/70">
+      {determinate && (
+        <div
+          className="relative h-full overflow-hidden rounded-full bg-[color:var(--u-accent)] transition-[width] duration-300 ease-out"
+          style={{ width: `${progress}%` }}
+          role="progressbar"
+          aria-valuenow={progress ?? 0}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
+          <span className="u-shimmer" aria-hidden />
+        </div>
+      )}
+      {indeterminate && <span className="u-indeterminate" aria-hidden />}
+      {full && <div className="h-full w-full rounded-full bg-[color:var(--u-accent)]/80" aria-hidden />}
+      {/* available / error → empty dim track (nothing rendered) */}
+    </div>
+  )
+}
+
+export function DesktopUpdateToast({
+  update,
+  onClose,
+}: {
+  update: DesktopUpdate
+  onClose?: () => void
+}) {
   const [state, setState] = useState<UpdateToastState>('available')
   const [downloaded, setDownloaded] = useState(0)
   const [total, setTotal] = useState<number | null>(null)
@@ -105,99 +171,188 @@ function DesktopUpdateToast({ update }: { update: DesktopUpdate }) {
     }
   }
 
+  function handleRestart() {
+    if (update.isMock) {
+      toast.success('Mock update ready — restart skipped', { duration: 2500 })
+      toast.dismiss(UPDATE_TOAST_ID)
+      onClose?.()
+      return
+    }
+    // Use the Rust `restart_app` command (not plugin-process relaunch directly):
+    // it terminates the sidecar and waits for port 4200 to free BEFORE restarting,
+    // so the relaunched instance never hits a port conflict (no second restart).
+    void invoke('restart_app').catch(() => {
+      // Fallback for older hosts without the command registered.
+      void relaunch()
+    })
+  }
+
   const progress = total && total > 0 ? Math.min(100, Math.round((downloaded / total) * 100)) : null
+
+  const accent = accentFor(state)
+  const busy = state === 'downloading' || state === 'installing'
+
+  const title =
+    state === 'downloading'
+      ? 'Downloading update'
+      : state === 'installing'
+        ? 'Installing update'
+        : state === 'ready'
+          ? 'Update ready'
+          : state === 'error'
+            ? 'Update failed'
+            : 'Update available'
+
   const description =
     state === 'available'
-      ? `Current ${update.currentVersion} -> ${update.version}`
+      ? 'A new version of SpecRails Hub is ready to install.'
       : state === 'downloading'
         ? progress == null
-          ? `Downloading ${formatBytes(downloaded)}`
-          : `Downloading ${progress}% (${formatBytes(downloaded)} of ${formatBytes(total ?? 0)})`
+          ? `Fetching ${formatBytes(downloaded)}…`
+          : `${progress}% · ${formatBytes(downloaded)} of ${formatBytes(total ?? 0)}`
         : state === 'installing'
-          ? 'Verifying signature and installing...'
+          ? 'Verifying signature and finishing up…'
           : state === 'ready'
-            ? 'Restart to finish installing the update.'
-            : error ?? 'Update failed'
+            ? `Restart to launch version ${update.version}.`
+            : (error && error.length <= 80 ? error : 'Couldn’t complete the update. Please try again.')
+
+  // Right-hand pill: version delta when idle, status word while working, hidden on error.
+  const pill =
+    state === 'available'
+      ? `${update.currentVersion} → ${update.version}`
+      : state === 'downloading'
+        ? 'Downloading'
+        : state === 'installing'
+          ? 'Installing'
+          : state === 'ready'
+            ? 'Ready'
+            : null
 
   return (
-    <div className="w-[372px] rounded-lg border border-accent-primary/35 bg-surface/95 p-3 shadow-2xl shadow-black/40">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 h-2.5 w-2.5 rounded-full bg-accent-primary shadow-[0_0_16px_hsl(265_89%_78%)]" />
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-foreground">SpecRails Hub {update.version} is available</p>
-          <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{description}</p>
-          {state === 'downloading' && progress != null && (
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-background">
-              <div
-                className="h-full rounded-full bg-accent-primary transition-[width]"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          )}
-          <div className="mt-3 flex items-center gap-2">
-            {state === 'ready' ? (
-              <button
-                type="button"
-                className="rounded-md border border-accent-primary/40 bg-accent-primary/20 px-3 py-1.5 text-[11px] font-medium text-foreground hover:bg-accent-primary/30"
-                onClick={() => {
-                  if (update.isMock) {
-                    toast.dismiss(UPDATE_TOAST_ID)
-                    return
-                  }
-                  void relaunch()
-                }}
-              >
-                Restart
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="rounded-md border border-accent-primary/40 bg-accent-primary/20 px-3 py-1.5 text-[11px] font-medium text-foreground hover:bg-accent-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={state === 'downloading' || state === 'installing'}
-                onClick={() => void installUpdate()}
-              >
-                Update
-              </button>
-            )}
+    <div
+      className="u-update-card relative flex w-full flex-col gap-2 overflow-hidden"
+      style={{ ['--u-accent' as string]: accent }}
+      role={state === 'error' ? 'alert' : 'status'}
+      aria-live={state === 'error' ? 'assertive' : 'polite'}
+      data-state={state}
+    >
+      {/* Top accent hairline — static at rest, pulsing while working, flash on ready */}
+      <span className="u-glow" aria-hidden />
+
+      <div className="flex items-center gap-2.5">
+        <span
+          className="u-badge grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-border/50 bg-background/60 text-[color:var(--u-accent)]"
+          aria-hidden
+        >
+          <StateIcon state={state} />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-tight text-foreground">
+          {title}
+        </span>
+        {pill != null && (
+          <span
+            className="shrink-0 whitespace-nowrap rounded-md border border-border/40 bg-background/60 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground"
+            style={state !== 'available' ? { color: 'var(--u-accent)' } : undefined}
+          >
+            {pill}
+          </span>
+        )}
+      </div>
+
+      <p className="h-4 truncate text-[11px] leading-4 text-muted-foreground" data-testid="update-description">
+        {description}
+      </p>
+
+      <ProgressTrack state={state} progress={progress} />
+
+      <div className="flex items-center justify-end gap-1.5">
+        {state === 'ready' ? (
+          <>
             <button
               type="button"
-              className="rounded-md px-3 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-background/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={state === 'downloading' || state === 'installing'}
-              onClick={() => dismissVersion(update.version)}
+              className="inline-grid h-7 min-w-[64px] place-items-center rounded-lg border border-[color:var(--u-accent)]/45 bg-[color:var(--u-accent)]/15 px-3 text-[11px] font-semibold leading-none text-foreground transition-colors hover:bg-[color:var(--u-accent)]/25"
+              onClick={handleRestart}
+            >
+              Restart
+            </button>
+            <button
+              type="button"
+              className="h-7 rounded-lg px-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
+              onClick={() => {
+                toast.dismiss(UPDATE_TOAST_ID)
+                onClose?.()
+              }}
+            >
+              Later
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="inline-grid h-7 min-w-[64px] place-items-center rounded-lg border border-[color:var(--u-accent)]/45 bg-[color:var(--u-accent)]/15 px-3 text-[11px] font-semibold leading-none text-foreground transition-colors hover:bg-[color:var(--u-accent)]/25 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={busy}
+              onClick={() => void installUpdate()}
+            >
+              {state === 'installing' ? 'Installing…' : state === 'error' ? 'Try again' : 'Update'}
+            </button>
+            <button
+              type="button"
+              className="h-7 rounded-lg px-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={busy}
+              onClick={() => {
+                dismissVersion(update.version)
+                onClose?.()
+              }}
             >
               Dismiss
             </button>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   )
 }
 
 export function useDesktopUpdateNotifier() {
-  const didCheck = useRef(false)
-
   useEffect(() => {
     const useMockUpdate = isMockUpdateEnabled()
-    if (didCheck.current || (!useMockUpdate && !isTauriRuntime())) return
-    didCheck.current = true
+    if (!useMockUpdate && !isTauriRuntime()) return
+
+    let cancelled = false
+    const shown = { current: false }
 
     async function checkForUpdate() {
+      if (cancelled || shown.current) return
       try {
         const update = useMockUpdate ? createMockUpdate() : await check()
-        if (!update || readDismissedVersion() === update.version) return
-
-        toast.custom(() => <DesktopUpdateToast update={update} />, {
+        if (cancelled || !update || readDismissedVersion() === update.version) return
+        shown.current = true
+        toast.custom(() => <DesktopUpdateToast update={update} onClose={() => { shown.current = false }} />, {
           id: UPDATE_TOAST_ID,
           duration: Infinity,
           dismissible: false,
           unstyled: true,
+          closeButton: false,
+          onDismiss: () => { shown.current = false },
+          onAutoClose: () => { shown.current = false },
         })
       } catch (err) {
         console.warn('[desktop-update] update check failed:', err)
+        // leave shown=false so the next interval tick retries
       }
     }
 
     void checkForUpdate()
+    // Periodic re-check: recovers from a transient failure at launch and surfaces
+    // releases published while the app stays open. The fixed toast id + the
+    // dismissed-version gate keep this idempotent; `shown` avoids disrupting an
+    // in-progress download.
+    const interval = setInterval(() => void checkForUpdate(), RECHECK_INTERVAL_MS)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   }, [])
 }
