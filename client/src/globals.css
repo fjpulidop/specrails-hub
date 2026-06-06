@@ -642,3 +642,119 @@
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Premium desktop self-update toast (see hooks/useDesktopUpdateNotifier.tsx).
+ * Fixed-height, accent-driven card with CSS-only motion. `--u-accent` is set
+ * per-state inline on `.u-update-card`. All motion degrades to a static state
+ * under prefers-reduced-motion.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/* Top accent hairline — the "alive" cue. */
+.u-update-card .u-glow {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--u-accent), transparent);
+  opacity: 0.45;
+  pointer-events: none;
+}
+.u-update-card[data-state='downloading'] .u-glow,
+.u-update-card[data-state='installing'] .u-glow {
+  animation: u-glow-pulse 2.2s ease-in-out infinite;
+}
+.u-update-card[data-state='ready'] .u-glow {
+  animation: u-glow-flash 0.6s ease-out;
+  opacity: 0.6;
+}
+.u-update-card[data-state='error'] .u-glow {
+  opacity: 0.15;
+}
+@keyframes u-glow-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.85; }
+}
+@keyframes u-glow-flash {
+  0% { opacity: 0.4; }
+  40% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* Determinate progress shimmer (sweeps only the filled portion). */
+.u-update-card .u-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-foreground) 26%, transparent),
+    transparent
+  );
+  transform: translateX(-130%);
+  animation: u-shimmer 1.15s linear infinite;
+  pointer-events: none;
+}
+@keyframes u-shimmer {
+  0% { transform: translateX(-130%); }
+  100% { transform: translateX(230%); }
+}
+
+/* Indeterminate sweep (installing, or downloading with unknown total). */
+.u-update-card .u-indeterminate {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -35%;
+  width: 35%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, var(--u-accent), transparent);
+  animation: u-indeterminate 1.1s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes u-indeterminate {
+  0% { left: -35%; }
+  100% { left: 100%; }
+}
+
+/* Slow cog rotation while installing. */
+.u-update-card .u-spin {
+  animation: u-spin 2.4s linear infinite;
+  transform-origin: center;
+}
+@keyframes u-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Success checkmark draw-in + badge pop on ready. */
+.u-update-card .u-check path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: u-check-draw 0.42s ease-out forwards;
+}
+@keyframes u-check-draw {
+  to { stroke-dashoffset: 0; }
+}
+.u-update-card[data-state='ready'] .u-badge {
+  animation: u-pop 0.3s ease-out;
+}
+@keyframes u-pop {
+  0% { transform: scale(0.7); opacity: 0.5; }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .u-update-card .u-glow,
+  .u-update-card[data-state='downloading'] .u-glow,
+  .u-update-card[data-state='installing'] .u-glow,
+  .u-update-card[data-state='ready'] .u-glow,
+  .u-update-card .u-shimmer,
+  .u-update-card .u-indeterminate,
+  .u-update-card .u-spin,
+  .u-update-card[data-state='ready'] .u-badge {
+    animation: none;
+  }
+  .u-update-card .u-shimmer { display: none; }
+  .u-update-card .u-indeterminate { left: 0; width: 100%; opacity: 0.5; }
+  .u-update-card .u-check path { stroke-dashoffset: 0; }
+}
+

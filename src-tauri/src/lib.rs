@@ -66,18 +66,65 @@ fn terminate_process(pid: u32) {
 #[cfg(windows)]
 fn terminate_process(pid: u32) {
     use std::process::Command;
-    // Try graceful HTTP shutdown first
-    let _ = reqwest::blocking::Client::new()
-        .post("http://localhost:4200/shutdown")
-        .timeout(Duration::from_secs(2))
-        .send();
-
-    std::thread::sleep(Duration::from_secs(2));
-
-    // Forceful kill as fallback
+    // Windows Node cannot catch a graceful termination signal (taskkill /F issues
+    // a non-catchable TerminateProcess), so there is no point POSTing to a
+    // shutdown route. Kill the whole process tree (/T) so the node sidecar AND its
+    // children (claude/codex rails, node-pty shells) are reaped — without /T the
+    // node process dies but its children are orphaned and keep file/DB locks.
     let _ = Command::new("taskkill")
-        .args(["/PID", &pid.to_string(), "/F"])
+        .args(["/PID", &pid.to_string(), "/T", "/F"])
         .output();
+
+    // Best-effort wait so the caller can rely on port 4200 having been released.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let alive = Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {}", pid), "/NH"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).contains(&pid.to_string()))
+            .unwrap_or(false);
+        if !alive || Instant::now() >= deadline {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(150));
+    }
+}
+
+/// Shared handle to the spawned sidecar PID, exposed to commands via managed state.
+struct SidecarState {
+    pid: Arc<Mutex<Option<u32>>>,
+}
+
+/// Cleanly restart the desktop app after a self-update.
+///
+/// The naive path — calling plugin-process `relaunch()` from the frontend —
+/// races: Tauri's `restart()` exits the host WITHOUT firing `CloseRequested`
+/// (so the sidecar is never terminated by us) and relaunches immediately, while
+/// the old Node sidecar is still listening on port 4200. The freshly-launched
+/// instance then fails its startup port check and the user has to restart a
+/// second time. This command closes that race: it terminates the current
+/// sidecar (and its process tree), waits until port 4200 is actually free, and
+/// only THEN restarts — so the new instance always finds a clean port.
+#[tauri::command]
+fn restart_app(app: tauri::AppHandle, sidecar: tauri::State<'_, SidecarState>) {
+    let pid = *sidecar.pid.lock().unwrap();
+    // Run off the command thread so the `invoke` resolves immediately and the UI
+    // stays responsive while the (up to several second) teardown happens.
+    std::thread::spawn(move || {
+        if let Some(pid) = pid {
+            terminate_process(pid);
+        }
+        // The Node server holds the port; it may take a moment to release after
+        // SIGTERM/taskkill. Wait until the bind succeeds, then restart regardless.
+        let deadline = Instant::now() + Duration::from_secs(8);
+        while Instant::now() < deadline {
+            if check_port_available(SERVER_PORT) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        app.restart();
+    });
 }
 
 pub fn run() {
@@ -90,8 +137,35 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .invoke_handler(tauri::generate_handler![restart_app])
         .setup(move |app| {
             let app_handle = app.handle().clone();
+
+            // Expose the sidecar PID to the `restart_app` command.
+            app.manage(SidecarState {
+                pid: Arc::clone(&sidecar_pid_clone),
+            });
+
+            // --- Port conflict check (with a grace window) ---
+            // Run this BEFORE showing/maximizing the window so a conflict bails
+            // out cleanly. During a self-update relaunch (or a quick quit→reopen)
+            // the previous sidecar may still be releasing port 4200 for a second
+            // or two; retry for a grace window instead of an immediate fatal
+            // failure that would force the user to restart a second time.
+            let port_deadline = Instant::now() + Duration::from_secs(10);
+            let mut port_free = check_port_available(SERVER_PORT);
+            while !port_free && Instant::now() < port_deadline {
+                std::thread::sleep(Duration::from_millis(250));
+                port_free = check_port_available(SERVER_PORT);
+            }
+            if !port_free {
+                app_handle
+                    .dialog()
+                    .message("Port 4200 is already in use by another process. Close it and reopen SpecRails Hub.")
+                    .title("SpecRails Hub — Port Conflict")
+                    .blocking_show();
+                std::process::exit(1);
+            }
 
             // --- Force the main window to open maximized ---
             // tauri.conf.json sets `maximized: true`, but macOS's window-state
@@ -99,16 +173,6 @@ pub fn run() {
             // call guarantees the window fills the screen every time.
             if let Some(win) = app.get_webview_window("main") {
                 let _ = win.maximize();
-            }
-
-            // --- Port conflict check ---
-            if !check_port_available(SERVER_PORT) {
-                app_handle
-                    .dialog()
-                    .message("Port 4200 is already in use. Close the conflicting process and try again.")
-                    .title("SpecRails Hub — Port Conflict")
-                    .blocking_show();
-                std::process::exit(1);
             }
 
             // --- Spawn sidecar ---

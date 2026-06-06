@@ -52,15 +52,22 @@ const parentPidArg = process.argv.find((a) => a.startsWith('--parent-pid='))
 if (parentPidArg) {
   const parentPid = parseInt(parentPidArg.split('=')[1], 10)
   if (!isNaN(parentPid)) {
-    setInterval(() => {
+    // Poll at 1s (not 3s): on a self-update relaunch the Tauri host exits and the
+    // freshly-launched instance needs port 4200 freed fast. The old 3s latency
+    // raced the new instance's startup port check and produced "port already in
+    // use". Faster detection + a graceful exit shrinks that window.
+    const watchdog = setInterval(() => {
       try {
         // signal 0 = existence check only, does not actually send a signal
         process.kill(parentPid, 0)
       } catch {
-        // Parent process is gone — terminate cleanly
-        process.exit(0)
+        // Parent process is gone — shut down GRACEFULLY (tree-kill child rails,
+        // PTYs, remove the PID file, release the port) instead of a bare
+        // process.exit(0) that orphans children and leaks the PID file.
+        clearInterval(watchdog)
+        void shutdown()
       }
-    }, 3000)
+    }, 1000)
   }
 }
 
@@ -414,7 +421,11 @@ server.listen(port, '127.0.0.1', () => {
 
 // ─── Clean shutdown ───────────────────────────────────────────────────────────
 
+let shuttingDown = false
 async function shutdown(): Promise<void> {
+  // Idempotent: the watchdog, SIGTERM and SIGINT can all race into here.
+  if (shuttingDown) return
+  shuttingDown = true
   removePidFile()
   try {
     _registry?.shutdown()
@@ -424,10 +435,26 @@ async function shutdown(): Promise<void> {
   } catch { /* ignore */ }
   try { wss.close() } catch { /* ignore */ }
   try { terminalWss.close() } catch { /* ignore */ }
+  // Force-close lingering keep-alive / WebSocket sockets so server.close()'s
+  // callback actually fires. The persistent /ws client connection and terminal
+  // sockets would otherwise hold the server open, stalling the port release that
+  // a relaunching desktop instance is waiting on. (Node 18.2+.)
+  try {
+    ;(server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.()
+  } catch { /* ignore */ }
+  // Hard-exit fallback in case server.close() still hangs.
+  const forceExit = setTimeout(() => process.exit(0), 3000)
+  forceExit.unref?.()
   server.close(() => {
+    clearTimeout(forceExit)
     process.exit(0)
   })
 }
 
 process.on('SIGTERM', () => { void shutdown() })
 process.on('SIGINT', () => { void shutdown() })
+// Last-resort PID-file cleanup for paths that bypass shutdown() (hard crash,
+// uncaught exception). 'exit' handlers must be synchronous.
+process.on('exit', () => {
+  try { fs.unlinkSync(PID_FILE) } catch { /* best effort */ }
+})
