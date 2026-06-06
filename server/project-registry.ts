@@ -353,6 +353,7 @@ export class ProjectRegistry {
         const raw = getHubSetting(this._hubDb, 'summary_language')
         return raw === 'es' ? 'es' : 'en'
       },
+      providerId: () => fileSummaryAdapter.id,
     })
     // NOTE: the chokidar watcher is NOT attached here. It is only needed to mark
     // already-generated summaries stale, which is irrelevant until the user opens

@@ -14,6 +14,8 @@ import {
 import {
   readSummary,
   computeFileHash,
+  pathHash,
+  summariesDir,
   type FileSummaryManager,
   type SummaryPayload,
 } from './file-summary-manager'
@@ -45,13 +47,24 @@ function isDenied(entryName: string): boolean {
   return false
 }
 
+// Apply the deny-list to ANY segment of a relative path so the policy is the
+// single source of truth across every surface (tree walk, touched-by-ai list,
+// and the content endpoints) — not just the top-level `all` walk.
+function isDeniedRelPath(rel: string): boolean {
+  return rel.split(/[\\/]/).filter(Boolean).some(isDenied)
+}
+
 function languageForExt(ext: string): string {
   const e = ext.toLowerCase()
   switch (e) {
-    case '.ts': return 'typescript'
-    case '.tsx': return 'typescriptreact'
-    case '.js': return 'javascript'
-    case '.jsx': return 'javascriptreact'
+    case '.ts':
+    case '.tsx':
+    case '.cts':
+    case '.mts': return 'typescript'
+    case '.js':
+    case '.jsx':
+    case '.mjs':
+    case '.cjs': return 'javascript'
     case '.json': return 'json'
     case '.md': return 'markdown'
     case '.py': return 'python'
@@ -252,6 +265,9 @@ function listTouchedEntries(
   const out: Array<{ rel: string; isDir: boolean; size: number | null; mtime: number | null }> = []
 
   for (const filePath of rowsByPath.keys()) {
+    // Keep touched-by-ai consistent with the `all` tree (and never surface
+    // secrets like .env that an AI job happened to touch).
+    if (isDeniedRelPath(filePath)) continue
     const parts = filePath.split('/').filter(Boolean)
     for (let i = 1; i < parts.length; i += 1) {
       const dirRel = parts.slice(0, i).join('/')
@@ -282,6 +298,23 @@ function listTouchedEntries(
     return Number(b.isDir) - Number(a.isDir)
   })
   return out
+}
+
+// Set of summary file basenames (without `.json`), i.e. the path-hash of every
+// file that currently has a summary on disk. One readdir replaces a per-entry
+// readSummary disk hit during the tree walk.
+function readSummaryHashSet(projectPath: string): Set<string> {
+  const set = new Set<string>()
+  let files: string[]
+  try {
+    files = fs.readdirSync(summariesDir(projectPath))
+  } catch {
+    return set
+  }
+  for (const f of files) {
+    if (f.endsWith('.json')) set.add(f.slice(0, -'.json'.length))
+  }
+  return set
 }
 
 export interface CodeExplorerDeps {
@@ -322,7 +355,7 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
     const jobId = parseNonEmptyString(req.query.jobId)
 
     let entries: Array<{ rel: string; isDir: boolean; size: number | null; mtime: number | null }>
-    let touchedRowsByPath = new Map<string, ProvenanceRow[]>()
+    const touchedRowsByPath = new Map<string, ProvenanceRow[]>()
     if (filter === 'touched-by-ai') {
       const rows = listTouchedRows(deps.db, { ticketId, jobId })
       for (const row of rows) {
@@ -333,26 +366,34 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
       entries = listTouchedEntries(deps.projectPath, touchedRowsByPath)
     } else {
       entries = listAllEntries(deps.projectPath)
+      // Batch-load ALL provenance once instead of a per-entry SQL query (N+1).
+      if (withProvenance) {
+        for (const row of listTouchedRows(deps.db, {})) {
+          const existing = touchedRowsByPath.get(row.file_path)
+          if (existing) existing.push(row)
+          else touchedRowsByPath.set(row.file_path, [row])
+        }
+      }
     }
 
     const page = entries.slice(skip, skip + MAX_TREE_PAGE)
     const nextCursor = skip + page.length < entries.length ? encodeCursor(skip + page.length) : null
 
+    // Read the summaries dir ONCE into a Set of path-hashes instead of opening +
+    // parsing a JSON file per entry just to test existence.
+    const summaryHashes = readSummaryHashSet(deps.projectPath)
+
     const out: TreeEntry[] = page.map((e) => {
-      const rawRows = withProvenance
-        ? (filter === 'touched-by-ai' && e.isDir
-            ? []
-            : (touchedRowsByPath.get(e.rel) ?? listByPath(deps.db, deps.projectId, e.rel)))
-        : []
-      const summary = readSummary(deps.projectPath, e.rel)
-      const provenance = withProvenance && filter === 'touched-by-ai' && e.isDir
+      const isTouchedDir = filter === 'touched-by-ai' && e.isDir
+      const rawRows = withProvenance && !isTouchedDir ? (touchedRowsByPath.get(e.rel) ?? []) : []
+      const provenance = withProvenance && isTouchedDir
         ? rollupDirectoryProvenance(touchedRowsByPath, e.rel)
         : rollupProvenance(rawRows)
       return {
         path: e.rel,
         kind: e.isDir ? 'dir' : 'file',
         sizeBytes: e.size,
-        hasSummary: summary != null,
+        hasSummary: !e.isDir && summaryHashes.has(pathHash(e.rel)),
         provenance,
         lastModifiedAt: e.mtime,
       }
@@ -377,6 +418,10 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
     const guard = resolveSafePath(deps.projectPath, relRaw)
     if (!guard) {
       res.status(400).json({ error: 'path traversal not allowed' })
+      return
+    }
+    if (isDeniedRelPath(relRaw)) {
+      res.status(403).json({ error: 'path is excluded by the code-explorer deny-list' })
       return
     }
     const abs = guard
@@ -476,6 +521,10 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
       res.status(400).json({ error: 'path traversal not allowed' })
       return
     }
+    if (isDeniedRelPath(relRaw)) {
+      res.status(403).json({ error: 'path is excluded by the code-explorer deny-list' })
+      return
+    }
     const summary = readSummary(deps.projectPath, relRaw)
     if (!summary) {
       res.json({ summary: null })
@@ -499,6 +548,10 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
     const guard = resolveSafePath(deps.projectPath, relRaw)
     if (!guard) {
       res.status(400).json({ error: 'path traversal not allowed' })
+      return
+    }
+    if (isDeniedRelPath(relRaw)) {
+      res.status(403).json({ error: 'path is excluded by the code-explorer deny-list' })
       return
     }
     let stat: fs.Stats
@@ -534,14 +587,31 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
     }
     const body = (req.body ?? {}) as { overrideBudget?: boolean }
     try {
-      await deps.fileSummaryManager.enqueue({
+      // force: true — an explicit "Regenerate" click should re-summarise even if
+      // the content hash is unchanged (e.g. after a hub language switch).
+      const result = await deps.fileSummaryManager.enqueue({
         projectPath: deps.projectPath,
         projectId: deps.projectId,
         projectSlug: deps.projectId,
         relPath: relRaw,
         triggeredBy: { kind: 'user', id: 'manual', ticketId: null },
         overrideBudget: body.overrideBudget === true,
+        force: true,
       })
+      // Surface the enqueue outcome so the client's budget-override prompt is
+      // reachable. 200 (not 4xx) keeps res.ok true so the client reads `skipped`.
+      if (result === 'skipped:budget') {
+        res.status(200).json({ skipped: 'budget' })
+        return
+      }
+      if (result === 'skipped:per-job-cap') {
+        res.status(200).json({ skipped: 'per-job-cap' })
+        return
+      }
+      if (result === 'failed') {
+        res.status(500).json({ error: 'summary generation failed' })
+        return
+      }
       res.status(202).json({ enqueued: true })
     } catch (err) {
       console.error('[code-explorer-router] enqueue failed:', err)
@@ -607,7 +677,39 @@ function resolveSafePath(projectPath: string, relPath: string): string | null {
   const resolved = path.resolve(projectPath, relPath)
   const root = projectPath.endsWith(path.sep) ? projectPath : projectPath + path.sep
   if (resolved !== projectPath && !resolved.startsWith(root)) return null
-  return resolved
+
+  // Symlink hardening: the lexical check above is defeated by an in-tree symlink
+  // whose target escapes the project (e.g. `link -> /etc/passwd`). Verify the
+  // REAL path stays under the REAL project root. Walk up to the nearest existing
+  // ancestor (so not-yet-created paths — used by the not-found banner and the
+  // regenerate endpoint — still validate), realpath it, then re-append the
+  // missing suffix.
+  let realRoot: string
+  try {
+    realRoot = fs.realpathSync.native(projectPath)
+  } catch {
+    // Project root itself is unreadable — fall back to the lexical result.
+    return resolved
+  }
+  const realRootWithSep = realRoot.endsWith(path.sep) ? realRoot : realRoot + path.sep
+  let probe = resolved
+  const suffix: string[] = []
+  for (;;) {
+    try {
+      const realProbe = fs.realpathSync.native(probe)
+      const realFull = suffix.length > 0
+        ? path.join(realProbe, ...suffix.slice().reverse())
+        : realProbe
+      if (realFull !== realRoot && !realFull.startsWith(realRootWithSep)) return null
+      return resolved
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') return null
+      const parent = path.dirname(probe)
+      if (parent === probe) return null // hit filesystem root without resolving
+      suffix.push(path.basename(probe))
+      probe = parent
+    }
+  }
 }
 
 async function computeStaleness(abs: string, summary: SummaryPayload | null): Promise<boolean> {

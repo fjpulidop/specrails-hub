@@ -13,6 +13,7 @@ import {
   getProvenanceDiff,
   listProvenanceByTicket,
   listProvenanceByPath,
+  listUntracked,
   broadcastProvenanceUpdated,
   type DiffEntry,
   type ProvenanceRow,
@@ -54,23 +55,25 @@ function initGitRepo(): string {
 }
 
 describe('snapshotWorkingTree', () => {
-  it('returns a sha for a dirty repo', () => {
+  it('returns a sha for a dirty repo and captures untracked files', () => {
     const dir = initGitRepo()
     try {
       appendFileSync(join(dir, 'a.txt'), 'change\n')
       writeFileSync(join(dir, 'b.txt'), 'new\n')
-      const sha = snapshotWorkingTree(dir)
-      expect(sha).toMatch(/^[0-9a-f]{40}$/)
+      const snap = snapshotWorkingTree(dir)
+      expect(snap.ref).toMatch(/^[0-9a-f]{40}$/)
+      expect(snap.untracked).toContain('b.txt')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
   })
 
-  it('returns empty string for a clean repo', () => {
+  it('returns empty ref and empty untracked for a clean repo', () => {
     const dir = initGitRepo()
     try {
-      const sha = snapshotWorkingTree(dir)
-      expect(sha).toBe('')
+      const snap = snapshotWorkingTree(dir)
+      expect(snap.ref).toBe('')
+      expect(snap.untracked).toEqual([])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -135,6 +138,86 @@ describe('diffAgainstSnapshot', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it('records rail-created untracked files even when the tree was DIRTY at snapshot time', () => {
+    // Regression: a dirty tree yields a non-empty stash ref; the old code only
+    // ran `git ls-files --others` when the ref was empty, so new untracked files
+    // a rail created were silently lost. Pre-existing untracked files must NOT be
+    // mis-recorded as created.
+    const dir = initGitRepo()
+    try {
+      // Dirty the tree: modify a tracked file AND leave a pre-existing untracked file.
+      appendFileSync(join(dir, 'a.txt'), 'dirty\n')
+      writeFileSync(join(dir, 'preexisting.txt'), 'was here before\n')
+      const snap = snapshotWorkingTree(dir)
+      expect(snap.ref).toMatch(/^[0-9a-f]{40}$/) // dirty → real ref
+      expect(snap.untracked).toContain('preexisting.txt')
+
+      // The "rail" runs: creates a brand-new untracked file + edits the tracked file again.
+      writeFileSync(join(dir, 'rail-new.txt'), 'created by rail\n')
+      appendFileSync(join(dir, 'a.txt'), 'rail edit\n')
+
+      const entries = diffAgainstSnapshot(dir, snap.ref, snap.untracked)
+      const byPath = new Map(entries.map((e) => [e.path, e]))
+      expect(byPath.get('rail-new.txt')?.status).toBe('A') // recorded as created
+      expect(byPath.get('a.txt')?.status).toBe('M')
+      expect(byPath.has('preexisting.txt')).toBe(false) // not the rail's creation
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('maps a typechange (T) status to modified and never desyncs the parser', () => {
+    // Replace a regular file with a symlink → git reports `T`. The next changed
+    // file must still be parsed correctly (no off-by-one corruption).
+    const dir = initGitRepo()
+    try {
+      writeFileSync(join(dir, 'sib.txt'), 'sibling\n')
+      execSync('git add -A', { cwd: dir })
+      execSync('git commit -q -m "add sib"', { cwd: dir })
+      const baselineRef = execSync('git rev-parse HEAD', { cwd: dir, encoding: 'utf8' }).trim()
+
+      unlinkSync(join(dir, 'a.txt'))
+      execSync('ln -s sib.txt a.txt', { cwd: dir }) // a.txt: regular → symlink = typechange
+      appendFileSync(join(dir, 'sib.txt'), 'more\n')
+      execSync('git add -A', { cwd: dir })
+
+      const entries = diffAgainstSnapshot(dir, baselineRef)
+      const byPath = new Map(entries.map((e) => [e.path, e]))
+      expect(byPath.get('a.txt')?.status).toBe('M') // T → M
+      expect(byPath.get('sib.txt')?.status).toBe('M')
+      // No phantom path named after a status letter leaked in.
+      expect(entries.every((e) => e.path === 'a.txt' || e.path === 'sib.txt')).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('listUntracked', () => {
+  it('lists untracked non-ignored files and excludes ignored ones', () => {
+    const dir = initGitRepo()
+    try {
+      writeFileSync(join(dir, '.gitignore'), 'ignored.txt\n')
+      writeFileSync(join(dir, 'untracked.txt'), 'x\n')
+      writeFileSync(join(dir, 'ignored.txt'), 'y\n')
+      const list = listUntracked(dir)
+      expect(list).toContain('untracked.txt')
+      expect(list).toContain('.gitignore')
+      expect(list).not.toContain('ignored.txt')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns [] outside a git repo', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fp-nogit-'))
+    try {
+      expect(listUntracked(dir)).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('collectDiffPatches', () => {
@@ -146,6 +229,25 @@ describe('collectDiffPatches', () => {
       const diff = diffAgainstSnapshot(dir, baselineRef)
       const patches = collectDiffPatches(dir, baselineRef, diff)
       expect(patches.get('a.txt')?.patch).toContain('+change')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('synthesizes an added-file patch with the no-newline marker for untracked files', () => {
+    const dir = initGitRepo()
+    try {
+      // Clean tree → empty snapshot ref → untracked files surface as 'A'.
+      writeFileSync(join(dir, 'no-eol.txt'), 'line1\nline2') // no trailing newline
+      writeFileSync(join(dir, 'eol.txt'), 'a\nb\n') // trailing newline
+      const diff = diffAgainstSnapshot(dir, '')
+      const patches = collectDiffPatches(dir, '', diff)
+      const noEol = patches.get('no-eol.txt')?.patch ?? ''
+      const eol = patches.get('eol.txt')?.patch ?? ''
+      expect(noEol).toContain('+line2')
+      expect(noEol).toContain('\\ No newline at end of file')
+      expect(eol).toContain('+b')
+      expect(eol).not.toContain('No newline at end of file')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

@@ -17,6 +17,7 @@ import {
   collectDiffPatches,
   recordProvenanceForJob,
   broadcastProvenanceUpdated,
+  type WorkingTreeSnapshot,
 } from './file-provenance'
 import { finaliseInvocationResult } from './result-event'
 import { randomUUID } from 'crypto'
@@ -240,7 +241,7 @@ export class QueueManager {
   private _jobProfileSelection: Map<string, string | null>
   /** Pre-spawn working-tree snapshot refs keyed by jobId — read at exit time
    *  by the Code-Explorer provenance hook. Cleared on job exit. */
-  private _snapshotRefs: Map<string, string>
+  private _snapshotRefs: Map<string, WorkingTreeSnapshot>
 
   constructor(
     broadcast: (msg: WsMessage) => void,
@@ -350,6 +351,8 @@ export class QueueManager {
 
     this._activeProcess = null
     this._activeJobId = null
+    // Release any per-job provenance snapshots so teardown leaves no map entries.
+    this._snapshotRefs.clear()
     // Drop the DB reference last so any in-flight 'close' callback sees null
     // and skips all DB work via the existing `if (this._db)` guards.
     this._db = null
@@ -853,8 +856,8 @@ export class QueueManager {
     // against it. Gated by SPECRAILS_CODE_EXPLORER — when off, no-op.
     if (isCodeExplorerEnabled() && this._cwd) {
       try {
-        const ref = snapshotWorkingTree(this._cwd)
-        this._snapshotRefs.set(jobId, ref)
+        const snap = snapshotWorkingTree(this._cwd)
+        this._snapshotRefs.set(jobId, snap)
       } catch (err) {
         console.warn(`[queue-manager] provenance snapshot failed: ${(err as Error).message}`)
       }
@@ -1065,6 +1068,12 @@ export class QueueManager {
       this._killTimer = null
     }
 
+    // Reclaim the pre-spawn snapshot unconditionally, BEFORE any early return,
+    // so a disposed/unknown job can't leak its entry in _snapshotRefs (the git
+    // stash commit it references is dangling and git-GC'd on its own).
+    const snapshot = this._snapshotRefs.get(jobId)
+    this._snapshotRefs.delete(jobId)
+
     // The manager was torn down (e.g. project removed) while the child was
     // still running. The DB may be closed; skip all bookkeeping to avoid an
     // uncaught throw inside this EventEmitter 'close' listener.
@@ -1168,10 +1177,9 @@ export class QueueManager {
       // SPECRAILS_CODE_EXPLORER (re-checked at each completion so the flag can
       // be flipped off mid-session without leaving partial writes).
       if (isCodeExplorerEnabled() && this._cwd && this._projectId) {
-        const ref = this._snapshotRefs.get(jobId) ?? ''
-        this._snapshotRefs.delete(jobId)
+        const ref = snapshot?.ref ?? ''
         try {
-          const diff = diffAgainstSnapshot(this._cwd, ref)
+          const diff = diffAgainstSnapshot(this._cwd, ref, snapshot?.untracked)
           const patches = collectDiffPatches(this._cwd, ref, diff)
           if (diff.length > 50) {
             console.warn(`[provenance.large_job] job=${jobId} files=${diff.length}`)

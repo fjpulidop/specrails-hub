@@ -4,7 +4,12 @@ import * as path from 'path'
 import chokidar, { type FSWatcher } from 'chokidar'
 import { isInBuildDir } from './build-dirs'
 import type { DbInstance } from './db'
-import type { WsMessage } from './types'
+import type {
+  WsMessage,
+  FileSummaryUpdatedMessage,
+  FileSummaryFailedMessage,
+  FileSummarySkippedMessage,
+} from './types'
 import { recordInvocation, type Surface } from './ai-invocations'
 
 export type SummaryLanguage = 'en' | 'es'
@@ -28,6 +33,9 @@ export interface EnqueueRequest {
   triggeredBy: SummaryPayload['triggeredBy']
   jobId?: string
   overrideBudget?: boolean
+  /** Bypass the content-hash gate. Set on explicit user "Regenerate" so an
+   *  unchanged file is re-summarised anyway (e.g. after a language switch). */
+  force?: boolean
 }
 
 export interface GenerateInput {
@@ -60,6 +68,9 @@ export interface FileSummaryDeps {
   monthlyBudgetUsd: () => number
   /** Hub-wide summary language. Defaults to 'en' when omitted. */
   language?: () => SummaryLanguage
+  /** Provider id for the project ('claude' | 'codex' | …). Used to attribute the
+   *  failure-path ai_invocations row correctly. Defaults to 'claude'. */
+  providerId?: () => string
   now?: () => number
 }
 
@@ -68,6 +79,8 @@ export interface FileSummaryOpts {
   hubConcurrency?: number
   perJobCap?: number
   queueTtlMs?: number
+  /** Upper bound on distinct jobId counters retained (defensive anti-leak). */
+  maxJobCounters?: number
 }
 
 type EnqueueResult =
@@ -78,6 +91,12 @@ type EnqueueResult =
   | 'skipped:per-job-cap'
 
 const SUMMARIES_REL = path.join('.specrails', 'file-summaries')
+// Current summary prompt version. Bump when buildSystemPrompt changes materially
+// so existing summaries are treated as stale and regenerated on next request.
+const CURRENT_PROMPT_VERSION = 1
+// Defensive bound on the per-job counter map so it cannot grow without limit
+// across a long-lived hub session (the per-job cap is best-effort).
+const MAX_JOB_COUNTERS = 2000
 const TOKEN_CHARS_PER_TOKEN = 4
 const TOKEN_LIMIT = 8000
 const TRUNCATE_HEAD_CHARS = 16000
@@ -193,6 +212,9 @@ export function sweepOrphans(
 interface QueueEntry {
   req: EnqueueRequest
   enqueuedAt: number
+  /** Content hash computed at enqueue time, carried on the entry so the worker
+   *  never has to recompute it — and never picks up another entry's hash. */
+  newHash: string
   resolve: (r: EnqueueResult) => void
   reject: (err: Error) => void
 }
@@ -208,6 +230,7 @@ export class FileSummaryManager {
   private readonly hubConcurrency: number
   private readonly perJobCap: number
   private readonly queueTtlMs: number
+  private readonly maxJobCounters: number
 
   // Per-project queue, per-project in-flight count, hub-wide in-flight count.
   private readonly queues = new Map<string, QueueEntry[]>()
@@ -230,6 +253,7 @@ export class FileSummaryManager {
     this.hubConcurrency = opts.hubConcurrency ?? 8
     this.perJobCap = opts.perJobCap ?? 50
     this.queueTtlMs = opts.queueTtlMs ?? 5 * 60 * 1000
+    this.maxJobCounters = opts.maxJobCounters ?? MAX_JOB_COUNTERS
   }
 
   async enqueue(req: EnqueueRequest): Promise<EnqueueResult> {
@@ -249,9 +273,20 @@ export class FileSummaryManager {
       return 'skipped:hash'
     }
 
-    // Step 2: hash gate.
+    // Step 2: hash gate. Skip regeneration only when content, language AND prompt
+    // version all match — and never when the caller forced it. Without the
+    // language check a hub language switch (en↔es) would never refresh existing
+    // summaries; without `force` an explicit "Regenerate" of an unchanged file
+    // would be a silent no-op.
+    const currentLang: SummaryLanguage = this.deps.language?.() ?? 'en'
     const existing = readSummary(req.projectPath, req.relPath)
-    if (existing && existing.fileHash === newHash) {
+    if (
+      !req.force &&
+      existing &&
+      existing.fileHash === newHash &&
+      existing.language === currentLang &&
+      existing.generatedBy?.promptVersion === CURRENT_PROMPT_VERSION
+    ) {
       this.deps.broadcast(buildSummaryUpdated(req.projectId, existing, false))
       return 'skipped:hash'
     }
@@ -263,11 +298,20 @@ export class FileSummaryManager {
         this.emitSkipped(req, 'per-job-cap')
         return 'skipped:per-job-cap'
       }
+      // Bound the map: drop the oldest counters if it grows unreasonably large
+      // over a long hub session (the cap is best-effort, so a reset is harmless).
+      if (!this.jobCounter.has(req.jobId) && this.jobCounter.size >= this.maxJobCounters) {
+        const oldest = this.jobCounter.keys().next().value
+        if (oldest !== undefined) this.jobCounter.delete(oldest)
+      }
       this.jobCounter.set(req.jobId, count + 1)
     }
 
-    // Step 4: budget cap (job-triggered only, unless overrideBudget).
-    if (req.triggeredBy.kind === 'job' && !req.overrideBudget) {
+    // Step 4: budget cap. Applies to job- AND user-triggered requests; the only
+    // bypass is an explicit overrideBudget (the "Override the budget cap?"
+    // confirmation in the UI). Previously only job-triggered requests were
+    // gated, which left the manual-regenerate budget prompt unreachable.
+    if (!req.overrideBudget) {
       const spend = this.deps.monthToDateSpend(req.projectId)
       const budget = this.deps.monthlyBudgetUsd()
       if (spend >= budget) {
@@ -281,18 +325,19 @@ export class FileSummaryManager {
       const entry: QueueEntry = {
         req: { ...req },
         enqueuedAt: (this.deps.now ?? Date.now)(),
+        newHash,
         resolve,
         reject,
       }
       const queue = this.queues.get(req.projectId) ?? []
       queue.push(entry)
       this.queues.set(req.projectId, queue)
-      this.pump(req.projectId, newHash)
+      this.pump(req.projectId)
     })
     return result
   }
 
-  private pump(projectId: string, hashHint?: string): void {
+  private pump(projectId: string): void {
     const queue = this.queues.get(projectId) ?? []
     while (queue.length > 0) {
       if (this.hubInFlight >= this.hubConcurrency) break
@@ -308,7 +353,7 @@ export class FileSummaryManager {
       }
       this.inFlightPerProject.set(projectId, perProject + 1)
       this.hubInFlight += 1
-      const p = this.runOne(entry, hashHint)
+      const p = this.runOne(entry)
         .catch((err) => entry.reject(err))
         .finally(() => {
           this.inFlightPerProject.set(
@@ -325,7 +370,7 @@ export class FileSummaryManager {
     else this.queues.set(projectId, queue)
   }
 
-  private async runOne(entry: QueueEntry, hashHint?: string): Promise<void> {
+  private async runOne(entry: QueueEntry): Promise<void> {
     const { req } = entry
     const absolutePath = path.join(req.projectPath, req.relPath)
     const startedIso = new Date((this.deps.now ?? Date.now)()).toISOString()
@@ -334,7 +379,9 @@ export class FileSummaryManager {
     let fileHash: string
     try {
       contents = fs.readFileSync(absolutePath, 'utf8')
-      fileHash = hashHint ?? (await computeFileHash(absolutePath))
+      // Use the hash captured for THIS entry at enqueue time (never another
+      // entry's). Fall back to a recompute only if it was somehow not set.
+      fileHash = entry.newHash || (await computeFileHash(absolutePath))
     } catch {
       this.emitSkipped(req, 'not-found')
       entry.resolve('skipped:hash')
@@ -394,10 +441,11 @@ export class FileSummaryManager {
           num_turns: 1,
           total_cost_usd_estimated: !!out.costEstimated,
         })
-      } catch {
-        // The 'file-summary' surface is introduced by a sibling change; if the
-        // ALLOWED_SURFACES set has not yet been extended at install time the
-        // insert is silently dropped rather than crashing the queue.
+      } catch (err) {
+        // An ai_invocations write failure must never crash the summary queue,
+        // but it should not be silent either — a swallowed failure here means
+        // spending under-counts with no trace.
+        console.error('[file-summary] recordInvocation (success) failed:', err)
       }
       this.deps.broadcast(buildSummaryUpdated(req.projectId, payload, false))
       this.deps.broadcast({ type: 'spending.invalidated', projectId: req.projectId })
@@ -408,7 +456,7 @@ export class FileSummaryManager {
         recordInvocation(this.deps.db, {
           id: randomUUID(),
           project_id: req.projectId,
-          provider: 'claude',
+          provider: this.deps.providerId?.() ?? 'claude',
           surface: 'file-summary' as Surface,
           surface_ref_id: req.jobId ?? null,
           ticket_id: req.triggeredBy.ticketId,
@@ -423,15 +471,18 @@ export class FileSummaryManager {
           num_turns: 1,
           total_cost_usd_estimated: false,
         })
-      } catch {
-        // ai_invocations write failures must not crash the manager.
+      } catch (recErr) {
+        // ai_invocations write failures must not crash the manager, but log so
+        // a persistent DB problem is visible.
+        console.error('[file-summary] recordInvocation (failure) failed:', recErr)
       }
-      this.deps.broadcast({
+      const failedMsg: FileSummaryFailedMessage = {
         type: 'file.summary_failed',
         projectId: req.projectId,
         path: req.relPath,
         reason,
-      } as unknown as WsMessage)
+      }
+      this.deps.broadcast(failedMsg)
       // Resolve with 'failed' (not 'enqueued') so a caller awaiting enqueue()
       // can distinguish a failed generation from a successful one.
       entry.resolve('failed')
@@ -520,13 +571,14 @@ export class FileSummaryManager {
     return false
   }
 
-  private emitSkipped(req: EnqueueRequest, reason: string): void {
-    this.deps.broadcast({
+  private emitSkipped(req: EnqueueRequest, reason: FileSummarySkippedMessage['reason']): void {
+    const msg: FileSummarySkippedMessage = {
       type: 'file.summary_skipped',
       projectId: req.projectId,
       path: req.relPath,
       reason,
-    } as unknown as WsMessage)
+    }
+    this.deps.broadcast(msg)
   }
 }
 
@@ -535,12 +587,13 @@ function buildSummaryUpdated(
   payload: SummaryPayload,
   stale: boolean,
 ): WsMessage {
-  return {
+  const msg: FileSummaryUpdatedMessage = {
     type: 'file.summary_updated',
     projectId,
     path: payload.path,
     summaryAvailable: true,
     stale,
     generatedAt: payload.generatedAt,
-  } as unknown as WsMessage
+  }
+  return msg
 }

@@ -392,15 +392,23 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   router.use('/:projectId/plugins', pluginsRouter)
 
   // Mount Code-Explorer router. FileSummaryManager comes from ProjectContext.
+  // Memoize per ProjectContext (keyed on the object so a removed+re-added
+  // project gets a fresh router) instead of rebuilding the router on every
+  // /code/* request.
+  const codeRouterByCtx = new WeakMap<object, Router>()
   router.use('/:projectId/code', (req: Request, res: Response, next: NextFunction) => {
     const projectCtx = ctx(req)
-    const codeRouter = createCodeExplorerRouter({
-      db: projectCtx.db,
-      projectPath: projectCtx.project.path,
-      projectId: projectCtx.project.id,
-      broadcast: projectCtx.broadcast,
-      fileSummaryManager: projectCtx.fileSummaryManager,
-    })
+    let codeRouter = codeRouterByCtx.get(projectCtx)
+    if (!codeRouter) {
+      codeRouter = createCodeExplorerRouter({
+        db: projectCtx.db,
+        projectPath: projectCtx.project.path,
+        projectId: projectCtx.project.id,
+        broadcast: projectCtx.broadcast,
+        fileSummaryManager: projectCtx.fileSummaryManager,
+      })
+      codeRouterByCtx.set(projectCtx, codeRouter)
+    }
     codeRouter(req, res, next)
   })
 

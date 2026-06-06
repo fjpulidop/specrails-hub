@@ -6,6 +6,20 @@ import os from 'os'
 import path from 'path'
 import { initDb, type DbInstance } from './db'
 import { createCodeExplorerRouter } from './code-explorer-router'
+import { writeSummary, computeFileHash } from './file-summary-manager'
+
+async function storeSummary(rel: string, fileHash: string): Promise<void> {
+  writeSummary(projectPath, rel, {
+    schemaVersion: 1,
+    path: rel,
+    fileHash,
+    summary: 'A summary.',
+    language: 'en',
+    generatedAt: '2026-05-22T00:00:00.000Z',
+    generatedBy: { model: 'claude-haiku-4-5', promptVersion: 1 },
+    triggeredBy: { kind: 'user', id: 'manual', ticketId: null },
+  })
+}
 
 let projectPath: string
 let db: DbInstance
@@ -301,5 +315,131 @@ describe('GET /summary', () => {
     const res = await request(app).get('/api/projects/proj-test/code/summary?path=foo.ts')
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ summary: null })
+  })
+})
+
+describe('summary staleness', () => {
+  it('reports summaryStale=false for a matching hash and true after the file changes', async () => {
+    fs.writeFileSync(path.join(projectPath, 'hello.ts'), 'export const x = 1\n', 'utf8')
+    const hash = await computeFileHash(path.join(projectPath, 'hello.ts'))
+    await storeSummary('hello.ts', hash)
+
+    const fresh = await request(app).get('/api/projects/proj-test/code/summary?path=hello.ts')
+    expect(fresh.status).toBe(200)
+    expect(fresh.body.summary).not.toBeNull()
+    expect(fresh.body.summaryStale).toBe(false)
+
+    // GET /file should agree.
+    const file = await request(app).get('/api/projects/proj-test/code/file?path=hello.ts')
+    expect(file.body.summaryStale).toBe(false)
+
+    // Mutate the file → the stored summary is now stale.
+    fs.writeFileSync(path.join(projectPath, 'hello.ts'), 'export const x = 2\n', 'utf8')
+    const stale = await request(app).get('/api/projects/proj-test/code/summary?path=hello.ts')
+    expect(stale.body.summaryStale).toBe(true)
+  })
+})
+
+describe('Monaco language ids', () => {
+  it('maps .tsx and .jsx to registered Monaco ids (typescript/javascript)', async () => {
+    fs.writeFileSync(path.join(projectPath, 'C.tsx'), 'export const C = () => null\n', 'utf8')
+    fs.writeFileSync(path.join(projectPath, 'd.jsx'), 'export const D = () => null\n', 'utf8')
+    const tsx = await request(app).get('/api/projects/proj-test/code/file?path=C.tsx')
+    expect(tsx.body.language).toBe('typescript')
+    const jsx = await request(app).get('/api/projects/proj-test/code/file?path=d.jsx')
+    expect(jsx.body.language).toBe('javascript')
+  })
+})
+
+describe('deny-list enforcement on content endpoints', () => {
+  it('GET /file returns 403 for denied files (.env, lockfiles)', async () => {
+    fs.writeFileSync(path.join(projectPath, '.env'), 'AWS_SECRET=topsecret', 'utf8')
+    fs.writeFileSync(path.join(projectPath, 'package-lock.json'), '{}', 'utf8')
+    const env = await request(app).get('/api/projects/proj-test/code/file?path=.env')
+    expect(env.status).toBe(403)
+    const lock = await request(app).get('/api/projects/proj-test/code/file?path=package-lock.json')
+    expect(lock.status).toBe(403)
+  })
+
+  it('GET /summary returns 403 for denied files', async () => {
+    fs.writeFileSync(path.join(projectPath, '.env'), 'X=1', 'utf8')
+    const res = await request(app).get('/api/projects/proj-test/code/summary?path=.env')
+    expect(res.status).toBe(403)
+  })
+
+  it('POST /file/regenerate-summary returns 403 for denied files and does not enqueue', async () => {
+    fs.writeFileSync(path.join(projectPath, 'secrets.log'), 'noise', 'utf8')
+    const res = await request(app)
+      .post('/api/projects/proj-test/code/file/regenerate-summary?path=secrets.log')
+      .send({})
+    expect(res.status).toBe(403)
+    expect(enqueueSpy).not.toHaveBeenCalled()
+  })
+
+  it('touched-by-ai tree omits denied files so it matches the all-tree', async () => {
+    fs.writeFileSync(path.join(projectPath, '.env'), 'X=1', 'utf8')
+    db.prepare(
+      `INSERT INTO file_provenance (file_path, ticket_id, job_id, kind, at) VALUES (?, ?, ?, ?, ?)`,
+    ).run('.env', 1, 'job-a', 'modified', Date.now())
+    const r = await request(app).get('/api/projects/proj-test/code/tree?filter=touched-by-ai&withProvenance=1')
+    const paths = (r.body.entries as Array<{ path: string }>).map((e) => e.path)
+    expect(paths).not.toContain('.env')
+  })
+})
+
+describe('symlink path-escape hardening', () => {
+  it('rejects a symlink whose target is outside the project root', async () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-outside-'))
+    fs.writeFileSync(path.join(outside, 'secret.txt'), 'TOP SECRET', 'utf8')
+    let linked = false
+    try {
+      fs.symlinkSync(path.join(outside, 'secret.txt'), path.join(projectPath, 'link.txt'))
+      linked = true
+    } catch {
+      // Platforms without symlink privileges (e.g. Windows non-admin) — skip.
+    }
+    try {
+      if (!linked) return
+      const res = await request(app).get('/api/projects/proj-test/code/file?path=link.txt')
+      expect(res.status).toBe(400)
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true })
+    }
+  })
+
+  it('still serves a legitimate in-project file (no false rejection)', async () => {
+    fs.writeFileSync(path.join(projectPath, 'real.ts'), 'export const r = 1\n', 'utf8')
+    const res = await request(app).get('/api/projects/proj-test/code/file?path=real.ts')
+    expect(res.status).toBe(200)
+    expect(res.body.content).toBe('export const r = 1\n')
+  })
+})
+
+describe('POST /file/regenerate-summary result surfacing', () => {
+  it('passes force:true so an explicit regenerate bypasses the hash gate', async () => {
+    fs.writeFileSync(path.join(projectPath, 'foo.ts'), 'x', 'utf8')
+    await request(app)
+      .post('/api/projects/proj-test/code/file/regenerate-summary?path=foo.ts')
+      .send({})
+    expect(enqueueSpy.mock.calls[0][0]).toMatchObject({ force: true })
+  })
+
+  it('surfaces skipped:budget as 200 { skipped: "budget" } so the client prompt is reachable', async () => {
+    fs.writeFileSync(path.join(projectPath, 'foo.ts'), 'x', 'utf8')
+    enqueueSpy.mockResolvedValueOnce('skipped:budget')
+    const res = await request(app)
+      .post('/api/projects/proj-test/code/file/regenerate-summary?path=foo.ts')
+      .send({})
+    expect(res.status).toBe(200)
+    expect(res.body.skipped).toBe('budget')
+  })
+
+  it('surfaces a failed enqueue as 500', async () => {
+    fs.writeFileSync(path.join(projectPath, 'foo.ts'), 'x', 'utf8')
+    enqueueSpy.mockResolvedValueOnce('failed')
+    const res = await request(app)
+      .post('/api/projects/proj-test/code/file/regenerate-summary?path=foo.ts')
+      .send({})
+    expect(res.status).toBe(500)
   })
 })

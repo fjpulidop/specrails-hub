@@ -17,12 +17,13 @@ interface Props {
 }
 
 export function TicketFilesTouched({ ticketId, onClose }: Props) {
-  if (!FEATURE_CODE_EXPLORER) return null
-
+  // Hooks must run unconditionally and in a stable order — declare them before
+  // any early return (Rules of Hooks). The feature gate is applied below.
   const navigate = useNavigate()
   const [rows, setRows] = useState<ProvenanceRow[] | null>(null)
 
   useEffect(() => {
+    if (!FEATURE_CODE_EXPLORER) return
     let cancelled = false
     fetch(`${getApiBase()}/code/provenance?ticketId=${ticketId}`)
       .then((r) => (r.ok ? r.json() : []))
@@ -31,6 +32,7 @@ export function TicketFilesTouched({ ticketId, onClose }: Props) {
     return () => { cancelled = true }
   }, [ticketId])
 
+  if (!FEATURE_CODE_EXPLORER) return null
   if (!rows || rows.length === 0) return null
 
   return (
