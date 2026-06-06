@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.59.0](https://github.com/fjpulidop/specrails-hub/compare/v1.58.4...v1.59.0) (2026-06-06)
+
+
+### Features
+
+* **desktop:** Specrails rebrand — icon, splash & default theme ([#337](https://github.com/fjpulidop/specrails-hub/issues/337)) ([f37485f](https://github.com/fjpulidop/specrails-hub/commit/f37485fb84a4dda822c35de53989fed244607728))
+
 ## [1.58.4](https://github.com/fjpulidop/specrails-hub/compare/v1.58.3...v1.58.4) (2026-06-06)
 
 
