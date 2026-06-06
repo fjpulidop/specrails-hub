@@ -161,8 +161,8 @@ pub fn run() {
             if !port_free {
                 app_handle
                     .dialog()
-                    .message("Port 4200 is already in use by another process. Close it and reopen SpecRails Hub.")
-                    .title("SpecRails Hub — Port Conflict")
+                    .message("Port 4200 is already in use by another process. Close it and reopen Specrails.")
+                    .title("Specrails — Port Conflict")
                     .blocking_show();
                 std::process::exit(1);
             }
@@ -293,9 +293,9 @@ pub fn run() {
                     app_handle2
                         .dialog()
                         .message(
-                            "SpecRails Hub failed to start. Check that port 4200 is not in use.",
+                            "Specrails failed to start. Check that port 4200 is not in use.",
                         )
-                        .title("SpecRails Hub — Startup Error")
+                        .title("Specrails — Startup Error")
                         .blocking_show();
                     std::process::exit(1);
                 }

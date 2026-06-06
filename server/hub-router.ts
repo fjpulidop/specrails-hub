@@ -670,7 +670,7 @@ export function createHubRouter(
   // Persisted under hub_settings key `ui_theme`. Default seeded by migration 8.
   router.get('/theme', (_req, res) => {
     const stored = getHubSetting(registry.hubDb, 'ui_theme')
-    const theme = stored && THEME_ID_ALLOWLIST.has(stored) ? stored : 'dracula'
+    const theme = stored && THEME_ID_ALLOWLIST.has(stored) ? stored : 'specrails'
     res.json({ theme })
   })
 

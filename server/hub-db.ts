@@ -154,7 +154,7 @@ function applyHubMigrations(db: DbInstance): void {
     // client (client/src/lib/themes.ts).
     () => {
       db.prepare('INSERT OR IGNORE INTO hub_settings (key, value) VALUES (?, ?)').run(
-        'ui_theme', 'dracula',
+        'ui_theme', 'specrails',
       )
     },
     // Migration 9: seed code-explorer hub settings — summary language + monthly
