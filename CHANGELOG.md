@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.58.4](https://github.com/fjpulidop/specrails-hub/compare/v1.58.3...v1.58.4) (2026-06-06)
+
+
+### Bug Fixes
+
+* **code-explorer:** repair provenance, summaries, security and viewer bugs ([#335](https://github.com/fjpulidop/specrails-hub/issues/335)) ([d56243f](https://github.com/fjpulidop/specrails-hub/commit/d56243facf621dcf503a1f5ab2c0156b849031ff))
+
 ## [1.58.3](https://github.com/fjpulidop/specrails-hub/compare/v1.58.2...v1.58.3) (2026-06-06)
 
 
