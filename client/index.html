@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>specrails — Hub</title>
+    <title>Specrails</title>
     <!--
       Anti-FOUC: read the cached theme synchronously and apply it to <html>
       BEFORE Vite's module bundle loads. Without this, every boot would flash
@@ -94,49 +94,92 @@
         opacity: 0;
         visibility: hidden;
       }
-      .specrails-splash__brand {
-        font-size: 22px;
-        font-weight: 600;
-        letter-spacing: -0.01em;
-        display: flex;
-        gap: 0;
+      .specrails-splash__mark {
+        width: 136px;
+        height: 136px;
+        display: block;
+        overflow: visible;
       }
-      .specrails-splash__brand .part-a { color: var(--splash-primary); }
-      .specrails-splash__brand .part-b { color: var(--splash-secondary); }
-      .specrails-splash__brand .part-c {
-        color: var(--splash-muted);
-        font-weight: 400;
-        margin-left: 8px;
+      .specrails-splash__mark .pill {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: splash-pill-travel 2.4s ease-in-out infinite;
       }
-      .specrails-splash__spinner {
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        border: 2px solid color-mix(in srgb, var(--splash-fg) 12%, transparent);
-        border-top-color: var(--splash-primary);
-        animation: specrails-spin 720ms linear infinite;
+      .specrails-splash__mark .pill-body {
+        filter:
+          drop-shadow(0 0 14px var(--splash-primary))
+          drop-shadow(0 0 26px color-mix(in srgb, var(--splash-secondary) 55%, transparent));
       }
-      .specrails-splash__hint {
-        font-size: 11px;
-        color: var(--splash-muted);
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
+      .specrails-splash__mark .bar-1 {
+        animation: splash-bar 2.4s ease-in-out infinite;
       }
-      @keyframes specrails-spin {
-        to { transform: rotate(360deg); }
+      .specrails-splash__mark .bar-2 {
+        animation: splash-bar 2.4s ease-in-out infinite;
+        animation-delay: 0.4s;
+      }
+      .specrails-splash__glow {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse 60% 45% at 50% 50%,
+          color-mix(in srgb, var(--splash-primary) 22%, transparent) 0%,
+          color-mix(in srgb, var(--splash-primary) 6%, transparent) 30%,
+          transparent 58%
+        );
+        animation: splash-glow 2.4s ease-in-out infinite;
+      }
+      /* The pill rides the rails: fades in from the left, rests in the
+         centre for ~0.5s, then shoots off to the right and fades out. */
+      @keyframes splash-pill-travel {
+        0%   { transform: translateX(-1000px); opacity: 0; }
+        28%  { transform: translateX(0);       opacity: 1; }
+        48%  { transform: translateX(0);       opacity: 1;
+               animation-timing-function: cubic-bezier(0.6, 0, 0.85, 0.15); }
+        60%  { transform: translateX(1100px);  opacity: 0; }
+        100% { transform: translateX(1100px);  opacity: 0; }
+      }
+      @keyframes splash-bar {
+        0%, 100% { opacity: 0.28; }
+        50% { opacity: 0.6; }
+      }
+      @keyframes splash-glow {
+        0%, 100% { opacity: 0.1; }
+        28%, 48% { opacity: 0.45; }
+        60% { opacity: 0.1; }
       }
       @media (prefers-reduced-motion: reduce) {
-        .specrails-splash__spinner { animation-duration: 1600ms; }
+        .specrails-splash__mark .pill,
+        .specrails-splash__mark .bar-1,
+        .specrails-splash__mark .bar-2,
+        .specrails-splash__glow {
+          animation: none;
+        }
+        .specrails-splash__mark .pill { opacity: 1; }
       }
     </style>
   </head>
   <body>
-    <div id="specrails-splash" aria-hidden="false" role="status" aria-label="Loading specrails hub">
-      <div class="specrails-splash__brand">
-        <span class="part-a">spec</span><span class="part-b">rails</span><span class="part-c">hub</span>
-      </div>
-      <div class="specrails-splash__spinner" aria-hidden="true"></div>
-      <div class="specrails-splash__hint">starting</div>
+    <div id="specrails-splash" aria-hidden="false" role="status" aria-label="Loading Specrails">
+      <div class="specrails-splash__glow" aria-hidden="true"></div>
+      <svg
+        class="specrails-splash__mark"
+        viewBox="64 166 384 182"
+        role="img"
+        aria-label="Specrails"
+      >
+        <defs>
+          <linearGradient id="splash-pillfill" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="var(--splash-primary)"></stop>
+            <stop offset="100%" stop-color="var(--splash-secondary)"></stop>
+          </linearGradient>
+        </defs>
+        <rect class="bar-1" x="80" y="182" width="352" height="18" rx="9" fill="var(--splash-muted)"></rect>
+        <rect class="bar-2" x="80" y="314" width="352" height="18" rx="9" fill="var(--splash-muted)"></rect>
+        <g class="pill">
+          <rect class="pill-body" x="80" y="220" width="352" height="72" rx="36" fill="url(#splash-pillfill)"></rect>
+        </g>
+      </svg>
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

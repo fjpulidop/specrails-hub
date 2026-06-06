@@ -1096,11 +1096,11 @@ describe('hub-router', () => {
   // ─── Theme ──────────────────────────────────────────────────────────────────
 
   describe('GET /api/hub/theme', () => {
-    it('returns dracula by default (seeded by migration)', async () => {
+    it('returns specrails by default (seeded by migration)', async () => {
       const { app } = createApp()
       const res = await request(app).get('/api/hub/theme')
       expect(res.status).toBe(200)
-      expect(res.body.theme).toBe('dracula')
+      expect(res.body.theme).toBe('specrails')
     })
 
     it('returns the persisted theme', async () => {
@@ -1111,12 +1111,12 @@ describe('hub-router', () => {
       expect(res.body.theme).toBe('aurora-light')
     })
 
-    it('falls back to dracula when persisted value is outside the allow-list', async () => {
+    it('falls back to specrails when persisted value is outside the allow-list', async () => {
       setHubSetting(hubDb, 'ui_theme', 'totally-bogus-theme')
       const { app } = createApp()
       const res = await request(app).get('/api/hub/theme')
       expect(res.status).toBe(200)
-      expect(res.body.theme).toBe('dracula')
+      expect(res.body.theme).toBe('specrails')
     })
   })
 
@@ -1148,7 +1148,7 @@ describe('hub-router', () => {
         .send({ theme: 'matricks' })
       expect(res.status).toBe(400)
       expect(res.body.error).toBe('invalid_theme')
-      expect(getHubSetting(hubDb, 'ui_theme')).toBe('dracula')
+      expect(getHubSetting(hubDb, 'ui_theme')).toBe('specrails')
     })
 
     it('rejects unknown theme with 400', async () => {
@@ -1158,7 +1158,7 @@ describe('hub-router', () => {
         .send({ theme: 'midnight-blue' })
       expect(res.status).toBe(400)
       expect(res.body.error).toBe('invalid_theme')
-      expect(getHubSetting(hubDb, 'ui_theme')).toBe('dracula')
+      expect(getHubSetting(hubDb, 'ui_theme')).toBe('specrails')
     })
 
     it('rejects non-string theme with 400', async () => {
