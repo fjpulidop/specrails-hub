@@ -6,15 +6,48 @@ import type { DbInstance } from './db'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export type CliProvider = 'claude' | 'codex'
+
 export interface ProjectRow {
   id: string
   slug: string
   name: string
   path: string
   db_path: string
-  provider: 'claude' | 'codex'
+  /** Primary / default provider. Single source for single-provider projects and
+   *  the fallback when a per-invocation provider override is not supplied. */
+  provider: CliProvider
+  /** All providers installed for this project. Always contains at least
+   *  `provider`. When length === 1 every feature behaves exactly as a
+   *  single-provider project. Stored as a JSON array in the `providers` column. */
+  providers: CliProvider[]
   added_at: string
   last_seen_at: string
+}
+
+/** Raw row shape as SQLite returns it (`providers` is the JSON TEXT column). */
+interface ProjectRowRaw extends Omit<ProjectRow, 'providers'> {
+  providers: string | null
+}
+
+function parseProviders(raw: string | null | undefined, primary: CliProvider): CliProvider[] {
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed.every((x) => typeof x === 'string')) {
+        return parsed as CliProvider[]
+      }
+    } catch {
+      /* fall through to single-provider fallback */
+    }
+  }
+  return [primary]
+}
+
+function mapProjectRow(raw: ProjectRowRaw | undefined): ProjectRow | undefined {
+  if (!raw) return undefined
+  const provider = (raw.provider ?? 'claude') as CliProvider
+  return { ...raw, provider, providers: parseProviders(raw.providers, provider) }
 }
 
 export type AgentStatus = 'idle' | 'busy' | 'offline'
@@ -164,6 +197,47 @@ function applyHubMigrations(db: DbInstance): void {
       seed.run('summary_language', 'en')
       seed.run('summary_monthly_budget_usd', '5.00')
     },
+    // Migration 10: multi-provider per project. Add a `providers` JSON-array
+    // column alongside the existing primary `provider` column and backfill it
+    // from the current single provider so legacy projects become
+    // providers=["<provider>"] (length 1 → behaves exactly as before).
+    () => {
+      db.exec(`ALTER TABLE projects ADD COLUMN providers TEXT NOT NULL DEFAULT '[]'`)
+      db.exec(`UPDATE projects SET providers = json_array(provider) WHERE providers IS NULL OR providers = '[]'`)
+    },
+    // Migration 11: self-heal the `providers` column. An earlier WIP of the
+    // multi-provider feature also numbered a migration #10 but used different
+    // column names (`installed_engines` / `default_engine`). On a DB that ran
+    // that variant, version 10 is already recorded so Migration 10 above is
+    // skipped and `providers` is missing — addProject's INSERT then fails. This
+    // higher-numbered migration is guarded by a column check so it is a no-op on
+    // fresh DBs (where #10 already added the column) and repairs the orphaned-
+    // WIP DBs, backfilling from `installed_engines` when present else `provider`.
+    () => {
+      const cols = (db.prepare('PRAGMA table_info(projects)').all() as { name: string }[]).map((c) => c.name)
+      if (!cols.includes('providers')) {
+        db.exec(`ALTER TABLE projects ADD COLUMN providers TEXT NOT NULL DEFAULT '[]'`)
+      }
+      const hasInstalledEngines = cols.includes('installed_engines')
+      const rows = db.prepare(
+        `SELECT id, provider, providers${hasInstalledEngines ? ', installed_engines' : ''} FROM projects`,
+      ).all() as { id: string; provider: string | null; providers: string | null; installed_engines?: string | null }[]
+      const upd = db.prepare('UPDATE projects SET providers = ? WHERE id = ?')
+      for (const r of rows) {
+        if (r.providers && r.providers !== '[]') continue
+        let value: string | null = null
+        if (hasInstalledEngines && r.installed_engines) {
+          try {
+            const parsed = JSON.parse(r.installed_engines)
+            if (Array.isArray(parsed) && parsed.length > 0) value = JSON.stringify(parsed)
+          } catch {
+            /* fall through to provider-based backfill */
+          }
+        }
+        if (!value) value = JSON.stringify([r.provider ?? 'claude'])
+        upd.run(value, r.id)
+      }
+    },
   ]
 
   for (let i = 0; i < migrations.length; i++) {
@@ -190,34 +264,46 @@ export function initHubDb(dbPath: string = getHubDbPath()): DbInstance {
 }
 
 export function listProjects(db: DbInstance): ProjectRow[] {
-  return db.prepare(
+  return (db.prepare(
     'SELECT * FROM projects ORDER BY added_at ASC'
-  ).all() as ProjectRow[]
+  ).all() as ProjectRowRaw[]).map((r) => mapProjectRow(r)!)
 }
 
 export function getProject(db: DbInstance, id: string): ProjectRow | undefined {
-  return db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as ProjectRow | undefined
+  return mapProjectRow(db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as ProjectRowRaw | undefined)
 }
 
 export function getProjectBySlug(db: DbInstance, slug: string): ProjectRow | undefined {
-  return db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug) as ProjectRow | undefined
+  return mapProjectRow(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug) as ProjectRowRaw | undefined)
 }
 
 export function getProjectByPath(db: DbInstance, projectPath: string): ProjectRow | undefined {
-  return db.prepare('SELECT * FROM projects WHERE path = ?').get(projectPath) as ProjectRow | undefined
+  return mapProjectRow(db.prepare('SELECT * FROM projects WHERE path = ?').get(projectPath) as ProjectRowRaw | undefined)
 }
 
 export function addProject(
   db: DbInstance,
-  project: { id: string; slug: string; name: string; path: string; provider?: 'claude' | 'codex' }
+  project: {
+    id: string
+    slug: string
+    name: string
+    path: string
+    provider?: CliProvider
+    providers?: CliProvider[]
+  }
 ): ProjectRow {
   const dbPath = getProjectDbPath(project.slug)
-  const provider = project.provider ?? 'claude'
+  const providers =
+    project.providers && project.providers.length > 0
+      ? project.providers
+      : [project.provider ?? 'claude']
+  // Primary provider = explicit override, else the first selected provider.
+  const provider = project.provider ?? providers[0]
   db.prepare(`
-    INSERT INTO projects (id, slug, name, path, db_path, provider)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(project.id, project.slug, project.name, project.path, dbPath, provider)
-  return db.prepare('SELECT * FROM projects WHERE id = ?').get(project.id) as ProjectRow
+    INSERT INTO projects (id, slug, name, path, db_path, provider, providers)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(project.id, project.slug, project.name, project.path, dbPath, provider, JSON.stringify(providers))
+  return getProject(db, project.id) as ProjectRow
 }
 
 export function removeProject(db: DbInstance, id: string): void {

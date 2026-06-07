@@ -43,6 +43,7 @@ export type RefineFailureReason =
   | 'malformed'
   | 'timeout'
   | 'parser_error'
+  | 'provider-unsupported'
 
 export interface ContractRefineDeps {
   db: DbInstance
@@ -252,6 +253,16 @@ export async function runContractRefine(
   if (!conversation || conversation.kind !== 'explore') {
     console.log(`[contract-refine-runner] skip: conversation missing or not explore (kind=${conversation?.kind})`)
     return { ok: false, reason: 'not-explore', ticketId, conversationId }
+  }
+
+  // Contract Layer refinement is a Claude-only capability (it `--resume`s the
+  // Explore session and invokes the `/specrails:contract-refine` slash command,
+  // neither of which Codex supports). Skip defensively when the conversation
+  // ran on a non-claude engine; the Add Spec UI already hides the toggle for
+  // those, but a manually-crafted scope must never spawn the wrong CLI.
+  if (conversation.provider && conversation.provider !== 'claude') {
+    console.log(`[contract-refine-runner] skip: provider '${conversation.provider}' does not support contract refine`)
+    return { ok: false, reason: 'provider-unsupported', ticketId, conversationId }
   }
 
   // Per-conversation gating: contractRefine on the conversation's stored

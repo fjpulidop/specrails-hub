@@ -8,17 +8,24 @@ import { AgentSelector, ALL_AGENTS, CORE_AGENTS, DEFAULT_SELECTED } from './Agen
 import { ModelSelector, type ModelPreset, type ModelOverrides } from './ModelSelector'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import { cn } from '../lib/utils'
-import type { HubProject } from '../hooks/useHub'
+import { type HubProject, projectProviders } from '../hooks/useHub'
+import { providerLabel } from '../lib/provider-capabilities'
 import { usePrerequisites, type SetupPrerequisitesStatus } from '../hooks/usePrerequisites'
 import { PrerequisitesPanel } from './PrerequisitesPanel'
 
 // ─── Wizard step types ────────────────────────────────────────────────────────
+//
+// Multi-provider: a project may install one or both providers. The wizard
+// configures each provider in turn (`agent-selection` with `providerIndex`),
+// then installs them sequentially (`installing`), then shows a combined
+// per-provider summary (`complete`). Single-provider projects collapse to the
+// classic Configure → Install → Done flow (providerIndex always 0).
 
 type WizardStep =
-  | { step: 'agent-selection' }
-  | { step: 'installing' }
-  | { step: 'complete'; summary: SetupSummary }
-  | { step: 'error'; message: string; retryStep: 'installing' }
+  | { step: 'agent-selection'; providerIndex: number }
+  | { step: 'installing'; providerIndex: number }
+  | { step: 'complete'; summaries: SetupSummary[] }
+  | { step: 'error'; message: string; retryStep: 'installing'; providerIndex: number }
 
 interface SetupSummary {
   agents: number
@@ -89,7 +96,8 @@ interface WizardSnapshot {
   wizardStep: WizardStep
   checkpoints: CheckpointState[]
   logLines: string[]
-  installConfig: InstallConfig
+  /** Per-provider install configs, keyed by provider id. */
+  configs: Record<string, InstallConfig>
 }
 
 const wizardCache = new Map<string, WizardSnapshot>()
@@ -128,6 +136,8 @@ function AgentSelectionStep({
   onInstall,
   onSkip,
   provider,
+  ctaLabel = 'Install',
+  lastStep = true,
   prerequisites,
   prerequisitesLoading,
   prerequisitesError,
@@ -138,6 +148,10 @@ function AgentSelectionStep({
   onInstall: () => void
   onSkip: () => void
   provider: 'claude' | 'codex'
+  /** Primary CTA label — "Install" on the last provider, "Next: …" otherwise. */
+  ctaLabel?: string
+  /** True on the last (or only) provider — drives the CTA icon. */
+  lastStep?: boolean
   prerequisites: SetupPrerequisitesStatus | null
   prerequisitesLoading: boolean
   prerequisitesError: Error | null
@@ -159,7 +173,7 @@ function AgentSelectionStep({
             <Bot className="w-5 h-5 text-accent-primary" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold">Configure your agents</h2>
+            <h2 className="text-sm font-semibold">Configure {providerLabel(provider)} agents</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
               Choose which agents to install and how to run them.
             </p>
@@ -244,8 +258,8 @@ function AgentSelectionStep({
             onClick={onInstall}
             disabled={installDisabled}
           >
-            <Package className="w-3.5 h-3.5" />
-            Install
+            {lastStep ? <Package className="w-3.5 h-3.5" /> : <ArrowRight className="w-3.5 h-3.5" />}
+            {ctaLabel}
           </Button>
         </div>
       </div>
@@ -258,9 +272,11 @@ function AgentSelectionStep({
 function InstallingStep({
   logLines,
   onBack,
+  providerLabelText,
 }: {
   logLines: string[]
   onBack: () => void
+  providerLabelText?: string
 }) {
   return (
     <div className="flex flex-col h-full max-w-lg mx-auto px-6 py-8 gap-4">
@@ -270,7 +286,9 @@ function InstallingStep({
             <Package className="w-4 h-4 text-accent-primary animate-pulse" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold">Installing specrails...</h2>
+            <h2 className="text-sm font-semibold">
+              {providerLabelText ? `Installing ${providerLabelText}…` : 'Installing specrails...'}
+            </h2>
             <p className="text-xs text-muted-foreground">Installing agents from templates</p>
           </div>
         </div>
@@ -293,17 +311,46 @@ function InstallingStep({
 
 // ─── Step 3: Complete ─────────────────────────────────────────────────────────
 
+function SummaryCard({ summary }: { summary: SetupSummary }) {
+  const isCodex = summary.provider === 'codex'
+  return (
+    <div className="w-full rounded-lg border border-border/50 bg-muted/20 p-4">
+      <div className="text-[11px] font-semibold text-foreground mb-2">{providerLabel(summary.provider)}</div>
+      <div className="grid grid-cols-3 gap-4 text-center">
+        <div>
+          <div className="text-2xl font-bold text-accent-primary">{summary.agents}</div>
+          <div className="text-[10px] text-muted-foreground">{isCodex ? 'Agent skills' : 'Agents'}</div>
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-accent-success">{summary.specrailsCommands}</div>
+          <div className="text-[10px] text-muted-foreground">{isCodex ? 'Skills' : '/specrails:*'}</div>
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-accent-info">{summary.opsxCommands}</div>
+          <div className="text-[10px] text-muted-foreground">{isCodex ? 'OpenSpec skills' : '/opsx:*'}</div>
+        </div>
+      </div>
+      {summary.legacySrRemoved > 0 && (
+        <p className="mt-3 text-xs text-muted-foreground text-center">
+          Removed {summary.legacySrRemoved} legacy <code className="text-xs">/specrails:*</code> command{summary.legacySrRemoved === 1 ? '' : 's'}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function CompleteStep({
   projectName,
-  summary,
+  summaries,
   onGoToProject,
 }: {
   projectName: string
-  summary: SetupSummary
+  summaries: SetupSummary[]
   onGoToProject: () => void
 }) {
+  const list = summaries.length > 0 ? summaries : [{ ...EMPTY_SUMMARY }]
   return (
-    <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto px-6 gap-8">
+    <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto px-6 gap-6 overflow-auto py-8">
       <div className="w-16 h-16 rounded-2xl bg-accent-success/20 flex items-center justify-center">
         <Check className="w-8 h-8 text-accent-success" />
       </div>
@@ -318,34 +365,12 @@ function CompleteStep({
         </p>
       </div>
 
-      <div className="w-full rounded-lg border border-border/50 bg-muted/20 p-4">
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <div className="text-2xl font-bold text-accent-primary">{summary.agents}</div>
-            <div className="text-[10px] text-muted-foreground">
-              {summary.provider === 'codex' ? 'Agent skills' : 'Agents'}
-            </div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-accent-success">{summary.specrailsCommands}</div>
-            <div className="text-[10px] text-muted-foreground">
-              {summary.provider === 'codex' ? 'Skills' : '/specrails:*'}
-            </div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-accent-info">{summary.opsxCommands}</div>
-            <div className="text-[10px] text-muted-foreground">
-              {summary.provider === 'codex' ? 'OpenSpec skills' : '/opsx:*'}
-            </div>
-          </div>
-        </div>
-
-        {summary.legacySrRemoved > 0 && (
-          <p className="mt-3 text-xs text-muted-foreground text-center">
-            Removed {summary.legacySrRemoved} legacy <code className="text-xs">/specrails:*</code> command{summary.legacySrRemoved === 1 ? '' : 's'}
-          </p>
-        )}
-      </div>
+      {list.length > 1 && (
+        <p className="text-[11px] text-muted-foreground">Installed for {list.length} engines</p>
+      )}
+      {list.map((s, i) => (
+        <SummaryCard key={s.provider ?? i} summary={s} />
+      ))}
 
       <div className="text-center space-y-1">
         <p className="text-xs text-muted-foreground">
@@ -404,16 +429,22 @@ function ErrorStep({
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
-function StepIndicator({ wizardStep }: { wizardStep: WizardStep }) {
-  const steps = [
-    { id: 'agent-selection', label: 'Configure' },
-    { id: 'installing', label: 'Install' },
-    { id: 'complete', label: 'Done' },
-  ]
-  const stepOrder = steps.map((s) => s.id)
+function StepIndicator({ wizardStep, providers }: { wizardStep: WizardStep; providers: readonly string[] }) {
+  // One "Configure" step per provider (labelled by provider when >1), then a
+  // single Install step and a Done step.
+  const multi = providers.length > 1
+  const configureSteps = multi
+    ? providers.map((p) => ({ label: providerLabel(p) }))
+    : [{ label: 'Configure' }]
+  const steps = [...configureSteps, { label: 'Install' }, { label: 'Done' }]
 
-  const currentStepId = wizardStep.step === 'error' ? wizardStep.retryStep : wizardStep.step
-  const currentIndex = stepOrder.indexOf(currentStepId)
+  const installIdx = configureSteps.length
+  const doneIdx = installIdx + 1
+  const currentIndex =
+    wizardStep.step === 'agent-selection' ? Math.min(wizardStep.providerIndex, configureSteps.length - 1)
+      : wizardStep.step === 'installing' ? installIdx
+      : wizardStep.step === 'error' ? installIdx
+      : doneIdx
 
   return (
     <div className="flex items-center gap-2">
@@ -421,7 +452,7 @@ function StepIndicator({ wizardStep }: { wizardStep: WizardStep }) {
         const isDone = i < currentIndex
         const isCurrent = i === currentIndex
         return (
-          <div key={s.id} className="flex items-center gap-2">
+          <div key={`${s.label}-${i}`} className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
               <div
                 className={cn(
@@ -463,10 +494,19 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
   const onComplete = useCallback(() => { wizardCache.delete(project.id); rawOnComplete() }, [project.id, rawOnComplete])
   const onSkip = useCallback(() => { wizardCache.delete(project.id); rawOnSkip() }, [project.id, rawOnSkip])
 
+  // Installed providers (one or both). The wizard configures + installs each in
+  // sequence; single-provider projects collapse to the classic flow.
+  const providers = projectProviders(project) as ('claude' | 'codex')[]
+
   const cached = wizardCache.get(project.id)
 
-  const [wizardStep, setWizardStep] = useState<WizardStep>(cached?.wizardStep ?? { step: 'agent-selection' })
-  const [installConfig, setInstallConfig] = useState<InstallConfig>(cached?.installConfig ?? buildDefaultConfig())
+  const [wizardStep, setWizardStep] = useState<WizardStep>(cached?.wizardStep ?? { step: 'agent-selection', providerIndex: 0 })
+  const [configs, setConfigs] = useState<Record<string, InstallConfig>>(() => {
+    if (cached?.configs) return cached.configs
+    const init: Record<string, InstallConfig> = {}
+    for (const p of providers) init[p] = buildDefaultConfig()
+    return init
+  })
   const [checkpoints, setCheckpoints] = useState<CheckpointState[]>(cached?.checkpoints ?? INSTALL_CHECKPOINTS)
   const [logLines, setLogLines] = useState<string[]>(cached?.logLines ?? [])
   const {
@@ -476,16 +516,31 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
     recheck: refreshSetupPrerequisites,
   } = usePrerequisites()
 
+  // Config for the provider currently being configured.
+  const currentConfigIndex = wizardStep.step === 'agent-selection' ? wizardStep.providerIndex : 0
+  const currentProvider = providers[Math.min(currentConfigIndex, providers.length - 1)] ?? 'claude'
+  const currentConfig = configs[currentProvider] ?? buildDefaultConfig()
+  const setCurrentConfig = useCallback((next: InstallConfig) => {
+    setConfigs((prev) => ({ ...prev, [currentProvider]: next }))
+  }, [currentProvider])
+
+  // Accumulates per-provider summaries across the sequential install; the index
+  // tracks which provider is currently installing. Refs so the WS handler reads
+  // the latest without re-subscribing.
+  const installSummariesRef = useRef<SetupSummary[]>([])
+  const installIndexRef = useRef(0)
+  const installProviderRef = useRef<(i: number) => void>(() => {})
+
   // Persist refs for cache-on-unmount
   const wizardStepRef = useRef(wizardStep)
   const checkpointsRef = useRef(checkpoints)
   const logLinesRef = useRef(logLines)
-  const installConfigRef = useRef(installConfig)
+  const configsRef = useRef(configs)
 
   wizardStepRef.current = wizardStep
   checkpointsRef.current = checkpoints
   logLinesRef.current = logLines
-  installConfigRef.current = installConfig
+  configsRef.current = configs
 
   useEffect(() => {
     return () => {
@@ -493,7 +548,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
         wizardStep: wizardStepRef.current,
         checkpoints: checkpointsRef.current,
         logLines: logLinesRef.current,
-        installConfig: installConfigRef.current,
+        configs: configsRef.current,
       })
     }
   }, [project.id])
@@ -534,7 +589,10 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
             (cp: CheckpointState) => cp.key === 'base_install' && cp.status === 'done'
           )
           if (hasBaseInstall) {
-            setWizardStep({ step: 'complete', summary: data.summary ?? { ...EMPTY_SUMMARY } })
+            const synced = installSummariesRef.current.length > 0
+              ? installSummariesRef.current
+              : [data.summary ?? { ...EMPTY_SUMMARY }]
+            setWizardStep({ step: 'complete', summaries: synced })
           }
         }
       } catch {
@@ -562,7 +620,16 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
 
       case 'setup_install_done': {
         const summary = (msg.summary as SetupSummary | undefined) ?? { ...EMPTY_SUMMARY }
-        setWizardStep({ step: 'complete', summary })
+        installSummariesRef.current = [...installSummariesRef.current, summary]
+        const nextIndex = installIndexRef.current + 1
+        if (nextIndex < providers.length) {
+          // More providers to install — kick off the next one and stay in the
+          // installing step. The step indicator/progress reset for the next CLI.
+          installIndexRef.current = nextIndex
+          installProviderRef.current(nextIndex)
+        } else {
+          setWizardStep({ step: 'complete', summaries: [...installSummariesRef.current] })
+        }
         break
       }
 
@@ -583,11 +650,14 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
 
       case 'setup_error': {
         const error = msg.error as string
-        setWizardStep({ step: 'error', message: error, retryStep: 'installing' })
+        setWizardStep({ step: 'error', message: error, retryStep: 'installing', providerIndex: installIndexRef.current })
         break
       }
     }
-  }, [project.id])
+    // providers.length (a stable number, unlike the freshly-derived providers
+    // array) keeps the sequential-install completion check correct without
+    // re-subscribing the WS handler on every render.
+  }, [project.id, providers.length])
 
   useLayoutEffect(() => {
     registerHandler(`setup-${project.id}`, handleWsMessage)
@@ -596,21 +666,11 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 
-  async function handleInstall() {
-    const cfg = installConfigRef.current
-    const provider = (project as { provider?: 'claude' | 'codex' }).provider ?? 'claude'
-
-    if (setupPrerequisites !== null && !setupPrerequisites.ok) {
-      setWizardStep({
-        step: 'error',
-        retryStep: 'installing',
-        message: [
-          'SpecRails setup needs Node.js, npm, npx and Git available on PATH before it can install this project.',
-          'Install the missing tools, restart SpecRails Hub, then retry setup.',
-        ].join('\n\n'),
-      })
-      return
-    }
+  // Kick off the install for a single provider (index into `providers`). The WS
+  // `setup_install_done` handler advances to the next provider or to Done.
+  const installProvider = useCallback((index: number) => {
+    const provider = providers[index] ?? 'claude'
+    const cfg = configsRef.current[provider] ?? buildDefaultConfig()
 
     // Ensure core agents are always included
     const selectedWithCore = [...new Set([...CORE_AGENTS, ...cfg.selectedAgents])]
@@ -624,64 +684,105 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
 
     setCheckpoints(INSTALL_CHECKPOINTS)
     setLogLines([])
-    setWizardStep({ step: 'installing' })
+    setWizardStep({ step: 'installing', providerIndex: index })
 
     // Write install config matching specrails-core's install-config.yaml schema.
     // `tier: 'quick'` is hardcoded — the hub only exposes the template-agent
     // install flow now; the legacy AI-enrich flow lives in specrails-core's
     // standalone `npx specrails-core@latest init` for users who want it.
-    try {
-      await fetch(`/api/projects/${project.id}/setup/install-config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          version: 1,
-          provider,
-          tier: 'quick',
-          agents: {
-            selected: selectedWithCore,
-            excluded,
-          },
-          models: {
-            preset: cfg.modelPreset,
-            defaults: { model: presetToDefaultModel(cfg.modelPreset) },
-            overrides: shortOverrides,
-          },
-          agent_teams: false,
-        }),
+    // install-config is written then `install` is started; the server runs ONE
+    // provider's `npx specrails-core init` per call. Multi-provider projects
+    // call this once per provider in sequence (driven by setup_install_done).
+    void (async () => {
+      try {
+        await fetch(`/api/projects/${project.id}/setup/install-config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            version: 1,
+            provider,
+            tier: 'quick',
+            agents: { selected: selectedWithCore, excluded },
+            models: {
+              preset: cfg.modelPreset,
+              defaults: { model: presetToDefaultModel(cfg.modelPreset) },
+              overrides: shortOverrides,
+            },
+            agent_teams: false,
+          }),
+        })
+      } catch (err) {
+        console.error('[SetupWizard] install-config write error:', err)
+      }
+      fetch(`/api/projects/${project.id}/setup/install`, { method: 'POST' }).catch((err) => {
+        console.error('[SetupWizard] install start error:', err)
       })
-    } catch (err) {
-      console.error('[SetupWizard] install-config write error:', err)
-    }
+    })()
+  }, [project.id, providers])
 
-    fetch(`/api/projects/${project.id}/setup/install`, { method: 'POST' }).catch((err) => {
-      console.error('[SetupWizard] install start error:', err)
-    })
-  }
+  installProviderRef.current = installProvider
+
+  // Start the full install sequence from the first provider.
+  const startInstallSequence = useCallback(() => {
+    if (setupPrerequisites !== null && !setupPrerequisites.ok) {
+      setWizardStep({
+        step: 'error',
+        retryStep: 'installing',
+        providerIndex: 0,
+        message: [
+          'SpecRails setup needs Node.js, npm, npx and Git available on PATH before it can install this project.',
+          'Install the missing tools, restart SpecRails Hub, then retry setup.',
+        ].join('\n\n'),
+      })
+      return
+    }
+    installSummariesRef.current = []
+    installIndexRef.current = 0
+    installProvider(0)
+  }, [setupPrerequisites, installProvider])
+
+  // Configure-step primary action: advance to the next provider, or — on the
+  // last (or only) provider — begin the install sequence.
+  const handlePrimary = useCallback(() => {
+    if (wizardStep.step !== 'agent-selection') return
+    const i = wizardStep.providerIndex
+    if (i < providers.length - 1) {
+      setWizardStep({ step: 'agent-selection', providerIndex: i + 1 })
+    } else {
+      startInstallSequence()
+    }
+  }, [wizardStep, providers.length, startInstallSequence])
 
   function handleRetry() {
     if (wizardStep.step !== 'error') return
-    handleInstall()
+    startInstallSequence()
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────────
+
+  const configProviderIndex = wizardStep.step === 'agent-selection' ? wizardStep.providerIndex : 0
+  const isLastProvider = configProviderIndex >= providers.length - 1
+  const ctaLabel = isLastProvider ? 'Install' : `Next: ${providerLabel(providers[configProviderIndex + 1])}`
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-background">
       {/* Wizard step indicator */}
       <div className="flex-shrink-0 border-b border-border/30 px-4 py-2">
-        <StepIndicator wizardStep={wizardStep} />
+        <StepIndicator wizardStep={wizardStep} providers={providers} />
       </div>
 
       {/* Step content */}
       <div className="flex-1 overflow-hidden">
         {wizardStep.step === 'agent-selection' && (
           <AgentSelectionStep
-            config={installConfig}
-            onChange={setInstallConfig}
-            onInstall={handleInstall}
+            key={currentProvider}
+            config={currentConfig}
+            onChange={setCurrentConfig}
+            onInstall={handlePrimary}
             onSkip={onSkip}
-            provider={(project as { provider?: 'claude' | 'codex' }).provider ?? 'claude'}
+            provider={currentProvider}
+            ctaLabel={ctaLabel}
+            lastStep={isLastProvider}
             prerequisites={setupPrerequisites}
             prerequisitesLoading={isRefreshingPrerequisites}
             prerequisitesError={setupPrerequisitesError}
@@ -692,14 +793,15 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
         {wizardStep.step === 'installing' && (
           <InstallingStep
             logLines={logLines}
-            onBack={() => setWizardStep({ step: 'agent-selection' })}
+            providerLabelText={providers.length > 1 ? providerLabel(providers[wizardStep.providerIndex]) : undefined}
+            onBack={() => setWizardStep({ step: 'agent-selection', providerIndex: providers.length - 1 })}
           />
         )}
 
         {wizardStep.step === 'complete' && (
           <CompleteStep
             projectName={project.name}
-            summary={wizardStep.summary}
+            summaries={wizardStep.summaries}
             onGoToProject={onComplete}
           />
         )}

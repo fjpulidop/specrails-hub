@@ -521,6 +521,42 @@ const MIGRATIONS: Migration[] = [
       );
     `)
   },
+
+  // Migration 24: chat_conversations.provider — per-conversation AI engine for
+  // multi-provider projects. NULL means "fall back to the project's primary
+  // provider" (single-provider projects never set it, so behaviour is
+  // unchanged). Set at conversation creation from the Add Spec AI Engine
+  // selector; resume turns reuse it so the right CLI binary is spawned.
+  (db) => {
+    db.exec(`ALTER TABLE chat_conversations ADD COLUMN provider TEXT;`)
+  },
+
+  // Migration 25: rails.ai_engine — per-rail AI engine override for
+  // multi-provider projects. NULL means "use the project's primary provider".
+  // Stored on every rail row alongside profile_name; getRail reads the first
+  // row's value.
+  (db) => {
+    db.exec(`ALTER TABLE rails ADD COLUMN ai_engine TEXT;`)
+  },
+
+  // Migration 26: self-heal the multi-provider columns. An earlier WIP of the
+  // multi-provider feature consumed migration versions 24 and 25 on some
+  // databases with DIFFERENT meaning — those DBs already record v24/v25 so
+  // Migrations 24/25 above are skipped, leaving `rails.ai_engine` (and possibly
+  // `chat_conversations.provider`) missing. This higher-numbered migration is
+  // guarded by column checks: a no-op on DBs where the columns already exist,
+  // and an additive repair everywhere else. (Mirrors the #18/#19 self-heal
+  // precedent in this file.)
+  (db) => {
+    const convCols = (db.prepare("PRAGMA table_info(chat_conversations)").all() as { name: string }[]).map((c) => c.name)
+    if (!convCols.includes('provider')) {
+      db.exec(`ALTER TABLE chat_conversations ADD COLUMN provider TEXT;`)
+    }
+    const railCols = (db.prepare("PRAGMA table_info(rails)").all() as { name: string }[]).map((c) => c.name)
+    if (!railCols.includes('ai_engine')) {
+      db.exec(`ALTER TABLE rails ADD COLUMN ai_engine TEXT;`)
+    }
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {
@@ -789,12 +825,12 @@ export function getProjectActivity(db: DbInstance, opts: ActivityQueryOpts): Act
 
 export function createConversation(
   db: DbInstance,
-  opts: { id: string; model: string; kind?: 'sidebar' | 'explore'; contextScope?: unknown }
+  opts: { id: string; model: string; kind?: 'sidebar' | 'explore'; contextScope?: unknown; provider?: string | null }
 ): void {
   const scopeJson = opts.contextScope != null ? JSON.stringify(opts.contextScope) : null
   db.prepare(
-    'INSERT INTO chat_conversations (id, model, kind, context_scope) VALUES (?, ?, ?, ?)'
-  ).run(opts.id, opts.model, opts.kind ?? 'sidebar', scopeJson)
+    'INSERT INTO chat_conversations (id, model, kind, context_scope, provider) VALUES (?, ?, ?, ?, ?)'
+  ).run(opts.id, opts.model, opts.kind ?? 'sidebar', scopeJson, opts.provider ?? null)
 }
 
 export function listConversations(db: DbInstance): ChatConversationRow[] {

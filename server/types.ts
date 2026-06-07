@@ -209,6 +209,8 @@ export interface ChatConversationRow {
   updated_at: string
   kind: 'sidebar' | 'explore'
   context_scope: string | null
+  /** Per-conversation AI engine for multi-provider projects. NULL = project primary. */
+  provider: string | null
 }
 
 export interface ChatMessageRow {

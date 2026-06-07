@@ -181,23 +181,39 @@ export function createHubRouter(
 
   // POST /api/hub/projects — register a new project by path
   router.post('/projects', (req, res) => {
-    const { path: projectPath, name, provider } = req.body ?? {}
+    const { path: projectPath, name, provider, providers: providersRaw } = req.body ?? {}
     if (!projectPath || typeof projectPath !== 'string') {
       res.status(400).json({ error: 'path is required' })
       return
     }
+    // Normalise to a providers list. New multi-provider clients send
+    // `providers: ['claude','codex']`; legacy clients send a single
+    // `provider`; omitting both defaults to ['claude']. The first entry is the
+    // primary/default provider.
+    let providers: string[]
+    if (Array.isArray(providersRaw) && providersRaw.length > 0) {
+      providers = providersRaw
+    } else if (typeof provider === 'string') {
+      providers = [provider]
+    } else {
+      providers = ['claude']
+    }
+    // De-duplicate while preserving order (primary stays first).
+    providers = providers.filter((p, i) => providers.indexOf(p) === i)
     // Provider validation walks the registry — `claude` and `codex` are
     // both accepted as of Stage C; future providers register one adapter
     // file and become acceptable here without further changes.
-    if (provider !== undefined && !hasAdapter(provider)) {
-      res.status(400).json({
-        error: `provider must be one of: ${[...listAdapters().map((a) => a.id)].join(', ')}`,
-      })
-      return
+    for (const p of providers) {
+      if (!hasAdapter(p)) {
+        res.status(400).json({
+          error: `provider must be one of: ${[...listAdapters().map((a) => a.id)].join(', ')}`,
+        })
+        return
+      }
     }
     // Beta-gate parity: if codex beta is forced off via env, refuse codex
-    // POSTs too (consistency with /available-providers).
-    if (provider === 'codex' && process.env.SPECRAILS_HUB_CODEX_BETA === '0') {
+    // selections too (consistency with /available-providers).
+    if (providers.includes('codex') && process.env.SPECRAILS_HUB_CODEX_BETA === '0') {
       res.status(400).json({
         error: 'Codex provider is currently disabled (SPECRAILS_HUB_CODEX_BETA=0). Unset or set to 1 to enable.',
       })
@@ -228,7 +244,14 @@ export function createHubRouter(
     const specrailsInstalled = hasSpecrails(canonicalPath)
 
     try {
-      const ctx = registry.addProject({ id, slug, name: derivedName, path: canonicalPath, provider: provider ?? 'claude' })
+      const ctx = registry.addProject({
+        id,
+        slug,
+        name: derivedName,
+        path: canonicalPath,
+        provider: providers[0] as 'claude' | 'codex',
+        providers: providers as ('claude' | 'codex')[],
+      })
       broadcast({
         type: 'hub.project_added',
         project: ctx.project,

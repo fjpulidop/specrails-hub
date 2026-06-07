@@ -20,9 +20,19 @@ export interface HubProject {
   name: string
   path: string
   db_path: string
+  /** Primary / default provider (first selected at install). */
   provider: 'claude' | 'codex'
+  /** All providers installed for this project. Always contains `provider`.
+   *  Optional for forward-compat: older server payloads omit it, callers fall
+   *  back to `[provider]`. */
+  providers?: ('claude' | 'codex')[]
   added_at: string
   last_seen_at: string
+}
+
+/** Installed providers for a project, tolerant of legacy payloads w/o `providers`. */
+export function projectProviders(p: Pick<HubProject, 'provider' | 'providers'>): ('claude' | 'codex')[] {
+  return p.providers && p.providers.length > 0 ? p.providers : [p.provider]
 }
 
 export interface AddProjectResult {
@@ -34,7 +44,7 @@ interface HubContextValue {
   projects: HubProject[]
   activeProjectId: string | null
   setActiveProjectId: (id: string | null) => void
-  addProject: (path: string, name?: string, provider?: 'claude' | 'codex') => Promise<AddProjectResult | null>
+  addProject: (path: string, name?: string, providers?: ('claude' | 'codex')[]) => Promise<AddProjectResult | null>
   removeProject: (id: string) => Promise<void>
   isLoading: boolean
   /** True briefly after switching active project — triggers the loading bar */
@@ -142,11 +152,11 @@ export function HubProvider({ children }: { children: ReactNode }) {
     return () => unregisterHandler('hub')
   }, [handleMessage, registerHandler, unregisterHandler])
 
-  const addProject = useCallback(async (projectPath: string, name?: string, provider: 'claude' | 'codex' = 'claude'): Promise<AddProjectResult | null> => {
+  const addProject = useCallback(async (projectPath: string, name?: string, providers: ('claude' | 'codex')[] = ['claude']): Promise<AddProjectResult | null> => {
     try {
-      const body: Record<string, string> = { path: projectPath }
+      const list = providers.length > 0 ? providers : ['claude']
+      const body: Record<string, unknown> = { path: projectPath, providers: list }
       if (name) body.name = name
-      if (provider) body.provider = provider
 
       const res = await fetch('/api/hub/projects', {
         method: 'POST',

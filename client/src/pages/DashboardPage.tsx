@@ -24,7 +24,7 @@ import { useDashboardSplit } from '../hooks/useDashboardSplit'
 import { TicketDetailModal } from '../components/TicketDetailModal'
 import { CreateTicketModal } from '../components/CreateTicketModal'
 import { getApiBase } from '../lib/api'
-import { useHub } from '../hooks/useHub'
+import { useHub, projectProviders } from '../hooks/useHub'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import { useSpecGenTracker } from '../hooks/useSpecGenTracker'
 import type { LocalTicket } from '../types'
@@ -89,7 +89,11 @@ function saveRails(projectId: string | null, rails: RailState[]) {
 }
 
 export default function DashboardPage() {
-  const { activeProjectId } = useHub()
+  const { activeProjectId, projects } = useHub()
+  const railProviders = (() => {
+    const p = projects.find((pr) => pr.id === activeProjectId)
+    return p ? projectProviders(p) : ['claude']
+  })()
   const { tickets, isLoading, updateTicket, updateTicketStatus, updateTicketPriority, deleteTicket, createTicket, refetch, contractRefiningIds } = useTickets()
   const { registerHandler, unregisterHandler, connectionStatus } = useSharedWebSocket()
   const { specToOpen, clearSpecToOpen } = useSpecGenTracker()
@@ -615,6 +619,22 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleEngineChange(railId: string, aiEngine: 'claude' | 'codex') {
+    updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, aiEngine } : r)))
+    const railIndex = rails.findIndex((r) => r.id === railId)
+    if (railIndex === -1) return
+    try {
+      await fetch(`${getApiBase()}/rails/${railIndex}/engine`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aiEngine }),
+      })
+    } catch {
+      // Best-effort persistence; localStorage holds the truth and the engine is
+      // sent inline on the next launch regardless.
+    }
+  }
+
   async function handleToggle(railId: string) {
     const railIndex = rails.findIndex((r) => r.id === railId)
     if (railIndex === -1) return
@@ -656,6 +676,9 @@ export default function DashboardPage() {
           // rail.profileName can be a string (explicit), null (force legacy),
           // or undefined (let server fall back to stored rail profile or defaults).
           ...(rail.profileName !== undefined ? { profileName: rail.profileName } : {}),
+          // rail.aiEngine: explicit per-rail engine override; undefined → server
+          // falls back to the stored rail engine or the project primary.
+          ...(rail.aiEngine != null ? { aiEngine: rail.aiEngine } : {}),
         }),
       })
       if (!res.ok) {
@@ -727,8 +750,10 @@ export default function DashboardPage() {
           <RailsBoard
             rails={rails}
             ticketMap={ticketMap}
+            providers={railProviders}
             onModeChange={handleModeChange}
             onProfileChange={handleProfileChange}
+            onEngineChange={handleEngineChange}
             onToggle={handleToggle}
             onTicketClick={setDetailTicket}
             onAddRail={handleAddRail}

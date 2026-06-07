@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { isSmashCapable } from '../provider-capabilities'
+import {
+  isSmashCapable,
+  providerSupportsSection,
+  sectionVisibleForProviders,
+  isMultiProvider,
+  providerLabel,
+} from '../provider-capabilities'
 
 describe('isSmashCapable', () => {
   it('returns true for claude', () => {
@@ -22,5 +28,137 @@ describe('isSmashCapable', () => {
     expect(isSmashCapable('openai')).toBe(false)
     expect(isSmashCapable('gemini')).toBe(false)
     expect(isSmashCapable('')).toBe(false)
+  })
+})
+
+describe('providerSupportsSection', () => {
+  it('always-visible sections return true for claude', () => {
+    expect(providerSupportsSection('claude', 'dashboard')).toBe(true)
+    expect(providerSupportsSection('claude', 'jobs')).toBe(true)
+    expect(providerSupportsSection('claude', 'analytics')).toBe(true)
+    expect(providerSupportsSection('claude', 'code')).toBe(true)
+    expect(providerSupportsSection('claude', 'settings')).toBe(true)
+  })
+
+  it('always-visible sections return true for codex', () => {
+    expect(providerSupportsSection('codex', 'dashboard')).toBe(true)
+    expect(providerSupportsSection('codex', 'jobs')).toBe(true)
+    expect(providerSupportsSection('codex', 'analytics')).toBe(true)
+    expect(providerSupportsSection('codex', 'code')).toBe(true)
+    expect(providerSupportsSection('codex', 'settings')).toBe(true)
+  })
+
+  it('always-visible sections return true for unknown / null / undefined', () => {
+    expect(providerSupportsSection(null, 'dashboard')).toBe(true)
+    expect(providerSupportsSection(undefined, 'jobs')).toBe(true)
+    expect(providerSupportsSection('openai', 'analytics')).toBe(true)
+  })
+
+  it('claude supports agents and integrations', () => {
+    expect(providerSupportsSection('claude', 'agents')).toBe(true)
+    expect(providerSupportsSection('claude', 'integrations')).toBe(true)
+  })
+
+  it('codex does NOT support agents or integrations', () => {
+    expect(providerSupportsSection('codex', 'agents')).toBe(false)
+    expect(providerSupportsSection('codex', 'integrations')).toBe(false)
+  })
+
+  it('null/undefined does NOT support claude-only sections', () => {
+    expect(providerSupportsSection(null, 'agents')).toBe(false)
+    expect(providerSupportsSection(undefined, 'integrations')).toBe(false)
+  })
+
+  it('unknown provider does NOT support claude-only sections', () => {
+    expect(providerSupportsSection('openai', 'agents')).toBe(false)
+    expect(providerSupportsSection('', 'integrations')).toBe(false)
+  })
+})
+
+describe('sectionVisibleForProviders', () => {
+  it('always-visible sections are true for any provider list', () => {
+    for (const section of ['dashboard', 'jobs', 'analytics', 'code', 'settings'] as const) {
+      expect(sectionVisibleForProviders(section, ['claude'])).toBe(true)
+      expect(sectionVisibleForProviders(section, ['codex'])).toBe(true)
+      expect(sectionVisibleForProviders(section, ['claude', 'codex'])).toBe(true)
+    }
+  })
+
+  it('claude-only project shows agents and integrations', () => {
+    expect(sectionVisibleForProviders('agents', ['claude'])).toBe(true)
+    expect(sectionVisibleForProviders('integrations', ['claude'])).toBe(true)
+  })
+
+  it('codex-only project hides agents and integrations', () => {
+    expect(sectionVisibleForProviders('agents', ['codex'])).toBe(false)
+    expect(sectionVisibleForProviders('integrations', ['codex'])).toBe(false)
+  })
+
+  it('[claude, codex] multi-provider hides agents and integrations (intersection)', () => {
+    expect(sectionVisibleForProviders('agents', ['claude', 'codex'])).toBe(false)
+    expect(sectionVisibleForProviders('integrations', ['claude', 'codex'])).toBe(false)
+  })
+
+  it('empty array defaults to claude (everything visible)', () => {
+    expect(sectionVisibleForProviders('agents', [])).toBe(true)
+    expect(sectionVisibleForProviders('integrations', [])).toBe(true)
+  })
+
+  it('null defaults to claude (everything visible)', () => {
+    expect(sectionVisibleForProviders('agents', null)).toBe(true)
+    expect(sectionVisibleForProviders('integrations', null)).toBe(true)
+  })
+
+  it('undefined defaults to claude (everything visible)', () => {
+    expect(sectionVisibleForProviders('agents', undefined)).toBe(true)
+    expect(sectionVisibleForProviders('integrations', undefined)).toBe(true)
+  })
+})
+
+describe('isMultiProvider', () => {
+  it('returns false for a single-provider list', () => {
+    expect(isMultiProvider(['claude'])).toBe(false)
+    expect(isMultiProvider(['codex'])).toBe(false)
+  })
+
+  it('returns true for more than one provider', () => {
+    expect(isMultiProvider(['claude', 'codex'])).toBe(true)
+    expect(isMultiProvider(['claude', 'codex', 'openai'])).toBe(true)
+  })
+
+  it('returns false for an empty array', () => {
+    expect(isMultiProvider([])).toBe(false)
+  })
+
+  it('returns false for null', () => {
+    expect(isMultiProvider(null)).toBe(false)
+  })
+
+  it('returns false for undefined', () => {
+    expect(isMultiProvider(undefined)).toBe(false)
+  })
+})
+
+describe('providerLabel', () => {
+  it('returns "Claude" for provider "claude"', () => {
+    expect(providerLabel('claude')).toBe('Claude')
+  })
+
+  it('returns "Codex" for provider "codex"', () => {
+    expect(providerLabel('codex')).toBe('Codex')
+  })
+
+  it('returns the raw string for an unknown provider', () => {
+    expect(providerLabel('openai')).toBe('openai')
+    expect(providerLabel('gemini')).toBe('gemini')
+    expect(providerLabel('')).toBe('')
+  })
+
+  it('returns "Claude" for null (backward-compat default)', () => {
+    expect(providerLabel(null)).toBe('Claude')
+  })
+
+  it('returns "Claude" for undefined (backward-compat default)', () => {
+    expect(providerLabel(undefined)).toBe('Claude')
   })
 })

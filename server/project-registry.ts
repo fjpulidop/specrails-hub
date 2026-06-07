@@ -88,6 +88,7 @@ export class ProjectRegistry {
     name: string
     path: string
     provider?: 'claude' | 'codex'
+    providers?: ('claude' | 'codex')[]
   }): ProjectContext {
     const row = addProjectToHub(this._hubDb, opts)
     return this._loadProjectContext(row)

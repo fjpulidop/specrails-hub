@@ -35,7 +35,7 @@ export interface UseChatReturn {
   createConversation: (model?: string) => Promise<void>
   deleteConversation: (id: string) => Promise<void>
   sendMessage: (conversationId: string, text: string, options?: ChatSendOptions) => Promise<void>
-  startWithMessage: (text: string, options?: ChatSendOptions, model?: string, kind?: 'sidebar' | 'explore', contextScope?: { specrails: boolean; openspec: boolean; full: boolean; mcp: boolean }) => Promise<string | null>
+  startWithMessage: (text: string, options?: ChatSendOptions, model?: string, kind?: 'sidebar' | 'explore', contextScope?: { specrails: boolean; openspec: boolean; full: boolean; mcp: boolean }, provider?: string) => Promise<string | null>
   hydrateConversation: (id: string) => Promise<void>
   abortStream: (conversationId: string) => Promise<void>
   confirmCommand: (command: string) => Promise<void>
@@ -347,10 +347,12 @@ export function useChat(): UseChatReturn {
     model?: string,
     kind?: 'sidebar' | 'explore',
     contextScope?: { specrails: boolean; openspec: boolean; full: boolean; mcp: boolean },
+    provider?: string,
   ): Promise<string | null> => {
     try {
       const body: Record<string, unknown> = { model: model ?? undefined, kind: kind ?? undefined }
       if (contextScope && kind === 'explore') body.contextScope = contextScope
+      if (provider) body.aiEngine = provider
       const res = await fetch(`${getApiBase()}/chat/conversations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -119,7 +119,7 @@ describe('useHub - error paths', () => {
     expect(postCall).toBeDefined()
     const body = JSON.parse(postCall![1].body as string)
     expect(body.name).toBe('Named Project')
-    expect(body.provider).toBe('claude')
+    expect(body.providers).toEqual(['claude'])
   })
 
   it('removeProject: throws when fetch returns non-ok', async () => {

@@ -189,6 +189,44 @@ describe('hub-router', () => {
       expect(res.status).toBe(201)
       expect(res.body.project.path).toBe('/private/tmp/test-wizard')
     })
+
+    it('defaults to providers=["claude"] when no provider is sent', async () => {
+      const { app } = createApp()
+      const res = await request(app).post('/api/hub/projects').send({ path: '/home/user/single' })
+      expect(res.status).toBe(201)
+      expect(res.body.project.provider).toBe('claude')
+      expect(res.body.project.providers).toEqual(['claude'])
+    })
+
+    it('accepts a providers array and sets the first as primary', async () => {
+      const { app } = createApp()
+      const res = await request(app).post('/api/hub/projects').send({ path: '/home/user/multi', providers: ['claude', 'codex'] })
+      expect(res.status).toBe(201)
+      expect(res.body.project.provider).toBe('claude')
+      expect(res.body.project.providers).toEqual(['claude', 'codex'])
+    })
+
+    it('honours a legacy single provider field', async () => {
+      const { app } = createApp()
+      const res = await request(app).post('/api/hub/projects').send({ path: '/home/user/legacy', provider: 'codex' })
+      expect(res.status).toBe(201)
+      expect(res.body.project.provider).toBe('codex')
+      expect(res.body.project.providers).toEqual(['codex'])
+    })
+
+    it('de-duplicates repeated providers', async () => {
+      const { app } = createApp()
+      const res = await request(app).post('/api/hub/projects').send({ path: '/home/user/dup', providers: ['claude', 'claude', 'codex'] })
+      expect(res.status).toBe(201)
+      expect(res.body.project.providers).toEqual(['claude', 'codex'])
+    })
+
+    it('rejects an unknown provider in the array', async () => {
+      const { app } = createApp()
+      const res = await request(app).post('/api/hub/projects').send({ path: '/home/user/bad', providers: ['claude', 'turbofake'] })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toMatch(/provider must be one of/i)
+    })
   })
 
   // ─── DELETE /projects/:id ──────────────────────────────────────────────────

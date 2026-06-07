@@ -38,6 +38,9 @@ export interface ExploreSpecShellProps {
    *  in this shell mutates it. Ignored when `resumeConversationId` is
    *  set (the persisted conversation already carries its own model). */
   initialModel?: string
+  /** AI engine picked at Add Spec (multi-provider). Seeds the conversation's
+   *  provider on first turn; ignored when resuming. Undefined → project primary. */
+  initialProvider?: string
   /** When set, skip the `/specrails:explore-spec` bootstrap turn and resume
    *  from an existing conversation id. Used by the minimize-to-dock restore
    *  path so the user picks up where they left off. */
@@ -116,6 +119,7 @@ export function ExploreSpecShell({
   pendingSpecId,
   initialAttachmentIds,
   initialModel,
+  initialProvider,
   resumeConversationId,
   seedDraftTitle,
   seedComposerText,
@@ -236,10 +240,11 @@ export function ExploreSpecShell({
       initialModel,
       'explore',
       contextScope,
+      initialProvider,
     ).then((id) => {
       if (id) setConversationId(id)
     })
-  }, [chat, initialIdea, pendingSpecId, initialAttachmentIds, resumeConversationId, initialModel, editTicket, contextScope])
+  }, [chat, initialIdea, pendingSpecId, initialAttachmentIds, resumeConversationId, initialModel, initialProvider, editTicket, contextScope])
 
   // Focus restoration on unmount
   useEffect(() => {
@@ -412,7 +417,7 @@ export function ExploreSpecShell({
         await chat.sendMessage(conversation.id, prompt, { lightweight: true, maxTurns: 20, attachments })
       } else {
         // No prior conversation — create one with the wrapped turn.
-        void chat.startWithMessage(prompt, { lightweight: true, maxTurns: 20, attachments }, initialModel, 'explore').then((id) => {
+        void chat.startWithMessage(prompt, { lightweight: true, maxTurns: 20, attachments }, initialModel, 'explore', undefined, initialProvider).then((id) => {
           if (id) setConversationId(id)
         })
       }

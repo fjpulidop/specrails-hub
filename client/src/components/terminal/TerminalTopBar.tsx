@@ -7,10 +7,15 @@ interface TerminalTopBarProps {
   visibility: PanelVisibility
   canCreate: boolean
   hasActive: boolean
-  /** CLI to launch from the Sparkles shortcut: 'claude' (default) or 'codex'. */
+  /** CLI to launch from the Sparkles shortcut: 'claude' (default) or 'codex'.
+   *  Used for the button label when only one provider is installed. */
   provider?: 'claude' | 'codex'
+  /** All installed providers. When >1, clicking the Sparkles shortcut opens a
+   *  picker (anchored at the click) instead of launching directly. */
+  providers?: readonly string[]
   onCreate: () => void
-  onOpenCli: () => void
+  /** Receives click coords so a multi-provider picker can anchor to the button. */
+  onOpenCli: (anchor?: { x: number; y: number }) => void
   onOpenBrowser: () => void
   onPasteScript: () => void
   pasteScriptDisabled: boolean
@@ -22,12 +27,16 @@ interface TerminalTopBarProps {
 }
 
 export function TerminalTopBar({
-  visibility, canCreate, hasActive, provider = 'claude',
+  visibility, canCreate, hasActive, provider = 'claude', providers,
   onCreate, onOpenCli, onOpenBrowser, onPasteScript, pasteScriptDisabled,
   onConfigureBrowser, onConfigureScript,
   onKillActive, onToggleMaximize, onCollapse,
 }: TerminalTopBarProps) {
+  const multiProvider = !!providers && providers.length > 1
   const cliDisplayName = provider === 'codex' ? 'Codex' : 'Claude'
+  const cliLabel = canCreate
+    ? (multiProvider ? 'Open AI CLI in new terminal' : `Open ${cliDisplayName} in new terminal`)
+    : 'Max 10 terminals per project'
   return (
     <div
       className={cn(
@@ -42,9 +51,9 @@ export function TerminalTopBar({
       </div>
       <div className="flex items-center gap-0.5">
         <ActionButton
-          label={canCreate ? `Open ${cliDisplayName} in new terminal` : 'Max 10 terminals per project'}
+          label={cliLabel}
           disabled={!canCreate}
-          onClick={onOpenCli}
+          onClick={(ev) => onOpenCli(ev ? { x: ev.clientX, y: ev.clientY } : undefined)}
         >
           <Sparkles className="h-3.5 w-3.5" />
         </ActionButton>
@@ -94,7 +103,7 @@ export function TerminalTopBar({
 interface ActionButtonProps {
   label: string
   disabled?: boolean
-  onClick: () => void
+  onClick: (ev?: React.MouseEvent) => void
   onContextMenu?: (ev: React.MouseEvent) => void
   children: React.ReactNode
 }
@@ -103,7 +112,7 @@ function ActionButton({ label, disabled, onClick, onContextMenu, children }: Act
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(e) => onClick(e)}
       onContextMenu={onContextMenu}
       disabled={disabled}
       title={label}

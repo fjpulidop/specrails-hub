@@ -44,6 +44,7 @@ import {
   isValidModelForProvider,
   type SpecProvider,
 } from './spec-models'
+import { resolveProvider, validateRequestedProvider, isMultiProvider } from './provider-selection'
 import type { ChatConversationRow, JobTemplate, JobRow } from './types'
 import { readChanges } from './changes-reader'
 import { getProjectMetrics } from './metrics'
@@ -415,7 +416,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   // ─── Queue / Spawn routes ────────────────────────────────────────────────────
 
   router.post('/:projectId/spawn', (req: Request, res: Response) => {
-    const { command, priority, dependsOnJobId, pipelineId, profileName } = req.body ?? {}
+    const { command, priority, dependsOnJobId, pipelineId, profileName, aiEngine } = req.body ?? {}
     if (!command || typeof command !== 'string' || !command.trim()) {
       res.status(400).json({ error: 'command is required' })
       return
@@ -429,11 +430,19 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       profileName === null ? null
         : typeof profileName === 'string' && profileName.trim() ? profileName.trim()
           : undefined
+    // aiEngine: optional per-job provider override; must be installed on the
+    // project. Omitting it runs on the project's primary provider.
+    const engineCheck = validateRequestedProvider(ctx(req).project, aiEngine)
+    if (!engineCheck.ok) {
+      res.status(400).json({ error: engineCheck.error })
+      return
+    }
     try {
       const job = ctx(req).queueManager.enqueue(command, (priority as JobPriority) ?? 'normal', {
         dependsOnJobId: dependsOnJobId || undefined,
         pipelineId: pipelineId || undefined,
         profileName: normalizedProfileName,
+        provider: aiEngine ? engineCheck.provider : undefined,
       })
       const position = job.queuePosition ?? 0
       res.status(202).json({ jobId: job.id, position })
@@ -484,10 +493,15 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   // own copy of the model lists. Source of truth is `server/spec-models.ts`.
   router.get('/:projectId/default-spec-model', (req: Request, res: Response) => {
     const { project } = ctx(req)
-    const provider: SpecProvider = (project.provider ?? 'claude') as SpecProvider
+    // Multi-provider: an optional ?provider= query selects which engine's models
+    // to return. It must be one the project actually has installed; an invalid
+    // or omitted value falls back to the project's primary provider. The
+    // response also lists every installed provider so the Add Spec modal can
+    // render its AI Engine selector without a second round-trip.
+    const provider = resolveProvider(project, typeof req.query.provider === 'string' ? req.query.provider : undefined) as SpecProvider
     const model = resolveDefaultSpecModel({ projectPath: project.path, provider })
     const allowed = getModelsForProvider(provider)
-    res.json({ model, provider, allowed })
+    res.json({ model, provider, allowed, providers: project.providers })
   })
 
   router.delete('/:projectId/jobs/:id', (req: Request, res: Response) => {
@@ -1091,7 +1105,18 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
   router.post('/:projectId/chat/conversations', (req: Request, res: Response) => {
     const { db, project } = ctx(req)
-    const provider: SpecProvider = (project.provider ?? 'claude') as SpecProvider
+    // Multi-provider: an optional aiEngine (alias: provider) picks which engine
+    // this conversation runs on. It must be installed on the project; omitting
+    // it uses the project's primary provider. The chosen provider drives model
+    // validation and is persisted on the conversation so resume turns and
+    // ai_invocations attribute to the right engine.
+    const requestedEngine = req.body?.aiEngine ?? req.body?.provider
+    const engineCheck = validateRequestedProvider(project, requestedEngine)
+    if (!engineCheck.ok) {
+      res.status(400).json({ error: engineCheck.error })
+      return
+    }
+    const provider = engineCheck.provider as SpecProvider
     const rawModel = req.body?.model
     let model: string
     if (rawModel === undefined || rawModel === null || rawModel === '') {
@@ -1116,18 +1141,22 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     let scope: ContextScope | undefined
     if (kind === 'explore') {
       const fallback = getLastContextScope(db, 'explore')
-      // Defence-in-depth: SMASH is Claude-only. Strip contractRefine from the scope
-      // when the project uses a non-Claude provider so no downstream code (Contract
-      // Refine Runner, SMASH eligibility) sees a mismatched flag.
+      // Defence-in-depth: SMASH / Contract Layer is Claude-only. Strip
+      // contractRefine from the scope when the conversation's resolved provider
+      // is non-Claude so no downstream code (Contract Refine Runner, SMASH
+      // eligibility) ever sees a mismatched flag.
       const safeRawScope =
         provider !== 'claude' && rawScope != null
           ? { ...rawScope, contractRefine: false }
           : rawScope
       scope = normalizeContextScope(safeRawScope ?? fallback, fallback)
       setLastContextScope(db, scope)
-      console.log(`[project-router] new explore conv ${id} scope=${JSON.stringify(scope)} rawScope=${JSON.stringify(rawScope)}`)
+      console.log(`[project-router] new explore conv ${id} provider=${provider} scope=${JSON.stringify(scope)} rawScope=${JSON.stringify(rawScope)}`)
     }
-    createConversation(db, { id, model, kind, contextScope: scope })
+    // Only persist provider when the project is multi-provider; single-provider
+    // projects leave it NULL so behaviour is byte-identical to before.
+    const persistProvider = isMultiProvider(project) ? provider : null
+    createConversation(db, { id, model, kind, contextScope: scope, provider: persistProvider })
     const conversation = getConversation(db, id) as ChatConversationRow
     res.status(201).json({ conversation })
   })
@@ -1734,7 +1763,15 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     }
 
     const { project, broadcast, ticketWatcher } = ctx(req)
-    const provider: SpecProvider = (project.provider ?? 'claude') as SpecProvider
+    // Multi-provider: optional aiEngine (alias provider) picks the engine for
+    // this Quick spec; must be installed on the project. Omitting it uses the
+    // primary provider.
+    const requestedEngine = req.body?.aiEngine ?? req.body?.provider
+    const engineCheck = validateRequestedProvider(project, requestedEngine)
+    if (!engineCheck.ok) {
+      res.status(400).json({ error: engineCheck.error }); return
+    }
+    const provider: SpecProvider = engineCheck.provider as SpecProvider
 
     // Resolve and validate the model. Order:
     //   - Body had a `model` and it's valid → use it.
@@ -1778,7 +1815,11 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     // Awareness controls; Quick still keeps Contract Refine as a top-level
     // field for the refine scheduler.
     const rawScope = req.body?.contextScope
-    const quickContractRefine = typeof req.body?.contractRefine === 'boolean'
+    // Contract Layer is Claude-only — force it off for any non-claude engine
+    // (defence-in-depth; the Quick UI hides the toggle for those).
+    const quickContractRefine = provider !== 'claude'
+      ? false
+      : typeof req.body?.contractRefine === 'boolean'
       ? req.body.contractRefine
       : typeof rawScope?.contractRefine === 'boolean'
         ? rawScope.contractRefine

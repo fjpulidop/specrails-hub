@@ -26,8 +26,14 @@ interface AddProjectDialogProps {
 
 type Provider = 'claude' | 'codex'
 
+// Canonical ordering — the first selected provider becomes the project primary.
+const PROVIDER_ORDER: Provider[] = ['claude', 'codex']
+
 export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
-  const [selectedProvider, setSelectedProvider] = useState<Provider>('claude')
+  // Multi-select: a project can be created with one or both providers. When both
+  // are available we pre-select both; the user can deselect down to one (but
+  // never zero). The first in canonical order is the primary/default provider.
+  const [selectedProviders, setSelectedProviders] = useState<Set<Provider>>(new Set(['claude']))
   const [projectPath, setProjectPath] = useState('')
   const [projectName, setProjectName] = useState('')
   const [isAdding, setIsAdding] = useState(false)
@@ -57,15 +63,36 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
         // Honour the server's real availability. The emergency-rollback env
         // var `SPECRAILS_HUB_CODEX_BETA=0` on the server reports codex:false
         // even if the binary is installed.
-        setAvailableProviders({ claude: Boolean(data.claude), codex: Boolean(data.codex) })
-        // Default selection: prefer claude when both are available (historical
-        // default), pick codex when it's the only usable one, otherwise leave
-        // on whichever was selected last.
-        if (data.claude) setSelectedProvider('claude')
-        else if (data.codex) setSelectedProvider('codex')
+        const claude = Boolean(data.claude)
+        const codex = Boolean(data.codex)
+        setAvailableProviders({ claude, codex })
+        // Default selection: every available provider is pre-selected, so the
+        // common "I have both" case sets up a multi-provider project in one
+        // click. The user can deselect down to one before submitting.
+        const next = new Set<Provider>()
+        if (claude) next.add('claude')
+        if (codex) next.add('codex')
+        if (next.size === 0) next.add('claude') // keep submit gating to drive the empty state
+        setSelectedProviders(next)
       })
       .catch(() => { /* ignore — defaults to claude */ })
   }, [open])
+
+  function toggleProvider(p: Provider) {
+    setSelectedProviders((prev) => {
+      const next = new Set(prev)
+      if (next.has(p)) {
+        if (next.size === 1) return prev // never deselect the last one
+        next.delete(p)
+      } else {
+        next.add(p)
+      }
+      return next
+    })
+  }
+
+  // Ordered list (primary first) for submission + summary.
+  const orderedSelected = PROVIDER_ORDER.filter((p) => selectedProviders.has(p) && availableProviders[p])
 
   async function handleAdd() {
     const trimmedPath = projectPath.trim()
@@ -74,9 +101,14 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
       return
     }
 
+    if (orderedSelected.length === 0) {
+      toast.error('Select at least one AI provider')
+      return
+    }
+
     setIsAdding(true)
     try {
-      const data = await addProject(trimmedPath, projectName.trim() || undefined, selectedProvider)
+      const data = await addProject(trimmedPath, projectName.trim() || undefined, orderedSelected)
       if (!data) return
       const { project } = data
 
@@ -194,50 +226,54 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
             </p>
           </div>
 
-          {/* Provider selector — less prominent, inline */}
+          {/* Provider selector — multi-select. Pick one or both. */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">AI provider</label>
+            <label className="text-xs font-medium text-muted-foreground">AI providers</label>
             <div className="flex gap-2">
-              <button
-                disabled={!availableProviders.claude}
-                onClick={() => setSelectedProvider('claude')}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-left transition-colors text-xs',
-                  'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                  selectedProvider === 'claude' && availableProviders.claude
-                    ? 'border-accent-primary/60 bg-accent-primary/10 text-foreground'
-                    : 'border-border/30 text-muted-foreground hover:border-border/60',
-                  !availableProviders.claude && 'opacity-40 cursor-not-allowed'
-                )}
-              >
-                <span>🤖</span>
-                <span className="font-medium">Claude</span>
-                {!availableProviders.claude && (
-                  <span className="text-[9px] text-muted-foreground/60">not found</span>
-                )}
-              </button>
-
-              <button
-                disabled={!availableProviders.codex}
-                onClick={() => setSelectedProvider('codex')}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-left transition-colors text-xs',
-                  'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                  selectedProvider === 'codex' && availableProviders.codex
-                    ? 'border-accent-primary/60 bg-accent-primary/10 text-foreground'
-                    : 'border-border/30 text-muted-foreground hover:border-border/60',
-                  !availableProviders.codex && 'opacity-40 cursor-not-allowed'
-                )}
-              >
-                <span>⚡</span>
-                <span className="font-medium">Codex</span>
-                {!availableProviders.codex && (
-                  <span className="text-[9px] text-muted-foreground/60">not found</span>
-                )}
-              </button>
+              {([
+                { id: 'claude' as Provider, icon: '🤖', label: 'Claude' },
+                { id: 'codex' as Provider, icon: '⚡', label: 'Codex' },
+              ]).map(({ id, icon, label }) => {
+                const avail = availableProviders[id]
+                const checked = selectedProviders.has(id) && avail
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={checked}
+                    disabled={!avail}
+                    onClick={() => toggleProvider(id)}
+                    data-testid={`provider-toggle-${id}`}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-left transition-colors text-xs',
+                      'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                      checked
+                        ? 'border-accent-primary/60 bg-accent-primary/10 text-foreground'
+                        : 'border-border/30 text-muted-foreground hover:border-border/60',
+                      !avail && 'opacity-40 cursor-not-allowed'
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm border text-[9px] leading-none',
+                        checked ? 'border-accent-primary bg-accent-primary text-background' : 'border-border/50'
+                      )}
+                      aria-hidden
+                    >{checked ? '✓' : ''}</span>
+                    <span>{icon}</span>
+                    <span className="font-medium">{label}</span>
+                    {!avail && (
+                      <span className="text-[9px] text-muted-foreground/60">not found</span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
             <p className="text-[9px] text-muted-foreground/70">
-              Cannot be changed after the project is created.
+              {orderedSelected.length > 1
+                ? 'Both engines will be set up. The first is the project default. Cannot be changed after creation.'
+                : 'Cannot be changed after the project is created.'}
             </p>
           </div>
         </div>
@@ -249,7 +285,7 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
           <Button
             size="sm"
             onClick={handleAdd}
-            disabled={isAdding || !projectPath.trim() || noProviderAvailable || prereqsBlock || prereqLoading}
+            disabled={isAdding || !projectPath.trim() || noProviderAvailable || orderedSelected.length === 0 || prereqsBlock || prereqLoading}
             title={prereqsBlock ? missingToolsLabel ?? undefined : undefined}
             data-testid="add-project-submit"
           >

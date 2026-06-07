@@ -172,7 +172,7 @@ describe('AddProjectDialog', () => {
     await user.click(addBtn)
 
     await waitFor(() => {
-      expect(mockAddProject).toHaveBeenCalledWith('/some/path', undefined, 'claude')
+      expect(mockAddProject).toHaveBeenCalledWith('/some/path', undefined, ['claude'])
       expect(onClose).toHaveBeenCalled()
     })
   })
@@ -221,17 +221,17 @@ describe('AddProjectDialog', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('shows Claude and Codex provider buttons', async () => {
+  it('shows Claude and Codex provider toggles', async () => {
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
-    expect(screen.getByRole('button', { name: /Claude/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Codex/i })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /Claude/i })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /Codex/i })).toBeInTheDocument()
   })
 
-  it('Codex button is disabled with "not found" when codex is not on PATH', async () => {
+  it('Codex toggle is disabled with "not found" when codex is not on PATH', async () => {
     // Default fetch mock (in beforeEach) reports claude:true, codex:false.
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
     await waitFor(() => {
-      const codexBtn = screen.getByRole('button', { name: /Codex/i })
+      const codexBtn = screen.getByRole('checkbox', { name: /Codex/i })
       expect(codexBtn).toBeDisabled()
       expect(codexBtn).toHaveTextContent(/not found/i)
     })
@@ -242,7 +242,7 @@ describe('AddProjectDialog', () => {
     expect(screen.getByRole('heading', { name: /Add Project/i })).toBeInTheDocument()
   })
 
-  it('Codex button is enabled when the server reports codex available (Stage C)', async () => {
+  it('Codex toggle is enabled when the server reports codex available (Stage C)', async () => {
     // Post-Stage-C: client honours the server's real codex availability.
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -252,10 +252,30 @@ describe('AddProjectDialog', () => {
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)
 
     await waitFor(() => {
-      const codexBtn = screen.getByRole('button', { name: /Codex/i })
+      const codexBtn = screen.getByRole('checkbox', { name: /Codex/i })
       expect(codexBtn).not.toBeDisabled()
       // "not found" label is hidden when codex is available
       expect(codexBtn).not.toHaveTextContent(/not found/i)
+    })
+  })
+
+  it('selects both providers by default when both are available and submits both', async () => {
+    const user = userEvent.setup()
+    global.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/api/hub/available-providers')) return { ok: true, json: async () => ({ claude: true, codex: true }) }
+      if (url.includes('/api/hub/setup-prerequisites')) return { ok: true, json: async () => goodPrereqsStatus }
+      return { ok: true, json: async () => ({}) }
+    })
+    render(<AddProjectDialog open={true} onClose={vi.fn()} />)
+    await waitFor(() => {
+      expect(screen.getByRole('checkbox', { name: /Codex/i })).toHaveAttribute('aria-checked', 'true')
+    })
+    const pathInput = screen.getByPlaceholderText('/Users/me/my-project')
+    await user.type(pathInput, '/some/path')
+    await user.click(screen.getByTestId('add-project-submit'))
+    await waitFor(() => {
+      expect(mockAddProject).toHaveBeenCalledWith('/some/path', undefined, ['claude', 'codex'])
     })
   })
 })

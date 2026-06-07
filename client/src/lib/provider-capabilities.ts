@@ -21,3 +21,61 @@ export type ProviderId = 'claude' | 'codex'
 export function isSmashCapable(provider: string | null | undefined): boolean {
   return provider === 'claude'
 }
+
+// ─── Multi-provider capability matrix ────────────────────────────────────────
+//
+// Right-sidebar sections that depend on a provider-specific mechanic. When a
+// project has more than one provider installed we show only the INTERSECTION of
+// what every installed provider supports — this prevents surfacing a Claude-only
+// section (Agents/Profiles, Integrations/Plugins) for a project that can also run
+// jobs on Codex, which has no equivalent. Single-provider projects are
+// unaffected: the intersection of one set is that set.
+
+export type SidebarSection =
+  | 'dashboard'
+  | 'jobs'
+  | 'analytics'
+  | 'agents'
+  | 'code'
+  | 'integrations'
+  | 'settings'
+
+/** Sections whose backing feature is Claude-only (no Codex equivalent yet). */
+const CLAUDE_ONLY_SECTIONS: ReadonlySet<SidebarSection> = new Set<SidebarSection>([
+  'agents',
+  'integrations',
+])
+
+/** True when a single provider supports a given sidebar section. */
+export function providerSupportsSection(
+  provider: string | null | undefined,
+  section: SidebarSection,
+): boolean {
+  if (!CLAUDE_ONLY_SECTIONS.has(section)) return true
+  return provider === 'claude'
+}
+
+/**
+ * Intersection gate: a section is visible only when EVERY installed provider
+ * supports it. An empty/undefined list defaults to Claude behaviour for
+ * backward compatibility (everything visible).
+ */
+export function sectionVisibleForProviders(
+  section: SidebarSection,
+  providers: readonly string[] | null | undefined,
+): boolean {
+  const list = providers && providers.length > 0 ? providers : ['claude']
+  return list.every((p) => providerSupportsSection(p, section))
+}
+
+/** True when the project offers a choice of engines (more than one installed). */
+export function isMultiProvider(providers: readonly string[] | null | undefined): boolean {
+  return !!providers && providers.length > 1
+}
+
+/** Human label for a provider id (UI menus / chips). */
+export function providerLabel(provider: string | null | undefined): string {
+  if (provider === 'codex') return 'Codex'
+  if (provider === 'claude') return 'Claude'
+  return provider ?? 'Claude'
+}

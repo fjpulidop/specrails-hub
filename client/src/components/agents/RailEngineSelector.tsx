@@ -1,0 +1,42 @@
+import { Cpu } from 'lucide-react'
+import { providerLabel } from '../../lib/provider-capabilities'
+
+interface Props {
+  /** Selected engine. null/undefined = project primary. */
+  value: string | null | undefined
+  providers: readonly string[]
+  onChange: (value: 'claude' | 'codex') => void
+}
+
+/**
+ * Compact rail-header AI engine selector. Renders nothing unless the project
+ * has more than one provider installed (single-provider rails always use the
+ * one engine, unchanged). Mirrors RailProfileSelector's dense styling.
+ */
+export function RailEngineSelector({ value, providers, onChange }: Props) {
+  if (!providers || providers.length <= 1) return null
+  const current = value ?? providers[0]
+  return (
+    <div
+      className="inline-flex items-center"
+      title="AI engine for this rail"
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Cpu className="w-3 h-3 text-muted-foreground mr-1" />
+      <select
+        value={current}
+        aria-label="AI engine for this rail"
+        data-testid="rail-engine-selector"
+        onChange={(e) => onChange(e.target.value as 'claude' | 'codex')}
+        className="h-5 text-[10px] rounded border border-border/50 bg-transparent text-muted-foreground hover:text-foreground pr-4 pl-1 focus:outline-none focus:ring-1 focus:ring-primary/40"
+      >
+        {providers.map((p) => (
+          <option key={p} value={p}>
+            {providerLabel(p)}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}

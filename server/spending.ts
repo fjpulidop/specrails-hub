@@ -12,6 +12,8 @@ export interface SpendingFilters {
   status?: InvocationStatus
   minCostUsd?: number
   ticketId?: number
+  /** Provider ids to include (multi-provider segmentation). Empty/undefined = all. */
+  provider?: string[]
 }
 
 export interface InvocationsFilters extends SpendingFilters {
@@ -169,6 +171,13 @@ function buildWhere(
     const placeholders = filters.model.map(() => '?').join(',')
     conditions.push(`${a}model IN (${placeholders})`)
     params.push(...filters.model)
+  }
+  if (filters.provider && filters.provider.length > 0) {
+    // Coalesce legacy NULL provider rows to 'claude' so a 'claude' filter still
+    // surfaces pre-migration invocations.
+    const placeholders = filters.provider.map(() => '?').join(',')
+    conditions.push(`COALESCE(${a}provider, 'claude') IN (${placeholders})`)
+    params.push(...filters.provider)
   }
   if (filters.status) {
     conditions.push(`${a}status = ?`)
@@ -548,6 +557,10 @@ export function parseSpendingFilters(query: Record<string, unknown>): SpendingFi
   }
   if (typeof query.model === 'string') {
     f.model = query.model.split(',').filter((s) => s.length > 0)
+  }
+  if (typeof query.provider === 'string') {
+    const provs = query.provider.split(',').filter((s) => s.length > 0)
+    if (provs.length > 0) f.provider = provs
   }
   if (typeof query.status === 'string' && ['success', 'failed', 'aborted'].includes(query.status)) {
     f.status = query.status as InvocationStatus

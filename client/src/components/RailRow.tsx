@@ -6,6 +6,7 @@ import { GripVertical, Trash2, ArrowLeft } from 'lucide-react'
 import { RailControls, type RailMode, type RailStatus } from './RailControls'
 import { SpecCard } from './SpecCard'
 import { RailProfileSelector } from './agents/RailProfileSelector'
+import { RailEngineSelector } from './agents/RailEngineSelector'
 import type { LocalTicket } from '../types'
 
 const LONG_PRESS_MS = 800
@@ -19,6 +20,10 @@ interface RailRowProps {
   status: RailStatus
   activeJobId?: string
   profileName?: string | null
+  /** Selected AI engine for this rail (multi-provider). null/undefined = primary. */
+  aiEngine?: string | null
+  /** Installed providers — when >1 the rail header shows an AI engine selector. */
+  providers?: readonly string[]
   jiggleMode: boolean
   dragHandleListeners?: Record<string, Function>
   dragHandleAttributes?: Record<string, any>
@@ -33,6 +38,7 @@ interface RailRowProps {
   density?: 'normal' | 'compact'
   onModeChange: (mode: RailMode) => void
   onProfileChange?: (profileName: string | null) => void
+  onEngineChange?: (aiEngine: 'claude' | 'codex') => void
   onToggle: () => void
   onTicketClick: (ticket: LocalTicket) => void
   onDelete: () => void
@@ -45,11 +51,14 @@ interface RailRowProps {
 }
 
 export function RailRow({
-  id, label, tickets, mode, status, activeJobId, profileName, jiggleMode,
+  id, label, tickets, mode, status, activeJobId, profileName, aiEngine, providers, jiggleMode,
   dragHandleListeners, dragHandleAttributes, density = 'normal',
-  onModeChange, onProfileChange, onToggle, onTicketClick, onDelete, onLongPress, onRename,
+  onModeChange, onProfileChange, onEngineChange, onToggle, onTicketClick, onDelete, onLongPress, onRename,
   onTicketMoveToSpecs,
 }: RailRowProps) {
+  // Codex has no agent profiles — hide the profile selector when this rail's
+  // engine is codex (the engine selector is shown only on multi-provider projects).
+  const profileApplies = (aiEngine ?? providers?.[0]) !== 'codex'
   // Compact-tier right-click context menu state. `{ticketId, x, y}` while
   // open, `null` otherwise. Closed by outside-click, Escape, or selection.
   const [ticketCtxMenu, setTicketCtxMenu] = useState<{ ticketId: number; x: number; y: number } | null>(null)
@@ -346,9 +355,12 @@ export function RailRow({
           document.body
         )}
 
-        {/* Mode dropdown + Profile picker (stacked) */}
+        {/* Mode dropdown + Engine + Profile picker (stacked) */}
         <div className="flex flex-col gap-1">
-          {onProfileChange && !isRunning && (
+          {onEngineChange && !isRunning && (
+            <RailEngineSelector value={aiEngine ?? null} providers={providers ?? []} onChange={onEngineChange} />
+          )}
+          {onProfileChange && !isRunning && profileApplies && (
             <RailProfileSelector value={profileName ?? null} onChange={onProfileChange} />
           )}
           <RailControls
@@ -483,7 +495,10 @@ export function RailRow({
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            {onProfileChange && status !== 'running' && (
+            {onEngineChange && status !== 'running' && (
+              <RailEngineSelector value={aiEngine ?? null} providers={providers ?? []} onChange={onEngineChange} />
+            )}
+            {onProfileChange && status !== 'running' && profileApplies && (
               <RailProfileSelector
                 value={profileName ?? null}
                 onChange={onProfileChange}
