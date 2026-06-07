@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { RefreshCw } from 'lucide-react'
 import { getApiBase } from '../lib/api'
-import { useHub } from '../hooks/useHub'
+import { useHub, projectProviders } from '../hooks/useHub'
+import { providerLabel } from '../lib/provider-capabilities'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import type {
   Period, Surface, SpendingFilters, SpendingResponse, InvocationsResponse,
@@ -40,6 +41,7 @@ function buildQuery(filters: SpendingFilters): string {
   if (filters.from) params.set('from', filters.from)
   if (filters.to) params.set('to', filters.to)
   if (filters.surface && filters.surface.length > 0) params.set('surface', filters.surface.join(','))
+  if (filters.provider && filters.provider.length > 0) params.set('provider', filters.provider.join(','))
   if (filters.model && filters.model.length > 0) params.set('model', filters.model.join(','))
   if (filters.status) params.set('status', filters.status)
   if (typeof filters.minCostUsd === 'number') params.set('minCostUsd', String(filters.minCostUsd))
@@ -48,16 +50,22 @@ function buildQuery(filters: SpendingFilters): string {
 }
 
 export default function AnalyticsPage() {
-  const { activeProjectId } = useHub()
+  const { activeProjectId, projects } = useHub()
   const [searchParams, setSearchParams] = useSearchParams()
+
+  const activeProject = projects.find((p) => p.id === activeProjectId)
+  const installedProviders = activeProject ? projectProviders(activeProject) : ['claude']
+  const multiProvider = installedProviders.length > 1
 
   const initialPeriod = (searchParams.get('period') as Period | null) ?? '30d'
   const initialSurface = (searchParams.get('surface') ?? '').split(',').filter(Boolean) as Surface[]
+  const initialProvider = (searchParams.get('provider') ?? '').split(',').filter(Boolean)
   const initialTicketId = searchParams.get('ticketId')
 
   const [filters, setFilters] = useState<SpendingFilters>({
     period: initialPeriod,
     surface: initialSurface.length > 0 ? initialSurface : undefined,
+    provider: initialProvider.length > 0 ? initialProvider : undefined,
     ticketId: initialTicketId ? Number(initialTicketId) : undefined,
   })
   const [data, setData] = useState<SpendingResponse | null>(null)
@@ -80,9 +88,10 @@ export default function AnalyticsPage() {
     const next = new URLSearchParams()
     next.set('period', filters.period)
     if (filters.surface && filters.surface.length > 0) next.set('surface', filters.surface.join(','))
+    if (filters.provider && filters.provider.length > 0) next.set('provider', filters.provider.join(','))
     if (filters.ticketId) next.set('ticketId', String(filters.ticketId))
     setSearchParams(next, { replace: true })
-  }, [filters.period, filters.surface, filters.ticketId, setSearchParams])
+  }, [filters.period, filters.surface, filters.provider, filters.ticketId, setSearchParams])
 
   const fetchSpending = useCallback(async () => {
     if (!activeProjectId) return
@@ -160,12 +169,27 @@ export default function AnalyticsPage() {
     })
   }
 
+  function toggleProvider(p: string | 'all') {
+    if (p === 'all') {
+      setFilters((f) => ({ ...f, provider: undefined }))
+      return
+    }
+    setFilters((f) => {
+      const curr = f.provider ?? []
+      const next = curr.includes(p) ? curr.filter((x) => x !== p) : [...curr, p]
+      return { ...f, provider: next.length > 0 ? next : undefined }
+    })
+  }
+
   const surfaceFilter = filters.surface
   const isAll = !surfaceFilter || surfaceFilter.length === 0
+  const providerFilter = filters.provider
+  const isAllProviders = !providerFilter || providerFilter.length === 0
 
   const exportParams = useMemo(() => {
     const p: Record<string, string> = { period: filters.period }
     if (filters.surface && filters.surface.length > 0) p.surface = filters.surface.join(',')
+    if (filters.provider && filters.provider.length > 0) p.provider = filters.provider.join(',')
     if (filters.ticketId) p.ticketId = String(filters.ticketId)
     return p
   }, [filters])
@@ -233,6 +257,36 @@ export default function AnalyticsPage() {
             )
           })}
         </div>
+        {/* Provider chips — only when the project has more than one engine */}
+        {multiProvider && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="analytics-provider-chips">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70 mr-1">Engine</span>
+            <button
+              type="button"
+              onClick={() => toggleProvider('all')}
+              className={`h-7 px-3 rounded-full text-[11px] font-medium transition-all ${
+                isAllProviders
+                  ? 'bg-foreground/10 text-foreground ring-1 ring-foreground/20'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/40'
+              }`}
+            >All</button>
+            {installedProviders.map((p) => {
+              const active = providerFilter?.includes(p) ?? false
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => toggleProvider(p)}
+                  className={`h-7 px-3 rounded-full text-[11px] font-medium transition-all ${
+                    active
+                      ? 'bg-foreground/10 text-foreground ring-1 ring-foreground/20'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/40'
+                  }`}
+                >{providerLabel(p)}</button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {error && (

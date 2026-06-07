@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express'
 import type { ProjectContext } from './project-registry'
-import { getRails, getRail, setRailTickets, setRailProfile } from './rails-store'
-import { ClaudeNotFoundError } from './queue-manager'
+import { getRails, getRail, setRailTickets, setRailProfile, setRailEngine } from './rails-store'
+import { ClaudeNotFoundError, CodexNotFoundError } from './queue-manager'
+import { validateRequestedProvider } from './provider-selection'
 import type { RailJobStartedMessage, RailJobStoppedMessage } from './types'
 
 // Extend Express Request to carry resolved ProjectContext (declared in project-router)
@@ -59,7 +60,10 @@ export function createRailsRouter(): Router {
       const body = req.body ?? {}
       const mode = typeof body.mode === 'string' ? body.mode : current.mode
       const profileName = 'profileName' in body ? body.profileName : current.profileName
-      const rail = setRailTickets(c.db, railIndex, ticketIds as number[], mode, profileName)
+      // Preserve the rail's AI engine across ticket reassignment (undefined →
+      // setRailTickets re-reads the current value), so it isn't silently wiped.
+      const aiEngine = 'aiEngine' in body ? body.aiEngine : undefined
+      const rail = setRailTickets(c.db, railIndex, ticketIds as number[], mode, profileName, aiEngine)
       res.json({ rail })
     } catch (err) {
       console.error('[rails-router] set rail tickets error:', err)
@@ -92,6 +96,33 @@ export function createRailsRouter(): Router {
     }
   })
 
+  // PUT /rails/:railIndex/engine — set the AI engine override for a rail
+  // Body: { aiEngine: string | null } (null = use the project's primary provider)
+  router.put('/:railIndex/engine', (req: Request, res: Response) => {
+    const railIndex = parseInt(req.params.railIndex as string, 10)
+    if (isNaN(railIndex) || railIndex < 0) {
+      res.status(400).json({ error: 'Invalid rail index' }); return
+    }
+    const body = req.body ?? {}
+    if (!('aiEngine' in body)) {
+      res.status(400).json({ error: "body must include 'aiEngine' (string or null)" }); return
+    }
+    const value = body.aiEngine
+    const c = ctx(req)
+    // null clears the override; a string must be one of the project's providers.
+    if (value !== null) {
+      const check = validateRequestedProvider(c.project, value)
+      if (!check.ok) { res.status(400).json({ error: check.error }); return }
+    }
+    try {
+      const rail = setRailEngine(c.db, railIndex, value)
+      res.json({ rail })
+    } catch (err) {
+      console.error('[rails-router] set rail engine error:', err)
+      res.status(500).json({ error: 'Failed to update rail engine' })
+    }
+  })
+
   // POST /rails/:railIndex/launch — launch job(s) for a rail
   router.post('/:railIndex/launch', (req: Request, res: Response) => {
     const railIndex = parseInt(req.params.railIndex as string, 10)
@@ -99,7 +130,7 @@ export function createRailsRouter(): Router {
       res.status(400).json({ error: 'Invalid rail index' }); return
     }
 
-    const { mode = 'implement', profileName } = req.body ?? {}
+    const { mode = 'implement', profileName, aiEngine } = req.body ?? {}
     if (!VALID_MODES.has(mode as string)) {
       res.status(400).json({ error: 'mode must be "implement" or "batch-implement"' }); return
     }
@@ -111,10 +142,25 @@ export function createRailsRouter(): Router {
       res.status(400).json({ error: 'Rail has no tickets assigned' }); return
     }
 
+    // AI engine precedence: explicit body param > stored rail engine > primary.
+    // `undefined`/empty in both means "run on the project's primary provider".
+    const requestedEngine =
+      aiEngine === undefined ? (rail.aiEngine ?? undefined) : aiEngine
+    const engineCheck = validateRequestedProvider(c.project, requestedEngine)
+    if (!engineCheck.ok) {
+      res.status(400).json({ error: engineCheck.error }); return
+    }
+    // Only pass a provider override when one was actually requested (keeps
+    // single-provider rails on the legacy code path).
+    const railProvider = requestedEngine ? engineCheck.provider : undefined
+
     // Profile selection precedence: explicit body param > stored rail profile > default resolution.
-    // `null` in the body explicitly forces legacy mode.
+    // `null` in the body explicitly forces legacy mode. Codex has no agent
+    // profiles, so force legacy mode whenever the chosen engine is not claude.
     let resolvedProfile: string | null | undefined
-    if (profileName === null) {
+    if (railProvider && railProvider !== 'claude') {
+      resolvedProfile = null
+    } else if (profileName === null) {
       resolvedProfile = null
     } else if (typeof profileName === 'string' && profileName.trim()) {
       resolvedProfile = profileName.trim()
@@ -132,7 +178,7 @@ export function createRailsRouter(): Router {
       const issueArgs = rail.ticketIds.map((id) => `#${id}`).join(' ')
       const commandName = mode === 'batch-implement' ? 'batch-implement' : 'implement'
       const command = `/specrails:${commandName} ${issueArgs} --yes`
-      const job = c.queueManager.enqueue(command, 'normal', { profileName: resolvedProfile })
+      const job = c.queueManager.enqueue(command, 'normal', { profileName: resolvedProfile, provider: railProvider })
       jobId = job.id
       c.railJobs.set(jobId, { railIndex, mode, ticketIds: [...rail.ticketIds] })
 
@@ -149,6 +195,9 @@ export function createRailsRouter(): Router {
     } catch (err) {
       if (err instanceof ClaudeNotFoundError) {
         res.status(503).json({ error: 'Claude CLI not found' }); return
+      }
+      if (err instanceof CodexNotFoundError) {
+        res.status(503).json({ error: 'Codex CLI not found' }); return
       }
       console.error('[rails-router] launch error:', err)
       res.status(500).json({ error: 'Failed to launch rail job' })

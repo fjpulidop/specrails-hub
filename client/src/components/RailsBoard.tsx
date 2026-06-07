@@ -22,13 +22,18 @@ export interface RailState {
   activeJobId?: string
   /** Selected agent profile for this rail. null/undefined = default resolution. */
   profileName?: string | null
+  /** Selected AI engine for this rail (multi-provider). null/undefined = primary. */
+  aiEngine?: string | null
 }
 
 interface RailsBoardProps {
   rails: RailState[]
   ticketMap: Map<number, LocalTicket>
+  /** Installed providers — when >1 the rail header shows an AI engine selector. */
+  providers?: readonly string[]
   onModeChange: (railId: string, mode: RailMode) => void
   onProfileChange?: (railId: string, profileName: string | null) => void
+  onEngineChange?: (railId: string, aiEngine: 'claude' | 'codex') => void
   onToggle: (railId: string) => void
   onTicketClick: (ticket: LocalTicket) => void
   onAddRail: () => void
@@ -57,7 +62,7 @@ function SortableRailWrapper({ railId, children }: { railId: string; children: (
 /** Width threshold below which rail rows switch to the compact mini-card layout. */
 export const RAILS_COMPACT_THRESHOLD_PX = 320
 
-export function RailsBoard({ rails, ticketMap, onModeChange, onProfileChange, onToggle, onTicketClick, onAddRail, onDeleteRail, onRenameRail, onTicketMoveToSpecs }: RailsBoardProps) {
+export function RailsBoard({ rails, ticketMap, providers, onModeChange, onProfileChange, onEngineChange, onToggle, onTicketClick, onAddRail, onDeleteRail, onRenameRail, onTicketMoveToSpecs }: RailsBoardProps) {
   const activeRails = rails.filter((r) => r.status === 'running').length
   const [jiggleMode, setJiggleMode] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -132,12 +137,15 @@ export function RailsBoard({ rails, ticketMap, onModeChange, onProfileChange, on
                     status={rail.status}
                     activeJobId={rail.activeJobId}
                     profileName={rail.profileName ?? null}
+                    aiEngine={rail.aiEngine ?? null}
+                    providers={providers}
                     jiggleMode={jiggleMode}
                     density={density}
                     dragHandleListeners={listeners}
                     dragHandleAttributes={attributes}
                     onModeChange={(mode) => onModeChange(rail.id, mode)}
                     onProfileChange={onProfileChange ? (p) => onProfileChange(rail.id, p) : undefined}
+                    onEngineChange={onEngineChange ? (e) => onEngineChange(rail.id, e) : undefined}
                     onToggle={() => onToggle(rail.id)}
                     onTicketClick={onTicketClick}
                     onDelete={() => onDeleteRail(rail.id)}

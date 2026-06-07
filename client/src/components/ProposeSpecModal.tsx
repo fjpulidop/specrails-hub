@@ -9,10 +9,12 @@ import { API_ORIGIN } from '../lib/origin'
 import { deleteAllAttachments } from '../lib/attachments'
 import { RichAttachmentEditor, type RichAttachmentEditorHandle } from './RichAttachmentEditor'
 import { SpecModelPicker, useDefaultSpecModel } from './explore-spec/SpecModelPicker'
+import { AiEngineSelector } from './AiEngineSelector'
 import type { LocalTicket } from '../types'
 import { ContextScopeChecks } from './ContextScopeChecks'
 import { ContextScopeSlider } from './ContextScopeSlider'
 import { isSmashCapable } from '../lib/provider-capabilities'
+import { getLastEngine, setLastEngine } from '../lib/last-engine'
 import { useContextScope } from '../hooks/useContextScope'
 import { useContextBudget } from '../hooks/useContextBudget'
 import { useQuickContractRefineLast } from '../hooks/useQuickContractRefineLast'
@@ -27,6 +29,9 @@ export interface ExploreLaunchPayload {
   /** Model picked at Add Spec — locked for the lifetime of the explore flow.
    *  No downstream UI changes it. */
   model: string
+  /** AI engine picked at Add Spec (multi-provider). Undefined → project primary.
+   *  Forwarded to the ExploreSpecShell so the conversation runs on it. */
+  provider?: 'claude' | 'codex'
   /** Add Spec context scope frozen at launch time. Forwarded to the
    *  ExploreSpecShell so the server-side conversation row carries it. */
   contextScope: ContextScope
@@ -64,16 +69,38 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
   const submittedRef = useRef(false)
   const scopeTouchedRef = useRef(false)
 
+  // AI Engine (multi-provider). null until the first fetch resolves the
+  // project's providers; then initialised to the last-used engine (default =
+  // primary). Single-provider projects never render the selector.
+  const [engine, setEngine] = useState<'claude' | 'codex' | null>(null)
+
   // Model picker — fetched on each open. Locked for the whole flow once the
   // user submits; no downstream surface changes it. See spec
-  // `add-spec-model-selection`.
-  const { model, setModel, allowed, loading: modelLoading, provider } = useDefaultSpecModel(activeProjectId, open)
+  // `add-spec-model-selection`. Refetches when the engine changes.
+  const { model, setModel, allowed, loading: modelLoading, provider, providers } =
+    useDefaultSpecModel(activeProjectId, open, engine)
+
+  // Initialise the engine selection once providers are known (remember last
+  // choice per project; default to primary).
+  useEffect(() => {
+    if (!open || engine || providers.length === 0) return
+    setEngine(getLastEngine(activeProjectId, providers, provider ?? 'claude'))
+  }, [open, engine, providers, provider, activeProjectId])
+
+  const handleEngineChange = useCallback((next: 'claude' | 'codex') => {
+    setEngine(next)
+    setLastEngine(activeProjectId, next)
+  }, [activeProjectId])
+
+  // Effective provider drives SMASH gating + the payload's aiEngine. Prefer the
+  // user's pick; fall back to the resolved primary while it loads.
+  const effectiveProvider = engine ?? provider
 
   const { scope, setScope, persist: persistScope } = useContextScope(activeProjectId, mode, open)
   const quickRefine = useQuickContractRefineLast(activeProjectId, open)
   const { data: budget, isError: budgetError } = useContextBudget(activeProjectId, open)
   const tier = useMemo(() => tierFromScope(scope), [scope])
-  const smashCapable = isSmashCapable(provider)
+  const smashCapable = isSmashCapable(effectiveProvider)
 
   useEffect(() => {
     if (mode !== 'quick' || !quickRefine.loaded || scopeTouchedRef.current) return
@@ -103,6 +130,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
       setIsSubmitting(false)
       setHasText(false)
       setAttachmentCount(0)
+      setEngine(null)
       submittedRef.current = false
       scopeTouchedRef.current = false
       // defer to let dialog mount; reset any user-resized height so the modal
@@ -149,6 +177,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
       onExploreLaunch({
         idea, pendingSpecId, initialAttachmentIds: attachmentIds,
         model: model ?? 'sonnet',
+        provider: effectiveProvider ?? undefined,
         contextScope: scope,
       })
       onClose()
@@ -180,6 +209,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             idea, attachmentIds, pendingSpecId, model: model ?? undefined,
+            aiEngine: effectiveProvider ?? undefined,
             contextScope: {
               specrails: scope.specrails,
               openspec: scope.openspec,
@@ -204,7 +234,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     } finally {
       setIsSubmitting(false)
     }
-  }, [mode, tickets, tracker, pendingSpecId, onClose, onExploreLaunch, model, quickRefine, scope])
+  }, [mode, tickets, tracker, pendingSpecId, onClose, onExploreLaunch, model, quickRefine, scope, effectiveProvider])
 
   return (
     <>
@@ -223,12 +253,21 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
           <div className="flex flex-col p-5 gap-4">
             <div className="flex items-center justify-between gap-3">
               <ModeSegmented value={mode} onChange={setMode} fullCodebase={scope.full} />
-              <SpecModelPicker
-                value={model}
-                allowed={allowed}
-                loading={modelLoading}
-                onChange={setModel}
-              />
+              <div className="flex items-center gap-2">
+                <AiEngineSelector
+                  value={effectiveProvider ?? 'claude'}
+                  providers={providers}
+                  onChange={handleEngineChange}
+                  disabled={modelLoading}
+                  ariaLabel="AI engine for this spec"
+                />
+                <SpecModelPicker
+                  value={model}
+                  allowed={allowed}
+                  loading={modelLoading}
+                  onChange={setModel}
+                />
+              </div>
             </div>
 
             <div className="space-y-3">

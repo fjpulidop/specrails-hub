@@ -198,6 +198,10 @@ export interface EnqueueOptions {
    *  resolves via default. Pass null to force legacy
    *  mode (no profile), even if a default exists. */
   profileName?: string | null
+  /** Per-job AI engine override (multi-provider projects). When omitted the
+   *  job runs with the project's primary provider (this._adapter). Validated by
+   *  the route layer against the project's installed providers. */
+  provider?: 'claude' | 'codex'
 }
 
 // ─── QueueManager ─────────────────────────────────────────────────────────────
@@ -239,6 +243,10 @@ export class QueueManager {
   private _projectSlug: string | null
   /** Pending profile selection keyed by jobId — read at spawn time */
   private _jobProfileSelection: Map<string, string | null>
+  /** Pending per-job provider override keyed by jobId — read at spawn time.
+   *  In-memory only (mirrors _jobProfileSelection): a queued job that survives a
+   *  restart falls back to the project's primary provider. */
+  private _jobProviderSelection: Map<string, 'claude' | 'codex'>
   /** Pre-spawn working-tree snapshot refs keyed by jobId — read at exit time
    *  by the Code-Explorer provenance hook. Cleared on job exit. */
   private _snapshotRefs: Map<string, WorkingTreeSnapshot>
@@ -288,6 +296,7 @@ export class QueueManager {
     this._hubPort = options?.hubPort ?? 4200
     this._projectSlug = options?.projectSlug ?? null
     this._jobProfileSelection = new Map()
+    this._jobProviderSelection = new Map()
     this._snapshotRefs = new Map()
 
     const envTimeout = process.env.WM_ZOMBIE_TIMEOUT_MS !== undefined
@@ -370,18 +379,23 @@ export class QueueManager {
       resolvedOpts = priorityOrOpts
     }
 
-    if (this._adapter.id === 'codex') {
+    // Resolve the adapter for THIS job: the per-job provider override when set
+    // and installed, else the project's primary provider. The binary check
+    // below probes the chosen provider's CLI.
+    const enqueueAdapter =
+      resolvedOpts?.provider ? getAdapter(resolvedOpts.provider) : this._adapter
+    if (enqueueAdapter.id === 'codex') {
       if (!codexOnPath()) throw new CodexNotFoundError()
-    } else if (this._adapter.id === 'claude') {
+    } else if (enqueueAdapter.id === 'claude') {
       if (!claudeOnPath()) throw new ClaudeNotFoundError()
     } else {
       // Future providers reuse the same pattern: a quick `which` probe via
       // the adapter's binary. We don't throw a typed *NotFoundError because
       // none has been declared; the adapter's id surfaces in the error.
       try {
-        execSync(`${_WHICH_CMD} ${this._adapter.binary}`, { stdio: 'ignore' })
+        execSync(`${_WHICH_CMD} ${enqueueAdapter.binary}`, { stdio: 'ignore' })
       } catch {
-        throw new Error(`${this._adapter.binary} binary not found`)
+        throw new Error(`${enqueueAdapter.binary} binary not found`)
       }
     }
 
@@ -407,6 +421,11 @@ export class QueueManager {
     // `undefined` means "use default resolution"; `null` means "force legacy".
     if (resolvedOpts && 'profileName' in resolvedOpts) {
       this._jobProfileSelection.set(id, resolvedOpts.profileName ?? null)
+    }
+
+    // Record per-job provider override so _startJob resolves the right adapter.
+    if (resolvedOpts?.provider) {
+      this._jobProviderSelection.set(id, resolvedOpts.provider)
     }
 
     // Insert at the correct position based on priority (higher priority first, FIFO within same level)
@@ -627,9 +646,32 @@ export class QueueManager {
     this._startJob(nextJobId)
   }
 
+  /**
+   * Resolve the adapter for a job at spawn time: the per-job provider override
+   * (consumed from `_jobProviderSelection`) when present and registered, else
+   * the project's primary adapter. Consuming the entry keeps the map bounded.
+   */
+  private _resolveJobAdapter(jobId: string): ProviderAdapter {
+    const override = this._jobProviderSelection.get(jobId)
+    this._jobProviderSelection.delete(jobId)
+    if (override) {
+      try {
+        return getAdapter(override)
+      } catch {
+        /* fall through to primary */
+      }
+    }
+    return this._adapter
+  }
+
   private async _startJob(jobId: string): Promise<void> {
     const job = this._jobs.get(jobId)
     if (!job) return
+
+    // Per-job adapter (multi-provider). `this._adapter` stays the project
+    // primary; everything in this spawn (binary, argv, model, profile, OTEL,
+    // plugins, result parsing, ai_invocations.provider) flows from `adapter`.
+    const adapter = this._resolveJobAdapter(jobId)
 
     job.status = 'running'
     job.startedAt = new Date().toISOString()
@@ -699,7 +741,7 @@ export class QueueManager {
       }
     }
 
-    const binary = this._adapter.binary
+    const binary = adapter.binary
     // Adapter-specific slash-command syntax:
     //  - claude: native `/specrails:foo` recognised by Claude CLI directly,
     //    so we pass the command verbatim and the system prompt rides along
@@ -711,13 +753,13 @@ export class QueueManager {
     //    claude slash command — propose-spec, implement, batch-implement,
     //    explore-spec, retry, …). This is the rail equivalent of the
     //    user typing `$implement #1 --yes` themselves in `codex`.
-    const railPrompt = this._adapter.id === 'codex'
+    const railPrompt = adapter.id === 'codex'
       ? commandToRun.replace(/^\/(specrails|sr):([\w-]+)/, '$$$2')
       : commandToRun
-    const railModel = this._adapter.id === 'claude' && this._db
+    const railModel = adapter.id === 'claude' && this._db
       ? getProjectSettings(this._db).orchestratorModel
-      : (this._resolvedModel ?? this._adapter.defaultModel())
-    const args = this._adapter.buildArgs('rail-job', {
+      : (this._resolvedModel ?? adapter.defaultModel())
+    const args = adapter.buildArgs('rail-job', {
       prompt: railPrompt,
       systemPrompt: systemAppend || undefined,
       model: railModel,
@@ -733,7 +775,7 @@ export class QueueManager {
     // tracked in OpenSpec change task §13.
     let profileSnapshotPath: string | null = null
     let profileName: string | null = null
-    if (this._adapter.capabilities.profileEnvSupport && this._projectId && this._projectSlug && this._cwd) {
+    if (adapter.capabilities.profileEnvSupport && this._projectId && this._projectSlug && this._cwd) {
       try {
         const selection = this._jobProfileSelection.get(jobId) // undefined|null|string
         this._jobProfileSelection.delete(jobId)
@@ -745,7 +787,7 @@ export class QueueManager {
             snapshotForJob,
             persistJobProfile,
           } = require('./profile-manager') as typeof import('./profile-manager')
-          const resolved = resolveProfile(this._cwd, selection ?? undefined, this._adapter.id)
+          const resolved = resolveProfile(this._cwd, selection ?? undefined, adapter.id)
           if (resolved) {
             profileSnapshotPath = snapshotForJob(this._projectSlug, jobId, resolved)
             profileName = resolved.name
@@ -768,7 +810,7 @@ export class QueueManager {
     // gets signals synthesised by the codex-otel-bridge attached below.
     let spawnEnv: NodeJS.ProcessEnv = process.env
     const telemetryEnabled = !!(this._projectId && this._db && getProjectSettings(this._db).pipelineTelemetryEnabled)
-    if (telemetryEnabled && this._adapter.capabilities.nativeOtelEnv && this._projectId) {
+    if (telemetryEnabled && adapter.capabilities.nativeOtelEnv && this._projectId) {
       const extra: Record<string, string> = {}
       if (profileName) extra['specrails.profile_name'] = profileName
       if (profileName) extra['specrails.profile_schema_version'] = '1'
@@ -795,7 +837,7 @@ export class QueueManager {
     let pluginActive: Array<{ name: string; version: string }> = []
     let pluginDegraded: Array<{ name: string; reason: string }> = []
     let pluginSnapshotPath: string | null = null
-    if (this._adapter.mcpRegistration === 'project-json' && this._projectId && this._projectSlug && this._cwd) {
+    if (adapter.mcpRegistration === 'project-json' && this._projectId && this._projectSlug && this._cwd) {
       try {
         const { resolvePluginsForSpawn, snapshotPluginsForJob } =
           require('./plugins/rail-integration') as typeof import('./plugins/rail-integration')
@@ -831,7 +873,7 @@ export class QueueManager {
     // Add OTEL attrs when telemetry already on AND the adapter accepts env
     // injection. Codex spawns receive these attributes via the bridge's
     // resource attribute block instead (see codex-otel-bridge.ts).
-    if (this._adapter.capabilities.nativeOtelEnv && this._projectId && this._db) {
+    if (adapter.capabilities.nativeOtelEnv && this._projectId && this._db) {
       const settings = getProjectSettings(this._db)
       if (settings.pipelineTelemetryEnabled && (pluginActive.length > 0 || pluginDegraded.length > 0)) {
         const extra: Record<string, string> = {}
@@ -898,7 +940,7 @@ export class QueueManager {
     // Synthetic OTEL bridge for providers whose CLI does not honour OTEL_*
     // env vars (codex today). Lifecycle bound to the spawn's close handler.
     let otelBridge: CodexOtelBridge | null = null
-    if (telemetryEnabled && !this._adapter.capabilities.nativeOtelEnv && this._projectId) {
+    if (telemetryEnabled && !adapter.capabilities.nativeOtelEnv && this._projectId) {
       otelBridge = createCodexOtelBridge({
         jobId,
         projectId: this._projectId,
@@ -968,7 +1010,7 @@ export class QueueManager {
       // alongside the raw event persistence below, NOT in place of it: the
       // raw event log is what feeds the live Job Detail UI and the
       // telemetry export ZIP for non-bridge providers.
-      const adapterEv = this._adapter.parseStreamLine(line)
+      const adapterEv = adapter.parseStreamLine(line)
       if (adapterEv) {
         adapterEvents.push(adapterEv)
         otelBridge?.consumeEvent(adapterEv)
@@ -1047,7 +1089,7 @@ export class QueueManager {
         })
       }
 
-      this._onJobExit(jobId, code, lastResultEvent, emitLine, adapterEvents, railModel)
+      this._onJobExit(jobId, code, lastResultEvent, emitLine, adapterEvents, railModel, adapter)
     })
 
     this._broadcastQueueState()
@@ -1060,6 +1102,9 @@ export class QueueManager {
     emitLine: (source: 'stdout' | 'stderr', line: string) => void,
     adapterEvents: readonly AdapterEvent[] = [],
     spawnedModel?: string,
+    /** Per-job adapter resolved in _startJob; defaults to the project primary
+     *  for any caller that does not thread it (none today). */
+    adapter: ProviderAdapter = this._adapter,
   ): void {
     this._clearZombieTimer()
 
@@ -1114,7 +1159,7 @@ export class QueueManager {
       // Adapter-driven result finalisation handles tokens, cost (or pricing-
       // table estimate for non-native-cost providers), and session_id stamping.
       const { result: normalised, estimated } = finaliseInvocationResult(
-        this._adapter,
+        adapter,
         adapterEvents,
         { fallbackModel: spawnedModel },
       )
@@ -1156,7 +1201,7 @@ export class QueueManager {
           recordInvocation(this._db, {
             id: randomUUID(),
             project_id: this._projectId,
-            provider: this._adapter.id,
+            provider: adapter.id,
             surface: 'job',
             surface_ref_id: jobId,
             ticket_id: ticketIds[0] ?? null,

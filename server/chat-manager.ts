@@ -146,6 +146,23 @@ export class ChatManager {
     return this._adapter.id
   }
 
+  /**
+   * Resolve the adapter for a conversation. A conversation may carry its own
+   * `provider` (set at creation from the Add Spec AI Engine selector); when
+   * present and registered it wins, otherwise the project's primary adapter is
+   * used. Single-provider conversations always resolve to the primary.
+   */
+  private _adapterForConversation(conversation: { provider?: string | null }): ProviderAdapter {
+    if (conversation.provider) {
+      try {
+        return getAdapter(conversation.provider)
+      } catch {
+        /* unknown id → fall back to primary */
+      }
+    }
+    return this._adapter
+  }
+
   // ─── Explore lifecycle helpers ──────────────────────────────────────────────
 
   private _getOrCreateExploreLifecycle(conversationId: string): ExploreLifecycle {
@@ -284,7 +301,11 @@ export class ChatManager {
    *
    * See openspec/changes/accelerate-spec-chat-first-token/design.md D1+D4.
    */
-  private _resolveSpawnCwd(kind: string | null | undefined, scope?: ContextScope | null): string | undefined {
+  private _resolveSpawnCwd(
+    kind: string | null | undefined,
+    scope?: ContextScope | null,
+    providerId?: string,
+  ): string | undefined {
     if (kind !== 'explore') return this._cwd
     if (!this._projectSlug || !this._cwd || !this._projectName) return this._cwd
     // Per-conversation scope.mcp is the only source of truth. Legacy null
@@ -296,7 +317,7 @@ export class ChatManager {
         slug: this._projectSlug,
         projectPath: this._cwd,
         projectName: this._projectName,
-        provider: this._adapter.id as 'claude' | 'codex',
+        provider: (providerId ?? this._adapter.id) as 'claude' | 'codex',
       })
       console.log(`[chat-manager] explore spawn cwd=${cwd} (mcp=off)`)
       return cwd
@@ -427,19 +448,24 @@ export class ChatManager {
       return
     }
 
-    if (!binaryOnPath(this._adapter.binary)) {
-      this._broadcast({
-        type: 'chat_error',
-        conversationId,
-        error: `${this._adapter.id.toUpperCase()}_NOT_FOUND`,
-        timestamp: new Date().toISOString(),
-      })
-      return
-    }
-
     const conversation = getConversation(this._db, conversationId)
     if (!conversation) {
       console.warn(`[ChatManager] conversation ${conversationId} not found`)
+      return
+    }
+
+    // Per-conversation adapter (multi-provider). The conversation's stored
+    // provider wins; null/legacy conversations fall back to the project
+    // primary (this._adapter). Resolved once and used for the whole turn.
+    const adapter = this._adapterForConversation(conversation)
+
+    if (!binaryOnPath(adapter.binary)) {
+      this._broadcast({
+        type: 'chat_error',
+        conversationId,
+        error: `${adapter.id.toUpperCase()}_NOT_FOUND`,
+        timestamp: new Date().toISOString(),
+      })
       return
     }
 
@@ -501,9 +527,9 @@ export class ChatManager {
       : this._buildSystemPrompt()
     if (hasAttachments) systemPrompt = `${systemPrompt}\n\n${USER_ATTACHMENT_SYSTEM_NOTE}`
 
-    const binary = this._adapter.binary
-    const model = conversation.model || this._adapter.defaultModel()
-    const action = conversation.session_id && this._adapter.capabilities.nativeResume
+    const binary = adapter.binary
+    const model = conversation.model || adapter.defaultModel()
+    const action = conversation.session_id && adapter.capabilities.nativeResume
       ? 'chat-resume' as const
       : 'chat-turn' as const
     // Translate the per-conversation Explore scope into provider-native
@@ -513,11 +539,11 @@ export class ChatManager {
     // gating is therefore claude-only today — codex inherits its sandbox
     // and approval policy from the project's `.codex/config.toml` (or the
     // `-c sandbox_mode=` override the adapter already attaches on resume).
-    const scopeFlags = conversationScope && this._adapter.id === 'claude'
+    const scopeFlags = conversationScope && adapter.id === 'claude'
       ? toolFlagsForScope(conversationScope).args
       : []
     let promptForAdapter = resolvedText
-    if (conversation.kind === 'explore' && this._adapter.id === 'codex' && conversationScope && this._cwd) {
+    if (conversation.kind === 'explore' && adapter.id === 'codex' && conversationScope && this._cwd) {
       const scopedContext = buildScopedSystemPromptPrefix(conversationScope, this._cwd)
       if (scopedContext) {
         promptForAdapter =
@@ -526,7 +552,7 @@ export class ChatManager {
           `## User turn\n\n${resolvedText}`
       }
     }
-    let args = this._adapter.buildArgs(action, {
+    let args = adapter.buildArgs(action, {
       prompt: promptForAdapter,
       systemPrompt,
       model,
@@ -541,7 +567,7 @@ export class ChatManager {
     // No OTEL env injection here — ChatManager spawns are interactive user sessions,
     // not pipeline jobs. Telemetry is scoped to QueueManager pipeline runs only.
     // spawnAiCli reroutes multi-line argv values through stdin on Windows.
-    const spawnCwd = this._resolveSpawnCwd(conversation.kind, conversationScope)
+    const spawnCwd = this._resolveSpawnCwd(conversation.kind, conversationScope, adapter.id)
     const child = spawnAiCli(binary, args, {
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -625,7 +651,7 @@ export class ChatManager {
     }
 
     const readerHandler = (line: string) => {
-      const ev = this._adapter.parseStreamLine(line)
+      const ev = adapter.parseStreamLine(line)
       if (!ev) return
       adapterEvents.push(ev)
       switch (ev.kind) {
@@ -661,7 +687,7 @@ export class ChatManager {
     void currentChild // keep reference live for crash respawn
     return new Promise<void>((resolve) => {
       const onClose = (code: number | null) => {
-        console.log(`[chat-manager] ${this._adapter.id} exited code=${code} conv=${conversationId}`)
+        console.log(`[chat-manager] ${adapter.id} exited code=${code} conv=${conversationId}`)
         const fullText = this._buffers.get(conversationId) ?? ''
         const wasAborting = this._abortingConversations.has(conversationId)
 
@@ -683,8 +709,8 @@ export class ChatManager {
             // resume AND we captured a session id before the crash. Otherwise
             // re-issue the original chat-turn argv so the spawn still happens.
             const respawnArgs =
-              capturedSessionId && this._adapter.capabilities.nativeResume
-                ? this._adapter.buildArgs('chat-resume', {
+              capturedSessionId && adapter.capabilities.nativeResume
+                ? adapter.buildArgs('chat-resume', {
                     prompt: resolvedText,
                     systemPrompt,
                     model,
@@ -775,13 +801,13 @@ export class ChatManager {
               : code === 0
                 ? 'success'
                 : 'failed'
-            const { result, estimated } = finaliseInvocationResult(this._adapter, adapterEvents, {
+            const { result, estimated } = finaliseInvocationResult(adapter, adapterEvents, {
               fallbackModel: model,
             })
             recordInvocation(this._db, {
               id: randomUUID(),
               project_id: this._projectId,
-              provider: this._adapter.id,
+              provider: adapter.id,
               surface: 'explore-spec',
               surface_ref_id: conversationId,
               conversation_id: conversationId,
@@ -928,15 +954,18 @@ export class ChatManager {
 
   private _autoTitle(conversationId: string, firstUserMsg: string, firstResponse: string): void {
     try {
+      // Title generation runs on the conversation's own provider.
+      const conv = getConversation(this._db, conversationId)
+      const adapter = this._adapterForConversation(conv ?? {})
       const titlePrompt =
         `Generate a 4-6 word title for this conversation. Output ONLY the title text, no quotes or punctuation.\n\n` +
         `User: ${firstUserMsg.slice(0, 200)}\nAssistant: ${firstResponse.slice(0, 300)}`
 
-      const args = this._adapter.buildArgs('auto-title', {
+      const args = adapter.buildArgs('auto-title', {
         prompt: titlePrompt,
-        model: this._adapter.defaultModel(),
+        model: adapter.defaultModel(),
       })
-      const child = spawnAiCli(this._adapter.binary, args, {
+      const child = spawnAiCli(adapter.binary, args, {
         env: process.env,
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd: this._cwd,
@@ -947,7 +976,7 @@ export class ChatManager {
 
       reader.on('line', (line) => {
         if (titleText) return
-        const ev = this._adapter.parseStreamLine(line)
+        const ev = adapter.parseStreamLine(line)
         if (ev?.kind === 'text-delta') {
           const trimmed = ev.text.trim()
           if (trimmed) titleText = trimmed

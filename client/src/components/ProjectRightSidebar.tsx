@@ -3,8 +3,9 @@ import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, Briefcase, BarChart3, Bot, Code2, Puzzle, Settings, PanelRight } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useSidebarPin } from '../context/SidebarPinContext'
-import { useHub } from '../hooks/useHub'
+import { useHub, projectProviders } from '../hooks/useHub'
 import { FEATURE_AGENTS_SECTION, FEATURE_CODE_EXPLORER } from '../lib/feature-flags'
+import { sectionVisibleForProviders } from '../lib/provider-capabilities'
 
 const RIGHT_PIN_LABEL: Record<'pinned-open' | 'pinned-collapsed' | 'unpinned', string> = {
   'pinned-open': 'Collapse right sidebar (keep pinned)',
@@ -20,22 +21,17 @@ export function ProjectRightSidebar() {
   const lit = rightMode !== 'unpinned'
   const pinLabel = RIGHT_PIN_LABEL[rightMode]
 
-  // Agents section is claude-only: the agent-profile catalogue, model
-  // overrides per agent, and the `sr-architect/developer/reviewer` sub-
-  // agent model maps to Claude Code's `.claude/agents/<id>.md` mechanic.
-  // Codex's `spawn_agent` tool uses a fixed enum of agent_types and runs
-  // skills as a single-agent loop, so the per-agent UI doesn't apply.
-  //
-  // Integrations (plugins / MCP servers) is also claude-only today: the
-  // plugin manager registers MCP servers via `.mcp.json` (claude's
-  // convention). Codex uses `codex mcp add` against an isolated
-  // CODEX_HOME — the hub wires that flow but the UI hasn't been adapted
-  // yet, so we hide the tab on codex projects to avoid presenting a
-  // claude-only surface.
+  // Agents (agent-profile catalogue, per-agent model overrides) and
+  // Integrations (plugins / MCP via `.mcp.json`) are Claude-only mechanics with
+  // no Codex equivalent in the hub today. We show a section only when EVERY
+  // installed provider supports it (the intersection): so a Claude-only project
+  // sees both, a Codex-only project sees neither (unchanged), and a project
+  // with BOTH engines hides them — surfacing a Claude-only section for a project
+  // that can also dispatch jobs to Codex would be a footgun.
   const activeProject = projects.find((p) => p.id === activeProjectId)
-  const isCodex = activeProject?.provider === 'codex'
-  const showAgentsTab = FEATURE_AGENTS_SECTION && !isCodex
-  const showIntegrationsTab = !isCodex
+  const providers = activeProject ? projectProviders(activeProject) : ['claude']
+  const showAgentsTab = FEATURE_AGENTS_SECTION && sectionVisibleForProviders('agents', providers)
+  const showIntegrationsTab = sectionVisibleForProviders('integrations', providers)
 
   const navItems = [
     { to: '/', end: true, icon: LayoutDashboard, label: 'Dashboard' },

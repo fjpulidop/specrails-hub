@@ -52,7 +52,7 @@ describe('SetupWizard', () => {
     it('renders agent-selection step by default', () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
-      expect(screen.getByText(/configure your agents/i)).toBeInTheDocument()
+      expect(screen.getByText(/configure .*agents/i)).toBeInTheDocument()
     })
 
     it('shows wizard step indicator labels (Configure / Install / Done — no Enrich, no tier)', () => {
@@ -301,7 +301,7 @@ describe('SetupWizard', () => {
       await waitFor(() => expect(screen.getByRole('button', { name: /^back$/i })).toBeInTheDocument())
       fireEvent.click(screen.getByRole('button', { name: /^back$/i }))
       await waitFor(() => {
-        expect(screen.getByText(/configure your agents/i)).toBeInTheDocument()
+        expect(screen.getByText(/configure .*agents/i)).toBeInTheDocument()
       })
     })
   })
@@ -391,6 +391,55 @@ describe('SetupWizard', () => {
     it('does not render legacy cleanup notice when legacySrRemoved === 0', async () => {
       await renderCompleteStep({ legacySrRemoved: 0 })
       expect(screen.queryByText(/legacy.*sr/i)).not.toBeInTheDocument()
+    })
+  })
+
+  // ─── Multi-provider (4-step) flow ─────────────────────────────────────────────
+  describe('Multi-provider flow', () => {
+    function makeMultiProject() {
+      return makeProject({ provider: 'claude', providers: ['claude', 'codex'] })
+    }
+
+    it('shows a Configure step per provider and a Next CTA on the first', () => {
+      render(<SetupWizard project={makeMultiProject()} onComplete={vi.fn()} onSkip={vi.fn()} />)
+      // Header reflects the first provider being configured.
+      expect(screen.getByText(/configure claude agents/i)).toBeInTheDocument()
+      // Step indicator shows both provider labels + Install + Done.
+      expect(screen.getByText('Claude')).toBeInTheDocument()
+      expect(screen.getByText('Codex')).toBeInTheDocument()
+      // First provider's CTA advances to the next provider rather than installing.
+      expect(screen.getByRole('button', { name: /next: codex/i })).toBeInTheDocument()
+    })
+
+    it('advances to the second provider then installs both sequentially', async () => {
+      const project = makeMultiProject()
+      render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)
+
+      // Step 1 → Step 2 (configure Codex)
+      fireEvent.click(screen.getByRole('button', { name: /next: codex/i }))
+      await waitFor(() => expect(screen.getByText(/configure codex agents/i)).toBeInTheDocument())
+
+      // Step 2 → Install (the last provider's CTA reads "Install")
+      fireEvent.click(screen.getByRole('button', { name: /^install$/i }))
+      await waitFor(() => expect(screen.getByText(/installing claude/i)).toBeInTheDocument())
+
+      const handler = mockRegisterHandler.mock.calls[0][1] as (msg: unknown) => void
+
+      // First provider finishes → wizard kicks off the second provider's install.
+      act(() => {
+        handler({ type: 'setup_install_done', projectId: project.id, summary: { agents: 4, specrailsCommands: 8, opsxCommands: 3, legacySrRemoved: 0, tier: 'quick', provider: 'claude' } })
+      })
+      await waitFor(() => expect(screen.getByText(/installing codex/i)).toBeInTheDocument())
+
+      // Second provider finishes → complete screen with BOTH summaries.
+      act(() => {
+        handler({ type: 'setup_install_done', projectId: project.id, summary: { agents: 5, specrailsCommands: 9, opsxCommands: 2, legacySrRemoved: 0, tier: 'quick', provider: 'codex' } })
+      })
+      await waitFor(() => expect(screen.getByText(/welcome to/i)).toBeInTheDocument())
+      expect(screen.getByText(/installed for 2 engines/i)).toBeInTheDocument()
+      // Per-provider summary cards present.
+      expect(screen.getByText('Agents')).toBeInTheDocument()       // claude card label
+      expect(screen.getByText('Agent skills')).toBeInTheDocument() // codex card label
     })
   })
 })

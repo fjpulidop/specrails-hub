@@ -18,6 +18,8 @@ export interface DefaultSpecModelResponse {
   model: string
   provider: 'claude' | 'codex'
   allowed: SpecModelOption[]
+  /** All providers installed for the project (multi-provider AI Engine selector). */
+  providers?: ('claude' | 'codex')[]
 }
 
 interface SpecModelPickerProps {
@@ -64,10 +66,17 @@ export function SpecModelPicker({ value, allowed, loading, onChange, ariaLabel }
  * on `projectId` change. Falls back to a tiny local list if the endpoint
  * fails so the modal stays usable; surface this via `error`.
  */
-export function useDefaultSpecModel(projectId: string | null, enabled: boolean) {
+export function useDefaultSpecModel(
+  projectId: string | null,
+  enabled: boolean,
+  /** Optional engine override (multi-provider). When set, the endpoint returns
+   *  that provider's default model + allow-list. Refetches when it changes. */
+  providerOverride?: 'claude' | 'codex' | null,
+) {
   const [model, setModel] = useState<string | null>(null)
   const [allowed, setAllowed] = useState<SpecModelOption[]>([])
   const [provider, setProvider] = useState<'claude' | 'codex' | null>(null)
+  const [providers, setProviders] = useState<('claude' | 'codex')[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -76,7 +85,8 @@ export function useDefaultSpecModel(projectId: string | null, enabled: boolean) 
     let cancelled = false
     setLoading(true)
     setError(null)
-    fetch(`${getApiBase()}/default-spec-model`)
+    const qs = providerOverride ? `?provider=${encodeURIComponent(providerOverride)}` : ''
+    fetch(`${getApiBase()}/default-spec-model${qs}`)
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json() as Promise<DefaultSpecModelResponse>
@@ -88,6 +98,9 @@ export function useDefaultSpecModel(projectId: string | null, enabled: boolean) 
           ? data.allowed
           : [{ value: 'sonnet', label: 'Claude Sonnet' }])
         setProvider(data?.provider ?? 'claude')
+        setProviders(Array.isArray(data?.providers) && data.providers.length > 0
+          ? data.providers
+          : [data?.provider ?? 'claude'])
       })
       .catch((err: Error) => {
         if (cancelled) return
@@ -97,12 +110,13 @@ export function useDefaultSpecModel(projectId: string | null, enabled: boolean) 
         setModel('sonnet')
         setAllowed([{ value: 'sonnet', label: 'Claude Sonnet' }])
         setProvider('claude')
+        setProviders(['claude'])
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [enabled, projectId])
+  }, [enabled, projectId, providerOverride])
 
-  return { model, setModel, allowed, provider, loading, error }
+  return { model, setModel, allowed, provider, providers, loading, error }
 }

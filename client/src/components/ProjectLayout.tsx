@@ -7,7 +7,7 @@ import { ChatPanel } from './ChatPanel'
 import { usePipeline } from '../hooks/usePipeline'
 import { useChat, ChatContext } from '../hooks/useChat'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
-import type { HubProject } from '../hooks/useHub'
+import { type HubProject, projectProviders } from '../hooks/useHub'
 import { FEATURE_CHAT_ENABLED, FEATURE_TERMINAL_PANEL } from '../lib/feature-flags'
 import { BottomPanel } from './terminal/BottomPanel'
 import { PanelChevronButton } from './terminal/PanelChevronButton'
@@ -111,6 +111,7 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
           <BottomPanel
             projectId={project.id}
             provider={project.provider}
+            providers={projectProviders(project)}
             state={panelState}
             viewportHeight={viewportHeight}
             statusBarHeight={STATUSBAR_HEIGHT_PX}

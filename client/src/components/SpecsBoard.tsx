@@ -82,6 +82,8 @@ interface ExploreState {
   /** Model picked at Add Spec — only carried for fresh sessions. Restored
    *  sessions read the model off the persisted conversation row. */
   initialModel?: string
+  /** AI engine picked at Add Spec — only carried for fresh sessions. */
+  initialProvider?: string
   resumeConversationId?: string
   /** Last-known draft title, surfaced as the shell's initial header label
    *  on restore so the title doesn't blank out across minimize/maximize
@@ -407,6 +409,7 @@ export function SpecsBoard({
       pendingSpecId: payload.pendingSpecId,
       initialAttachmentIds: payload.initialAttachmentIds,
       initialModel: payload.model,
+      initialProvider: payload.provider,
       contextScope: payload.contextScope,
     })
   }, [parkCurrentExplore, activeProjectId])
@@ -732,6 +735,7 @@ export function SpecsBoard({
           pendingSpecId={explore.pendingSpecId}
           initialAttachmentIds={explore.initialAttachmentIds}
           initialModel={explore.initialModel}
+          initialProvider={explore.initialProvider}
           resumeConversationId={explore.resumeConversationId}
           seedDraftTitle={explore.seedDraftTitle}
           seedComposerText={explore.seedComposerText}

@@ -11,6 +11,7 @@ import { DEFAULT_TERMINAL_SETTINGS, type TerminalSettings } from '../../lib/term
 import { TERMINAL_SETTINGS_UPDATED_EVENT, type TerminalSettingsUpdatedEventDetail } from '../../lib/terminal-settings-events'
 import { registerTauriDragDrop } from '../../lib/tauri-drag-drop'
 import { ShortcutContextMenu } from './ShortcutContextMenu'
+import { CliLaunchMenu } from './CliLaunchMenu'
 import { TerminalTopBar } from './TerminalTopBar'
 import { TerminalSidebar } from './TerminalSidebar'
 import { TerminalViewport } from './TerminalViewport'
@@ -19,21 +20,27 @@ import { EmptyTerminalPlaceholder } from './EmptyTerminalPlaceholder'
 
 interface BottomPanelProps {
   projectId: string
-  /** Project's CLI provider — drives the Sparkles shortcut (claude vs codex). */
+  /** Project's primary CLI provider — drives the Sparkles shortcut label when a
+   *  single provider is installed (claude vs codex). */
   provider?: 'claude' | 'codex'
+  /** All installed providers. When >1, the Sparkles shortcut opens a picker. */
+  providers?: readonly string[]
   state: ProjectPanelState
   /** Full project viewport height in px — used for maximize computation. */
   viewportHeight: number
   statusBarHeight: number
 }
 
-export function BottomPanel({ projectId, provider = 'claude', state, viewportHeight, statusBarHeight }: BottomPanelProps) {
+export function BottomPanel({ projectId, provider = 'claude', providers, state, viewportHeight, statusBarHeight }: BottomPanelProps) {
   const t = useTerminals()
   const navigate = useNavigate()
   const panelRef = useRef<HTMLDivElement | null>(null)
   const [livePreviewHeight, setLivePreviewHeight] = useState<number | null>(null)
   const [settings, setSettings] = useState<TerminalSettings>(DEFAULT_TERMINAL_SETTINGS)
   const [shortcutMenu, setShortcutMenu] = useState<{ x: number; y: number; kind: 'browser' | 'script' } | null>(null)
+  const [cliMenu, setCliMenu] = useState<{ x: number; y: number } | null>(null)
+  const installedProviders = providers && providers.length > 0 ? providers : [provider]
+  const multiProvider = installedProviders.length > 1
 
   const loadSettings = useCallback(async (cancelled: () => boolean = () => false) => {
     try {
@@ -106,16 +113,27 @@ export function BottomPanel({ projectId, provider = 'claude', state, viewportHei
     void t.create(projectId)
   }, [canCreate, projectId, t])
 
-  const handleOpenCli = useCallback(() => {
+  const launchCli = useCallback((which: 'claude' | 'codex') => {
     if (!canCreate) return
-    const baseName = provider === 'codex' ? 'codex' : 'claude'
+    const baseName = which === 'codex' ? 'codex' : 'claude'
     const numberSuffix = new RegExp(`^${baseName} \\(\\d+\\)$`)
     const matches = state.sessions.filter(
       (s) => s.name === baseName || numberSuffix.test(s.name),
     )
     const name = matches.length === 0 ? baseName : `${baseName} (${matches.length + 1})`
     void t.createAndType(projectId, `${baseName}\n`, { name })
-  }, [canCreate, projectId, provider, state.sessions, t])
+  }, [canCreate, projectId, state.sessions, t])
+
+  const handleOpenCli = useCallback((anchor?: { x: number; y: number }) => {
+    if (!canCreate) return
+    // Multi-provider: open a picker so the user chooses which CLI to launch.
+    // Single-provider: launch directly (unchanged behaviour).
+    if (multiProvider && anchor) {
+      setCliMenu(anchor)
+      return
+    }
+    launchCli((provider === 'codex' ? 'codex' : 'claude'))
+  }, [canCreate, multiProvider, provider, launchCli])
 
   const handleOpenBrowser = useCallback(() => {
     void openExternalUrl(settings.browserShortcutUrl)
@@ -181,6 +199,7 @@ export function BottomPanel({ projectId, provider = 'claude', state, viewportHei
         canCreate={canCreate}
         hasActive={hasActive}
         provider={provider}
+        providers={installedProviders}
         onCreate={handleCreate}
         onOpenCli={handleOpenCli}
         onOpenBrowser={handleOpenBrowser}
@@ -199,6 +218,15 @@ export function BottomPanel({ projectId, provider = 'claude', state, viewportHei
           label={shortcutMenu.kind === 'browser' ? 'Configure browser URL in settings…' : 'Edit quick script in settings…'}
           onSelect={() => handleNavigateToSetting(shortcutMenu.kind)}
           onClose={() => setShortcutMenu(null)}
+        />
+      )}
+      {cliMenu && (
+        <CliLaunchMenu
+          x={cliMenu.x}
+          y={cliMenu.y}
+          providers={installedProviders}
+          onSelect={(p) => launchCli(p)}
+          onClose={() => setCliMenu(null)}
         />
       )}
       <div className="flex-1 flex min-h-0">

@@ -11,6 +11,8 @@ export interface SpendingFilters {
   status?: 'success' | 'failed' | 'aborted'
   minCostUsd?: number
   ticketId?: number
+  /** Provider ids to include (multi-provider segmentation). Empty/undefined = all. */
+  provider?: string[]
 }
 
 export interface BySurfaceCount { surface: Surface; count: number; costUsd: number }

@@ -120,7 +120,7 @@ function makeSpecLauncherManager(overrides: Partial<{
 
 function makeContext(db: DbInstance, overrides: Partial<ProjectContext> = {}): ProjectContext {
   return {
-    project: { id: 'proj-1', slug: 'proj', name: 'Test Project', path: '/tmp', db_path: ':memory:', added_at: '', last_seen_at: '' },
+    project: { id: 'proj-1', slug: 'proj', name: 'Test Project', path: '/tmp', db_path: ':memory:', provider: 'claude', providers: ['claude'], added_at: '', last_seen_at: '' },
     db,
     queueManager: makeQueueManager() as any,
     chatManager: makeChatManager() as any,
@@ -3231,6 +3231,85 @@ describe('project-router', () => {
         .send({})
       expect(res.status).toBe(201)
       expect(res.body.conversation.model).toBe('sonnet')
+    })
+  })
+})
+
+// ─── Multi-provider routes ─────────────────────────────────────────────────────
+
+describe('project-router multi-provider', () => {
+  let db: DbInstance
+
+  const MULTI_PROJECT = {
+    id: 'proj-1', slug: 'proj', name: 'Multi', path: '/tmp',
+    db_path: ':memory:', provider: 'claude' as const, providers: ['claude', 'codex'] as ('claude' | 'codex')[],
+    added_at: '', last_seen_at: '',
+  }
+
+  beforeEach(() => { db = initDb(':memory:') })
+
+  describe('GET /default-spec-model', () => {
+    it('returns codex models + provider list when ?provider=codex on a multi-provider project', async () => {
+      const ctx = makeContext(db, { project: MULTI_PROJECT })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/default-spec-model?provider=codex')
+      expect(res.status).toBe(200)
+      expect(res.body.provider).toBe('codex')
+      expect(res.body.providers).toEqual(['claude', 'codex'])
+      expect(res.body.allowed.some((m: { value: string }) => m.value === 'gpt-5.5')).toBe(true)
+    })
+
+    it('falls back to the primary provider when ?provider= is not installed', async () => {
+      const ctx = makeContext(db, { project: { ...MULTI_PROJECT, providers: ['claude'] } })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).get('/api/projects/proj-1/default-spec-model?provider=codex')
+      expect(res.status).toBe(200)
+      expect(res.body.provider).toBe('claude')
+    })
+  })
+
+  describe('POST /spawn aiEngine', () => {
+    it('threads aiEngine through to enqueue as provider', async () => {
+      const enqueue = vi.fn(() => ({ id: 'job-x', queuePosition: 0 }))
+      const ctx = makeContext(db, { project: MULTI_PROJECT, queueManager: makeQueueManager({ enqueue }) as any })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).post('/api/projects/proj-1/spawn').send({ command: '/specrails:implement #1', aiEngine: 'codex' })
+      expect(res.status).toBe(202)
+      expect((enqueue.mock.calls[0][2] as { provider?: string }).provider).toBe('codex')
+    })
+
+    it('rejects an aiEngine not installed for the project', async () => {
+      const ctx = makeContext(db, { project: { ...MULTI_PROJECT, providers: ['claude'] } })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).post('/api/projects/proj-1/spawn').send({ command: '/x', aiEngine: 'codex' })
+      expect(res.status).toBe(400)
+    })
+  })
+
+  describe('POST /chat/conversations aiEngine', () => {
+    it('persists the conversation provider on a multi-provider project', async () => {
+      const ctx = makeContext(db, { project: MULTI_PROJECT })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).post('/api/projects/proj-1/chat/conversations').send({ kind: 'explore', aiEngine: 'codex' })
+      expect(res.status).toBe(201)
+      expect(res.body.conversation.provider).toBe('codex')
+      // codex model default
+      expect(res.body.conversation.model).toBe('gpt-5.5')
+    })
+
+    it('rejects an aiEngine not installed for the project', async () => {
+      const ctx = makeContext(db, { project: { ...MULTI_PROJECT, providers: ['claude'] } })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).post('/api/projects/proj-1/chat/conversations').send({ kind: 'explore', aiEngine: 'codex' })
+      expect(res.status).toBe(400)
+    })
+
+    it('leaves provider NULL on a single-provider project (legacy behaviour)', async () => {
+      const ctx = makeContext(db, { project: { ...MULTI_PROJECT, providers: ['claude'] } })
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app).post('/api/projects/proj-1/chat/conversations').send({ kind: 'explore' })
+      expect(res.status).toBe(201)
+      expect(res.body.conversation.provider).toBeNull()
     })
   })
 })
