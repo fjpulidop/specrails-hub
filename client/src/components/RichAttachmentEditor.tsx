@@ -8,6 +8,7 @@ import {
   type DragEvent,
   type KeyboardEvent,
   type ClipboardEvent,
+  type ReactNode,
 } from 'react'
 import type { Attachment } from '../types'
 import {
@@ -45,6 +46,9 @@ interface RichAttachmentEditorProps {
   onUploadError?: (error: Error, file: File) => void
   onChange?: () => void
   onSubmit?: () => void // Cmd+Enter
+  /** Extra action(s) rendered next to "Attach files" in the footer (e.g. the
+   *  "From a website" capture button) so all add-context actions sit together. */
+  footerExtra?: ReactNode
 }
 
 interface PendingUpload {
@@ -131,6 +135,7 @@ export const RichAttachmentEditor = forwardRef<RichAttachmentEditorHandle, RichA
       onUploadError,
       onChange,
       onSubmit,
+      footerExtra,
     },
     ref,
   ) {
@@ -545,15 +550,18 @@ export const RichAttachmentEditor = forwardRef<RichAttachmentEditorHandle, RichA
         )}
 
         <div className="flex items-center justify-between mt-2 text-[11px] text-muted-foreground">
-          <button
-            type="button"
-            onClick={handleBrowseClick}
-            disabled={disabled}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border hover:bg-accent/40 transition-colors disabled:opacity-50"
-          >
-            <span aria-hidden>📎</span>
-            <span>Attach files</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleBrowseClick}
+              disabled={disabled}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border hover:bg-accent/40 transition-colors disabled:opacity-50"
+            >
+              <span aria-hidden>📎</span>
+              <span>Attach files</span>
+            </button>
+            {footerExtra}
+          </div>
           {uploads.length > 0 && (
             <span className="animate-pulse">Uploading {uploads.length} file{uploads.length > 1 ? 's' : ''}…</span>
           )}

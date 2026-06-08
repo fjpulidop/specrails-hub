@@ -8,7 +8,17 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
       include: ['server/**/*.ts', 'cli/**/*.ts'],
-      exclude: ['**/*.test.ts', 'server/dist/**', 'server/index.ts'],
+      exclude: [
+        '**/*.test.ts',
+        'server/dist/**',
+        'server/index.ts',
+        // Real Playwright/CDP implementation of the browser-capture abstractions.
+        // Every branch requires a live Chromium (screencast frames, CDP input,
+        // DOM eval) which is not exercisable in the node test env; the manager
+        // that consumes it (browser-capture-manager.ts) is fully tested through a
+        // fake ContextLauncher. See server/browser-playwright.ts header.
+        'server/browser-playwright.ts',
+      ],
       // Global: 70% lines/functions (SPEA-380 target); branches excluded from global
       // because CLI has complex runtime code (HTTP/WebSocket/spawn) requiring integration tests
       // Server: 80% per engineering-standards.md §3.2

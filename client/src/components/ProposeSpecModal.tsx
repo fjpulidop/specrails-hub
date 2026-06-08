@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
-import { Sparkles, Send, Zap, MessagesSquare } from 'lucide-react'
+import { Sparkles, Send, Zap, MessagesSquare, Globe } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
@@ -19,6 +19,17 @@ import { useContextScope } from '../hooks/useContextScope'
 import { useContextBudget } from '../hooks/useContextBudget'
 import { useQuickContractRefineLast } from '../hooks/useQuickContractRefineLast'
 import { quickHintForScope, tierFromScope, submitAccentForTier, type ContextScope } from '../types/context-scope'
+import { BrowserCaptureModal } from './browser-capture/BrowserCaptureModal'
+import { CapturedDomPanel } from './browser-capture/CapturedDomPanel'
+import { isBrowserCaptureEnabled, type CaptureResult, type CapturedDom } from '../lib/browser-capture'
+
+interface BrowserCaptureEntry {
+  screenshotId: string
+  screenshotName: string
+  screenshotDataUrl: string
+  domAttachmentId: string
+  dom: CapturedDom
+}
 
 type SpecMode = 'quick' | 'explore'
 
@@ -65,6 +76,9 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
   const [hasText, setHasText] = useState(false)
   const [attachmentCount, setAttachmentCount] = useState(0)
   const [pendingSpecId, setPendingSpecId] = useState<string>(() => genPendingId())
+  const [browserOpen, setBrowserOpen] = useState(false)
+  const [captures, setCaptures] = useState<BrowserCaptureEntry[]>([])
+  const browserCaptureEnabled = isBrowserCaptureEnabled()
   const editorRef = useRef<RichAttachmentEditorHandle | null>(null)
   const submittedRef = useRef(false)
   const scopeTouchedRef = useRef(false)
@@ -131,6 +145,8 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
       setHasText(false)
       setAttachmentCount(0)
       setEngine(null)
+      setBrowserOpen(false)
+      setCaptures([])
       submittedRef.current = false
       scopeTouchedRef.current = false
       // defer to let dialog mount; reset any user-resized height so the modal
@@ -150,12 +166,42 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const canSubmit = useMemo(() => hasText && !isSubmitting, [hasText, isSubmitting])
+  const canSubmit = useMemo(() => (hasText || captures.length > 0) && !isSubmitting, [hasText, captures.length, isSubmitting])
+
+  const handleCaptured = useCallback((result: CaptureResult) => {
+    // A capture contributes two attachments (screenshot image + DOM JSON). Both
+    // are tracked here and merged into the submit payload; the screenshot renders
+    // as a visual chip and the DOM in a collapsible panel. They are NOT inserted
+    // as editor pills so removeCapture can cleanly drop both.
+    setCaptures((c) => [...c, {
+      screenshotId: result.screenshot.id,
+      screenshotName: result.screenshot.filename,
+      screenshotDataUrl: result.screenshotDataUrl,
+      domAttachmentId: result.domAttachment.id,
+      dom: result.dom,
+    }])
+    setAttachmentCount((c) => c + 2)
+  }, [])
+
+  const removeCapture = useCallback((entry: BrowserCaptureEntry) => {
+    setCaptures((c) => c.filter((e) => e.domAttachmentId !== entry.domAttachmentId))
+    setAttachmentCount((c) => Math.max(0, c - 2))
+    const pid = activeProjectIdRef.current
+    for (const id of [entry.screenshotId, entry.domAttachmentId]) {
+      fetch(`${API_ORIGIN}/api/projects/${pid}/tickets/${pendingSpecId}/attachments/${id}`, { method: 'DELETE' }).catch(() => {})
+    }
+  }, [pendingSpecId])
 
   const handleSubmit = useCallback(async () => {
-    const idea = editorRef.current?.getPlainText().trim() ?? ''
+    const typed = editorRef.current?.getPlainText().trim() ?? ''
+    const idea = typed || (captures.length > 0
+      ? 'Create a spec based on the captured browser selection (a screenshot and the page DOM are attached for reference).'
+      : '')
     if (!idea) return
-    const attachmentIds = editorRef.current?.getAttachmentIds() ?? []
+    const attachmentIds = [
+      ...(editorRef.current?.getAttachmentIds() ?? []),
+      ...captures.flatMap((c) => [c.screenshotId, c.domAttachmentId]),
+    ]
 
     const projectId = activeProjectIdRef.current
     if (!projectId) return
@@ -198,6 +244,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     editorRef.current?.clear()
     setAttachmentCount(0)
     setHasText(false)
+    setCaptures([])
 
     const reg = { toastId, truncated, knownTicketIds, projectId, projectName, startTime, persistId: toastId }
 
@@ -234,11 +281,16 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     } finally {
       setIsSubmitting(false)
     }
-  }, [mode, tickets, tracker, pendingSpecId, onClose, onExploreLaunch, model, quickRefine, scope, effectiveProvider])
+  }, [mode, tickets, tracker, pendingSpecId, onClose, onExploreLaunch, model, quickRefine, scope, effectiveProvider, captures])
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      {/* While the embedded-browser overlay is open we drop the Add Spec dialog to
+          non-modal: Radix's modal layer otherwise sets `pointer-events:none` on
+          <body> and traps focus inside DialogContent, which would block the
+          body-portaled browser overlay (can't type the URL or click). DialogContent
+          stays mounted, so the composer text/captures are preserved. */}
+      <Dialog open={open} modal={!browserOpen} onOpenChange={(o) => { if (!o && !browserOpen) onClose() }}>
         <DialogContent className="max-w-4xl flex flex-col gap-0 p-0 overflow-hidden">
           <DialogHeader className="px-5 py-4 border-b border-border/40 shrink-0">
             <DialogTitle className="text-sm flex items-center gap-2">
@@ -250,7 +302,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col p-5 gap-4">
+          <div className="flex flex-col p-5 gap-4 flex-1 min-h-0 overflow-y-auto">
             <div className="flex items-center justify-between gap-3">
               <ModeSegmented value={mode} onChange={setMode} fullCodebase={scope.full} />
               <div className="flex items-center gap-2">
@@ -306,7 +358,41 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
               onUnsupportedFile={(f) => toast.error(`Unsupported file type: ${f.name}`)}
               onUploadError={(err, f) => toast.error(`Upload failed for ${f.name}: ${err.message}`)}
               onSubmit={handleSubmit}
+              footerExtra={browserCaptureEnabled && activeProjectId ? (
+                <button
+                  type="button"
+                  onClick={() => setBrowserOpen(true)}
+                  data-testid="from-browser-btn"
+                  title="Open a real web page, select an area, and turn it into a spec"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-accent-info/50 text-accent-info hover:bg-accent-info/10 transition-colors font-medium"
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>From a website</span>
+                </button>
+              ) : undefined}
             />
+            {captures.length > 0 && (
+              <div className="space-y-3" data-testid="captured-dom-list">
+                {captures.map((c) => (
+                  <div key={c.domAttachmentId} className="space-y-1.5">
+                    <div className="rounded-lg border border-accent-secondary/40 bg-accent-secondary/5 p-2 space-y-1.5">
+                      <img
+                        src={c.screenshotDataUrl}
+                        alt={c.screenshotName}
+                        className="max-h-44 w-auto max-w-full object-contain rounded border border-border/60 bg-background-deep mx-auto block"
+                      />
+                      {c.dom.url && c.dom.url !== 'about:blank' && (
+                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground" title={c.dom.url}>
+                          <Globe className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{c.dom.url}</span>
+                        </div>
+                      )}
+                    </div>
+                    <CapturedDomPanel dom={c.dom} onRemove={() => removeCapture(c)} />
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex items-center justify-end">
               <Button
                 size="sm"
@@ -323,6 +409,15 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
         </DialogContent>
       </Dialog>
 
+      {browserCaptureEnabled && browserOpen && activeProjectId && (
+        <BrowserCaptureModal
+          open={browserOpen}
+          onClose={() => setBrowserOpen(false)}
+          projectId={activeProjectId}
+          pendingSpecId={pendingSpecId}
+          onCaptured={handleCaptured}
+        />
+      )}
     </>
   )
 }

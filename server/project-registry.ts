@@ -16,6 +16,7 @@ import { SpecLauncherManager } from './spec-launcher-manager'
 import { WebhookManager } from './webhook-manager'
 import { TicketWatcher } from './ticket-watcher'
 import { getTerminalManager } from './terminal-manager'
+import { BrowserCaptureManager } from './browser-capture-manager'
 import { removeExploreCwd } from './explore-cwd-manager'
 import { resolveTicketStoragePath, mutateStore } from './ticket-store'
 import type { WsMessage, TicketUpdatedMessage } from './types'
@@ -49,6 +50,7 @@ export interface ProjectContext {
   fileSummaryManager: FileSummaryManager
   specLauncherManager: SpecLauncherManager
   ticketWatcher: TicketWatcher
+  browserCaptureManager: BrowserCaptureManager
   broadcast: (msg: WsMessage) => void
   /** Maps jobId → rail metadata for active rail-launched jobs */
   railJobs: Map<string, { railIndex: number; mode: string; ticketIds: number[] }>
@@ -107,6 +109,8 @@ export class ProjectRegistry {
       try { ctx.queueManager.shutdown() } catch { /* ignore */ }
       try { ctx.chatManager.shutdown() } catch { /* ignore */ }
       try { ctx.setupManager.abort(id) } catch { /* ignore */ }
+      // Tear down the embedded browser (closes pages + persistent context).
+      void ctx.browserCaptureManager.shutdown().catch(() => { /* ignore */ })
       // Kill any terminal sessions belonging to this project
       try { getTerminalManager().killAllForProject(id) } catch { /* ignore */ }
       // Close the ticket file watcher
@@ -154,6 +158,7 @@ export class ProjectRegistry {
     for (const ctx of this._contexts.values()) {
       try { ctx.queueManager.shutdown() } catch { /* ignore */ }
       try { ctx.chatManager.shutdown() } catch { /* ignore */ }
+      void ctx.browserCaptureManager.shutdown().catch(() => { /* ignore */ })
       // Release chokidar watchers (fsevents/inotify handles) so a restart does
       // not leak them — removeProject() does this per-project; mirror it here.
       try { ctx.fileSummaryManager.detachWatcher(ctx.project.id) } catch { /* ignore */ }
@@ -375,7 +380,18 @@ export class ProjectRegistry {
     const ticketWatcher = new TicketWatcher(project.path, project.id, boundBroadcast)
     ticketWatcher.start()
 
-    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, agentRefineManager, fileSummaryManager, specLauncherManager, ticketWatcher, broadcast: boundBroadcast, railJobs }
+    // BrowserCaptureManager — "Add Spec from browser". Constructed for every
+    // project regardless of the feature flag; the routes + WS endpoint 404 when
+    // the flag is off, and the persistent Chromium context is launched lazily on
+    // first session create, so a project that never uses it pays nothing.
+    const browserCaptureManager = new BrowserCaptureManager({
+      projectId: project.id,
+      projectSlug: project.slug,
+      db,
+      broadcast: boundBroadcast,
+    })
+
+    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, agentRefineManager, fileSummaryManager, specLauncherManager, ticketWatcher, browserCaptureManager, broadcast: boundBroadcast, railJobs }
     this._contexts.set(project.id, ctx)
     return ctx
   }

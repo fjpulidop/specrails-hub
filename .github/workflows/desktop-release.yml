@@ -11,6 +11,14 @@ permissions:
 env:
   NODE_BUNDLE_VERSION: "22.x"
   GIT_BUNDLE_VERSION: "2.49.0"
+  # Bundle a Chromium build for the embedded browser-capture feature ("Add Spec
+  # from browser"). Default OFF: when unset/false the desktop app falls back to a
+  # Playwright-managed Chromium downloaded on first use (server/chromium-resolver.ts
+  # returns null → Playwright's default). Flip to "true" to ship Chromium inside the
+  # app for an offline-first experience — but VALIDATE macOS notarization first: the
+  # nested Chromium.app frameworks/helpers may need inside-out codesigning beyond the
+  # existing per-Mach-O loop, and a notarization failure fails the whole macOS release.
+  BUNDLE_CHROMIUM: "false"
 
 jobs:
   build-macos:
@@ -152,6 +160,23 @@ jobs:
             echo "ERROR: bundled git links a non-system dylib — not self-contained"; exit 1
           fi
           echo "Built relocatable Git ${GIT_VERSION} → ${DEST}"
+
+      - name: Assemble bundled Chromium (macOS arm64)
+        if: ${{ env.BUNDLE_CHROMIUM == 'true' }}
+        run: |
+          set -euo pipefail
+          # Install the Chromium build pinned to our Playwright version, then copy
+          # its platform folder into runtimes/chromium so the sign loop below covers
+          # its Mach-O binaries and server/chromium-resolver.ts can locate it at
+          # runtime (candidate: chromium/chrome-mac/Chromium.app/Contents/MacOS/Chromium).
+          npx playwright install chromium
+          EXE=$(node -e "process.stdout.write(require('playwright').chromium.executablePath())")
+          PLATDIR="$EXE"; for _ in 1 2 3 4; do PLATDIR=$(dirname "$PLATDIR"); done   # → chrome-mac
+          rm -rf src-tauri/runtimes/chromium
+          mkdir -p src-tauri/runtimes/chromium
+          cp -R "$PLATDIR" "src-tauri/runtimes/chromium/$(basename "$PLATDIR")"
+          test -e "src-tauri/runtimes/chromium/chrome-mac/Chromium.app/Contents/MacOS/Chromium"
+          echo "Bundled Chromium from ${PLATDIR}"
 
       - name: Import codesign certificate
         uses: apple-actions/import-codesign-certs@v3
@@ -329,6 +354,20 @@ jobs:
           test -f src-tauri/runtimes/git/cmd/git.exe
           echo "Extracted Git for Windows to src-tauri/runtimes/git/"
 
+      - name: Assemble bundled Chromium (Windows x64)
+        if: ${{ env.BUNDLE_CHROMIUM == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright install chromium
+          EXE=$(node -e "process.stdout.write(require('playwright').chromium.executablePath().replace(/\\\\/g,'/'))")
+          PLATDIR=$(dirname "$EXE")   # → chrome-win
+          rm -rf src-tauri/runtimes/chromium
+          mkdir -p src-tauri/runtimes/chromium
+          cp -R "$PLATDIR" "src-tauri/runtimes/chromium/$(basename "$PLATDIR")"
+          test -e "src-tauri/runtimes/chromium/chrome-win/chrome.exe"
+          echo "Bundled Chromium from ${PLATDIR}"
+
       - name: Build desktop app
         shell: bash
         run: npm run build:desktop
@@ -467,6 +506,20 @@ jobs:
           rm "${ARCHIVE}"
           test -f src-tauri/runtimes/git/cmd/git.exe
           echo "Extracted Git for Windows (arm64) to src-tauri/runtimes/git/"
+
+      - name: Assemble bundled Chromium (Windows arm64)
+        if: ${{ env.BUNDLE_CHROMIUM == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright install chromium
+          EXE=$(node -e "process.stdout.write(require('playwright').chromium.executablePath().replace(/\\\\/g,'/'))")
+          PLATDIR=$(dirname "$EXE")   # → chrome-win
+          rm -rf src-tauri/runtimes/chromium
+          mkdir -p src-tauri/runtimes/chromium
+          cp -R "$PLATDIR" "src-tauri/runtimes/chromium/$(basename "$PLATDIR")"
+          test -e "src-tauri/runtimes/chromium/chrome-win/chrome.exe"
+          echo "Bundled Chromium from ${PLATDIR}"
 
       - name: Build desktop app
         shell: bash

@@ -55,6 +55,13 @@ export default defineConfig({
         // monaco-editor loaded dynamically; not testable in jsdom
         'src/lib/monaco-setup.ts',
         'src/components/code-explorer/CodeViewerMonaco.tsx',
+        // Browser-capture ("Add Spec from browser"): the screencast canvas + WS
+        // hook and the large overlay rely on WebSocket binary frames,
+        // createImageBitmap, canvas 2d drawing and pointer-drag — none of which
+        // run under jsdom. The pure geometry/REST/flag logic lives in
+        // lib/browser-capture.ts and CapturedDomPanel, both unit-tested.
+        'src/components/browser-capture/useBrowserCaptureSession.ts',
+        'src/components/browser-capture/BrowserCaptureModal.tsx',
       ],
       thresholds: {
         lines: 80,

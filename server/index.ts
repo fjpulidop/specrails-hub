@@ -18,6 +18,9 @@ import { createDocsRouter } from './docs-router'
 import { requireAuth, loadOrGenerateToken, tokenFromUpgradeRequest } from './auth'
 import { getTerminalManager } from './terminal-manager'
 import { cleanupStaleShimDirs } from './terminal-shell-integration'
+import { isBrowserCaptureEnabled } from './feature-flags'
+import type { BrowserWsClient } from './browser-capture-manager'
+import type { BrowserInputEvent } from './browser-capture-types'
 import { createTelemetryRouter } from './telemetry-receiver'
 import { runCompactionForAll } from './telemetry-compactor'
 import { resolveStartupPath, augmentPathFromLoginShell, getPathDiagnostic } from './path-resolver'
@@ -31,6 +34,7 @@ const inheritedPathBeforeResolve = (process.env.PATH ?? '').split(process.platfo
 resolveStartupPath()
 
 const TERMINAL_PANEL_ENABLED = process.env.SPECRAILS_TERMINAL_PANEL !== 'false'
+const BROWSER_CAPTURE_ENABLED = isBrowserCaptureEnabled()
 
 // Read package.json version once at startup
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -164,9 +168,11 @@ const wsServerOptions = {
 
 const wss = new WebSocketServer(wsServerOptions)
 const terminalWss = new WebSocketServer(wsServerOptions)
+const browserWss = new WebSocketServer(wsServerOptions)
 const clients = new Set<WebSocket>()
 
 const TERMINAL_WS_RE = /^\/ws\/terminal\/([0-9a-f-]+)$/i
+const BROWSER_WS_RE = /^\/ws\/browser\/([0-9a-f-]+)$/i
 
 function rejectUpgrade(socket: { write: (s: string) => void; destroy: () => void }, status: number, reason: string): void {
   socket.write(`HTTP/1.1 ${status} ${reason}\r\nConnection: close\r\n\r\n`)
@@ -265,6 +271,57 @@ server.on('upgrade', (request, socket, head) => {
     })
     return
   }
+
+  // Embedded-browser screencast WebSocket: /ws/browser/:id?projectId=...
+  // Frames stream server→client as binary; client→server are JSON control
+  // messages (input/navigate). Kept off the shared /ws so high-rate screencast
+  // throughput can't starve the project event stream (mirrors the terminal WS).
+  const browserMatch = pathOnly.match(BROWSER_WS_RE)
+  if (browserMatch) {
+    if (!BROWSER_CAPTURE_ENABLED) return rejectUpgrade(socket, 404, 'Not Found')
+    let parsed: URL
+    try { parsed = new URL(urlStr, 'http://localhost') } catch { return rejectUpgrade(socket, 400, 'Bad Request') }
+    const projectId = parsed.searchParams.get('projectId')
+    const sessionId = browserMatch[1]
+    if (!projectId) return rejectUpgrade(socket, 400, 'Bad Request')
+    const mgr = _registry?.getContext(projectId)?.browserCaptureManager
+    const session = mgr?.getSession(sessionId)
+    if (!mgr || !session) return rejectUpgrade(socket, 404, 'Not Found')
+    browserWss.handleUpgrade(request, socket, head, (ws) => {
+      const client = ws as unknown as BrowserWsClient
+      void mgr.attach(sessionId, client).then((meta) => {
+        if (!meta) {
+          // Session died between the upgrade check and attach — tell the client
+          // explicitly instead of leaving a silent, frame-less socket open.
+          try { ws.close(1000, 'session_closed') } catch { /* ignore */ }
+        }
+      })
+      ws.on('message', (data, isBinary) => {
+        if (isBinary) return // browser inbound is JSON control only
+        try {
+          const msg = JSON.parse((data as Buffer).toString('utf8')) as
+            | { type: 'input'; event: BrowserInputEvent }
+            | { type: 'navigate'; action?: 'goto' | 'back' | 'forward' | 'reload'; url?: string }
+            | { type: 'probe'; x: number; y: number }
+          if (msg.type === 'input' && msg.event) {
+            void mgr.handleInput(sessionId, msg.event)
+          } else if (msg.type === 'navigate') {
+            void mgr.navigate(sessionId, msg.action ?? 'goto', msg.url)
+          } else if (msg.type === 'probe' && Number.isFinite(msg.x) && Number.isFinite(msg.y) && msg.x >= 0 && msg.y >= 0) {
+            // Hover-to-select: resolve the element under the cursor and reply with
+            // its rect so the client can draw a highlight box.
+            void mgr.probeElement(sessionId, { x: msg.x, y: msg.y }).then((probe) => {
+              try { ws.send(JSON.stringify({ type: 'hover', rect: probe?.rect ?? null })) } catch { /* drop */ }
+            })
+          }
+        } catch { /* ignore malformed control */ }
+      })
+      ws.on('close', () => mgr.detach(sessionId, client))
+      ws.on('error', () => mgr.detach(sessionId, client))
+    })
+    return
+  }
+
   // Default: main event WebSocket.
   wss.handleUpgrade(request, socket, head, (ws) => {
     wss.emit('connection', ws, request)
@@ -435,6 +492,7 @@ async function shutdown(): Promise<void> {
   } catch { /* ignore */ }
   try { wss.close() } catch { /* ignore */ }
   try { terminalWss.close() } catch { /* ignore */ }
+  try { browserWss.close() } catch { /* ignore */ }
   // Force-close lingering keep-alive / WebSocket sockets so server.close()'s
   // callback actually fires. The persistent /ws client connection and terminal
   // sockets would otherwise hold the server open, stalling the port release that

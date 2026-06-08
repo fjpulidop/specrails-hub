@@ -1,0 +1,221 @@
+import { getApiBase } from './api'
+import { WS_URL } from './ws-url'
+import { getHubTokenProtocol } from './auth'
+import type { Attachment } from '../types'
+
+// ─── Feature flag ─────────────────────────────────────────────────────────────
+
+/**
+ * "Add Spec from browser" client gate. Default ON; set
+ * `VITE_FEATURE_BROWSER_CAPTURE=false` at build time to hide the entry point.
+ * The server gates independently via SPECRAILS_BROWSER_CAPTURE.
+ */
+export function isBrowserCaptureEnabled(): boolean {
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+  const override = env?.VITE_FEATURE_BROWSER_CAPTURE
+  if (typeof override === 'string') return override !== 'false'
+  return true
+}
+
+// ─── Types (mirror server/browser-capture-types.ts) ──────────────────────────
+
+export interface CaptureRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface CapturedNode {
+  tag: string
+  role: string | null
+  text: string | null
+  rect: CaptureRect
+  attributes: Record<string, string>
+  styles: Record<string, string>
+}
+
+export interface CapturedDom {
+  url: string
+  title: string
+  viewport: { width: number; height: number }
+  rect: CaptureRect
+  html: string
+  htmlTruncated: boolean
+  css: string
+  cssTruncated: boolean
+  nodes: CapturedNode[]
+  capturedAt: string
+}
+
+export interface BrowserSessionMeta {
+  id: string
+  projectId: string
+  url: string | null
+  title: string | null
+  viewportWidth: number
+  viewportHeight: number
+  createdAt: number
+}
+
+export type BrowserInputEvent =
+  | { type: 'mouse'; action: 'move' | 'down' | 'up'; x: number; y: number; button?: 'left' | 'middle' | 'right'; clickCount?: number; modifiers?: number }
+  | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; modifiers?: number }
+  | { type: 'key'; action: 'down' | 'up'; key: string; code?: string; text?: string; modifiers?: number }
+  | { type: 'resize'; width: number; height: number }
+
+export interface CaptureResult {
+  screenshot: Attachment
+  domAttachment: Attachment
+  dom: CapturedDom
+  /** Inline data URL of the screenshot for a thumbnail (avoids an unauthenticated
+   *  <img src> to the attachment endpoint). */
+  screenshotDataUrl: string
+}
+
+export class BrowserSessionLimitError extends Error {}
+export class BrowserLaunchFailedError extends Error {}
+
+// ─── REST helpers ─────────────────────────────────────────────────────────────
+
+export async function createBrowserSession(initialUrl?: string): Promise<BrowserSessionMeta> {
+  const res = await fetch(`${getApiBase()}/browser/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initialUrl }),
+  })
+  if (res.status === 409) throw new BrowserSessionLimitError('Too many open browser sessions')
+  if (res.status === 502) throw new BrowserLaunchFailedError('The browser failed to launch')
+  if (!res.ok) throw new Error(`Failed to open browser (${res.status})`)
+  const data = (await res.json()) as { session: BrowserSessionMeta }
+  return data.session
+}
+
+export async function navigateBrowser(
+  sessionId: string,
+  action: 'goto' | 'back' | 'forward' | 'reload',
+  url?: string,
+): Promise<{ url: string; title: string }> {
+  const res = await fetch(`${getApiBase()}/browser/sessions/${sessionId}/navigate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, url }),
+  })
+  if (!res.ok) throw new Error(`Navigation failed (${res.status})`)
+  return (await res.json()) as { url: string; title: string }
+}
+
+export async function captureBrowserRegion(
+  sessionId: string,
+  rect: CaptureRect,
+  pendingSpecId: string,
+): Promise<CaptureResult> {
+  const res = await fetch(`${getApiBase()}/browser/sessions/${sessionId}/capture`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rect, pendingSpecId }),
+  })
+  if (!res.ok) throw new Error(`Capture failed (${res.status})`)
+  return (await res.json()) as CaptureResult
+}
+
+export async function killBrowserSession(sessionId: string): Promise<void> {
+  try {
+    await fetch(`${getApiBase()}/browser/sessions/${sessionId}`, { method: 'DELETE' })
+  } catch {
+    /* best effort */
+  }
+}
+
+// ─── WebSocket ────────────────────────────────────────────────────────────────
+
+export function browserWsUrl(sessionId: string, projectId: string): string {
+  const wsBase =
+    WS_URL ||
+    (typeof window !== 'undefined'
+      ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`
+      : 'ws://localhost:4200')
+  return `${wsBase}/ws/browser/${sessionId}?projectId=${encodeURIComponent(projectId)}`
+}
+
+export function openBrowserWs(sessionId: string, projectId: string): WebSocket {
+  const url = browserWsUrl(sessionId, projectId)
+  const protocol = getHubTokenProtocol()
+  const ws = protocol ? new WebSocket(url, ['specrails-hub', protocol]) : new WebSocket(url)
+  ws.binaryType = 'arraybuffer'
+  return ws
+}
+
+// ─── Pure geometry helpers (unit-tested; keep coordinate logic out of the canvas
+//     component so it can be verified deterministically) ────────────────────────
+
+export interface Point {
+  x: number
+  y: number
+}
+
+export interface DisplayRect {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+/**
+ * Map a pointer position (page coords from a PointerEvent) onto the page's CSS
+ * viewport coordinate space, given the displayed canvas rect and the logical
+ * viewport size. Result is clamped to [0, viewport).
+ */
+export function mapPointToViewport(
+  pointer: Point,
+  canvas: DisplayRect,
+  viewport: { width: number; height: number },
+): Point {
+  const relX = canvas.width > 0 ? (pointer.x - canvas.left) / canvas.width : 0
+  const relY = canvas.height > 0 ? (pointer.y - canvas.top) / canvas.height : 0
+  const x = Math.min(Math.max(relX, 0), 1) * viewport.width
+  const y = Math.min(Math.max(relY, 0), 1) * viewport.height
+  return { x: Math.round(x), y: Math.round(y) }
+}
+
+/** Map a viewport-space rect (e.g. a hovered element's box) back to displayed
+ *  page coordinates over the canvas, for drawing a highlight overlay. */
+export function mapRectToDisplay(
+  rect: CaptureRect,
+  canvas: DisplayRect,
+  viewport: { width: number; height: number },
+): DisplayRect {
+  const sx = viewport.width > 0 ? canvas.width / viewport.width : 0
+  const sy = viewport.height > 0 ? canvas.height / viewport.height : 0
+  return {
+    left: canvas.left + rect.x * sx,
+    top: canvas.top + rect.y * sy,
+    width: rect.width * sx,
+    height: rect.height * sy,
+  }
+}
+
+/** Build a normalised rect from two corner points (drag in any direction). */
+export function rectFromPoints(a: Point, b: Point): CaptureRect {
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    width: Math.abs(a.x - b.x),
+    height: Math.abs(a.y - b.y),
+  }
+}
+
+/** True when a selection rect is large enough to be meaningful (avoids stray
+ *  clicks producing 1px captures). */
+export function isUsableSelection(rect: CaptureRect, minPx = 8): boolean {
+  return rect.width >= minPx && rect.height >= minPx
+}
+
+/** Count populated (non-empty) facets of a captured DOM for the panel badge. */
+export function domSummary(dom: CapturedDom): { nodeCount: number; htmlBytes: number; truncated: boolean } {
+  return {
+    nodeCount: dom.nodes.length,
+    htmlBytes: dom.html.length,
+    truncated: dom.htmlTruncated,
+  }
+}

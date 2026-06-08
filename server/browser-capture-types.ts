@@ -1,0 +1,137 @@
+// Shared types for the browser-capture feature ("Add Spec from browser").
+//
+// The manager (`browser-capture-manager.ts`) depends only on these types plus an
+// injected `ContextLauncher`, so it is fully unit-testable with a fake launcher —
+// no real Chromium. The real Playwright/CDP implementation lives in
+// `browser-playwright.ts` and is the ONLY module that imports `playwright`.
+
+/** Public, serialisable session metadata returned over REST. */
+export interface BrowserSessionMeta {
+  id: string
+  projectId: string
+  url: string | null
+  title: string | null
+  viewportWidth: number
+  viewportHeight: number
+  createdAt: number
+}
+
+/** A selection rectangle in CSS pixels relative to the page viewport. */
+export interface CaptureRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** One DOM element inside (or intersecting) the selection rectangle. */
+export interface CapturedNode {
+  /** Lowercase tag name, e.g. "button". */
+  tag: string
+  /** Resolved ARIA role (explicit role attr or implicit by tag), else null. */
+  role: string | null
+  /** Trimmed, length-capped text content, else null. */
+  text: string | null
+  /** Bounding box in CSS px relative to the viewport. */
+  rect: CaptureRect
+  /** Selected attributes (id, class, name, href, src, aria-*, data-*). */
+  attributes: Record<string, string>
+  /** A small set of computed styles relevant to layout/typography/colour. */
+  styles: Record<string, string>
+}
+
+/** The rich DOM payload captured for a selection. Serialised to JSON and stored
+ *  as an attachment (mime application/json) so it flows through the existing
+ *  attachment → prompt pipeline for both Quick and Explore. */
+export interface CapturedDom {
+  url: string
+  title: string
+  viewport: { width: number; height: number }
+  rect: CaptureRect
+  /** Pretty-ish outerHTML of the smallest element covering the selection. */
+  html: string
+  /** True when `html` was truncated at the size cap. */
+  htmlTruncated: boolean
+  /** CSS rules actually applied to the selected elements (+ :root design tokens). */
+  css: string
+  /** True when `css` was truncated at the size cap. */
+  cssTruncated: boolean
+  nodes: CapturedNode[]
+  capturedAt: string
+}
+
+/** Pointer / wheel / key input forwarded from the client canvas to the page. */
+export type BrowserInputEvent =
+  | { type: 'mouse'; action: 'move' | 'down' | 'up'; x: number; y: number; button?: 'left' | 'middle' | 'right'; clickCount?: number; modifiers?: number }
+  | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; modifiers?: number }
+  | { type: 'key'; action: 'down' | 'up'; key: string; code?: string; text?: string; modifiers?: number }
+  | { type: 'resize'; width: number; height: number }
+
+/** A screencast frame emitted by the page handle. `data` is raw JPEG bytes. */
+export interface ScreencastFrame {
+  data: Buffer
+  width: number
+  height: number
+}
+
+/** The element under a point, for hover-to-select highlighting. */
+export interface ElementProbe {
+  rect: CaptureRect
+  tag: string
+}
+
+/** Minimal page abstraction the manager drives. Implemented for real over CDP in
+ *  `browser-playwright.ts`; faked in tests. */
+export interface BrowserPageHandle {
+  goto(url: string): Promise<{ url: string; title: string }>
+  goBack(): Promise<{ url: string; title: string }>
+  goForward(): Promise<{ url: string; title: string }>
+  reload(): Promise<{ url: string; title: string }>
+  currentUrl(): string
+  currentTitle(): Promise<string>
+  setViewport(width: number, height: number): Promise<void>
+  dispatchInput(event: BrowserInputEvent): Promise<void>
+  /** Begin streaming JPEG frames; the handle auto-acks. */
+  startScreencast(onFrame: (frame: ScreencastFrame) => void): Promise<void>
+  stopScreencast(): Promise<void>
+  /** PNG buffer of the clipped region. */
+  screenshotClip(rect: CaptureRect): Promise<Buffer>
+  /** Rich DOM extraction for the selection rectangle. */
+  extractDom(rect: CaptureRect, htmlByteCap: number): Promise<CapturedDom>
+  /** The element at a viewport point (for hover-to-select highlighting). */
+  probeElementAt(point: { x: number; y: number }): Promise<ElementProbe | null>
+  close(): Promise<void>
+}
+
+export interface BrowserContextHandle {
+  newPage(): Promise<BrowserPageHandle>
+  close(): Promise<void>
+}
+
+export interface LaunchContextOptions {
+  userDataDir: string
+  executablePath?: string
+  viewport: { width: number; height: number }
+}
+
+export type ContextLauncher = (opts: LaunchContextOptions) => Promise<BrowserContextHandle>
+
+// ─── Error classes (mirror terminal-manager's typed errors) ───────────────────
+
+export class BrowserLimitExceededError extends Error {
+  readonly limit: number
+  constructor(limit: number) {
+    super('browser_session_limit_exceeded')
+    this.name = 'BrowserLimitExceededError'
+    this.limit = limit
+  }
+}
+
+export class BrowserLaunchError extends Error {
+  readonly cause?: unknown
+  constructor(message: string, cause?: unknown) {
+    super(message)
+    this.name = 'BrowserLaunchError'
+    this.cause = cause
+  }
+}

@@ -31,3 +31,6 @@ build/
 # specrails
 .claude/agent-memory/
 .specrails/
+
+# macOS
+.DS_Store
