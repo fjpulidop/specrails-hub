@@ -42,6 +42,7 @@
       "binaries/pty.node",
       "binaries/node-pty/**/*",
       "binaries/shell-integration/**/*",
+      "binaries/node_modules/**/*",
       "runtimes/**/*"
     ],
     "macOS": {

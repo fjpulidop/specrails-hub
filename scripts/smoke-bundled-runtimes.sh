@@ -49,4 +49,24 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
 "${GIT}" -C "${T}" help -a >/dev/null   # proves libexec/git-core resolves
 rm -rf "${T}"
 
+# Optional: bundled Chromium for the browser-capture feature. Only validated when
+# present (it is bundled solely when BUNDLE_CHROMIUM=true in the release workflow);
+# otherwise the feature falls back to a Playwright-managed Chromium at runtime.
+CHROMIUM=""
+for c in \
+  "${RT}/chromium/chrome-mac/Chromium.app/Contents/MacOS/Chromium" \
+  "${RT}/chromium/chrome-linux/chrome" \
+  "${RT}/chromium/chrome-win/chrome.exe" \
+  "${RT}/chromium/bin/chromium" \
+  "${RT}/chromium/bin/chromium.exe"; do
+  if [[ -e "${c}" ]]; then CHROMIUM="${c}"; break; fi
+done
+if [[ -n "${CHROMIUM}" ]]; then
+  echo "chromium: $("${CHROMIUM}" --version 2>&1 | head -n1)"
+  "${CHROMIUM}" --headless=new --dump-dom about:blank >/dev/null 2>&1 \
+    || "${CHROMIUM}" --headless --dump-dom about:blank >/dev/null 2>&1 \
+    || { echo "ERROR: bundled chromium failed to render about:blank"; exit 1; }
+  echo "chromium headless probe OK"
+fi
+
 echo "Smoke test PASSED for ${RT}"

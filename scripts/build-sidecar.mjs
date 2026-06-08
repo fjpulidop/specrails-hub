@@ -119,6 +119,22 @@ if (typeof process !== "undefined" && process.pkg !== undefined) {
       _ptyModuleCached = realReq(_ptyDirReal);
       return _ptyModuleCached;
     }
+    // Playwright (browser-capture feature) is externalized + copied to
+    // binaries/node_modules/. Load it from the real fs via createRequire anchored
+    // at that node_modules so its own internal require('playwright-core') and its
+    // fs reads (browsers.json / package.json relative to __dirname) resolve
+    // outside the pkg snapshot.
+    var _pwAnchor = _p.join(_resourcesDir, "node_modules", "playwright", "package.json");
+    var _hasPlaywright = false;
+    try { _hasPlaywright = _Fs.existsSync(_pwAnchor); } catch (_e) { _hasPlaywright = false; }
+    var _pwCache = {};
+    function _loadRealPlaywright(req) {
+      if (_pwCache[req]) return _pwCache[req];
+      var realReq = _Module.createRequire(_pwAnchor);
+      var mod = realReq(req);
+      _pwCache[req] = mod;
+      return mod;
+    }
     var _origResolve = _Module._resolveFilename.bind(_Module);
     _Module._resolveFilename = function () {
       var req = arguments[0];
@@ -141,6 +157,9 @@ if (typeof process !== "undefined" && process.pkg !== undefined) {
       var req = arguments[0];
       if (typeof req === "string" && (req === "node-pty" || req.indexOf("node-pty/") === 0)) {
         return _loadRealNodePty();
+      }
+      if (_hasPlaywright && typeof req === "string" && (req === "playwright" || req === "playwright-core" || req.indexOf("playwright/") === 0 || req.indexOf("playwright-core/") === 0)) {
+        return _loadRealPlaywright(req);
       }
       return _origLoad.apply(_Module, arguments);
     };
@@ -298,7 +317,7 @@ async function main() {
     platform: 'node',
     format: 'cjs',
     outfile: BUNDLE_PATH,
-    external: ['better-sqlite3', 'fsevents', 'node-pty', '@aws-sdk/client-s3', 'read-excel-file/node', 'pdf-parse'],
+    external: ['better-sqlite3', 'fsevents', 'node-pty', '@aws-sdk/client-s3', 'read-excel-file/node', 'pdf-parse', 'playwright', 'playwright-core'],
     banner: { js: PKG_RUNTIME_PATCHES },
     minify: false,
     sourcemap: false,
@@ -396,6 +415,27 @@ async function main() {
     console.log(`  ${ptyAddonSrc} → ${ptyAddonDest}`)
   } else {
     console.warn(`  WARN: no pty.node prebuild found for ${triple} — terminal panel will be unavailable in this sidecar`)
+  }
+
+  // Step 3c: Copy Playwright (browser-capture feature) externally so require()
+  // resolves on the real fs inside the packaged sidecar (mirrors node-pty). Pure
+  // JS — no Mach-O, so no codesigning needed. The Chromium *browser binary* is
+  // shipped separately under runtimes/chromium (when BUNDLE_CHROMIUM=true) or
+  // downloaded by Playwright on first use; this only ships the JS driver.
+  console.log('\n[3c] Copying Playwright packages...')
+  const pwNodeModulesDest = path.join(BINARIES_DIR, 'node_modules')
+  ensureDir(pwNodeModulesDest)
+  for (const pkg of ['playwright', 'playwright-core']) {
+    const src = path.join(ROOT, 'node_modules', pkg)
+    if (!fs.existsSync(src)) {
+      console.warn(`  WARN: ${pkg} not found in node_modules — browser-capture will be unavailable in this sidecar`)
+      continue
+    }
+    const dest = path.join(pwNodeModulesDest, pkg)
+    copyDirSync(src, dest)
+    // Defensive: drop any in-package browser cache (browsers live in ~/.cache).
+    fs.rmSync(path.join(dest, '.local-browsers'), { recursive: true, force: true })
+    console.log(`  ${src} → ${dest}`)
   }
 
   // Step 4: Codesign sidecar + .node addons (macOS only, requires APPLE_SIGNING_IDENTITY)

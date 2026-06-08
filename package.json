@@ -52,6 +52,7 @@
     "multer": "^2.1.1",
     "node-pty": "^1.0.0",
     "pdf-parse": "^2.4.5",
+    "playwright": "^1.60.0",
     "read-excel-file": "^9.0.6",
     "tree-kill": "^1.2.2",
     "ws": "^8.16.0"

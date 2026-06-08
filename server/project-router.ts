@@ -74,6 +74,9 @@ import {
 } from './terminal-settings'
 import { listMarks } from './terminal-marks-store'
 import { attachmentManager, isSupportedUploadedFile, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
+import { isBrowserCaptureEnabled } from './feature-flags'
+import { BrowserLimitExceededError, BrowserLaunchError } from './browser-capture-types'
+import type { CaptureRect } from './browser-capture-types'
 import {
   getTerminalManager,
   TerminalLimitExceededError,
@@ -3378,6 +3381,134 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     const ok = getTerminalManager().kill(projectId, req.params.id as string)
     if (!ok) {
       res.status(404).json({ error: 'terminal_not_found' })
+      return
+    }
+    res.json({ ok: true })
+  })
+
+  // ─── Embedded browser ("Add Spec from browser") ──────────────────────────────
+
+  function requireBrowserCaptureEnabled(_req: Request, res: Response, next: NextFunction): void {
+    if (!isBrowserCaptureEnabled()) {
+      res.status(404).json({ error: 'browser_capture_disabled' })
+      return
+    }
+    next()
+  }
+
+  function parseRect(raw: unknown): CaptureRect | null {
+    if (!raw || typeof raw !== 'object') return null
+    const r = raw as Record<string, unknown>
+    const nums = [r.x, r.y, r.width, r.height]
+    if (!nums.every((n) => typeof n === 'number' && Number.isFinite(n))) return null
+    const x = r.x as number, y = r.y as number, width = r.width as number, height = r.height as number
+    if (width <= 0 || height <= 0) return null
+    if (x < 0 || y < 0) return null
+    // Upper bound guards against an over-read request far past any real viewport.
+    if (x + width > 20000 || y + height > 20000) return null
+    return { x, y, width, height }
+  }
+
+  // pendingSpecId becomes a filesystem path segment inside attachmentManager
+  // (~/.specrails/projects/<slug>/attachments/<pendingSpecId>/). Reject anything
+  // that isn't a safe opaque token so a crafted value can't traverse the tree.
+  const SAFE_PENDING_ID = /^[A-Za-z0-9_-]{1,128}$/
+
+  router.get('/:projectId/browser/sessions', requireBrowserCaptureEnabled, (req: Request, res: Response) => {
+    const mgr = ctx(req).browserCaptureManager
+    res.json({ sessions: mgr.listSessions(), lastUrl: mgr.getLastUrl() })
+  })
+
+  router.post('/:projectId/browser/sessions', requireBrowserCaptureEnabled, async (req: Request, res: Response) => {
+    const mgr = ctx(req).browserCaptureManager
+    const initialUrl = typeof req.body?.initialUrl === 'string' ? req.body.initialUrl : undefined
+    try {
+      const session = await mgr.create({ initialUrl })
+      res.status(201).json({ session })
+    } catch (err) {
+      if (err instanceof BrowserLimitExceededError) {
+        res.status(409).json({ error: 'browser_session_limit_exceeded', limit: err.limit })
+        return
+      }
+      if (err instanceof BrowserLaunchError) {
+        console.error('[project-router] browser launch failed:', (err.cause as Error)?.message ?? err.message)
+        res.status(502).json({ error: 'browser_launch_failed' })
+        return
+      }
+      console.error('[project-router] browser session create error:', err)
+      res.status(500).json({ error: 'Failed to create browser session' })
+    }
+  })
+
+  router.post('/:projectId/browser/sessions/:id/navigate', requireBrowserCaptureEnabled, async (req: Request, res: Response) => {
+    const mgr = ctx(req).browserCaptureManager
+    const action = req.body?.action ?? 'goto'
+    const validActions = new Set(['goto', 'back', 'forward', 'reload'])
+    if (!validActions.has(action)) {
+      res.status(400).json({ error: 'action must be one of: goto, back, forward, reload' })
+      return
+    }
+    let url: string | undefined
+    if (action === 'goto') {
+      url = typeof req.body?.url === 'string' ? req.body.url.trim() : ''
+      if (!url) {
+        res.status(400).json({ error: 'url is required for goto' })
+        return
+      }
+      // Only allow web schemes (or bare hosts the manager will https-prefix).
+      // Blocks file://, data:, javascript: etc. from reaching the embedded browser.
+      if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !/^https?:\/\//i.test(url)) {
+        res.status(400).json({ error: 'only http(s) URLs are allowed' })
+        return
+      }
+    }
+    try {
+      const result = await mgr.navigate(req.params.id as string, action, url)
+      if (!result) {
+        res.status(404).json({ error: 'browser_session_not_found' })
+        return
+      }
+      res.json(result)
+    } catch (err) {
+      console.error('[project-router] browser navigate error:', err)
+      res.status(500).json({ error: 'Failed to navigate' })
+    }
+  })
+
+  router.post('/:projectId/browser/sessions/:id/capture', requireBrowserCaptureEnabled, async (req: Request, res: Response) => {
+    const mgr = ctx(req).browserCaptureManager
+    const rect = parseRect(req.body?.rect)
+    if (!rect) {
+      res.status(400).json({ error: 'rect {x,y,width,height} with positive size is required' })
+      return
+    }
+    const pendingSpecId = typeof req.body?.pendingSpecId === 'string' ? req.body.pendingSpecId.trim() : ''
+    if (!pendingSpecId) {
+      res.status(400).json({ error: 'pendingSpecId is required' })
+      return
+    }
+    if (!SAFE_PENDING_ID.test(pendingSpecId)) {
+      res.status(400).json({ error: 'pendingSpecId has an invalid format' })
+      return
+    }
+    try {
+      const result = await mgr.capture(req.params.id as string, rect, pendingSpecId)
+      if (!result) {
+        res.status(404).json({ error: 'browser_session_not_found' })
+        return
+      }
+      res.json(result)
+    } catch (err) {
+      console.error('[project-router] browser capture error:', err)
+      res.status(500).json({ error: 'Failed to capture' })
+    }
+  })
+
+  router.delete('/:projectId/browser/sessions/:id', requireBrowserCaptureEnabled, async (req: Request, res: Response) => {
+    const mgr = ctx(req).browserCaptureManager
+    const ok = await mgr.kill(req.params.id as string)
+    if (!ok) {
+      res.status(404).json({ error: 'browser_session_not_found' })
       return
     }
     res.json({ ok: true })

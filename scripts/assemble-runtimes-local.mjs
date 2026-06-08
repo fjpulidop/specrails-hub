@@ -134,6 +134,23 @@ bash('Build relocatable Git from source (macOS arm64)', `
   echo "Built relocatable Git \${GIT_VERSION} → \${DEST}"
 `);
 
+// --- Chromium (macOS arm64): bundle for the browser-capture feature, opt-in ---
+// Default skipped (keeps the local build lean + avoids the download). Set
+// BUNDLE_CHROMIUM=true to include it; the desktop app then launches the bundled
+// Chromium instead of downloading a Playwright-managed one on first use.
+if (process.env.BUNDLE_CHROMIUM === 'true') {
+  bash('Bundle Chromium (macOS arm64)', `
+    npx playwright install chromium
+    EXE=$(node -e "process.stdout.write(require('playwright').chromium.executablePath())")
+    PLATDIR="\${EXE}"; for _ in 1 2 3 4; do PLATDIR=$(dirname "\${PLATDIR}"); done
+    rm -rf src-tauri/runtimes/chromium
+    mkdir -p src-tauri/runtimes/chromium
+    cp -R "\${PLATDIR}" "src-tauri/runtimes/chromium/$(basename "\${PLATDIR}")"
+    test -e "src-tauri/runtimes/chromium/chrome-mac/Chromium.app/Contents/MacOS/Chromium"
+    echo "Bundled Chromium from \${PLATDIR}"
+  `);
+}
+
 // Sanity: assert the Rust has_runtimes gate (src-tauri/src/lib.rs:134) will pass.
 const nodeBin = path.join(runtimes, 'node', 'bin', 'node');
 const gitBin = path.join(runtimes, 'git', 'bin', 'git');

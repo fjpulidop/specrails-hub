@@ -1,0 +1,218 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  createBrowserSession,
+  openBrowserWs,
+  navigateBrowser,
+  captureBrowserRegion,
+  killBrowserSession,
+  BrowserSessionLimitError,
+  BrowserLaunchFailedError,
+  type BrowserInputEvent,
+  type CaptureRect,
+  type CaptureResult,
+} from '../../lib/browser-capture'
+
+export type SessionStatus = 'connecting' | 'ready' | 'error'
+
+export interface BrowserSessionState {
+  status: SessionStatus
+  errorMsg: string | null
+  url: string | null
+  title: string | null
+  viewport: { width: number; height: number }
+  /** Bounding box (viewport coords) of the element under the cursor in select
+   *  mode — server-resolved via the hover probe; null when nothing is hovered. */
+  hoverRect: CaptureRect | null
+}
+
+export interface UseBrowserCaptureSession extends BrowserSessionState {
+  canvasRef: React.RefObject<HTMLCanvasElement | null>
+  forwardInput: (e: BrowserInputEvent) => void
+  navigate: (action: 'goto' | 'back' | 'forward' | 'reload', url?: string) => Promise<void>
+  capture: (rect: CaptureRect, pendingSpecId: string) => Promise<CaptureResult>
+  setViewport: (width: number, height: number) => void
+  /** Ask the server which element is at a viewport point (hover-to-select). */
+  probe: (point: { x: number; y: number }) => void
+  /** Clear the current hover highlight. */
+  clearHover: () => void
+}
+
+/**
+ * Owns one embedded-browser session: creates it over REST, streams its screencast
+ * over the dedicated WS onto a canvas, forwards input, and tears the session down
+ * (DELETE) on unmount/close. Excluded from coverage — WebSocket binary frames +
+ * createImageBitmap + canvas drawing are not exercisable under jsdom; the pure
+ * coordinate logic it relies on lives in `lib/browser-capture.ts` and is tested.
+ */
+export function useBrowserCaptureSession(opts: {
+  projectId: string
+  open: boolean
+  initialUrl?: string
+}): UseBrowserCaptureSession {
+  const { projectId, open, initialUrl } = opts
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const wsRef = useRef<WebSocket | null>(null)
+  const sessionIdRef = useRef<string | null>(null)
+  const drawingRef = useRef(false)
+
+  const [state, setState] = useState<BrowserSessionState>({
+    status: 'connecting',
+    errorMsg: null,
+    url: null,
+    title: null,
+    viewport: { width: 1280, height: 800 },
+    hoverRect: null,
+  })
+
+  const drawFrame = useCallback(async (buf: ArrayBuffer) => {
+    if (drawingRef.current) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    drawingRef.current = true
+    try {
+      const blob = new Blob([buf], { type: 'image/jpeg' })
+      const bitmap = await createImageBitmap(blob)
+      if (canvas.width !== bitmap.width) canvas.width = bitmap.width
+      if (canvas.height !== bitmap.height) canvas.height = bitmap.height
+      const ctx = canvas.getContext('2d')
+      if (ctx) ctx.drawImage(bitmap, 0, 0)
+      bitmap.close()
+    } catch {
+      /* drop bad frame */
+    } finally {
+      drawingRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!open || !projectId) return
+    let cancelled = false
+
+    setState((s) => ({ ...s, status: 'connecting', errorMsg: null }))
+
+    ;(async () => {
+      try {
+        const session = await createBrowserSession(initialUrl)
+        if (cancelled) {
+          void killBrowserSession(session.id)
+          return
+        }
+        sessionIdRef.current = session.id
+        setState((s) => ({
+          ...s,
+          url: session.url,
+          title: session.title,
+          viewport: { width: session.viewportWidth, height: session.viewportHeight },
+        }))
+
+        const ws = openBrowserWs(session.id, projectId)
+        wsRef.current = ws
+        ws.onmessage = (ev: MessageEvent) => {
+          if (typeof ev.data === 'string') {
+            try {
+              const msg = JSON.parse(ev.data) as { type: string; url?: string; title?: string; viewport?: { width: number; height: number }; rect?: CaptureRect | null }
+              if (msg.type === 'ready') {
+                setState((s) => ({ ...s, status: 'ready', url: msg.url ?? s.url, title: msg.title ?? s.title, viewport: msg.viewport ?? s.viewport }))
+              } else if (msg.type === 'nav') {
+                setState((s) => ({ ...s, url: msg.url ?? s.url, title: msg.title ?? s.title }))
+              } else if (msg.type === 'hover') {
+                setState((s) => ({ ...s, hoverRect: msg.rect ?? null }))
+              }
+            } catch {
+              /* ignore */
+            }
+            return
+          }
+          // binary screencast frame
+          void drawFrame(ev.data as ArrayBuffer)
+        }
+        ws.onopen = () => { if (!cancelled) setState((s) => ({ ...s, status: 'ready' })) }
+        ws.onerror = () => { if (!cancelled) setState((s) => ({ ...s, status: 'error', errorMsg: 'Connection error' })) }
+        ws.onclose = () => {
+          // Unexpected drop (server restarted, session ended) — surface it so the
+          // user knows to reopen instead of capturing against a dead session.
+          if (!cancelled) setState((s) => (s.status === 'ready' ? { ...s, status: 'error', errorMsg: 'Lost connection to the browser. Close and reopen “From a website”.' } : s))
+        }
+      } catch (err) {
+        if (cancelled) return
+        const msg =
+          err instanceof BrowserSessionLimitError ? 'Too many open browser sessions. Close one and retry.'
+            : err instanceof BrowserLaunchFailedError ? 'The browser failed to launch on the server.'
+              : 'Could not open the browser.'
+        setState((s) => ({ ...s, status: 'error', errorMsg: msg }))
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      const ws = wsRef.current
+      if (ws) {
+        // Detach handlers before closing so no late frame/message/close touches
+        // state after teardown (avoids React "update on unmounted" + stale closures
+        // + a spurious "lost connection" error on intentional close).
+        ws.onmessage = null
+        ws.onopen = null
+        ws.onerror = null
+        ws.onclose = null
+        try { ws.close() } catch { /* ignore */ }
+      }
+      wsRef.current = null
+      const sid = sessionIdRef.current
+      sessionIdRef.current = null
+      if (sid) void killBrowserSession(sid)
+    }
+  }, [open, projectId, initialUrl, drawFrame])
+
+  const forwardInput = useCallback((event: BrowserInputEvent) => {
+    const ws = wsRef.current
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try { ws.send(JSON.stringify({ type: 'input', event })) } catch { /* drop */ }
+    }
+  }, [])
+
+  const navigate = useCallback(async (action: 'goto' | 'back' | 'forward' | 'reload', url?: string) => {
+    const sid = sessionIdRef.current
+    if (!sid) return
+    try {
+      const result = await navigateBrowser(sid, action, url)
+      setState((s) => ({ ...s, url: result.url, title: result.title }))
+    } catch {
+      /* nav failures are non-fatal */
+    }
+  }, [])
+
+  const capture = useCallback(async (rect: CaptureRect, pendingSpecId: string): Promise<CaptureResult> => {
+    const sid = sessionIdRef.current
+    if (!sid) throw new Error('No active browser session')
+    return captureBrowserRegion(sid, rect, pendingSpecId)
+  }, [])
+
+  const setViewport = useCallback((width: number, height: number) => {
+    const w = Math.max(1, Math.round(width))
+    const h = Math.max(1, Math.round(height))
+    setState((s) => ({ ...s, viewport: { width: w, height: h } }))
+    forwardInput({ type: 'resize', width: w, height: h })
+  }, [forwardInput])
+
+  const probe = useCallback((point: { x: number; y: number }) => {
+    const ws = wsRef.current
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try { ws.send(JSON.stringify({ type: 'probe', x: point.x, y: point.y })) } catch { /* drop */ }
+    }
+  }, [])
+
+  const clearHover = useCallback(() => {
+    setState((s) => (s.hoverRect ? { ...s, hoverRect: null } : s))
+  }, [])
+
+  return {
+    ...state,
+    canvasRef,
+    forwardInput,
+    navigate,
+    capture,
+    setViewport,
+    probe,
+    clearHover,
+  }
+}
