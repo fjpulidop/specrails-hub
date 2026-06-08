@@ -12,6 +12,7 @@ It's a local-first companion to [specrails-core](https://github.com/fjpulidop/sp
 
 - **Draft a spec by talking to Claude or Codex** — open Explore, describe what you want; the live draft updates each turn. Save it as a draft and come back later, or commit when it looks right.
 - **Generate a spec in one shot** — Quick mode for when you already know what you want. Optionally enrich it with a "Contract Layer" of names, shapes, invariants, and a file touch list.
+- **Turn a live website into a spec** — *Add Spec → From a website* opens an embedded browser. Navigate to a page, hover-select an element or drag a rectangle, and the screenshot + rich DOM + applied CSS become attachments that feed Quick or Explore. The desktop app ships its own Chromium, so it works offline.
 - **Drag specs onto execution rails** — each rail is an independent lane. Run multiple specs in parallel, with different agent profiles per rail.
 - **Compare two specs side by side** — drag any spec modal to the edge of the screen; a picker of your todo specs appears on the other side. Pick one and they live next to each other. Tablet-style.
 - **Split a big epic** — SMASH a parent spec into a family of sub-specs in one click; the children carry short summaries on their cards.
@@ -71,8 +72,8 @@ If the project doesn't have specrails-core yet, the setup wizard walks you throu
 The provider is chosen per-project at install time and is immutable after
 creation. On macOS, the desktop app handles Homebrew/Volta/nvm paths
 automatically — see [docs/platforms/macos.md](docs/platforms/macos.md).
-**Windows users:** see [docs/windows.md](docs/windows.md) for Windows
-10/11 specifics. For Codex-specific topics — auth, sandbox config,
+**Windows users:** see [docs/platforms/windows.md](docs/platforms/windows.md)
+for Windows 10/11 specifics. For Codex-specific topics — auth, sandbox config,
 estimated cost caveats, plugin support, and emergency rollback — see
 [docs/codex.md](docs/codex.md).
 
@@ -111,12 +112,44 @@ npm run dev                        # server (4200) + client (4201)
 
 | Script | Description |
 |--------|-------------|
-| `npm run dev` | Server + client with hot reload |
-| `npm run build` | Production build |
-| `npm test` | vitest |
-| `npm run tauri dev` | Run desktop app in dev mode |
+| `npm run dev` | Server (4200) + client (4201) with hot reload |
+| `npm run dev:desktop` | Desktop app (Tauri) in dev mode |
+| `npm run build` | Production build (client + server + CLI) |
+| `npm test` | vitest (server + CLI) |
+| `npm run test:coverage` | Server coverage (mirrors the CI gate) |
+| `npm run build:desktop` | Desktop installers — ships an **empty** `runtimes/` |
+| `npm run build:desktop:local` | Self-contained desktop app (macOS arm64) |
 
-CI gates coverage hard: 70 % global, 80 % server, 80 % client. Local runs must clear the same bars.
+CI gates coverage hard: 70 % global, 80 % server, 80 % client. Local runs must clear the same bars (`npm run test:coverage`, and `cd client && npm run test:coverage`).
+
+### Building the desktop app locally
+
+`npm run build:desktop` builds the `.app`/`.dmg`/`.exe` but does **not** assemble
+the bundled Node/Git/Chromium runtimes — the resulting app falls back to your
+system PATH, and the embedded browser downloads a Playwright-managed Chromium on
+first use. To build a self-contained app the way CI does (**macOS arm64 only**):
+
+```bash
+# Bundle Node 22 + a relocatable Git into src-tauri/runtimes/, then build.
+npm run build:desktop:local
+
+# …and bundle Chromium too, so "Add Spec from a website" works fully offline.
+# Adds a one-time ~150 MB Playwright Chromium download.
+BUNDLE_CHROMIUM=true npm run build:desktop:local
+```
+
+Notes:
+
+- **Local builds are unsigned.** Gatekeeper will warn ("unidentified developer") —
+  right-click → Open, or run `xattr -dr com.apple.quarantine <App>.app`.
+- Locally, Chromium is bundled **unpacked**; the app launches it straight from
+  `Contents/Resources/runtimes/chromium`.
+- The signed + notarized installers are produced only by the `desktop-release` CI
+  workflow. There, Chromium is shipped as an obfuscated `chromium.pak` blob — the
+  notarization service recurses into plain archives and would reject Chromium's
+  ad-hoc-signed binaries, so the magic bytes are XOR-broken to make it opaque. The
+  app reverses the XOR and extracts Chromium to `~/.specrails/runtimes/chromium`
+  on first use, where Google's ad-hoc signature is enough to run it.
 
 ## Security model
 
