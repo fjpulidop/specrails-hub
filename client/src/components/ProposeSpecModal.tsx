@@ -182,6 +182,12 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     // are tracked here and merged into the submit payload; the screenshot renders
     // as a visual chip and the DOM in a collapsible panel. They are NOT inserted
     // as editor pills so removeCapture can cleanly drop both.
+    // If the user annotated, the flattened image is `screenshot`; drop the raw one
+    // it replaced so only the annotated image + DOM ride into the spec.
+    if (result.rawScreenshot && result.rawScreenshot.id !== result.screenshot.id) {
+      const pid = activeProjectIdRef.current
+      fetch(`${API_ORIGIN}/api/projects/${pid}/tickets/${pendingSpecId}/attachments/${result.rawScreenshot.id}`, { method: 'DELETE' }).catch(() => {})
+    }
     const breakpoints = result.breakpoints
       ? Object.entries(result.breakpoints).map(([key, b]) => ({ key, attachmentId: b.attachment.id, dataUrl: b.dataUrl, width: b.viewport.width }))
       : undefined
@@ -195,7 +201,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     }])
     // One DOM attachment + N screenshots (N=1 for a normal capture).
     setAttachmentCount((c) => c + 1 + (breakpoints ? breakpoints.length : 1))
-  }, [])
+  }, [pendingSpecId])
 
   const removeCapture = useCallback((entry: BrowserCaptureEntry) => {
     setCaptures((c) => c.filter((e) => e.domAttachmentId !== entry.domAttachmentId))

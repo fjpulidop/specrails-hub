@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, RotateCw, X, Crop, Loader2, Globe, AlertTriangle
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { useBrowserCaptureSession } from './useBrowserCaptureSession'
+import { AnnotationEditor } from './AnnotationEditor'
 import {
   mapPointToViewport,
   mapRectToDisplay,
@@ -69,6 +70,8 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
   const [captureNetwork, setCaptureNetwork] = useState(true)
   // Capture the selected element at desktop/tablet/mobile in one shot.
   const [captureAllSizes, setCaptureAllSizes] = useState(false)
+  // When set, a single capture is frozen and the markup editor is shown over it.
+  const [markup, setMarkup] = useState<CaptureResult | null>(null)
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const pendingMoveRef = useRef<{ x: number; y: number } | null>(null)
@@ -198,13 +201,18 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
   const runCapture = useCallback(async (rect: CaptureRect) => {
     setCapturing(true)
     try {
-      const anchorPoint = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
-      const result = captureAllSizes
-        ? await session.captureBreakpoints(rect, anchorPoint, pendingSpecId, BREAKPOINT_DIMS)
-        : await session.capture(rect, pendingSpecId, { captureNetwork })
-      onCaptured(result)
-      toast.success('Captured page selection')
-      onClose()
+      if (captureAllSizes) {
+        // Multi-breakpoint = 3 reference images; no markup step.
+        const anchorPoint = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+        const result = await session.captureBreakpoints(rect, anchorPoint, pendingSpecId, BREAKPOINT_DIMS)
+        onCaptured(result)
+        toast.success('Captured page selection')
+        onClose()
+      } else {
+        // Freeze the single capture and hand it to the in-place markup editor.
+        const result = await session.capture(rect, pendingSpecId, { captureNetwork })
+        setMarkup(result)
+      }
     } catch {
       toast.error('Capture failed')
     } finally {
@@ -284,6 +292,17 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
 
   return createPortal(
     <div className="fixed inset-0 z-[80] flex flex-col bg-background-deep/95 backdrop-blur-sm pointer-events-auto" role="dialog" aria-modal="true" aria-label="Browser capture">
+      {markup ? (
+        <AnnotationEditor
+          result={markup}
+          pendingSpecId={pendingSpecId}
+          macOverlay={macOverlay}
+          onConfirm={(aug) => { onCaptured(aug); onClose() }}
+          onReselect={() => { setMarkup(null); setSelecting(true) }}
+          onCancel={() => { setMarkup(null); onClose() }}
+        />
+      ) : (
+      <>
       {/* Toolbar */}
       <div className={`flex items-center gap-2 py-1.5 border-b border-border/50 bg-surface/80 shrink-0 ${macOverlay ? 'pr-3' : 'px-3'}`}>
         {/* On macOS desktop the native traffic-light controls float over the top-left;
@@ -448,6 +467,8 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
         <div className="px-3 py-1.5 text-center text-[11px] text-muted-foreground border-t border-border/40 shrink-0">
           Click a highlighted element to capture it, or drag a custom rectangle. Press Esc to cancel.
         </div>
+      )}
+      </>
       )}
     </div>,
     document.body,

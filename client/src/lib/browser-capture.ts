@@ -2,6 +2,7 @@ import { getApiBase } from './api'
 import { WS_URL } from './ws-url'
 import { getHubTokenProtocol } from './auth'
 import type { Attachment } from '../types'
+import type { AnnotationSet } from './annotations'
 
 // ─── Feature flag ─────────────────────────────────────────────────────────────
 
@@ -121,6 +122,12 @@ export interface CaptureResult {
   screenshotDataUrl: string
   /** Present only for a multi-breakpoint capture: the same element at each size. */
   breakpoints?: Record<string, BreakpointCapture>
+  /** Present when the user annotated the capture: the original (pre-markup) image,
+   *  so it can be cleaned up; `screenshot`/`screenshotDataUrl` point at the
+   *  flattened, annotated image that the spec uses. */
+  rawScreenshot?: Attachment
+  /** Structured annotation objects (metadata; the image already carries them). */
+  annotations?: AnnotationSet
 }
 
 /** Default device sizes for "capture at all sizes". Sent in the request body so
@@ -192,6 +199,17 @@ export async function captureBrowserBreakpoints(
   })
   if (!res.ok) throw new Error(`Capture failed (${res.status})`)
   return (await res.json()) as CaptureResult
+}
+
+/** Upload a flattened (annotated) capture image to the pending spec's attachment
+ *  dir, reusing the generic multipart attachment endpoint. Returns the Attachment. */
+export async function uploadCaptureImage(pendingSpecId: string, blob: Blob, filename: string): Promise<Attachment> {
+  const form = new FormData()
+  form.append('file', blob, filename)
+  const res = await fetch(`${getApiBase()}/tickets/${pendingSpecId}/attachments`, { method: 'POST', body: form })
+  if (!res.ok) throw new Error(`Upload failed (${res.status})`)
+  const data = (await res.json()) as { attachment: Attachment }
+  return data.attachment
 }
 
 export async function killBrowserSession(sessionId: string): Promise<void> {

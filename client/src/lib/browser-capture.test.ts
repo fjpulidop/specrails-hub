@@ -12,6 +12,7 @@ import {
   navigateBrowser,
   captureBrowserRegion,
   captureBrowserBreakpoints,
+  uploadCaptureImage,
   killBrowserSession,
   BrowserSessionLimitError,
   BrowserLaunchFailedError,
@@ -168,6 +169,16 @@ describe('browser-capture lib', () => {
       }) as typeof fetch
       const r = await captureBrowserBreakpoints('s1', { x: 1, y: 2, width: 3, height: 4 }, { x: 5, y: 5 }, 'pend-1')
       expect(r.breakpoints!.desktop.attachment.id).toBe('b1')
+    })
+
+    it('uploadCaptureImage posts the blob as multipart and returns the attachment', async () => {
+      global.fetch = mockFetch((url, init) => {
+        expect(url).toContain('/api/projects/proj-1/tickets/pend-1/attachments')
+        expect(init?.body).toBeInstanceOf(FormData)
+        return { status: 201, body: { attachment: { id: 'an1' } } }
+      }) as typeof fetch
+      const att = await uploadCaptureImage('pend-1', new Blob(['x'], { type: 'image/png' }), 'annotated.png')
+      expect(att.id).toBe('an1')
     })
 
     it('killBrowserSession swallows errors', async () => {
