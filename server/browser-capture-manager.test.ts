@@ -57,7 +57,8 @@ class FakePage implements BrowserPageHandle {
   async dispatchInput(e: unknown) { this.inputs.push(e) }
   async startScreencast(cb: (f: ScreencastFrame) => void) { this.screencasting = true; this.frameCb = cb }
   async stopScreencast() { this.screencasting = false; this.frameCb = null }
-  async screenshotClip() { return Buffer.from('PNGDATA') }
+  clips: CaptureRect[] = []
+  async screenshotClip(rect: CaptureRect) { this.clips.push(rect); return Buffer.from('PNGDATA') }
   async extractDom() { return makeDom() }
   async probeElementAt(point: { x: number; y: number }) { return { rect: { x: point.x, y: point.y, width: 50, height: 20 }, tag: 'div' } }
   async enableNetwork() { this.enabledNetwork = true }
@@ -343,6 +344,21 @@ describe('BrowserCaptureManager', () => {
       'viewport:1280x800', 'viewport:768x1024', 'viewport:375x667', 'viewport:1280x800',
     ])
     expect(mgr.getSession(meta.id)!.viewport).toEqual({ width: 1280, height: 800 })
+  })
+
+  it('captureBreakpoints clamps an out-of-bounds rect to each breakpoint viewport', async () => {
+    const { mgr, ctx } = makeManager({ db })
+    const meta = await mgr.create()
+    // No selector → fall back to the (huge, desktop-sized) original rect, which
+    // would sit outside a smaller viewport and make screenshot throw if unclamped.
+    mgr.getSession(meta.id)!.page.resolveAnchorSelector = async () => null
+    await mgr.captureBreakpoints(meta.id, { x: 1000, y: 700, width: 800, height: 600 }, { x: 5, y: 5 }, 'pend', { mobile: { width: 375, height: 667 } })
+    const clip = ctx.pages[0].clips[0]
+    expect(clip.x).toBeLessThan(375)
+    expect(clip.x + clip.width).toBeLessThanOrEqual(375)
+    expect(clip.y + clip.height).toBeLessThanOrEqual(667)
+    expect(clip.width).toBeGreaterThanOrEqual(1)
+    expect(clip.height).toBeGreaterThanOrEqual(1)
   })
 
   it('captureBreakpoints falls back to the original rect when no anchor selector resolves', async () => {

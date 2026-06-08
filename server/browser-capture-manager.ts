@@ -470,11 +470,17 @@ export class BrowserCaptureManager {
             if (r && r.width > 0 && r.height > 0) useRect = r
           } catch { /* fall back to the original rect */ }
         }
+        // CLAMP to the current (breakpoint) viewport: a rect resolved at a larger
+        // viewport — or the original-rect fallback when the element collapsed /
+        // is hidden at this size — can sit outside the smaller viewport, which
+        // makes page.screenshot throw "Clipped area is outside the image".
+        const cx = Math.max(0, Math.min(useRect.x, d.width - 1))
+        const cy = Math.max(0, Math.min(useRect.y, d.height - 1))
         const safeRect: CaptureRect = {
-          x: Math.max(0, useRect.x),
-          y: Math.max(0, useRect.y),
-          width: Math.max(1, useRect.width),
-          height: Math.max(1, useRect.height),
+          x: cx,
+          y: cy,
+          width: Math.max(1, Math.min(useRect.width, d.width - cx)),
+          height: Math.max(1, Math.min(useRect.height, d.height - cy)),
         }
         const [png, dom] = await Promise.all([
           s.page.screenshotClip(safeRect),

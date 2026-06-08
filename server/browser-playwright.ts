@@ -281,6 +281,9 @@ class PlaywrightPageHandle implements BrowserPageHandle {
       return await this.page.evaluate((sel: string) => {
         const el = document.querySelector(sel)
         if (!el) return null
+        // Bring it into view so a below-the-fold element at this breakpoint yields
+        // an on-screen rect (instant scroll → getBoundingClientRect reflects it).
+        try { el.scrollIntoView({ block: 'center', inline: 'center' }) } catch { /* ignore */ }
         const b = el.getBoundingClientRect()
         if (b.width <= 0 || b.height <= 0) return null
         return { x: b.x, y: b.y, width: b.width, height: b.height }
