@@ -192,6 +192,31 @@ function copyDirSync(src, dest) {
   fs.cpSync(src, dest, { recursive: true, dereference: false })
 }
 
+/** Recursively delete every directory named `name` under `root`. */
+function removeDirsByName(root, name) {
+  let entries
+  try { entries = fs.readdirSync(root, { withFileTypes: true }) } catch { return }
+  for (const e of entries) {
+    if (!e.isDirectory()) continue
+    const p = path.join(root, e.name)
+    if (e.name === name) fs.rmSync(p, { recursive: true, force: true })
+    else removeDirsByName(p, name)
+  }
+}
+
+/** Collect every `*.node` file under `root` (transitive native addons). */
+function findNodeAddons(root) {
+  const out = []
+  let entries
+  try { entries = fs.readdirSync(root, { withFileTypes: true }) } catch { return out }
+  for (const e of entries) {
+    const p = path.join(root, e.name)
+    if (e.isDirectory()) out.push(...findNodeAddons(p))
+    else if (e.name.endsWith('.node')) out.push(p)
+  }
+  return out
+}
+
 function ensureSpawnHelperExecutable(nodePtyDir) {
   if (process.platform === 'win32') return
   const prebuildsDir = path.join(nodePtyDir, 'prebuilds')
@@ -418,10 +443,10 @@ async function main() {
   }
 
   // Step 3c: Copy Playwright (browser-capture feature) externally so require()
-  // resolves on the real fs inside the packaged sidecar (mirrors node-pty). Pure
-  // JS — no Mach-O, so no codesigning needed. The Chromium *browser binary* is
-  // shipped separately under runtimes/chromium (when BUNDLE_CHROMIUM=true) or
-  // downloaded by Playwright on first use; this only ships the JS driver.
+  // resolves on the real fs inside the packaged sidecar (mirrors node-pty). The
+  // Chromium *browser binary* is shipped separately under runtimes/chromium (when
+  // BUNDLE_CHROMIUM=true) or downloaded by Playwright on first use; this only
+  // ships the JS driver.
   console.log('\n[3c] Copying Playwright packages...')
   const pwNodeModulesDest = path.join(BINARIES_DIR, 'node_modules')
   ensureDir(pwNodeModulesDest)
@@ -435,8 +460,15 @@ async function main() {
     copyDirSync(src, dest)
     // Defensive: drop any in-package browser cache (browsers live in ~/.cache).
     fs.rmSync(path.join(dest, '.local-browsers'), { recursive: true, force: true })
+    // Drop `fsevents` — a transitive, optional macOS-only native addon. Its
+    // unsigned fsevents.node fails Apple notarization, and the browser-capture
+    // path (launch + screencast + screenshot/DOM) never needs file watching.
+    fs.rmSync(path.join(dest, 'node_modules', 'fsevents'), { recursive: true, force: true })
     console.log(`  ${src} → ${dest}`)
   }
+  // Belt-and-suspenders: remove any remaining nested fsevents anywhere under the
+  // copied node_modules (npm layout can vary across versions).
+  removeDirsByName(pwNodeModulesDest, 'fsevents')
 
   // Step 4: Codesign sidecar + .node addons (macOS only, requires APPLE_SIGNING_IDENTITY)
   // Apple notarization rejects bundles with unsigned binaries or binaries missing
@@ -479,6 +511,14 @@ async function main() {
           console.log(`  Signed: ${helper}`)
         }
       }
+    }
+
+    // Sign any remaining native addons under binaries/node_modules (e.g. a
+    // transitive `*.node` pulled in by Playwright). fsevents is trimmed above,
+    // but this future-proofs notarization against any other native dep.
+    for (const addon of findNodeAddons(path.join(BINARIES_DIR, 'node_modules'))) {
+      run(`codesign --force --sign "${signingIdentity}" --timestamp "${addon}"`)
+      console.log(`  Signed: ${addon}`)
     }
   } else if (process.platform === 'darwin') {
     console.log('\n[4/4] Skipping codesign (APPLE_SIGNING_IDENTITY not set — local build)')
