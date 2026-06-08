@@ -298,6 +298,22 @@ class PlaywrightPageHandle implements BrowserPageHandle {
     try { await this.page.waitForTimeout?.(120) } catch { /* ignore */ }
   }
 
+  async getSelectionText(): Promise<string> {
+    try {
+      return await this.page.evaluate(() => window.getSelection()?.toString() ?? '')
+    } catch {
+      return ''
+    }
+  }
+
+  async insertText(text: string): Promise<void> {
+    try { await this.page.keyboard.insertText(text) } catch { /* ignore */ }
+  }
+
+  async deleteSelection(): Promise<void> {
+    try { await this.page.keyboard.press('Delete') } catch { /* ignore */ }
+  }
+
   async close(): Promise<void> {
     await this.stopScreencast()
     if (this.netCdp) {

@@ -5,6 +5,7 @@ import {
   navigateBrowser,
   captureBrowserRegion,
   captureBrowserBreakpoints,
+  browserClipboard,
   killBrowserSession,
   BrowserSessionLimitError,
   BrowserLaunchFailedError,
@@ -34,6 +35,8 @@ export interface UseBrowserCaptureSession extends BrowserSessionState {
   /** Capture the same selection at several viewport sizes (responsive reference). */
   captureBreakpoints: (rect: CaptureRect, anchorPoint: { x: number; y: number }, pendingSpecId: string, breakpoints?: Record<string, { width: number; height: number }>) => Promise<CaptureResult>
   setViewport: (width: number, height: number) => void
+  /** Bridge the host clipboard to the page (copy/cut → returns selection; paste → inject). */
+  clipboard: (action: 'copy' | 'paste' | 'cut', text?: string) => Promise<{ text: string }>
   /** Ask the server which element is at a viewport point (hover-to-select). */
   probe: (point: { x: number; y: number }) => void
   /** Clear the current hover highlight. */
@@ -196,6 +199,12 @@ export function useBrowserCaptureSession(opts: {
     return captureBrowserBreakpoints(sid, rect, anchorPoint, pendingSpecId, breakpoints)
   }, [])
 
+  const clipboard = useCallback(async (action: 'copy' | 'paste' | 'cut', text?: string): Promise<{ text: string }> => {
+    const sid = sessionIdRef.current
+    if (!sid) return { text: '' }
+    return browserClipboard(sid, action, text)
+  }, [])
+
   const setViewport = useCallback((width: number, height: number) => {
     const w = Math.max(1, Math.round(width))
     const h = Math.max(1, Math.round(height))
@@ -221,6 +230,7 @@ export function useBrowserCaptureSession(opts: {
     navigate,
     capture,
     captureBreakpoints,
+    clipboard,
     setViewport,
     probe,
     clearHover,

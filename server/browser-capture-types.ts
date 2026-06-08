@@ -175,6 +175,13 @@ export interface BrowserPageHandle {
   resolveAnchorRect?(selector: string): Promise<CaptureRect | null>
   /** Wait for layout to settle after a viewport change (best-effort). */
   waitForStable?(): Promise<void>
+  // ─── Clipboard bridge (optional) ──────────────────────────────────────────
+  /** The page's current selection text (for copy/cut). */
+  getSelectionText?(): Promise<string>
+  /** Insert text at the focused element's caret (for paste). */
+  insertText?(text: string): Promise<void>
+  /** Delete the current selection (for cut). */
+  deleteSelection?(): Promise<void>
   close(): Promise<void>
 }
 

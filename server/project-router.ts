@@ -3553,6 +3553,27 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     }
   })
 
+  router.post('/:projectId/browser/sessions/:id/clipboard', requireBrowserCaptureEnabled, async (req: Request, res: Response) => {
+    const mgr = ctx(req).browserCaptureManager
+    const action = req.body?.action
+    if (action !== 'copy' && action !== 'paste' && action !== 'cut') {
+      res.status(400).json({ error: 'action must be copy | paste | cut' })
+      return
+    }
+    const text = typeof req.body?.text === 'string' ? req.body.text.slice(0, 100_000) : undefined
+    try {
+      const out = await mgr.clipboard(req.params.id as string, action, text)
+      if (!out) {
+        res.status(404).json({ error: 'browser_session_not_found' })
+        return
+      }
+      res.json(out)
+    } catch (err) {
+      console.error('[project-router] browser clipboard error:', err)
+      res.status(500).json({ error: 'Failed clipboard op' })
+    }
+  })
+
   router.delete('/:projectId/browser/sessions/:id', requireBrowserCaptureEnabled, async (req: Request, res: Response) => {
     const mgr = ctx(req).browserCaptureManager
     const ok = await mgr.kill(req.params.id as string)

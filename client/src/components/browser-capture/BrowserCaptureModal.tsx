@@ -186,7 +186,30 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
 
   const onKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (selecting || e.key === 'Escape') return
-    const ev: BrowserInputEvent = { type: 'key', action: 'down', key: e.key, code: e.code, text: e.key.length === 1 ? e.key : undefined }
+    const meta = e.metaKey || e.ctrlKey
+    // Clipboard bridge: the embedded headless page can't reach the OS clipboard,
+    // so ⌘/Ctrl+C/X read the page selection into the host clipboard and ⌘/Ctrl+V
+    // injects the host clipboard text into the page.
+    if (meta && (e.key === 'c' || e.key === 'v' || e.key === 'x')) {
+      e.preventDefault()
+      const key = e.key
+      void (async () => {
+        try {
+          if (key === 'v') {
+            const text = await navigator.clipboard.readText()
+            if (text) await session.clipboard('paste', text)
+          } else {
+            const { text } = await session.clipboard(key === 'x' ? 'cut' : 'copy')
+            if (text) await navigator.clipboard.writeText(text)
+          }
+        } catch {
+          /* clipboard permission denied / unavailable — ignore */
+        }
+      })()
+      return
+    }
+    // Don't type the letter of an unhandled ⌘/Ctrl combo (e.g. ⌘A) into the page.
+    const ev: BrowserInputEvent = { type: 'key', action: 'down', key: e.key, code: e.code, text: !meta && e.key.length === 1 ? e.key : undefined }
     session.forwardInput(ev)
     if (e.key === 'Tab' || e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault()
   }, [selecting, session])

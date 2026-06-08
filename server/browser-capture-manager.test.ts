@@ -67,6 +67,12 @@ class FakePage implements BrowserPageHandle {
   async resolveAnchorSelector() { this.calls.push('anchorSel'); return this.anchorSelector }
   async resolveAnchorRect() { return this.anchorRect }
   async waitForStable() { this.calls.push('stable') }
+  selection = ''
+  pasted: string[] = []
+  deleted = 0
+  async getSelectionText() { return this.selection }
+  async insertText(t: string) { this.pasted.push(t) }
+  async deleteSelection() { this.deleted++ }
   async close() { this.closed = true }
   emitFrame(data: Buffer) { this.frameCb?.({ data, width: 1280, height: 800 }) }
 }
@@ -375,6 +381,27 @@ describe('BrowserCaptureManager', () => {
     const result = await mgr.capture(meta.id, { x: 0, y: 0, width: 10, height: 10 }, 'pend')
     expect(result).toBeNull()
     expect(mgr.getSession(meta.id)).toBeUndefined()
+  })
+
+  it('clipboard copy returns the selection, paste injects, cut returns + deletes', async () => {
+    const { mgr, ctx } = makeManager({ db })
+    const meta = await mgr.create()
+    const page = ctx.pages[0]
+    page.selection = 'copied text'
+    expect(await mgr.clipboard(meta.id, 'copy')).toEqual({ text: 'copied text' })
+    await mgr.clipboard(meta.id, 'paste', 'pasted!')
+    expect(page.pasted).toEqual(['pasted!'])
+    const cut = await mgr.clipboard(meta.id, 'cut')
+    expect(cut).toEqual({ text: 'copied text' })
+    expect(page.deleted).toBe(1)
+  })
+
+  it('clipboard returns null for unknown session or after shutdown', async () => {
+    const { mgr } = makeManager({ db })
+    const meta = await mgr.create()
+    expect(await mgr.clipboard('nope', 'copy')).toBeNull()
+    await mgr.shutdown()
+    expect(await mgr.clipboard(meta.id, 'copy')).toBeNull()
   })
 
   it('probeElement returns the hovered element rect; null for unknown/disposed', async () => {

@@ -15,6 +15,7 @@ function makeBrowserManager(overrides: Record<string, unknown> = {}) {
     navigate: vi.fn(async () => ({ url: 'https://x.dev', title: 'X' })),
     capture: vi.fn(async () => ({ screenshot: { id: 'a1' }, domAttachment: { id: 'a2' }, dom: { html: '<i>', nodes: [] } })),
     captureBreakpoints: vi.fn(async () => ({ screenshot: { id: 'b1' }, domAttachment: { id: 'b2' }, dom: { html: '<i>', nodes: [] }, screenshotDataUrl: 'data:image/png;base64,x', breakpoints: { desktop: { attachment: { id: 'b1' }, dataUrl: 'data:image/png;base64,x', viewport: { width: 1280, height: 800 } } } })),
+    clipboard: vi.fn(async () => ({ text: 'sel' })),
     kill: vi.fn(async () => true),
     ...overrides,
   }
@@ -196,6 +197,18 @@ describe('project-router browser endpoints', () => {
     const app = createApp(makeContext(db, browser))
     const res = await request(app).post('/api/projects/proj-1/browser/sessions/s1/capture').send({ rect: { x: 0, y: 0, width: 5, height: 5 }, pendingSpecId: 'p' })
     expect(res.status).toBe(404)
+  })
+
+  it('POST clipboard validates the action and forwards copy/paste', async () => {
+    const app = createApp(makeContext(db, browser))
+    const base = '/api/projects/proj-1/browser/sessions/s1/clipboard'
+    expect((await request(app).post(base).send({ action: 'bogus' })).status).toBe(400)
+    expect(browser.clipboard).not.toHaveBeenCalled()
+    const res = await request(app).post(base).send({ action: 'copy' })
+    expect(res.status).toBe(200)
+    expect(res.body.text).toBe('sel')
+    await request(app).post(base).send({ action: 'paste', text: 'hi' })
+    expect(browser.clipboard).toHaveBeenCalledWith('s1', 'paste', 'hi')
   })
 
   it('DELETE kills the session; 404 when unknown', async () => {

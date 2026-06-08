@@ -407,6 +407,27 @@ export class BrowserCaptureManager {
     return { screenshot, domAttachment, dom, screenshotDataUrl: `data:image/png;base64,${png.toString('base64')}` }
   }
 
+  // ─── Clipboard bridge ───────────────────────────────────────────────────────
+
+  /**
+   * Bridge the host clipboard to the embedded (headless) page, which has no
+   * access to the OS clipboard. `copy`/`cut` return the page's current selection
+   * text for the client to write to the host clipboard; `paste` inserts the
+   * host clipboard text (sent by the client) at the focused element.
+   */
+  async clipboard(sessionId: string, action: 'copy' | 'paste' | 'cut', text?: string): Promise<{ text: string } | null> {
+    if (this.disposed) return null
+    const s = this.getSession(sessionId)
+    if (!s) return null
+    if (action === 'paste') {
+      if (text) await s.page.insertText?.(text)
+      return { text: '' }
+    }
+    const sel = (await s.page.getSelectionText?.()) ?? ''
+    if (action === 'cut' && sel) await s.page.deleteSelection?.()
+    return { text: sel }
+  }
+
   // ─── Multi-breakpoint capture ───────────────────────────────────────────────
 
   /**

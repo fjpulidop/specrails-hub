@@ -12,6 +12,7 @@ import {
   navigateBrowser,
   captureBrowserRegion,
   captureBrowserBreakpoints,
+  browserClipboard,
   uploadCaptureImage,
   killBrowserSession,
   BrowserSessionLimitError,
@@ -179,6 +180,16 @@ describe('browser-capture lib', () => {
       }) as typeof fetch
       const att = await uploadCaptureImage('pend-1', new Blob(['x'], { type: 'image/png' }), 'annotated.png')
       expect(att.id).toBe('an1')
+    })
+
+    it('browserClipboard posts the action + text and returns the selection', async () => {
+      global.fetch = mockFetch((url, init) => {
+        expect(url).toContain('/browser/sessions/s1/clipboard')
+        const body = JSON.parse(String(init?.body))
+        expect(body).toEqual({ action: 'paste', text: 'hello' })
+        return { body: { text: '' } }
+      }) as typeof fetch
+      expect(await browserClipboard('s1', 'paste', 'hello')).toEqual({ text: '' })
     })
 
     it('killBrowserSession swallows errors', async () => {

@@ -212,6 +212,22 @@ export async function uploadCaptureImage(pendingSpecId: string, blob: Blob, file
   return data.attachment
 }
 
+/** Bridge the host clipboard to the embedded page (which can't reach the OS
+ *  clipboard): copy/cut return the page's selection text; paste injects text. */
+export async function browserClipboard(
+  sessionId: string,
+  action: 'copy' | 'paste' | 'cut',
+  text?: string,
+): Promise<{ text: string }> {
+  const res = await fetch(`${getApiBase()}/browser/sessions/${sessionId}/clipboard`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, text }),
+  })
+  if (!res.ok) throw new Error(`Clipboard failed (${res.status})`)
+  return (await res.json()) as { text: string }
+}
+
 export async function killBrowserSession(sessionId: string): Promise<void> {
   try {
     await fetch(`${getApiBase()}/browser/sessions/${sessionId}`, { method: 'DELETE' })
