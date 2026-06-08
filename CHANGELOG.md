@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.61.2](https://github.com/fjpulidop/specrails-hub/compare/v1.61.1...v1.61.2) (2026-06-08)
+
+
+### Bug Fixes
+
+* **desktop:** bundle + notarize Chromium for browser-capture ([#345](https://github.com/fjpulidop/specrails-hub/issues/345)) ([4d679b6](https://github.com/fjpulidop/specrails-hub/commit/4d679b66b615f03363515931cdd14a6fd63f7fbe))
+
 ## [1.61.1](https://github.com/fjpulidop/specrails-hub/compare/v1.61.0...v1.61.1) (2026-06-08)
 
 
