@@ -168,6 +168,13 @@ export interface BrowserPageHandle {
   /** Buffered network requests that started at/after `sinceMs` (newest-first,
    *  capped). Optional — returns nothing when unimplemented. */
   recentNetwork?(sinceMs: number): CapturedNetworkRequest[]
+  // ─── Multi-breakpoint capture (optional) ──────────────────────────────────
+  /** Build a stable-ish CSS selector for the element at a viewport point. */
+  resolveAnchorSelector?(point: { x: number; y: number }): Promise<string | null>
+  /** Current bounding box of the element matching `selector`, or null. */
+  resolveAnchorRect?(selector: string): Promise<CaptureRect | null>
+  /** Wait for layout to settle after a viewport change (best-effort). */
+  waitForStable?(): Promise<void>
   close(): Promise<void>
 }
 

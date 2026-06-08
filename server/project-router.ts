@@ -3505,6 +3505,54 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     }
   })
 
+  router.post('/:projectId/browser/sessions/:id/capture-breakpoints', requireBrowserCaptureEnabled, async (req: Request, res: Response) => {
+    const mgr = ctx(req).browserCaptureManager
+    const rect = parseRect(req.body?.rect)
+    if (!rect) {
+      res.status(400).json({ error: 'rect {x,y,width,height} with positive size is required' })
+      return
+    }
+    const pendingSpecId = typeof req.body?.pendingSpecId === 'string' ? req.body.pendingSpecId.trim() : ''
+    if (!pendingSpecId || !SAFE_PENDING_ID.test(pendingSpecId)) {
+      res.status(400).json({ error: 'pendingSpecId is required and must be well-formed' })
+      return
+    }
+    // Validate the per-breakpoint viewport dims (client-supplied; single source).
+    const rawDims = req.body?.breakpoints
+    const dims: Record<string, { width: number; height: number }> = {}
+    if (rawDims && typeof rawDims === 'object') {
+      for (const [k, v] of Object.entries(rawDims as Record<string, unknown>)) {
+        if (Object.keys(dims).length >= 4) break
+        if (!/^[a-z0-9_-]{1,20}$/i.test(k)) continue
+        const d = v as { width?: unknown; height?: unknown }
+        const w = Math.round(Number(d?.width))
+        const h = Math.round(Number(d?.height))
+        if (Number.isFinite(w) && Number.isFinite(h) && w >= 1 && h >= 1 && w <= 4000 && h <= 4000) {
+          dims[k] = { width: w, height: h }
+        }
+      }
+    }
+    if (Object.keys(dims).length === 0) {
+      res.status(400).json({ error: 'breakpoints {name:{width,height}} is required' })
+      return
+    }
+    const a = req.body?.anchorPoint
+    const anchorPoint = a && typeof a.x === 'number' && typeof a.y === 'number'
+      ? { x: a.x, y: a.y }
+      : { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+    try {
+      const result = await mgr.captureBreakpoints(req.params.id as string, rect, anchorPoint, pendingSpecId, dims)
+      if (!result) {
+        res.status(404).json({ error: 'browser_session_not_found' })
+        return
+      }
+      res.json(result)
+    } catch (err) {
+      console.error('[project-router] browser capture-breakpoints error:', err)
+      res.status(500).json({ error: 'Failed to capture' })
+    }
+  })
+
   router.delete('/:projectId/browser/sessions/:id', requireBrowserCaptureEnabled, async (req: Request, res: Response) => {
     const mgr = ctx(req).browserCaptureManager
     const ok = await mgr.kill(req.params.id as string)

@@ -246,6 +246,58 @@ class PlaywrightPageHandle implements BrowserPageHandle {
     return this.netBuffer.recent(sinceMs)
   }
 
+  async resolveAnchorSelector(point: { x: number; y: number }): Promise<string | null> {
+    try {
+      return await this.page.evaluate((p: { x: number; y: number }) => {
+        const el = document.elementFromPoint(p.x, p.y)
+        if (!el) return null
+        const esc = (s: string) => (window.CSS && CSS.escape ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, '\\$&'))
+        const target = el as HTMLElement
+        if (target.id) return '#' + esc(target.id)
+        const testid = target.getAttribute('data-testid')
+        if (testid) return `[data-testid="${testid.replace(/"/g, '\\"')}"]`
+        const parts: string[] = []
+        let node: Element | null = el
+        let depth = 0
+        while (node && node.nodeType === 1 && node !== document.body && depth < 6) {
+          const tag = node.tagName.toLowerCase()
+          const parent: Element | null = node.parentElement
+          if (!parent) { parts.unshift(tag); break }
+          const sameTag = Array.from(parent.children).filter((c) => c.tagName === (node as Element).tagName)
+          const idx = sameTag.indexOf(node) + 1
+          parts.unshift(sameTag.length > 1 ? `${tag}:nth-of-type(${idx})` : tag)
+          node = parent
+          depth++
+        }
+        return parts.length ? parts.join(' > ') : null
+      }, point)
+    } catch {
+      return null
+    }
+  }
+
+  async resolveAnchorRect(selector: string): Promise<CaptureRect | null> {
+    try {
+      return await this.page.evaluate((sel: string) => {
+        const el = document.querySelector(sel)
+        if (!el) return null
+        const b = el.getBoundingClientRect()
+        if (b.width <= 0 || b.height <= 0) return null
+        return { x: b.x, y: b.y, width: b.width, height: b.height }
+      }, selector)
+    } catch {
+      return null
+    }
+  }
+
+  async waitForStable(): Promise<void> {
+    try {
+      await this.page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+    } catch { /* ignore */ }
+    // A small extra settle for late reflow / lazy-loaded images / web fonts.
+    try { await this.page.waitForTimeout?.(120) } catch { /* ignore */ }
+  }
+
   async close(): Promise<void> {
     await this.stopScreencast()
     if (this.netCdp) {

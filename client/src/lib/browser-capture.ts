@@ -106,6 +106,12 @@ export type BrowserInputEvent =
   | { type: 'key'; action: 'down' | 'up'; key: string; code?: string; text?: string; modifiers?: number }
   | { type: 'resize'; width: number; height: number }
 
+export interface BreakpointCapture {
+  attachment: Attachment
+  dataUrl: string
+  viewport: { width: number; height: number }
+}
+
 export interface CaptureResult {
   screenshot: Attachment
   domAttachment: Attachment
@@ -113,6 +119,16 @@ export interface CaptureResult {
   /** Inline data URL of the screenshot for a thumbnail (avoids an unauthenticated
    *  <img src> to the attachment endpoint). */
   screenshotDataUrl: string
+  /** Present only for a multi-breakpoint capture: the same element at each size. */
+  breakpoints?: Record<string, BreakpointCapture>
+}
+
+/** Default device sizes for "capture at all sizes". Sent in the request body so
+ *  the server has a single source of truth (no drift with this constant). */
+export const BREAKPOINT_DIMS: Record<'desktop' | 'tablet' | 'mobile', { width: number; height: number }> = {
+  desktop: { width: 1280, height: 800 },
+  tablet: { width: 768, height: 1024 },
+  mobile: { width: 375, height: 667 },
 }
 
 export class BrowserSessionLimitError extends Error {}
@@ -157,6 +173,22 @@ export async function captureBrowserRegion(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rect, pendingSpecId, captureNetwork: opts?.captureNetwork ?? true }),
+  })
+  if (!res.ok) throw new Error(`Capture failed (${res.status})`)
+  return (await res.json()) as CaptureResult
+}
+
+export async function captureBrowserBreakpoints(
+  sessionId: string,
+  rect: CaptureRect,
+  anchorPoint: { x: number; y: number },
+  pendingSpecId: string,
+  breakpoints: Record<string, { width: number; height: number }> = BREAKPOINT_DIMS,
+): Promise<CaptureResult> {
+  const res = await fetch(`${getApiBase()}/browser/sessions/${sessionId}/capture-breakpoints`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rect, anchorPoint, pendingSpecId, breakpoints }),
   })
   if (!res.ok) throw new Error(`Capture failed (${res.status})`)
   return (await res.json()) as CaptureResult

@@ -59,6 +59,13 @@ interface BrowserSession {
   closed: boolean
 }
 
+/** One per-breakpoint screenshot in a multi-breakpoint capture. */
+export interface BreakpointCapture {
+  attachment: Attachment
+  dataUrl: string
+  viewport: { width: number; height: number }
+}
+
 export interface CaptureResult {
   screenshot: Attachment
   domAttachment: Attachment
@@ -67,6 +74,9 @@ export interface CaptureResult {
    *  without a second authenticated request (an <img src> to the attachment GET
    *  endpoint would omit the X-Hub-Token header and 401). */
   screenshotDataUrl: string
+  /** Present only for a multi-breakpoint capture: the same element shot at each
+   *  viewport. `screenshot`/`dom` above point at the first (canonical) entry. */
+  breakpoints?: Record<string, BreakpointCapture>
 }
 
 export interface BrowserCaptureManagerOptions {
@@ -395,6 +405,105 @@ export class BrowserCaptureManager {
       },
     })
     return { screenshot, domAttachment, dom, screenshotDataUrl: `data:image/png;base64,${png.toString('base64')}` }
+  }
+
+  // ─── Multi-breakpoint capture ───────────────────────────────────────────────
+
+  /**
+   * Capture the SAME selection at several viewport sizes. The element occupies a
+   * different rect at each breakpoint (a nav collapses on mobile), so we resolve
+   * a stable anchor selector once at the live viewport and re-query its box per
+   * breakpoint, falling back to the original rect when it can't be resolved. The
+   * whole sequence is driven server-side (set viewport → settle → re-resolve →
+   * shoot) so there is no fire-and-forget WS resize race; the live viewport is
+   * always restored. One canonical DOM (the first breakpoint) is stored.
+   */
+  async captureBreakpoints(
+    sessionId: string,
+    rect: CaptureRect,
+    anchorPoint: { x: number; y: number },
+    pendingSpecId: string,
+    dims: Record<string, { width: number; height: number }>,
+  ): Promise<CaptureResult | null> {
+    if (this.disposed) return null
+    const s = this.getSession(sessionId)
+    if (!s) return null
+    const order = Object.keys(dims)
+    if (order.length === 0) return null
+
+    const stashed = { ...s.viewport }
+    let selector: string | null = null
+    try { selector = (await s.page.resolveAnchorSelector?.(anchorPoint)) ?? null } catch { selector = null }
+
+    const captured: Record<string, { png: Buffer; dom: CapturedDom }> = {}
+    try {
+      for (const key of order) {
+        const d = dims[key]
+        await s.page.setViewport(d.width, d.height)
+        s.viewport = { width: d.width, height: d.height }
+        try { await s.page.waitForStable?.() } catch { /* settle is best-effort */ }
+        let useRect = rect
+        if (selector) {
+          try {
+            const r = await s.page.resolveAnchorRect?.(selector)
+            if (r && r.width > 0 && r.height > 0) useRect = r
+          } catch { /* fall back to the original rect */ }
+        }
+        const safeRect: CaptureRect = {
+          x: Math.max(0, useRect.x),
+          y: Math.max(0, useRect.y),
+          width: Math.max(1, useRect.width),
+          height: Math.max(1, useRect.height),
+        }
+        const [png, dom] = await Promise.all([
+          s.page.screenshotClip(safeRect),
+          s.page.extractDom(safeRect, DOM_HTML_BYTE_CAP),
+        ])
+        captured[key] = { png, dom }
+      }
+    } catch (err) {
+      if (isTargetClosedError(err)) {
+        await this.kill(sessionId)
+        return null
+      }
+      throw err
+    } finally {
+      try { await s.page.setViewport(stashed.width, stashed.height) } catch { /* ignore */ }
+      s.viewport = stashed
+    }
+
+    const stamp = this.now()
+    const breakpoints: Record<string, BreakpointCapture> = {}
+    for (const key of order) {
+      const { png } = captured[key]
+      const attachment = await this.attachments.upload({
+        slug: this.projectSlug,
+        ticketKey: pendingSpecId,
+        projectPath: null,
+        file: { buffer: png, originalname: `screen-capture-${key}-${stamp}.png`, mimetype: 'image/png', size: png.length },
+      })
+      breakpoints[key] = { attachment, dataUrl: `data:image/png;base64,${png.toString('base64')}`, viewport: dims[key] }
+    }
+
+    // Canonical = the first breakpoint: only its DOM is persisted (avoid tripling
+    // the DOM artifact / prompt cost). screenshot/dom point at it.
+    const canonicalKey = order[0]
+    const canonicalDom = captured[canonicalKey].dom
+    const domJson = Buffer.from(JSON.stringify(canonicalDom, null, 2), 'utf-8')
+    const domAttachment = await this.attachments.upload({
+      slug: this.projectSlug,
+      ticketKey: pendingSpecId,
+      projectPath: null,
+      file: { buffer: domJson, originalname: `page-dom-${stamp}.json`, mimetype: 'application/json', size: domJson.length },
+    })
+
+    return {
+      screenshot: breakpoints[canonicalKey].attachment,
+      domAttachment,
+      dom: canonicalDom,
+      screenshotDataUrl: breakpoints[canonicalKey].dataUrl,
+      breakpoints,
+    }
   }
 
   // ─── Teardown ───────────────────────────────────────────────────────────────

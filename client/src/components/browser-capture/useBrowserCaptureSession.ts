@@ -4,6 +4,7 @@ import {
   openBrowserWs,
   navigateBrowser,
   captureBrowserRegion,
+  captureBrowserBreakpoints,
   killBrowserSession,
   BrowserSessionLimitError,
   BrowserLaunchFailedError,
@@ -30,6 +31,8 @@ export interface UseBrowserCaptureSession extends BrowserSessionState {
   forwardInput: (e: BrowserInputEvent) => void
   navigate: (action: 'goto' | 'back' | 'forward' | 'reload', url?: string) => Promise<void>
   capture: (rect: CaptureRect, pendingSpecId: string, opts?: { captureNetwork?: boolean }) => Promise<CaptureResult>
+  /** Capture the same selection at several viewport sizes (responsive reference). */
+  captureBreakpoints: (rect: CaptureRect, anchorPoint: { x: number; y: number }, pendingSpecId: string, breakpoints?: Record<string, { width: number; height: number }>) => Promise<CaptureResult>
   setViewport: (width: number, height: number) => void
   /** Ask the server which element is at a viewport point (hover-to-select). */
   probe: (point: { x: number; y: number }) => void
@@ -187,6 +190,12 @@ export function useBrowserCaptureSession(opts: {
     return captureBrowserRegion(sid, rect, pendingSpecId, opts)
   }, [])
 
+  const captureBreakpoints = useCallback(async (rect: CaptureRect, anchorPoint: { x: number; y: number }, pendingSpecId: string, breakpoints?: Record<string, { width: number; height: number }>): Promise<CaptureResult> => {
+    const sid = sessionIdRef.current
+    if (!sid) throw new Error('No active browser session')
+    return captureBrowserBreakpoints(sid, rect, anchorPoint, pendingSpecId, breakpoints)
+  }, [])
+
   const setViewport = useCallback((width: number, height: number) => {
     const w = Math.max(1, Math.round(width))
     const h = Math.max(1, Math.round(height))
@@ -211,6 +220,7 @@ export function useBrowserCaptureSession(opts: {
     forwardInput,
     navigate,
     capture,
+    captureBreakpoints,
     setViewport,
     probe,
     clearHover,

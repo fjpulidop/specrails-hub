@@ -6,6 +6,7 @@ import {
   BrowserLaunchError,
   type BrowserContextHandle,
   type BrowserPageHandle,
+  type CaptureRect,
   type CapturedDom,
   type CapturedNetworkRequest,
   type ContextLauncher,
@@ -61,6 +62,11 @@ class FakePage implements BrowserPageHandle {
   async probeElementAt(point: { x: number; y: number }) { return { rect: { x: point.x, y: point.y, width: 50, height: 20 }, tag: 'div' } }
   async enableNetwork() { this.enabledNetwork = true }
   recentNetwork() { return this.network }
+  anchorSelector: string | null = '#el'
+  anchorRect: CaptureRect | null = { x: 0, y: 0, width: 100, height: 40 }
+  async resolveAnchorSelector() { this.calls.push('anchorSel'); return this.anchorSelector }
+  async resolveAnchorRect() { return this.anchorRect }
+  async waitForStable() { this.calls.push('stable') }
   async close() { this.closed = true }
   emitFrame(data: Buffer) { this.frameCb?.({ data, width: 1280, height: 800 }) }
 }
@@ -307,6 +313,57 @@ describe('BrowserCaptureManager', () => {
   it('capture returns null for an unknown session', async () => {
     const { mgr } = makeManager({ db })
     expect(await mgr.capture('nope', { x: 0, y: 0, width: 1, height: 1 }, 'p')).toBeNull()
+  })
+
+  const BPS = { desktop: { width: 1280, height: 800 }, tablet: { width: 768, height: 1024 }, mobile: { width: 375, height: 667 } }
+
+  it('captureBreakpoints shoots the selection at every size and restores the live viewport', async () => {
+    const attachments = makeAttachments()
+    const { mgr, ctx } = makeManager({ db, attachments })
+    const meta = await mgr.create()
+    const result = await mgr.captureBreakpoints(meta.id, { x: 0, y: 0, width: 100, height: 50 }, { x: 50, y: 25 }, 'pend', BPS)
+    expect(result).not.toBeNull()
+    expect(Object.keys(result!.breakpoints!)).toEqual(['desktop', 'tablet', 'mobile'])
+    expect(result!.breakpoints!.tablet.viewport).toEqual({ width: 768, height: 1024 })
+    expect(result!.breakpoints!.mobile.attachment.mimeType).toBe('image/png')
+    // canonical screenshot/dom point at the first (desktop) breakpoint
+    expect(result!.screenshot.id).toBe(result!.breakpoints!.desktop.attachment.id)
+    expect(result!.screenshotDataUrl.startsWith('data:image/png;base64,')).toBe(true)
+    // 3 screenshots + 1 canonical DOM
+    expect(attachments.uploads.filter((u) => u.mime === 'image/png')).toHaveLength(3)
+    expect(attachments.uploads.filter((u) => u.mime === 'application/json')).toHaveLength(1)
+    // viewport visited each size then restored to the live (default) viewport
+    expect(ctx.pages[0].calls.filter((c) => c.startsWith('viewport:'))).toEqual([
+      'viewport:1280x800', 'viewport:768x1024', 'viewport:375x667', 'viewport:1280x800',
+    ])
+    expect(mgr.getSession(meta.id)!.viewport).toEqual({ width: 1280, height: 800 })
+  })
+
+  it('captureBreakpoints falls back to the original rect when no anchor selector resolves', async () => {
+    const { mgr } = makeManager({ db })
+    const meta = await mgr.create()
+    mgr.getSession(meta.id)!.page.resolveAnchorSelector = async () => null
+    const result = await mgr.captureBreakpoints(meta.id, { x: 1, y: 2, width: 30, height: 40 }, { x: 5, y: 5 }, 'pend', { desktop: { width: 1280, height: 800 } })
+    expect(result).not.toBeNull()
+    expect(Object.keys(result!.breakpoints!)).toEqual(['desktop'])
+  })
+
+  it('captureBreakpoints returns null for unknown session, empty dims, or after shutdown', async () => {
+    const { mgr } = makeManager({ db })
+    const meta = await mgr.create()
+    expect(await mgr.captureBreakpoints('nope', { x: 0, y: 0, width: 1, height: 1 }, { x: 0, y: 0 }, 'p', BPS)).toBeNull()
+    expect(await mgr.captureBreakpoints(meta.id, { x: 0, y: 0, width: 1, height: 1 }, { x: 0, y: 0 }, 'p', {})).toBeNull()
+    await mgr.shutdown()
+    expect(await mgr.captureBreakpoints(meta.id, { x: 0, y: 0, width: 1, height: 1 }, { x: 0, y: 0 }, 'p', BPS)).toBeNull()
+  })
+
+  it('captureBreakpoints kills the session when the page dies mid-sequence', async () => {
+    const { mgr } = makeManager({ db })
+    const meta = await mgr.create()
+    mgr.getSession(meta.id)!.page.screenshotClip = async () => { throw new Error('Target page, context or browser has been closed') }
+    const result = await mgr.captureBreakpoints(meta.id, { x: 0, y: 0, width: 10, height: 10 }, { x: 5, y: 5 }, 'pend', BPS)
+    expect(result).toBeNull()
+    expect(mgr.getSession(meta.id)).toBeUndefined()
   })
 
   it('capture returns null (and kills the session) when the page is already closed', async () => {

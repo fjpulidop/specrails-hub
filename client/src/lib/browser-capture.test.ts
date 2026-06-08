@@ -11,6 +11,7 @@ import {
   createBrowserSession,
   navigateBrowser,
   captureBrowserRegion,
+  captureBrowserBreakpoints,
   killBrowserSession,
   BrowserSessionLimitError,
   BrowserLaunchFailedError,
@@ -154,6 +155,19 @@ describe('browser-capture lib', () => {
     it('captureBrowserRegion throws on non-ok', async () => {
       global.fetch = mockFetch(() => ({ status: 500 })) as typeof fetch
       await expect(captureBrowserRegion('s1', { x: 0, y: 0, width: 1, height: 1 }, 'p')).rejects.toThrow()
+    })
+
+    it('captureBrowserBreakpoints posts rect, anchor + breakpoints and returns the result', async () => {
+      global.fetch = mockFetch((url, init) => {
+        expect(url).toContain('/browser/sessions/s1/capture-breakpoints')
+        const body = JSON.parse(String(init?.body))
+        expect(body.pendingSpecId).toBe('pend-1')
+        expect(body.anchorPoint).toEqual({ x: 5, y: 5 })
+        expect(body.breakpoints.desktop).toEqual({ width: 1280, height: 800 })
+        return { body: { screenshot: { id: 'b1' }, domAttachment: { id: 'b2' }, dom, screenshotDataUrl: 'data:image/png;base64,x', breakpoints: { desktop: { attachment: { id: 'b1' }, dataUrl: 'd', viewport: { width: 1280, height: 800 } } } } }
+      }) as typeof fetch
+      const r = await captureBrowserBreakpoints('s1', { x: 1, y: 2, width: 3, height: 4 }, { x: 5, y: 5 }, 'pend-1')
+      expect(r.breakpoints!.desktop.attachment.id).toBe('b1')
     })
 
     it('killBrowserSession swallows errors', async () => {

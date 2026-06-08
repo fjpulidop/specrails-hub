@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, ArrowRight, RotateCw, X, Crop, Loader2, Globe, AlertTriangle, Monitor, Tablet, Smartphone, Maximize2, Network } from 'lucide-react'
+import { ArrowLeft, ArrowRight, RotateCw, X, Crop, Loader2, Globe, AlertTriangle, Monitor, Tablet, Smartphone, Maximize2, Network, Ratio } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { useBrowserCaptureSession } from './useBrowserCaptureSession'
@@ -9,6 +9,7 @@ import {
   mapRectToDisplay,
   rectFromPoints,
   isUsableSelection,
+  BREAKPOINT_DIMS,
   type CaptureRect,
   type CaptureResult,
   type BrowserInputEvent,
@@ -66,6 +67,8 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
   // Capture the page's XHR/fetch requests alongside the selection (ON by default;
   // a user can disable it for a privacy-sensitive page).
   const [captureNetwork, setCaptureNetwork] = useState(true)
+  // Capture the selected element at desktop/tablet/mobile in one shot.
+  const [captureAllSizes, setCaptureAllSizes] = useState(false)
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const pendingMoveRef = useRef<{ x: number; y: number } | null>(null)
@@ -195,7 +198,10 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
   const runCapture = useCallback(async (rect: CaptureRect) => {
     setCapturing(true)
     try {
-      const result = await session.capture(rect, pendingSpecId, { captureNetwork })
+      const anchorPoint = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+      const result = captureAllSizes
+        ? await session.captureBreakpoints(rect, anchorPoint, pendingSpecId, BREAKPOINT_DIMS)
+        : await session.capture(rect, pendingSpecId, { captureNetwork })
       onCaptured(result)
       toast.success('Captured page selection')
       onClose()
@@ -207,7 +213,7 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
       setBox(null)
       session.clearHover()
     }
-  }, [session, pendingSpecId, captureNetwork, onCaptured, onClose])
+  }, [session, pendingSpecId, captureNetwork, captureAllSizes, onCaptured, onClose])
 
   const onSelectDown = useCallback((e: React.PointerEvent) => {
     ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
@@ -330,6 +336,17 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
         >
           <Network className="w-3.5 h-3.5" />
           Network
+        </button>
+        <button
+          type="button"
+          aria-label="Capture at all screen sizes"
+          aria-pressed={captureAllSizes}
+          title={captureAllSizes ? 'Will capture this element at desktop, tablet and mobile (click to disable)' : 'Capture at all sizes: desktop, tablet and mobile'}
+          onClick={() => setCaptureAllSizes((v) => !v)}
+          className={`hidden md:inline-flex items-center gap-1 h-7 px-2 rounded-md border text-[11px] shrink-0 transition-colors ${captureAllSizes ? 'border-accent-highlight/40 bg-accent-highlight/10 text-accent-highlight' : 'border-border/50 text-muted-foreground hover:text-foreground hover:bg-card/60'}`}
+        >
+          <Ratio className="w-3.5 h-3.5" />
+          All sizes
         </button>
         <Button
           size="sm"
