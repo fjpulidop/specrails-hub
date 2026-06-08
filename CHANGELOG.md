@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.60.0](https://github.com/fjpulidop/specrails-hub/compare/v1.59.0...v1.60.0) (2026-06-07)
+
+
+### Features
+
+* **multi-provider:** run Claude and Codex in the same project ([#339](https://github.com/fjpulidop/specrails-hub/issues/339)) ([75f1c3d](https://github.com/fjpulidop/specrails-hub/commit/75f1c3d6e2584e074c0bfb3c0140c171b6dcd400))
+
 ## [1.59.0](https://github.com/fjpulidop/specrails-hub/compare/v1.58.4...v1.59.0) (2026-06-06)
 
 
