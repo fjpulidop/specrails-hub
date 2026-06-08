@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.61.4](https://github.com/fjpulidop/specrails-hub/compare/v1.61.3...v1.61.4) (2026-06-08)
+
+
+### Bug Fixes
+
+* **desktop:** obfuscate bundled Chromium so notarization can't recurse it ([#349](https://github.com/fjpulidop/specrails-hub/issues/349)) ([e458afc](https://github.com/fjpulidop/specrails-hub/commit/e458afc71c41ad7373a3cb35e41d56f5f5658f94))
+
 ## [1.61.3](https://github.com/fjpulidop/specrails-hub/compare/v1.61.2...v1.61.3) (2026-06-08)
 
 
