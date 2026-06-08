@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.61.3](https://github.com/fjpulidop/specrails-hub/compare/v1.61.2...v1.61.3) (2026-06-08)
+
+
+### Bug Fixes
+
+* **desktop:** ship Chromium as an archive so it notarizes and launches ([#347](https://github.com/fjpulidop/specrails-hub/issues/347)) ([e404ea7](https://github.com/fjpulidop/specrails-hub/commit/e404ea738582e0ec03c81ea506345b512b0ec9fb))
+
 ## [1.61.2](https://github.com/fjpulidop/specrails-hub/compare/v1.61.1...v1.61.2) (2026-06-08)
 
 
