@@ -60,6 +60,17 @@ describe('chromium-resolver', () => {
     return archive
   }
 
+  // Pack a fake chromium tree into <runtimes>/chromium/chromium.pak via the REAL
+  // CI obfuscation script — proving the script's XOR key matches the resolver's.
+  function makeObfuscatedArchive(runtimesPath: string): string {
+    const tarGz = makeArchive(runtimesPath)
+    const pak = path.join(runtimesPath, 'chromium', 'chromium.pak')
+    const r = spawnSync('node', ['scripts/obfuscate-chromium.mjs', tarGz, pak])
+    if (r.status !== 0) throw new Error(`obfuscate failed: ${r.stderr}`)
+    fs.rmSync(tarGz, { force: true }) // ship only the .pak
+    return pak
+  }
+
   beforeEach(() => {
     tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'chromium-resolver-'))
     process.env.SPECRAILS_CHROMIUM_CACHE_DIR = path.join(tmp, 'cache')
@@ -148,6 +159,18 @@ describe('chromium-resolver', () => {
     expect(fs.existsSync(exe!)).toBe(true)
     // Marker written so a later run can skip re-extraction.
     expect(fs.existsSync(path.join(process.env.SPECRAILS_CHROMIUM_CACHE_DIR!, '.source'))).toBe(true)
+  })
+
+  it('async resolver de-obfuscates and extracts a chromium.pak blob', async () => {
+    process.env.SPECRAILS_IS_DESKTOP = '1'
+    process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH = tmp
+    const pak = makeObfuscatedArchive(tmp)
+    // The .pak must not be a readable gzip/tar (else the notary would recurse it).
+    expect(fs.readFileSync(pak).subarray(0, 2).equals(Buffer.from([0x1f, 0x8b]))).toBe(false)
+    const exe = await resolveBundledChromiumExecutable()
+    expect(exe).toBeTruthy()
+    expect(exe!.startsWith(process.env.SPECRAILS_CHROMIUM_CACHE_DIR!)).toBe(true)
+    expect(fs.existsSync(exe!)).toBe(true)
   })
 
   it('async resolver reuses the extracted cache when the marker matches (no re-extract)', async () => {
