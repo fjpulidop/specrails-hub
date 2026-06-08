@@ -14,6 +14,17 @@ import {
   type BrowserInputEvent,
 } from '../../lib/browser-capture'
 
+/**
+ * Detect Tauri-on-Mac. The overlay is portaled to <body> as `fixed inset-0`, so it
+ * covers the custom titlebar and the native traffic-light controls (close/min/max)
+ * float over its top-left. Reserve a left gutter there so the nav buttons clear them.
+ */
+function isMacTauriOverlay(): boolean {
+  if (typeof window === 'undefined') return false
+  if (!('__TAURI_INTERNALS__' in window)) return false
+  return /mac/i.test(navigator.platform)
+}
+
 interface BrowserCaptureModalProps {
   open: boolean
   onClose: () => void
@@ -260,20 +271,25 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
     ? mapRectToDisplay(hoverRect, cr, viewport)
     : null
 
+  const macOverlay = isMacTauriOverlay()
+
   return createPortal(
     <div className="fixed inset-0 z-[80] flex flex-col bg-background-deep/95 backdrop-blur-sm pointer-events-auto" role="dialog" aria-modal="true" aria-label="Browser capture">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-surface/80 shrink-0">
+      <div className={`flex items-center gap-2 py-1.5 border-b border-border/50 bg-surface/80 shrink-0 ${macOverlay ? 'pr-3' : 'px-3'}`}>
+        {/* On macOS desktop the native traffic-light controls float over the top-left;
+            this drag-region gutter reserves their space and keeps the window movable. */}
+        {macOverlay && <div data-tauri-drag-region className="w-20 self-stretch shrink-0" aria-hidden />}
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Back" onClick={() => session.navigate('back')}><ArrowLeft className="w-4 h-4" /></Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Forward" onClick={() => session.navigate('forward')}><ArrowRight className="w-4 h-4" /></Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Reload" onClick={() => session.navigate('reload')}><RotateCw className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Back" onClick={() => session.navigate('back')}><ArrowLeft className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Forward" onClick={() => session.navigate('forward')}><ArrowRight className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Reload" onClick={() => session.navigate('reload')}><RotateCw className="w-4 h-4" /></Button>
         </div>
         <form
           className="flex-1 flex items-center gap-2 min-w-0"
           onSubmit={(e) => { e.preventDefault(); go() }}
         >
-          <div className="flex items-center gap-2 flex-1 min-w-0 rounded-md border border-border bg-background px-2.5 py-1.5">
+          <div className="flex items-center gap-2 flex-1 min-w-0 rounded-md border border-border bg-background px-2.5 py-1">
             <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
             <input
               value={addressValue}
@@ -312,7 +328,7 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
           <Crop className="w-3.5 h-3.5" />
           {selecting ? 'Click an element or drag…' : 'Select to create spec'}
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Close browser" onClick={onClose}><X className="w-4 h-4" /></Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Close browser" onClick={onClose}><X className="w-4 h-4" /></Button>
       </div>
 
       <div className="px-3 py-1 text-[11px] text-muted-foreground truncate shrink-0 flex items-center gap-2">
