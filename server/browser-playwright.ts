@@ -163,6 +163,7 @@ class PlaywrightPageHandle implements BrowserPageHandle {
       css: raw.css,
       cssTruncated: raw.cssTruncated,
       nodes: raw.nodes,
+      designTokens: raw.designTokens,
       capturedAt: new Date().toISOString(),
     }
   }
@@ -204,6 +205,13 @@ function domExtractScript(arg: { rect: CaptureRect; htmlByteCap: number }): {
     attributes: Record<string, string>
     styles: Record<string, string>
   }>
+  designTokens?: {
+    contractVersion: number
+    anchor: Record<string, string>
+    byTag: Record<string, Record<string, string>>
+    palette: string[]
+    fonts: string[]
+  }
 } {
   const { rect, htmlByteCap } = arg
   const NODE_CAP = 60
@@ -256,6 +264,70 @@ function domExtractScript(arg: { rect: CaptureRect; htmlByteCap: number }): {
       if (v) out[k] = String(v).slice(0, 120)
     }
     return out
+  }
+
+  // ─── Design tokens: exact computed values for "clone this UI" specs ───────────
+  // getComputedStyle does not reliably populate the `border`/`borderRadius`/
+  // `padding`/`margin` shorthands, so we read the longhands and recompose. All
+  // helpers are `const` arrows (no inner named functions) so esbuild/tsx don't
+  // inject the `__name` helper that breaks page.evaluate (see extractDom).
+  const SIDES = ['top', 'right', 'bottom', 'left']
+  const collapse4 = (vals: string[]): string => {
+    const [t, r, b, l] = vals
+    if (t === r && r === b && b === l) return t
+    if (t === b && r === l) return `${t} ${r}`
+    return vals.join(' ')
+  }
+  const tokenSetFor = (el: Element): Record<string, string> => {
+    const cs = window.getComputedStyle(el)
+    const g = (p: string): string => cs.getPropertyValue(p) || ''
+    const out: Record<string, string> = {}
+    const setIf = (k: string, v: string, drop: string[]) => {
+      const t = String(v).trim()
+      if (t && !drop.includes(t)) out[k] = t.slice(0, 240)
+    }
+    setIf('color', g('color'), ['rgba(0, 0, 0, 0)'])
+    setIf('backgroundColor', g('background-color'), ['rgba(0, 0, 0, 0)', 'transparent'])
+    setIf('fontFamily', g('font-family'), [])
+    setIf('fontSize', g('font-size'), [])
+    setIf('fontWeight', g('font-weight'), [])
+    setIf('lineHeight', g('line-height'), ['normal'])
+    setIf('letterSpacing', g('letter-spacing'), ['normal'])
+    setIf('padding', collapse4(SIDES.map((s) => g('padding-' + s))), ['0px'])
+    setIf('margin', collapse4(SIDES.map((s) => g('margin-' + s))), ['0px'])
+    const bw = g('border-top-width')
+    const bsStyle = g('border-top-style')
+    const widthsUniform = SIDES.every((s) => g('border-' + s + '-width') === bw)
+    const stylesUniform = SIDES.every((s) => g('border-' + s + '-style') === bsStyle)
+    if (bsStyle && bsStyle !== 'none' && bw && bw !== '0px' && widthsUniform && stylesUniform) {
+      setIf('border', `${bw} ${bsStyle} ${g('border-top-color')}`, [])
+    }
+    const radii = ['top-left', 'top-right', 'bottom-right', 'bottom-left'].map((c) => g('border-' + c + '-radius'))
+    setIf('borderRadius', collapse4(radii), ['0px'])
+    setIf('boxShadow', g('box-shadow'), ['none'])
+    return out
+  }
+  const deriveDesignTokens = (anchorEl: Element, els: Element[]) => {
+    const anchor = tokenSetFor(anchorEl)
+    const tagCount: Record<string, number> = {}
+    for (const el of els) { const t = el.tagName.toLowerCase(); tagCount[t] = (tagCount[t] || 0) + 1 }
+    const topTags = Object.keys(tagCount).sort((a, b) => tagCount[b] - tagCount[a]).slice(0, 8)
+    const byTag: Record<string, Record<string, string>> = {}
+    for (const t of topTags) {
+      const el = els.find((e) => e.tagName.toLowerCase() === t)
+      if (el) byTag[t] = tokenSetFor(el)
+    }
+    const palette: string[] = []
+    const fonts: string[] = []
+    const consider = (ts: Record<string, string>) => {
+      for (const v of [ts.color, ts.backgroundColor]) {
+        if (v && !palette.includes(v) && palette.length < 12) palette.push(v)
+      }
+      if (ts.fontFamily && !fonts.includes(ts.fontFamily) && fonts.length < 6) fonts.push(ts.fontFamily)
+    }
+    consider(anchor)
+    for (const t of Object.keys(byTag)) consider(byTag[t])
+    return { contractVersion: 1, anchor, byTag, palette, fonts }
   }
 
   // Sample a grid of points across the selection to discover candidate elements.
@@ -450,6 +522,9 @@ function domExtractScript(arg: { rect: CaptureRect; htmlByteCap: number }): {
     css = ''
   }
 
+  let designTokens
+  try { designTokens = deriveDesignTokens(container, nodeEls) } catch { designTokens = undefined }
+
   return {
     viewport: { width: window.innerWidth, height: window.innerHeight },
     html,
@@ -457,6 +532,7 @@ function domExtractScript(arg: { rect: CaptureRect; htmlByteCap: number }): {
     css,
     cssTruncated,
     nodes,
+    designTokens,
   }
 }
 

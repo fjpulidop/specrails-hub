@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { ChevronRight, Code2, Palette, X } from 'lucide-react'
+import { Fragment, useMemo, useState } from 'react'
+import { ChevronRight, Code2, Palette, Pipette, X } from 'lucide-react'
 import { domSummary, type CapturedDom } from '../../lib/browser-capture'
 import { tokenizeHtml, HL_CLASS } from '../../lib/html-highlight'
 
@@ -36,10 +36,25 @@ function HighlightedHtml({ html }: { html: string }) {
 export function CapturedDomPanel({ dom, onRemove }: CapturedDomPanelProps) {
   const [openPanel, setOpenPanel] = useState(false)
   const [openCss, setOpenCss] = useState(false)
+  const [openTokens, setOpenTokens] = useState(false)
+  const [copied, setCopied] = useState(false)
   const summary = domSummary(dom)
+  const tokens = dom.designTokens
+  const anchorRows = tokens ? Object.entries(tokens.anchor) : []
+  const hasTokens = !!tokens && (tokens.palette.length > 0 || anchorRows.length > 0)
   const host = (() => {
     try { return new URL(dom.url).host } catch { return dom.url }
   })()
+
+  const copyTokens = () => {
+    try {
+      void navigator.clipboard?.writeText(JSON.stringify(tokens, null, 2))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      /* clipboard unavailable (non-secure context / jsdom) — ignore */
+    }
+  }
 
   return (
     <div className="rounded-lg border border-accent-secondary/40 bg-accent-secondary/5 text-xs">
@@ -55,7 +70,7 @@ export function CapturedDomPanel({ dom, onRemove }: CapturedDomPanelProps) {
           <span className="truncate font-medium">Captured page · {dom.title || host}</span>
         </button>
         <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
-          {summary.nodeCount} elements{dom.css ? ' · CSS' : ''}{summary.truncated ? ' · truncated' : ''}
+          {summary.nodeCount} elements{dom.css ? ' · CSS' : ''}{hasTokens ? ' · tokens' : ''}{summary.truncated ? ' · truncated' : ''}
         </span>
         {onRemove && (
           <button
@@ -98,6 +113,60 @@ export function CapturedDomPanel({ dom, onRemove }: CapturedDomPanelProps) {
                 >
                   {dom.css}
                 </pre>
+              )}
+            </div>
+          )}
+          {hasTokens && tokens && (
+            <div className="border-t border-accent-secondary/30">
+              <button
+                type="button"
+                onClick={() => setOpenTokens((v) => !v)}
+                aria-expanded={openTokens}
+                className="flex items-center gap-2 w-full px-3 py-2 text-left text-foreground/90 hover:text-foreground transition-colors"
+              >
+                <ChevronRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${openTokens ? 'rotate-90' : ''}`} />
+                <Pipette className="w-3.5 h-3.5 shrink-0 text-accent-highlight" />
+                <span className="font-medium">Design tokens</span>
+              </button>
+              {openTokens && (
+                <div className="px-3 pb-3 space-y-2" data-testid="captured-dom-tokens">
+                  {tokens.palette.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {tokens.palette.map((c, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1 rounded border border-border/50 px-1.5 py-0.5 font-mono text-[10px] text-foreground/80"
+                        >
+                          {/* Swatch colour is captured data (not a layout/brand token) → inline style is intentional. */}
+                          <span className="inline-block w-3 h-3 rounded-sm border border-border/40" style={{ background: c }} aria-hidden />
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {anchorRows.length > 0 && (
+                    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 font-mono text-[11px]">
+                      {anchorRows.map(([k, v]) => (
+                        <Fragment key={k}>
+                          <dt className="text-muted-foreground">{k}</dt>
+                          <dd className="text-accent-success/90 break-all">{v}</dd>
+                        </Fragment>
+                      ))}
+                    </dl>
+                  )}
+                  {tokens.fonts.length > 0 && (
+                    <div className="text-[11px] text-muted-foreground">
+                      Fonts: <span className="font-mono text-foreground/80 break-all">{tokens.fonts.join(', ')}</span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={copyTokens}
+                    className="text-[10px] text-accent-info hover:underline"
+                  >
+                    {copied ? 'Copied!' : 'Copy as JSON'}
+                  </button>
+                </div>
               )}
             </div>
           )}

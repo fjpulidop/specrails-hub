@@ -72,6 +72,46 @@ describe('CapturedDomPanel', () => {
     expect(screen.getByText(/Captured page · example\.com/)).toBeInTheDocument()
   })
 
+  const tokens = {
+    contractVersion: 1,
+    anchor: { color: 'rgb(17, 24, 39)', backgroundColor: 'rgb(59, 130, 246)', fontFamily: 'Inter, sans-serif', fontSize: '16px', borderRadius: '8px' },
+    byTag: { button: { color: 'rgb(255, 255, 255)' } },
+    palette: ['rgb(17, 24, 39)', 'rgb(59, 130, 246)'],
+    fonts: ['Inter, sans-serif'],
+  }
+
+  it('shows a tokens badge and the design-tokens section when designTokens are present', () => {
+    render(<CapturedDomPanel dom={makeDom({ designTokens: tokens })} />)
+    expect(screen.getByText(/· tokens/)).toBeInTheDocument()
+    // Collapsed by default.
+    fireEvent.click(screen.getByRole('button', { name: /Captured page/ }))
+    expect(screen.queryByTestId('captured-dom-tokens')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Design tokens/ }))
+    const block = screen.getByTestId('captured-dom-tokens')
+    expect(block.textContent).toContain('rgb(59, 130, 246)') // palette swatch + anchor value
+    expect(block.textContent).toContain('borderRadius')
+    expect(block.textContent).toContain('8px')
+    expect(block.textContent).toContain('Inter, sans-serif') // fonts row
+  })
+
+  it('copies the tokens as JSON', () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+    render(<CapturedDomPanel dom={makeDom({ designTokens: tokens })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Captured page/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Design tokens/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Copy as JSON/ }))
+    expect(writeText).toHaveBeenCalledOnce()
+    expect(writeText.mock.calls[0][0]).toContain('"contractVersion": 1')
+  })
+
+  it('renders no tokens section nor badge for a capture without designTokens', () => {
+    render(<CapturedDomPanel dom={makeDom()} />)
+    expect(screen.queryByText(/· tokens/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Captured page/ }))
+    expect(screen.queryByRole('button', { name: /Design tokens/ })).not.toBeInTheDocument()
+  })
+
   it('invokes onRemove when the remove button is clicked', () => {
     const onRemove = vi.fn()
     render(<CapturedDomPanel dom={makeDom()} onRemove={onRemove} />)

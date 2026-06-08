@@ -40,6 +40,41 @@ export interface CapturedNode {
   styles: Record<string, string>
 }
 
+/** A digest of computed design tokens for a single element. Values are raw
+ *  computed-style strings (e.g. "16px", "rgb(59, 130, 246)"); empty/default
+ *  values (transparent colour, 0px spacing, no border, "normal" line-height) are
+ *  omitted so the digest stays small. */
+export interface TokenSet {
+  color?: string
+  backgroundColor?: string
+  fontFamily?: string
+  fontSize?: string
+  fontWeight?: string
+  lineHeight?: string
+  letterSpacing?: string
+  padding?: string
+  margin?: string
+  border?: string
+  borderRadius?: string
+  boxShadow?: string
+}
+
+/** Exact design tokens derived from the selection's computed styles so a
+ *  "clone this UI" spec carries precise values instead of guesses. A
+ *  deterministic byproduct of the styles already collected — no extra CDP work. */
+export interface CapturedDesignTokens {
+  /** Schema version of this digest, for forward-compatible parsing. */
+  contractVersion: number
+  /** Tokens of the container/anchor element covering the selection. */
+  anchor: TokenSet
+  /** Deduped tokens for the most frequent tags inside the selection (cap ~8). */
+  byTag: Record<string, TokenSet>
+  /** Deduped non-transparent colours (text + background), cap ~12. */
+  palette: string[]
+  /** Deduped font-family stacks used inside the selection (cap ~6). */
+  fonts: string[]
+}
+
 /** The rich DOM payload captured for a selection. Serialised to JSON and stored
  *  as an attachment (mime application/json) so it flows through the existing
  *  attachment → prompt pipeline for both Quick and Explore. */
@@ -57,6 +92,9 @@ export interface CapturedDom {
   /** True when `css` was truncated at the size cap. */
   cssTruncated: boolean
   nodes: CapturedNode[]
+  /** Exact computed design tokens for the selection. Optional — absent on
+   *  captures taken before this feature, so old serialised JSON still parses. */
+  designTokens?: CapturedDesignTokens
   capturedAt: string
 }
 

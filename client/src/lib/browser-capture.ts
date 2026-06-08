@@ -35,6 +35,29 @@ export interface CapturedNode {
   styles: Record<string, string>
 }
 
+export interface TokenSet {
+  color?: string
+  backgroundColor?: string
+  fontFamily?: string
+  fontSize?: string
+  fontWeight?: string
+  lineHeight?: string
+  letterSpacing?: string
+  padding?: string
+  margin?: string
+  border?: string
+  borderRadius?: string
+  boxShadow?: string
+}
+
+export interface CapturedDesignTokens {
+  contractVersion: number
+  anchor: TokenSet
+  byTag: Record<string, TokenSet>
+  palette: string[]
+  fonts: string[]
+}
+
 export interface CapturedDom {
   url: string
   title: string
@@ -45,6 +68,9 @@ export interface CapturedDom {
   css: string
   cssTruncated: boolean
   nodes: CapturedNode[]
+  /** Exact computed design tokens for the selection (optional; absent on
+   *  captures taken before this feature). */
+  designTokens?: CapturedDesignTokens
   capturedAt: string
 }
 
