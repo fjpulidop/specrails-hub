@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.61.1](https://github.com/fjpulidop/specrails-hub/compare/v1.61.0...v1.61.1) (2026-06-08)
+
+
+### Bug Fixes
+
+* **desktop:** drop unsigned fsevents from bundled Playwright ([#343](https://github.com/fjpulidop/specrails-hub/issues/343)) ([44cc1f9](https://github.com/fjpulidop/specrails-hub/commit/44cc1f9a553b60fcf88e8713039e0ffd195803e0))
+
 ## [1.61.0](https://github.com/fjpulidop/specrails-hub/compare/v1.60.0...v1.61.0) (2026-06-08)
 
 
