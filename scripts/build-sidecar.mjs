@@ -128,12 +128,23 @@ if (typeof process !== "undefined" && process.pkg !== undefined) {
     var _hasPlaywright = false;
     try { _hasPlaywright = _Fs.existsSync(_pwAnchor); } catch (_e) { _hasPlaywright = false; }
     var _pwCache = {};
+    // Re-entrancy guard: createRequire() routes through the patched _Module._load,
+    // so without this the redirect would re-intercept the same "playwright" require
+    // and recurse infinitely ("Maximum call stack size exceeded"). While loading
+    // the real package, nested requires (playwright-core, submodules) fall through
+    // to the original loader, which resolves them relative to the real module dir.
+    var _pwLoading = false;
     function _loadRealPlaywright(req) {
       if (_pwCache[req]) return _pwCache[req];
       var realReq = _Module.createRequire(_pwAnchor);
-      var mod = realReq(req);
-      _pwCache[req] = mod;
-      return mod;
+      _pwLoading = true;
+      try {
+        var mod = realReq(req);
+        _pwCache[req] = mod;
+        return mod;
+      } finally {
+        _pwLoading = false;
+      }
     }
     var _origResolve = _Module._resolveFilename.bind(_Module);
     _Module._resolveFilename = function () {
@@ -158,7 +169,7 @@ if (typeof process !== "undefined" && process.pkg !== undefined) {
       if (typeof req === "string" && (req === "node-pty" || req.indexOf("node-pty/") === 0)) {
         return _loadRealNodePty();
       }
-      if (_hasPlaywright && typeof req === "string" && (req === "playwright" || req === "playwright-core" || req.indexOf("playwright/") === 0 || req.indexOf("playwright-core/") === 0)) {
+      if (!_pwLoading && _hasPlaywright && typeof req === "string" && (req === "playwright" || req === "playwright-core" || req.indexOf("playwright/") === 0 || req.indexOf("playwright-core/") === 0)) {
         return _loadRealPlaywright(req);
       }
       return _origLoad.apply(_Module, arguments);

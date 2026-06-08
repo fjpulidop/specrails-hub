@@ -15,9 +15,16 @@ env:
   # from browser"). Default OFF: when unset/false the desktop app falls back to a
   # Playwright-managed Chromium downloaded on first use (server/chromium-resolver.ts
   # returns null → Playwright's default). Flip to "true" to ship Chromium inside the
-  # app for an offline-first experience. macOS notarization of Chromium's nested
-  # frameworks/helpers is handled by scripts/sign-chromium-macos.sh (inside-out
-  # codesigning with hardened runtime + JIT entitlements), run before tauri build.
+  # app for an offline-first experience.
+  #
+  # Chromium is shipped as a single OPAQUE archive (chromium.tar.gz), NOT an unpacked
+  # tree: Tauri's resource bundler dereferences symlinks when copying bundle.resources
+  # (tauri-apps/tauri#13219), which mangles Chromium's versioned *.framework and breaks
+  # its code signature → macOS notarization rejects it. An archive copies as one regular
+  # file (nothing to dereference) and notarization treats its bytes as opaque data, so
+  # the app notarizes with NO Developer-ID signing of Chromium. The server extracts it
+  # on first use; the extracted Chromium keeps Google's ad-hoc signature (enough to run
+  # on arm64) and, being self-extracted, is not Gatekeeper-quarantined.
   BUNDLE_CHROMIUM: "true"
 
 jobs:
@@ -165,24 +172,32 @@ jobs:
         if: ${{ env.BUNDLE_CHROMIUM == 'true' }}
         run: |
           set -euo pipefail
-          # Install the Chromium build pinned to our Playwright version, then copy
-          # its platform folder into runtimes/chromium so the sign loop below covers
-          # its Mach-O binaries and server/chromium-resolver.ts can locate it at
-          # runtime (candidate: chromium/chrome-mac/Chromium.app/Contents/MacOS/Chromium).
+          # Install the Chromium build pinned to our Playwright version, then pack its
+          # platform folder into a single archive (runtimes/chromium/chromium.tar.gz).
+          # We ship an ARCHIVE, not an unpacked tree, because Tauri's resource copy
+          # dereferences Chromium's framework symlinks and breaks notarization (see the
+          # env comment above). tar -czf preserves the symlinks; the server restores
+          # them by extracting at first use (server/chromium-resolver.ts).
           npx playwright install chromium
           EXE=$(node -e "process.stdout.write(require('playwright').chromium.executablePath())")
           # Walk up to Playwright's platform folder (chrome-mac-arm64 / chrome-mac / …
           # depending on version) — the dir directly under chromium-<rev>.
           PLATDIR="$EXE"
           while [[ "$(basename "$(dirname "$PLATDIR")")" != chromium-* && "$PLATDIR" != "/" ]]; do PLATDIR=$(dirname "$PLATDIR"); done
+          # Sanity: a *.app with a MacOS binary exists before we archive it.
+          APP=$(find "$PLATDIR" -maxdepth 1 -name "*.app" -type d | head -1)
+          test -n "${APP}" && test -n "$(find "${APP}/Contents/MacOS" -type f | head -1)"
           rm -rf src-tauri/runtimes/chromium
           mkdir -p src-tauri/runtimes/chromium
-          cp -R "$PLATDIR" "src-tauri/runtimes/chromium/$(basename "$PLATDIR")"
-          # Verify a *.app with a MacOS binary landed (name varies: "Google Chrome for
-          # Testing.app" in current Playwright). The resolver discovers it at runtime.
-          APP=$(find src-tauri/runtimes/chromium -maxdepth 2 -name "*.app" -type d | head -1)
-          test -n "${APP}" && test -n "$(find "${APP}/Contents/MacOS" -type f | head -1)"
-          echo "Bundled Chromium from ${PLATDIR} (app: ${APP})"
+          # Archive the platform folder's CONTENTS (so it extracts back as chrome-mac-arm64/…).
+          tar -czf src-tauri/runtimes/chromium/chromium.tar.gz -C "$(dirname "$PLATDIR")" "$(basename "$PLATDIR")"
+          ARCHIVE=src-tauri/runtimes/chromium/chromium.tar.gz
+          test -f "$ARCHIVE"
+          echo "Archived Chromium from ${PLATDIR} → ${ARCHIVE} ($(du -h "$ARCHIVE" | cut -f1))"
+          # Verify the archive round-trips and the executable is discoverable.
+          VTMP=$(mktemp -d); tar -xf "$ARCHIVE" -C "$VTMP"
+          test -n "$(find "$VTMP" -maxdepth 2 -name "*.app" -type d | head -1)"
+          rm -rf "$VTMP"
 
       - name: Import codesign certificate
         uses: apple-actions/import-codesign-certs@v3
@@ -225,19 +240,9 @@ jobs:
           codesign --verify --strict --verbose=2 src-tauri/runtimes/node/bin/node
           codesign --verify --strict --verbose=2 src-tauri/runtimes/git/bin/git
 
-      - name: Sign bundled Chromium (macOS arm64)
-        if: ${{ env.BUNDLE_CHROMIUM == 'true' }}
-        env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${APPLE_SIGNING_IDENTITY:-}" ]]; then
-            echo "APPLE_SIGNING_IDENTITY not set — skipping Chromium signing."
-            exit 0
-          fi
-          APP=$(find "$PWD/src-tauri/runtimes/chromium" -maxdepth 2 -name "*.app" -type d | head -1)
-          if [[ -z "${APP}" ]]; then echo "No Chromium .app found to sign"; exit 1; fi
-          bash scripts/sign-chromium-macos.sh "$APP" "$APPLE_SIGNING_IDENTITY" "$PWD/src-tauri/entitlements.plist"
+      # Chromium is shipped as an opaque chromium.tar.gz archive (see "Assemble bundled
+      # Chromium" above), so it needs NO codesigning — notarization treats archive bytes
+      # as opaque data, and the extracted Chromium keeps Google's ad-hoc signature.
 
       - name: Build desktop app
         run: npm run build:desktop
@@ -381,14 +386,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Ship Chromium as a single archive (uniform with macOS — the server extracts
+          # it at first use). Windows has no framework symlinks, but archiving keeps one
+          # runtime code path. Windows 10+ ships bsdtar as `tar`.
           npx playwright install chromium
           EXE=$(node -e "process.stdout.write(require('playwright').chromium.executablePath().replace(/\\\\/g,'/'))")
           PLATDIR=$(dirname "$EXE")   # → chrome-win
+          test -n "$(find "$PLATDIR" -maxdepth 1 -name 'chrome.exe' | head -1)"
           rm -rf src-tauri/runtimes/chromium
           mkdir -p src-tauri/runtimes/chromium
-          cp -R "$PLATDIR" "src-tauri/runtimes/chromium/$(basename "$PLATDIR")"
-          test -n "$(find src-tauri/runtimes/chromium -name 'chrome.exe' | head -1)"
-          echo "Bundled Chromium from ${PLATDIR}"
+          tar -czf src-tauri/runtimes/chromium/chromium.tar.gz -C "$(dirname "$PLATDIR")" "$(basename "$PLATDIR")"
+          test -f src-tauri/runtimes/chromium/chromium.tar.gz
+          echo "Archived Chromium from ${PLATDIR}"
 
       - name: Build desktop app
         shell: bash
@@ -534,14 +543,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Ship Chromium as a single archive (uniform with macOS/x64 — the server
+          # extracts it at first use). Windows 10+ ships bsdtar as `tar`.
           npx playwright install chromium
           EXE=$(node -e "process.stdout.write(require('playwright').chromium.executablePath().replace(/\\\\/g,'/'))")
           PLATDIR=$(dirname "$EXE")   # → chrome-win
+          test -n "$(find "$PLATDIR" -maxdepth 1 -name 'chrome.exe' | head -1)"
           rm -rf src-tauri/runtimes/chromium
           mkdir -p src-tauri/runtimes/chromium
-          cp -R "$PLATDIR" "src-tauri/runtimes/chromium/$(basename "$PLATDIR")"
-          test -n "$(find src-tauri/runtimes/chromium -name 'chrome.exe' | head -1)"
-          echo "Bundled Chromium from ${PLATDIR}"
+          tar -czf src-tauri/runtimes/chromium/chromium.tar.gz -C "$(dirname "$PLATDIR")" "$(basename "$PLATDIR")"
+          test -f src-tauri/runtimes/chromium/chromium.tar.gz
+          echo "Archived Chromium from ${PLATDIR}"
 
       - name: Build desktop app
         shell: bash

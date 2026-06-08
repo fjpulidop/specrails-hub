@@ -17,7 +17,7 @@ import type {
   ElementProbe,
   ScreencastFrame,
 } from './browser-capture-types'
-import { resolveBundledChromiumPath } from './chromium-resolver'
+import { resolveBundledChromiumExecutable } from './chromium-resolver'
 
 function normalizeUrl(raw: string): string {
   const trimmed = raw.trim()
@@ -490,9 +490,14 @@ class PlaywrightContextHandle implements BrowserContextHandle {
  */
 export function createPlaywrightLauncher(): ContextLauncher {
   return async (opts) => {
+    // Use CommonJS require (NOT dynamic import()): in the packaged pkg sidecar the
+    // native-addon banner redirects require('playwright') to the externally-copied
+    // package via _Module._load. A dynamic import() goes through Node's ESM resolver
+    // instead, which can't find 'playwright' inside the /snapshot pkg vfs
+    // ("Cannot find package 'playwright'"). require keeps it on the patched path.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { chromium } = (await import('playwright')) as typeof import('playwright')
-    const executablePath = opts.executablePath ?? resolveBundledChromiumPath() ?? undefined
+    const { chromium } = require('playwright') as typeof import('playwright')
+    const executablePath = opts.executablePath ?? (await resolveBundledChromiumExecutable()) ?? undefined
     const context = await chromium.launchPersistentContext(opts.userDataDir, {
       headless: true,
       executablePath,
