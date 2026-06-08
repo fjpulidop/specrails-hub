@@ -142,12 +142,14 @@ if (process.env.BUNDLE_CHROMIUM === 'true') {
   bash('Bundle Chromium (macOS arm64)', `
     npx playwright install chromium
     EXE=$(node -e "process.stdout.write(require('playwright').chromium.executablePath())")
-    PLATDIR="\${EXE}"; for _ in 1 2 3 4; do PLATDIR=$(dirname "\${PLATDIR}"); done
+    PLATDIR="\${EXE}"
+    while [[ "$(basename "$(dirname "\${PLATDIR}")")" != chromium-* && "\${PLATDIR}" != "/" ]]; do PLATDIR=$(dirname "\${PLATDIR}"); done
     rm -rf src-tauri/runtimes/chromium
     mkdir -p src-tauri/runtimes/chromium
     cp -R "\${PLATDIR}" "src-tauri/runtimes/chromium/$(basename "\${PLATDIR}")"
-    test -e "src-tauri/runtimes/chromium/chrome-mac/Chromium.app/Contents/MacOS/Chromium"
-    echo "Bundled Chromium from \${PLATDIR}"
+    APP=$(find src-tauri/runtimes/chromium -maxdepth 2 -name "*.app" -type d | head -1)
+    test -n "\${APP}" && test -n "$(find "\${APP}/Contents/MacOS" -type f | head -1)"
+    echo "Bundled Chromium from \${PLATDIR} (app: \${APP})"
   `);
 }
 
