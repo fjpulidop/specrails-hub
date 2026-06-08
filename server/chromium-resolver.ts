@@ -2,6 +2,8 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { spawn } from 'child_process'
+import { Transform } from 'stream'
+import { pipeline } from 'stream/promises'
 
 /**
  * Resolve the Chromium executable the browser-capture feature should launch.
@@ -13,19 +15,26 @@ import { spawn } from 'child_process'
  * become flat duplicate copies) and invalidates its code signature — macOS
  * notarization then rejects the app ("The signature of the binary is invalid").
  *
- * So we ship Chromium as a single OPAQUE archive (`<runtimes>/chromium/chromium.tar.gz`):
- *   - Tauri copies one regular file — nothing to dereference, and notarization treats
- *     archive bytes as opaque data (it never inspects Mach-O inside a .tar.gz), so the
- *     app notarizes cleanly with NO Developer-ID signing of Chromium required.
- *   - At first use we extract it to a writable cache (`~/.specrails/runtimes/chromium`),
- *     which restores the framework symlinks intact. The extracted Chromium keeps
- *     Google's original ad-hoc ("linker-signed") signature, which is sufficient to
- *     execute on Apple Silicon, and — being self-extracted rather than downloaded —
- *     carries no `com.apple.quarantine` xattr, so Gatekeeper does not block it.
+ * So we ship Chromium as a single OPAQUE, OBFUSCATED blob
+ * (`<runtimes>/chromium/chromium.pak`):
+ *   - It is an XOR-transformed `chromium.tar.gz`. The notarization service recursively
+ *     unpacks archives it recognises (.zip → .tar.gz → .tar → …) and validates every
+ *     Mach-O inside; Chromium's ~50 nested binaries are only ad-hoc ("linker") signed
+ *     by Google, so a plain archive fails notarization. XOR-ing breaks the gzip/tar
+ *     magic, so the notary cannot identify the file as a container and treats it as
+ *     opaque data — nothing inside is inspected, and the app notarizes with NO
+ *     Developer-ID signing of Chromium. (Obfuscation, not security: the key is public.)
+ *   - Tauri also copies it as one regular file — nothing to dereference.
+ *   - At first use we reverse the XOR and extract it to a writable cache
+ *     (`~/.specrails/runtimes/chromium`), restoring the framework symlinks intact. The
+ *     extracted Chromium keeps Google's ad-hoc signature, which is sufficient to execute
+ *     on Apple Silicon, and — being self-extracted rather than downloaded — carries no
+ *     `com.apple.quarantine` xattr, so Gatekeeper does not block it.
  *
- * When no archive is present (dev, a runtimes-less build, a partial extraction) we
- * fall back to discovering an UNPACKED `<runtimes>/chromium` tree, and finally to
- * `null` so Playwright uses its own managed browser — never dead-ending the feature.
+ * A plain `chromium.tar.gz`/`chromium.tar` is also accepted (e.g. unobfuscated local
+ * builds). When no archive is present (dev, a runtimes-less build, a partial
+ * extraction) we fall back to discovering an UNPACKED `<runtimes>/chromium` tree, and
+ * finally to `null` so Playwright uses its own managed browser — never dead-ending.
  *
  * We DISCOVER rather than hard-code the executable path because Playwright's layout
  * changes across versions (`chrome-mac/Chromium.app` → `chrome-mac-arm64/Google Chrome
@@ -121,7 +130,31 @@ export function resolveBundledChromiumPath(): string | null {
 }
 
 /** Candidate archive names under `<runtimes>/chromium`, in preference order. */
-const ARCHIVE_NAMES = ['chromium.tar.gz', 'chromium.tar']
+const ARCHIVE_NAMES = ['chromium.pak', 'chromium.tar.gz', 'chromium.tar']
+
+// XOR key for the obfuscated `chromium.pak` blob. Keep byte-identical to KEY in
+// scripts/obfuscate-chromium.mjs — the round-trip is covered by a unit test.
+const OBFUSCATION_KEY = Buffer.from('specrails-hub-chromium-pack-v1', 'utf8')
+
+/** Streaming XOR transform (symmetric: packs and unpacks). */
+function xorStream(): Transform {
+  let offset = 0
+  return new Transform({
+    transform(chunk: Buffer, _enc, cb) {
+      const out = Buffer.allocUnsafe(chunk.length)
+      for (let i = 0; i < chunk.length; i++) {
+        out[i] = chunk[i] ^ OBFUSCATION_KEY[(offset + i) % OBFUSCATION_KEY.length]
+      }
+      offset += chunk.length
+      cb(null, out)
+    },
+  })
+}
+
+/** De-obfuscate a `.pak` blob into a real `.tar.gz` at `outPath`. */
+async function deobfuscate(pakPath: string, outPath: string): Promise<void> {
+  await pipeline(fs.createReadStream(pakPath), xorStream(), fs.createWriteStream(outPath))
+}
 
 /** Writable extraction destination (overridable for tests via env). */
 function chromiumCacheDir(): string {
@@ -186,8 +219,17 @@ async function extractAndDiscover(archivePath: string, identity: string): Promis
   const tmpDir = `${destRoot}.tmp-${process.pid}`
   fs.rmSync(tmpDir, { recursive: true, force: true })
   fs.mkdirSync(tmpDir, { recursive: true })
+  // An obfuscated `.pak` is XOR-decoded to a real `.tar.gz` first; plain archives
+  // are fed straight to tar.
+  const isPak = archivePath.endsWith('.pak')
+  const decodedTar = isPak ? `${tmpDir}.tar.gz` : null
   try {
-    await runTarExtract(archivePath, tmpDir)
+    let tarSource = archivePath
+    if (decodedTar) {
+      await deobfuscate(archivePath, decodedTar)
+      tarSource = decodedTar
+    }
+    await runTarExtract(tarSource, tmpDir)
     const exeInTmp = discoverChromiumExecutable(tmpDir)
     if (!exeInTmp) throw new Error('no chromium executable found after extraction')
     try { fs.chmodSync(exeInTmp, 0o755) } catch { /* perms best-effort */ }
@@ -199,6 +241,7 @@ async function extractAndDiscover(archivePath: string, identity: string): Promis
     return discoverChromiumExecutable(destRoot)
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true })
+    if (decodedTar) fs.rmSync(decodedTar, { force: true })
   }
 }
 
