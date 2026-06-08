@@ -158,7 +158,14 @@ describe('project-router browser endpoints', () => {
     expect(res.status).toBe(200)
     expect(res.body.screenshot.id).toBe('a1')
     expect(res.body.domAttachment.id).toBe('a2')
-    expect(browser.capture).toHaveBeenCalledWith('s1', { x: 1, y: 2, width: 30, height: 40 }, 'pend-1')
+    expect(browser.capture).toHaveBeenCalledWith('s1', { x: 1, y: 2, width: 30, height: 40 }, 'pend-1', { captureNetwork: true })
+  })
+
+  it('POST capture forwards captureNetwork:false to the manager', async () => {
+    const app = createApp(makeContext(db, browser))
+    const res = await request(app).post('/api/projects/proj-1/browser/sessions/s1/capture').send({ rect: { x: 1, y: 2, width: 30, height: 40 }, pendingSpecId: 'pend-1', captureNetwork: false })
+    expect(res.status).toBe(200)
+    expect(browser.capture).toHaveBeenCalledWith('s1', { x: 1, y: 2, width: 30, height: 40 }, 'pend-1', { captureNetwork: false })
   })
 
   it('POST capture returns 404 when capture yields null', async () => {

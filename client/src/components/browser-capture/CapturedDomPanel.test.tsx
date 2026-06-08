@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { fireEvent } from '@testing-library/react'
 import { render, screen } from '../../test-utils'
 import { CapturedDomPanel } from './CapturedDomPanel'
-import type { CapturedDom } from '../../lib/browser-capture'
+import type { CapturedDom, CapturedNetworkRequest } from '../../lib/browser-capture'
 
 function makeDom(over: Partial<CapturedDom> = {}): CapturedDom {
   return {
@@ -110,6 +110,32 @@ describe('CapturedDomPanel', () => {
     expect(screen.queryByText(/· tokens/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Captured page/ }))
     expect(screen.queryByRole('button', { name: /Design tokens/ })).not.toBeInTheDocument()
+  })
+
+  const netRequests: CapturedNetworkRequest[] = [
+    { method: 'GET', url: 'https://api.example.com/items?token=secret', status: 200, resourceType: 'Fetch', mimeType: 'application/json', requestBodyShape: null, responseShape: '{ items: [object] }', durationMs: 42, startedAt: 0 },
+    { method: 'POST', url: 'https://api.example.com/save', status: 500, resourceType: 'Fetch', mimeType: 'application/json', durationMs: 88, startedAt: 1 },
+  ]
+
+  it('shows a request-count badge and the network section', () => {
+    render(<CapturedDomPanel dom={makeDom({ networkRequests: netRequests })} />)
+    expect(screen.getByText(/· 2 req/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Captured page/ }))
+    expect(screen.queryByTestId('captured-dom-network')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Network · 2 requests/ }))
+    const net = screen.getByTestId('captured-dom-network')
+    expect(net.textContent).toContain('api.example.com/items') // query dropped from the label
+    expect(net.textContent).not.toContain('token=secret')
+    expect(net.textContent).toContain('{ items: [object] }')
+    expect(net.textContent).toContain('42ms')
+    expect(net.textContent).toContain('500')
+  })
+
+  it('renders no network section nor badge without networkRequests', () => {
+    render(<CapturedDomPanel dom={makeDom()} />)
+    expect(screen.queryByText(/req/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Captured page/ }))
+    expect(screen.queryByRole('button', { name: /Network ·/ })).not.toBeInTheDocument()
   })
 
   it('invokes onRemove when the remove button is clicked', () => {

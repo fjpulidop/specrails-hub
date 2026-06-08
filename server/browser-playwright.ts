@@ -18,6 +18,7 @@ import type {
   ScreencastFrame,
 } from './browser-capture-types'
 import { resolveBundledChromiumExecutable } from './chromium-resolver'
+import { NetworkRingBuffer, sketchJsonShape } from './browser-network'
 
 function normalizeUrl(raw: string): string {
   const trimmed = raw.trim()
@@ -31,6 +32,12 @@ class PlaywrightPageHandle implements BrowserPageHandle {
   // dependency on playwright's exported types leaking through the abstraction.
   private cdp: any = null
   private screencastHandler: ((frame: ScreencastFrame) => void) | null = null
+  // A dedicated, long-lived CDP session for the Network domain — kept SEPARATE
+  // from `cdp` (which is attached/detached around screencast) so request capture
+  // survives screencast toggles.
+  private netCdp: any = null
+  private netEnabled = false
+  private readonly netBuffer = new NetworkRingBuffer()
 
   constructor(private readonly page: any) {}
 
@@ -183,8 +190,69 @@ class PlaywrightPageHandle implements BrowserPageHandle {
     }
   }
 
+  async enableNetwork(): Promise<void> {
+    if (this.netEnabled) return
+    this.netEnabled = true
+    try {
+      const ctx = this.page.context()
+      this.netCdp = await ctx.newCDPSession(this.page)
+      await this.netCdp.send('Network.enable', { maxResourceBufferSize: 5_000_000, maxTotalBufferSize: 10_000_000 })
+      this.netCdp.on('Network.requestWillBeSent', (e: any) => {
+        try {
+          this.netBuffer.start(e.requestId, {
+            method: e.request?.method ?? 'GET',
+            url: e.request?.url ?? '',
+            resourceType: e.type ?? 'Other',
+            startedAt: Date.now(),
+            requestBodyShape: e.request?.postData ? sketchJsonShape(e.request.postData) : null,
+          })
+        } catch { /* never let a network event bubble */ }
+      })
+      this.netCdp.on('Network.responseReceived', (e: any) => {
+        try {
+          this.netBuffer.response(e.requestId, { status: e.response?.status ?? 0, mimeType: e.response?.mimeType ?? null })
+        } catch { /* ignore */ }
+      })
+      this.netCdp.on('Network.loadingFinished', (e: any) => {
+        try {
+          this.netBuffer.finish(e.requestId, { finishedAt: Date.now() })
+          // Sketch JSON response shapes only, body under a cap, fully guarded.
+          if (this.netBuffer.wantsBodySketch(e.requestId)) void this.sketchResponseBody(e.requestId)
+        } catch { /* ignore */ }
+      })
+      this.netCdp.on('Network.loadingFailed', (e: any) => {
+        try { this.netBuffer.fail(e.requestId, { finishedAt: Date.now(), errorText: e.errorText }) } catch { /* ignore */ }
+      })
+    } catch {
+      // Network capture is best-effort — a failure here never breaks the session.
+      this.netEnabled = false
+    }
+  }
+
+  private async sketchResponseBody(requestId: string): Promise<void> {
+    if (!this.netCdp) return
+    try {
+      const res = await this.netCdp.send('Network.getResponseBody', { requestId })
+      if (!res || res.base64Encoded) return // binary — skip
+      const body = typeof res.body === 'string' ? res.body : ''
+      const shape = sketchJsonShape(body)
+      if (shape) this.netBuffer.setResponseShape(requestId, shape)
+    } catch {
+      // The body may already be evicted / unavailable — degrade to no shape.
+    }
+  }
+
+  recentNetwork(sinceMs: number) {
+    return this.netBuffer.recent(sinceMs)
+  }
+
   async close(): Promise<void> {
     await this.stopScreencast()
+    if (this.netCdp) {
+      try { await this.netCdp.send('Network.disable') } catch { /* ignore */ }
+      try { await this.netCdp.detach() } catch { /* ignore */ }
+      this.netCdp = null
+    }
     try { await this.page.close() } catch { /* ignore */ }
   }
 }

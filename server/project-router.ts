@@ -3491,8 +3491,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       res.status(400).json({ error: 'pendingSpecId has an invalid format' })
       return
     }
+    const captureNetwork = req.body?.captureNetwork !== false
     try {
-      const result = await mgr.capture(req.params.id as string, rect, pendingSpecId)
+      const result = await mgr.capture(req.params.id as string, rect, pendingSpecId, { captureNetwork })
       if (!result) {
         res.status(404).json({ error: 'browser_session_not_found' })
         return

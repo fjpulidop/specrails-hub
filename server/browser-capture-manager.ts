@@ -31,6 +31,8 @@ function isTargetClosedError(err: unknown): boolean {
 const MAX_SESSIONS_PER_PROJECT = 4
 const DOM_HTML_BYTE_CAP = 100_000
 const LAST_URL_KEY = 'config.browser_last_url'
+/** How far back from capture time to include buffered network requests. */
+const NETWORK_WINDOW_MS = 30_000
 
 /** A minimal structural view of a `ws` WebSocket — keeps the manager decoupled
  *  from the `ws` package so tests can pass plain fakes. */
@@ -209,6 +211,11 @@ export class BrowserCaptureManager {
     }
     this.sessions.set(id, session)
 
+    // Start capturing the page's network requests before the first navigation so
+    // XHR/fetch made during page load are available at capture time. Best-effort:
+    // a handle that doesn't support it (or a failure) just yields no network data.
+    try { await page.enableNetwork?.() } catch { /* network capture is best-effort */ }
+
     const target = opts?.initialUrl?.trim() || this.getLastUrl() || 'about:blank'
     const result = await page.goto(target)
     session.url = result.url
@@ -326,7 +333,7 @@ export class BrowserCaptureManager {
 
   // ─── Capture: screenshot + rich DOM → attachments ───────────────────────────
 
-  async capture(sessionId: string, rect: CaptureRect, pendingSpecId: string): Promise<CaptureResult | null> {
+  async capture(sessionId: string, rect: CaptureRect, pendingSpecId: string, opts?: { captureNetwork?: boolean }): Promise<CaptureResult | null> {
     if (this.disposed) return null
     const s = this.getSession(sessionId)
     if (!s) return null
@@ -352,6 +359,15 @@ export class BrowserCaptureManager {
         return null
       }
       throw err
+    }
+
+    // Snapshot the recent network requests into the DOM payload (rides the same
+    // JSON attachment → spec prompt). ON unless the spec explicitly disabled it.
+    if (opts?.captureNetwork !== false) {
+      try {
+        const reqs = s.page.recentNetwork?.(this.now() - NETWORK_WINDOW_MS) ?? []
+        if (reqs.length > 0) dom.networkRequests = reqs
+      } catch { /* network snapshot is best-effort */ }
     }
 
     const stamp = this.now()

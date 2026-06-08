@@ -92,7 +92,15 @@ describe('browser-capture lib', () => {
     })
 
     it('summarises a captured DOM', () => {
-      expect(domSummary(dom)).toEqual({ nodeCount: 1, htmlBytes: dom.html.length, truncated: true })
+      expect(domSummary(dom)).toEqual({ nodeCount: 1, htmlBytes: dom.html.length, truncated: true, networkCount: 0 })
+    })
+
+    it('counts captured network requests', () => {
+      const withNet = { ...dom, networkRequests: [
+        { method: 'GET', url: 'https://api.x/a', status: 200, resourceType: 'Fetch', mimeType: 'application/json', durationMs: 1, startedAt: 0 },
+        { method: 'POST', url: 'https://api.x/b', status: 201, resourceType: 'Fetch', mimeType: 'application/json', durationMs: 2, startedAt: 1 },
+      ] }
+      expect(domSummary(withNet).networkCount).toBe(2)
     })
   })
 

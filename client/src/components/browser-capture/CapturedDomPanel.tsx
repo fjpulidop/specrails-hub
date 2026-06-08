@@ -1,6 +1,16 @@
 import { Fragment, useMemo, useState } from 'react'
-import { ChevronRight, Code2, Palette, Pipette, X } from 'lucide-react'
+import { ChevronRight, Code2, Palette, Pipette, Network, X } from 'lucide-react'
 import { domSummary, type CapturedDom } from '../../lib/browser-capture'
+
+/** Short, readable path for a captured request URL (host + pathname, query dropped). */
+function reqLabel(url: string): string {
+  try {
+    const u = new URL(url)
+    return u.host + u.pathname
+  } catch {
+    return url
+  }
+}
 import { tokenizeHtml, HL_CLASS } from '../../lib/html-highlight'
 
 interface CapturedDomPanelProps {
@@ -37,11 +47,14 @@ export function CapturedDomPanel({ dom, onRemove }: CapturedDomPanelProps) {
   const [openPanel, setOpenPanel] = useState(false)
   const [openCss, setOpenCss] = useState(false)
   const [openTokens, setOpenTokens] = useState(false)
+  const [openNet, setOpenNet] = useState(false)
   const [copied, setCopied] = useState(false)
   const summary = domSummary(dom)
   const tokens = dom.designTokens
   const anchorRows = tokens ? Object.entries(tokens.anchor) : []
   const hasTokens = !!tokens && (tokens.palette.length > 0 || anchorRows.length > 0)
+  const requests = dom.networkRequests ?? []
+  const hasNetwork = requests.length > 0
   const host = (() => {
     try { return new URL(dom.url).host } catch { return dom.url }
   })()
@@ -70,7 +83,7 @@ export function CapturedDomPanel({ dom, onRemove }: CapturedDomPanelProps) {
           <span className="truncate font-medium">Captured page · {dom.title || host}</span>
         </button>
         <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
-          {summary.nodeCount} elements{dom.css ? ' · CSS' : ''}{hasTokens ? ' · tokens' : ''}{summary.truncated ? ' · truncated' : ''}
+          {summary.nodeCount} elements{dom.css ? ' · CSS' : ''}{hasTokens ? ' · tokens' : ''}{hasNetwork ? ` · ${requests.length} req` : ''}{summary.truncated ? ' · truncated' : ''}
         </span>
         {onRemove && (
           <button
@@ -166,6 +179,39 @@ export function CapturedDomPanel({ dom, onRemove }: CapturedDomPanelProps) {
                   >
                     {copied ? 'Copied!' : 'Copy as JSON'}
                   </button>
+                </div>
+              )}
+            </div>
+          )}
+          {hasNetwork && (
+            <div className="border-t border-accent-secondary/30">
+              <button
+                type="button"
+                onClick={() => setOpenNet((v) => !v)}
+                aria-expanded={openNet}
+                className="flex items-center gap-2 w-full px-3 py-2 text-left text-foreground/90 hover:text-foreground transition-colors"
+              >
+                <ChevronRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${openNet ? 'rotate-90' : ''}`} />
+                <Network className="w-3.5 h-3.5 shrink-0 text-accent-info" />
+                <span className="font-medium">Network · {requests.length} request{requests.length === 1 ? '' : 's'}</span>
+              </button>
+              {openNet && (
+                <div className="max-h-64 overflow-auto px-3 pb-3 space-y-1.5" data-testid="captured-dom-network">
+                  {requests.map((r, i) => (
+                    <div key={i} className="font-mono text-[11px] leading-snug">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-accent-highlight shrink-0">{r.method}</span>
+                        <span className={`shrink-0 tabular-nums ${r.failed ? 'text-destructive' : (r.status ?? 0) >= 400 ? 'text-accent-warning' : 'text-accent-success/90'}`}>
+                          {r.failed ? 'ERR' : r.status ?? '…'}
+                        </span>
+                        <span className="truncate flex-1 text-foreground/80" title={r.url}>{reqLabel(r.url)}</span>
+                        {r.durationMs != null && <span className="shrink-0 text-muted-foreground tabular-nums">{r.durationMs}ms</span>}
+                      </div>
+                      {r.responseShape && (
+                        <div className="pl-4 text-accent-info/80 break-all whitespace-pre-wrap">→ {r.responseShape}</div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

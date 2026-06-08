@@ -7,6 +7,7 @@ import {
   type BrowserContextHandle,
   type BrowserPageHandle,
   type CapturedDom,
+  type CapturedNetworkRequest,
   type ContextLauncher,
   type ScreencastFrame,
 } from './browser-capture-types'
@@ -38,6 +39,8 @@ class FakePage implements BrowserPageHandle {
   screencasting = false
   closed = false
   nextNav: { url: string; title: string } | null = null
+  enabledNetwork = false
+  network: CapturedNetworkRequest[] = []
 
   private nav(): { url: string; title: string } {
     if (this.nextNav) { this.url = this.nextNav.url; this.title = this.nextNav.title }
@@ -56,6 +59,8 @@ class FakePage implements BrowserPageHandle {
   async screenshotClip() { return Buffer.from('PNGDATA') }
   async extractDom() { return makeDom() }
   async probeElementAt(point: { x: number; y: number }) { return { rect: { x: point.x, y: point.y, width: 50, height: 20 }, tag: 'div' } }
+  async enableNetwork() { this.enabledNetwork = true }
+  recentNetwork() { return this.network }
   async close() { this.closed = true }
   emitFrame(data: Buffer) { this.frameCb?.({ data, width: 1280, height: 800 }) }
 }
@@ -274,6 +279,29 @@ describe('BrowserCaptureManager', () => {
     expect(attachments.uploads).toHaveLength(2)
     expect(attachments.uploads.every((u) => u.ticketKey === 'pending-1')).toBe(true)
     expect(attachments.uploads.map((u) => u.mime)).toEqual(['image/png', 'application/json'])
+  })
+
+  it('enables network capture on session create and folds requests into the DOM', async () => {
+    const { mgr, ctx } = makeManager({ db })
+    const meta = await mgr.create()
+    expect(ctx.pages[0].enabledNetwork).toBe(true)
+    ctx.pages[0].network = [
+      { method: 'GET', url: 'https://api.x/items', status: 200, resourceType: 'Fetch', mimeType: 'application/json', requestBodyShape: null, responseShape: '{ items: [object] }', durationMs: 42, startedAt: 0 },
+    ]
+    const result = await mgr.capture(meta.id, { x: 0, y: 0, width: 10, height: 10 }, 'pend')
+    expect(result!.dom.networkRequests).toHaveLength(1)
+    expect(result!.dom.networkRequests![0].url).toBe('https://api.x/items')
+    expect(result!.dom.networkRequests![0].responseShape).toBe('{ items: [object] }')
+  })
+
+  it('omits network requests when captureNetwork is false', async () => {
+    const { mgr, ctx } = makeManager({ db })
+    const meta = await mgr.create()
+    ctx.pages[0].network = [
+      { method: 'GET', url: 'https://api.x/items', status: 200, resourceType: 'Fetch', mimeType: 'application/json', durationMs: 1, startedAt: 0 } as CapturedNetworkRequest,
+    ]
+    const result = await mgr.capture(meta.id, { x: 0, y: 0, width: 10, height: 10 }, 'pend', { captureNetwork: false })
+    expect(result!.dom.networkRequests).toBeUndefined()
   })
 
   it('capture returns null for an unknown session', async () => {

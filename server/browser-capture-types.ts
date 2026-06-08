@@ -75,6 +75,27 @@ export interface CapturedDesignTokens {
   fonts: string[]
 }
 
+/** One XHR/fetch (or document) request the page made around capture time. Bodies
+ *  are NEVER stored raw — only a structural shape sketch (key names), so captured
+ *  pages can't leak tokens/PII into a ticket. */
+export interface CapturedNetworkRequest {
+  method: string
+  url: string
+  status: number | null
+  /** CDP resource type (e.g. "Fetch", "XHR", "Document"). */
+  resourceType: string
+  mimeType: string | null
+  /** Sketch of the request body shape (JSON key names), never raw values. */
+  requestBodyShape?: string | null
+  /** Sketch of the response JSON shape (top-level keys / array element keys). */
+  responseShape?: string | null
+  durationMs: number | null
+  /** Wall-clock ms when the request started (for windowed capture). */
+  startedAt: number
+  failed?: boolean
+  errorText?: string
+}
+
 /** The rich DOM payload captured for a selection. Serialised to JSON and stored
  *  as an attachment (mime application/json) so it flows through the existing
  *  attachment → prompt pipeline for both Quick and Explore. */
@@ -95,6 +116,9 @@ export interface CapturedDom {
   /** Exact computed design tokens for the selection. Optional — absent on
    *  captures taken before this feature, so old serialised JSON still parses. */
   designTokens?: CapturedDesignTokens
+  /** XHR/fetch requests the page made around capture time. Optional — absent on
+   *  old captures or when network capture is disabled for the spec. */
+  networkRequests?: CapturedNetworkRequest[]
   capturedAt: string
 }
 
@@ -138,6 +162,12 @@ export interface BrowserPageHandle {
   extractDom(rect: CaptureRect, htmlByteCap: number): Promise<CapturedDom>
   /** The element at a viewport point (for hover-to-select highlighting). */
   probeElementAt(point: { x: number; y: number }): Promise<ElementProbe | null>
+  /** Begin capturing the page's network requests (best-effort, idempotent).
+   *  Optional — a handle that doesn't implement it simply captures no network. */
+  enableNetwork?(): Promise<void>
+  /** Buffered network requests that started at/after `sinceMs` (newest-first,
+   *  capped). Optional — returns nothing when unimplemented. */
+  recentNetwork?(sinceMs: number): CapturedNetworkRequest[]
   close(): Promise<void>
 }
 

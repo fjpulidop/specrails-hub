@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, ArrowRight, RotateCw, X, Crop, Loader2, Globe, AlertTriangle, Monitor, Tablet, Smartphone, Maximize2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, RotateCw, X, Crop, Loader2, Globe, AlertTriangle, Monitor, Tablet, Smartphone, Maximize2, Network } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { useBrowserCaptureSession } from './useBrowserCaptureSession'
@@ -63,6 +63,9 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
   const [box, setBox] = useState<SelectionBox | null>(null)
   const [capturing, setCapturing] = useState(false)
   const [preset, setPreset] = useState<ViewportPreset>('fit')
+  // Capture the page's XHR/fetch requests alongside the selection (ON by default;
+  // a user can disable it for a privacy-sensitive page).
+  const [captureNetwork, setCaptureNetwork] = useState(true)
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const pendingMoveRef = useRef<{ x: number; y: number } | null>(null)
@@ -192,7 +195,7 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
   const runCapture = useCallback(async (rect: CaptureRect) => {
     setCapturing(true)
     try {
-      const result = await session.capture(rect, pendingSpecId)
+      const result = await session.capture(rect, pendingSpecId, { captureNetwork })
       onCaptured(result)
       toast.success('Captured page selection')
       onClose()
@@ -204,7 +207,7 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
       setBox(null)
       session.clearHover()
     }
-  }, [session, pendingSpecId, onCaptured, onClose])
+  }, [session, pendingSpecId, captureNetwork, onCaptured, onClose])
 
   const onSelectDown = useCallback((e: React.PointerEvent) => {
     ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
@@ -317,6 +320,17 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          aria-label="Capture network requests"
+          aria-pressed={captureNetwork}
+          title={captureNetwork ? 'Capturing the page’s network requests (click to disable)' : 'Network capture off (click to enable)'}
+          onClick={() => setCaptureNetwork((v) => !v)}
+          className={`hidden md:inline-flex items-center gap-1 h-7 px-2 rounded-md border text-[11px] shrink-0 transition-colors ${captureNetwork ? 'border-accent-info/40 bg-accent-info/10 text-accent-info' : 'border-border/50 text-muted-foreground hover:text-foreground hover:bg-card/60'}`}
+        >
+          <Network className="w-3.5 h-3.5" />
+          Network
+        </button>
         <Button
           size="sm"
           variant={selecting ? 'default' : 'secondary'}

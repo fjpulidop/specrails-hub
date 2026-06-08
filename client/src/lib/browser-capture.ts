@@ -58,6 +58,20 @@ export interface CapturedDesignTokens {
   fonts: string[]
 }
 
+export interface CapturedNetworkRequest {
+  method: string
+  url: string
+  status: number | null
+  resourceType: string
+  mimeType: string | null
+  requestBodyShape?: string | null
+  responseShape?: string | null
+  durationMs: number | null
+  startedAt: number
+  failed?: boolean
+  errorText?: string
+}
+
 export interface CapturedDom {
   url: string
   title: string
@@ -71,6 +85,8 @@ export interface CapturedDom {
   /** Exact computed design tokens for the selection (optional; absent on
    *  captures taken before this feature). */
   designTokens?: CapturedDesignTokens
+  /** XHR/fetch requests the page made around capture time (optional). */
+  networkRequests?: CapturedNetworkRequest[]
   capturedAt: string
 }
 
@@ -135,11 +151,12 @@ export async function captureBrowserRegion(
   sessionId: string,
   rect: CaptureRect,
   pendingSpecId: string,
+  opts?: { captureNetwork?: boolean },
 ): Promise<CaptureResult> {
   const res = await fetch(`${getApiBase()}/browser/sessions/${sessionId}/capture`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rect, pendingSpecId }),
+    body: JSON.stringify({ rect, pendingSpecId, captureNetwork: opts?.captureNetwork ?? true }),
   })
   if (!res.ok) throw new Error(`Capture failed (${res.status})`)
   return (await res.json()) as CaptureResult
@@ -238,10 +255,11 @@ export function isUsableSelection(rect: CaptureRect, minPx = 8): boolean {
 }
 
 /** Count populated (non-empty) facets of a captured DOM for the panel badge. */
-export function domSummary(dom: CapturedDom): { nodeCount: number; htmlBytes: number; truncated: boolean } {
+export function domSummary(dom: CapturedDom): { nodeCount: number; htmlBytes: number; truncated: boolean; networkCount: number } {
   return {
     nodeCount: dom.nodes.length,
     htmlBytes: dom.html.length,
     truncated: dom.htmlTruncated,
+    networkCount: dom.networkRequests?.length ?? 0,
   }
 }

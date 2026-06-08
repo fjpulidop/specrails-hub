@@ -29,7 +29,7 @@ export interface UseBrowserCaptureSession extends BrowserSessionState {
   canvasRef: React.RefObject<HTMLCanvasElement | null>
   forwardInput: (e: BrowserInputEvent) => void
   navigate: (action: 'goto' | 'back' | 'forward' | 'reload', url?: string) => Promise<void>
-  capture: (rect: CaptureRect, pendingSpecId: string) => Promise<CaptureResult>
+  capture: (rect: CaptureRect, pendingSpecId: string, opts?: { captureNetwork?: boolean }) => Promise<CaptureResult>
   setViewport: (width: number, height: number) => void
   /** Ask the server which element is at a viewport point (hover-to-select). */
   probe: (point: { x: number; y: number }) => void
@@ -181,10 +181,10 @@ export function useBrowserCaptureSession(opts: {
     }
   }, [])
 
-  const capture = useCallback(async (rect: CaptureRect, pendingSpecId: string): Promise<CaptureResult> => {
+  const capture = useCallback(async (rect: CaptureRect, pendingSpecId: string, opts?: { captureNetwork?: boolean }): Promise<CaptureResult> => {
     const sid = sessionIdRef.current
     if (!sid) throw new Error('No active browser session')
-    return captureBrowserRegion(sid, rect, pendingSpecId)
+    return captureBrowserRegion(sid, rect, pendingSpecId, opts)
   }, [])
 
   const setViewport = useCallback((width: number, height: number) => {
