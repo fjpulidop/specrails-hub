@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.61.0](https://github.com/fjpulidop/specrails-hub/compare/v1.60.0...v1.61.0) (2026-06-08)
+
+
+### Features
+
+* **add-spec:** create specs from an embedded browser ([#341](https://github.com/fjpulidop/specrails-hub/issues/341)) ([9f5b052](https://github.com/fjpulidop/specrails-hub/commit/9f5b0522e7107a870ece0b139d30172ad937f270))
+
 ## [1.60.0](https://github.com/fjpulidop/specrails-hub/compare/v1.59.0...v1.60.0) (2026-06-07)
 
 
