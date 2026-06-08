@@ -15,10 +15,10 @@ env:
   # from browser"). Default OFF: when unset/false the desktop app falls back to a
   # Playwright-managed Chromium downloaded on first use (server/chromium-resolver.ts
   # returns null → Playwright's default). Flip to "true" to ship Chromium inside the
-  # app for an offline-first experience — but VALIDATE macOS notarization first: the
-  # nested Chromium.app frameworks/helpers may need inside-out codesigning beyond the
-  # existing per-Mach-O loop, and a notarization failure fails the whole macOS release.
-  BUNDLE_CHROMIUM: "false"
+  # app for an offline-first experience. macOS notarization of Chromium's nested
+  # frameworks/helpers is handled by scripts/sign-chromium-macos.sh (inside-out
+  # codesigning with hardened runtime + JIT entitlements), run before tauri build.
+  BUNDLE_CHROMIUM: "true"
 
 jobs:
   build-macos:
@@ -171,12 +171,18 @@ jobs:
           # runtime (candidate: chromium/chrome-mac/Chromium.app/Contents/MacOS/Chromium).
           npx playwright install chromium
           EXE=$(node -e "process.stdout.write(require('playwright').chromium.executablePath())")
-          PLATDIR="$EXE"; for _ in 1 2 3 4; do PLATDIR=$(dirname "$PLATDIR"); done   # → chrome-mac
+          # Walk up to Playwright's platform folder (chrome-mac-arm64 / chrome-mac / …
+          # depending on version) — the dir directly under chromium-<rev>.
+          PLATDIR="$EXE"
+          while [[ "$(basename "$(dirname "$PLATDIR")")" != chromium-* && "$PLATDIR" != "/" ]]; do PLATDIR=$(dirname "$PLATDIR"); done
           rm -rf src-tauri/runtimes/chromium
           mkdir -p src-tauri/runtimes/chromium
           cp -R "$PLATDIR" "src-tauri/runtimes/chromium/$(basename "$PLATDIR")"
-          test -e "src-tauri/runtimes/chromium/chrome-mac/Chromium.app/Contents/MacOS/Chromium"
-          echo "Bundled Chromium from ${PLATDIR}"
+          # Verify a *.app with a MacOS binary landed (name varies: "Google Chrome for
+          # Testing.app" in current Playwright). The resolver discovers it at runtime.
+          APP=$(find src-tauri/runtimes/chromium -maxdepth 2 -name "*.app" -type d | head -1)
+          test -n "${APP}" && test -n "$(find "${APP}/Contents/MacOS" -type f | head -1)"
+          echo "Bundled Chromium from ${PLATDIR} (app: ${APP})"
 
       - name: Import codesign certificate
         uses: apple-actions/import-codesign-certs@v3
@@ -205,6 +211,8 @@ jobs:
           # Mach-O under runtimes/ with hardened runtime + the JIT/library-validation
           # entitlements node's V8 needs. Signatures embed in the Mach-O and survive
           # Tauri's copy into the .app, so the assembled bundle notarizes cleanly.
+          # Chromium is excluded here — it is a deep app bundle that must be signed
+          # inside-out as bundles (see the dedicated step below), not as loose files.
           count=0
           while IFS= read -r f; do
             if file "$f" | grep -q "Mach-O"; then
@@ -212,10 +220,24 @@ jobs:
                 --sign "$APPLE_SIGNING_IDENTITY" "$f"
               count=$((count+1))
             fi
-          done < <(find src-tauri/runtimes -type f)
-          echo "Signed ${count} Mach-O binaries under src-tauri/runtimes/"
+          done < <(find src-tauri/runtimes -type f -not -path '*/chromium/*')
+          echo "Signed ${count} Mach-O binaries under src-tauri/runtimes/ (excluding chromium)"
           codesign --verify --strict --verbose=2 src-tauri/runtimes/node/bin/node
           codesign --verify --strict --verbose=2 src-tauri/runtimes/git/bin/git
+
+      - name: Sign bundled Chromium (macOS arm64)
+        if: ${{ env.BUNDLE_CHROMIUM == 'true' }}
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${APPLE_SIGNING_IDENTITY:-}" ]]; then
+            echo "APPLE_SIGNING_IDENTITY not set — skipping Chromium signing."
+            exit 0
+          fi
+          APP=$(find "$PWD/src-tauri/runtimes/chromium" -maxdepth 2 -name "*.app" -type d | head -1)
+          if [[ -z "${APP}" ]]; then echo "No Chromium .app found to sign"; exit 1; fi
+          bash scripts/sign-chromium-macos.sh "$APP" "$APPLE_SIGNING_IDENTITY" "$PWD/src-tauri/entitlements.plist"
 
       - name: Build desktop app
         run: npm run build:desktop
@@ -365,7 +387,7 @@ jobs:
           rm -rf src-tauri/runtimes/chromium
           mkdir -p src-tauri/runtimes/chromium
           cp -R "$PLATDIR" "src-tauri/runtimes/chromium/$(basename "$PLATDIR")"
-          test -e "src-tauri/runtimes/chromium/chrome-win/chrome.exe"
+          test -n "$(find src-tauri/runtimes/chromium -name 'chrome.exe' | head -1)"
           echo "Bundled Chromium from ${PLATDIR}"
 
       - name: Build desktop app
@@ -518,7 +540,7 @@ jobs:
           rm -rf src-tauri/runtimes/chromium
           mkdir -p src-tauri/runtimes/chromium
           cp -R "$PLATDIR" "src-tauri/runtimes/chromium/$(basename "$PLATDIR")"
-          test -e "src-tauri/runtimes/chromium/chrome-win/chrome.exe"
+          test -n "$(find src-tauri/runtimes/chromium -name 'chrome.exe' | head -1)"
           echo "Bundled Chromium from ${PLATDIR}"
 
       - name: Build desktop app

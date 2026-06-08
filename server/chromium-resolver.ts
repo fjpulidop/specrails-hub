@@ -5,52 +5,85 @@ import path from 'path'
  * Resolve the Chromium executable the browser-capture feature should launch.
  *
  * Mirrors the bundled-runtime resolution used by `path-resolver.ts` for node/git:
- * in desktop mode (`SPECRAILS_IS_DESKTOP=1`) we existence-gate a bundled Chromium
- * shipped under `<runtimes>/chromium/` (declared in tauri.conf.json via the
- * `runtimes/**` glob, codesigned in CI before `tauri build`). When the bundled
- * binary is absent (dev, a runtimes-less build, or a partial extraction) we return
- * `null` so Playwright falls back to its own managed Chromium download — never
- * dead-ending the feature.
+ * in desktop mode (`SPECRAILS_IS_DESKTOP=1`) we DISCOVER a bundled Chromium shipped
+ * under `<runtimes>/chromium/` (declared in tauri.conf.json via the `runtimes/**`
+ * glob, codesigned in CI before `tauri build`). When no bundle is present (dev, a
+ * runtimes-less build, or a partial extraction) we return `null` so Playwright
+ * falls back to its own managed browser — never dead-ending the feature.
  *
- * Layout (matches the CI assembly + smoke test):
- *   macOS/Linux: runtimes/chromium/chrome-<plat>/Chromium.app/Contents/MacOS/Chromium
- *                or runtimes/chromium/bin/chromium
- *   Windows:     runtimes/chromium/chrome-win/chrome.exe
- *                or runtimes/chromium/bin/chromium.exe
- *
- * Multiple candidate paths are probed so the exact Playwright tarball layout
- * (which nests under chrome-<platform>/) and a flattened bin/ layout both work.
+ * We DISCOVER rather than hard-code the path because Playwright's layout changes
+ * across versions (e.g. `chrome-mac/Chromium.app` → `chrome-mac-arm64/Google Chrome
+ * for Testing.app`, `chrome-win/chrome.exe`, `chrome-linux/chrome`). The CI assembly
+ * copies Playwright's platform folder verbatim under `<runtimes>/chromium/`; this
+ * walks that tree to find the real executable.
  */
-function fileExists(p: string): boolean {
-  try {
-    return fs.statSync(p).isFile()
-  } catch {
-    return false
-  }
+
+const MAX_DEPTH = 6
+
+function isFile(p: string): boolean {
+  try { return fs.statSync(p).isFile() } catch { return false }
 }
 
-export function bundledChromiumCandidates(runtimesPath: string): string[] {
-  const root = path.join(runtimesPath, 'chromium')
+/** Depth-bounded search for the first file whose basename satisfies `match`. */
+function findFirstFile(root: string, match: (name: string) => boolean, depth = 0): string | null {
+  if (depth > MAX_DEPTH) return null
+  let entries: fs.Dirent[]
+  try { entries = fs.readdirSync(root, { withFileTypes: true }) } catch { return null }
+  // Files first (cheap), then recurse into dirs.
+  for (const e of entries) {
+    if (e.isFile() && match(e.name)) return path.join(root, e.name)
+  }
+  for (const e of entries) {
+    if (e.isDirectory()) {
+      const hit = findFirstFile(path.join(root, e.name), match, depth + 1)
+      if (hit) return hit
+    }
+  }
+  return null
+}
+
+/** On macOS: locate the main executable inside the first `*.app` under `root`. */
+function findMacAppExecutable(root: string, depth = 0): string | null {
+  if (depth > MAX_DEPTH) return null
+  let entries: fs.Dirent[]
+  try { entries = fs.readdirSync(root, { withFileTypes: true }) } catch { return null }
+  for (const e of entries) {
+    if (e.isDirectory() && e.name.endsWith('.app')) {
+      const macosDir = path.join(root, e.name, 'Contents', 'MacOS')
+      // The main binary is conventionally named like the app (sans ".app");
+      // fall back to the first regular file in MacOS/.
+      const preferred = path.join(macosDir, e.name.slice(0, -'.app'.length))
+      if (isFile(preferred)) return preferred
+      try {
+        for (const inner of fs.readdirSync(macosDir, { withFileTypes: true })) {
+          if (inner.isFile()) return path.join(macosDir, inner.name)
+        }
+      } catch { /* keep searching */ }
+    }
+  }
+  for (const e of entries) {
+    if (e.isDirectory() && !e.name.endsWith('.app')) {
+      const hit = findMacAppExecutable(path.join(root, e.name), depth + 1)
+      if (hit) return hit
+    }
+  }
+  return null
+}
+
+/** Find the bundled Chromium executable under `<chromiumRoot>`, or null. */
+export function discoverChromiumExecutable(chromiumRoot: string): string | null {
+  if (!fs.existsSync(chromiumRoot)) return null
   if (process.platform === 'win32') {
-    return [
-      path.join(root, 'bin', 'chromium.exe'),
-      path.join(root, 'chrome-win', 'chrome.exe'),
-      path.join(root, 'chrome.exe'),
-    ]
+    return findFirstFile(chromiumRoot, (n) => n === 'chrome.exe' || n === 'chromium.exe')
   }
   if (process.platform === 'darwin') {
-    return [
-      path.join(root, 'bin', 'chromium'),
-      path.join(root, 'chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
-      path.join(root, 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
-    ]
+    return (
+      findMacAppExecutable(chromiumRoot) ??
+      findFirstFile(chromiumRoot, (n) => n === 'Chromium' || n === 'chromium' || n === 'chrome')
+    )
   }
   // linux
-  return [
-    path.join(root, 'bin', 'chromium'),
-    path.join(root, 'chrome-linux', 'chrome'),
-    path.join(root, 'chrome'),
-  ]
+  return findFirstFile(chromiumRoot, (n) => n === 'chrome' || n === 'chromium' || n === 'chrome-wrapper')
 }
 
 /**
@@ -61,8 +94,9 @@ export function resolveBundledChromiumPath(): string | null {
   if (process.env.SPECRAILS_IS_DESKTOP !== '1') return null
   const runtimesPath = process.env.SPECRAILS_BUNDLED_RUNTIMES_PATH
   if (!runtimesPath) return null
-  for (const candidate of bundledChromiumCandidates(runtimesPath)) {
-    if (fileExists(candidate)) return candidate
+  try {
+    return discoverChromiumExecutable(path.join(runtimesPath, 'chromium'))
+  } catch {
+    return null
   }
-  return null
 }

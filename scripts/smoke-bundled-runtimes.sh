@@ -53,14 +53,14 @@ rm -rf "${T}"
 # present (it is bundled solely when BUNDLE_CHROMIUM=true in the release workflow);
 # otherwise the feature falls back to a Playwright-managed Chromium at runtime.
 CHROMIUM=""
-for c in \
-  "${RT}/chromium/chrome-mac/Chromium.app/Contents/MacOS/Chromium" \
-  "${RT}/chromium/chrome-linux/chrome" \
-  "${RT}/chromium/chrome-win/chrome.exe" \
-  "${RT}/chromium/bin/chromium" \
-  "${RT}/chromium/bin/chromium.exe"; do
-  if [[ -e "${c}" ]]; then CHROMIUM="${c}"; break; fi
-done
+if [[ -d "${RT}/chromium" ]]; then
+  # Discover the executable (Playwright's name/layout varies: a macOS *.app binary,
+  # or chrome.exe / chrome on Windows / Linux).
+  CHROMIUM=$(find "${RT}/chromium" -path "*.app/Contents/MacOS/*" -type f 2>/dev/null | head -1)
+  if [[ -z "${CHROMIUM}" ]]; then
+    CHROMIUM=$(find "${RT}/chromium" -type f \( -name "chrome.exe" -o -name "chrome" -o -name "chromium" \) 2>/dev/null | head -1)
+  fi
+fi
 if [[ -n "${CHROMIUM}" ]]; then
   echo "chromium: $("${CHROMIUM}" --version 2>&1 | head -n1)"
   "${CHROMIUM}" --headless=new --dump-dom about:blank >/dev/null 2>&1 \
