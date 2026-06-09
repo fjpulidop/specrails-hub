@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.62.0](https://github.com/fjpulidop/specrails-hub/compare/v1.61.4...v1.62.0) (2026-06-09)
+
+
+### Features
+
+* **browser-capture:** design tokens, network capture, multi-breakpoint, annotations + clipboard & toolbar fixes ([#352](https://github.com/fjpulidop/specrails-hub/issues/352)) ([a138df8](https://github.com/fjpulidop/specrails-hub/commit/a138df8e666b3f2583a05291024e9336411e28ee))
+
 ## [1.61.4](https://github.com/fjpulidop/specrails-hub/compare/v1.61.3...v1.61.4) (2026-06-08)
 
 
