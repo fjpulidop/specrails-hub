@@ -2034,7 +2034,7 @@ describe('project-router', () => {
       const res = await request(app).get('/api/projects/proj-1/context-scope-last')
       expect(res.status).toBe(200)
       expect(res.body.scope).toEqual({
-        specrails: true, openspec: false, full: true, mcp: false, contractRefine: false,
+        specrails: true, openspec: false, full: true, mcp: false, contractRefine: false, userMcp: false,
       })
     })
   })
@@ -2048,7 +2048,7 @@ describe('project-router', () => {
         .send({ openspec: true, full: false })
       expect(a.status).toBe(200)
       expect(a.body.scope).toEqual({
-        specrails: true, openspec: true, full: false, mcp: false, contractRefine: false,
+        specrails: true, openspec: true, full: false, mcp: false, contractRefine: false, userMcp: false,
       })
       const verify = await request(app).get('/api/projects/proj-1/context-scope-last')
       expect(verify.body.scope.openspec).toBe(true)
@@ -2091,7 +2091,23 @@ describe('project-router', () => {
       const row = db.prepare('SELECT context_scope FROM chat_conversations WHERE id = ?')
         .get(res.body.conversation.id) as { context_scope: string }
       const parsed = JSON.parse(row.context_scope)
-      expect(parsed).toEqual({ specrails: false, openspec: true, full: false, mcp: true, contractRefine: false })
+      expect(parsed).toEqual({ specrails: false, openspec: true, full: false, mcp: true, contractRefine: false, userMcp: false })
+    })
+
+    it('persists userMcp=true on explore conversations', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .post('/api/projects/proj-1/chat/conversations')
+        .send({
+          model: 'sonnet',
+          kind: 'explore',
+          contextScope: { specrails: false, openspec: false, full: false, mcp: false, contractRefine: false, userMcp: true },
+        })
+      expect(res.status).toBe(201)
+      const row = db.prepare('SELECT context_scope FROM chat_conversations WHERE id = ?')
+        .get(res.body.conversation.id) as { context_scope: string }
+      expect(JSON.parse(row.context_scope).userMcp).toBe(true)
     })
 
     it('rejects contextScope on sidebar conversations', async () => {

@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Trash2 } from 'lucide-react'
+import { Trash2, AlertTriangle } from 'lucide-react'
 import { Badge } from './ui/badge'
 import type { LocalTicket, TicketPriority } from '../types'
 
@@ -175,6 +175,17 @@ export function SpecCard({
         >
           ↑ #{ticket.parent_epic_id} {parentEpicTitle}
         </button>
+      ) : null}
+      {ticket.needs_review ? (
+        <Badge
+          variant="outline"
+          className="text-[9px] shrink-0 gap-1 border-accent-warning/60 text-accent-warning bg-accent-warning/10"
+          title="This spec was marked done but its job ended in failure — review it"
+          data-testid={`needs-review-badge-${ticket.id}`}
+        >
+          <AlertTriangle className="w-2.5 h-2.5" aria-hidden />
+          Review
+        </Badge>
       ) : null}
       {isDraft ? (
         <Badge variant="outline" className="text-[9px] shrink-0 border-accent-secondary/60 text-accent-secondary">

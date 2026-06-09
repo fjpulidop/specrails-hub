@@ -58,8 +58,8 @@ export const PRESETS: readonly Preset[] = [
   {
     id: 'hub',
     label: 'Hub',
-    scope: { specrails: true, openspec: true, full: true, mcp: true, contractRefine: true },
-    costSummary: '4–6× cost · all features + MCP servers loaded',
+    scope: { specrails: true, openspec: true, full: true, mcp: true, contractRefine: true, userMcp: true },
+    costSummary: '4–6× cost · all features + project & your approved MCPs',
   },
 ] as const
 
@@ -69,6 +69,7 @@ function scopesEqual(a: ContextScope, b: ContextScope): boolean {
     && a.full === b.full
     && a.mcp === b.mcp
     && a.contractRefine === b.contractRefine
+    && (a.userMcp ?? false) === (b.userMcp ?? false)
 }
 
 /** Finds the preset index matching the given scope exactly, or -1 for Custom. */
@@ -86,6 +87,7 @@ function customRank(scope: ContextScope): number {
     full: 1.0,
     contractRefine: 1.0,
     mcp: 1.0,
+    userMcp: 1.0,
   }
   let r = 0
   if (scope.specrails) r += weights.specrails
@@ -93,6 +95,7 @@ function customRank(scope: ContextScope): number {
   if (scope.full) r += weights.full
   if (scope.contractRefine) r += weights.contractRefine
   if (scope.mcp) r += weights.mcp
+  if (scope.userMcp) r += weights.userMcp
   return Math.max(0, Math.min(5, r))
 }
 

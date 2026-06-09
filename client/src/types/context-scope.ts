@@ -4,6 +4,10 @@ export interface ContextScope {
   full: boolean
   mcp: boolean
   contractRefine: boolean
+  /** Explore-only: inject the user's own already-approved MCP servers
+   *  (claude `~/.claude.json`, codex `~/.codex`). Optional for backward compat —
+   *  preset literals omit it and it is treated as `false`. */
+  userMcp?: boolean
 }
 
 export interface ContextBudget {
@@ -25,6 +29,7 @@ export function defaultBootScope(mode: SpecMode): ContextScope {
     full: mode === 'explore',
     mcp: false,
     contractRefine: false,
+    userMcp: false,
   }
 }
 

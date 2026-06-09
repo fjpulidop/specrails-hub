@@ -80,6 +80,17 @@ describe('SpecCard', () => {
     expect(screen.getByText('low')).toBeInTheDocument()
   })
 
+  it('renders a Review badge when needs_review is set', () => {
+    render(<SpecCard ticket={makeTicket({ status: 'done', needs_review: true })} onClick={onClickMock} />)
+    expect(screen.getByTestId('needs-review-badge-42')).toBeInTheDocument()
+    expect(screen.getByText('Review')).toBeInTheDocument()
+  })
+
+  it('does not render a Review badge when needs_review is unset', () => {
+    render(<SpecCard ticket={makeTicket({ status: 'done' })} onClick={onClickMock} />)
+    expect(screen.queryByTestId('needs-review-badge-42')).not.toBeInTheDocument()
+  })
+
   it('calls onClick when card is clicked', () => {
     const ticket = makeTicket()
     render(<SpecCard ticket={ticket} onClick={onClickMock} />)

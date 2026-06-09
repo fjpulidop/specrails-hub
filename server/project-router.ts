@@ -1834,6 +1834,8 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       full: typeof rawScope?.full === 'boolean' ? rawScope.full : false,
       mcp: false,
       contractRefine: quickContractRefine,
+      // Quick mode never injects MCPs (user MCP is an Explore-only toggle).
+      userMcp: false,
     }
     // Persist Quick mode Contract Refine choice (per-project last value).
     setQuickContractRefineLast(ctx(req).db, quickContractRefine)
@@ -3664,7 +3666,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       return
     }
     // Validate booleans-only for any provided key.
-    for (const key of ['specrails', 'openspec', 'full', 'mcp', 'contractRefine']) {
+    for (const key of ['specrails', 'openspec', 'full', 'mcp', 'contractRefine', 'userMcp']) {
       if (body[key] !== undefined && typeof body[key] !== 'boolean') {
         res.status(400).json({ error: `${key} must be a boolean` })
         return

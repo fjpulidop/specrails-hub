@@ -29,6 +29,35 @@ export interface RailState {
   ultracodeModel?: UltracodeModel | null
 }
 
+/**
+ * Apply a finished rail job to the rails, returning a new array. On every
+ * terminal outcome (completed / failed / canceled / zombie) the job's tickets
+ * are stripped from the target rail and the rail is reset to idle:
+ *  - completed → the server marked them `done` (they surface in the Done column).
+ *  - failed/canceled/zombie → the server reset them to `todo` (or flagged review),
+ *    so they must return to the Specs column rather than stay stranded on the rail.
+ * Only this job's ids are removed (never the whole rail) so an ultracode rail —
+ * one job per spec — keeps its still-running specs in place. When the message
+ * carries no ids the whole rail is cleared (best-effort fallback).
+ */
+export function applyRailJobOutcome(
+  rails: RailState[],
+  targetIndex: number,
+  jobTicketIds: number[],
+): RailState[] {
+  const strip = new Set(jobTicketIds)
+  return rails.map((r, idx) =>
+    idx === targetIndex
+      ? {
+          ...r,
+          status: 'idle' as const,
+          activeJobId: undefined,
+          ticketIds: strip.size > 0 ? r.ticketIds.filter((id) => !strip.has(id)) : [],
+        }
+      : r,
+  )
+}
+
 interface RailsBoardProps {
   rails: RailState[]
   ticketMap: Map<number, LocalTicket>

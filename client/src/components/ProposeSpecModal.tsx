@@ -316,11 +316,12 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
 
   return (
     <>
-      {/* While the embedded-browser overlay is open we drop the Add Spec dialog to
+      {/* While the browser-capture modal is open we drop the Add Spec dialog to
           non-modal: Radix's modal layer otherwise sets `pointer-events:none` on
           <body> and traps focus inside DialogContent, which would block the
-          body-portaled browser overlay (can't type the URL or click). DialogContent
-          stays mounted, so the composer text/captures are preserved. */}
+          body-portaled BrowserCaptureModal (can't interact with URL bar or
+          canvas). DialogContent stays mounted with state preserved while the
+          capture modal is stacked above at a higher z-index. */}
       <Dialog open={open} modal={!browserOpen} onOpenChange={(o) => { if (!o && !browserOpen) onClose() }}>
         <DialogContent className="max-w-4xl flex flex-col gap-0 p-0 overflow-hidden">
           <DialogHeader className="px-5 py-4 border-b border-border/40 shrink-0">

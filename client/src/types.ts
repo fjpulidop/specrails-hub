@@ -278,5 +278,9 @@ export interface LocalTicket {
   updated_at: string
   created_by: string
   source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'explore-draft' | 'specs-smash'
+  /** Hub-managed: set when a job that had already marked this spec `done` then
+   *  failed/was canceled/zombie-killed. The board shows a "review" badge on the
+   *  Done card. Cleared on the next clean completion. */
+  needs_review?: boolean
 }
 

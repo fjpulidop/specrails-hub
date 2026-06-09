@@ -65,12 +65,14 @@ export function ContextScopeChecks({
   showSummary = true,
 }: Props) {
   const mcpDisabled = mode === 'quick'
+  const userMcpDisabled = mode === 'quick'
   const [open, setOpen] = useState(defaultOpen)
   const activeScopes = [
     scope.specrails && 'specrails',
     scope.openspec && 'openspec',
     scope.full && 'codebase',
     scope.mcp && !mcpDisabled && 'mcp',
+    scope.userMcp && !userMcpDisabled && 'my-mcp',
     scope.contractRefine && 'contract',
   ].filter(Boolean) as string[]
   const summary = activeScopes.length === 0 ? 'minimal' : activeScopes.join(', ')
@@ -120,12 +122,21 @@ export function ContextScopeChecks({
         />
         <CheckRow
           id="ctx-mcp"
-          label="External tools (MCPs)"
+          label="Project MCPs"
           hint=".mcp.json servers"
           checked={scope.mcp && !mcpDisabled}
           disabled={mcpDisabled}
           tooltip={mcpDisabled ? 'Explore mode only' : undefined}
           onChange={(v) => onChange({ ...scope, mcp: v })}
+        />
+        <CheckRow
+          id="ctx-user-mcp"
+          label="My approved MCPs"
+          hint="~/.claude · ~/.codex servers"
+          checked={!!scope.userMcp && !userMcpDisabled}
+          disabled={userMcpDisabled}
+          tooltip={userMcpDisabled ? 'Explore mode only' : 'Your locally-approved MCP servers (claude mcp add / codex mcp add)'}
+          onChange={(v) => onChange({ ...scope, userMcp: v })}
         />
         <CheckRow
           id="ctx-contract-refine"

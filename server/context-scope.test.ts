@@ -27,19 +27,19 @@ describe('context-scope', () => {
   describe('defaultBootScope', () => {
     it('Quick mode boots specrails ON, others OFF', () => {
       expect(defaultBootScope('quick')).toEqual({
-        specrails: true, openspec: false, full: false, mcp: false, contractRefine: false,
+        specrails: true, openspec: false, full: false, mcp: false, contractRefine: false, userMcp: false,
       })
     })
 
     it('Explore mode boots specrails+full ON, mcp+contractRefine OFF', () => {
       expect(defaultBootScope('explore')).toEqual({
-        specrails: true, openspec: false, full: true, mcp: false, contractRefine: false,
+        specrails: true, openspec: false, full: true, mcp: false, contractRefine: false, userMcp: false,
       })
     })
   })
 
   describe('normalizeContextScope', () => {
-    const fb = { specrails: false, openspec: false, full: false, mcp: false, contractRefine: false }
+    const fb = { specrails: false, openspec: false, full: false, mcp: false, contractRefine: false, userMcp: false }
 
     it('returns fallback for non-object', () => {
       expect(normalizeContextScope(null, fb)).toEqual(fb)
@@ -59,14 +59,23 @@ describe('context-scope', () => {
 
     it('passes through valid object', () => {
       expect(normalizeContextScope({ specrails: true, openspec: true, full: true, mcp: true, contractRefine: true }, fb))
-        .toEqual({ specrails: true, openspec: true, full: true, mcp: true, contractRefine: true })
+        .toEqual({ specrails: true, openspec: true, full: true, mcp: true, contractRefine: true, userMcp: false })
+    })
+
+    it('preserves userMcp=true and falls back to false when absent', () => {
+      expect(normalizeContextScope({ specrails: false, openspec: false, full: false, mcp: false, contractRefine: false, userMcp: true }, fb).userMcp)
+        .toBe(true)
+      // Missing userMcp falls back to fb.userMcp (false here).
+      expect(normalizeContextScope({ specrails: true }, fb).userMcp).toBe(false)
+      // Non-boolean userMcp falls back too.
+      expect(normalizeContextScope({ userMcp: 'yes' }, { ...fb, userMcp: true }).userMcp).toBe(true)
     })
   })
 
   describe('get/setLastContextScope', () => {
     it('returns default boot when nothing persisted', () => {
       const scope = getLastContextScope(db, 'explore')
-      expect(scope).toEqual({ specrails: true, openspec: false, full: true, mcp: false, contractRefine: false })
+      expect(scope).toEqual({ specrails: true, openspec: false, full: true, mcp: false, contractRefine: false, userMcp: false })
     })
 
     it('default boot does not consult any project-level setting', () => {
@@ -78,9 +87,9 @@ describe('context-scope', () => {
     })
 
     it('persists and restores', () => {
-      setLastContextScope(db, { specrails: false, openspec: true, full: false, mcp: true, contractRefine: true })
+      setLastContextScope(db, { specrails: false, openspec: true, full: false, mcp: true, contractRefine: true, userMcp: true })
       expect(getLastContextScope(db, 'explore')).toEqual({
-        specrails: false, openspec: true, full: false, mcp: true, contractRefine: true,
+        specrails: false, openspec: true, full: false, mcp: true, contractRefine: true, userMcp: true,
       })
     })
 
@@ -98,9 +107,9 @@ describe('context-scope', () => {
   describe('conversation context_scope', () => {
     it('round-trips', () => {
       createConversation(db, { id: 'c1', model: 'sonnet', kind: 'explore' })
-      setConversationContextScope(db, 'c1', { specrails: true, openspec: true, full: false, mcp: true, contractRefine: true })
+      setConversationContextScope(db, 'c1', { specrails: true, openspec: true, full: false, mcp: true, contractRefine: true, userMcp: true })
       expect(getConversationContextScope(db, 'c1')).toEqual({
-        specrails: true, openspec: true, full: false, mcp: true, contractRefine: true,
+        specrails: true, openspec: true, full: false, mcp: true, contractRefine: true, userMcp: true,
       })
     })
 
@@ -115,7 +124,7 @@ describe('context-scope', () => {
         contextScope: { specrails: false, openspec: false, full: true, mcp: false, contractRefine: false },
       })
       expect(getConversationContextScope(db, 'c3')).toEqual({
-        specrails: false, openspec: false, full: true, mcp: false, contractRefine: false,
+        specrails: false, openspec: false, full: true, mcp: false, contractRefine: false, userMcp: false,
       })
     })
 
