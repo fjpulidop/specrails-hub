@@ -122,7 +122,11 @@ export function InvocationsTable({
               {rows.map((r) => {
                 const surface = r.surface as Surface
                 const accent = SURFACE_ACCENT[surface]
-                const totalTokens = (r.tokens_in ?? 0) + (r.tokens_out ?? 0)
+                const totalTokens =
+                  (r.tokens_in ?? 0) +
+                  (r.tokens_out ?? 0) +
+                  (r.tokens_cache_read ?? 0) +
+                  (r.tokens_cache_create ?? 0)
                 const isContractLayer = isContractLayerInvocation(r)
                 const surfaceLabel = isContractLayer ? 'Contract Layer' : SURFACE_LABEL[surface]
                 const model = inferredModelFor(r, inferredModels)

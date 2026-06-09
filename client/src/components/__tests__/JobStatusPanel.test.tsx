@@ -145,6 +145,21 @@ describe('JobStatusPanel', () => {
     expect(screen.getByText('8.0k')).toBeInTheDocument()
   })
 
+  it('includes cache tokens in the authoritative Tokens total', () => {
+    // Real total = in + out + cache_read + cache_create (cache dominates).
+    const cacheHeavy: JobSummary = {
+      ...completedJob,
+      tokens_in: 5000,
+      tokens_out: 3000,
+      tokens_cache_read: 90_000,
+      tokens_cache_create: 2_000,
+    }
+    render(<JobStatusPanel job={cacheHeavy} events={[]} />)
+    // 5000 + 3000 + 90000 + 2000 = 100000 → 100.0k (NOT 8.0k)
+    expect(screen.getByText('100.0k')).toBeInTheDocument()
+    expect(screen.queryByText('8.0k')).not.toBeInTheDocument()
+  })
+
   it('renders "—" for null metric values', () => {
     render(<JobStatusPanel job={failedJob} events={[]} />)
     const dashes = screen.getAllByText('—')
@@ -262,9 +277,10 @@ describe('JobStatusPanel', () => {
         makeAssistantEvent(3, 300, 100),
       ]
       render(<JobStatusPanel job={runningJob} events={events} />)
-      expect(screen.getByText('3')).toBeInTheDocument() // Turns
-      // (100+50) + (200+75) + (300+100) = 825 → "0.8k"
-      expect(screen.getByText('0.8k')).toBeInTheDocument()
+      // Live (still-running) values are marked approximate with a ~ prefix.
+      expect(screen.getByText('~3')).toBeInTheDocument() // Turns
+      // (100+50) + (200+75) + (300+100) = 825 → "~0.8k"
+      expect(screen.getByText('~0.8k')).toBeInTheDocument()
     })
 
     it('tolerates missing or partial usage fields without NaN', () => {
@@ -274,9 +290,9 @@ describe('JobStatusPanel', () => {
         { ...makeAssistantEvent(3, 50, 25), payload: JSON.stringify({ message: { usage: { input_tokens: 50 } } }) },
       ]
       render(<JobStatusPanel job={runningJob} events={events} />)
-      expect(screen.getByText('3')).toBeInTheDocument()
-      // 100+50 + 0 + 50 = 200 → "0.2k"
-      expect(screen.getByText('0.2k')).toBeInTheDocument()
+      expect(screen.getByText('~3')).toBeInTheDocument()
+      // 100+50 + 0 + 50 = 200 → "~0.2k"
+      expect(screen.getByText('~0.2k')).toBeInTheDocument()
     })
 
     it('aggregator scales to thousands of events without NaN', () => {
@@ -289,8 +305,8 @@ describe('JobStatusPanel', () => {
         expectedTokens += (inT ?? 0) + (outT ?? 0)
       }
       render(<JobStatusPanel job={runningJob} events={events} />)
-      expect(screen.getByText('1000')).toBeInTheDocument()
-      const expectedDisplay = `${(expectedTokens / 1000).toFixed(1)}k`
+      expect(screen.getByText('~1000')).toBeInTheDocument()
+      const expectedDisplay = `~${(expectedTokens / 1000).toFixed(1)}k`
       expect(screen.getByText(expectedDisplay)).toBeInTheDocument()
     })
 

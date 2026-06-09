@@ -1230,6 +1230,7 @@ export class QueueManager {
             tokens_cache_read: normalised.tokens_cache_read,
             tokens_cache_create: normalised.tokens_cache_create,
             total_cost_usd: normalised.total_cost_usd,
+            total_cost_usd_estimated: estimated,
             num_turns: normalised.num_turns,
             model: normalised.model,
             duration_ms: normalised.duration_ms,

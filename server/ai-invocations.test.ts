@@ -97,10 +97,22 @@ describe('ai-invocations', () => {
     expect(summary.totalCostUsd).toBeCloseTo(3.5)
     expect(summary.totalTurns).toBe(9)
     expect(summary.activeDurationMs).toBe(3500)
+    // Each fixedInput defaults tokens_in:100 + tokens_out:50 = 150; ×3 = 450.
+    expect(summary.totalTokens).toBe(450)
     expect(summary.bySurface.job.count).toBe(2)
     expect(summary.bySurface.job.costUsd).toBeCloseTo(3.0)
     expect(summary.bySurface['explore-spec'].count).toBe(1)
     expect(summary.bySurface['quick-spec'].count).toBe(0)
+  })
+
+  it('totalTokens includes cache-read and cache-create tiers', () => {
+    recordInvocation(db, fixedInput({
+      id: 'c1', surface: 'job', ticket_id: 9,
+      tokens_in: 1000, tokens_out: 200, tokens_cache_read: 50_000, tokens_cache_create: 800,
+    }))
+    const summary = getTicketSpendingSummary(db, 9)
+    // 1000 + 200 + 50000 + 800 = 52000 (cache dominates)
+    expect(summary.totalTokens).toBe(52_000)
   })
 
   it('persists provider column from input', () => {

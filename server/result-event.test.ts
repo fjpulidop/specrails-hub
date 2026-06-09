@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { normaliseResultEvent, finaliseInvocationResult } from './result-event'
 import './providers' // register claude+codex adapters
 import { getAdapter } from './providers/registry'
@@ -100,8 +100,9 @@ describe('finaliseInvocationResult (new adapter-aware API)', () => {
     })
     expect(estimated).toBe(true)
     // codex:gpt-5.4-mini → input 0.25, output 2.00, cache_read 0.025 per 1M
-    // cost = 1M*0.25 + 500K*2.00 + 200K*0.025 / 1M = 0.25 + 1.00 + 0.005 = 1.255
-    expect(result.total_cost_usd).toBeCloseTo(1.255, 5)
+    // input_tokens (1M) INCLUDES cached_input_tokens (200K), so fresh input = 800K.
+    // cost = 800K*0.25 + 500K*2.00 + 200K*0.025 / 1M = 0.20 + 1.00 + 0.005 = 1.205
+    expect(result.total_cost_usd).toBeCloseTo(1.205, 5)
     expect(result.model).toBe('gpt-5.4-mini')
     expect(result.tokens_in).toBe(1_000_000)
     expect(result.tokens_out).toBe(500_000)
@@ -128,6 +129,35 @@ describe('finaliseInvocationResult (new adapter-aware API)', () => {
     expect(result.total_cost_usd).toBeUndefined()
     expect(result.model).toBe('gpt-99-future-model')
     expect(result.tokens_in).toBe(100)
+  })
+
+  it('codex: warns once when a known model id has no pricing-table entry', () => {
+    const adapter = getAdapter('codex')
+    const events: AdapterEvent[] = [
+      { kind: 'result', payload: { type: 'turn.completed', usage: { input_tokens: 100, output_tokens: 50 } } },
+    ]
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      finaliseInvocationResult(adapter, events, { fallbackModel: 'gpt-99-future-model' })
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(warn.mock.calls[0][0]).toContain('codex:gpt-99-future-model')
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('codex: does NOT warn when no model could be resolved (different failure mode)', () => {
+    const adapter = getAdapter('codex')
+    const events: AdapterEvent[] = [
+      { kind: 'result', payload: { type: 'turn.completed', usage: { input_tokens: 100, output_tokens: 50 } } },
+    ]
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      finaliseInvocationResult(adapter, events) // no fallbackModel → model undefined
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
   })
 
   it('codex: no estimation when no fallbackModel and adapter cannot derive', () => {

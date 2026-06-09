@@ -175,7 +175,8 @@ export function createProfilesRouter(): Router {
              COUNT(*) AS jobs,
              SUM(CASE WHEN j.status = 'completed' THEN 1 ELSE 0 END) AS succeeded,
              AVG(j.duration_ms) AS avgDurationMs,
-             AVG(COALESCE(j.tokens_in, 0) + COALESCE(j.tokens_out, 0)) AS avgTokens,
+             AVG(COALESCE(j.tokens_in, 0) + COALESCE(j.tokens_out, 0)
+                 + COALESCE(j.tokens_cache_read, 0) + COALESCE(j.tokens_cache_create, 0)) AS avgTokens,
              AVG(j.total_cost_usd) AS avgCostUsd
            FROM job_profiles jp
            JOIN jobs j ON j.id = jp.job_id

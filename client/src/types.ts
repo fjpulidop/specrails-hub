@@ -16,6 +16,9 @@ export interface JobSummary {
   status: JobStatus
   priority?: JobPriority
   total_cost_usd?: number | null
+  /** 1 when total_cost_usd is a pricing-table estimate (codex), 0/absent when
+   *  authoritative from the provider (claude). Drives the `~` cost badge. */
+  total_cost_usd_estimated?: number | null
   duration_ms?: number | null
   model?: string | null
   tokens_in?: number | null

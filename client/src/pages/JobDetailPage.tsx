@@ -284,6 +284,8 @@ export default function JobDetailPage() {
     totalCostUsd: pipelineJobs.reduce((s, j) => s + (j.total_cost_usd ?? 0), 0),
     totalTokensIn: pipelineJobs.reduce((s, j) => s + (j.tokens_in ?? 0), 0),
     totalTokensOut: pipelineJobs.reduce((s, j) => s + (j.tokens_out ?? 0), 0),
+    totalTokensCacheRead: pipelineJobs.reduce((s, j) => s + (j.tokens_cache_read ?? 0), 0),
+    totalTokensCacheCreate: pipelineJobs.reduce((s, j) => s + (j.tokens_cache_create ?? 0), 0),
     jobCount: pipelineJobs.length,
   } : null
 

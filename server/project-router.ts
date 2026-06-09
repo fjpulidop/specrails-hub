@@ -35,7 +35,8 @@ import {
   buildScopedSystemPromptPrefix, toolFlagsForScope, defaultBootScope,
   type ContextScope,
 } from './context-scope'
-import { normaliseResultEvent } from './result-event'
+import { finaliseInvocationResult } from './result-event'
+import type { AdapterEvent } from './providers/types'
 import { getSpending, getInvocations, parseSpendingFilters } from './spending'
 import { randomUUID } from 'crypto'
 import {
@@ -1968,10 +1969,18 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
     let buffer = ''
     let lastResultEvent: Record<string, unknown> | null = null
+    // Canonical adapter events feed finaliseInvocationResult on close, giving
+    // codex a real pricing-table cost estimate (+ estimated flag) and tokens,
+    // instead of the legacy hardcoded $0. Accumulated ALONGSIDE the existing
+    // buffer/delta plumbing below — never in place of it.
+    const adapterEvents: AdapterEvent[] = []
     const turnStartedAt = new Date().toISOString()
     const stdoutReader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
 
     stdoutReader.on('line', (line) => {
+      const adapterEv = adapter.parseStreamLine(line)
+      if (adapterEv) adapterEvents.push(adapterEv)
+
       let parsed: Record<string, unknown> | null = null
       try { parsed = JSON.parse(line) } catch { /* skip */ }
       if (!parsed) return
@@ -2197,31 +2206,33 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
       // ai_invocations capture (surface='quick-spec'). Always emit a row, success or fail.
       try {
-        const cliProvider: 'claude' | 'codex' = provider === 'codex' ? 'codex' : 'claude'
-        const synthCodexResult = (cliProvider === 'codex' && code === 0)
-          ? {
-              type: 'result',
-              total_cost_usd: 0,
-              model: resolvedModel,
-              num_turns: 1,
-              duration_ms: Date.now() - new Date(turnStartedAt).getTime(),
-            }
-          : null
-        const eventForParse = lastResultEvent ?? synthCodexResult
-        const normalised = eventForParse
-          ? normaliseResultEvent(eventForParse as Record<string, unknown>, cliProvider)
-          : {}
+        // Adapter-driven finalisation: claude passes its native total_cost_usd
+        // through untouched; codex (nativeCostUsd:false) gets a pricing-table
+        // estimate from its captured token usage + estimated=true. This
+        // replaces the legacy normaliseResultEvent path that hardcoded codex
+        // cost to $0 and never set the estimated flag.
+        const { result: normalised, estimated } = finaliseInvocationResult(
+          adapter,
+          adapterEvents,
+          { fallbackModel: resolvedModel },
+        )
+        // extractCodexResult does not surface duration (codex stream carries
+        // none); stamp wall-clock so the row's duration isn't lost. Claude's
+        // result event already provides duration_ms, so prefer it.
+        const wallMs = Date.now() - new Date(turnStartedAt).getTime()
         recordInvocation(ctx(req).db, {
           id: randomUUID(),
           project_id: projectId,
-          provider: cliProvider,
+          provider: adapter.id,
           surface: 'quick-spec',
           surface_ref_id: requestId,
           ticket_id: createdTicketId,
           status: code === 0 && buffer.trim() ? 'success' : 'failed',
           started_at: turnStartedAt,
           finished_at: new Date().toISOString(),
+          total_cost_usd_estimated: estimated,
           ...normalised,
+          duration_ms: normalised.duration_ms ?? wallMs,
         })
         broadcast({ type: 'spending.invalidated', projectId })
       } catch (err) {

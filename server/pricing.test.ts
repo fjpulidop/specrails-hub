@@ -33,18 +33,38 @@ describe('pricing.PRICING — table sanity', () => {
 })
 
 describe('estimateCostUsd', () => {
-  it('computes cost = (in*p_in + out*p_out + cache_read*p_cache) / 1M', () => {
+  it('bills cached tokens at cache rate only: ((in-cache)*p_in + out*p_out + cache*p_cache) / 1M', () => {
     // codex:gpt-5.4-mini → input 0.25, output 2.00, cache_read 0.025
     const cost = estimateCostUsd('codex', 'gpt-5.4-mini', {
-      tokens_in: 100_000,
+      tokens_in: 100_000,        // TOTAL prompt tokens (includes the cached subset)
       tokens_out: 50_000,
-      tokens_cache_read: 20_000,
+      tokens_cache_read: 20_000, // subset already inside tokens_in
     })
-    // 100000 * 0.25 / 1M = 0.025
-    // 50000  * 2.00 / 1M = 0.100
-    // 20000  * 0.025 / 1M = 0.0005
-    // Total ≈ 0.1255
-    expect(cost).toBeCloseTo(0.1255, 4)
+    // fresh input = 100000 - 20000 = 80000
+    // 80000 * 0.25  / 1M = 0.020
+    // 50000 * 2.00  / 1M = 0.100
+    // 20000 * 0.025 / 1M = 0.0005
+    // Total ≈ 0.1205  (NOT 0.1255 — the cached 20k is not charged at full input rate)
+    expect(cost).toBeCloseTo(0.1205, 4)
+  })
+
+  it('does not double-charge cached tokens (cache subset billed once, at the cache rate)', () => {
+    // All input is cached → input portion is 0; only the cache-read rate applies.
+    const cost = estimateCostUsd('codex', 'gpt-5.4-mini', {
+      tokens_in: 50_000,
+      tokens_cache_read: 50_000,
+    })
+    // fresh input = 0; cache = 50000 * 0.025 / 1M = 0.00125
+    expect(cost).toBeCloseTo(0.00125, 6)
+  })
+
+  it('clamps fresh input at 0 when reported cache subset exceeds the total (malformed payload)', () => {
+    const cost = estimateCostUsd('codex', 'gpt-5.4-mini', {
+      tokens_in: 10_000,
+      tokens_cache_read: 30_000, // larger than tokens_in — must not go negative
+    })
+    // fresh input = max(0, 10000-30000) = 0; cache = 30000 * 0.025 / 1M = 0.00075
+    expect(cost).toBeCloseTo(0.00075, 6)
   })
 
   it('returns 0 when usage is empty', () => {
@@ -93,11 +113,13 @@ describe('estimateCostUsd', () => {
     for (const [key, entry] of Object.entries(PRICING)) {
       const [providerId, model] = key.split(':')
       const cost = estimateCostUsd(providerId!, model!, {
-        tokens_in: 1_000_000,
+        tokens_in: 1_500_000,       // 1M fresh + 500k cached
         tokens_out: 1_000_000,
-        tokens_cache_read: 1_000_000,
+        tokens_cache_read: 500_000, // subset of tokens_in
       })
-      expect(cost).toBeCloseTo(entry.inputPer1M + entry.outputPer1M + entry.cacheReadPer1M, 6)
+      // fresh input = 1.5M - 0.5M = 1M → entry.inputPer1M; out = entry.outputPer1M;
+      // cache = 0.5M * cacheReadPer1M / 1M = 0.5 * cacheReadPer1M
+      expect(cost).toBeCloseTo(entry.inputPer1M + entry.outputPer1M + entry.cacheReadPer1M * 0.5, 6)
     }
   })
 })

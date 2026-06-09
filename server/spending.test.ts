@@ -46,6 +46,17 @@ describe('getSpending', () => {
     expect(r.summary.avgCostPerRun).toBeCloseTo(2.0)
   })
 
+  it('summary.totalTokens sums all four token tiers across rows', () => {
+    const now = new Date().toISOString()
+    seed(db, [
+      { id: 'a', surface: 'job', tokens_in: 1000, tokens_out: 200, tokens_cache_read: 40_000, tokens_cache_create: 500, started_at: now },
+      { id: 'b', surface: 'explore-spec', tokens_in: 300, tokens_out: 100, started_at: now },
+    ])
+    const r = getSpending(db, 'p1', { period: 'all' })
+    // (1000+200+40000+500) + (300+100) = 41700 + 400 = 42100
+    expect(r.summary.totalTokens).toBe(42_100)
+  })
+
   it('filters by surface', () => {
     seed(db, [
       { id: 'a', surface: 'job', total_cost_usd: 5, started_at: new Date().toISOString() },
