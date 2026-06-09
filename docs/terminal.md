@@ -18,11 +18,19 @@ specrails-hub ships a full-featured terminal at the bottom of the window. Toggle
 
 You don't have to. You can keep using iTerm/Windows Terminal/Alacritty/whatever you love. But the built-in panel buys you:
 
-- **Per-prompt timing** — every command taking > 500 ms shows a small live timer in the gutter; once done, the duration sits there as a record.
+- **Per-prompt timing** — every command taking ≥ 500 ms shows a small live timer in the terminal's top-left corner; once done, the duration sits there as a record.
 - **Long-running command notifications** — when a command exceeds 60 seconds and you've context-switched away, you get a native desktop notification.
-- **Open this directory** in the right-click menu when a CWD has been observed.
+- **Open this directory** in the right-click menu when a CWD has been observed (Tauri desktop app only).
 - **Drag a file from Finder/Explorer** onto the terminal to paste its absolute path (Tauri desktop app only).
 - **Live theme switching** — the terminal recolours when you change the hub theme without losing scrollback.
+
+### Toolbar shortcuts
+
+The panel header carries three one-click shortcuts:
+
+- **Open AI CLI** (✨ Sparkles) — spins up a fresh session and types your CLI for you. On a single-provider project it launches that provider's CLI directly (`claude` or `codex`); on a multi-provider project it opens a small picker so you choose which CLI to start.
+- **Open in browser** (🌐 Globe) — opens the URL from the `browserShortcutUrl` setting (default `https://specrails.dev`). Right-click it to jump to the setting and change the URL.
+- **Paste quick script** (`</>`) — writes the snippet from the `quickScript` setting (which defaults to a personalised `echo "Wake up, <username> …"` reminder, editable in Settings) into the active session. Right-click it to edit the snippet in Settings. Disabled when there's no active terminal or the snippet is empty.
 
 ## Keyboard shortcuts
 
@@ -45,7 +53,7 @@ You don't have to. You can keep using iTerm/Windows Terminal/Alacritty/whatever 
 Right-click anywhere in the active terminal:
 
 - Copy / Paste / Select All / Clear / Search… / Save scrollback to file…
-- **Open `<cwd>`** — when shell integration has reported a CWD via OSC 1337.
+- **Open `<cwd>`** — when shell integration has reported a CWD via OSC 1337 (Tauri desktop app only). In a plain browser context this item never appears.
 
 Menu position flips when near the bottom-right corner of the viewport.
 
@@ -59,16 +67,12 @@ Per shell:
 |-------|-----------|
 | zsh | `ZDOTDIR=<shim dir>`; the shim's `.zshrc` sources `~/.zshrc` first |
 | bash | `--rcfile <shim path>`; the shim sources `~/.bashrc` first |
-| fish | `XDG_CONFIG_HOME=<shim dir>`; `conf.d/specrails-shim.fish` runs after `config.fish` |
+| fish | `fish -C "source '<bundled shim>'"` (`--init-command`); runs after `config.fish` / `conf.d`, so your real fish config is preserved |
 | PowerShell | `-NoLogo -NoExit -File <shim.ps1>`; the shim dot-sources the original `$PROFILE` |
 
 Each shim sets `SPECRAILS_SHELL_INTEGRATION_LOADED=1` as a sentinel.
 
-If no `prompt-start` mark arrives within ~5 seconds of the first prompt, the panel surfaces:
-
-> _"Shell integration unavailable for this shell — prompt marks are disabled."_
-
-This typically means your `~/.zshrc` runs `exec zsh` (which throws away our `ZDOTDIR`) or a similarly aggressive customisation. In that case, disable shell integration in Settings; the rest of the panel keeps working.
+If shell integration doesn't bootstrap — for example your `~/.zshrc` runs `exec zsh` (which throws away our `ZDOTDIR`) or a similarly aggressive customisation — there's no error message. The panel detects the missing prompt marks silently; the gutter, per-prompt timing badge, and long-running notifications simply won't appear. If that happens, disable shell integration in Settings; the rest of the panel keeps working.
 
 ## Drag and drop
 
@@ -83,7 +87,7 @@ In a plain browser context this is a silent no-op — the browser doesn't expose
 
 The panel decodes Sixel and iTerm2 inline-image protocols via `@xterm/addon-image`. Try `imgcat foo.png` or any tool that emits Sixel.
 
-Disable in Settings → Terminal panel → Image rendering if you hit memory pressure on heavy image streams. Per-frame cap is 8 megapixels, in-flight cache cap is 32 MB.
+Disable in Settings → Terminal panel → Image rendering if you hit memory pressure on heavy image streams. The per-frame cap is 8 megapixels.
 
 ## Settings
 
@@ -102,11 +106,13 @@ Hot-reload semantics:
 | Copy on select | Live | |
 | Long-running threshold | Live | |
 | Notify on completion | Live | |
+| Browser shortcut URL | Live | The Open-in-browser toolbar button uses the new value next click |
+| Quick script | Live | The Paste-quick-script toolbar button uses the new value next click |
 | Render mode (auto / canvas / webgl) | Next session | Live sessions keep their boot-time config |
 | Shell integration | Next session | |
 | Image rendering | Next session | |
 
-Render mode `auto` picks WebGL when the WebView exposes WebGL2; on `webglcontextlost` the panel falls back to canvas with a one-time toast.
+Render mode `auto` picks WebGL when the WebView exposes WebGL2; on `webglcontextlost` the panel transparently reverts to xterm's default renderer.
 
 ## Limits and edge cases
 

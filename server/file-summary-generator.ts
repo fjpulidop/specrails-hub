@@ -63,8 +63,9 @@ export function createFileSummaryGenerator(opts: GeneratorOpts): (input: Generat
   const timeoutMs = opts.timeoutMs ?? GENERATE_TIMEOUT_MS
   const spawn = opts.spawn ?? spawnAiCli
 
-  return async function generate(input: GenerateInput): Promise<GenerateOutput> {
+  return async function generate(input: GenerateInput, signal?: AbortSignal): Promise<GenerateOutput> {
     const startedAt = Date.now()
+    if (signal?.aborted) throw new Error('file-summary generator aborted before start')
     const args = adapter.buildArgs('spec-gen', {
       prompt: buildUserPrompt(input, adapter),
       systemPrompt: adapter.capabilities.systemPromptArg ? buildSystemPrompt(input.language) : undefined,
@@ -84,14 +85,35 @@ export function createFileSummaryGenerator(opts: GeneratorOpts): (input: Generat
       let stderrBuf = ''
       let settled = false
 
+      // Best-effort partial usage so a timeout/abort that killed the child AFTER
+      // the provider billed tokens still reports real spend (the manager stamps
+      // it onto the failed ai_invocations row instead of $0).
+      const buildPartial = (): Partial<GenerateOutput> | undefined => {
+        if (events.length === 0) return undefined
+        try {
+          const { result, estimated } = finaliseInvocationResult(adapter, events, { fallbackModel: model })
+          return {
+            model: result.model ?? model,
+            provider: adapter.id,
+            costUsd: result.total_cost_usd ?? 0,
+            costEstimated: estimated,
+            tokensIn: result.tokens_in ?? 0,
+            tokensOut: result.tokens_out ?? 0,
+            tokensCacheRead: result.tokens_cache_read,
+            tokensCacheCreate: result.tokens_cache_create,
+            durationMs: result.duration_ms ?? (Date.now() - startedAt),
+          }
+        } catch { return undefined }
+      }
+      const rejectWithPartial = (message: string) => {
+        const err = new Error(message) as Error & { partial?: Partial<GenerateOutput> }
+        const partial = buildPartial()
+        if (partial) err.partial = partial
+        reject(err)
+      }
+
       let killGrace: ReturnType<typeof setTimeout> | null = null
-      const timer = setTimeout(() => {
-        if (settled) return
-        settled = true
-        // treeKill (not child.kill) so the whole process tree dies — on Windows
-        // the CLI is wrapped in cmd.exe; on POSIX the CLI may have grandchildren.
-        // Escalate to SIGKILL if SIGTERM is ignored (node CLIs mid-network-call),
-        // so a hung child is not orphaned. The grace timer is cleared on close.
+      const killTree = () => {
         const pid = child.pid
         if (pid) {
           try { treeKill(pid, 'SIGTERM') } catch { /* best effort */ }
@@ -102,7 +124,23 @@ export function createFileSummaryGenerator(opts: GeneratorOpts): (input: Generat
         } else {
           try { child.kill('SIGTERM') } catch { /* best effort */ }
         }
-        reject(new Error(`file-summary generator timeout after ${timeoutMs}ms`))
+      }
+
+      const onAbort = () => {
+        if (settled) return
+        settled = true
+        // treeKill (not child.kill) so the whole process tree dies — on Windows
+        // the CLI is wrapped in cmd.exe; on POSIX the CLI may have grandchildren.
+        killTree()
+        rejectWithPartial('file-summary generator aborted')
+      }
+      if (signal) signal.addEventListener('abort', onAbort, { once: true })
+
+      const timer = setTimeout(() => {
+        if (settled) return
+        settled = true
+        killTree()
+        rejectWithPartial(`file-summary generator timeout after ${timeoutMs}ms`)
       }, timeoutMs)
 
       if (child.stderr) {
@@ -114,6 +152,7 @@ export function createFileSummaryGenerator(opts: GeneratorOpts): (input: Generat
 
       if (!child.stdout) {
         clearTimeout(timer)
+        if (signal) signal.removeEventListener('abort', onAbort)
         reject(new Error('file-summary generator: child has no stdout'))
         return
       }
@@ -128,6 +167,7 @@ export function createFileSummaryGenerator(opts: GeneratorOpts): (input: Generat
 
       child.on('error', (err) => {
         clearTimeout(timer)
+        if (signal) signal.removeEventListener('abort', onAbort)
         if (killGrace) { clearTimeout(killGrace); killGrace = null }
         if (settled) return
         settled = true
@@ -136,6 +176,7 @@ export function createFileSummaryGenerator(opts: GeneratorOpts): (input: Generat
 
       child.on('close', (code) => {
         clearTimeout(timer)
+        if (signal) signal.removeEventListener('abort', onAbort)
         // A child that exits after a timeout-triggered SIGTERM clears the
         // escalation so no stray SIGKILL lands on a recycled pid.
         if (killGrace) { clearTimeout(killGrace); killGrace = null }

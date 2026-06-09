@@ -4,7 +4,7 @@ The `specrails-hub` CLI does three things:
 
 1. **Manages the hub server** — start, stop, status.
 2. **Manages projects** — list, add, remove.
-3. **Routes commands into the running hub** — implement specs, run health checks, pass raw prompts to Claude.
+3. **Routes commands into the running hub** — implement specs, run health checks, pass raw prompts to your AI CLI.
 
 Everything here is grouped by what you're trying to do, not by alphabetical order of flags.
 
@@ -17,10 +17,12 @@ specrails-hub start
 specrails-hub start --port 5000     # custom port (default 4200)
 ```
 
-The hub daemonises and writes its PID to `~/.specrails/manager.pid`. Logs go to stdout — to capture them:
+`start` daemonises the server, writes its PID to `~/.specrails/manager.pid`, and streams the server's stdout/stderr to `~/.specrails/hub.log` automatically. The command polls until the server is ready, prints `hub started on http://127.0.0.1:<port>`, and returns — it does **not** keep streaming logs to your shell.
+
+To watch the server logs:
 
 ```bash
-specrails-hub start > ~/.specrails/hub.log 2>&1 &
+tail -f ~/.specrails/hub.log
 ```
 
 If you're using the desktop app, it bundles the server and starts it for you. You don't need `specrails-hub start` at all.
@@ -31,15 +33,19 @@ If you're using the desktop app, it bundles the server and starts it for you. Yo
 specrails-hub stop
 ```
 
-Cleanly shuts down: SIGTERM, 2 s grace, SIGKILL. Removes the PID file.
+Sends `SIGTERM` to the hub process. The server then shuts down cleanly and removes its own PID file.
 
 ### See what it's doing
 
 ```bash
-specrails-hub status                # human-readable
-specrails-hub --status              # one-shot, machine-friendly
-specrails-hub --jobs                # recent jobs table across all projects
+specrails-hub status                # hub status + registered projects
+specrails-hub --status              # one-shot status, compact text output
+specrails-hub --jobs                # see the note below
 ```
+
+`--status` prints a compact status line that includes the hub version. The bare `status` subcommand prints whether the hub is running (with its PID and URL) plus the registered project count and names — but no version. Both are plain text, handy to read or grep, not JSON.
+
+> **Note on `--jobs`:** there is no hub-level jobs endpoint today, so `--jobs` prints a message that jobs history requires a manager with SQLite persistence and exits non-zero against a running hub. Job history lives **per project** — view it on the project's **Jobs** page (right sidebar) in the dashboard instead.
 
 ## Manage projects
 
@@ -49,15 +55,16 @@ specrails-hub --jobs                # recent jobs table across all projects
 specrails-hub list
 ```
 
-Prints every registered project: ID, slug, name, path.
+Prints every registered project in three columns: **ID**, **NAME**, **PATH**.
 
 ### Add
 
 ```bash
-specrails-hub add /path/to/your/project
+specrails-hub add .                 # register the current directory
+specrails-hub add /path/to/project  # or an explicit path
 ```
 
-Registers the project with the hub. The path must be absolute and must exist. If the project doesn't have specrails-core installed, the next dashboard visit triggers the setup wizard.
+Registers the project with the hub. The path can be **absolute or relative** (it's resolved against your current directory) and must exist. If the project doesn't have specrails-core installed, the next dashboard visit triggers the setup wizard.
 
 ### Remove
 
@@ -65,11 +72,18 @@ Registers the project with the hub. The path must be absolute and must exist. If
 specrails-hub remove <project-id>
 ```
 
-Unregisters the project. Does **not** delete the project directory or its specrails-core installation. To re-register, just `add` it again — job history under `~/.specrails/projects/<slug>/jobs.sqlite` is preserved.
+Unregisters the project (use the **ID** from `specrails-hub list`). Does **not** delete the project directory or its specrails-core installation. To re-register, just `add` it again — job history under `~/.specrails/projects/<slug>/jobs.sqlite` is preserved.
 
 ## Run things in the active project
 
-`specrails-hub` auto-detects which project you're in by matching your `cwd` against registered projects' paths (or any parent directory).
+`specrails-hub` auto-detects which project you're in by matching your **exact** current directory against registered project paths. Run commands from the project's **root directory** — subdirectories are **not** auto-resolved (path matching is exact, with no parent-directory walking). From anywhere else, use `--project`.
+
+If the hub is running but no project is registered for your directory, you'll see:
+
+```
+[specrails-hub] error: hub is running but no project registered for the current directory.
+  Run: specrails-hub add <cwd>
+```
 
 ### Implement a spec
 
@@ -86,7 +100,7 @@ This is shorthand for `specrails-hub /specrails:implement "#42"` — the hub que
 specrails-hub batch-implement "#40" "#41" "#43"
 ```
 
-Queues each spec as its own job.
+Shorthand for `/specrails:batch-implement` — runs the listed specs in one dependency-aware job.
 
 ### Health check
 
@@ -94,7 +108,7 @@ Queues each spec as its own job.
 specrails-hub health-check
 ```
 
-Runs the project's `/specrails:health-check` agent: validates the agent layout, checks for missing baseline trio agents, surfaces stale upstream agents.
+Runs `/specrails:health-check`: a comprehensive codebase health pass (tests, linting, coverage, complexity, dependency audit), comparing against previous runs to surface regressions.
 
 ### Compatibility check
 
@@ -102,28 +116,28 @@ Runs the project's `/specrails:health-check` agent: validates the agent layout, 
 specrails-hub compat-check
 ```
 
-Runs `/specrails:compat-check`: probes the installed specrails-core version against the hub's expectations and reports gaps (e.g. profile support requires ≥ 4.1.0).
+Runs `/specrails:compat-check`: snapshots the current API surface and detects breaking changes against a prior baseline, generating a migration guide when breaking changes are found.
 
-### Other known verbs
+### Known verbs
 
 These are all shorthand for `/specrails:<verb>` — the hub auto-prefixes:
 
 | Verb | What it does |
 |------|--------------|
 | `implement` | Queue a rail job for one spec |
-| `batch-implement` | Queue rail jobs for many specs |
+| `batch-implement` | Queue one job that implements many specs |
 | `why` | Explain why a chunk of code looks the way it does |
-| `propose-spec` | Draft a spec proposal from a natural-language description |
-| `get-backlog-specs` | Read your product backlog and surface candidate specs |
-| `auto-propose-backlog-specs` | Auto-propose specs from the product backlog |
+| `propose-spec` | Explore an idea and produce a structured spec proposal |
+| `get-backlog-specs` | View the prioritised spec backlog |
+| `auto-propose-backlog-specs` | Auto-propose new spec ideas from the backlog |
 | `refactor-recommender` | Scan the codebase and recommend high-leverage refactors |
-| `health-check` | Verify agent layout |
-| `compat-check` | Check specrails-core version compatibility |
-| `enrich` | Re-run the AI enrichment step for an existing install |
+| `health-check` | Run the codebase health check |
+| `compat-check` | Detect breaking API changes against a baseline |
+| `enrich` | Run the agent enrichment workflow |
 
 ### Pass a raw prompt
 
-Anything that isn't a known verb is forwarded verbatim to `claude` in the project directory:
+Anything that isn't a known verb (or starts with `/`) is forwarded verbatim to your AI CLI in the project directory:
 
 ```bash
 specrails-hub "summarise the changes since main"
@@ -140,36 +154,42 @@ specrails-hub --project my-app implement "#42"
 specrails-hub --project ~/repos/api-srv batch-implement "#5" "#6"
 ```
 
-`--project` accepts a project slug, project ID, or absolute path. Use it when you want to launch work in a project from outside its directory (e.g. from a CI runner or your home directory).
+`--project` accepts a project name or absolute path. Use it when you want to launch work in a project from outside its directory (e.g. from a CI runner or your home directory). Both `--project` and `--port` may appear **anywhere** in the command, not just at the front.
+
+## Providers
+
+The CLI is provider-agnostic in name but **always launches the project's primary provider**. CLI-routed jobs (and the offline fallback below) run on whichever provider you set as the default when you added the project — there's no flag to pick Claude vs Codex from the CLI. To choose an engine per spec or per rail on a multi-provider project, use the **dashboard** (Add Spec engine selector, rail header engine selector). See [Codex](codex.md).
 
 ## OpenSpec workflow
 
 Bundled `opsx:*` commands for structured change management of the hub itself. Run them from the project directory:
 
 ```bash
-specrails-hub /opsx:new
-specrails-hub /opsx:ff          # fast-forward — create all artifacts in one go
-specrails-hub /opsx:apply       # implement the change
-specrails-hub /opsx:verify      # reviewer pass
-specrails-hub /opsx:archive     # archive to .specrails/changes/archived/
-specrails-hub /opsx:sync        # sync delta specs to main specs (no archive)
-specrails-hub /opsx:continue    # step through artifact creation one at a time
+specrails-hub /opsx:new          # start a new change
+specrails-hub /opsx:ff           # fast-forward — create all artifacts in one go
+specrails-hub /opsx:continue     # step through artifact creation one at a time
+specrails-hub /opsx:apply        # implement the change in this conversation
+specrails-hub /opsx:verify       # completeness / correctness / coherence review
+specrails-hub /opsx:sync         # sync delta specs to main specs (no archive)
+specrails-hub /opsx:archive      # archive to openspec/changes/archive/
 ```
 
-Full lifecycle reference: [internals/openspec-workflow.md](internals/openspec-workflow.md).
+`opsx:apply` and `opsx:verify` run **in the conversation** — `apply` edits code and flips tasks from `- [ ]` to `- [x]`; `verify` reads the change artifacts and writes a completeness/correctness/coherence report. They do **not** queue a hub job or spawn the Architect → Developer → Reviewer pipeline (that's the separate `/specrails:implement` flow). Full lifecycle reference: [internals/openspec-workflow.md](internals/openspec-workflow.md).
 
 ## Diagnostic flags
 
 | Flag | What it does |
 |------|--------------|
 | `--port <n>` | Connect to (or start) the hub on a non-default port |
-| `--status` | One-shot status print, machine-friendly |
-| `--jobs` | Recent jobs table, machine-friendly |
+| `--project <name\|path>` | Target a specific project from anywhere |
+| `--status` | One-shot status print (compact text) |
+| `--jobs` | Print job history (per-project only — see the note above) |
+| `--version`, `-v` | Print the CLI version and exit |
 | `--help`, `-h` | Print usage and exit |
 
 ## When the hub isn't running
 
-If you invoke a `specrails-hub` command while the hub is not running, it falls back to invoking `claude` directly (no queue, no tracking). You'll see a `[specrails-hub] hub not running, falling back to direct claude invocation` warning. Start the hub first if you want jobs to appear in the dashboard.
+If you invoke a command that routes work (`implement`, `batch-implement`, a raw prompt, …) while the hub is not running, the CLI falls back to spawning the **`claude`** binary directly in the current directory — no queue, no Analytics tracking, and always Claude regardless of the project's primary provider. You'll see a `manager not running — invoking claude directly` line. Start the hub first if you want jobs to appear in the dashboard.
 
 ## Where to go next
 

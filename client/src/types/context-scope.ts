@@ -18,7 +18,7 @@ export interface ContextBudget {
   mcpServers: string[]
 }
 
-export type SpecMode = 'quick' | 'explore'
+export type SpecMode = 'quick' | 'explore' | 'free'
 
 export type Tier = 'Light' | 'Medium' | 'Heavy' | 'Deep'
 

@@ -167,4 +167,33 @@ describe('TicketPostitCard', () => {
     fireEvent.click(screen.getByText('Add dark mode toggle'))
     expect(onClick).not.toHaveBeenCalled()
   })
+
+  it('renders a Raw badge for a free-prompt ticket', () => {
+    render(
+      wrap(
+        <TicketPostitCard
+          ticket={makeTicket({ source: 'free-prompt' })}
+          rails={makeRails()}
+          onClick={() => {}}
+          onMoveToRail={() => {}}
+        />,
+      ),
+    )
+    expect(screen.getByTestId('raw-badge-42')).toBeInTheDocument()
+    expect(screen.getByText('Raw')).toBeInTheDocument()
+  })
+
+  it('does not render a Raw badge for a non-free-prompt ticket', () => {
+    render(
+      wrap(
+        <TicketPostitCard
+          ticket={makeTicket({ source: 'propose-spec' })}
+          rails={makeRails()}
+          onClick={() => {}}
+          onMoveToRail={() => {}}
+        />,
+      ),
+    )
+    expect(screen.queryByTestId('raw-badge-42')).not.toBeInTheDocument()
+  })
 })

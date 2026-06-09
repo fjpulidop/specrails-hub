@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { execFileSync } from 'child_process'
 import { Router, Request, Response } from 'express'
 import type { DbInstance } from './db'
 import type { WsMessage } from './types'
@@ -35,15 +36,24 @@ const BINARY_PROBE_BYTES = 8 * 1024
 // build, out, coverage, target, vendor) so the on-demand tree walk skips the same
 // heavy trees the file-summary watcher prunes; extensions handled below.
 const DENY_EXTS = new Set(['.lock', '.log'])
+// Secret-bearing extensions/names blocked as defense-in-depth so credentials are
+// never served to the (non-developer) reader even if .gitignore is missing or git
+// is unavailable. Kept conservative to avoid hiding ordinary source files.
+const SECRET_EXTS = new Set(['.pem', '.key', '.p12', '.pfx', '.keystore', '.jks'])
+const SECRET_NAMES = new Set(['id_rsa', 'id_dsa', 'id_ecdsa', 'id_ed25519'])
+const DENY_NAMES = new Set(['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'])
 
 function isDenied(entryName: string): boolean {
+  // Dotfiles (.env, .npmrc, .netrc, .git, …) are denied wholesale by prefix.
   if (entryName.startsWith('.')) return true
-  if (BUILD_DIRS.has(entryName)) return true
-  const ext = path.extname(entryName).toLowerCase()
-  if (DENY_EXTS.has(ext)) return true
-  // common lockfile names whose extension is .json/.yaml are excluded by
-  // explicit name match below.
-  if (entryName === 'package-lock.json' || entryName === 'pnpm-lock.yaml' || entryName === 'yarn.lock') return true
+  // Case-insensitive for dir/lockfile names: macOS (APFS) and Windows (NTFS) are
+  // case-insensitive, so `Node_Modules` / `Package-Lock.json` resolve to the same
+  // denied path on disk and must not slip past the policy.
+  const lower = entryName.toLowerCase()
+  if (BUILD_DIRS.has(lower)) return true
+  const ext = path.extname(lower)
+  if (DENY_EXTS.has(ext) || SECRET_EXTS.has(ext)) return true
+  if (DENY_NAMES.has(lower) || SECRET_NAMES.has(lower)) return true
   return false
 }
 
@@ -52,6 +62,41 @@ function isDenied(entryName: string): boolean {
 // and the content endpoints) — not just the top-level `all` walk.
 function isDeniedRelPath(rel: string): boolean {
   return rel.split(/[\\/]/).filter(Boolean).some(isDenied)
+}
+
+// Normalize a client-supplied relative path to POSIX separators so summary
+// (sha256 of relPath), provenance (git always emits '/'), and content lookups
+// all key off ONE canonical form regardless of the request's separator style.
+function normalizeRel(rel: string): string {
+  return rel.split(/[\\/]/).filter((seg) => seg.length > 0).join('/')
+}
+
+// Return the subset of `relPaths` that git considers ignored (honours nested
+// .gitignore, excludes tracked files — exactly the set we must hide). One batched
+// `git check-ignore` spawn. Best-effort: any git failure (no repo, no git) → no
+// paths reported, so the deny-list remains the only filter. `check-ignore` exits
+// 1 ("none ignored") which execFileSync throws on — the matched list still lands
+// on stdout, so both branches read stdout.
+function gitIgnoredSet(projectPath: string, relPaths: string[]): Set<string> {
+  if (relPaths.length === 0) return new Set()
+  let out = ''
+  try {
+    out = execFileSync('git', ['check-ignore', '--stdin', '-z'], {
+      cwd: projectPath,
+      input: relPaths.join('\0') + '\0',
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+      maxBuffer: 16 * 1024 * 1024,
+      timeout: 15_000,
+    })
+  } catch (err) {
+    out = ((err as { stdout?: string | Buffer }).stdout ?? '').toString()
+  }
+  return new Set(out.split('\0').filter((p) => p.length > 0))
+}
+
+function isGitIgnored(projectPath: string, relPath: string): boolean {
+  return gitIgnoredSet(projectPath, [relPath]).has(relPath)
 }
 
 function languageForExt(ext: string): string {
@@ -235,7 +280,9 @@ function listAllEntries(projectPath: string): Array<{ rel: string; isDir: boolea
     for (const entry of entries) {
       if (isDenied(entry.name)) continue
       const abs = path.join(dir, entry.name)
-      const rel = path.relative(projectPath, abs)
+      // Normalize to POSIX so provenance/summary lookups (which are '/'-keyed)
+      // match on Windows, where path.relative emits backslashes.
+      const rel = normalizeRel(path.relative(projectPath, abs))
       if (entry.isDirectory()) {
         out.push({ rel, isDir: true, size: null, mtime: null })
         stack.push(abs)
@@ -253,8 +300,14 @@ function listAllEntries(projectPath: string): Array<{ rel: string; isDir: boolea
       }
     }
   }
-  out.sort((a, b) => a.rel.localeCompare(b.rel))
-  return out
+  // Drop gitignored files (honours the documented .gitignore-respect contract).
+  // Directories are kept — git can't report an ignored dir without its files, and
+  // an empty dir node is harmless; its ignored children are already filtered.
+  const files = out.filter((e) => !e.isDir).map((e) => e.rel)
+  const ignored = gitIgnoredSet(projectPath, files)
+  const filtered = ignored.size > 0 ? out.filter((e) => e.isDir || !ignored.has(e.rel)) : out
+  filtered.sort((a, b) => a.rel.localeCompare(b.rel))
+  return filtered
 }
 
 function listTouchedEntries(
@@ -333,6 +386,28 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
   const listByPath = deps.listProvenanceByPath ?? listProvenanceByPath
   const listByTicket = deps.listProvenanceByTicket ?? listProvenanceByTicket
 
+  // Short-TTL per-project cache so paginating a large `all` tree reuses ONE
+  // synchronous filesystem walk instead of re-walking (and re-statting) on every
+  // page — the cursor only slices an already-materialized array. Also caches the
+  // one-readdir summary-hash set. 5s is long enough for a pagination burst and
+  // short enough that tree edits surface promptly.
+  const WALK_CACHE_TTL_MS = 5000
+  let allEntriesCache: { at: number; entries: ReturnType<typeof listAllEntries> } | null = null
+  let summaryHashCache: { at: number; set: Set<string> } | null = null
+  const nowMs = () => Date.now()
+  function getAllEntriesCached(): ReturnType<typeof listAllEntries> {
+    if (allEntriesCache && nowMs() - allEntriesCache.at < WALK_CACHE_TTL_MS) return allEntriesCache.entries
+    const entries = listAllEntries(deps.projectPath)
+    allEntriesCache = { at: nowMs(), entries }
+    return entries
+  }
+  function getSummaryHashesCached(): Set<string> {
+    if (summaryHashCache && nowMs() - summaryHashCache.at < WALK_CACHE_TTL_MS) return summaryHashCache.set
+    const set = readSummaryHashSet(deps.projectPath)
+    summaryHashCache = { at: nowMs(), set }
+    return set
+  }
+
   // Feature-flag gate — entire prefix returns 404 when disabled.
   router.use((_req, res, next) => {
     if (!isCodeExplorerEnabled()) {
@@ -365,7 +440,7 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
       }
       entries = listTouchedEntries(deps.projectPath, touchedRowsByPath)
     } else {
-      entries = listAllEntries(deps.projectPath)
+      entries = getAllEntriesCached()
       // Batch-load ALL provenance once instead of a per-entry SQL query (N+1).
       if (withProvenance) {
         for (const row of listTouchedRows(deps.db, {})) {
@@ -380,8 +455,8 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
     const nextCursor = skip + page.length < entries.length ? encodeCursor(skip + page.length) : null
 
     // Read the summaries dir ONCE into a Set of path-hashes instead of opening +
-    // parsing a JSON file per entry just to test existence.
-    const summaryHashes = readSummaryHashSet(deps.projectPath)
+    // parsing a JSON file per entry just to test existence (cached per project).
+    const summaryHashes = getSummaryHashesCached()
 
     const out: TreeEntry[] = page.map((e) => {
       const isTouchedDir = filter === 'touched-by-ai' && e.isDir
@@ -424,6 +499,12 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
       res.status(403).json({ error: 'path is excluded by the code-explorer deny-list' })
       return
     }
+    // Canonical POSIX form for all summary/provenance/hash lookups.
+    const rel = normalizeRel(relRaw)
+    if (isGitIgnored(deps.projectPath, rel)) {
+      res.status(403).json({ error: 'path is gitignored' })
+      return
+    }
     const abs = guard
 
     let stat: fs.Stats
@@ -432,8 +513,8 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
     } catch {
       // Honour the staleness scenario: even if content is unavailable, return
       // the existing summary so the client can render a "not found" banner.
-      const summary = readSummary(deps.projectPath, relRaw)
-      const provenance = listByPath(deps.db, deps.projectId, relRaw)
+      const summary = readSummary(deps.projectPath, rel)
+      const provenance = listByPath(deps.db, deps.projectId, rel)
       if (summary || provenance.length > 0) {
         res.json({
           content: null,
@@ -456,8 +537,8 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
       res.json({
         tooLarge: true,
         sizeBytes: stat.size,
-        provenance: provenanceRowsToJson(listByPath(deps.db, deps.projectId, relRaw)),
-        summary: readSummary(deps.projectPath, relRaw),
+        provenance: provenanceRowsToJson(listByPath(deps.db, deps.projectId, rel)),
+        summary: readSummary(deps.projectPath, rel),
         absolutePath: abs,
       })
       return
@@ -482,8 +563,8 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
         binary: true,
         sizeBytes: stat.size,
         mime: 'application/octet-stream',
-        provenance: provenanceRowsToJson(listByPath(deps.db, deps.projectId, relRaw)),
-        summary: readSummary(deps.projectPath, relRaw),
+        provenance: provenanceRowsToJson(listByPath(deps.db, deps.projectId, rel)),
+        summary: readSummary(deps.projectPath, rel),
         absolutePath: abs,
       })
       return
@@ -497,13 +578,13 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
       return
     }
 
-    const summary = readSummary(deps.projectPath, relRaw)
+    const summary = readSummary(deps.projectPath, rel)
     const summaryStale = await computeStaleness(abs, summary)
     res.json({
       content,
       encoding: 'utf-8',
-      language: languageForExt(path.extname(relRaw)),
-      provenance: provenanceRowsToJson(listByPath(deps.db, deps.projectId, relRaw)),
+      language: languageForExt(path.extname(rel)),
+      provenance: provenanceRowsToJson(listByPath(deps.db, deps.projectId, rel)),
       summary,
       summaryStale,
       absolutePath: abs,
@@ -525,7 +606,12 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
       res.status(403).json({ error: 'path is excluded by the code-explorer deny-list' })
       return
     }
-    const summary = readSummary(deps.projectPath, relRaw)
+    const rel = normalizeRel(relRaw)
+    if (isGitIgnored(deps.projectPath, rel)) {
+      res.status(403).json({ error: 'path is gitignored' })
+      return
+    }
+    const summary = readSummary(deps.projectPath, rel)
     if (!summary) {
       res.json({ summary: null })
       return
@@ -552,6 +638,11 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
     }
     if (isDeniedRelPath(relRaw)) {
       res.status(403).json({ error: 'path is excluded by the code-explorer deny-list' })
+      return
+    }
+    const rel = normalizeRel(relRaw)
+    if (isGitIgnored(deps.projectPath, rel)) {
+      res.status(403).json({ error: 'path is gitignored' })
       return
     }
     let stat: fs.Stats
@@ -593,7 +684,7 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
         projectPath: deps.projectPath,
         projectId: deps.projectId,
         projectSlug: deps.projectId,
-        relPath: relRaw,
+        relPath: rel,
         triggeredBy: { kind: 'user', id: 'manual', ticketId: null },
         overrideBudget: body.overrideBudget === true,
         force: true,
@@ -606,6 +697,18 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
       }
       if (result === 'skipped:per-job-cap') {
         res.status(200).json({ skipped: 'per-job-cap' })
+        return
+      }
+      // TTL-dropped (queue saturated >5min) and not-found (file vanished between
+      // the stat above and the worker) must NOT masquerade as a 202 success —
+      // surface them so the client toasts "try again" instead of silently
+      // clearing the spinner with no summary.
+      if (result === 'skipped:ttl') {
+        res.status(200).json({ skipped: 'ttl' })
+        return
+      }
+      if (result === 'skipped:not-found') {
+        res.status(200).json({ skipped: 'not-found' })
         return
       }
       if (result === 'failed') {
@@ -629,6 +732,12 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
         res.status(400).json({ error: 'path traversal not allowed' })
         return
       }
+      // Mirror the content endpoints: never leak even the metadata (which ticket/
+      // job touched it, when) of a denied/secret file.
+      if (isDeniedRelPath(relPath)) {
+        res.status(403).json({ error: 'path is excluded by the code-explorer deny-list' })
+        return
+      }
     }
     if (ticketId == null && !jobId && !relPath) {
       res.status(400).json({ error: 'ticketId, jobId, or path query parameter is required' })
@@ -640,7 +749,7 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
     }
     const rows = ticketId != null && !jobId && !relPath
       ? listByTicket(deps.db, deps.projectId, ticketId)
-      : listTouchedRows(deps.db, { ticketId, jobId, path: relPath })
+      : listTouchedRows(deps.db, { ticketId, jobId, path: relPath ? normalizeRel(relPath) : relPath })
     res.json(
       provenanceRowsToJson(rows),
     )
@@ -658,7 +767,7 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
       res.status(400).json({ error: 'path traversal not allowed' })
       return
     }
-    const diff = getProvenanceDiff(deps.db, deps.projectId, jobId, relPath)
+    const diff = getProvenanceDiff(deps.db, deps.projectId, jobId, normalizeRel(relPath))
     if (!diff) {
       res.status(404).json({ error: 'diff not available' })
       return
@@ -688,8 +797,11 @@ function resolveSafePath(projectPath: string, relPath: string): string | null {
   try {
     realRoot = fs.realpathSync.native(projectPath)
   } catch {
-    // Project root itself is unreadable — fall back to the lexical result.
-    return resolved
+    // Project root itself is uncanonicalisable — fail CLOSED. Returning the
+    // lexical path here would silently drop the symlink-escape hardening (the
+    // lexical check alone is defeatable by an in-tree symlink pointing outside
+    // the project). Reading any file is pointless if the root can't resolve.
+    return null
   }
   const realRootWithSep = realRoot.endsWith(path.sep) ? realRoot : realRoot + path.sep
   let probe = resolved

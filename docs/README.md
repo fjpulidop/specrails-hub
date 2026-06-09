@@ -14,6 +14,7 @@ If you're contributing to the hub itself or building on its API, head over to [`
 |-------|-------------|
 | [Creating specs](creating-specs.md) | …you want to draft a spec, compare two specs, save a draft, split a big epic, or refine an existing spec |
 | [Running pipelines](running-pipelines.md) | …you want to launch the AI pipeline against a spec, manage rails, pick agent profiles, or install plugins |
+| [Using Codex](codex.md) | …you added a project with OpenAI's Codex CLI instead of (or alongside) Claude |
 | [Tracking cost](tracking-cost.md) | …you want to see what AI is costing you and which specs are the most expensive |
 | [Customising the hub](customizing.md) | …you want to change theme, configure settings, set a budget, or turn on telemetry |
 | [Terminal panel](terminal.md) | …you want to use the built-in terminal: shortcuts, shell integration, drag-and-drop |
@@ -29,6 +30,7 @@ If you're contributing to the hub itself or building on its API, head over to [`
 - **"How do I install it?"** → [Getting started](getting-started.md#install)
 - **"How do I add a project?"** → [Getting started](getting-started.md#add-a-project)
 - **"Quick vs Explore mode?"** → [Creating specs › Creating a spec](creating-specs.md#creating-a-spec)
+- **"How do I use Codex instead of Claude?"** → [Using Codex](codex.md)
 - **"How do I compare two specs?"** → [Creating specs › Compare two specs side by side](creating-specs.md#compare-two-specs-side-by-side)
 - **"What's a draft?"** → [Creating specs › Drafts](creating-specs.md#drafts)
 - **"What's SMASH?"** → [Creating specs › SMASH a big spec](creating-specs.md#smash-a-big-spec)
@@ -49,3 +51,4 @@ If you're hacking on the hub, building on its API, or just curious about how it 
 - [Operations runbook](internals/operations-runbook.md) — start/stop, recovery, backups
 - [OpenSpec workflow](internals/openspec-workflow.md) — `opsx:*` change lifecycle (used by the hub itself)
 - [Profiles deep dive](internals/profiles.md) — agent profile internals
+- [Adding a provider](internals/adding-a-provider.md) — one-file guide to wiring a third AI CLI adapter

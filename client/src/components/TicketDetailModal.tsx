@@ -37,6 +37,7 @@ const SOURCE_LABELS: Record<string, string> = {
   'product-backlog': 'From product backlog',
   'propose-spec': 'From spec proposal',
   'get-backlog-specs': 'From backlog specs',
+  'free-prompt': 'From Raw prompt',
 }
 
 // ─── Props ──────────────────────────────────────────────────────────────────

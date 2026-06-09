@@ -66,6 +66,7 @@ const GUIDES_DOC_ORDER = [
   'customizing',
   'terminal',
   'cli',
+  'codex',
 ]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

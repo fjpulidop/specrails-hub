@@ -23,9 +23,15 @@ Dashboard/Jobs/Analytics/Settings).
 - **Catalog** tab — read the upstream `sr-*` agents or author custom
   `custom-*` ones via the Studio.
 
-If the project already has agents installed with per-agent model choices,
-the empty state offers **Migrate from current agents**: one click creates
-a `default` profile mirroring today's frontmatter.
+When the project has no profiles yet, the empty state offers two entry
+points:
+
+- **Migrate from current agents** — reads your existing
+  `.claude/agents/` frontmatter models and creates a `default` profile
+  mirroring today's behavior (zero-loss). It requires the baseline trio
+  `sr-architect`, `sr-developer`, and `sr-reviewer` to be present — the
+  server rejects the migration if any is missing.
+- **Blank profile** — start from scratch.
 
 ## 2. Saved profiles vs selection
 
@@ -43,25 +49,36 @@ Resolution order when no explicit selection is passed:
 
 ## 3. Pick a profile at launch
 
-- **Single feature** (Implement Wizard): the footer has a Profile dropdown
-  preselected to the project default profile when one exists. Picking a
-  different one only affects that launch.
-- **Batch** (Batch Implement Wizard): the footer has a batch-level picker
-  that applies to every rail, plus a per-feature override table when you
-  select more than one issue. Override the rows that need it; leave the
-  rest to inherit.
-- **Dashboard rails**: each rail has a compact profile dropdown in its
-  header. Pick once and it persists across launches of that rail.
+Profiles are picked on the **Dashboard rails board**, not in a separate
+wizard. Each rail header has a compact profile dropdown
+(`RailProfileSelector`):
+
+- Pick a profile once and it persists across launches of that rail
+  (stored per rail; sent inline on `POST /rails/:i/launch`, or set on its
+  own via `PUT /rails/:i/profile`).
+- Concurrent rails can run different profiles at the same time, so a batch
+  spread across rails can give each feature its own flavor of pipeline.
+- The selector **self-hides** when the project has no profiles, so it never
+  leaves an empty gap in the rail header.
 
 The "No profile" option is always available — use it to run a
 rail exactly as it did pre-4.1.0.
+
+### Codex / multi-provider
+
+Agent profiles are a **Claude-only** feature. When a rail's AI engine is
+Codex, the hub force-nulls the profile and runs the rail in legacy mode —
+Codex has no agent-profile concept. The profile selector is hidden for
+Codex rails, so a profile picked on one engine never silently applies to
+the other.
 
 ## 4. Author a custom agent (Agent Studio)
 
 From the Catalog tab, create a new custom agent via:
 
-- **Template** — pick from Security Reviewer, Data Engineer, Performance
-  Profiler, or UI/UX Polisher.
+- **Template** — start from one of ~50 curated templates spanning many
+  categories (engineering, product, data, security, …) — for example
+  Security Reviewer, Performance Profiler, Data Engineer, or UI/UX Polisher.
 - **Generate** — describe the agent in natural language; Claude drafts the
   full `.md` for you to review and edit before saving.
 - **Blank** — start from a minimal template.
@@ -77,10 +94,10 @@ see output, token count, and duration inline.
 
 ## 5. Observe
 
-- A purple **profile badge** appears on each job row showing which profile
-  it ran under.
+- A **profile badge** (themed with the `accent-primary` color) appears on
+  each job row showing which profile it ran under.
 - The **Usage** tab shows usage per profile for the last 7/30/90 days:
-  jobs, success rate, avg tokens, avg duration.
+  jobs, success rate, avg duration, avg tokens, and avg cost.
 - The **diagnostic ZIP export** on a job includes `profile.json` with
   the exact snapshot that rail used.
 
@@ -90,9 +107,15 @@ see output, token count, and duration inline.
   in the project to bring it to ≥ 4.1.0.
 - **Save disabled with "N issues to resolve"** — the live validator
   enforces the baseline trio (`sr-architect`, `sr-developer`, `sr-reviewer`)
-  and routing ordering. Fix the listed issues and Save re-enables.
+  and routing ordering. Among the rules: a `default: true` routing rule (if
+  present) must be the **last** entry in `routing` and must target
+  `sr-developer`. Fix the listed issues and Save re-enables.
 - **"agent 'xyz' already exists" (409)** — the name collides with an
   existing file in `.claude/agents/`. Pick a different name.
+- **The whole Agents section is missing** — it can be disabled server-side
+  with `SPECRAILS_AGENTS_SECTION=false`, which 404s the entire
+  `/profiles` router. Unset it (or leave it at its default) to restore the
+  section.
 
 ## 7. Reserved paths
 
@@ -104,3 +127,26 @@ see output, token count, and duration inline.
 Everything else under `.specrails/` (install-config, specrails-version,
 setup-templates) is managed by the installer and may be overwritten on
 update.
+
+## 8. For developers
+
+A few internals worth knowing if you're working on this surface:
+
+- **Version gate.** Profile-aware spawns are gated by
+  `projectSupportsProfiles()` (`server/queue-manager.ts`), which reads the
+  project's `.specrails/specrails-version` and requires
+  `specrails-core >= 4.1.0`. Below that, the rail spawns in legacy mode and
+  no profile env var is injected.
+- **Snapshot per job.** When a rail launches with a profile, the resolved
+  profile is written to
+  `~/.specrails/projects/<slug>/jobs/<jobId>/profile.json` (chmod `400`, so
+  mid-run edits are impossible) before the `claude` process spawns. The
+  spawn env then carries `SPECRAILS_PROFILE_PATH` pointing at that file.
+  The same snapshot is persisted to the `job_profiles` table for the Usage
+  analytics.
+- **REST surface.** All profile operations live under
+  `/api/projects/:projectId/profiles` — list/get/create/update/delete,
+  `/:name/duplicate`, `/:name/rename`, `/resolve`, `/migrate-from-settings`,
+  `/analytics`, `/core-version`, and the catalog routes under `/catalog`.
+  The router 404s entirely when `SPECRAILS_AGENTS_SECTION=false`. See
+  [api-reference.md](api-reference.md) for the full route list.

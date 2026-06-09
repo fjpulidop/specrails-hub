@@ -118,19 +118,35 @@ export function FileTree({ onOpenFile, selectedPath, filterJobId, filterTicketId
 
   const expandAll = useCallback(() => { setCollapsed(new Set()) }, [])
 
-  const namespace = `code-tree:${filter}:${filterJobId ?? 'all-jobs'}:${filterTicketId ?? 'all-specs'}`
+  // The job/ticket scope only affects the touched-by-ai query; in 'All files' the
+  // server response is identical regardless, so don't fork the cache key on it.
+  const scopeKey = filter === 'touched-by-ai'
+    ? `${filterJobId ?? 'all-jobs'}:${filterTicketId ?? 'all-specs'}`
+    : 'all'
+  const namespace = `code-tree:${filter}:${scopeKey}`
   const fetcher = useCallback(async (): Promise<TreeEntry[]> => {
-    const params = new URLSearchParams({ withProvenance: '1', filter })
-    if (filter === 'touched-by-ai' && filterJobId) params.set('jobId', filterJobId)
-    if (filter === 'touched-by-ai' && typeof filterTicketId === 'number') params.set('ticketId', String(filterTicketId))
-    const res = await fetch(`${getApiBase()}/code/tree?${params.toString()}`)
-    if (!res.ok) return []
-    const json = await res.json().catch(() => ({}))
-    const entries = (json as { entries?: TreeEntry[] }).entries
-    return Array.isArray(entries) ? entries : []
+    // Follow server pagination (cursor) to completion — the tree is capped at
+    // 2000 entries PER PAGE; without this loop everything after the first page is
+    // silently lost on large repos. MAX_PAGES bounds a pathological response.
+    const MAX_PAGES = 100
+    const all: TreeEntry[] = []
+    let cursor: string | null = null
+    for (let page = 0; page < MAX_PAGES; page += 1) {
+      const params = new URLSearchParams({ withProvenance: '1', filter })
+      if (filter === 'touched-by-ai' && filterJobId) params.set('jobId', filterJobId)
+      if (filter === 'touched-by-ai' && typeof filterTicketId === 'number') params.set('ticketId', String(filterTicketId))
+      if (cursor) params.set('cursor', cursor)
+      const res = await fetch(`${getApiBase()}/code/tree?${params.toString()}`)
+      if (!res.ok) break
+      const json = await res.json().catch(() => ({})) as { entries?: TreeEntry[]; nextCursor?: string | null }
+      if (Array.isArray(json.entries)) all.push(...json.entries)
+      if (!json.nextCursor) break
+      cursor = json.nextCursor
+    }
+    return all
   }, [filter, filterJobId, filterTicketId])
 
-  const { data: entries, refresh } = useProjectCache<TreeEntry[]>({
+  const { data: entries, refresh, isFirstLoad } = useProjectCache<TreeEntry[]>({
     namespace,
     projectId: activeProjectId,
     initialValue: [],
@@ -249,7 +265,11 @@ export function FileTree({ onOpenFile, selectedPath, filterJobId, filterTicketId
         )}
       </div>
 
-      {isEmpty && filter === 'touched-by-ai' ? (
+      {isEmpty && isFirstLoad ? (
+        <div className="flex-1 flex items-center justify-center px-4 text-center" data-testid="file-tree-loading">
+          <p className="text-xs text-muted-foreground animate-pulse">Loading files…</p>
+        </div>
+      ) : isEmpty && filter === 'touched-by-ai' ? (
         <div className="flex-1 flex flex-col items-center justify-center px-4 text-center gap-3">
           <p className="text-xs text-muted-foreground">
             No AI-touched files yet. Run a job, or switch to All files.

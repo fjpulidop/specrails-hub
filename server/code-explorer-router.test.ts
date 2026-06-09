@@ -4,6 +4,7 @@ import request from 'supertest'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import { execSync } from 'child_process'
 import { initDb, type DbInstance } from './db'
 import { createCodeExplorerRouter } from './code-explorer-router'
 import { writeSummary, computeFileHash } from './file-summary-manager'
@@ -441,5 +442,41 @@ describe('POST /file/regenerate-summary result surfacing', () => {
       .post('/api/projects/proj-test/code/file/regenerate-summary?path=foo.ts')
       .send({})
     expect(res.status).toBe(500)
+  })
+})
+
+describe('security: deny-list + gitignore', () => {
+  it('refuses secret-bearing names/extensions (id_rsa, *.pem) and case-variant build dirs', async () => {
+    fs.writeFileSync(path.join(projectPath, 'id_rsa'), 'PRIVATE KEY', 'utf8')
+    fs.writeFileSync(path.join(projectPath, 'server.pem'), 'CERT', 'utf8')
+    for (const p of ['id_rsa', 'server.pem', 'Node_Modules/pkg/index.js', 'Package-Lock.json']) {
+      const res = await request(app).get(`/api/projects/proj-test/code/file?path=${encodeURIComponent(p)}`)
+      expect(res.status).toBe(403)
+    }
+  })
+
+  it('does not serve gitignored files and excludes them from the all-files tree', async () => {
+    execSync('git init -q', { cwd: projectPath })
+    execSync('git config user.email t@t.local', { cwd: projectPath })
+    execSync('git config user.name t', { cwd: projectPath })
+    fs.writeFileSync(path.join(projectPath, '.gitignore'), 'secret.txt\n', 'utf8')
+    fs.writeFileSync(path.join(projectPath, 'secret.txt'), 'sshhh', 'utf8')
+    fs.writeFileSync(path.join(projectPath, 'public.ts'), 'export const x = 1\n', 'utf8')
+
+    const blocked = await request(app).get('/api/projects/proj-test/code/file?path=secret.txt')
+    expect(blocked.status).toBe(403)
+
+    const ok = await request(app).get('/api/projects/proj-test/code/file?path=public.ts')
+    expect(ok.status).toBe(200)
+
+    const tree = await request(app).get('/api/projects/proj-test/code/tree?filter=all')
+    const paths = (tree.body.entries as Array<{ path: string }>).map((e) => e.path)
+    expect(paths).toContain('public.ts')
+    expect(paths).not.toContain('secret.txt')
+  })
+
+  it('applies the deny-list to GET /provenance?path so touched-secret metadata never leaks', async () => {
+    const res = await request(app).get('/api/projects/proj-test/code/provenance?path=.env')
+    expect(res.status).toBe(403)
   })
 })

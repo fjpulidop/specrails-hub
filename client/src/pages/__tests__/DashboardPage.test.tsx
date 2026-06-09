@@ -16,7 +16,7 @@ vi.mock('../../hooks/useSharedWebSocket', () => ({
   }),
 }))
 
-const mockTickets: LocalTicket[] = [
+let mockTickets: LocalTicket[] = [
   {
     id: 1,
     title: 'Spec ticket',
@@ -99,6 +99,21 @@ describe('DashboardPage', () => {
     render(<DashboardPage />)
     expect(screen.getByTestId('specs-board-ticket-count')).toHaveTextContent('1')
     expect(screen.getByTestId('specs-board-loading')).toHaveTextContent('false')
+  })
+
+  it('includes free-prompt (Raw) tickets on the spec board', () => {
+    const original = mockTickets
+    mockTickets = [
+      ...original,
+      { ...original[0], id: 99, title: 'Raw spec', source: 'free-prompt' },
+    ]
+    try {
+      render(<DashboardPage />)
+      // Both the propose-spec and the free-prompt ticket must reach the board.
+      expect(screen.getByTestId('specs-board-ticket-count')).toHaveTextContent('2')
+    } finally {
+      mockTickets = original
+    }
   })
 
   it('shows Rails board with rail rows', () => {

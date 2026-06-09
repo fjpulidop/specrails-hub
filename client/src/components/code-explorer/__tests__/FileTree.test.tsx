@@ -69,6 +69,22 @@ describe('FileTree', () => {
     expect(screen.getByText('job-123456')).toBeInTheDocument()
   })
 
+  it('follows server cursor pagination so no entries past the first page are lost', async () => {
+    const page1 = { entries: [{ path: 'src/a.ts', kind: 'file', provenance: { modifiedByTicketIds: [] } }], nextCursor: 'cur1' }
+    const page2 = { entries: [{ path: 'src/b.ts', kind: 'file', provenance: { modifiedByTicketIds: [] } }], nextCursor: null }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page1 })
+      .mockResolvedValueOnce({ ok: true, json: async () => page2 })
+    global.fetch = fetchMock as never
+    render(wrap(<FileTree onOpenFile={() => {}} selectedPath={null} />))
+    await waitFor(() => {
+      expect(screen.getByText('a.ts')).toBeInTheDocument()
+      expect(screen.getByText('b.ts')).toBeInTheDocument()
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[1][0] as string).toContain('cursor=cur1')
+  })
+
   it('switches filter without crashing', async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ entries: [] }) }) as never
     render(wrap(<FileTree onOpenFile={() => {}} selectedPath={null} />))

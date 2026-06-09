@@ -45,7 +45,7 @@ export interface Ticket {
   created_at: string
   updated_at: string
   created_by: string
-  source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'hub' | 'explore-draft' | 'specs-smash'
+  source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'hub' | 'explore-draft' | 'specs-smash' | 'free-prompt'
   /**
    * Hub-managed review flag. Set when a job had already marked this spec `done`
    * (the agent reached its Ship phase) but the job then failed / was canceled /

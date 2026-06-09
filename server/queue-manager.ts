@@ -1285,8 +1285,8 @@ export class QueueManager {
       if (isCodeExplorerEnabled() && this._cwd && this._projectId) {
         const ref = snapshot?.ref ?? ''
         try {
-          const diff = diffAgainstSnapshot(this._cwd, ref, snapshot?.untracked)
-          const patches = collectDiffPatches(this._cwd, ref, diff)
+          const diff = diffAgainstSnapshot(this._cwd, ref, snapshot?.untracked, snapshot?.headSha)
+          const patches = collectDiffPatches(this._cwd, ref, diff, snapshot?.headSha)
           if (diff.length > 50) {
             console.warn(`[provenance.large_job] job=${jobId} files=${diff.length}`)
           }

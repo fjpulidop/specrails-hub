@@ -28,6 +28,7 @@ import {
   summaryFilePath,
   summariesDir,
   sweepOrphans,
+  __resetHubSummaryStateForTests,
   type FileSummaryDeps,
   type GenerateInput,
   type GenerateOutput,
@@ -77,6 +78,7 @@ let db: DbInstance
 beforeEach(() => {
   projectPath = mkTmpProject()
   db = initDb(':memory:')
+  __resetHubSummaryStateForTests()
 })
 
 afterEach(() => {
@@ -360,7 +362,7 @@ describe('FileSummaryManager.enqueue', () => {
       relPath: 'nowhere.ts',
       triggeredBy: { kind: 'user', id: 'u1', ticketId: null },
     })
-    expect(r).toBe('skipped:hash')
+    expect(r).toBe('skipped:not-found')
     expect(generate).not.toHaveBeenCalled()
     expect(
       broadcasts.some((b) => b.type === 'file.summary_skipped' && b.reason === 'not-found'),
@@ -564,5 +566,87 @@ describe('sweepOrphans', () => {
     const result = sweepOrphans(projectPath, 3)
     expect(result.deleted).toBe(3)
     expect(result.remaining).toBe(2)
+  })
+})
+
+describe('FileSummaryManager bug-fix regressions', () => {
+  const out: GenerateOutput = {
+    summary: 's', model: 'm', provider: 'claude', costUsd: 0.001, tokensIn: 1, tokensOut: 1, durationMs: 1,
+  }
+
+  it('coalesces concurrent enqueues of the same file (no double-generate / double-bill)', async () => {
+    writeFile(projectPath, 'src/foo.ts', 'x\n')
+    let release: () => void = () => {}
+    const gate = new Promise<void>((r) => { release = r })
+    const genFn = vi.fn(async (): Promise<GenerateOutput> => { await gate; return out })
+    const { deps } = makeDeps(db, { generate: genFn })
+    const mgr = new FileSummaryManager(deps)
+    const base = { projectPath, projectId: 'p1', projectSlug: 'p1', relPath: 'src/foo.ts', force: true } as const
+    const p1 = mgr.enqueue({ ...base, triggeredBy: { kind: 'user', id: 'u1', ticketId: null } })
+    const p2 = mgr.enqueue({ ...base, triggeredBy: { kind: 'user', id: 'u2', ticketId: null } })
+    expect(p1).toBe(p2) // second rides the first promise
+    release()
+    const [r1, r2] = await Promise.all([p1, p2])
+    expect(r1).toBe('enqueued')
+    expect(r2).toBe('enqueued')
+    expect(genFn).toHaveBeenCalledTimes(1)
+    // Exactly one ai_invocations row → billed once, not twice (the test file mocks
+    // recordInvocation to store the file-summary surface as 'job', so count rows
+    // rather than filter by surface). Fresh db → this generation is the only row.
+    const rows = db.prepare('SELECT COUNT(*) c FROM ai_invocations').get() as { c: number }
+    expect(rows.c).toBe(1)
+  })
+
+  it('re-checks the budget at dequeue (deterministic): under-budget at enqueue, over-budget at dequeue → skipped', async () => {
+    writeFile(projectPath, 'src/a.ts', 'a\n')
+    // monthToDateSpend is read twice for one enqueue: once in the enqueue gate
+    // (returns 0 → passes) and once in the pump dequeue re-check (returns 10 →
+    // skip). This isolates the dequeue re-check (#16) without any wall-clock.
+    let calls = 0
+    const genFn = vi.fn(async (): Promise<GenerateOutput> => out)
+    const { deps } = makeDeps(db, {
+      monthToDateSpend: () => (calls++ === 0 ? 0 : 10),
+      monthlyBudgetUsd: () => 5,
+      generate: genFn,
+    })
+    const mgr = new FileSummaryManager(deps)
+    const r = await mgr.enqueue({ projectPath, projectId: 'p1', projectSlug: 'p1', relPath: 'src/a.ts', force: true, triggeredBy: { kind: 'user', id: 'u1', ticketId: null } })
+    expect(r).toBe('skipped:budget')
+    expect(genFn).not.toHaveBeenCalled()
+  })
+
+  it('returns skipped:ttl (not skipped:hash) when an entry has expired (deterministic)', async () => {
+    writeFile(projectPath, 'src/a.ts', 'a\n')
+    // now() is called once for enqueuedAt then once for the pump TTL check; an
+    // incrementing stub makes the second value exceed enqueuedAt by > queueTtlMs.
+    let t = 0
+    const genFn = vi.fn(async (): Promise<GenerateOutput> => out)
+    const { deps } = makeDeps(db, { now: () => { t += 1000; return t }, generate: genFn })
+    const mgr = new FileSummaryManager(deps, { queueTtlMs: 0 })
+    const r = await mgr.enqueue({ projectPath, projectId: 'p1', projectSlug: 'p1', relPath: 'src/a.ts', force: true, triggeredBy: { kind: 'user', id: 'u1', ticketId: null } })
+    expect(r).toBe('skipped:ttl')
+    expect(genFn).not.toHaveBeenCalled()
+  })
+
+  it('dispose() aborts an in-flight generation and skips the closed-DB write', async () => {
+    writeFile(projectPath, 'src/foo.ts', 'x\n')
+    let captured: AbortSignal | undefined
+    let started: () => void = () => {}
+    const startedP = new Promise<void>((r) => { started = r })
+    const genFn = vi.fn((_input: GenerateInput, signal?: AbortSignal): Promise<GenerateOutput> => {
+      captured = signal
+      started() // resolve deterministically the moment generation begins
+      return new Promise<GenerateOutput>((_res, rej) => {
+        signal?.addEventListener('abort', () => rej(new Error('aborted')), { once: true })
+      })
+    })
+    const { deps } = makeDeps(db, { generate: genFn })
+    const mgr = new FileSummaryManager(deps)
+    const p = mgr.enqueue({ projectPath, projectId: 'p1', projectSlug: 'p1', relPath: 'src/foo.ts', force: true, triggeredBy: { kind: 'user', id: 'u1', ticketId: null } })
+    await startedP // generation has started and captured the signal
+    expect(captured).toBeDefined()
+    mgr.dispose()
+    expect(captured?.aborted).toBe(true)
+    expect(await p).toBe('failed')
   })
 })

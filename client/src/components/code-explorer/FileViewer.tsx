@@ -193,24 +193,34 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
   useEffect(() => {
     setRegenerating(false)
     setBudgetPromptOpen(false)
+    setMarkdownMode('preview')
   }, [relPath])
 
+  const reqIdRef = useRef(0)
   const fetchFile = useCallback(async () => {
+    // Monotonic request id: a slower fetch for a previously-selected file can
+    // resolve after a newer one — ignore any response that is no longer current
+    // so the viewer never shows the wrong file's content.
+    const myReq = ++reqIdRef.current
     setLoading(true)
     try {
       const res = await fetch(`${getApiBase()}/code/file?path=${encodeURIComponent(relPath)}`)
+      if (myReq !== reqIdRef.current) return
       if (!res.ok) {
         setFile(null)
         return
       }
       const json = (await res.json()) as FileResponse
+      if (myReq !== reqIdRef.current) return
       setFile(json)
     } catch {
-      setFile(null)
+      if (myReq === reqIdRef.current) setFile(null)
     } finally {
-      setLoading(false)
+      if (myReq === reqIdRef.current) setLoading(false)
     }
-  }, [relPath])
+    // activeProjectId: getApiBase() is project-scoped, so a project switch (with
+    // the same relPath) must refetch against the new project.
+  }, [relPath, activeProjectId])
 
   useEffect(() => { fetchFile() }, [fetchFile])
 
@@ -257,6 +267,13 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
         setBudgetPromptOpen(true)
         return
       }
+      // ttl / not-found / per-job-cap come back as 200 with a `skipped` reason —
+      // tell the user it was dropped instead of silently clearing the spinner.
+      if (json.skipped) {
+        setRegenerating(false)
+        toast(`Summary skipped: ${json.skipped}`)
+        return
+      }
       await fetchFile()
       setRegenerating(false)
     } catch {
@@ -265,10 +282,17 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
     }
   }, [fetchFile, relPath])
 
-  const copyAbsolutePath = useCallback(() => {
+  const copyAbsolutePath = useCallback(async () => {
     const abs = file?.absolutePath ?? relPath
-    try { navigator.clipboard?.writeText(abs) } catch { /* ignore */ }
-    toast.success('Path copied')
+    try {
+      // writeText rejects ASYNC (insecure origin, unfocused doc, Tauri webview);
+      // await so a failure doesn't leak an unhandled rejection AND so the success
+      // toast only fires when the clipboard actually received the path.
+      await navigator.clipboard?.writeText(abs)
+      toast.success('Path copied')
+    } catch {
+      toast.error('Could not copy path')
+    }
   }, [file, relPath])
 
   // Hook order must be stable across renders — declare BEFORE any early return.
