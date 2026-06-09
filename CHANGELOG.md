@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.63.0](https://github.com/fjpulidop/specrails-hub/compare/v1.62.0...v1.63.0) (2026-06-09)
+
+
+### Features
+
+* **rails:** add Ultracode rail mode (Claude-only, autonomous, no OpenSpec) ([#354](https://github.com/fjpulidop/specrails-hub/issues/354)) ([6464f85](https://github.com/fjpulidop/specrails-hub/commit/6464f85aba20946f9a548cab54d8aa5d5188b60c))
+
 ## [1.62.0](https://github.com/fjpulidop/specrails-hub/compare/v1.61.4...v1.62.0) (2026-06-09)
 
 
