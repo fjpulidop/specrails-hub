@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.63.1](https://github.com/fjpulidop/specrails-hub/compare/v1.63.0...v1.63.1) (2026-06-09)
+
+
+### Bug Fixes
+
+* **cost:** accurate per-job token & USD cost for Claude and Codex (+ Explore composer fix, README) ([#356](https://github.com/fjpulidop/specrails-hub/issues/356)) ([d9efd01](https://github.com/fjpulidop/specrails-hub/commit/d9efd01265d8483dfa4ff4288cff98178505b6f1))
+
 ## [1.63.0](https://github.com/fjpulidop/specrails-hub/compare/v1.62.0...v1.63.0) (2026-06-09)
 
 
