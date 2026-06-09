@@ -23,6 +23,7 @@ import { DashboardSplitter } from '../components/DashboardSplitter'
 import { useDashboardSplit } from '../hooks/useDashboardSplit'
 import { TicketDetailModal } from '../components/TicketDetailModal'
 import { CreateTicketModal } from '../components/CreateTicketModal'
+import { UltracodeLaunchDialog } from '../components/UltracodeLaunchDialog'
 import { getApiBase } from '../lib/api'
 import { useHub, projectProviders } from '../hooks/useHub'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
@@ -70,6 +71,7 @@ interface PersistedRail {
   mode: RailMode
   status: RailStatus
   profileName?: string | null
+  ultracodeModel?: import('../components/agents/RailModelSelector').UltracodeModel | null
 }
 
 function loadRails(projectId: string | null): RailState[] | null {
@@ -99,6 +101,8 @@ export default function DashboardPage() {
   const { specToOpen, clearSpecToOpen } = useSpecGenTracker()
   const [detailTicket, setDetailTicket] = useState<LocalTicket | null>(null)
   const [createTicketOpen, setCreateTicketOpen] = useState(false)
+  // Rail pending an ultracode-launch confirmation (variable-cost warning modal).
+  const [ultracodeConfirm, setUltracodeConfirm] = useState<{ railId: string } | null>(null)
 
   // Open a spec when the tracker signals "View" was clicked for this project
   useEffect(() => {
@@ -619,8 +623,19 @@ export default function DashboardPage() {
     }
   }
 
+  function handleUltracodeModelChange(railId: string, model: import('../components/agents/RailModelSelector').UltracodeModel) {
+    // Model lives in localStorage (like mode) and is sent inline at launch —
+    // no dedicated server endpoint needed.
+    updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, ultracodeModel: model } : r)))
+  }
+
   async function handleEngineChange(railId: string, aiEngine: 'claude' | 'codex') {
-    updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, aiEngine } : r)))
+    // Ultracode is Claude-only — if the rail leaves Claude while in Ultracode,
+    // fall back to implement so the launch can't 400.
+    updateRails((prev) => prev.map((r) =>
+      r.id === railId
+        ? { ...r, aiEngine, mode: aiEngine !== 'claude' && r.mode === 'ultracode' ? 'implement' : r.mode }
+        : r))
     const railIndex = rails.findIndex((r) => r.id === railId)
     if (railIndex === -1) return
     try {
@@ -654,6 +669,21 @@ export default function DashboardPage() {
 
     if (rail.ticketIds.length === 0) return
 
+    // Ultracode bypasses OpenSpec and has variable cost — confirm before launch.
+    if (rail.mode === 'ultracode') {
+      setUltracodeConfirm({ railId })
+      return
+    }
+
+    await doLaunchRail(railId)
+  }
+
+  async function doLaunchRail(railId: string) {
+    const railIndex = rails.findIndex((r) => r.id === railId)
+    if (railIndex === -1) return
+    const rail = rails[railIndex]
+    if (rail.ticketIds.length === 0) return
+
     // Sync ticket assignments to server before launching
     try {
       await fetch(`${getApiBase()}/rails/${railIndex}/tickets`, {
@@ -679,6 +709,8 @@ export default function DashboardPage() {
           // rail.aiEngine: explicit per-rail engine override; undefined → server
           // falls back to the stored rail engine or the project primary.
           ...(rail.aiEngine != null ? { aiEngine: rail.aiEngine } : {}),
+          // Ultracode model picker — only meaningful for ultracode launches.
+          ...(rail.mode === 'ultracode' && rail.ultracodeModel ? { model: rail.ultracodeModel } : {}),
         }),
       })
       if (!res.ok) {
@@ -754,6 +786,7 @@ export default function DashboardPage() {
             onModeChange={handleModeChange}
             onProfileChange={handleProfileChange}
             onEngineChange={handleEngineChange}
+            onUltracodeModelChange={handleUltracodeModelChange}
             onToggle={handleToggle}
             onTicketClick={setDetailTicket}
             onAddRail={handleAddRail}
@@ -838,6 +871,24 @@ export default function DashboardPage() {
         onClose={() => setCreateTicketOpen(false)}
         onCreate={createTicket}
       />
+
+      {(() => {
+        const r = ultracodeConfirm ? rails.find((x) => x.id === ultracodeConfirm.railId) : undefined
+        return (
+          <UltracodeLaunchDialog
+            open={!!ultracodeConfirm && !!r}
+            railLabel={r?.label ?? ''}
+            specCount={r?.ticketIds.length ?? 0}
+            model={r?.ultracodeModel ?? 'sonnet'}
+            onCancel={() => setUltracodeConfirm(null)}
+            onConfirm={() => {
+              const id = ultracodeConfirm?.railId
+              setUltracodeConfirm(null)
+              if (id) void doLaunchRail(id)
+            }}
+          />
+        )
+      })()}
     </DndContext>
   )
 }

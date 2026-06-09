@@ -12,7 +12,10 @@ declare module 'express-serve-static-core' {
   }
 }
 
-const VALID_MODES = new Set(['implement', 'batch-implement'])
+const VALID_MODES = new Set(['implement', 'batch-implement', 'ultracode'])
+// Models the ultracode picker exposes (Claude aliases). Mirrors the client
+// RailModelSelector options and the project-router orchestrator-model allow-list.
+const VALID_ULTRACODE_MODELS = new Set(['haiku', 'sonnet', 'opus'])
 
 export function createRailsRouter(): Router {
   const router = Router({ mergeParams: true })
@@ -130,9 +133,16 @@ export function createRailsRouter(): Router {
       res.status(400).json({ error: 'Invalid rail index' }); return
     }
 
-    const { mode = 'implement', profileName, aiEngine } = req.body ?? {}
+    const { mode = 'implement', profileName, aiEngine, model } = req.body ?? {}
     if (!VALID_MODES.has(mode as string)) {
-      res.status(400).json({ error: 'mode must be "implement" or "batch-implement"' }); return
+      res.status(400).json({ error: 'mode must be "implement", "batch-implement" or "ultracode"' }); return
+    }
+    // Ultracode model picker: optional, validated against the allow-list.
+    // Ignored for non-ultracode modes (they use the orchestrator model).
+    if (mode === 'ultracode' && model !== undefined && model !== null) {
+      if (typeof model !== 'string' || !VALID_ULTRACODE_MODELS.has(model)) {
+        res.status(400).json({ error: 'model must be one of: haiku, sonnet, opus' }); return
+      }
     }
 
     const c = ctx(req)
@@ -154,11 +164,20 @@ export function createRailsRouter(): Router {
     // single-provider rails on the legacy code path).
     const railProvider = requestedEngine ? engineCheck.provider : undefined
 
+    // Ultracode bypasses the OpenSpec pipeline and hands the raw spec to
+    // Claude. It is Claude-only — reject when the effective engine is not claude.
+    if (mode === 'ultracode' && engineCheck.provider !== 'claude') {
+      res.status(400).json({ error: 'Ultracode requires the Claude provider' }); return
+    }
+
     // Profile selection precedence: explicit body param > stored rail profile > default resolution.
     // `null` in the body explicitly forces legacy mode. Codex has no agent
     // profiles, so force legacy mode whenever the chosen engine is not claude.
     let resolvedProfile: string | null | undefined
-    if (railProvider && railProvider !== 'claude') {
+    if (mode === 'ultracode') {
+      // Ultracode runs no agent pipeline, so profiles do not apply.
+      resolvedProfile = null
+    } else if (railProvider && railProvider !== 'claude') {
       resolvedProfile = null
     } else if (profileName === null) {
       resolvedProfile = null
@@ -173,7 +192,44 @@ export function createRailsRouter(): Router {
     try {
       let jobId: string
 
-      // Both modes create a single job with all ticket IDs.
+      if (mode === 'ultracode') {
+        // Ultracode launches ONE independent Claude job per ticket — each gets
+        // its own log and runs the spec autonomously (no pipeline). The rail UI
+        // tracks the first job as its representative active job; every job is
+        // registered so its ticket is marked done on completion.
+        // `provider: 'claude'` is explicit so the spawn resolves the claude
+        // adapter regardless of the project's primary.
+        const ultracodeModel =
+          mode === 'ultracode' && typeof model === 'string' && VALID_ULTRACODE_MODELS.has(model)
+            ? model
+            : undefined
+        const jobIds: string[] = []
+        for (const ticketId of rail.ticketIds) {
+          const command = `/specrails:ultracode #${ticketId} --yes`
+          const job = c.queueManager.enqueue(command, 'normal', {
+            profileName: null,
+            provider: 'claude',
+            ...(ultracodeModel ? { model: ultracodeModel } : {}),
+          })
+          jobIds.push(job.id)
+          c.railJobs.set(job.id, { railIndex, mode, ticketIds: [ticketId] })
+        }
+        jobId = jobIds[0]
+
+        const startMsg: RailJobStartedMessage = {
+          type: 'rail.job_started',
+          projectId: c.project.id,
+          railIndex,
+          jobId,
+          mode,
+        }
+        c.broadcast(startMsg)
+
+        res.status(202).json({ jobId, jobIds, railIndex, mode })
+        return
+      }
+
+      // Implement / batch-implement create a single job with all ticket IDs.
       // /specrails:implement handles multiple specs in parallel internally.
       const issueArgs = rail.ticketIds.map((id) => `#${id}`).join(' ')
       const commandName = mode === 'batch-implement' ? 'batch-implement' : 'implement'

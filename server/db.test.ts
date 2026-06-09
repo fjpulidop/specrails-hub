@@ -20,6 +20,10 @@ import {
   getTemplate,
   updateTemplate,
   deleteTemplate,
+  getProjectSettings,
+  updateProjectSettings,
+  getUltracodePrePrompt,
+  DEFAULT_ULTRACODE_PRE_PROMPT,
 } from './db'
 import type { DbInstance } from './db'
 
@@ -564,4 +568,29 @@ describe('job templates', () => {
 
   // The Explore MCP / Contract Refine project toggles were removed; the
   // decisions now live exclusively per-spec in chat_conversations.context_scope.
+})
+
+describe('project settings — ultracode pre-prompt', () => {
+  let db: ReturnType<typeof makeDb>
+  beforeEach(() => { db = makeDb() })
+
+  it('defaults ultraPrePrompt to empty string', () => {
+    expect(getProjectSettings(db).ultraPrePrompt).toBe('')
+  })
+
+  it('persists and clears the ultraPrePrompt override', () => {
+    updateProjectSettings(db, { ultraPrePrompt: 'Be bold.' })
+    expect(getProjectSettings(db).ultraPrePrompt).toBe('Be bold.')
+    updateProjectSettings(db, { ultraPrePrompt: '   ' })
+    expect(getProjectSettings(db).ultraPrePrompt).toBe('')
+  })
+
+  it('getUltracodePrePrompt falls back to the default when unset', () => {
+    expect(getUltracodePrePrompt(db)).toBe(DEFAULT_ULTRACODE_PRE_PROMPT)
+  })
+
+  it('getUltracodePrePrompt returns the trimmed override when set', () => {
+    updateProjectSettings(db, { ultraPrePrompt: '  Custom instruction.  ' })
+    expect(getUltracodePrePrompt(db)).toBe('Custom instruction.')
+  })
 })

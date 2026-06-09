@@ -3666,7 +3666,7 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   router.patch('/:projectId/settings', (req: Request, res: Response) => {
-    const { pipelineTelemetryEnabled, orchestratorModel, prePrompt } = req.body ?? {}
+    const { pipelineTelemetryEnabled, orchestratorModel, prePrompt, ultraPrePrompt } = req.body ?? {}
     const patch: Parameters<typeof updateProjectSettings>[1] = {}
     if (pipelineTelemetryEnabled !== undefined) {
       patch.pipelineTelemetryEnabled = Boolean(pipelineTelemetryEnabled)
@@ -3685,6 +3685,13 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
         return
       }
       patch.prePrompt = prePrompt
+    }
+    if (ultraPrePrompt !== undefined) {
+      if (typeof ultraPrePrompt !== 'string') {
+        res.status(400).json({ error: 'ultraPrePrompt must be a string' })
+        return
+      }
+      patch.ultraPrePrompt = ultraPrePrompt
     }
     try {
       updateProjectSettings(ctx(req).db, patch)

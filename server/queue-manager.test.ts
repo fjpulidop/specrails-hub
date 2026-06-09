@@ -1642,6 +1642,100 @@ describe('QueueManager', () => {
       expect(spawnArgs[pIdx + 1]).not.toContain('$implement')
     })
 
+    it('ultracode: sends default pre-prompt + spec text as the claude -p prompt (no slash command)', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('ultracode-default' as any)
+
+      const projectDir = makeProjectDirWithTickets({
+        '7': {
+          id: 7, title: 'Add dark mode', description: 'Toggle theme in settings',
+          status: 'todo', priority: 'high', labels: [], assignee: null,
+          prerequisites: [], metadata: {},
+          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+          created_by: 'user', source: 'manual',
+        },
+      })
+      try {
+        const qm = new QueueManager(broadcast, undefined, [], projectDir, { provider: 'claude' })
+        qm.enqueue('/specrails:ultracode #7 --yes')
+
+        const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+        const pIdx = spawnArgs.indexOf('-p')
+        const prompt = spawnArgs[pIdx + 1]
+        expect(prompt).toContain('ULTRACODE')
+        expect(prompt).toContain('# Spec #7: Add dark mode')
+        expect(prompt).toContain('Toggle theme in settings')
+        // The slash command itself must NOT be sent as the prompt.
+        expect(prompt).not.toContain('/specrails:ultracode')
+      } finally {
+        fs.rmSync(projectDir, { recursive: true, force: true })
+      }
+    })
+
+    it('ultracode: uses the per-project pre-prompt override when set', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('ultracode-override' as any)
+
+      const projectDir = makeProjectDirWithTickets({
+        '3': {
+          id: 3, title: 'Spec three', description: 'Body three',
+          status: 'todo', priority: 'low', labels: [], assignee: null,
+          prerequisites: [], metadata: {},
+          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+          created_by: 'user', source: 'manual',
+        },
+      })
+      const db = initDb(':memory:')
+      updateProjectSettings(db, { ultraPrePrompt: 'CUSTOM ULTRA INSTRUCTION' })
+      try {
+        const qm = new QueueManager(broadcast, db, [], projectDir, { provider: 'claude' })
+        qm.enqueue('/specrails:ultracode #3 --yes')
+
+        const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+        const prompt = spawnArgs[spawnArgs.indexOf('-p') + 1]
+        expect(prompt).toContain('CUSTOM ULTRA INSTRUCTION')
+        expect(prompt).toContain('# Spec #3: Spec three')
+      } finally {
+        db.close()
+        fs.rmSync(projectDir, { recursive: true, force: true })
+      }
+    })
+
+    it('ultracode: model override is passed as --model, overriding orchestrator', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(mockUuidV4).mockReturnValue('ultracode-model' as any)
+
+      const projectDir = makeProjectDirWithTickets({
+        '9': {
+          id: 9, title: 'Spec nine', description: 'Body nine',
+          status: 'todo', priority: 'low', labels: [], assignee: null,
+          prerequisites: [], metadata: {},
+          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+          created_by: 'user', source: 'manual',
+        },
+      })
+      const db = initDb(':memory:')
+      updateProjectSettings(db, { orchestratorModel: 'sonnet' })
+      try {
+        const qm = new QueueManager(broadcast, db, [], projectDir, { provider: 'claude' })
+        qm.enqueue('/specrails:ultracode #9 --yes', 'normal', { profileName: null, model: 'opus' })
+
+        const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+        const mIdx = spawnArgs.indexOf('--model')
+        expect(mIdx).toBeGreaterThanOrEqual(0)
+        expect(spawnArgs[mIdx + 1]).toBe('opus')
+      } finally {
+        db.close()
+        fs.rmSync(projectDir, { recursive: true, force: true })
+      }
+    })
+
     it('embeds referenced ticket attachments in the codex prompt', () => {
       vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/codex'))
       const child = createMockChildProcess()

@@ -175,3 +175,84 @@ describe('rails-router POST /:railIndex/launch with aiEngine', () => {
     expect((enqueue.mock.calls[0][2] as { provider?: string }).provider).toBeUndefined()
   })
 })
+
+describe('rails-router POST /:railIndex/launch ultracode mode', () => {
+  let db: DbInstance
+  beforeEach(() => { db = initDb(':memory:') })
+  afterEach(() => { db.close() })
+
+  it('enqueues one claude job per ticket with an ultracode command and no profile', async () => {
+    setRailTickets(db, 0, [5, 7])
+    let n = 0
+    const enqueue = vi.fn().mockImplementation(() => ({ id: `job-${++n}`, queuePosition: 0 }))
+    const railJobs = new Map<string, unknown>()
+    const app = express()
+    app.use(express.json())
+    app.use((req, _res, next) => {
+      ;(req as unknown as { projectCtx: unknown }).projectCtx = {
+        db, railJobs,
+        project: { id: 'p1', slug: 's1', provider: 'claude', providers: ['claude'] },
+        queueManager: { enqueue },
+        broadcast: () => {},
+      }
+      next()
+    })
+    app.use('/rails', createRailsRouter())
+
+    const res = await request(app).post('/rails/0/launch').send({ mode: 'ultracode' })
+    expect(res.status).toBe(202)
+    expect(res.body.jobIds).toEqual(['job-1', 'job-2'])
+    expect(res.body.jobId).toBe('job-1')
+    expect(enqueue).toHaveBeenCalledTimes(2)
+    expect(enqueue.mock.calls[0][0]).toBe('/specrails:ultracode #5 --yes')
+    expect(enqueue.mock.calls[1][0]).toBe('/specrails:ultracode #7 --yes')
+    const opts = enqueue.mock.calls[0][2] as { provider?: string; profileName?: unknown }
+    expect(opts.provider).toBe('claude')
+    expect(opts.profileName).toBeNull()
+    // Each job registered against the rail with its single ticket.
+    expect(railJobs.size).toBe(2)
+  })
+
+  it('rejects ultracode when the effective engine is not claude', async () => {
+    setRailTickets(db, 0, [1], 'implement', null, 'codex')
+    const enqueue = vi.fn()
+    const res = await request(appWith(db, { providers: ['claude', 'codex'], queueManager: { enqueue } }))
+      .post('/rails/0/launch').send({ mode: 'ultracode', aiEngine: 'codex' })
+    expect(res.status).toBe(400)
+    expect(enqueue).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unknown mode', async () => {
+    setRailTickets(db, 0, [1])
+    const res = await request(appWith(db, { queueManager: { enqueue: vi.fn() } }))
+      .post('/rails/0/launch').send({ mode: 'bogus' })
+    expect(res.status).toBe(400)
+  })
+
+  it('passes a valid ultracode model through to enqueue', async () => {
+    setRailTickets(db, 0, [1])
+    const enqueue = vi.fn().mockReturnValue({ id: 'job-1', queuePosition: 0 })
+    const res = await request(appWith(db, { providers: ['claude'], queueManager: { enqueue } }))
+      .post('/rails/0/launch').send({ mode: 'ultracode', model: 'opus' })
+    expect(res.status).toBe(202)
+    expect((enqueue.mock.calls[0][2] as { model?: string }).model).toBe('opus')
+  })
+
+  it('rejects an invalid ultracode model', async () => {
+    setRailTickets(db, 0, [1])
+    const enqueue = vi.fn()
+    const res = await request(appWith(db, { providers: ['claude'], queueManager: { enqueue } }))
+      .post('/rails/0/launch').send({ mode: 'ultracode', model: 'gpt-5' })
+    expect(res.status).toBe(400)
+    expect(enqueue).not.toHaveBeenCalled()
+  })
+
+  it('omits model from enqueue when none is provided', async () => {
+    setRailTickets(db, 0, [1])
+    const enqueue = vi.fn().mockReturnValue({ id: 'job-1', queuePosition: 0 })
+    const res = await request(appWith(db, { providers: ['claude'], queueManager: { enqueue } }))
+      .post('/rails/0/launch').send({ mode: 'ultracode' })
+    expect(res.status).toBe(202)
+    expect((enqueue.mock.calls[0][2] as { model?: string }).model).toBeUndefined()
+  })
+})

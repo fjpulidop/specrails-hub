@@ -2,7 +2,7 @@ import { Play, Square, AlertTriangle, ScrollText } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from './ui/button'
 
-export type RailMode = 'implement' | 'batch-implement'
+export type RailMode = 'implement' | 'batch-implement' | 'ultracode'
 export type RailStatus = 'idle' | 'running' | 'failed'
 
 interface RailControlsProps {
@@ -10,11 +10,14 @@ interface RailControlsProps {
   status: RailStatus
   activeJobId?: string
   ticketCount: number
+  /** When true, show the Claude-only Ultracode segment. Ultracode bypasses
+   *  the OpenSpec pipeline and lets Claude implement the spec autonomously. */
+  ultracodeAvailable?: boolean
   onModeChange: (mode: RailMode) => void
   onToggle: () => void
 }
 
-export function RailControls({ mode, status, activeJobId, ticketCount, onModeChange, onToggle }: RailControlsProps) {
+export function RailControls({ mode, status, activeJobId, ticketCount, ultracodeAvailable, onModeChange, onToggle }: RailControlsProps) {
   const navigate = useNavigate()
   const canPlay = ticketCount > 0
   return (
@@ -58,6 +61,23 @@ export function RailControls({ mode, status, activeJobId, ticketCount, onModeCha
         >
           Batch
         </button>
+        {ultracodeAvailable && (
+          <>
+            <div className="w-px h-3 bg-border/40 shrink-0" />
+            <button
+              type="button"
+              className={`px-2 py-0.5 transition-colors ${
+                mode === 'ultracode'
+                  ? 'bg-accent-highlight/20 text-accent-highlight font-semibold'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+              }`}
+              onClick={() => onModeChange('ultracode')}
+              title="Ultracode — Claude implements the spec autonomously, no pipeline"
+            >
+              Ultra
+            </button>
+          </>
+        )}
       </div>
 
       {/* Play / Stop / Failed toggle */}

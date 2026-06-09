@@ -2247,6 +2247,26 @@ describe('project-router', () => {
       expect(res.status).toBe(200)
       expect(res.body.ok).toBe(true)
     })
+
+    it('updates ultraPrePrompt', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .patch('/api/projects/proj-1/settings')
+        .send({ ultraPrePrompt: 'Ship it autonomously.' })
+      expect(res.status).toBe(200)
+      expect(res.body.settings.ultraPrePrompt).toBe('Ship it autonomously.')
+    })
+
+    it('rejects non-string ultraPrePrompt', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+      const res = await request(app)
+        .patch('/api/projects/proj-1/settings')
+        .send({ ultraPrePrompt: 7 })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toContain('ultraPrePrompt')
+    })
   })
 
   // ─── POST /config dailyBudgetUsd ─────────────────────────────────────────
