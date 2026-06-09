@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.65.0](https://github.com/fjpulidop/specrails-hub/compare/v1.64.0...v1.65.0) (2026-06-09)
+
+
+### Features
+
+* spec-from-prompt (Raw mode) + onboarding rework + code-explorer hardening ([#360](https://github.com/fjpulidop/specrails-hub/issues/360)) ([baf5227](https://github.com/fjpulidop/specrails-hub/commit/baf52272361f6f52dc78ddcbd6eb07172d97016c))
+
 ## [1.64.0](https://github.com/fjpulidop/specrails-hub/compare/v1.63.1...v1.64.0) (2026-06-09)
 
 
