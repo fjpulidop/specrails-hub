@@ -136,10 +136,23 @@ export interface ScreencastFrame {
   height: number
 }
 
-/** The element under a point, for hover-to-select highlighting. */
+/** One node in the hovered element's ancestor breadcrumb. */
+export interface BreadcrumbSegment {
+  /** Short human label, e.g. "div.container" or "button#cta". */
+  label: string
+  /** Stable-ish CSS selector to re-resolve this node (for up/down navigation). */
+  selector: string
+}
+
+/** The element under a point (or re-resolved by selector), for hover-to-select
+ *  highlighting + DevTools-style breadcrumb navigation. */
 export interface ElementProbe {
   rect: CaptureRect
   tag: string
+  /** Selector for the probed element (used to step to parent/child). */
+  selector: string
+  /** Ancestor chain root→element (inclusive), capped for readability. */
+  path: BreadcrumbSegment[]
 }
 
 /** Minimal page abstraction the manager drives. Implemented for real over CDP in
@@ -162,6 +175,9 @@ export interface BrowserPageHandle {
   extractDom(rect: CaptureRect, htmlByteCap: number): Promise<CapturedDom>
   /** The element at a viewport point (for hover-to-select highlighting). */
   probeElementAt(point: { x: number; y: number }): Promise<ElementProbe | null>
+  /** Re-resolve an element by selector and optionally step to its parent/child,
+   *  for breadcrumb navigation. Optional — unimplemented handles can't navigate. */
+  navigateElement?(selector: string, direction: 'parent' | 'child' | 'self'): Promise<ElementProbe | null>
   /** Begin capturing the page's network requests (best-effort, idempotent).
    *  Optional — a handle that doesn't implement it simply captures no network. */
   enableNetwork?(): Promise<void>

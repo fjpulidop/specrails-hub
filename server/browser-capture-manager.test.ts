@@ -60,7 +60,11 @@ class FakePage implements BrowserPageHandle {
   clips: CaptureRect[] = []
   async screenshotClip(rect: CaptureRect) { this.clips.push(rect); return Buffer.from('PNGDATA') }
   async extractDom() { return makeDom() }
-  async probeElementAt(point: { x: number; y: number }) { return { rect: { x: point.x, y: point.y, width: 50, height: 20 }, tag: 'div' } }
+  async probeElementAt(point: { x: number; y: number }) { return { rect: { x: point.x, y: point.y, width: 50, height: 20 }, tag: 'div', selector: 'div.box', path: [{ label: 'body', selector: 'body' }, { label: 'div.box', selector: 'div.box' }] } }
+  async navigateElement(selector: string, direction: 'parent' | 'child' | 'self') {
+    if (direction === 'parent' && selector === 'body') return null
+    return { rect: { x: 0, y: 0, width: 10, height: 10 }, tag: direction === 'parent' ? 'section' : 'span', selector: `${selector} ${direction}`, path: [{ label: 'body', selector: 'body' }, { label: 'x', selector: `${selector} ${direction}` }] }
+  }
   async enableNetwork() { this.enabledNetwork = true }
   recentNetwork() { return this.network }
   anchorSelector: string | null = '#el'
@@ -424,10 +428,25 @@ describe('BrowserCaptureManager', () => {
     const { mgr } = makeManager({ db })
     const meta = await mgr.create()
     const probe = await mgr.probeElement(meta.id, { x: 12, y: 34 })
-    expect(probe).toEqual({ rect: { x: 12, y: 34, width: 50, height: 20 }, tag: 'div' })
+    expect(probe!.rect).toEqual({ x: 12, y: 34, width: 50, height: 20 })
+    expect(probe!.tag).toBe('div')
+    expect(probe!.path.map((p) => p.label)).toEqual(['body', 'div.box'])
     expect(await mgr.probeElement('nope', { x: 0, y: 0 })).toBeNull()
     await mgr.shutdown()
     expect(await mgr.probeElement(meta.id, { x: 0, y: 0 })).toBeNull()
+  })
+
+  it('navigateElement steps the breadcrumb to parent/child/self; null when it cannot', async () => {
+    const { mgr } = makeManager({ db })
+    const meta = await mgr.create()
+    const up = await mgr.navigateElement(meta.id, 'div.box', 'parent')
+    expect(up!.selector).toBe('div.box parent')
+    expect(up!.tag).toBe('section')
+    expect(up!.path.length).toBeGreaterThan(0)
+    const down = await mgr.navigateElement(meta.id, 'div.box', 'child')
+    expect(down!.tag).toBe('span')
+    expect(await mgr.navigateElement(meta.id, 'body', 'parent')).toBeNull() // can't go above body
+    expect(await mgr.navigateElement('nope', 'div', 'self')).toBeNull()
   })
 
   it('kills a session, closing page + clients; unknown kill returns false', async () => {

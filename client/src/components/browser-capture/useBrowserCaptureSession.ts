@@ -6,12 +6,15 @@ import {
   captureBrowserRegion,
   captureBrowserBreakpoints,
   browserClipboard,
+  navigateBrowserElement,
   killBrowserSession,
   BrowserSessionLimitError,
   BrowserLaunchFailedError,
   type BrowserInputEvent,
+  type BreadcrumbSegment,
   type CaptureRect,
   type CaptureResult,
+  type ElementProbe,
 } from '../../lib/browser-capture'
 
 export type SessionStatus = 'connecting' | 'ready' | 'error'
@@ -25,6 +28,10 @@ export interface BrowserSessionState {
   /** Bounding box (viewport coords) of the element under the cursor in select
    *  mode — server-resolved via the hover probe; null when nothing is hovered. */
   hoverRect: CaptureRect | null
+  /** Selector of the hovered element (for breadcrumb up/down navigation). */
+  hoverSelector: string | null
+  /** Ancestor breadcrumb (root→element) of the hovered element. */
+  hoverPath: BreadcrumbSegment[] | null
 }
 
 export interface UseBrowserCaptureSession extends BrowserSessionState {
@@ -37,6 +44,8 @@ export interface UseBrowserCaptureSession extends BrowserSessionState {
   setViewport: (width: number, height: number) => void
   /** Bridge the host clipboard to the page (copy/cut → returns selection; paste → inject). */
   clipboard: (action: 'copy' | 'paste' | 'cut', text?: string) => Promise<{ text: string }>
+  /** Step the breadcrumb to a parent/child/self element; null when can't step. */
+  navigateElement: (selector: string, direction: 'parent' | 'child' | 'self') => Promise<ElementProbe | null>
   /** Ask the server which element is at a viewport point (hover-to-select). */
   probe: (point: { x: number; y: number }) => void
   /** Clear the current hover highlight. */
@@ -68,6 +77,8 @@ export function useBrowserCaptureSession(opts: {
     title: null,
     viewport: { width: 1280, height: 800 },
     hoverRect: null,
+    hoverSelector: null,
+    hoverPath: null,
   })
 
   const drawFrame = useCallback(async (buf: ArrayBuffer) => {
@@ -116,13 +127,13 @@ export function useBrowserCaptureSession(opts: {
         ws.onmessage = (ev: MessageEvent) => {
           if (typeof ev.data === 'string') {
             try {
-              const msg = JSON.parse(ev.data) as { type: string; url?: string; title?: string; viewport?: { width: number; height: number }; rect?: CaptureRect | null }
+              const msg = JSON.parse(ev.data) as { type: string; url?: string; title?: string; viewport?: { width: number; height: number }; rect?: CaptureRect | null; selector?: string | null; path?: BreadcrumbSegment[] | null }
               if (msg.type === 'ready') {
                 setState((s) => ({ ...s, status: 'ready', url: msg.url ?? s.url, title: msg.title ?? s.title, viewport: msg.viewport ?? s.viewport }))
               } else if (msg.type === 'nav') {
                 setState((s) => ({ ...s, url: msg.url ?? s.url, title: msg.title ?? s.title }))
               } else if (msg.type === 'hover') {
-                setState((s) => ({ ...s, hoverRect: msg.rect ?? null }))
+                setState((s) => ({ ...s, hoverRect: msg.rect ?? null, hoverSelector: msg.selector ?? null, hoverPath: msg.path ?? null }))
               }
             } catch {
               /* ignore */
@@ -220,7 +231,13 @@ export function useBrowserCaptureSession(opts: {
   }, [])
 
   const clearHover = useCallback(() => {
-    setState((s) => (s.hoverRect ? { ...s, hoverRect: null } : s))
+    setState((s) => (s.hoverRect || s.hoverPath ? { ...s, hoverRect: null, hoverSelector: null, hoverPath: null } : s))
+  }, [])
+
+  const navigateElement = useCallback(async (selector: string, direction: 'parent' | 'child' | 'self'): Promise<ElementProbe | null> => {
+    const sid = sessionIdRef.current
+    if (!sid) return null
+    return navigateBrowserElement(sid, selector, direction)
   }, [])
 
   return {
@@ -231,6 +248,7 @@ export function useBrowserCaptureSession(opts: {
     capture,
     captureBreakpoints,
     clipboard,
+    navigateElement,
     setViewport,
     probe,
     clearHover,

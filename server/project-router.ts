@@ -3553,6 +3553,24 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     }
   })
 
+  router.post('/:projectId/browser/sessions/:id/element', requireBrowserCaptureEnabled, async (req: Request, res: Response) => {
+    const mgr = ctx(req).browserCaptureManager
+    const selector = typeof req.body?.selector === 'string' ? req.body.selector : ''
+    const direction = req.body?.direction
+    if (!selector || (direction !== 'parent' && direction !== 'child' && direction !== 'self')) {
+      res.status(400).json({ error: 'selector and direction (parent|child|self) are required' })
+      return
+    }
+    try {
+      // probe may be null (can't step further / element gone) — still 200.
+      const probe = await mgr.navigateElement(req.params.id as string, selector.slice(0, 4000), direction)
+      res.json({ probe })
+    } catch (err) {
+      console.error('[project-router] browser element navigate error:', err)
+      res.status(500).json({ error: 'Failed to resolve element' })
+    }
+  })
+
   router.post('/:projectId/browser/sessions/:id/clipboard', requireBrowserCaptureEnabled, async (req: Request, res: Response) => {
     const mgr = ctx(req).browserCaptureManager
     const action = req.body?.action

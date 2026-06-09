@@ -176,15 +176,19 @@ class PlaywrightPageHandle implements BrowserPageHandle {
   }
 
   async probeElementAt(point: { x: number; y: number }): Promise<ElementProbe | null> {
+    return this.runProbe({ point })
+  }
+
+  async navigateElement(selector: string, direction: 'parent' | 'child' | 'self'): Promise<ElementProbe | null> {
+    return this.runProbe({ selector, direction })
+  }
+
+  private async runProbe(arg: { point?: { x: number; y: number }; selector?: string; direction?: 'parent' | 'child' | 'self' }): Promise<ElementProbe | null> {
     try {
-      // Inline arrow with no inner named functions → esbuild/tsx won't inject the
-      // `__name` helper, so it's safe to pass directly to page.evaluate.
-      return await this.page.evaluate((p: { x: number; y: number }) => {
-        const el = document.elementFromPoint(p.x, p.y)
-        if (!el) return null
-        const b = el.getBoundingClientRect()
-        return { rect: { x: b.x, y: b.y, width: b.width, height: b.height }, tag: el.tagName.toLowerCase() }
-      }, point)
+      // Serialise with the `__name` shim (same pattern as extractDom) so the inner
+      // const-arrow helpers survive esbuild keepNames in the page context.
+      const src = `(() => { const __name = (f) => f; return (${probeScript.toString()})(${JSON.stringify(arg)}); })()`
+      return (await this.page.evaluate(src)) as ElementProbe | null
     } catch {
       return null
     }
@@ -672,6 +676,78 @@ function domExtractScript(arg: { rect: CaptureRect; htmlByteCap: number }): {
     cssTruncated,
     nodes,
     designTokens,
+  }
+}
+
+// Serialised into the page via page.evaluate (with a `__name` shim). Resolves an
+// element by point or by selector (+optional parent/child step) and returns its
+// rect, a stable-ish selector, and the ancestor breadcrumb root→element.
+function probeScript(arg: {
+  point?: { x: number; y: number }
+  selector?: string
+  direction?: 'parent' | 'child' | 'self'
+}): {
+  rect: { x: number; y: number; width: number; height: number }
+  tag: string
+  selector: string
+  path: Array<{ label: string; selector: string }>
+} | null {
+  const { point, selector, direction } = arg
+  const SKIP = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT'])
+  let el: Element | null = null
+  if (point) {
+    el = document.elementFromPoint(point.x, point.y)
+  } else if (selector) {
+    const base = document.querySelector(selector)
+    if (base) {
+      if (direction === 'parent') el = base.parentElement
+      else if (direction === 'child') el = Array.from(base.children).find((c) => !SKIP.has(c.tagName)) ?? null
+      else el = base
+    }
+  }
+  if (el === document.documentElement) el = document.body
+  if (!el || el.nodeType !== 1) return null
+
+  const cssEsc = (s: string) => (window.CSS && CSS.escape ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, '\\$&'))
+  const partFor = (node: Element): string => {
+    const tag = node.tagName.toLowerCase()
+    const id = (node as HTMLElement).id
+    if (id) return '#' + cssEsc(id)
+    const parent = node.parentElement
+    if (!parent) return tag
+    const sameTag = Array.from(parent.children).filter((c) => c.tagName === node.tagName)
+    return sameTag.length > 1 ? `${tag}:nth-of-type(${sameTag.indexOf(node) + 1})` : tag
+  }
+  const labelFor = (node: Element): string => {
+    const tag = node.tagName.toLowerCase()
+    const id = (node as HTMLElement).id
+    if (id) return `${tag}#${id}`
+    const cn = node.getAttribute('class')
+    const first = cn ? cn.trim().split(/\s+/)[0] : ''
+    return first ? `${tag}.${first}` : tag
+  }
+
+  const chain: Element[] = []
+  let node: Element | null = el
+  while (node && node.nodeType === 1 && node !== document.documentElement) {
+    chain.unshift(node)
+    node = node.parentElement
+  }
+  const capped = new Set(chain.slice(Math.max(0, chain.length - 8)))
+  const path: Array<{ label: string; selector: string }> = []
+  let sel = ''
+  for (const n of chain) {
+    const part = partFor(n)
+    sel = part.charAt(0) === '#' ? part : sel ? `${sel} > ${part}` : part
+    if (capped.has(n)) path.push({ label: labelFor(n), selector: sel })
+  }
+
+  const b = el.getBoundingClientRect()
+  return {
+    rect: { x: b.x, y: b.y, width: b.width, height: b.height },
+    tag: el.tagName.toLowerCase(),
+    selector: sel,
+    path,
   }
 }
 

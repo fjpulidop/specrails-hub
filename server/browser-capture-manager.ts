@@ -312,6 +312,14 @@ export class BrowserCaptureManager {
     return s.page.probeElementAt(point)
   }
 
+  /** Re-resolve an element by selector and step to parent/child/self (breadcrumb). */
+  async navigateElement(sessionId: string, selector: string, direction: 'parent' | 'child' | 'self'): Promise<ElementProbe | null> {
+    if (this.disposed) return null
+    const s = this.getSession(sessionId)
+    if (!s) return null
+    return (await s.page.navigateElement?.(selector, direction)) ?? null
+  }
+
   async handleInput(sessionId: string, event: BrowserInputEvent): Promise<void> {
     if (this.disposed) return
     const s = this.getSession(sessionId)

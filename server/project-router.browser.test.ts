@@ -16,6 +16,7 @@ function makeBrowserManager(overrides: Record<string, unknown> = {}) {
     capture: vi.fn(async () => ({ screenshot: { id: 'a1' }, domAttachment: { id: 'a2' }, dom: { html: '<i>', nodes: [] } })),
     captureBreakpoints: vi.fn(async () => ({ screenshot: { id: 'b1' }, domAttachment: { id: 'b2' }, dom: { html: '<i>', nodes: [] }, screenshotDataUrl: 'data:image/png;base64,x', breakpoints: { desktop: { attachment: { id: 'b1' }, dataUrl: 'data:image/png;base64,x', viewport: { width: 1280, height: 800 } } } })),
     clipboard: vi.fn(async () => ({ text: 'sel' })),
+    navigateElement: vi.fn(async () => ({ rect: { x: 0, y: 0, width: 10, height: 10 }, tag: 'section', selector: 'body > section', path: [{ label: 'body', selector: 'body' }, { label: 'section', selector: 'body > section' }] })),
     kill: vi.fn(async () => true),
     ...overrides,
   }
@@ -197,6 +198,18 @@ describe('project-router browser endpoints', () => {
     const app = createApp(makeContext(db, browser))
     const res = await request(app).post('/api/projects/proj-1/browser/sessions/s1/capture').send({ rect: { x: 0, y: 0, width: 5, height: 5 }, pendingSpecId: 'p' })
     expect(res.status).toBe(404)
+  })
+
+  it('POST element validates selector + direction and forwards the breadcrumb step', async () => {
+    const app = createApp(makeContext(db, browser))
+    const base = '/api/projects/proj-1/browser/sessions/s1/element'
+    expect((await request(app).post(base).send({ selector: '', direction: 'parent' })).status).toBe(400)
+    expect((await request(app).post(base).send({ selector: 'div', direction: 'sideways' })).status).toBe(400)
+    expect(browser.navigateElement).not.toHaveBeenCalled()
+    const res = await request(app).post(base).send({ selector: 'div.box', direction: 'parent' })
+    expect(res.status).toBe(200)
+    expect(res.body.probe.tag).toBe('section')
+    expect(browser.navigateElement).toHaveBeenCalledWith('s1', 'div.box', 'parent')
   })
 
   it('POST clipboard validates the action and forwards copy/paste', async () => {

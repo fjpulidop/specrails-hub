@@ -91,6 +91,18 @@ export interface CapturedDom {
   capturedAt: string
 }
 
+export interface BreadcrumbSegment {
+  label: string
+  selector: string
+}
+
+export interface ElementProbe {
+  rect: CaptureRect
+  tag: string
+  selector: string
+  path: BreadcrumbSegment[]
+}
+
 export interface BrowserSessionMeta {
   id: string
   projectId: string
@@ -226,6 +238,23 @@ export async function browserClipboard(
   })
   if (!res.ok) throw new Error(`Clipboard failed (${res.status})`)
   return (await res.json()) as { text: string }
+}
+
+/** Re-resolve an element by selector and step to parent/child/self for the
+ *  DevTools-style breadcrumb. Returns null when it can't step further. */
+export async function navigateBrowserElement(
+  sessionId: string,
+  selector: string,
+  direction: 'parent' | 'child' | 'self',
+): Promise<ElementProbe | null> {
+  const res = await fetch(`${getApiBase()}/browser/sessions/${sessionId}/element`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ selector, direction }),
+  })
+  if (!res.ok) throw new Error(`Element navigate failed (${res.status})`)
+  const data = (await res.json()) as { probe: ElementProbe | null }
+  return data.probe
 }
 
 export async function killBrowserSession(sessionId: string): Promise<void> {

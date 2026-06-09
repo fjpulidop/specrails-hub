@@ -13,6 +13,7 @@ import {
   captureBrowserRegion,
   captureBrowserBreakpoints,
   browserClipboard,
+  navigateBrowserElement,
   uploadCaptureImage,
   killBrowserSession,
   BrowserSessionLimitError,
@@ -190,6 +191,22 @@ describe('browser-capture lib', () => {
         return { body: { text: '' } }
       }) as typeof fetch
       expect(await browserClipboard('s1', 'paste', 'hello')).toEqual({ text: '' })
+    })
+
+    it('navigateBrowserElement posts selector + direction and returns the probe', async () => {
+      global.fetch = mockFetch((url, init) => {
+        expect(url).toContain('/browser/sessions/s1/element')
+        const body = JSON.parse(String(init?.body))
+        expect(body).toEqual({ selector: 'div.box', direction: 'parent' })
+        return { body: { probe: { rect: { x: 0, y: 0, width: 1, height: 1 }, tag: 'section', selector: 'body', path: [] } } }
+      }) as typeof fetch
+      const p = await navigateBrowserElement('s1', 'div.box', 'parent')
+      expect(p!.tag).toBe('section')
+    })
+
+    it('navigateBrowserElement returns null when the server reports no further step', async () => {
+      global.fetch = mockFetch(() => ({ body: { probe: null } })) as typeof fetch
+      expect(await navigateBrowserElement('s1', 'body', 'parent')).toBeNull()
     })
 
     it('killBrowserSession swallows errors', async () => {

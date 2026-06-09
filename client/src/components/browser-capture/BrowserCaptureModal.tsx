@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, ArrowRight, RotateCw, X, Crop, Loader2, Globe, AlertTriangle, Monitor, Tablet, Smartphone, Maximize2, Network, Ratio } from 'lucide-react'
+import { ArrowLeft, ArrowRight, RotateCw, X, Crop, Loader2, Globe, AlertTriangle, Monitor, Tablet, Smartphone, Maximize2, Network, Ratio, ChevronRight, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { useBrowserCaptureSession } from './useBrowserCaptureSession'
@@ -14,6 +14,8 @@ import {
   type CaptureRect,
   type CaptureResult,
   type BrowserInputEvent,
+  type BreadcrumbSegment,
+  type ElementProbe,
 } from '../../lib/browser-capture'
 
 /**
@@ -58,7 +60,7 @@ const PRESET_DIMS: Record<Exclude<ViewportPreset, 'fit'>, { w: number; h: number
  */
 export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, onCaptured }: BrowserCaptureModalProps) {
   const session = useBrowserCaptureSession({ projectId, open })
-  const { canvasRef, viewport, status, errorMsg, url, title, hoverRect } = session
+  const { canvasRef, viewport, status, errorMsg, url, title, hoverRect, hoverSelector, hoverPath } = session
 
   const [addressValue, setAddressValue] = useState('')
   const [selecting, setSelecting] = useState(false)
@@ -72,6 +74,9 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
   const [captureAllSizes, setCaptureAllSizes] = useState(false)
   // When set, a single capture is frozen and the markup editor is shown over it.
   const [markup, setMarkup] = useState<CaptureResult | null>(null)
+  // Breadcrumb lock: when the user steps up/down the DOM tree (arrows / clicking a
+  // segment) the selection locks to that element until the cursor moves again.
+  const [locked, setLocked] = useState<ElementProbe | null>(null)
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const pendingMoveRef = useRef<{ x: number; y: number } | null>(null)
@@ -79,6 +84,13 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
   const presetRef = useRef<ViewportPreset>('fit')
   const canvasRectRef = useRef<{ left: number; top: number; width: number; height: number } | null>(null)
   const lastProbeAtRef = useRef(0)
+  // Refs for the breadcrumb keyboard handler (avoid re-subscribing on every hover).
+  const lockedRef = useRef<ElementProbe | null>(null)
+  const hoverSelectorRef = useRef<string | null>(null)
+  const navigateElementRef = useRef(session.navigateElement)
+  useEffect(() => { lockedRef.current = locked }, [locked])
+  useEffect(() => { hoverSelectorRef.current = hoverSelector }, [hoverSelector])
+  navigateElementRef.current = session.navigateElement
 
   useEffect(() => { setAddressValue(url ?? '') }, [url])
 
@@ -126,13 +138,30 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (selecting) { setSelecting(false); setBox(null) }
+        if (selecting) { setSelecting(false); setBox(null); setLocked(null) }
         else onClose()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, selecting, onClose])
+
+  // Breadcrumb navigation: ↑ = parent, ↓ = child of the locked-or-hovered element.
+  // Locks the selection to the resolved element until the cursor moves again.
+  useEffect(() => {
+    if (!open || !selecting) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+      const sel = lockedRef.current?.selector ?? hoverSelectorRef.current
+      if (!sel) return
+      e.preventDefault()
+      void navigateElementRef.current(sel, e.key === 'ArrowUp' ? 'parent' : 'child').then((probe) => {
+        if (probe) setLocked(probe)
+      })
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, selecting])
 
   const canvasRect = useCallback((): DOMRect | null => {
     const r = canvasRef.current?.getBoundingClientRect() ?? null
@@ -242,9 +271,14 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
       setCapturing(false)
       setSelecting(false)
       setBox(null)
+      setLocked(null)
       session.clearHover()
     }
   }, [session, pendingSpecId, captureNetwork, captureAllSizes, onCaptured, onClose])
+
+  const onBreadcrumbClick = useCallback((segment: BreadcrumbSegment) => {
+    void session.navigateElement(segment.selector, 'self').then((probe) => { if (probe) setLocked(probe) })
+  }, [session])
 
   const onSelectDown = useCallback((e: React.PointerEvent) => {
     ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
@@ -257,6 +291,8 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
       setBox((b) => (b ? { ...b, curX: cx, curY: cy } : b))
       return
     }
+    // Moving the cursor over the page resumes live hover (drops a breadcrumb lock).
+    if (lockedRef.current) setLocked(null)
     // Not dragging → hover-probe the element under the cursor (throttled: at most
     // one probe per animation frame AND no more often than every 40ms, to avoid
     // flooding the WS / the page's elementFromPoint on fast movement).
@@ -275,6 +311,7 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
   }, [box, toViewport, session])
 
   const onSelectUp = useCallback((e: React.PointerEvent) => {
+    const lk = lockedRef.current
     setBox((b) => {
       if (b) {
         const a = toViewport(b.startX, b.startY)
@@ -283,6 +320,9 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
         if (isUsableSelection(dragRect)) {
           // A real drag → capture the custom rectangle.
           void runCapture(dragRect)
+        } else if (lk) {
+          // A click with a breadcrumb lock → capture the locked element.
+          void runCapture(lk.rect)
         } else if (hoverRect) {
           // A click (no meaningful drag) → capture the hovered element.
           void runCapture(hoverRect)
@@ -307,8 +347,10 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
   // mid-drag). Uses the canvas rect cached during the last pointer move so we
   // never measure layout during the render phase.
   const cr = canvasRectRef.current
-  const hoverStyle = selecting && hoverRect && !box && cr
-    ? mapRectToDisplay(hoverRect, cr, viewport)
+  const activeRect = locked?.rect ?? hoverRect
+  const activePath = locked?.path ?? hoverPath
+  const hoverStyle = selecting && activeRect && !box && cr
+    ? mapRectToDisplay(activeRect, cr, viewport)
     : null
 
   const macOverlay = isMacTauriOverlay()
@@ -394,7 +436,7 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
           size="sm"
           variant={selecting ? 'default' : 'secondary'}
           className="gap-1.5"
-          onClick={() => { setSelecting((v) => !v); setBox(null); session.clearHover() }}
+          onClick={() => { setSelecting((v) => !v); setBox(null); setLocked(null); session.clearHover() }}
           disabled={status !== 'ready' || capturing}
           data-testid="browser-select-toggle"
         >
@@ -486,9 +528,29 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
         )}
       </div>
 
+      {selecting && activePath && activePath.length > 0 && (
+        <div className="flex items-center gap-1 px-3 py-1.5 border-t border-border/40 bg-surface/70 shrink-0 overflow-x-auto text-[11px]">
+          {locked ? <Lock className="w-3 h-3 shrink-0 text-accent-info" /> : null}
+          {activePath.map((seg, i) => (
+            <Fragment key={`${seg.selector}-${i}`}>
+              {i > 0 && <ChevronRight className="w-3 h-3 text-muted-foreground/50 shrink-0" />}
+              <button
+                type="button"
+                onClick={() => onBreadcrumbClick(seg)}
+                title={seg.selector}
+                className={`shrink-0 font-mono px-1 rounded hover:bg-card/60 transition-colors ${i === activePath.length - 1 ? 'text-accent-info font-medium' : 'text-foreground/70'}`}
+              >
+                {seg.label}
+              </button>
+            </Fragment>
+          ))}
+          <span className="text-muted-foreground/60 shrink-0 ml-auto pl-2 hidden md:inline">↑ parent · ↓ child</span>
+        </div>
+      )}
+
       {selecting && (
         <div className="px-3 py-1.5 text-center text-[11px] text-muted-foreground border-t border-border/40 shrink-0">
-          Click a highlighted element to capture it, or drag a custom rectangle. Press Esc to cancel.
+          Click a highlighted element to capture it, or drag a custom rectangle. Use the breadcrumb (or ↑/↓) to refine. Press Esc to cancel.
         </div>
       )}
       </>
