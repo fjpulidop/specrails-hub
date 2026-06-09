@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.64.0](https://github.com/fjpulidop/specrails-hub/compare/v1.63.1...v1.64.0) (2026-06-09)
+
+
+### Features
+
+* user-approved MCP toggle + robust job-outcome → ticket/rail flow ([#358](https://github.com/fjpulidop/specrails-hub/issues/358)) ([97266be](https://github.com/fjpulidop/specrails-hub/commit/97266be4b2ca8ac283ebf3dcaa3cd8d7e9b48ad9))
+
 ## [1.63.1](https://github.com/fjpulidop/specrails-hub/compare/v1.63.0...v1.63.1) (2026-06-09)
 
 
