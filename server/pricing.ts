@@ -67,7 +67,15 @@ export function estimateCostUsd(
   if (!model) return null
   const entry = PRICING[`${providerId}:${model}`]
   if (!entry) return null
-  const inputCost     = (usage.tokens_in         ?? 0) * entry.inputPer1M     / 1_000_000
+  // `tokens_in` is the TOTAL prompt token count and `tokens_cache_read` is a
+  // SUBSET already inside it (OpenAI/codex usage semantics: input_tokens
+  // includes cached_input_tokens). Bill the cached portion at the cache rate
+  // ONLY, and the remaining fresh input at the full input rate. Charging the
+  // full input rate over the whole `tokens_in` AND a separate cache-read cost
+  // would double-charge every cached token. Clamp at 0 to guard a malformed
+  // payload where the reported cache subset exceeds the total.
+  const freshInput    = Math.max(0, (usage.tokens_in ?? 0) - (usage.tokens_cache_read ?? 0))
+  const inputCost     = freshInput                      * entry.inputPer1M     / 1_000_000
   const outputCost    = (usage.tokens_out        ?? 0) * entry.outputPer1M    / 1_000_000
   const cacheReadCost = (usage.tokens_cache_read ?? 0) * entry.cacheReadPer1M / 1_000_000
   return inputCost + outputCost + cacheReadCost

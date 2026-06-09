@@ -36,6 +36,10 @@ interface RichAttachmentEditorProps {
   ticketKey: string | number
   placeholder?: string
   minHeight?: number
+  /** Cap on the editor's auto-grow height (px). Beyond this the content
+   *  scrolls vertically instead of expanding the box without bound — without
+   *  it, pasting a very large text grows the editor off-screen with no scroll. */
+  maxHeight?: number
   ariaLabel?: string
   autoFocus?: boolean
   className?: string
@@ -125,6 +129,7 @@ export const RichAttachmentEditor = forwardRef<RichAttachmentEditorHandle, RichA
       ticketKey,
       placeholder,
       minHeight = 120,
+      maxHeight = 320,
       ariaLabel,
       autoFocus,
       className,
@@ -525,7 +530,7 @@ export const RichAttachmentEditor = forwardRef<RichAttachmentEditorHandle, RichA
             'data-[empty=true]:before:text-muted-foreground data-[empty=true]:before:pointer-events-none',
             'data-[empty=true]:before:absolute data-[empty=true]:before:top-2 data-[empty=true]:before:left-3',
           )}
-          style={{ minHeight, resize: 'vertical', overflow: 'auto' }}
+          style={{ minHeight, maxHeight, resize: 'vertical', overflow: 'auto' }}
           data-placeholder={placeholder ?? ''}
         />
 

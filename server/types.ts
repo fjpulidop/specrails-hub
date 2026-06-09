@@ -60,6 +60,9 @@ export interface JobRow {
   tokens_cache_read: number | null
   tokens_cache_create: number | null
   total_cost_usd: number | null
+  /** 1 when total_cost_usd is a pricing-table estimate (codex), 0 when
+   *  authoritative from the provider (claude). Added in migration 27. */
+  total_cost_usd_estimated?: number | null
   num_turns: number | null
   model: string | null
   duration_ms: number | null

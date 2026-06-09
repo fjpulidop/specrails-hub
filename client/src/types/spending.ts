@@ -72,6 +72,9 @@ export interface SpendingResponse {
      *  fell back to `server/pricing.ts` (codex, today). Drives the
      *  "Includes estimated costs" Hero footnote. */
     totalEstimatedCostUsd: number
+    /** Real total tokens across matching rows = fresh input + output +
+     *  cache-read + cache-create (cache tiers dominate agentic Claude runs). */
+    totalTokens: number
     totalRuns: number
     failureRate: number
     prevTotalCostUsd: number

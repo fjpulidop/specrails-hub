@@ -128,13 +128,15 @@ export function getTicketSpendingSummary(
   ticketId: number
 ): {
   totalCostUsd: number
+  totalTokens: number
   totalTurns: number
   activeDurationMs: number
   bySurface: Record<Surface, { count: number; costUsd: number }>
   totalRuns: number
 } {
   const rows = db.prepare(
-    `SELECT surface, status, total_cost_usd, num_turns, duration_ms
+    `SELECT surface, status, total_cost_usd, num_turns, duration_ms,
+            tokens_in, tokens_out, tokens_cache_read, tokens_cache_create
      FROM ai_invocations WHERE ticket_id = ?`
   ).all(ticketId) as Array<{
     surface: Surface
@@ -142,6 +144,10 @@ export function getTicketSpendingSummary(
     total_cost_usd: number | null
     num_turns: number | null
     duration_ms: number | null
+    tokens_in: number | null
+    tokens_out: number | null
+    tokens_cache_read: number | null
+    tokens_cache_create: number | null
   }>
   const bySurface: Record<Surface, { count: number; costUsd: number }> = {
     job: { count: 0, costUsd: 0 },
@@ -152,16 +158,23 @@ export function getTicketSpendingSummary(
     'file-summary': { count: 0, costUsd: 0 },
   }
   let totalCostUsd = 0
+  let totalTokens = 0
   let totalTurns = 0
   let activeDurationMs = 0
   for (const r of rows) {
     bySurface[r.surface].count += 1
     bySurface[r.surface].costUsd += r.total_cost_usd ?? 0
     totalCostUsd += r.total_cost_usd ?? 0
+    // Real total tokens = fresh input + output + cache-read + cache-create.
+    totalTokens +=
+      (r.tokens_in ?? 0) +
+      (r.tokens_out ?? 0) +
+      (r.tokens_cache_read ?? 0) +
+      (r.tokens_cache_create ?? 0)
     totalTurns += r.num_turns ?? 0
     activeDurationMs += r.duration_ms ?? 0
   }
-  return { totalCostUsd, totalTurns, activeDurationMs, bySurface, totalRuns: rows.length }
+  return { totalCostUsd, totalTokens, totalTurns, activeDurationMs, bySurface, totalRuns: rows.length }
 }
 
 /**

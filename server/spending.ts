@@ -78,6 +78,10 @@ export interface SpendingResponse {
      *  `total_cost_usd_estimated === 1` (currently codex). Drives the
      *  "Includes estimated costs" footnote in the AnalyticsPage Hero. */
     totalEstimatedCostUsd: number
+    /** Real total tokens across all matching rows = fresh input + output +
+     *  cache-read + cache-create. Cache tiers (esp. cache_read) dominate
+     *  agentic Claude runs, so this is far larger than input+output alone. */
+    totalTokens: number
     totalRuns: number
     failureRate: number
     prevTotalCostUsd: number
@@ -231,6 +235,8 @@ export function getSpending(
     SELECT
       COALESCE(SUM(total_cost_usd), 0) AS totalCost,
       COALESCE(SUM(CASE WHEN total_cost_usd_estimated = 1 THEN total_cost_usd ELSE 0 END), 0) AS totalEstimatedCost,
+      COALESCE(SUM(COALESCE(tokens_in, 0) + COALESCE(tokens_out, 0)
+                   + COALESCE(tokens_cache_read, 0) + COALESCE(tokens_cache_create, 0)), 0) AS totalTokens,
       COUNT(*) AS totalRuns,
       SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
       AVG(CASE WHEN status = 'success' THEN total_cost_usd END) AS avgCost
@@ -238,6 +244,7 @@ export function getSpending(
   `).get(...where.params) as {
     totalCost: number
     totalEstimatedCost: number
+    totalTokens: number
     totalRuns: number
     failed: number | null
     avgCost: number | null
@@ -440,6 +447,7 @@ export function getSpending(
     summary: {
       totalCostUsd: summaryRow.totalCost,
       totalEstimatedCostUsd: summaryRow.totalEstimatedCost,
+      totalTokens: summaryRow.totalTokens,
       totalRuns: summaryRow.totalRuns,
       failureRate: summaryRow.totalRuns > 0 ? (summaryRow.failed ?? 0) / summaryRow.totalRuns : 0,
       prevTotalCostUsd: prevRow.totalCost,

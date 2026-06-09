@@ -162,12 +162,16 @@ function parseCodexStreamLine(line: string): AdapterEvent | null {
 function extractCodexResult(events: readonly AdapterEvent[]): NormalisedResult {
   let sessionId: string | undefined
   let resultPayload: Record<string, unknown> | null = null
+  let turnCount = 0
   // First text-delta timestamp is unavailable from events (we'd need wall-clock
   // tracking). duration_ms is left undefined and the manager-level wrapper
   // synthesises it from the spawn-close timestamps if it wants to populate.
   for (const ev of events) {
     if (ev.kind === 'session-started') sessionId = ev.sessionId
-    else if (ev.kind === 'result') resultPayload = ev.payload
+    else if (ev.kind === 'result') {
+      resultPayload = ev.payload
+      turnCount += 1 // each turn.completed is one codex turn
+    }
   }
 
   if (!resultPayload) {
@@ -188,7 +192,9 @@ function extractCodexResult(events: readonly AdapterEvent[]): NormalisedResult {
     // Codex has no separate "cache creation" tier — left undefined.
     tokens_cache_create: undefined,
     // total_cost_usd intentionally absent — estimated via pricing.ts.
-    num_turns: 1, // codex exec is single-turn; resume is also one turn
+    // Derive from the number of turn.completed events rather than hardcoding 1
+    // (a single `codex exec` normally emits exactly one, but don't assume it).
+    num_turns: turnCount || 1,
     // Model on stream events is not present; manager-level wrapper passes
     // the requested model in via the spawn args and stamps it on the row.
     model: undefined,

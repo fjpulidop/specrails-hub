@@ -20,6 +20,12 @@ function fmtUsdLarge(v: number): string {
   return `$${v.toFixed(2)}`
 }
 
+function fmtTokens(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
+  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}k`
+  return `${v}`
+}
+
 const SURFACES: Surface[] = ['job', 'explore-spec', 'quick-spec', 'ai-edit', 'smash']
 
 export function SpendingHero({ data, loading }: Props) {
@@ -54,6 +60,7 @@ export function SpendingHero({ data, loading }: Props) {
 
   const total = data.summary.totalCostUsd
   const totalRuns = data.summary.totalRuns
+  const totalTokens = data.summary.totalTokens ?? 0
   const totalEstimated = data.summary.totalEstimatedCostUsd ?? 0
   const delta = data.summary.deltaPct
   const trackingStartedAt = data.trackingStartedAt
@@ -88,6 +95,14 @@ export function SpendingHero({ data, loading }: Props) {
           </div>
           <div className="text-xs text-muted-foreground mt-1 tabular-nums flex items-center gap-2">
             <span>{totalRuns} invocation{totalRuns === 1 ? '' : 's'}</span>
+            {totalTokens > 0 && (
+              <span
+                className="text-muted-foreground/80"
+                title="Total tokens = fresh input + output + cache-read + cache-create across all invocations in this window."
+              >
+                · {fmtTokens(totalTokens)} tokens
+              </span>
+            )}
             {hasEstimatedCost && (
               <span
                 className="text-[10px] text-muted-foreground/70 italic"

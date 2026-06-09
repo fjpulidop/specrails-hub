@@ -21,6 +21,8 @@ interface PipelineTotals {
   totalCostUsd: number
   totalTokensIn: number
   totalTokensOut: number
+  totalTokensCacheRead: number
+  totalTokensCacheCreate: number
   jobCount: number
 }
 
@@ -73,12 +75,28 @@ function aggReducer(state: LiveAggregate, action: AggAction): LiveAggregate {
       turns += 1
       try {
         const payload = JSON.parse(ev.payload) as
-          | { message?: { usage?: { input_tokens?: number; output_tokens?: number } } }
+          | {
+              message?: {
+                usage?: {
+                  input_tokens?: number
+                  output_tokens?: number
+                  cache_read_input_tokens?: number
+                  cache_creation_input_tokens?: number
+                }
+              }
+            }
           | undefined
         const usage = payload?.message?.usage
-        const input = typeof usage?.input_tokens === 'number' ? usage.input_tokens : 0
-        const output = typeof usage?.output_tokens === 'number' ? usage.output_tokens : 0
-        tokens += input + output
+        const n = (v: unknown): number => (typeof v === 'number' ? v : 0)
+        // NOTE: this is a deliberately rough LIVE indicator — per-frame usage
+        // re-includes the re-sent context each turn, so summing over-counts.
+        // It is labelled approximate in the UI and is replaced by the
+        // authoritative job.tokens_* totals at exit.
+        tokens +=
+          n(usage?.input_tokens) +
+          n(usage?.output_tokens) +
+          n(usage?.cache_read_input_tokens) +
+          n(usage?.cache_creation_input_tokens)
       } catch {
         // unparseable assistant payload — count the turn, skip token math
       }
@@ -124,12 +142,24 @@ export function JobStatusPanel({
 
   // Authoritative values once available; live values otherwise.
   const liveTurns = job.num_turns ?? (isTerminal ? null : agg.turns)
+  // Real total tokens = fresh input + output + cache-read + cache-create. The
+  // cache tiers (especially cache_read) typically dominate agentic Claude runs,
+  // so omitting them understated the figure by an order of magnitude.
   const liveTokens =
     job.tokens_in != null
-      ? (job.tokens_in ?? 0) + (job.tokens_out ?? 0)
+      ? (job.tokens_in ?? 0) +
+        (job.tokens_out ?? 0) +
+        (job.tokens_cache_read ?? 0) +
+        (job.tokens_cache_create ?? 0)
       : isTerminal
         ? null
         : agg.tokens
+  // Live (still-running) figures are rough: tokens sum per-frame usage (which
+  // re-includes re-sent context) and turns count assistant frames, not CLI
+  // turns. Both are replaced by authoritative server values at job exit; mark
+  // them with a ~ while live so the visible jump at exit is not surprising.
+  const tokensApproximate = job.tokens_in == null && !isTerminal && liveTokens != null
+  const turnsApproximate = job.num_turns == null && !isTerminal && liveTurns != null
 
   const durationDisplay = job.finished_at
     ? formatWallClock(job.started_at, job.finished_at)
@@ -152,8 +182,11 @@ export function JobStatusPanel({
       ? 'w-4 h-4 text-emerald-400 shrink-0'
       : 'w-4 h-4 text-red-400 shrink-0'
 
+  // Codex (and any non-native-cost provider) cost is a pricing-table estimate;
+  // prefix `~` so it is never read as a provider-billed figure.
+  const costEstimated = !!job.total_cost_usd_estimated
   const costDisplay =
-    job.total_cost_usd != null ? `$${job.total_cost_usd.toFixed(4)}` : '—'
+    job.total_cost_usd != null ? `${costEstimated ? '~' : ''}$${job.total_cost_usd.toFixed(4)}` : '—'
   const costDimmed = job.total_cost_usd == null
 
   return (
@@ -201,10 +234,13 @@ export function JobStatusPanel({
               value={costDisplay}
               valueClass={costDimmed ? 'text-muted-foreground' : 'text-yellow-400'}
             />
-            <SummaryMetric label="Turns" value={liveTurns != null ? `${liveTurns}` : '—'} />
+            <SummaryMetric
+              label="Turns"
+              value={liveTurns != null ? `${turnsApproximate ? '~' : ''}${liveTurns}` : '—'}
+            />
             <SummaryMetric
               label="Tokens"
-              value={liveTokens != null ? `${(liveTokens / 1000).toFixed(1)}k` : '—'}
+              value={liveTokens != null ? `${tokensApproximate ? '~' : ''}${(liveTokens / 1000).toFixed(1)}k` : '—'}
             />
           </div>
 
@@ -222,7 +258,10 @@ export function JobStatusPanel({
                 />
                 <SummaryMetric
                   label="Total tokens"
-                  value={`${(((pipelineTotals.totalTokensIn + pipelineTotals.totalTokensOut)) / 1000).toFixed(1)}k`}
+                  value={`${((pipelineTotals.totalTokensIn +
+                    pipelineTotals.totalTokensOut +
+                    pipelineTotals.totalTokensCacheRead +
+                    pipelineTotals.totalTokensCacheCreate) / 1000).toFixed(1)}k`}
                 />
               </div>
             </div>

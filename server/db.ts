@@ -37,6 +37,10 @@ export interface JobResult {
   tokens_cache_read?: number
   tokens_cache_create?: number
   total_cost_usd?: number
+  /** 1/true when total_cost_usd is a pricing-table estimate (codex) rather
+   *  than a provider-billed figure (claude). Persisted to
+   *  jobs.total_cost_usd_estimated so hub surfaces can badge it. */
+  total_cost_usd_estimated?: boolean
   num_turns?: number
   model?: string
   duration_ms?: number
@@ -557,6 +561,22 @@ const MIGRATIONS: Migration[] = [
       db.exec(`ALTER TABLE rails ADD COLUMN ai_engine TEXT;`)
     }
   },
+
+  // Migration 27: jobs.total_cost_usd_estimated — 1 when jobs.total_cost_usd
+  // came from server/pricing.ts (estimated fallback for non-native-cost
+  // providers like codex); 0 when authoritative from the provider's terminal
+  // event. Mirrors the ai_invocations column (migration 20) so the hub
+  // dashboard, budget enforcement, and webhook can distinguish a rate-card
+  // estimate from a provider-billed figure. Additive + idempotent.
+  (db) => {
+    const cols = (db.prepare(`PRAGMA table_info(jobs)`).all() as { name: string }[]).map((r) => r.name)
+    if (!cols.includes('total_cost_usd_estimated')) {
+      db.exec(`
+        ALTER TABLE jobs
+          ADD COLUMN total_cost_usd_estimated INTEGER NOT NULL DEFAULT 0;
+      `)
+    }
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {
@@ -636,6 +656,7 @@ export function finishJob(
       tokens_cache_read   = ?,
       tokens_cache_create = ?,
       total_cost_usd      = ?,
+      total_cost_usd_estimated = ?,
       num_turns           = ?,
       model               = ?,
       duration_ms         = ?,
@@ -651,6 +672,7 @@ export function finishJob(
     result.tokens_cache_read ?? null,
     result.tokens_cache_create ?? null,
     result.total_cost_usd ?? null,
+    result.total_cost_usd_estimated ? 1 : 0,
     result.num_turns ?? null,
     result.model ?? null,
     result.duration_ms ?? null,

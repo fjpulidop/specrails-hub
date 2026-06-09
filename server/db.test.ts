@@ -205,6 +205,23 @@ describe('db', () => {
       expect(row.duration_ms).toBe(5000)
       expect(row.duration_api_ms).toBe(4800)
       expect(row.session_id).toBe('sess-abc')
+      // Default: claude is authoritative → estimated flag is 0.
+      expect(row.total_cost_usd_estimated).toBe(0)
+    })
+
+    it('persists the estimated flag (1) for pricing-table costs (codex)', () => {
+      const db = makeDb()
+      const id = makeJobId('est')
+      createJob(db, { id, command: '/test', started_at: new Date().toISOString() })
+      finishJob(db, id, {
+        exit_code: 0,
+        status: 'completed',
+        total_cost_usd: 0.0152,
+        total_cost_usd_estimated: true,
+      })
+      const row = getJob(db, id)!
+      expect(row.total_cost_usd).toBeCloseTo(0.0152)
+      expect(row.total_cost_usd_estimated).toBe(1)
     })
   })
 

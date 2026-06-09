@@ -1,169 +1,288 @@
-# specrails-hub
+<div align="center">
 
-**The local dashboard for shipping software with AI agents.**
+# 🚄 specrails-hub
 
-specrails-hub turns "I'll let Claude do it" into a workflow you can see, steer, and trust. Draft specs in conversation with Claude, drag them onto execution rails, and watch the pipeline ship — all from one window, on your laptop, with every cost tracked.
+### The local cockpit for shipping software with AI agents
 
-It's a local-first companion to [specrails-core](https://github.com/fjpulidop/specrails-core): one window for all your projects, one place to manage specs and pipelines, one place to see what AI cost you this week.
+**Draft specs by talking to Claude or Codex → drag them onto execution rails → watch the pipeline ship — all from one window, on your laptop, with every dollar tracked.**
 
-> 100% local. Single user. No accounts. No telemetry leaving your machine. Your code stays on your laptop unless **you** spawn an agent against it.
+[![npm version](https://img.shields.io/npm/v/specrails-hub?color=4f46e5&label=npm&logo=npm&logoColor=white&style=flat-square)](https://www.npmjs.com/package/specrails-hub)
+[![license](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
+[![node](https://img.shields.io/badge/node-%E2%89%A520-339933?logo=node.js&logoColor=white&style=flat-square)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white&style=flat-square)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=black&style=flat-square)](https://react.dev)
+[![Desktop](https://img.shields.io/badge/Desktop-Tauri-ffc131?logo=tauri&logoColor=black&style=flat-square)](https://tauri.app)
+[![providers](https://img.shields.io/badge/agents-Claude%20%2B%20Codex-ff7a59?style=flat-square)](#-bring-your-own-agent)
 
-## What you can do with it
+[Quick start](#-quick-start) · [Features](#-what-you-can-do) · [Architecture](#%EF%B8%8F-how-its-built) · [Docs](#-documentation) · [Desktop app](#%EF%B8%8F-desktop-app)
 
-- **Draft a spec by talking to Claude or Codex** — open Explore, describe what you want; the live draft updates each turn. Save it as a draft and come back later, or commit when it looks right.
-- **Generate a spec in one shot** — Quick mode for when you already know what you want. Optionally enrich it with a "Contract Layer" of names, shapes, invariants, and a file touch list.
-- **Turn a live website into a spec** — *Add Spec → From a website* opens an embedded browser. Navigate to a page, hover-select an element or drag a rectangle, and the screenshot + rich DOM + applied CSS become attachments that feed Quick or Explore. The desktop app ships its own Chromium, so it works offline.
-- **Drag specs onto execution rails** — each rail is an independent lane. Run multiple specs in parallel, with different agent profiles per rail.
-- **Compare two specs side by side** — drag any spec modal to the edge of the screen; a picker of your todo specs appears on the other side. Pick one and they live next to each other. Tablet-style.
-- **Split a big epic** — SMASH a parent spec into a family of sub-specs in one click; the children carry short summaries on their cards.
-- **Refine a spec in place** — *Continue Editing* reopens any draft / todo / backlog spec in Explore, with the original conversation resumed if there was one.
-- **Track every AI cost** — every AI CLI invocation across rails, Quick spec, Explore turns, and AI edits is recorded — across **both** Claude and Codex. Codex cost is estimated from a local rate-card since the CLI doesn't report it natively. The Analytics page shows your burn rate, top tickets, breaks down spend per provider, and lets you export CSV.
-- **Customise everything** — three themes, font sizes, terminal preferences, agent profiles, plugin integrations (Serena bundled today).
+</div>
 
-## How specrails-hub looks
+---
+
+## 🌟 What is this?
+
+**specrails-hub** turns *"I'll just let the AI do it"* into a workflow you can **see, steer, and trust**. It's a local-first dashboard and CLI that sits on top of [**specrails-core**](https://github.com/fjpulidop/specrails-core) and gives you **one window for all your projects**:
+
+- 💬 Shape a spec in conversation with an AI, or generate one in a single shot.
+- 🛤️ Drag specs onto **execution rails** and run them — many in parallel.
+- 🤖 Watch the **Architect → Developer → Reviewer → Ship** pipeline stream live.
+- 💰 See exactly **what each agent cost you** this week, per provider, per ticket.
+
+> 🔒 **100% local. Single user. No accounts. No telemetry leaves your machine.**
+> Your code stays on your laptop — nothing moves unless **you** spawn an agent against it.
+
+---
+
+## ✨ What you can do
+
+### 📝 Turn ideas into specs
+
+| | |
+|---|---|
+| 🗣️ **Explore** | Describe what you want in a chat; a **live draft** rebuilds itself every turn. Save it as a *draft ticket* and resume later, or commit when it looks right. First-token latency is tuned to feel electric. |
+| ⚡ **Quick** | Already know what you want? Generate a full spec in one shot — optionally enriched with a **Contract Layer** of exact names, data shapes, invariants, and a file-touch list so the downstream agents don't reinvent anything. |
+| 🌐 **From a website** | *Add Spec → From a website* opens an **embedded browser**. Navigate, hover-select an element or drag a rectangle, and the screenshot + DOM + applied CSS become attachments. The desktop build ships its own Chromium, so it works **offline**. |
+| 💥 **SMASH** | Explode a big epic into a family of sub-specs in one click — children carry short summaries on their cards. |
+| 🔁 **Continue Editing** | Reopen any draft / todo / backlog spec back in Explore, resuming the original conversation if there was one. |
+| 🪟 **Compare** | Drag a spec modal to the screen edge → a picker of your todo specs slides in on the other side. Pick one and review them **side by side**, tablet-style. |
+
+### 🚀 Run the pipeline
+
+| | |
+|---|---|
+| 🛤️ **Execution rails** | Each rail is an independent lane. Run multiple specs **in parallel**, each with its own **agent profile** (which agents, which models, how tasks route). |
+| 🧩 **Agent profiles** | A per-project, declarative catalog that tells the implement pipeline which agents to run and at what model — snapshotted per job so concurrent rails stay isolated. |
+| 📡 **Live job detail** | A premium ticket-identity header, live duration ticker, incremental turns/tokens, and authoritative cost on exit. |
+| 🔌 **Plugins** | A per-project marketplace of MCP-based integrations (**Serena** semantic code-nav bundled today). Additive by design — installing plugin N+1 never disturbs plugin N. |
+
+### 💸 Track every cent
+
+| | |
+|---|---|
+| 📊 **Analytics** | Every billable AI invocation — across rails, Quick, Explore, AI edits, and file summaries — is recorded for **both Claude and Codex**. Burn-rate hero, daily timeline, top tickets, model breakdown, cost-vs-turns scatter. |
+| 🧮 **Honest numbers** | Claude cost is the provider-billed figure; Codex cost is **estimated** from a local rate-card (the CLI doesn't report it) and clearly flagged with a `~`. Token totals include the cache tiers, so the figures actually reconcile. |
+| 📤 **Exports** | One-click CSV/JSON, plus per-ticket spending deep-links. |
+
+### 🛠️ Make it yours
+
+| | |
+|---|---|
+| 🖥️ **Terminal panel** | A real VS-Code-style bottom panel (`Cmd/Ctrl+J`) powered by `node-pty` + xterm.js — WebGL rendering, search, ligatures, image inline, drag-drop paths, and OSC 133 shell integration. |
+| 🎨 **Themes** | Three built-ins — `dracula`, `aurora-light`, `obsidian-dark` — applied before React hydrates (no flash). |
+| 🧭 **Code explorer** | A read-only, non-developer-friendly file tree + Monaco viewer with plain-language AI summaries and *"touched by AI"* provenance chips. |
+| 💬 **Minimizable chats** | Park an Explore or AI-Edit session into a dock chip and pick it back up later — never lost across refreshes or project switches. |
+
+---
+
+## 🤖 Bring your own agent
+
+specrails-hub treats **Claude Code** and **Codex CLI** as first-class, interchangeable providers through a single `ProviderAdapter` contract — no manager ever branches on `provider === 'X'`.
+
+| | 🟣 Claude Code | 🟢 Codex CLI |
+|---|:---:|:---:|
+| Native streaming | ✅ | ✅ |
+| Native session resume | ✅ | ✅ |
+| Native cost reporting | ✅ | ⚠️ estimated via rate-card |
+| Native OTEL telemetry | ✅ | 🔧 synthesized by the hub |
+| Agent profiles | ✅ | — |
+
+A project can install **one or both**. When both are present, the UI lets you pick the engine per spec, per rail, or per terminal launch. Adding a third provider is *one file + one registry entry* — see [`docs/internals/`](docs/internals/).
+
+---
+
+## 🖼️ How it looks
 
 ```
 ┌──────────┬───────────────────────────────────────────────────┐
 │          │  Dashboard · Jobs · Analytics · Agents · ⚙        │
 │   Arc    │ ──────────────────────────────────────────────── │
 │  side-   │                                                   │
-│   bar    │   SpecsBoard            │   Rails                 │
+│   bar    │   📋 SpecsBoard          │   🛤️  Rails             │
 │          │   (your specs)          │   (execution lanes)     │
 │ projects │                         │                         │
-│          │   #1  Login flow ●      │   ▶ Rail 1   #1 #2     │
-│ + Add    │   #2  Webhook retry     │     [profile: default]  │
+│  ● proj  │   #1  Login flow ●      │   ▶ Rail 1   #1 #2     │
+│  ○ proj  │   #2  Webhook retry     │     [profile: default]  │
 │          │   #3  Cost limits  ●    │                         │
-│          │                         │   ▶ Rail 2   running    │
+│  ➕ Add   │   #4  Draft idea  ✎     │   ▶ Rail 2   running    │
 │          │                         │     [profile: budget]   │
 │   ⚙      │                         │                         │
 └──────────┴───────────────────────────────────────────────────┘
-                  ⌥ Terminal panel (Cmd+J)
+                 ⌨️  Terminal panel  (Cmd/Ctrl + J)
 ```
 
-## Quick start
+---
+
+## 🚀 Quick start
 
 ```bash
-# 1. Install
+# 1️⃣  Install
 npm install -g specrails-hub
 
-# 2. Start the hub
+# 2️⃣  Start the hub
 specrails-hub start
 
-# 3. Add a project from the CLI…
+# 3️⃣  Add a project from the CLI…
 specrails-hub add /path/to/your/project
 
-# …or click "+ Add project" in the dashboard sidebar at
+# …or click “➕ Add project” in the dashboard sidebar at
 #   http://127.0.0.1:4200
 ```
 
-If the project doesn't have specrails-core yet, the setup wizard walks you through installing it. One flow, no tier picker. Total time: about a minute on a warm cache.
+If a project doesn't have specrails-core yet, a **5-step setup wizard** installs it for you — one flow, no tier picker, ~1 minute on a warm cache.
 
-**Prefer a desktop app?** Download a signed build for macOS or Windows from `https://specrails.dev/downloads/specrails-hub/latest/`. The desktop app bundles the server, so you don't need a separate `start` command.
+> 💡 **Prefer a desktop app?** Grab a signed macOS or Windows build — see [Desktop app](#%EF%B8%8F-desktop-app). It bundles the server, so there's no separate `start`.
 
-## Prerequisites
+### 🧑‍💻 The `specrails-hub` CLI
 
-- **Node.js 20+** (specrails-core ≥ 4.6.0 for codex projects; ≥ 4.2.0 for claude-only)
-- **At least one AI CLI** on your PATH:
-  - **[Claude Code](https://claude.com/claude-code)** — `claude` binary. Set `ANTHROPIC_API_KEY` to authenticate.
-  - **[Codex CLI](https://developers.openai.com/codex)** ≥ 0.128.0 — `codex` binary. Run `codex login` or set `OPENAI_API_KEY`.
-- **`git`**
-- (Optional) **`uv`** if you want to use the Serena plugin
+```bash
+specrails-hub start | stop | add | remove | list   # manage the hub
+specrails-hub implement #42                         # run a specrails verb
+specrails-hub --status                              # manager status
+specrails-hub --jobs                                # recent job history
+specrails-hub --project <name|path>                 # target a project
+specrails-hub --help                                # full reference
+```
 
-The provider is chosen per-project at install time and is immutable after
-creation. On macOS, the desktop app handles Homebrew/Volta/nvm paths
-automatically — see [docs/platforms/macos.md](docs/platforms/macos.md).
-**Windows users:** see [docs/platforms/windows.md](docs/platforms/windows.md)
-for Windows 10/11 specifics. For Codex-specific topics — auth, sandbox config,
-estimated cost caveats, plugin support, and emergency rollback — see
-[docs/codex.md](docs/codex.md).
+When the hub is running, the CLI talks to it over HTTP + WebSocket; when it isn't, it spawns the agent directly. Either way you get streamed logs.
 
-## Documentation
+---
 
-User guides:
+## 📦 Prerequisites
 
-| Guide | What it covers |
-|-------|----------------|
-| [Getting started](docs/getting-started.md) | Install, register a project, run your first pipeline |
-| [Creating specs](docs/creating-specs.md) | Quick vs Explore, drafts, SMASH, Compare, Continue Editing |
-| [Running pipelines](docs/running-pipelines.md) | Rails, jobs, agent profiles, plugins |
-| [Tracking cost](docs/tracking-cost.md) | Analytics page, exports, per-ticket spending |
-| [Customising the hub](docs/customizing.md) | Themes, settings, telemetry, kill switches |
-| [Terminal panel](docs/terminal.md) | Keyboard shortcuts, shell integration, drag-and-drop |
-| [CLI reference](docs/cli.md) | Every command grouped by task |
+- 🟩 **Node.js 20+**
+- 🤖 **At least one AI CLI** on your `PATH`:
+  - **[Claude Code](https://claude.com/claude-code)** — the `claude` binary. Authenticate with `ANTHROPIC_API_KEY`.
+  - **[Codex CLI](https://developers.openai.com/codex)** ≥ 0.128.0 — the `codex` binary. Run `codex login` or set `OPENAI_API_KEY`.
+- 🌿 **git**
+- 🧪 *(optional)* **`uv`** — only if you want the Serena plugin
+- 📦 **specrails-core** ≥ 4.6.0 in the project for Codex, ≥ 4.2.0 for Claude-only *(the wizard installs it)*
 
-Platform notes:
+The provider is chosen **per project at install time** and is immutable afterward. On macOS the desktop app resolves Homebrew/Volta/nvm paths for you.
 
-- [macOS](docs/platforms/macos.md) — GUI-launch PATH, broken-symlink detection
-- [Windows](docs/platforms/windows.md) — installer formats, SmartScreen, ConPTY
+---
 
-Contributing or extending:
+## 🏗️ How it's built
 
-- [`docs/internals/`](docs/internals/) — architecture, REST reference, operations runbook, OpenSpec workflow, profile internals
+A clean **three-layer TypeScript monorepo** — one Express process runs in *hub mode* and manages every project.
 
-## Development
+```
+🗄️  server/   Express 5 + WebSocket + SQLite (better-sqlite3)   · the brain
+🎨  client/   React 18 + Vite + Tailwind v4                      · the dashboard
+⌨️  cli/      specrails-hub command bridge                       · the terminal door
+```
+
+```
+~/.specrails/
+├── hub.sqlite                       # project registry
+├── manager.pid                      # running server PID
+└── projects/<slug>/
+    ├── jobs.sqlite                  # per-project DB (jobs, analytics, chats)
+    └── …                            # snapshots, telemetry, terminals, summaries
+```
+
+**Highlights under the hood:**
+
+- 🔗 **One WebSocket** multiplexes everything; every project-scoped message carries a `projectId`, injected by a `boundBroadcast` closure — managers need zero changes.
+- 🧱 **Per-project isolation** — each project gets its own SQLite, queue manager, and chat manager.
+- 🖥️ **Terminals** stream over a *dedicated* WebSocket so PTY throughput can't starve the event stream.
+- 🌐 **Embedded browser** via Playwright (CDP capture) for the *"From a website"* flow.
+- 📦 **Desktop** via Tauri, with optionally-bundled Node, Git, and Chromium runtimes so it runs fully offline.
+
+> 📖 Want the deep dive? CLAUDE.md and [`docs/internals/`](docs/internals/) document the adapter contract, REST surface, migrations, and the OpenSpec workflow.
+
+---
+
+## 🛠️ Development
 
 ```bash
 git clone https://github.com/fjpulidop/specrails-hub.git
 cd specrails-hub
 npm install                        # root deps (server + CLI)
 cd client && npm install && cd ..  # client deps (separate tree)
-npm run dev                        # server (4200) + client (4201)
+npm run dev                        # 🚀 server :4200 + client :4201, hot reload
 ```
 
-| Script | Description |
-|--------|-------------|
+| Script | What it does |
+|--------|--------------|
 | `npm run dev` | Server (4200) + client (4201) with hot reload |
 | `npm run dev:desktop` | Desktop app (Tauri) in dev mode |
-| `npm run build` | Production build (client + server + CLI) |
-| `npm test` | vitest (server + CLI) |
+| `npm run build` | Production build (server + client + CLI) |
+| `npm test` | Vitest suite (server + CLI) + core-compat check |
 | `npm run test:coverage` | Server coverage (mirrors the CI gate) |
-| `npm run build:desktop` | Desktop installers — ships an **empty** `runtimes/` |
-| `npm run build:desktop:local` | Self-contained desktop app (macOS arm64) |
+| `npm run test:client` | Client Vitest suite |
+| `npm run ci` | Everything CI runs: typecheck + tests + both coverage gates |
 
-CI gates coverage hard: 70 % global, 80 % server, 80 % client. Local runs must clear the same bars (`npm run test:coverage`, and `cd client && npm run test:coverage`).
+🛡️ **Coverage is a hard gate** — **70 % global**, **80 % server**, **80 % client**. Local runs must clear the same bars before pushing.
 
-### Building the desktop app locally
+- 🌍 `4200` — Express API + WebSocket
+- ⚡ `4201` — Vite dev server (proxies `/api` and `/hooks` to 4200)
 
-`npm run build:desktop` builds the `.app`/`.dmg`/`.exe` but does **not** assemble
-the bundled Node/Git/Chromium runtimes — the resulting app falls back to your
-system PATH, and the embedded browser downloads a Playwright-managed Chromium on
-first use. To build a self-contained app the way CI does (**macOS arm64 only**):
+---
+
+## 🖥️ Desktop app
+
+Signed, notarized builds for **macOS (Apple Silicon)** and **Windows (x64)** are published at:
+
+> 📥 `https://specrails.dev/downloads/specrails-hub/latest/`
+
+`npm run build:desktop` produces the `.app` / `.dmg` / `.exe`, but does **not** assemble the bundled runtimes — that app falls back to your system PATH and downloads a Playwright Chromium on first use. To build a self-contained app the way CI does (**macOS arm64 only**):
 
 ```bash
-# Bundle Node 22 + a relocatable Git into src-tauri/runtimes/, then build.
+# Bundle Node 22 + a relocatable Git, then build
 npm run build:desktop:local
 
-# …and bundle Chromium too, so "Add Spec from a website" works fully offline.
-# Adds a one-time ~150 MB Playwright Chromium download.
+# …and bundle Chromium too, so "Add Spec from a website" works fully offline
+# (one-time ~150 MB Playwright Chromium download)
 BUNDLE_CHROMIUM=true npm run build:desktop:local
 ```
 
-Notes:
+> ℹ️ Local builds are **unsigned** — Gatekeeper warns; right-click → Open, or `xattr -dr com.apple.quarantine <App>.app`. Signed + notarized installers come only from the `desktop-release` CI workflow.
 
-- **Local builds are unsigned.** Gatekeeper will warn ("unidentified developer") —
-  right-click → Open, or run `xattr -dr com.apple.quarantine <App>.app`.
-- Locally, Chromium is bundled **unpacked**; the app launches it straight from
-  `Contents/Resources/runtimes/chromium`.
-- The signed + notarized installers are produced only by the `desktop-release` CI
-  workflow. There, Chromium is shipped as an obfuscated `chromium.pak` blob — the
-  notarization service recurses into plain archives and would reject Chromium's
-  ad-hoc-signed binaries, so the magic bytes are XOR-broken to make it opaque. The
-  app reverses the XOR and extracts Chromium to `~/.specrails/runtimes/chromium`
-  on first use, where Google's ad-hoc signature is enough to run it.
+---
 
-## Security model
+## 🔒 Security model
 
-- Binds to `127.0.0.1` only. **Do not expose to a network.**
-- No authentication (single-user local tool).
-- Parameterised SQL throughout.
-- Reserved paths in your project (`.mcp.json`, `.specrails/plugins/state.json`, `.specrails/profiles/.user-preferred.json`) are mutated surgically — read, modify owned keys, atomic rename — so adding plugin N+1 never disturbs plugin N's state.
+- 🏠 Binds to `127.0.0.1` only — **do not expose to a network**.
+- 🙅 No authentication (single-user local tool by design).
+- 🧷 Parameterised SQL everywhere — never string-interpolated.
+- 🧬 Reserved files in your project (`.mcp.json`, `.specrails/plugins/state.json`, `.specrails/profiles/.user-preferred.json`) are mutated **surgically** — read → modify only owned keys → atomic temp+rename — so adding plugin N+1 never disturbs plugin N.
 
-## Support
+---
 
-If specrails-hub saves you time, you can buy me a coffee on [Ko-fi](https://ko-fi.com/D1D81Y002C). It funds development of the open-source ecosystem.
+## 📚 Documentation
+
+**User guides**
+
+| Guide | What it covers |
+|-------|----------------|
+| 🏁 [Getting started](docs/getting-started.md) | Install, register a project, run your first pipeline |
+| 📝 [Creating specs](docs/creating-specs.md) | Quick vs Explore, drafts, SMASH, Compare, Continue Editing |
+| 🚀 [Running pipelines](docs/running-pipelines.md) | Rails, jobs, agent profiles, plugins |
+| 💰 [Tracking cost](docs/tracking-cost.md) | Analytics, exports, per-ticket spending |
+| 🎨 [Customising the hub](docs/customizing.md) | Themes, settings, telemetry, kill switches |
+| ⌨️ [Terminal panel](docs/terminal.md) | Shortcuts, shell integration, drag-and-drop |
+| 🧑‍💻 [CLI reference](docs/cli.md) | Every command grouped by task |
+| 🟢 [Codex notes](docs/codex.md) | Auth, sandbox, estimated-cost caveats, rollback |
+
+**Platform notes** — 🍎 [macOS](docs/platforms/macos.md) · 🪟 [Windows](docs/platforms/windows.md)
+
+**Extending** — 🧩 [`docs/internals/`](docs/internals/): architecture, REST reference, ops runbook, adding a provider.
+
+---
+
+## ☕ Support
+
+If specrails-hub saves you time, you can buy me a coffee on **Ko-fi** — it funds the open-source ecosystem. 💜
 
 [![Donate on Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-FF5E5B?logo=kofi&logoColor=white&style=flat-square)](https://ko-fi.com/D1D81Y002C)
 
-## License
+---
 
-MIT
+## 📄 License
+
+[MIT](LICENSE) © [Javier Pulido](https://github.com/fjpulidop)
+
+<div align="center">
+<sub>Built with TypeScript, React, Express & a lot of ☕ — and shipped by the agents it orchestrates. 🚄</sub>
+</div>

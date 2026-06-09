@@ -72,6 +72,16 @@ export function finaliseInvocationResult(
     if (computed !== null) {
       cloned.total_cost_usd = computed
       estimated = true
+    } else if (cloned.model) {
+      // Non-native-cost provider with a known model id but no pricing-table
+      // entry → cost is persisted NULL and silently vanishes from totals.
+      // Surface it so a new/renamed/drifted model id is caught fast (the fix
+      // is to add the rate to server/pricing.ts, per its quarterly-review
+      // contract). We deliberately do NOT fabricate a fallback rate.
+      console.warn(
+        `[pricing] no rate-card entry for "${adapter.id}:${cloned.model}" — ` +
+          `cost will be persisted NULL. Add it to server/pricing.ts PRICING.`,
+      )
     }
   }
 
