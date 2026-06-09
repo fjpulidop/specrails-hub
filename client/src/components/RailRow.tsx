@@ -7,6 +7,7 @@ import { RailControls, type RailMode, type RailStatus } from './RailControls'
 import { SpecCard } from './SpecCard'
 import { RailProfileSelector } from './agents/RailProfileSelector'
 import { RailEngineSelector } from './agents/RailEngineSelector'
+import { RailModelSelector, type UltracodeModel } from './agents/RailModelSelector'
 import type { LocalTicket } from '../types'
 
 const LONG_PRESS_MS = 800
@@ -22,6 +23,8 @@ interface RailRowProps {
   profileName?: string | null
   /** Selected AI engine for this rail (multi-provider). null/undefined = primary. */
   aiEngine?: string | null
+  /** Selected model for ultracode rails. null/undefined = default (sonnet). */
+  ultracodeModel?: UltracodeModel | null
   /** Installed providers — when >1 the rail header shows an AI engine selector. */
   providers?: readonly string[]
   jiggleMode: boolean
@@ -39,6 +42,7 @@ interface RailRowProps {
   onModeChange: (mode: RailMode) => void
   onProfileChange?: (profileName: string | null) => void
   onEngineChange?: (aiEngine: 'claude' | 'codex') => void
+  onUltracodeModelChange?: (model: UltracodeModel) => void
   onToggle: () => void
   onTicketClick: (ticket: LocalTicket) => void
   onDelete: () => void
@@ -51,14 +55,29 @@ interface RailRowProps {
 }
 
 export function RailRow({
-  id, label, tickets, mode, status, activeJobId, profileName, aiEngine, providers, jiggleMode,
+  id, label, tickets, mode, status, activeJobId, profileName, aiEngine, ultracodeModel, providers, jiggleMode,
   dragHandleListeners, dragHandleAttributes, density = 'normal',
-  onModeChange, onProfileChange, onEngineChange, onToggle, onTicketClick, onDelete, onLongPress, onRename,
+  onModeChange, onProfileChange, onEngineChange, onUltracodeModelChange, onToggle, onTicketClick, onDelete, onLongPress, onRename,
   onTicketMoveToSpecs,
 }: RailRowProps) {
   // Codex has no agent profiles — hide the profile selector when this rail's
   // engine is codex (the engine selector is shown only on multi-provider projects).
   const profileApplies = (aiEngine ?? providers?.[0]) !== 'codex'
+  // Ultracode is Claude-only. Effective engine = explicit rail override, else
+  // the project's primary provider (providers[0]); default to claude when
+  // unknown (single-provider claude projects pass no providers list).
+  const engineIsClaude = (aiEngine ?? providers?.[0] ?? 'claude') === 'claude'
+  // Which secondary selectors are visible right now. When any is shown we move
+  // them onto their own row beneath the rail name so the header doesn't cram
+  // engine + model + mode segments + play into a single line.
+  const showEngineSel = !!onEngineChange && status !== 'running' && (providers?.length ?? 0) > 1
+  const showProfileSel = !!onProfileChange && status !== 'running' && profileApplies
+  const showModelSel = !!onUltracodeModelChange && status !== 'running' && mode === 'ultracode' && engineIsClaude
+  // Only the engine + model selectors crowd the header (and always render when
+  // their condition holds). The profile selector self-hides when the project
+  // has no profiles, so it can't trigger an empty row — it rides along the
+  // second row when one exists, else stays inline on the top row.
+  const hasSelectorRow = showEngineSel || showModelSel
   // Compact-tier right-click context menu state. `{ticketId, x, y}` while
   // open, `null` otherwise. Closed by outside-click, Escape, or selection.
   const [ticketCtxMenu, setTicketCtxMenu] = useState<{ ticketId: number; x: number; y: number } | null>(null)
@@ -363,11 +382,15 @@ export function RailRow({
           {onProfileChange && !isRunning && profileApplies && (
             <RailProfileSelector value={profileName ?? null} onChange={onProfileChange} />
           )}
+          {onUltracodeModelChange && !isRunning && mode === 'ultracode' && engineIsClaude && (
+            <RailModelSelector value={ultracodeModel ?? null} onChange={onUltracodeModelChange} />
+          )}
           <RailControls
             mode={mode}
             status={status}
             activeJobId={activeJobId}
             ticketCount={tickets.length}
+            ultracodeAvailable={engineIsClaude}
             onModeChange={onModeChange}
             onToggle={onToggle}
           />
@@ -430,9 +453,11 @@ export function RailRow({
           ...(railJigglePhaseMs !== undefined ? { animationDelay: `${railJigglePhaseMs}ms` } : {}),
         }}
       >
-        {/* Row header */}
-        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/30 bg-gradient-to-r from-muted/30 to-transparent shrink-0">
-          <div className="flex items-center gap-2">
+        {/* Row header — name + mode/play on top, secondary selectors on a
+            recessed config strip below so nothing crams together. */}
+        <div className="flex flex-col border-b border-border/30 bg-gradient-to-r from-muted/30 to-transparent shrink-0">
+          <div className="flex items-center justify-between gap-2 px-3 py-1.5">
+          <div className="flex items-center gap-2 min-w-0">
             <button
               type="button"
               className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors -ml-1"
@@ -494,17 +519,13 @@ export function RailRow({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1.5">
-            {onEngineChange && status !== 'running' && (
-              <RailEngineSelector value={aiEngine ?? null} providers={providers ?? []} onChange={onEngineChange} />
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Profile stays inline when no second row exists (it self-hides
+                with no profiles, so it never leaves an empty gap here). */}
+            {!hasSelectorRow && showProfileSel && onProfileChange && (
+              <RailProfileSelector value={profileName ?? null} onChange={onProfileChange} />
             )}
-            {onProfileChange && status !== 'running' && profileApplies && (
-              <RailProfileSelector
-                value={profileName ?? null}
-                onChange={onProfileChange}
-              />
-            )}
-            <RailControls mode={mode} status={status} activeJobId={activeJobId} ticketCount={tickets.length} onModeChange={onModeChange} onToggle={onToggle} />
+            <RailControls mode={mode} status={status} activeJobId={activeJobId} ticketCount={tickets.length} ultracodeAvailable={engineIsClaude} onModeChange={onModeChange} onToggle={onToggle} />
             {/* Jiggle-mode delete button */}
             {jiggleMode && canDelete && (
               <button
@@ -516,6 +537,24 @@ export function RailRow({
               </button>
             )}
           </div>
+          </div>
+
+          {/* Secondary selector strip (engine / profile / ultracode model).
+              A recessed bar with its own divider + faint inset background so it
+              reads as the rail's config row instead of floating controls. */}
+          {hasSelectorRow && (
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 px-3 py-1.5 border-t border-border/20 bg-background/20">
+              {showEngineSel && onEngineChange && (
+                <RailEngineSelector value={aiEngine ?? null} providers={providers ?? []} onChange={onEngineChange} />
+              )}
+              {hasSelectorRow && showProfileSel && onProfileChange && (
+                <RailProfileSelector value={profileName ?? null} onChange={onProfileChange} />
+              )}
+              {showModelSel && onUltracodeModelChange && (
+                <RailModelSelector value={ultracodeModel ?? null} onChange={onUltracodeModelChange} />
+              )}
+            </div>
+          )}
         </div>
 
         {/* Droppable body */}

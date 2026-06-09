@@ -4,6 +4,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Layers, Plus } from 'lucide-react'
 import { RailRow } from './RailRow'
 import type { RailMode, RailStatus } from './RailControls'
+import type { UltracodeModel } from './agents/RailModelSelector'
 import type { LocalTicket } from '../types'
 
 export const RAIL_SORT_PREFIX = '__rail:'
@@ -24,6 +25,8 @@ export interface RailState {
   profileName?: string | null
   /** Selected AI engine for this rail (multi-provider). null/undefined = primary. */
   aiEngine?: string | null
+  /** Selected model for ultracode rails. null/undefined = default (sonnet). */
+  ultracodeModel?: UltracodeModel | null
 }
 
 interface RailsBoardProps {
@@ -34,6 +37,7 @@ interface RailsBoardProps {
   onModeChange: (railId: string, mode: RailMode) => void
   onProfileChange?: (railId: string, profileName: string | null) => void
   onEngineChange?: (railId: string, aiEngine: 'claude' | 'codex') => void
+  onUltracodeModelChange?: (railId: string, model: UltracodeModel) => void
   onToggle: (railId: string) => void
   onTicketClick: (ticket: LocalTicket) => void
   onAddRail: () => void
@@ -62,7 +66,7 @@ function SortableRailWrapper({ railId, children }: { railId: string; children: (
 /** Width threshold below which rail rows switch to the compact mini-card layout. */
 export const RAILS_COMPACT_THRESHOLD_PX = 320
 
-export function RailsBoard({ rails, ticketMap, providers, onModeChange, onProfileChange, onEngineChange, onToggle, onTicketClick, onAddRail, onDeleteRail, onRenameRail, onTicketMoveToSpecs }: RailsBoardProps) {
+export function RailsBoard({ rails, ticketMap, providers, onModeChange, onProfileChange, onEngineChange, onUltracodeModelChange, onToggle, onTicketClick, onAddRail, onDeleteRail, onRenameRail, onTicketMoveToSpecs }: RailsBoardProps) {
   const activeRails = rails.filter((r) => r.status === 'running').length
   const [jiggleMode, setJiggleMode] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -138,6 +142,7 @@ export function RailsBoard({ rails, ticketMap, providers, onModeChange, onProfil
                     activeJobId={rail.activeJobId}
                     profileName={rail.profileName ?? null}
                     aiEngine={rail.aiEngine ?? null}
+                    ultracodeModel={rail.ultracodeModel ?? null}
                     providers={providers}
                     jiggleMode={jiggleMode}
                     density={density}
@@ -146,6 +151,7 @@ export function RailsBoard({ rails, ticketMap, providers, onModeChange, onProfil
                     onModeChange={(mode) => onModeChange(rail.id, mode)}
                     onProfileChange={onProfileChange ? (p) => onProfileChange(rail.id, p) : undefined}
                     onEngineChange={onEngineChange ? (e) => onEngineChange(rail.id, e) : undefined}
+                    onUltracodeModelChange={onUltracodeModelChange ? (m) => onUltracodeModelChange(rail.id, m) : undefined}
                     onToggle={() => onToggle(rail.id)}
                     onTicketClick={onTicketClick}
                     onDelete={() => onDeleteRail(rail.id)}

@@ -1021,10 +1021,27 @@ export function getStats(db: DbInstance): StatsRow {
 
 // ─── Project settings ─────────────────────────────────────────────────────────
 
+/**
+ * Default pre-prompt used by Ultracode (Claude-only rails) when the project
+ * has no per-project override. Ultracode skips the OpenSpec pipeline entirely:
+ * it hands Claude the spec text plus this instruction and lets it work
+ * autonomously end-to-end.
+ */
+export const DEFAULT_ULTRACODE_PRE_PROMPT = [
+  'You are operating in ULTRACODE: fully autonomous, end-to-end implementation.',
+  'Implement the following spec COMPLETELY in this repository. You have full access to the codebase and tools.',
+  'Work independently until the feature is done: write the code, the tests, update docs as needed, and make sure everything builds and the test suite passes.',
+  'Do NOT follow any structured architect/developer/reviewer pipeline — use your own judgement and the repo conventions.',
+  'Never ask for confirmation; there is no human to answer. Choose the recommended option and proceed.',
+].join('\n')
+
 export interface ProjectSettings {
   pipelineTelemetryEnabled: boolean
   orchestratorModel: string
   prePrompt: string
+  /** Per-project Ultracode pre-prompt override. Empty string = use
+   *  DEFAULT_ULTRACODE_PRE_PROMPT at spawn time. */
+  ultraPrePrompt: string
 }
 
 export function getProjectSettings(db: DbInstance): ProjectSettings {
@@ -1037,11 +1054,22 @@ export function getProjectSettings(db: DbInstance): ProjectSettings {
   const prePromptRow = db.prepare(
     `SELECT value FROM queue_state WHERE key = 'config.pre_prompt'`
   ).get() as { value: string } | undefined
+  const ultraPrePromptRow = db.prepare(
+    `SELECT value FROM queue_state WHERE key = 'config.ultracode_pre_prompt'`
+  ).get() as { value: string } | undefined
   return {
     pipelineTelemetryEnabled: telemetryRow?.value === 'true',
     orchestratorModel: modelRow?.value ?? 'sonnet',
     prePrompt: prePromptRow?.value ?? '',
+    ultraPrePrompt: ultraPrePromptRow?.value ?? '',
   }
+}
+
+/** Resolve the effective Ultracode pre-prompt: the per-project override when
+ *  set, otherwise the built-in default. */
+export function getUltracodePrePrompt(db: DbInstance): string {
+  const override = getProjectSettings(db).ultraPrePrompt.trim()
+  return override || DEFAULT_ULTRACODE_PRE_PROMPT
 }
 
 export function updateProjectSettings(db: DbInstance, patch: Partial<ProjectSettings>): void {
@@ -1062,6 +1090,15 @@ export function updateProjectSettings(db: DbInstance, patch: Partial<ProjectSett
       db.prepare(
         `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.pre_prompt', ?)`
       ).run(patch.prePrompt)
+    }
+  }
+  if (patch.ultraPrePrompt !== undefined) {
+    if (patch.ultraPrePrompt.trim() === '') {
+      db.prepare(`DELETE FROM queue_state WHERE key = 'config.ultracode_pre_prompt'`).run()
+    } else {
+      db.prepare(
+        `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('config.ultracode_pre_prompt', ?)`
+      ).run(patch.ultraPrePrompt)
     }
   }
 }

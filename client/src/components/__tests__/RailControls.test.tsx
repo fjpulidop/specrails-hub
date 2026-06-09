@@ -78,4 +78,20 @@ describe('RailControls', () => {
     render(<RailControls {...defaultProps} ticketCount={0} />)
     expect(screen.getByTitle('Add specs to this rail first')).toBeInTheDocument()
   })
+
+  it('hides the Ultra segment by default', () => {
+    render(<RailControls {...defaultProps} />)
+    expect(screen.queryByText('Ultra')).not.toBeInTheDocument()
+  })
+
+  it('shows the Ultra segment when ultracodeAvailable', () => {
+    render(<RailControls {...defaultProps} ultracodeAvailable />)
+    expect(screen.getByText('Ultra')).toBeInTheDocument()
+  })
+
+  it('calls onModeChange with ultracode when Ultra clicked', () => {
+    render(<RailControls {...defaultProps} ultracodeAvailable />)
+    fireEvent.click(screen.getByText('Ultra'))
+    expect(defaultProps.onModeChange).toHaveBeenCalledWith('ultracode')
+  })
 })

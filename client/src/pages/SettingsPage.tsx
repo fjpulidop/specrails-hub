@@ -13,6 +13,7 @@ interface ProjectSettings {
   pipelineTelemetryEnabled: boolean
   orchestratorModel?: string
   prePrompt?: string
+  ultraPrePrompt?: string
 }
 
 export default function SettingsPage() {
@@ -59,6 +60,8 @@ export default function SettingsPage() {
   const [isSavingTelemetry, setIsSavingTelemetry] = useState(false)
   const [prePrompt, setPrePrompt] = useState('')
   const [isSavingPrePrompt, setIsSavingPrePrompt] = useState(false)
+  const [ultraPrePrompt, setUltraPrePrompt] = useState('')
+  const [isSavingUltraPrePrompt, setIsSavingUltraPrePrompt] = useState(false)
 
   const cacheRef = useRef<Map<string, ProjectConfig>>(new Map())
 
@@ -117,6 +120,7 @@ export default function SettingsPage() {
         const data = await res.json() as ProjectSettings
         setTelemetryEnabled(data.pipelineTelemetryEnabled ?? false)
         setPrePrompt(data.prePrompt ?? '')
+        setUltraPrePrompt(data.ultraPrePrompt ?? '')
       } catch {
         // ignore
       }
@@ -205,6 +209,26 @@ export default function SettingsPage() {
       toast.error('Failed to save pre-prompt', { description: (err as Error).message })
     } finally {
       setIsSavingPrePrompt(false)
+    }
+  }
+
+  async function saveUltraPrePrompt() {
+    setIsSavingUltraPrePrompt(true)
+    try {
+      const res = await fetch(`${getApiBase()}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ultraPrePrompt }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      const data = await res.json() as { settings?: ProjectSettings }
+      const savedValue = data.settings?.ultraPrePrompt ?? ''
+      setUltraPrePrompt(savedValue)
+      toast.success(savedValue.trim() === '' ? 'Ultra pre-prompt reset to default' : 'Ultra pre-prompt saved')
+    } catch (err) {
+      toast.error('Failed to save Ultra pre-prompt', { description: (err as Error).message })
+    } finally {
+      setIsSavingUltraPrePrompt(false)
     }
   }
 
@@ -302,6 +326,43 @@ export default function SettingsPage() {
               onClick={savePrePrompt}
             >
               {isSavingPrePrompt ? 'Saving...' : 'Save pre-prompt'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ultracode pre-prompt</CardTitle>
+          <CardDescription>
+            Instruction sent to Claude in Ultracode (Claude-only rails). Ultracode skips the OpenSpec pipeline — it hands Claude this pre-prompt plus the spec text and lets it implement autonomously. Leave blank to use the built-in default.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <label htmlFor="project-ultra-pre-prompt" className="text-xs font-medium">
+              Ultra pre-prompt
+            </label>
+            <textarea
+              id="project-ultra-pre-prompt"
+              value={ultraPrePrompt}
+              onChange={(e) => setUltraPrePrompt(e.target.value)}
+              placeholder="Leave blank to use the default Ultracode instruction."
+              className="min-h-32 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20"
+            />
+            <p className="text-xs text-muted-foreground">
+              The spec text is appended automatically after this pre-prompt. Empty = default.
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-7 text-xs"
+              disabled={isSavingUltraPrePrompt}
+              onClick={saveUltraPrePrompt}
+            >
+              {isSavingUltraPrePrompt ? 'Saving...' : 'Save Ultra pre-prompt'}
             </Button>
           </div>
         </CardContent>

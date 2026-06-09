@@ -23,7 +23,7 @@ import { finaliseInvocationResult } from './result-event'
 import { randomUUID } from 'crypto'
 import { getAdapter, type ProviderAdapter, type AdapterEvent } from './providers'
 import { createCodexOtelBridge, type CodexOtelBridge } from './codex-otel-bridge'
-import { createJob, finishJob, appendEvent, skipJob, getProjectSettings } from './db'
+import { createJob, finishJob, appendEvent, skipJob, getProjectSettings, getUltracodePrePrompt, DEFAULT_ULTRACODE_PRE_PROMPT } from './db'
 import type { JobResult } from './db'
 import type { CommandInfo } from './config'
 import { attachmentManager, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
@@ -191,6 +191,9 @@ function extractDisplayText(event: Record<string, unknown>): string | null {
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'canceled', 'zombie_terminated', 'skipped'])
 
+/** Match an Ultracode rail command: `/specrails:ultracode #5 …` (or `/sr:…`). */
+export const ULTRACODE_COMMAND_RE = /^\/(specrails|sr):ultracode\b/
+
 export interface EnqueueOptions {
   dependsOnJobId?: string
   pipelineId?: string
@@ -202,6 +205,11 @@ export interface EnqueueOptions {
    *  job runs with the project's primary provider (this._adapter). Validated by
    *  the route layer against the project's installed providers. */
   provider?: 'claude' | 'codex'
+  /** Per-job model override (e.g. ultracode rails let the user pick
+   *  haiku/sonnet/opus per launch). For claude this becomes the `--model`
+   *  value, taking precedence over the project orchestrator model. In-memory
+   *  only — a queued job that survives a restart falls back to the default. */
+  model?: string
 }
 
 // ─── QueueManager ─────────────────────────────────────────────────────────────
@@ -247,6 +255,9 @@ export class QueueManager {
    *  In-memory only (mirrors _jobProfileSelection): a queued job that survives a
    *  restart falls back to the project's primary provider. */
   private _jobProviderSelection: Map<string, 'claude' | 'codex'>
+  /** Pending per-job model override keyed by jobId — read at spawn time.
+   *  In-memory only (mirrors _jobProviderSelection). */
+  private _jobModelSelection: Map<string, string>
   /** Pre-spawn working-tree snapshot refs keyed by jobId — read at exit time
    *  by the Code-Explorer provenance hook. Cleared on job exit. */
   private _snapshotRefs: Map<string, WorkingTreeSnapshot>
@@ -297,6 +308,7 @@ export class QueueManager {
     this._projectSlug = options?.projectSlug ?? null
     this._jobProfileSelection = new Map()
     this._jobProviderSelection = new Map()
+    this._jobModelSelection = new Map()
     this._snapshotRefs = new Map()
 
     const envTimeout = process.env.WM_ZOMBIE_TIMEOUT_MS !== undefined
@@ -426,6 +438,11 @@ export class QueueManager {
     // Record per-job provider override so _startJob resolves the right adapter.
     if (resolvedOpts?.provider) {
       this._jobProviderSelection.set(id, resolvedOpts.provider)
+    }
+
+    // Record per-job model override (e.g. ultracode model picker).
+    if (resolvedOpts?.model) {
+      this._jobModelSelection.set(id, resolvedOpts.model)
     }
 
     // Insert at the correct position based on priority (higher priority first, FIFO within same level)
@@ -627,6 +644,36 @@ export class QueueManager {
     }
   }
 
+  /**
+   * Build the Claude prompt for an Ultracode job. Ultracode does NOT invoke
+   * a slash command: it sends the resolved pre-prompt followed by the full spec
+   * text of every ticket referenced in the command. Fully reconstructible from
+   * the command (`/specrails:ultracode #<id> …`) + the local ticket store, so a
+   * queued job survives a server restart without losing the prompt.
+   */
+  private _buildUltracodePrompt(command: string): string {
+    const pre = this._db ? getUltracodePrePrompt(this._db) : DEFAULT_ULTRACODE_PRE_PROMPT
+    const ticketIds = this._extractTicketIds(command)
+    const specs: string[] = []
+    if (this._cwd) {
+      try {
+        const store = readStore(resolveTicketStoragePath(this._cwd))
+        for (const ticketId of ticketIds) {
+          const ticket = store.tickets[String(ticketId)]
+          if (!ticket) continue
+          const body = (ticket.description ?? '').trim()
+          specs.push(`# Spec #${ticketId}: ${ticket.title}\n\n${body || '_(no description)_'}`)
+        }
+      } catch (err) {
+        console.warn(`[queue-manager] failed to read specs for ultracode: ${(err as Error).message}`)
+      }
+    }
+    const specBlock = specs.length > 0
+      ? specs.join('\n\n---\n\n')
+      : `(No spec content found for ${ticketIds.map((id) => `#${id}`).join(', ') || 'this rail'}.)`
+    return `${pre}\n\n---\n\n${specBlock}`
+  }
+
   private _drainQueue(): void {
     if (this._disposed) return
     if (this._activeJobId !== null) return
@@ -753,12 +800,25 @@ export class QueueManager {
     //    claude slash command — propose-spec, implement, batch-implement,
     //    explore-spec, retry, …). This is the rail equivalent of the
     //    user typing `$implement #1 --yes` themselves in `codex`.
-    const railPrompt = adapter.id === 'codex'
-      ? commandToRun.replace(/^\/(specrails|sr):([\w-]+)/, '$$$2')
-      : commandToRun
-    const railModel = adapter.id === 'claude' && this._db
-      ? getProjectSettings(this._db).orchestratorModel
-      : (this._resolvedModel ?? adapter.defaultModel())
+    // Ultracode (Claude only): skip the slash command entirely and send the
+    // pre-prompt + spec text directly as the prompt. The server route guards
+    // that ultracode never reaches a non-claude adapter; defensively, a codex
+    // adapter still falls through to its skill-translation path below.
+    const isUltracode = adapter.id === 'claude' && ULTRACODE_COMMAND_RE.test(commandToRun)
+    const railPrompt = isUltracode
+      ? this._buildUltracodePrompt(commandToRun)
+      : adapter.id === 'codex'
+        ? commandToRun.replace(/^\/(specrails|sr):([\w-]+)/, '$$$2')
+        : commandToRun
+    // Per-job model override (consumed once) takes precedence — used by the
+    // ultracode model picker so the user can choose haiku/sonnet/opus per launch.
+    const modelOverride = this._jobModelSelection.get(jobId)
+    this._jobModelSelection.delete(jobId)
+    const railModel = modelOverride
+      ? modelOverride
+      : adapter.id === 'claude' && this._db
+        ? getProjectSettings(this._db).orchestratorModel
+        : (this._resolvedModel ?? adapter.defaultModel())
     const args = adapter.buildArgs('rail-job', {
       prompt: railPrompt,
       systemPrompt: systemAppend || undefined,
