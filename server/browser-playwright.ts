@@ -18,6 +18,7 @@ import type {
   ScreencastFrame,
 } from './browser-capture-types'
 import { resolveBundledChromiumExecutable } from './chromium-resolver'
+import { NetworkRingBuffer, sketchJsonShape } from './browser-network'
 
 function normalizeUrl(raw: string): string {
   const trimmed = raw.trim()
@@ -31,6 +32,12 @@ class PlaywrightPageHandle implements BrowserPageHandle {
   // dependency on playwright's exported types leaking through the abstraction.
   private cdp: any = null
   private screencastHandler: ((frame: ScreencastFrame) => void) | null = null
+  // A dedicated, long-lived CDP session for the Network domain — kept SEPARATE
+  // from `cdp` (which is attached/detached around screencast) so request capture
+  // survives screencast toggles.
+  private netCdp: any = null
+  private netEnabled = false
+  private readonly netBuffer = new NetworkRingBuffer()
 
   constructor(private readonly page: any) {}
 
@@ -163,27 +170,164 @@ class PlaywrightPageHandle implements BrowserPageHandle {
       css: raw.css,
       cssTruncated: raw.cssTruncated,
       nodes: raw.nodes,
+      designTokens: raw.designTokens,
       capturedAt: new Date().toISOString(),
     }
   }
 
   async probeElementAt(point: { x: number; y: number }): Promise<ElementProbe | null> {
+    return this.runProbe({ point })
+  }
+
+  async navigateElement(selector: string, direction: 'parent' | 'child' | 'self'): Promise<ElementProbe | null> {
+    return this.runProbe({ selector, direction })
+  }
+
+  private async runProbe(arg: { point?: { x: number; y: number }; selector?: string; direction?: 'parent' | 'child' | 'self' }): Promise<ElementProbe | null> {
     try {
-      // Inline arrow with no inner named functions → esbuild/tsx won't inject the
-      // `__name` helper, so it's safe to pass directly to page.evaluate.
+      // Serialise with the `__name` shim (same pattern as extractDom) so the inner
+      // const-arrow helpers survive esbuild keepNames in the page context.
+      const src = `(() => { const __name = (f) => f; return (${probeScript.toString()})(${JSON.stringify(arg)}); })()`
+      return (await this.page.evaluate(src)) as ElementProbe | null
+    } catch {
+      return null
+    }
+  }
+
+  async enableNetwork(): Promise<void> {
+    if (this.netEnabled) return
+    this.netEnabled = true
+    try {
+      const ctx = this.page.context()
+      this.netCdp = await ctx.newCDPSession(this.page)
+      await this.netCdp.send('Network.enable', { maxResourceBufferSize: 5_000_000, maxTotalBufferSize: 10_000_000 })
+      this.netCdp.on('Network.requestWillBeSent', (e: any) => {
+        try {
+          this.netBuffer.start(e.requestId, {
+            method: e.request?.method ?? 'GET',
+            url: e.request?.url ?? '',
+            resourceType: e.type ?? 'Other',
+            startedAt: Date.now(),
+            requestBodyShape: e.request?.postData ? sketchJsonShape(e.request.postData) : null,
+          })
+        } catch { /* never let a network event bubble */ }
+      })
+      this.netCdp.on('Network.responseReceived', (e: any) => {
+        try {
+          this.netBuffer.response(e.requestId, { status: e.response?.status ?? 0, mimeType: e.response?.mimeType ?? null })
+        } catch { /* ignore */ }
+      })
+      this.netCdp.on('Network.loadingFinished', (e: any) => {
+        try {
+          this.netBuffer.finish(e.requestId, { finishedAt: Date.now() })
+          // Sketch JSON response shapes only, body under a cap, fully guarded.
+          if (this.netBuffer.wantsBodySketch(e.requestId)) void this.sketchResponseBody(e.requestId)
+        } catch { /* ignore */ }
+      })
+      this.netCdp.on('Network.loadingFailed', (e: any) => {
+        try { this.netBuffer.fail(e.requestId, { finishedAt: Date.now(), errorText: e.errorText }) } catch { /* ignore */ }
+      })
+    } catch {
+      // Network capture is best-effort — a failure here never breaks the session.
+      this.netEnabled = false
+    }
+  }
+
+  private async sketchResponseBody(requestId: string): Promise<void> {
+    if (!this.netCdp) return
+    try {
+      const res = await this.netCdp.send('Network.getResponseBody', { requestId })
+      if (!res || res.base64Encoded) return // binary — skip
+      const body = typeof res.body === 'string' ? res.body : ''
+      const shape = sketchJsonShape(body)
+      if (shape) this.netBuffer.setResponseShape(requestId, shape)
+    } catch {
+      // The body may already be evicted / unavailable — degrade to no shape.
+    }
+  }
+
+  recentNetwork(sinceMs: number) {
+    return this.netBuffer.recent(sinceMs)
+  }
+
+  async resolveAnchorSelector(point: { x: number; y: number }): Promise<string | null> {
+    try {
       return await this.page.evaluate((p: { x: number; y: number }) => {
         const el = document.elementFromPoint(p.x, p.y)
         if (!el) return null
-        const b = el.getBoundingClientRect()
-        return { rect: { x: b.x, y: b.y, width: b.width, height: b.height }, tag: el.tagName.toLowerCase() }
+        const esc = (s: string) => (window.CSS && CSS.escape ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, '\\$&'))
+        const target = el as HTMLElement
+        if (target.id) return '#' + esc(target.id)
+        const testid = target.getAttribute('data-testid')
+        if (testid) return `[data-testid="${testid.replace(/"/g, '\\"')}"]`
+        const parts: string[] = []
+        let node: Element | null = el
+        let depth = 0
+        while (node && node.nodeType === 1 && node !== document.body && depth < 6) {
+          const tag = node.tagName.toLowerCase()
+          const parent: Element | null = node.parentElement
+          if (!parent) { parts.unshift(tag); break }
+          const sameTag = Array.from(parent.children).filter((c) => c.tagName === (node as Element).tagName)
+          const idx = sameTag.indexOf(node) + 1
+          parts.unshift(sameTag.length > 1 ? `${tag}:nth-of-type(${idx})` : tag)
+          node = parent
+          depth++
+        }
+        return parts.length ? parts.join(' > ') : null
       }, point)
     } catch {
       return null
     }
   }
 
+  async resolveAnchorRect(selector: string): Promise<CaptureRect | null> {
+    try {
+      return await this.page.evaluate((sel: string) => {
+        const el = document.querySelector(sel)
+        if (!el) return null
+        // Bring it into view so a below-the-fold element at this breakpoint yields
+        // an on-screen rect (instant scroll → getBoundingClientRect reflects it).
+        try { el.scrollIntoView({ block: 'center', inline: 'center' }) } catch { /* ignore */ }
+        const b = el.getBoundingClientRect()
+        if (b.width <= 0 || b.height <= 0) return null
+        return { x: b.x, y: b.y, width: b.width, height: b.height }
+      }, selector)
+    } catch {
+      return null
+    }
+  }
+
+  async waitForStable(): Promise<void> {
+    try {
+      await this.page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+    } catch { /* ignore */ }
+    // A small extra settle for late reflow / lazy-loaded images / web fonts.
+    try { await this.page.waitForTimeout?.(120) } catch { /* ignore */ }
+  }
+
+  async getSelectionText(): Promise<string> {
+    try {
+      return await this.page.evaluate(() => window.getSelection()?.toString() ?? '')
+    } catch {
+      return ''
+    }
+  }
+
+  async insertText(text: string): Promise<void> {
+    try { await this.page.keyboard.insertText(text) } catch { /* ignore */ }
+  }
+
+  async deleteSelection(): Promise<void> {
+    try { await this.page.keyboard.press('Delete') } catch { /* ignore */ }
+  }
+
   async close(): Promise<void> {
     await this.stopScreencast()
+    if (this.netCdp) {
+      try { await this.netCdp.send('Network.disable') } catch { /* ignore */ }
+      try { await this.netCdp.detach() } catch { /* ignore */ }
+      this.netCdp = null
+    }
     try { await this.page.close() } catch { /* ignore */ }
   }
 }
@@ -204,6 +348,13 @@ function domExtractScript(arg: { rect: CaptureRect; htmlByteCap: number }): {
     attributes: Record<string, string>
     styles: Record<string, string>
   }>
+  designTokens?: {
+    contractVersion: number
+    anchor: Record<string, string>
+    byTag: Record<string, Record<string, string>>
+    palette: string[]
+    fonts: string[]
+  }
 } {
   const { rect, htmlByteCap } = arg
   const NODE_CAP = 60
@@ -256,6 +407,70 @@ function domExtractScript(arg: { rect: CaptureRect; htmlByteCap: number }): {
       if (v) out[k] = String(v).slice(0, 120)
     }
     return out
+  }
+
+  // ─── Design tokens: exact computed values for "clone this UI" specs ───────────
+  // getComputedStyle does not reliably populate the `border`/`borderRadius`/
+  // `padding`/`margin` shorthands, so we read the longhands and recompose. All
+  // helpers are `const` arrows (no inner named functions) so esbuild/tsx don't
+  // inject the `__name` helper that breaks page.evaluate (see extractDom).
+  const SIDES = ['top', 'right', 'bottom', 'left']
+  const collapse4 = (vals: string[]): string => {
+    const [t, r, b, l] = vals
+    if (t === r && r === b && b === l) return t
+    if (t === b && r === l) return `${t} ${r}`
+    return vals.join(' ')
+  }
+  const tokenSetFor = (el: Element): Record<string, string> => {
+    const cs = window.getComputedStyle(el)
+    const g = (p: string): string => cs.getPropertyValue(p) || ''
+    const out: Record<string, string> = {}
+    const setIf = (k: string, v: string, drop: string[]) => {
+      const t = String(v).trim()
+      if (t && !drop.includes(t)) out[k] = t.slice(0, 240)
+    }
+    setIf('color', g('color'), ['rgba(0, 0, 0, 0)'])
+    setIf('backgroundColor', g('background-color'), ['rgba(0, 0, 0, 0)', 'transparent'])
+    setIf('fontFamily', g('font-family'), [])
+    setIf('fontSize', g('font-size'), [])
+    setIf('fontWeight', g('font-weight'), [])
+    setIf('lineHeight', g('line-height'), ['normal'])
+    setIf('letterSpacing', g('letter-spacing'), ['normal'])
+    setIf('padding', collapse4(SIDES.map((s) => g('padding-' + s))), ['0px'])
+    setIf('margin', collapse4(SIDES.map((s) => g('margin-' + s))), ['0px'])
+    const bw = g('border-top-width')
+    const bsStyle = g('border-top-style')
+    const widthsUniform = SIDES.every((s) => g('border-' + s + '-width') === bw)
+    const stylesUniform = SIDES.every((s) => g('border-' + s + '-style') === bsStyle)
+    if (bsStyle && bsStyle !== 'none' && bw && bw !== '0px' && widthsUniform && stylesUniform) {
+      setIf('border', `${bw} ${bsStyle} ${g('border-top-color')}`, [])
+    }
+    const radii = ['top-left', 'top-right', 'bottom-right', 'bottom-left'].map((c) => g('border-' + c + '-radius'))
+    setIf('borderRadius', collapse4(radii), ['0px'])
+    setIf('boxShadow', g('box-shadow'), ['none'])
+    return out
+  }
+  const deriveDesignTokens = (anchorEl: Element, els: Element[]) => {
+    const anchor = tokenSetFor(anchorEl)
+    const tagCount: Record<string, number> = {}
+    for (const el of els) { const t = el.tagName.toLowerCase(); tagCount[t] = (tagCount[t] || 0) + 1 }
+    const topTags = Object.keys(tagCount).sort((a, b) => tagCount[b] - tagCount[a]).slice(0, 8)
+    const byTag: Record<string, Record<string, string>> = {}
+    for (const t of topTags) {
+      const el = els.find((e) => e.tagName.toLowerCase() === t)
+      if (el) byTag[t] = tokenSetFor(el)
+    }
+    const palette: string[] = []
+    const fonts: string[] = []
+    const consider = (ts: Record<string, string>) => {
+      for (const v of [ts.color, ts.backgroundColor]) {
+        if (v && !palette.includes(v) && palette.length < 12) palette.push(v)
+      }
+      if (ts.fontFamily && !fonts.includes(ts.fontFamily) && fonts.length < 6) fonts.push(ts.fontFamily)
+    }
+    consider(anchor)
+    for (const t of Object.keys(byTag)) consider(byTag[t])
+    return { contractVersion: 1, anchor, byTag, palette, fonts }
   }
 
   // Sample a grid of points across the selection to discover candidate elements.
@@ -450,6 +665,9 @@ function domExtractScript(arg: { rect: CaptureRect; htmlByteCap: number }): {
     css = ''
   }
 
+  let designTokens
+  try { designTokens = deriveDesignTokens(container, nodeEls) } catch { designTokens = undefined }
+
   return {
     viewport: { width: window.innerWidth, height: window.innerHeight },
     html,
@@ -457,6 +675,79 @@ function domExtractScript(arg: { rect: CaptureRect; htmlByteCap: number }): {
     css,
     cssTruncated,
     nodes,
+    designTokens,
+  }
+}
+
+// Serialised into the page via page.evaluate (with a `__name` shim). Resolves an
+// element by point or by selector (+optional parent/child step) and returns its
+// rect, a stable-ish selector, and the ancestor breadcrumb root→element.
+function probeScript(arg: {
+  point?: { x: number; y: number }
+  selector?: string
+  direction?: 'parent' | 'child' | 'self'
+}): {
+  rect: { x: number; y: number; width: number; height: number }
+  tag: string
+  selector: string
+  path: Array<{ label: string; selector: string }>
+} | null {
+  const { point, selector, direction } = arg
+  const SKIP = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT'])
+  let el: Element | null = null
+  if (point) {
+    el = document.elementFromPoint(point.x, point.y)
+  } else if (selector) {
+    const base = document.querySelector(selector)
+    if (base) {
+      if (direction === 'parent') el = base.parentElement
+      else if (direction === 'child') el = Array.from(base.children).find((c) => !SKIP.has(c.tagName)) ?? null
+      else el = base
+    }
+  }
+  if (el === document.documentElement) el = document.body
+  if (!el || el.nodeType !== 1) return null
+
+  const cssEsc = (s: string) => (window.CSS && CSS.escape ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, '\\$&'))
+  const partFor = (node: Element): string => {
+    const tag = node.tagName.toLowerCase()
+    const id = (node as HTMLElement).id
+    if (id) return '#' + cssEsc(id)
+    const parent = node.parentElement
+    if (!parent) return tag
+    const sameTag = Array.from(parent.children).filter((c) => c.tagName === node.tagName)
+    return sameTag.length > 1 ? `${tag}:nth-of-type(${sameTag.indexOf(node) + 1})` : tag
+  }
+  const labelFor = (node: Element): string => {
+    const tag = node.tagName.toLowerCase()
+    const id = (node as HTMLElement).id
+    if (id) return `${tag}#${id}`
+    const cn = node.getAttribute('class')
+    const first = cn ? cn.trim().split(/\s+/)[0] : ''
+    return first ? `${tag}.${first}` : tag
+  }
+
+  const chain: Element[] = []
+  let node: Element | null = el
+  while (node && node.nodeType === 1 && node !== document.documentElement) {
+    chain.unshift(node)
+    node = node.parentElement
+  }
+  const capped = new Set(chain.slice(Math.max(0, chain.length - 8)))
+  const path: Array<{ label: string; selector: string }> = []
+  let sel = ''
+  for (const n of chain) {
+    const part = partFor(n)
+    sel = part.charAt(0) === '#' ? part : sel ? `${sel} > ${part}` : part
+    if (capped.has(n)) path.push({ label: labelFor(n), selector: sel })
+  }
+
+  const b = el.getBoundingClientRect()
+  return {
+    rect: { x: b.x, y: b.y, width: b.width, height: b.height },
+    tag: el.tagName.toLowerCase(),
+    selector: sel,
+    path,
   }
 }
 

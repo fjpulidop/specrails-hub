@@ -2,6 +2,7 @@ import { getApiBase } from './api'
 import { WS_URL } from './ws-url'
 import { getHubTokenProtocol } from './auth'
 import type { Attachment } from '../types'
+import type { AnnotationSet } from './annotations'
 
 // ─── Feature flag ─────────────────────────────────────────────────────────────
 
@@ -35,6 +36,43 @@ export interface CapturedNode {
   styles: Record<string, string>
 }
 
+export interface TokenSet {
+  color?: string
+  backgroundColor?: string
+  fontFamily?: string
+  fontSize?: string
+  fontWeight?: string
+  lineHeight?: string
+  letterSpacing?: string
+  padding?: string
+  margin?: string
+  border?: string
+  borderRadius?: string
+  boxShadow?: string
+}
+
+export interface CapturedDesignTokens {
+  contractVersion: number
+  anchor: TokenSet
+  byTag: Record<string, TokenSet>
+  palette: string[]
+  fonts: string[]
+}
+
+export interface CapturedNetworkRequest {
+  method: string
+  url: string
+  status: number | null
+  resourceType: string
+  mimeType: string | null
+  requestBodyShape?: string | null
+  responseShape?: string | null
+  durationMs: number | null
+  startedAt: number
+  failed?: boolean
+  errorText?: string
+}
+
 export interface CapturedDom {
   url: string
   title: string
@@ -45,7 +83,24 @@ export interface CapturedDom {
   css: string
   cssTruncated: boolean
   nodes: CapturedNode[]
+  /** Exact computed design tokens for the selection (optional; absent on
+   *  captures taken before this feature). */
+  designTokens?: CapturedDesignTokens
+  /** XHR/fetch requests the page made around capture time (optional). */
+  networkRequests?: CapturedNetworkRequest[]
   capturedAt: string
+}
+
+export interface BreadcrumbSegment {
+  label: string
+  selector: string
+}
+
+export interface ElementProbe {
+  rect: CaptureRect
+  tag: string
+  selector: string
+  path: BreadcrumbSegment[]
 }
 
 export interface BrowserSessionMeta {
@@ -64,6 +119,12 @@ export type BrowserInputEvent =
   | { type: 'key'; action: 'down' | 'up'; key: string; code?: string; text?: string; modifiers?: number }
   | { type: 'resize'; width: number; height: number }
 
+export interface BreakpointCapture {
+  attachment: Attachment
+  dataUrl: string
+  viewport: { width: number; height: number }
+}
+
 export interface CaptureResult {
   screenshot: Attachment
   domAttachment: Attachment
@@ -71,6 +132,22 @@ export interface CaptureResult {
   /** Inline data URL of the screenshot for a thumbnail (avoids an unauthenticated
    *  <img src> to the attachment endpoint). */
   screenshotDataUrl: string
+  /** Present only for a multi-breakpoint capture: the same element at each size. */
+  breakpoints?: Record<string, BreakpointCapture>
+  /** Present when the user annotated the capture: the original (pre-markup) image,
+   *  so it can be cleaned up; `screenshot`/`screenshotDataUrl` point at the
+   *  flattened, annotated image that the spec uses. */
+  rawScreenshot?: Attachment
+  /** Structured annotation objects (metadata; the image already carries them). */
+  annotations?: AnnotationSet
+}
+
+/** Default device sizes for "capture at all sizes". Sent in the request body so
+ *  the server has a single source of truth (no drift with this constant). */
+export const BREAKPOINT_DIMS: Record<'desktop' | 'tablet' | 'mobile', { width: number; height: number }> = {
+  desktop: { width: 1280, height: 800 },
+  tablet: { width: 768, height: 1024 },
+  mobile: { width: 375, height: 667 },
 }
 
 export class BrowserSessionLimitError extends Error {}
@@ -109,14 +186,75 @@ export async function captureBrowserRegion(
   sessionId: string,
   rect: CaptureRect,
   pendingSpecId: string,
+  opts?: { captureNetwork?: boolean },
 ): Promise<CaptureResult> {
   const res = await fetch(`${getApiBase()}/browser/sessions/${sessionId}/capture`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rect, pendingSpecId }),
+    body: JSON.stringify({ rect, pendingSpecId, captureNetwork: opts?.captureNetwork ?? true }),
   })
   if (!res.ok) throw new Error(`Capture failed (${res.status})`)
   return (await res.json()) as CaptureResult
+}
+
+export async function captureBrowserBreakpoints(
+  sessionId: string,
+  rect: CaptureRect,
+  anchorPoint: { x: number; y: number },
+  pendingSpecId: string,
+  breakpoints: Record<string, { width: number; height: number }> = BREAKPOINT_DIMS,
+): Promise<CaptureResult> {
+  const res = await fetch(`${getApiBase()}/browser/sessions/${sessionId}/capture-breakpoints`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rect, anchorPoint, pendingSpecId, breakpoints }),
+  })
+  if (!res.ok) throw new Error(`Capture failed (${res.status})`)
+  return (await res.json()) as CaptureResult
+}
+
+/** Upload a flattened (annotated) capture image to the pending spec's attachment
+ *  dir, reusing the generic multipart attachment endpoint. Returns the Attachment. */
+export async function uploadCaptureImage(pendingSpecId: string, blob: Blob, filename: string): Promise<Attachment> {
+  const form = new FormData()
+  form.append('file', blob, filename)
+  const res = await fetch(`${getApiBase()}/tickets/${pendingSpecId}/attachments`, { method: 'POST', body: form })
+  if (!res.ok) throw new Error(`Upload failed (${res.status})`)
+  const data = (await res.json()) as { attachment: Attachment }
+  return data.attachment
+}
+
+/** Bridge the host clipboard to the embedded page (which can't reach the OS
+ *  clipboard): copy/cut return the page's selection text; paste injects text. */
+export async function browserClipboard(
+  sessionId: string,
+  action: 'copy' | 'paste' | 'cut',
+  text?: string,
+): Promise<{ text: string }> {
+  const res = await fetch(`${getApiBase()}/browser/sessions/${sessionId}/clipboard`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, text }),
+  })
+  if (!res.ok) throw new Error(`Clipboard failed (${res.status})`)
+  return (await res.json()) as { text: string }
+}
+
+/** Re-resolve an element by selector and step to parent/child/self for the
+ *  DevTools-style breadcrumb. Returns null when it can't step further. */
+export async function navigateBrowserElement(
+  sessionId: string,
+  selector: string,
+  direction: 'parent' | 'child' | 'self',
+): Promise<ElementProbe | null> {
+  const res = await fetch(`${getApiBase()}/browser/sessions/${sessionId}/element`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ selector, direction }),
+  })
+  if (!res.ok) throw new Error(`Element navigate failed (${res.status})`)
+  const data = (await res.json()) as { probe: ElementProbe | null }
+  return data.probe
 }
 
 export async function killBrowserSession(sessionId: string): Promise<void> {
@@ -212,10 +350,11 @@ export function isUsableSelection(rect: CaptureRect, minPx = 8): boolean {
 }
 
 /** Count populated (non-empty) facets of a captured DOM for the panel badge. */
-export function domSummary(dom: CapturedDom): { nodeCount: number; htmlBytes: number; truncated: boolean } {
+export function domSummary(dom: CapturedDom): { nodeCount: number; htmlBytes: number; truncated: boolean; networkCount: number } {
   return {
     nodeCount: dom.nodes.length,
     htmlBytes: dom.html.length,
     truncated: dom.htmlTruncated,
+    networkCount: dom.networkRequests?.length ?? 0,
   }
 }

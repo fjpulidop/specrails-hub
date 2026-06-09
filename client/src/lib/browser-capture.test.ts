@@ -11,6 +11,10 @@ import {
   createBrowserSession,
   navigateBrowser,
   captureBrowserRegion,
+  captureBrowserBreakpoints,
+  browserClipboard,
+  navigateBrowserElement,
+  uploadCaptureImage,
   killBrowserSession,
   BrowserSessionLimitError,
   BrowserLaunchFailedError,
@@ -92,7 +96,15 @@ describe('browser-capture lib', () => {
     })
 
     it('summarises a captured DOM', () => {
-      expect(domSummary(dom)).toEqual({ nodeCount: 1, htmlBytes: dom.html.length, truncated: true })
+      expect(domSummary(dom)).toEqual({ nodeCount: 1, htmlBytes: dom.html.length, truncated: true, networkCount: 0 })
+    })
+
+    it('counts captured network requests', () => {
+      const withNet = { ...dom, networkRequests: [
+        { method: 'GET', url: 'https://api.x/a', status: 200, resourceType: 'Fetch', mimeType: 'application/json', durationMs: 1, startedAt: 0 },
+        { method: 'POST', url: 'https://api.x/b', status: 201, resourceType: 'Fetch', mimeType: 'application/json', durationMs: 2, startedAt: 1 },
+      ] }
+      expect(domSummary(withNet).networkCount).toBe(2)
     })
   })
 
@@ -146,6 +158,55 @@ describe('browser-capture lib', () => {
     it('captureBrowserRegion throws on non-ok', async () => {
       global.fetch = mockFetch(() => ({ status: 500 })) as typeof fetch
       await expect(captureBrowserRegion('s1', { x: 0, y: 0, width: 1, height: 1 }, 'p')).rejects.toThrow()
+    })
+
+    it('captureBrowserBreakpoints posts rect, anchor + breakpoints and returns the result', async () => {
+      global.fetch = mockFetch((url, init) => {
+        expect(url).toContain('/browser/sessions/s1/capture-breakpoints')
+        const body = JSON.parse(String(init?.body))
+        expect(body.pendingSpecId).toBe('pend-1')
+        expect(body.anchorPoint).toEqual({ x: 5, y: 5 })
+        expect(body.breakpoints.desktop).toEqual({ width: 1280, height: 800 })
+        return { body: { screenshot: { id: 'b1' }, domAttachment: { id: 'b2' }, dom, screenshotDataUrl: 'data:image/png;base64,x', breakpoints: { desktop: { attachment: { id: 'b1' }, dataUrl: 'd', viewport: { width: 1280, height: 800 } } } } }
+      }) as typeof fetch
+      const r = await captureBrowserBreakpoints('s1', { x: 1, y: 2, width: 3, height: 4 }, { x: 5, y: 5 }, 'pend-1')
+      expect(r.breakpoints!.desktop.attachment.id).toBe('b1')
+    })
+
+    it('uploadCaptureImage posts the blob as multipart and returns the attachment', async () => {
+      global.fetch = mockFetch((url, init) => {
+        expect(url).toContain('/api/projects/proj-1/tickets/pend-1/attachments')
+        expect(init?.body).toBeInstanceOf(FormData)
+        return { status: 201, body: { attachment: { id: 'an1' } } }
+      }) as typeof fetch
+      const att = await uploadCaptureImage('pend-1', new Blob(['x'], { type: 'image/png' }), 'annotated.png')
+      expect(att.id).toBe('an1')
+    })
+
+    it('browserClipboard posts the action + text and returns the selection', async () => {
+      global.fetch = mockFetch((url, init) => {
+        expect(url).toContain('/browser/sessions/s1/clipboard')
+        const body = JSON.parse(String(init?.body))
+        expect(body).toEqual({ action: 'paste', text: 'hello' })
+        return { body: { text: '' } }
+      }) as typeof fetch
+      expect(await browserClipboard('s1', 'paste', 'hello')).toEqual({ text: '' })
+    })
+
+    it('navigateBrowserElement posts selector + direction and returns the probe', async () => {
+      global.fetch = mockFetch((url, init) => {
+        expect(url).toContain('/browser/sessions/s1/element')
+        const body = JSON.parse(String(init?.body))
+        expect(body).toEqual({ selector: 'div.box', direction: 'parent' })
+        return { body: { probe: { rect: { x: 0, y: 0, width: 1, height: 1 }, tag: 'section', selector: 'body', path: [] } } }
+      }) as typeof fetch
+      const p = await navigateBrowserElement('s1', 'div.box', 'parent')
+      expect(p!.tag).toBe('section')
+    })
+
+    it('navigateBrowserElement returns null when the server reports no further step', async () => {
+      global.fetch = mockFetch(() => ({ body: { probe: null } })) as typeof fetch
+      expect(await navigateBrowserElement('s1', 'body', 'parent')).toBeNull()
     })
 
     it('killBrowserSession swallows errors', async () => {

@@ -14,6 +14,9 @@ function makeBrowserManager(overrides: Record<string, unknown> = {}) {
     create: vi.fn(async () => ({ id: 's1', projectId: 'proj-1', url: 'about:blank', title: null, viewportWidth: 1280, viewportHeight: 800, createdAt: 1 })),
     navigate: vi.fn(async () => ({ url: 'https://x.dev', title: 'X' })),
     capture: vi.fn(async () => ({ screenshot: { id: 'a1' }, domAttachment: { id: 'a2' }, dom: { html: '<i>', nodes: [] } })),
+    captureBreakpoints: vi.fn(async () => ({ screenshot: { id: 'b1' }, domAttachment: { id: 'b2' }, dom: { html: '<i>', nodes: [] }, screenshotDataUrl: 'data:image/png;base64,x', breakpoints: { desktop: { attachment: { id: 'b1' }, dataUrl: 'data:image/png;base64,x', viewport: { width: 1280, height: 800 } } } })),
+    clipboard: vi.fn(async () => ({ text: 'sel' })),
+    navigateElement: vi.fn(async () => ({ rect: { x: 0, y: 0, width: 10, height: 10 }, tag: 'section', selector: 'body > section', path: [{ label: 'body', selector: 'body' }, { label: 'section', selector: 'body > section' }] })),
     kill: vi.fn(async () => true),
     ...overrides,
   }
@@ -158,7 +161,36 @@ describe('project-router browser endpoints', () => {
     expect(res.status).toBe(200)
     expect(res.body.screenshot.id).toBe('a1')
     expect(res.body.domAttachment.id).toBe('a2')
-    expect(browser.capture).toHaveBeenCalledWith('s1', { x: 1, y: 2, width: 30, height: 40 }, 'pend-1')
+    expect(browser.capture).toHaveBeenCalledWith('s1', { x: 1, y: 2, width: 30, height: 40 }, 'pend-1', { captureNetwork: true })
+  })
+
+  it('POST capture forwards captureNetwork:false to the manager', async () => {
+    const app = createApp(makeContext(db, browser))
+    const res = await request(app).post('/api/projects/proj-1/browser/sessions/s1/capture').send({ rect: { x: 1, y: 2, width: 30, height: 40 }, pendingSpecId: 'pend-1', captureNetwork: false })
+    expect(res.status).toBe(200)
+    expect(browser.capture).toHaveBeenCalledWith('s1', { x: 1, y: 2, width: 30, height: 40 }, 'pend-1', { captureNetwork: false })
+  })
+
+  it('POST capture-breakpoints validates rect, pendingSpecId and breakpoints', async () => {
+    const app = createApp(makeContext(db, browser))
+    const base = '/api/projects/proj-1/browser/sessions/s1/capture-breakpoints'
+    expect((await request(app).post(base).send({ rect: { x: 0, y: 0, width: 0, height: 0 }, pendingSpecId: 'p', breakpoints: { d: { width: 10, height: 10 } } })).status).toBe(400)
+    expect((await request(app).post(base).send({ rect: { x: 0, y: 0, width: 10, height: 10 }, pendingSpecId: '../x', breakpoints: { d: { width: 10, height: 10 } } })).status).toBe(400)
+    expect((await request(app).post(base).send({ rect: { x: 0, y: 0, width: 10, height: 10 }, pendingSpecId: 'p', breakpoints: {} })).status).toBe(400)
+    expect(browser.captureBreakpoints).not.toHaveBeenCalled()
+  })
+
+  it('POST capture-breakpoints forwards validated dims + a default anchor and returns the result', async () => {
+    const app = createApp(makeContext(db, browser))
+    const res = await request(app).post('/api/projects/proj-1/browser/sessions/s1/capture-breakpoints').send({
+      rect: { x: 10, y: 20, width: 100, height: 50 },
+      pendingSpecId: 'pend-1',
+      breakpoints: { desktop: { width: 1280, height: 800 }, bad: { width: 99999, height: 1 } },
+    })
+    expect(res.status).toBe(200)
+    expect(res.body.breakpoints.desktop.viewport.width).toBe(1280)
+    // out-of-range "bad" dim dropped; default anchor = rect centre
+    expect(browser.captureBreakpoints).toHaveBeenCalledWith('s1', { x: 10, y: 20, width: 100, height: 50 }, { x: 60, y: 45 }, 'pend-1', { desktop: { width: 1280, height: 800 } })
   })
 
   it('POST capture returns 404 when capture yields null', async () => {
@@ -166,6 +198,30 @@ describe('project-router browser endpoints', () => {
     const app = createApp(makeContext(db, browser))
     const res = await request(app).post('/api/projects/proj-1/browser/sessions/s1/capture').send({ rect: { x: 0, y: 0, width: 5, height: 5 }, pendingSpecId: 'p' })
     expect(res.status).toBe(404)
+  })
+
+  it('POST element validates selector + direction and forwards the breadcrumb step', async () => {
+    const app = createApp(makeContext(db, browser))
+    const base = '/api/projects/proj-1/browser/sessions/s1/element'
+    expect((await request(app).post(base).send({ selector: '', direction: 'parent' })).status).toBe(400)
+    expect((await request(app).post(base).send({ selector: 'div', direction: 'sideways' })).status).toBe(400)
+    expect(browser.navigateElement).not.toHaveBeenCalled()
+    const res = await request(app).post(base).send({ selector: 'div.box', direction: 'parent' })
+    expect(res.status).toBe(200)
+    expect(res.body.probe.tag).toBe('section')
+    expect(browser.navigateElement).toHaveBeenCalledWith('s1', 'div.box', 'parent')
+  })
+
+  it('POST clipboard validates the action and forwards copy/paste', async () => {
+    const app = createApp(makeContext(db, browser))
+    const base = '/api/projects/proj-1/browser/sessions/s1/clipboard'
+    expect((await request(app).post(base).send({ action: 'bogus' })).status).toBe(400)
+    expect(browser.clipboard).not.toHaveBeenCalled()
+    const res = await request(app).post(base).send({ action: 'copy' })
+    expect(res.status).toBe(200)
+    expect(res.body.text).toBe('sel')
+    await request(app).post(base).send({ action: 'paste', text: 'hi' })
+    expect(browser.clipboard).toHaveBeenCalledWith('s1', 'paste', 'hi')
   })
 
   it('DELETE kills the session; 404 when unknown', async () => {

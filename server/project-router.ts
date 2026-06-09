@@ -3491,8 +3491,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       res.status(400).json({ error: 'pendingSpecId has an invalid format' })
       return
     }
+    const captureNetwork = req.body?.captureNetwork !== false
     try {
-      const result = await mgr.capture(req.params.id as string, rect, pendingSpecId)
+      const result = await mgr.capture(req.params.id as string, rect, pendingSpecId, { captureNetwork })
       if (!result) {
         res.status(404).json({ error: 'browser_session_not_found' })
         return
@@ -3501,6 +3502,93 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     } catch (err) {
       console.error('[project-router] browser capture error:', err)
       res.status(500).json({ error: 'Failed to capture' })
+    }
+  })
+
+  router.post('/:projectId/browser/sessions/:id/capture-breakpoints', requireBrowserCaptureEnabled, async (req: Request, res: Response) => {
+    const mgr = ctx(req).browserCaptureManager
+    const rect = parseRect(req.body?.rect)
+    if (!rect) {
+      res.status(400).json({ error: 'rect {x,y,width,height} with positive size is required' })
+      return
+    }
+    const pendingSpecId = typeof req.body?.pendingSpecId === 'string' ? req.body.pendingSpecId.trim() : ''
+    if (!pendingSpecId || !SAFE_PENDING_ID.test(pendingSpecId)) {
+      res.status(400).json({ error: 'pendingSpecId is required and must be well-formed' })
+      return
+    }
+    // Validate the per-breakpoint viewport dims (client-supplied; single source).
+    const rawDims = req.body?.breakpoints
+    const dims: Record<string, { width: number; height: number }> = {}
+    if (rawDims && typeof rawDims === 'object') {
+      for (const [k, v] of Object.entries(rawDims as Record<string, unknown>)) {
+        if (Object.keys(dims).length >= 4) break
+        if (!/^[a-z0-9_-]{1,20}$/i.test(k)) continue
+        const d = v as { width?: unknown; height?: unknown }
+        const w = Math.round(Number(d?.width))
+        const h = Math.round(Number(d?.height))
+        if (Number.isFinite(w) && Number.isFinite(h) && w >= 1 && h >= 1 && w <= 4000 && h <= 4000) {
+          dims[k] = { width: w, height: h }
+        }
+      }
+    }
+    if (Object.keys(dims).length === 0) {
+      res.status(400).json({ error: 'breakpoints {name:{width,height}} is required' })
+      return
+    }
+    const a = req.body?.anchorPoint
+    const anchorPoint = a && typeof a.x === 'number' && typeof a.y === 'number'
+      ? { x: a.x, y: a.y }
+      : { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+    try {
+      const result = await mgr.captureBreakpoints(req.params.id as string, rect, anchorPoint, pendingSpecId, dims)
+      if (!result) {
+        res.status(404).json({ error: 'browser_session_not_found' })
+        return
+      }
+      res.json(result)
+    } catch (err) {
+      console.error('[project-router] browser capture-breakpoints error:', err)
+      res.status(500).json({ error: 'Failed to capture' })
+    }
+  })
+
+  router.post('/:projectId/browser/sessions/:id/element', requireBrowserCaptureEnabled, async (req: Request, res: Response) => {
+    const mgr = ctx(req).browserCaptureManager
+    const selector = typeof req.body?.selector === 'string' ? req.body.selector : ''
+    const direction = req.body?.direction
+    if (!selector || (direction !== 'parent' && direction !== 'child' && direction !== 'self')) {
+      res.status(400).json({ error: 'selector and direction (parent|child|self) are required' })
+      return
+    }
+    try {
+      // probe may be null (can't step further / element gone) — still 200.
+      const probe = await mgr.navigateElement(req.params.id as string, selector.slice(0, 4000), direction)
+      res.json({ probe })
+    } catch (err) {
+      console.error('[project-router] browser element navigate error:', err)
+      res.status(500).json({ error: 'Failed to resolve element' })
+    }
+  })
+
+  router.post('/:projectId/browser/sessions/:id/clipboard', requireBrowserCaptureEnabled, async (req: Request, res: Response) => {
+    const mgr = ctx(req).browserCaptureManager
+    const action = req.body?.action
+    if (action !== 'copy' && action !== 'paste' && action !== 'cut') {
+      res.status(400).json({ error: 'action must be copy | paste | cut' })
+      return
+    }
+    const text = typeof req.body?.text === 'string' ? req.body.text.slice(0, 100_000) : undefined
+    try {
+      const out = await mgr.clipboard(req.params.id as string, action, text)
+      if (!out) {
+        res.status(404).json({ error: 'browser_session_not_found' })
+        return
+      }
+      res.json(out)
+    } catch (err) {
+      console.error('[project-router] browser clipboard error:', err)
+      res.status(500).json({ error: 'Failed clipboard op' })
     }
   })
 

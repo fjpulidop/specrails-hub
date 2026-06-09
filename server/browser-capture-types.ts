@@ -40,6 +40,62 @@ export interface CapturedNode {
   styles: Record<string, string>
 }
 
+/** A digest of computed design tokens for a single element. Values are raw
+ *  computed-style strings (e.g. "16px", "rgb(59, 130, 246)"); empty/default
+ *  values (transparent colour, 0px spacing, no border, "normal" line-height) are
+ *  omitted so the digest stays small. */
+export interface TokenSet {
+  color?: string
+  backgroundColor?: string
+  fontFamily?: string
+  fontSize?: string
+  fontWeight?: string
+  lineHeight?: string
+  letterSpacing?: string
+  padding?: string
+  margin?: string
+  border?: string
+  borderRadius?: string
+  boxShadow?: string
+}
+
+/** Exact design tokens derived from the selection's computed styles so a
+ *  "clone this UI" spec carries precise values instead of guesses. A
+ *  deterministic byproduct of the styles already collected — no extra CDP work. */
+export interface CapturedDesignTokens {
+  /** Schema version of this digest, for forward-compatible parsing. */
+  contractVersion: number
+  /** Tokens of the container/anchor element covering the selection. */
+  anchor: TokenSet
+  /** Deduped tokens for the most frequent tags inside the selection (cap ~8). */
+  byTag: Record<string, TokenSet>
+  /** Deduped non-transparent colours (text + background), cap ~12. */
+  palette: string[]
+  /** Deduped font-family stacks used inside the selection (cap ~6). */
+  fonts: string[]
+}
+
+/** One XHR/fetch (or document) request the page made around capture time. Bodies
+ *  are NEVER stored raw — only a structural shape sketch (key names), so captured
+ *  pages can't leak tokens/PII into a ticket. */
+export interface CapturedNetworkRequest {
+  method: string
+  url: string
+  status: number | null
+  /** CDP resource type (e.g. "Fetch", "XHR", "Document"). */
+  resourceType: string
+  mimeType: string | null
+  /** Sketch of the request body shape (JSON key names), never raw values. */
+  requestBodyShape?: string | null
+  /** Sketch of the response JSON shape (top-level keys / array element keys). */
+  responseShape?: string | null
+  durationMs: number | null
+  /** Wall-clock ms when the request started (for windowed capture). */
+  startedAt: number
+  failed?: boolean
+  errorText?: string
+}
+
 /** The rich DOM payload captured for a selection. Serialised to JSON and stored
  *  as an attachment (mime application/json) so it flows through the existing
  *  attachment → prompt pipeline for both Quick and Explore. */
@@ -57,6 +113,12 @@ export interface CapturedDom {
   /** True when `css` was truncated at the size cap. */
   cssTruncated: boolean
   nodes: CapturedNode[]
+  /** Exact computed design tokens for the selection. Optional — absent on
+   *  captures taken before this feature, so old serialised JSON still parses. */
+  designTokens?: CapturedDesignTokens
+  /** XHR/fetch requests the page made around capture time. Optional — absent on
+   *  old captures or when network capture is disabled for the spec. */
+  networkRequests?: CapturedNetworkRequest[]
   capturedAt: string
 }
 
@@ -74,10 +136,23 @@ export interface ScreencastFrame {
   height: number
 }
 
-/** The element under a point, for hover-to-select highlighting. */
+/** One node in the hovered element's ancestor breadcrumb. */
+export interface BreadcrumbSegment {
+  /** Short human label, e.g. "div.container" or "button#cta". */
+  label: string
+  /** Stable-ish CSS selector to re-resolve this node (for up/down navigation). */
+  selector: string
+}
+
+/** The element under a point (or re-resolved by selector), for hover-to-select
+ *  highlighting + DevTools-style breadcrumb navigation. */
 export interface ElementProbe {
   rect: CaptureRect
   tag: string
+  /** Selector for the probed element (used to step to parent/child). */
+  selector: string
+  /** Ancestor chain root→element (inclusive), capped for readability. */
+  path: BreadcrumbSegment[]
 }
 
 /** Minimal page abstraction the manager drives. Implemented for real over CDP in
@@ -100,6 +175,29 @@ export interface BrowserPageHandle {
   extractDom(rect: CaptureRect, htmlByteCap: number): Promise<CapturedDom>
   /** The element at a viewport point (for hover-to-select highlighting). */
   probeElementAt(point: { x: number; y: number }): Promise<ElementProbe | null>
+  /** Re-resolve an element by selector and optionally step to its parent/child,
+   *  for breadcrumb navigation. Optional — unimplemented handles can't navigate. */
+  navigateElement?(selector: string, direction: 'parent' | 'child' | 'self'): Promise<ElementProbe | null>
+  /** Begin capturing the page's network requests (best-effort, idempotent).
+   *  Optional — a handle that doesn't implement it simply captures no network. */
+  enableNetwork?(): Promise<void>
+  /** Buffered network requests that started at/after `sinceMs` (newest-first,
+   *  capped). Optional — returns nothing when unimplemented. */
+  recentNetwork?(sinceMs: number): CapturedNetworkRequest[]
+  // ─── Multi-breakpoint capture (optional) ──────────────────────────────────
+  /** Build a stable-ish CSS selector for the element at a viewport point. */
+  resolveAnchorSelector?(point: { x: number; y: number }): Promise<string | null>
+  /** Current bounding box of the element matching `selector`, or null. */
+  resolveAnchorRect?(selector: string): Promise<CaptureRect | null>
+  /** Wait for layout to settle after a viewport change (best-effort). */
+  waitForStable?(): Promise<void>
+  // ─── Clipboard bridge (optional) ──────────────────────────────────────────
+  /** The page's current selection text (for copy/cut). */
+  getSelectionText?(): Promise<string>
+  /** Insert text at the focused element's caret (for paste). */
+  insertText?(text: string): Promise<void>
+  /** Delete the current selection (for cut). */
+  deleteSelection?(): Promise<void>
   close(): Promise<void>
 }
 

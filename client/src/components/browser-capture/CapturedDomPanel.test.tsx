@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { fireEvent } from '@testing-library/react'
 import { render, screen } from '../../test-utils'
 import { CapturedDomPanel } from './CapturedDomPanel'
-import type { CapturedDom } from '../../lib/browser-capture'
+import type { CapturedDom, CapturedNetworkRequest } from '../../lib/browser-capture'
 
 function makeDom(over: Partial<CapturedDom> = {}): CapturedDom {
   return {
@@ -70,6 +70,72 @@ describe('CapturedDomPanel', () => {
   it('falls back to the host when there is no title', () => {
     render(<CapturedDomPanel dom={makeDom({ title: '' })} />)
     expect(screen.getByText(/Captured page · example\.com/)).toBeInTheDocument()
+  })
+
+  const tokens = {
+    contractVersion: 1,
+    anchor: { color: 'rgb(17, 24, 39)', backgroundColor: 'rgb(59, 130, 246)', fontFamily: 'Inter, sans-serif', fontSize: '16px', borderRadius: '8px' },
+    byTag: { button: { color: 'rgb(255, 255, 255)' } },
+    palette: ['rgb(17, 24, 39)', 'rgb(59, 130, 246)'],
+    fonts: ['Inter, sans-serif'],
+  }
+
+  it('shows a tokens badge and the design-tokens section when designTokens are present', () => {
+    render(<CapturedDomPanel dom={makeDom({ designTokens: tokens })} />)
+    expect(screen.getByText(/· tokens/)).toBeInTheDocument()
+    // Collapsed by default.
+    fireEvent.click(screen.getByRole('button', { name: /Captured page/ }))
+    expect(screen.queryByTestId('captured-dom-tokens')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Design tokens/ }))
+    const block = screen.getByTestId('captured-dom-tokens')
+    expect(block.textContent).toContain('rgb(59, 130, 246)') // palette swatch + anchor value
+    expect(block.textContent).toContain('borderRadius')
+    expect(block.textContent).toContain('8px')
+    expect(block.textContent).toContain('Inter, sans-serif') // fonts row
+  })
+
+  it('copies the tokens as JSON', () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+    render(<CapturedDomPanel dom={makeDom({ designTokens: tokens })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Captured page/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Design tokens/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Copy as JSON/ }))
+    expect(writeText).toHaveBeenCalledOnce()
+    expect(writeText.mock.calls[0][0]).toContain('"contractVersion": 1')
+  })
+
+  it('renders no tokens section nor badge for a capture without designTokens', () => {
+    render(<CapturedDomPanel dom={makeDom()} />)
+    expect(screen.queryByText(/· tokens/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Captured page/ }))
+    expect(screen.queryByRole('button', { name: /Design tokens/ })).not.toBeInTheDocument()
+  })
+
+  const netRequests: CapturedNetworkRequest[] = [
+    { method: 'GET', url: 'https://api.example.com/items?token=secret', status: 200, resourceType: 'Fetch', mimeType: 'application/json', requestBodyShape: null, responseShape: '{ items: [object] }', durationMs: 42, startedAt: 0 },
+    { method: 'POST', url: 'https://api.example.com/save', status: 500, resourceType: 'Fetch', mimeType: 'application/json', durationMs: 88, startedAt: 1 },
+  ]
+
+  it('shows a request-count badge and the network section', () => {
+    render(<CapturedDomPanel dom={makeDom({ networkRequests: netRequests })} />)
+    expect(screen.getByText(/· 2 req/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Captured page/ }))
+    expect(screen.queryByTestId('captured-dom-network')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Network · 2 requests/ }))
+    const net = screen.getByTestId('captured-dom-network')
+    expect(net.textContent).toContain('api.example.com/items') // query dropped from the label
+    expect(net.textContent).not.toContain('token=secret')
+    expect(net.textContent).toContain('{ items: [object] }')
+    expect(net.textContent).toContain('42ms')
+    expect(net.textContent).toContain('500')
+  })
+
+  it('renders no network section nor badge without networkRequests', () => {
+    render(<CapturedDomPanel dom={makeDom()} />)
+    expect(screen.queryByText(/req/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Captured page/ }))
+    expect(screen.queryByRole('button', { name: /Network ·/ })).not.toBeInTheDocument()
   })
 
   it('invokes onRemove when the remove button is clicked', () => {

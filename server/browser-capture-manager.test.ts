@@ -6,7 +6,9 @@ import {
   BrowserLaunchError,
   type BrowserContextHandle,
   type BrowserPageHandle,
+  type CaptureRect,
   type CapturedDom,
+  type CapturedNetworkRequest,
   type ContextLauncher,
   type ScreencastFrame,
 } from './browser-capture-types'
@@ -38,6 +40,8 @@ class FakePage implements BrowserPageHandle {
   screencasting = false
   closed = false
   nextNav: { url: string; title: string } | null = null
+  enabledNetwork = false
+  network: CapturedNetworkRequest[] = []
 
   private nav(): { url: string; title: string } {
     if (this.nextNav) { this.url = this.nextNav.url; this.title = this.nextNav.title }
@@ -53,9 +57,27 @@ class FakePage implements BrowserPageHandle {
   async dispatchInput(e: unknown) { this.inputs.push(e) }
   async startScreencast(cb: (f: ScreencastFrame) => void) { this.screencasting = true; this.frameCb = cb }
   async stopScreencast() { this.screencasting = false; this.frameCb = null }
-  async screenshotClip() { return Buffer.from('PNGDATA') }
+  clips: CaptureRect[] = []
+  async screenshotClip(rect: CaptureRect) { this.clips.push(rect); return Buffer.from('PNGDATA') }
   async extractDom() { return makeDom() }
-  async probeElementAt(point: { x: number; y: number }) { return { rect: { x: point.x, y: point.y, width: 50, height: 20 }, tag: 'div' } }
+  async probeElementAt(point: { x: number; y: number }) { return { rect: { x: point.x, y: point.y, width: 50, height: 20 }, tag: 'div', selector: 'div.box', path: [{ label: 'body', selector: 'body' }, { label: 'div.box', selector: 'div.box' }] } }
+  async navigateElement(selector: string, direction: 'parent' | 'child' | 'self') {
+    if (direction === 'parent' && selector === 'body') return null
+    return { rect: { x: 0, y: 0, width: 10, height: 10 }, tag: direction === 'parent' ? 'section' : 'span', selector: `${selector} ${direction}`, path: [{ label: 'body', selector: 'body' }, { label: 'x', selector: `${selector} ${direction}` }] }
+  }
+  async enableNetwork() { this.enabledNetwork = true }
+  recentNetwork() { return this.network }
+  anchorSelector: string | null = '#el'
+  anchorRect: CaptureRect | null = { x: 0, y: 0, width: 100, height: 40 }
+  async resolveAnchorSelector() { this.calls.push('anchorSel'); return this.anchorSelector }
+  async resolveAnchorRect() { return this.anchorRect }
+  async waitForStable() { this.calls.push('stable') }
+  selection = ''
+  pasted: string[] = []
+  deleted = 0
+  async getSelectionText() { return this.selection }
+  async insertText(t: string) { this.pasted.push(t) }
+  async deleteSelection() { this.deleted++ }
   async close() { this.closed = true }
   emitFrame(data: Buffer) { this.frameCb?.({ data, width: 1280, height: 800 }) }
 }
@@ -276,9 +298,98 @@ describe('BrowserCaptureManager', () => {
     expect(attachments.uploads.map((u) => u.mime)).toEqual(['image/png', 'application/json'])
   })
 
+  it('enables network capture on session create and folds requests into the DOM', async () => {
+    const { mgr, ctx } = makeManager({ db })
+    const meta = await mgr.create()
+    expect(ctx.pages[0].enabledNetwork).toBe(true)
+    ctx.pages[0].network = [
+      { method: 'GET', url: 'https://api.x/items', status: 200, resourceType: 'Fetch', mimeType: 'application/json', requestBodyShape: null, responseShape: '{ items: [object] }', durationMs: 42, startedAt: 0 },
+    ]
+    const result = await mgr.capture(meta.id, { x: 0, y: 0, width: 10, height: 10 }, 'pend')
+    expect(result!.dom.networkRequests).toHaveLength(1)
+    expect(result!.dom.networkRequests![0].url).toBe('https://api.x/items')
+    expect(result!.dom.networkRequests![0].responseShape).toBe('{ items: [object] }')
+  })
+
+  it('omits network requests when captureNetwork is false', async () => {
+    const { mgr, ctx } = makeManager({ db })
+    const meta = await mgr.create()
+    ctx.pages[0].network = [
+      { method: 'GET', url: 'https://api.x/items', status: 200, resourceType: 'Fetch', mimeType: 'application/json', durationMs: 1, startedAt: 0 } as CapturedNetworkRequest,
+    ]
+    const result = await mgr.capture(meta.id, { x: 0, y: 0, width: 10, height: 10 }, 'pend', { captureNetwork: false })
+    expect(result!.dom.networkRequests).toBeUndefined()
+  })
+
   it('capture returns null for an unknown session', async () => {
     const { mgr } = makeManager({ db })
     expect(await mgr.capture('nope', { x: 0, y: 0, width: 1, height: 1 }, 'p')).toBeNull()
+  })
+
+  const BPS = { desktop: { width: 1280, height: 800 }, tablet: { width: 768, height: 1024 }, mobile: { width: 375, height: 667 } }
+
+  it('captureBreakpoints shoots the selection at every size and restores the live viewport', async () => {
+    const attachments = makeAttachments()
+    const { mgr, ctx } = makeManager({ db, attachments })
+    const meta = await mgr.create()
+    const result = await mgr.captureBreakpoints(meta.id, { x: 0, y: 0, width: 100, height: 50 }, { x: 50, y: 25 }, 'pend', BPS)
+    expect(result).not.toBeNull()
+    expect(Object.keys(result!.breakpoints!)).toEqual(['desktop', 'tablet', 'mobile'])
+    expect(result!.breakpoints!.tablet.viewport).toEqual({ width: 768, height: 1024 })
+    expect(result!.breakpoints!.mobile.attachment.mimeType).toBe('image/png')
+    // canonical screenshot/dom point at the first (desktop) breakpoint
+    expect(result!.screenshot.id).toBe(result!.breakpoints!.desktop.attachment.id)
+    expect(result!.screenshotDataUrl.startsWith('data:image/png;base64,')).toBe(true)
+    // 3 screenshots + 1 canonical DOM
+    expect(attachments.uploads.filter((u) => u.mime === 'image/png')).toHaveLength(3)
+    expect(attachments.uploads.filter((u) => u.mime === 'application/json')).toHaveLength(1)
+    // viewport visited each size then restored to the live (default) viewport
+    expect(ctx.pages[0].calls.filter((c) => c.startsWith('viewport:'))).toEqual([
+      'viewport:1280x800', 'viewport:768x1024', 'viewport:375x667', 'viewport:1280x800',
+    ])
+    expect(mgr.getSession(meta.id)!.viewport).toEqual({ width: 1280, height: 800 })
+  })
+
+  it('captureBreakpoints clamps an out-of-bounds rect to each breakpoint viewport', async () => {
+    const { mgr, ctx } = makeManager({ db })
+    const meta = await mgr.create()
+    // No selector → fall back to the (huge, desktop-sized) original rect, which
+    // would sit outside a smaller viewport and make screenshot throw if unclamped.
+    mgr.getSession(meta.id)!.page.resolveAnchorSelector = async () => null
+    await mgr.captureBreakpoints(meta.id, { x: 1000, y: 700, width: 800, height: 600 }, { x: 5, y: 5 }, 'pend', { mobile: { width: 375, height: 667 } })
+    const clip = ctx.pages[0].clips[0]
+    expect(clip.x).toBeLessThan(375)
+    expect(clip.x + clip.width).toBeLessThanOrEqual(375)
+    expect(clip.y + clip.height).toBeLessThanOrEqual(667)
+    expect(clip.width).toBeGreaterThanOrEqual(1)
+    expect(clip.height).toBeGreaterThanOrEqual(1)
+  })
+
+  it('captureBreakpoints falls back to the original rect when no anchor selector resolves', async () => {
+    const { mgr } = makeManager({ db })
+    const meta = await mgr.create()
+    mgr.getSession(meta.id)!.page.resolveAnchorSelector = async () => null
+    const result = await mgr.captureBreakpoints(meta.id, { x: 1, y: 2, width: 30, height: 40 }, { x: 5, y: 5 }, 'pend', { desktop: { width: 1280, height: 800 } })
+    expect(result).not.toBeNull()
+    expect(Object.keys(result!.breakpoints!)).toEqual(['desktop'])
+  })
+
+  it('captureBreakpoints returns null for unknown session, empty dims, or after shutdown', async () => {
+    const { mgr } = makeManager({ db })
+    const meta = await mgr.create()
+    expect(await mgr.captureBreakpoints('nope', { x: 0, y: 0, width: 1, height: 1 }, { x: 0, y: 0 }, 'p', BPS)).toBeNull()
+    expect(await mgr.captureBreakpoints(meta.id, { x: 0, y: 0, width: 1, height: 1 }, { x: 0, y: 0 }, 'p', {})).toBeNull()
+    await mgr.shutdown()
+    expect(await mgr.captureBreakpoints(meta.id, { x: 0, y: 0, width: 1, height: 1 }, { x: 0, y: 0 }, 'p', BPS)).toBeNull()
+  })
+
+  it('captureBreakpoints kills the session when the page dies mid-sequence', async () => {
+    const { mgr } = makeManager({ db })
+    const meta = await mgr.create()
+    mgr.getSession(meta.id)!.page.screenshotClip = async () => { throw new Error('Target page, context or browser has been closed') }
+    const result = await mgr.captureBreakpoints(meta.id, { x: 0, y: 0, width: 10, height: 10 }, { x: 5, y: 5 }, 'pend', BPS)
+    expect(result).toBeNull()
+    expect(mgr.getSession(meta.id)).toBeUndefined()
   })
 
   it('capture returns null (and kills the session) when the page is already closed', async () => {
@@ -292,14 +403,50 @@ describe('BrowserCaptureManager', () => {
     expect(mgr.getSession(meta.id)).toBeUndefined()
   })
 
+  it('clipboard copy returns the selection, paste injects, cut returns + deletes', async () => {
+    const { mgr, ctx } = makeManager({ db })
+    const meta = await mgr.create()
+    const page = ctx.pages[0]
+    page.selection = 'copied text'
+    expect(await mgr.clipboard(meta.id, 'copy')).toEqual({ text: 'copied text' })
+    await mgr.clipboard(meta.id, 'paste', 'pasted!')
+    expect(page.pasted).toEqual(['pasted!'])
+    const cut = await mgr.clipboard(meta.id, 'cut')
+    expect(cut).toEqual({ text: 'copied text' })
+    expect(page.deleted).toBe(1)
+  })
+
+  it('clipboard returns null for unknown session or after shutdown', async () => {
+    const { mgr } = makeManager({ db })
+    const meta = await mgr.create()
+    expect(await mgr.clipboard('nope', 'copy')).toBeNull()
+    await mgr.shutdown()
+    expect(await mgr.clipboard(meta.id, 'copy')).toBeNull()
+  })
+
   it('probeElement returns the hovered element rect; null for unknown/disposed', async () => {
     const { mgr } = makeManager({ db })
     const meta = await mgr.create()
     const probe = await mgr.probeElement(meta.id, { x: 12, y: 34 })
-    expect(probe).toEqual({ rect: { x: 12, y: 34, width: 50, height: 20 }, tag: 'div' })
+    expect(probe!.rect).toEqual({ x: 12, y: 34, width: 50, height: 20 })
+    expect(probe!.tag).toBe('div')
+    expect(probe!.path.map((p) => p.label)).toEqual(['body', 'div.box'])
     expect(await mgr.probeElement('nope', { x: 0, y: 0 })).toBeNull()
     await mgr.shutdown()
     expect(await mgr.probeElement(meta.id, { x: 0, y: 0 })).toBeNull()
+  })
+
+  it('navigateElement steps the breadcrumb to parent/child/self; null when it cannot', async () => {
+    const { mgr } = makeManager({ db })
+    const meta = await mgr.create()
+    const up = await mgr.navigateElement(meta.id, 'div.box', 'parent')
+    expect(up!.selector).toBe('div.box parent')
+    expect(up!.tag).toBe('section')
+    expect(up!.path.length).toBeGreaterThan(0)
+    const down = await mgr.navigateElement(meta.id, 'div.box', 'child')
+    expect(down!.tag).toBe('span')
+    expect(await mgr.navigateElement(meta.id, 'body', 'parent')).toBeNull() // can't go above body
+    expect(await mgr.navigateElement('nope', 'div', 'self')).toBeNull()
   })
 
   it('kills a session, closing page + clients; unknown kill returns false', async () => {

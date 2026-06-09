@@ -311,7 +311,7 @@ server.on('upgrade', (request, socket, head) => {
             // Hover-to-select: resolve the element under the cursor and reply with
             // its rect so the client can draw a highlight box.
             void mgr.probeElement(sessionId, { x: msg.x, y: msg.y }).then((probe) => {
-              try { ws.send(JSON.stringify({ type: 'hover', rect: probe?.rect ?? null })) } catch { /* drop */ }
+              try { ws.send(JSON.stringify({ type: 'hover', rect: probe?.rect ?? null, selector: probe?.selector ?? null, path: probe?.path ?? null })) } catch { /* drop */ }
             })
           }
         } catch { /* ignore malformed control */ }

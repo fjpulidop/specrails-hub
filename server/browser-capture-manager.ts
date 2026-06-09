@@ -31,6 +31,8 @@ function isTargetClosedError(err: unknown): boolean {
 const MAX_SESSIONS_PER_PROJECT = 4
 const DOM_HTML_BYTE_CAP = 100_000
 const LAST_URL_KEY = 'config.browser_last_url'
+/** How far back from capture time to include buffered network requests. */
+const NETWORK_WINDOW_MS = 30_000
 
 /** A minimal structural view of a `ws` WebSocket — keeps the manager decoupled
  *  from the `ws` package so tests can pass plain fakes. */
@@ -57,6 +59,13 @@ interface BrowserSession {
   closed: boolean
 }
 
+/** One per-breakpoint screenshot in a multi-breakpoint capture. */
+export interface BreakpointCapture {
+  attachment: Attachment
+  dataUrl: string
+  viewport: { width: number; height: number }
+}
+
 export interface CaptureResult {
   screenshot: Attachment
   domAttachment: Attachment
@@ -65,6 +74,9 @@ export interface CaptureResult {
    *  without a second authenticated request (an <img src> to the attachment GET
    *  endpoint would omit the X-Hub-Token header and 401). */
   screenshotDataUrl: string
+  /** Present only for a multi-breakpoint capture: the same element shot at each
+   *  viewport. `screenshot`/`dom` above point at the first (canonical) entry. */
+  breakpoints?: Record<string, BreakpointCapture>
 }
 
 export interface BrowserCaptureManagerOptions {
@@ -209,6 +221,11 @@ export class BrowserCaptureManager {
     }
     this.sessions.set(id, session)
 
+    // Start capturing the page's network requests before the first navigation so
+    // XHR/fetch made during page load are available at capture time. Best-effort:
+    // a handle that doesn't support it (or a failure) just yields no network data.
+    try { await page.enableNetwork?.() } catch { /* network capture is best-effort */ }
+
     const target = opts?.initialUrl?.trim() || this.getLastUrl() || 'about:blank'
     const result = await page.goto(target)
     session.url = result.url
@@ -295,6 +312,14 @@ export class BrowserCaptureManager {
     return s.page.probeElementAt(point)
   }
 
+  /** Re-resolve an element by selector and step to parent/child/self (breadcrumb). */
+  async navigateElement(sessionId: string, selector: string, direction: 'parent' | 'child' | 'self'): Promise<ElementProbe | null> {
+    if (this.disposed) return null
+    const s = this.getSession(sessionId)
+    if (!s) return null
+    return (await s.page.navigateElement?.(selector, direction)) ?? null
+  }
+
   async handleInput(sessionId: string, event: BrowserInputEvent): Promise<void> {
     if (this.disposed) return
     const s = this.getSession(sessionId)
@@ -326,7 +351,7 @@ export class BrowserCaptureManager {
 
   // ─── Capture: screenshot + rich DOM → attachments ───────────────────────────
 
-  async capture(sessionId: string, rect: CaptureRect, pendingSpecId: string): Promise<CaptureResult | null> {
+  async capture(sessionId: string, rect: CaptureRect, pendingSpecId: string, opts?: { captureNetwork?: boolean }): Promise<CaptureResult | null> {
     if (this.disposed) return null
     const s = this.getSession(sessionId)
     if (!s) return null
@@ -354,6 +379,15 @@ export class BrowserCaptureManager {
       throw err
     }
 
+    // Snapshot the recent network requests into the DOM payload (rides the same
+    // JSON attachment → spec prompt). ON unless the spec explicitly disabled it.
+    if (opts?.captureNetwork !== false) {
+      try {
+        const reqs = s.page.recentNetwork?.(this.now() - NETWORK_WINDOW_MS) ?? []
+        if (reqs.length > 0) dom.networkRequests = reqs
+      } catch { /* network snapshot is best-effort */ }
+    }
+
     const stamp = this.now()
     const screenshot = await this.attachments.upload({
       slug: this.projectSlug,
@@ -379,6 +413,132 @@ export class BrowserCaptureManager {
       },
     })
     return { screenshot, domAttachment, dom, screenshotDataUrl: `data:image/png;base64,${png.toString('base64')}` }
+  }
+
+  // ─── Clipboard bridge ───────────────────────────────────────────────────────
+
+  /**
+   * Bridge the host clipboard to the embedded (headless) page, which has no
+   * access to the OS clipboard. `copy`/`cut` return the page's current selection
+   * text for the client to write to the host clipboard; `paste` inserts the
+   * host clipboard text (sent by the client) at the focused element.
+   */
+  async clipboard(sessionId: string, action: 'copy' | 'paste' | 'cut', text?: string): Promise<{ text: string } | null> {
+    if (this.disposed) return null
+    const s = this.getSession(sessionId)
+    if (!s) return null
+    if (action === 'paste') {
+      if (text) await s.page.insertText?.(text)
+      return { text: '' }
+    }
+    const sel = (await s.page.getSelectionText?.()) ?? ''
+    if (action === 'cut' && sel) await s.page.deleteSelection?.()
+    return { text: sel }
+  }
+
+  // ─── Multi-breakpoint capture ───────────────────────────────────────────────
+
+  /**
+   * Capture the SAME selection at several viewport sizes. The element occupies a
+   * different rect at each breakpoint (a nav collapses on mobile), so we resolve
+   * a stable anchor selector once at the live viewport and re-query its box per
+   * breakpoint, falling back to the original rect when it can't be resolved. The
+   * whole sequence is driven server-side (set viewport → settle → re-resolve →
+   * shoot) so there is no fire-and-forget WS resize race; the live viewport is
+   * always restored. One canonical DOM (the first breakpoint) is stored.
+   */
+  async captureBreakpoints(
+    sessionId: string,
+    rect: CaptureRect,
+    anchorPoint: { x: number; y: number },
+    pendingSpecId: string,
+    dims: Record<string, { width: number; height: number }>,
+  ): Promise<CaptureResult | null> {
+    if (this.disposed) return null
+    const s = this.getSession(sessionId)
+    if (!s) return null
+    const order = Object.keys(dims)
+    if (order.length === 0) return null
+
+    const stashed = { ...s.viewport }
+    let selector: string | null = null
+    try { selector = (await s.page.resolveAnchorSelector?.(anchorPoint)) ?? null } catch { selector = null }
+
+    const captured: Record<string, { png: Buffer; dom: CapturedDom }> = {}
+    try {
+      for (const key of order) {
+        const d = dims[key]
+        await s.page.setViewport(d.width, d.height)
+        s.viewport = { width: d.width, height: d.height }
+        try { await s.page.waitForStable?.() } catch { /* settle is best-effort */ }
+        let useRect = rect
+        if (selector) {
+          try {
+            const r = await s.page.resolveAnchorRect?.(selector)
+            if (r && r.width > 0 && r.height > 0) useRect = r
+          } catch { /* fall back to the original rect */ }
+        }
+        // CLAMP to the current (breakpoint) viewport: a rect resolved at a larger
+        // viewport — or the original-rect fallback when the element collapsed /
+        // is hidden at this size — can sit outside the smaller viewport, which
+        // makes page.screenshot throw "Clipped area is outside the image".
+        const cx = Math.max(0, Math.min(useRect.x, d.width - 1))
+        const cy = Math.max(0, Math.min(useRect.y, d.height - 1))
+        const safeRect: CaptureRect = {
+          x: cx,
+          y: cy,
+          width: Math.max(1, Math.min(useRect.width, d.width - cx)),
+          height: Math.max(1, Math.min(useRect.height, d.height - cy)),
+        }
+        const [png, dom] = await Promise.all([
+          s.page.screenshotClip(safeRect),
+          s.page.extractDom(safeRect, DOM_HTML_BYTE_CAP),
+        ])
+        captured[key] = { png, dom }
+      }
+    } catch (err) {
+      if (isTargetClosedError(err)) {
+        await this.kill(sessionId)
+        return null
+      }
+      throw err
+    } finally {
+      try { await s.page.setViewport(stashed.width, stashed.height) } catch { /* ignore */ }
+      s.viewport = stashed
+    }
+
+    const stamp = this.now()
+    const breakpoints: Record<string, BreakpointCapture> = {}
+    for (const key of order) {
+      const { png } = captured[key]
+      const attachment = await this.attachments.upload({
+        slug: this.projectSlug,
+        ticketKey: pendingSpecId,
+        projectPath: null,
+        file: { buffer: png, originalname: `screen-capture-${key}-${stamp}.png`, mimetype: 'image/png', size: png.length },
+      })
+      breakpoints[key] = { attachment, dataUrl: `data:image/png;base64,${png.toString('base64')}`, viewport: dims[key] }
+    }
+
+    // Canonical = the first breakpoint: only its DOM is persisted (avoid tripling
+    // the DOM artifact / prompt cost). screenshot/dom point at it.
+    const canonicalKey = order[0]
+    const canonicalDom = captured[canonicalKey].dom
+    const domJson = Buffer.from(JSON.stringify(canonicalDom, null, 2), 'utf-8')
+    const domAttachment = await this.attachments.upload({
+      slug: this.projectSlug,
+      ticketKey: pendingSpecId,
+      projectPath: null,
+      file: { buffer: domJson, originalname: `page-dom-${stamp}.json`, mimetype: 'application/json', size: domJson.length },
+    })
+
+    return {
+      screenshot: breakpoints[canonicalKey].attachment,
+      domAttachment,
+      dom: canonicalDom,
+      screenshotDataUrl: breakpoints[canonicalKey].dataUrl,
+      breakpoints,
+    }
   }
 
   // ─── Teardown ───────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
-import { Sparkles, Send, Zap, MessagesSquare, Globe } from 'lucide-react'
+import { Sparkles, Send, Zap, MessagesSquare, Globe, Ratio } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
@@ -23,12 +23,21 @@ import { BrowserCaptureModal } from './browser-capture/BrowserCaptureModal'
 import { CapturedDomPanel } from './browser-capture/CapturedDomPanel'
 import { isBrowserCaptureEnabled, type CaptureResult, type CapturedDom } from '../lib/browser-capture'
 
+interface BrowserCaptureBreakpoint {
+  key: string
+  attachmentId: string
+  dataUrl: string
+  width: number
+}
+
 interface BrowserCaptureEntry {
   screenshotId: string
   screenshotName: string
   screenshotDataUrl: string
   domAttachmentId: string
   dom: CapturedDom
+  /** Present for a multi-breakpoint capture: one screenshot per device size. */
+  breakpoints?: BrowserCaptureBreakpoint[]
 }
 
 type SpecMode = 'quick' | 'explore'
@@ -173,34 +182,56 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     // are tracked here and merged into the submit payload; the screenshot renders
     // as a visual chip and the DOM in a collapsible panel. They are NOT inserted
     // as editor pills so removeCapture can cleanly drop both.
+    // If the user annotated, the flattened image is `screenshot`; drop the raw one
+    // it replaced so only the annotated image + DOM ride into the spec.
+    if (result.rawScreenshot && result.rawScreenshot.id !== result.screenshot.id) {
+      const pid = activeProjectIdRef.current
+      fetch(`${API_ORIGIN}/api/projects/${pid}/tickets/${pendingSpecId}/attachments/${result.rawScreenshot.id}`, { method: 'DELETE' }).catch(() => {})
+    }
+    const breakpoints = result.breakpoints
+      ? Object.entries(result.breakpoints).map(([key, b]) => ({ key, attachmentId: b.attachment.id, dataUrl: b.dataUrl, width: b.viewport.width }))
+      : undefined
     setCaptures((c) => [...c, {
       screenshotId: result.screenshot.id,
       screenshotName: result.screenshot.filename,
       screenshotDataUrl: result.screenshotDataUrl,
       domAttachmentId: result.domAttachment.id,
       dom: result.dom,
+      breakpoints,
     }])
-    setAttachmentCount((c) => c + 2)
-  }, [])
+    // One DOM attachment + N screenshots (N=1 for a normal capture).
+    setAttachmentCount((c) => c + 1 + (breakpoints ? breakpoints.length : 1))
+  }, [pendingSpecId])
 
   const removeCapture = useCallback((entry: BrowserCaptureEntry) => {
     setCaptures((c) => c.filter((e) => e.domAttachmentId !== entry.domAttachmentId))
-    setAttachmentCount((c) => Math.max(0, c - 2))
+    const ids = new Set<string>([entry.screenshotId, entry.domAttachmentId, ...(entry.breakpoints?.map((b) => b.attachmentId) ?? [])])
+    setAttachmentCount((c) => Math.max(0, c - ids.size))
     const pid = activeProjectIdRef.current
-    for (const id of [entry.screenshotId, entry.domAttachmentId]) {
+    for (const id of ids) {
       fetch(`${API_ORIGIN}/api/projects/${pid}/tickets/${pendingSpecId}/attachments/${id}`, { method: 'DELETE' }).catch(() => {})
     }
   }, [pendingSpecId])
 
   const handleSubmit = useCallback(async () => {
     const typed = editorRef.current?.getPlainText().trim() ?? ''
-    const idea = typed || (captures.length > 0
+    let idea = typed || (captures.length > 0
       ? 'Create a spec based on the captured browser selection (a screenshot and the page DOM are attached for reference).'
       : '')
     if (!idea) return
+    // When any capture is multi-breakpoint, tell the spec generator it must be
+    // responsive and which reference sizes are attached.
+    const responsive = captures.find((c) => c.breakpoints && c.breakpoints.length > 1)
+    if (responsive) {
+      const widths = responsive.breakpoints!.map((b) => `${b.width}px`).join(', ')
+      idea += `${idea ? '\n\n' : ''}This element must be responsive: reference screenshots are attached at ${widths}.`
+    }
     const attachmentIds = [
       ...(editorRef.current?.getAttachmentIds() ?? []),
-      ...captures.flatMap((c) => [c.screenshotId, c.domAttachmentId]),
+      ...captures.flatMap((c) => [
+        ...(c.breakpoints ? c.breakpoints.map((b) => b.attachmentId) : [c.screenshotId]),
+        c.domAttachmentId,
+      ]),
     ]
 
     const projectId = activeProjectIdRef.current
@@ -376,11 +407,32 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                 {captures.map((c) => (
                   <div key={c.domAttachmentId} className="space-y-1.5">
                     <div className="rounded-lg border border-accent-secondary/40 bg-accent-secondary/5 p-2 space-y-1.5">
-                      <img
-                        src={c.screenshotDataUrl}
-                        alt={c.screenshotName}
-                        className="max-h-44 w-auto max-w-full object-contain rounded border border-border/60 bg-background-deep mx-auto block"
-                      />
+                      {c.breakpoints ? (
+                        <div className="space-y-1.5" data-testid="capture-breakpoints">
+                          <div className="flex items-center gap-1 text-[10px] font-medium text-accent-highlight">
+                            <Ratio className="w-3 h-3 shrink-0" />
+                            Responsive · {c.breakpoints.length} sizes
+                          </div>
+                          <div className="flex items-end justify-center gap-2 flex-wrap">
+                            {c.breakpoints.map((b) => (
+                              <div key={b.key} className="flex flex-col items-center gap-1">
+                                <img
+                                  src={b.dataUrl}
+                                  alt={`${b.key} (${b.width}px)`}
+                                  className="max-h-36 w-auto max-w-[10rem] object-contain rounded border border-border/60 bg-background-deep block"
+                                />
+                                <span className="text-[10px] text-muted-foreground tabular-nums">{b.key} · {b.width}px</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <img
+                          src={c.screenshotDataUrl}
+                          alt={c.screenshotName}
+                          className="max-h-44 w-auto max-w-full object-contain rounded border border-border/60 bg-background-deep mx-auto block"
+                        />
+                      )}
                       {c.dom.url && c.dom.url !== 'about:blank' && (
                         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground" title={c.dom.url}>
                           <Globe className="w-3 h-3 shrink-0" />
