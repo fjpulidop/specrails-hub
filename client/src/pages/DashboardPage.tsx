@@ -338,7 +338,8 @@ export default function DashboardPage() {
 
   // All spec-source tickets not in rails. `explore-draft` is the source of
   // tickets persisted via "Save as Draft" in ExploreSpecShell; they live on
-  // the spec board until the user commits or discards them.
+  // the spec board until the user commits or discards them. `free-prompt` is
+  // the source of Raw-mode specs (verbatim prompt, no AI at intake).
   const allSpecTickets = useMemo(() => {
     return tickets.filter(
       (t) =>
@@ -346,7 +347,8 @@ export default function DashboardPage() {
           t.source === 'product-backlog' ||
           t.source === 'get-backlog-specs' ||
           t.source === 'explore-draft' ||
-          t.source === 'specs-smash') &&
+          t.source === 'specs-smash' ||
+          t.source === 'free-prompt') &&
         !railTicketIds.has(t.id),
     )
   }, [tickets, railTicketIds])

@@ -1,9 +1,11 @@
 # Using SpecRails Hub with the Codex CLI
 
 SpecRails Hub supports **two AI providers**: Anthropic's
-[Claude Code](https://claude.com/download) and OpenAI's
-[Codex CLI](https://developers.openai.com/codex). You choose one when you
-add a project; the rest of the hub behaves identically across them.
+[Claude Code](https://claude.com/claude-code) and OpenAI's
+[Codex CLI](https://developers.openai.com/codex). You pick one or
+both when you add a project; the rest of the hub behaves identically
+across them. (See [Running both providers in one
+project](#running-both-providers-in-one-project) below.)
 
 > The codex path is enabled by default. To temporarily disable it
 > (e.g. as an emergency rollback during a beta window), set
@@ -20,30 +22,67 @@ add a project; the rest of the hub behaves identically across them.
 | `git`, `node`, `npm`, `npx` | Same as Claude — needed for `specrails-core init` | Use your usual installer |
 
 The hub's `Add Project` dialog runs a live prerequisites check. It
-disables the Codex provider button with a "not found" hint when the
+disables the Codex provider checkbox with a "not found" hint when the
 binary isn't on `PATH`; it shows install commands if you click "More info".
 
 ## Adding a codex project
 
 1. Open the hub UI and click **Add Project**.
 2. Pick the project's path.
-3. In the **AI provider** row, click **Codex**.
-4. Submit. The hub spawns `npx specrails-core@latest init --provider
-   codex --quick` and produces the codex install:
+3. In the **AI providers** row, check **Codex** (you can check
+   **Claude** too — see [Running both providers in one
+   project](#running-both-providers-in-one-project)). The first
+   provider you select becomes the project default.
+4. Submit. The hub writes `.specrails/install-config.yaml` (with
+   `provider: codex` and `tier: quick` as YAML keys) and spawns
+   `npx specrails-core@latest init --from-config <file>` — the provider
+   and tier live in the YAML, not as CLI flags. The install produces:
    - `.codex/config.toml` — model, reasoning effort, sandbox mode, and
      approval policy (all top-level keys per the codex 0.128.0+ schema).
    - `.codex/skills/sr-*/SKILL.md` — general specrails skills
      (implement, batch-implement, why, compat-check, …).
-   - `.codex/skills/rails/sr-{architect,developer,reviewer,merge-resolver}/SKILL.md`
-     — the four pipeline rails.
-   - `.codex/skills/{enrich,doctor}/SKILL.md` — the lifecycle commands.
+   - `.codex/skills/rails/sr-*/SKILL.md` — the pipeline rails.
    - `AGENTS.md` — top-level instructions file with a sentinel-protected
      managed block. Anything outside the sentinels is preserved on
      updates.
 
-You can't switch a project from claude to codex (or vice versa) after
-creation — the on-disk layouts are disjoint and we don't want to ask
-the user to migrate two trees in place.
+   The exact rail and lifecycle skill set is produced by
+   `specrails-core`, not the hub, so the precise file list can vary by
+   core version.
+
+The provider **set** you choose is immutable after creation — you
+can't add or remove a provider on an existing project (the on-disk
+layouts are disjoint and we don't want to ask you to migrate two trees
+in place). Install both up front if you want the choice later.
+
+## Running both providers in one project
+
+A single project can install **both** Claude and Codex. In the
+**Add Project** dialog the **AI providers** control is a multi-select —
+check both and the hub runs each provider's install sequentially. The
+first provider you select is the **primary/default**; the helper text
+spells this out: *"Both engines will be set up. The first is the
+project default. Cannot be changed after creation."*
+
+Once both are installed:
+
+- **Per-invocation engine pickers** let you choose Claude vs Codex each
+  time you spawn work. The picker appears in the **Add Spec** dialog
+  (`AiEngineSelector`), in the **rail header** (`RailEngineSelector`),
+  and in the terminal's **Open AI CLI** menu (`CliLaunchMenu`). On
+  single-provider projects these pickers don't render — there's nothing
+  to choose.
+- The **selected engine is remembered per project** (it defaults to the
+  primary), so you don't have to re-pick on every spawn.
+- **Capability intersection.** The right sidebar only shows sections
+  that *every* installed provider supports. Because Codex has no agent
+  profiles and no plugins, the **Agents** and **Integrations** sections
+  are **hidden** while both providers are installed. Single-provider
+  projects are unaffected.
+
+When only one provider is installed the hub behaves byte-identically to
+a single-provider project — no engine pickers, no provider persisted on
+spawns, no overrides.
 
 ## What's different vs Claude
 
@@ -53,6 +92,8 @@ the user to migrate two trees in place.
 | **Project dir** | `.claude/` | `.codex/` |
 | **Instructions file** | `CLAUDE.md` | `AGENTS.md` |
 | **Agent format** | `.claude/agents/<id>.md` with `model:` frontmatter | `.codex/skills/<id>/SKILL.md` Skill format |
+| **Agent profiles** | Full support (rail `RailProfileSelector`, `ProfilePicker`) | **None** — codex rails force the profile to `null`; the Agents section is Claude-only |
+| **Contract Refine** | Claude-only (it `--resume`s the Explore session and runs `/specrails:contract-refine`) | **Skipped** — toggling "Enrich with Contract Layer" on a codex spec is a no-op |
 | **MCP registration** | Surgical merge of `<project>/.mcp.json` | `codex mcp add` against per-project `CODEX_HOME=~/.specrails/projects/<slug>/codex-home/` (isolated) |
 | **Session resume** | `--resume <session_id>` | `exec resume <thread_id>` |
 | **Native cost report** | `result.total_cost_usd` from `--output-format stream-json` | None — cost is **estimated** by the hub from `turn.completed.usage` and the local pricing table at `server/pricing.ts` |
@@ -81,16 +122,18 @@ The pricing table is reviewed quarterly. The reference date sits on
 each entry as `lastReviewedAt`. If OpenAI raises prices mid-quarter,
 ship an out-of-band update to `server/pricing.ts`.
 
-## Plugins on codex projects
+## Plugins and MCP on codex projects
 
-Plugins (Serena today) install on codex projects via `codex mcp add`
-with a per-project `CODEX_HOME`. That means:
+The **Integrations** (plugins) marketplace is a **Claude-only** capability. The hub
+hides the Integrations tab for any project that includes codex — both codex-only and
+dual-provider (Claude + Codex) projects — because the sidebar only shows sections that
+*every* installed provider supports (the capability intersection in
+`provider-capabilities.ts`). So there is no in-app plugins page to install Serena on a
+codex project.
 
-- Installing Serena in project A does **not** affect project B.
-- The MCP servers you've added globally via `codex mcp add` from your
-  terminal are not visible to the hub's codex spawns (and vice versa).
-- Plugins whose manifest does not declare `providerSupport.codex` show
-  as **`not-applicable`** on the codex project's Plugins page.
+To give a codex project MCP servers, register them with `codex mcp add` from your
+terminal: codex chat / Explore turns spawn with your own environment and read your global
+`~/.codex/config.toml`, so those servers are available natively — no hub plumbing required.
 
 ## Troubleshooting
 
@@ -117,13 +160,23 @@ re-feeds the prior conversation. Long sessions accumulate input-
 token cost the same way Claude's `--resume` does. The Hero footnote
 calls this out.
 
+**"Enrich with Contract Layer" did nothing on a codex spec** — that's
+expected. Contract Refine is a Claude-only capability; the Add Spec UI
+hides the toggle for codex, and the server skips it defensively if a
+codex conversation reaches the refine path. There's no error — the
+spec just commits without a Contract Layer block.
+
 ## Emergency rollback
 
-If you need to disable the codex path without redeploying:
+If you need to disable the codex path, set `SPECRAILS_HUB_CODEX_BETA=0`
+in the hub's environment. For a source checkout that's:
 
 ```bash
 SPECRAILS_HUB_CODEX_BETA=0 npm run dev
 ```
+
+For a packaged/desktop hub, set the variable in the environment the hub
+process inherits (the `npm run dev` form is for source runs only).
 
 `GET /api/hub/available-providers` will report `codex: false` and
 `POST /api/hub/projects` will refuse new codex projects. Existing
@@ -146,3 +199,11 @@ The codex integration lives in:
 The contract every provider implements is at
 `server/providers/types.ts`. Adding a new provider in the future is
 one new adapter file + one entry in `server/providers/index.ts`.
+
+## See also
+
+- [Adding a provider](internals/adding-a-provider.md) — the developer
+  guide to wiring a third AI CLI adapter.
+- [Tracking cost](tracking-cost.md) — how the Analytics page surfaces
+  per-invocation cost across every surface (including the estimated
+  codex rows described above).

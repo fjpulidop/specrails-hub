@@ -1,6 +1,6 @@
 # Running pipelines
 
-You have specs on the board. Now let's ship them. This guide covers everything from launching a single rail to wiring agent profiles and plugins.
+You have specs on the board. Now let's ship them. This guide covers launching a rail, the three rail modes, agent profiles, plugins, and the Jobs page.
 
 ## The big picture
 
@@ -16,24 +16,39 @@ SpecsBoard (left)            Rails (right)
                                      ▶ Play
 
                      Each rail runs Architect → Developer → Reviewer → Ship
-                     using the Claude CLI in your project directory.
+                     in your project directory.
 ```
 
-A **rail** is an execution lane. Drag a spec onto a rail and press **▶ Play** to launch the AI pipeline. Each rail runs independently — you can have two rails working on different specs in parallel, with different agent profiles.
+A **rail** is an execution lane. Drag a spec card from the SpecsBoard onto a rail and press **▶ Play** to launch the pipeline. Rails let you organise and queue work into named lanes.
+
+Rails run on **Claude** by default. If your project has both providers installed, a per-rail engine selector lets you launch a rail on **Codex** instead — see [Using Codex](codex.md).
+
+> **One job at a time per project.** Each project has a single queue, so within a project only one rail job runs at a time; the rest queue behind it. Real parallelism is **across projects** — open two projects and their rails run independently. See [Running multiple rails](#running-multiple-rails).
 
 ## Rails
 
 Each rail has a header with:
 
-- **Status pill** — `idle`, `running`, `completed`, `failed`.
-- **Spec list** — the IDs of the specs assigned to this rail. Drag in more, drag out to detach.
-- **Mode toggle** — one-shot (run the first spec only) or batch (run all assigned specs sequentially).
-- **Profile picker** — which agent profile this rail will use. Defaults to the project's `default` profile if one exists; "No profile" = legacy mode.
+- **Status pill** — `idle`, `running`, or `failed`. (There's no separate "completed" state — a rail returns to `idle` when its job finishes cleanly.)
+- **Spec list** — the IDs of the specs assigned to this rail. Drag in more, drag out to detach. You can also use the **Move to rail** popover from a spec card; it shows a status dot per rail so you don't push work onto a busy lane.
+- **Mode segmented control** — `Implement`, `Batch`, and (Claude rails only) `Ultra`. See [Rail modes](#rail-modes).
+- **Profile picker** — which agent profile this rail uses. This only appears once the project has **at least one** profile (create them on the Agents page). When present, `No profile` runs the rail in legacy mode.
+- **Engine selector** — Claude vs Codex. Only renders on projects with more than one provider installed.
 - **Play / Stop button** — start or cancel.
+
+### Rail modes
+
+The mode is a segmented control in the rail header, persisted per rail.
+
+| Mode | Command | What it does |
+|------|---------|--------------|
+| **Implement** | `/specrails:implement` | One job covering all the specs on the rail. Runs the full Architect → Developer → Reviewer → Ship pipeline. |
+| **Batch** | `/specrails:batch-implement` | One job that works through the rail's specs sequentially, in dependency-aware waves. |
+| **Ultra** | (Ultracode) | Claude implements each spec autonomously, **bypassing** the OpenSpec pipeline. One independent job per spec. Claude only. |
 
 ### Pipeline phases
 
-By default each rail runs four phases in sequence:
+`Implement` and `Batch` run the pipeline phases defined by the slash command's frontmatter — by default:
 
 ```
 Architect ──► Developer ──► Reviewer ──► Ship
@@ -48,106 +63,120 @@ Each phase is a specialised Claude Code agent invoked in your project's working 
 | Reviewer | `sr-reviewer` | Reviews the output |
 | Ship | (varies) | Final wrap-up: tests, commit, PR draft |
 
-The exact agent for each phase is determined by your project's agent profile. The baseline trio (`sr-architect`, `sr-developer`, `sr-reviewer`) is mandatory; routing rules in the profile can fan-out or override.
+The exact agent for each phase is determined by your project's agent profile. The baseline trio (`sr-architect`, `sr-developer`, `sr-reviewer`) is mandatory; routing rules in the profile can fan-out or override. The phase progress bar only renders when the command defines phases.
+
+### Ultracode mode
+
+`Ultra` is a Claude-only mode that skips the Architect → Developer → Reviewer → Ship pipeline entirely. Instead of orchestrating the agent chain, it hands Claude a configurable pre-prompt plus the full spec text and lets it work autonomously with its native tools.
+
+- **One job per spec.** If the rail has three specs, `Ultra` launches three independent jobs.
+- **Variable cost.** Because the run is open-ended, pressing Play opens a confirmation dialog before anything spawns.
+- **Model picker.** A per-rail control lets you pick **Haiku / Sonnet / Opus** (default Sonnet) for the Ultracode run.
+- **Claude only.** The `Ultra` segment and its model picker only appear when the rail's engine is Claude. Agent profiles don't apply to Ultracode rails.
+
+You can customise the Ultracode pre-prompt per project on the [Settings page](customizing.md#per-project-settings).
 
 ### Running multiple rails
 
-Different rails can run **simultaneously** within the same project. They share the same Claude API account but are otherwise independent processes. Different projects' rails run in parallel without constraint.
+Within a single project, jobs are **serialised** — the project runs one rail job at a time and queues the rest. Adding more rails organises your work into lanes, but it doesn't make them run concurrently inside that project.
 
-Within a single project, *jobs* (rail runs) for the same rail are serialised — Rail 1 finishes before Rail 1 starts again. Across rails, parallelism is bounded by your global "Max concurrent jobs" setting (default: 4).
+True parallelism is **across projects**: each project has its own queue, so rails in different projects run at the same time without contending. There is no global concurrency limit to configure — the only automatic throttle is budget-based (see [Stopping everything](#stopping-everything)).
 
 ## Jobs
 
-Every rail run becomes a **Job**. Find them under the **Jobs** tab in the project navbar.
+Every rail run becomes a **Job**. Find them under **Jobs** in the project's right sidebar.
 
 ### Jobs page
 
-A table of every job for the active project. Columns:
+A card list of every job for the active project, newest first. Each card shows:
 
-- Status, command, duration, cost, exit code, started-at, profile badge.
-- Filter by status, search by command, sort by any column.
-- Click a row to open the **Job Detail page**.
+- A status badge, the profile badge, a priority badge, duration, cost, and the launched command.
+
+Controls above the list:
+
+- **Status filter chips** — click to show only jobs in a given status.
+- **Date-range filter** — narrow to a window of time.
+- **Compare** — enter compare mode, select two jobs, and open a side-by-side comparison.
+
+Click a card to open the **Job Detail page**.
 
 ### Job Detail page
 
 Two purpose-built components above the streaming log:
 
-- **`JobStatusPanel`** — header with status icon, live duration ticker, and an incremental counter for turns + tokens + cost (derived from streaming `assistant` events). Cost shows `—` until the authoritative `total_cost_usd` arrives at job exit.
-- **`JobTicketHeader`** — chips for every ticket the job touched (resolved by parsing the `command` and matching against the spec board). Click a chip to open the spec's detail modal over the job page without changing the route. `+N more` collapse mode at ≥ 4 tickets.
+- **`JobStatusPanel`** — header with a status icon, a live duration ticker, and an incremental counter for turns + tokens + cost (derived from streaming `assistant` events). Cost shows `—` until the authoritative `total_cost_usd` arrives at job exit.
+- **`JobTicketHeader`** — chips for every ticket the job touched (resolved by parsing the `command` and matching against the spec board). Click a chip to open the spec's detail modal over the job page without changing the route. A `+N more` collapse mode kicks in at ≥ 4 tickets.
 
 Below: the full streaming log with auto-scroll, search, and copy.
 
 ### Cancelling a job
 
-Click **Stop** on the rail header. The hub sends SIGTERM to the Claude subprocess with a 2 s grace, then SIGKILL.
+Click **Stop** on the rail header. The hub sends `SIGTERM` to the subprocess, waits **5 s**, then `SIGKILL`.
 
-### Diagnostic ZIP export
+### Diagnostic export
 
-Visible iff [telemetry](customizing.md#telemetry) was enabled for this job. Click **Export diagnostic ZIP** in the Job Detail header. Contains:
+Visible only when [telemetry](customizing.md#telemetry) was enabled for the job. Click **Export diagnostic** in the Job Detail header to download a ZIP containing:
 
 - `job-metadata.json` — command, status, profile, plugins
 - `telemetry.ndjson` — uncompressed OTLP/JSON
 - `logs.txt` — full streaming log
 - `summary.md` — human-readable highlights
-- `profile.json`, `plugins.json` — exact snapshots of what ran
+- `profile.json`, `plugins.json` — exact snapshots of what ran (when present)
 
 ## Agent profiles
 
-A **profile** is a named JSON file that bundles orchestrator + agent chain + per-agent models + routing rules. Different rails can run different profiles.
+A **profile** is a named JSON file that bundles the agent chain + per-agent models + routing rules. Different rails can run different profiles.
 
 ### Why use profiles
 
 Without profiles, every rail uses the project's frontmatter-baked models. With profiles, you can:
 
-- Have a `default` profile for everyday work (Sonnet across the board).
-- A `budget` profile that swaps Developer to Haiku and routes simple tasks away from Architect.
-- A `max` profile for high-stakes work with Opus + every optional agent.
+- Keep a `default` profile for everyday work (Sonnet across the board).
+- Add a `budget` profile that swaps Developer to Haiku and routes simple tasks away from Architect.
+- Add a `max` profile for high-stakes work with Opus + every optional agent.
 
 ### Browse / create profiles
 
-Open the **Agents** tab in the project navbar. Two sub-tabs:
+Open **Agents** in the project's right sidebar. Two sub-tabs:
 
-- **Profiles** — full CRUD over `.specrails/profiles/*.json`. The live validator enforces the baseline trio and routing ordering — Save is disabled with a "N issues to resolve" hint while you're broken.
+- **Profiles** — full CRUD over `.specrails/profiles/*.json`. The live validator enforces the baseline trio and routing ordering — Save is disabled with an "N issues to resolve" hint while the profile is broken.
 - **Agents Catalog** — read-only viewer of upstream `sr-*` agents and your `custom-*` agents.
 
-Empty state offers **Migrate from current agents**: one click creates a `default` profile mirroring today's frontmatter.
+The empty state offers **Migrate from current agents**: one click creates a `default` profile mirroring today's frontmatter.
 
 Each profile gets a per-profile analytics card showing usage for the last 7 / 30 / 90 days: jobs, success rate, avg tokens, avg duration.
 
 ### Pick a profile at launch
 
-Three places to pick:
+Pick the profile from the **rail header's profile dropdown**. It's preselected to the project's resolved default, and your choice **persists per rail** across launches. The selection is sent with the launch; rails in the same batch can run different profiles.
 
-- **Implement Wizard** (one spec) — footer dropdown, preselected to the project default.
-- **Batch Implement Wizard** (multiple specs) — batch-level picker + a per-feature override table when you have > 1 issue selected.
-- **Dashboard rails** — compact dropdown in each rail header. Pick once; it persists across launches of that rail.
-
-The **"No profile"** option always exists — use it to run a rail exactly as it did pre-4.1.0.
+The **`No profile`** option always exists — use it to run a rail exactly as it did pre-4.1.0. (The dropdown itself only appears once the project has at least one profile.)
 
 ### Custom agents (Agent Studio)
 
-From the Agents Catalog tab, click **Create New** to open the Agent Studio. Four creation modes:
+From the Agents Catalog tab, the toolbar offers three creation entry points:
 
-| Mode | Behaviour |
-|------|-----------|
-| Template | Pick from Security Reviewer, Data Engineer, Performance Profiler, UI/UX Polisher |
-| Generate | Describe the agent in natural language; Claude drafts the full `.md` |
-| Blank | Start from a minimal template |
-| Duplicate | Copy any existing agent (upstream or custom) |
+| Button | Behaviour |
+|--------|-----------|
+| **Generate with Claude** | Describe the agent in natural language; Claude drafts the full `.md`. |
+| **Template** | Start from the catalog of 50 templates across 13 categories (Software Engineering, Testing & QA, Data & Analytics, Security & Compliance, Product & Design, …). |
+| **Blank** | Start from a minimal template. |
+
+You can also **Duplicate** any existing agent (upstream or custom) from its card.
 
 Custom agents live at `.claude/agents/custom-*.md` and are **never touched** by specrails-core's installer/update scripts. Every save appends a version row — open **History** in the Studio to browse and restore.
 
-Click **Test** in the Studio to run the current draft against a sample task in an isolated `claude` invocation — no files written, output + token count + duration shown inline.
+Click **Test** in the Studio to run the current draft against a sample task in an isolated `claude` invocation — no files written; output + token count + duration shown inline.
 
 ### Requirements
 
-Profiles require `specrails-core ≥ 4.1.0` in the project. Without it, you can still create and edit profiles in the hub, but the pipeline runs in legacy mode (no env injection). A yellow banner on the Agents page tells you when you need to upgrade.
+Profiles require `specrails-core ≥ 4.1.0` in the project. Without it, you can still create and edit profiles in the hub, but the pipeline runs in legacy mode (no env injection). A yellow banner on the Agents page tells you when to upgrade.
 
 For deeper internals (resolution order, snapshotting, file format), see [internals/profiles.md](internals/profiles.md).
 
 ## Plugins
 
-Per-project bundled integrations. Click **Integrations** in the project navbar.
+Per-project bundled integrations. Click **Integrations** in the project's right sidebar.
 
 ### Bundled today
 
@@ -157,7 +186,7 @@ Per-project bundled integrations. Click **Integrations** in the project navbar.
 
 Each plugin tile has:
 
-- **Status** — `not installed`, `installed`, `orphan` (state file mentions it but `.mcp.json` doesn't), `degraded` (verify failed).
+- **Status** — `not installed`, `installed`, `orphan` (state file mentions it but `.mcp.json` doesn't), or `degraded` (verify failed).
 - **Preview install** — shows which `mcpServers` entries and agent fragments will land where, so you can sanity-check before clicking.
 - **Install** — applies the changes. Progress streams over the WebSocket (`plugin.install_progress` event).
 - **Uninstall** — removes the surgical changes; never wholesale rewrites your `.mcp.json`.
@@ -170,7 +199,7 @@ Before each rail spawn, the hub:
 1. Resolves the project's installed plugins (parallel verify, per-plugin 2 s timeout).
 2. Classifies them into `active` and `degraded`.
 3. Writes a per-job snapshot to `~/.specrails/projects/<slug>/jobs/<jobId>/plugins.json` (chmod 400).
-4. Injects two env vars into the Claude subprocess: `SPECRAILS_PLUGINS_ACTIVE` (CSV) and `SPECRAILS_PLUGINS_SNAPSHOT` (file path).
+4. Injects two env vars into the subprocess: `SPECRAILS_PLUGINS_ACTIVE` (CSV) and `SPECRAILS_PLUGINS_SNAPSHOT` (file path).
 
 Degraded plugins are **non-blocking** — the rail spawns anyway, but a `plugin.degraded` toast surfaces in the UI.
 
@@ -185,27 +214,27 @@ The hub never wholesale rewrites these files:
 
 specrails-core's installer also guarantees it never touches `.specrails/plugins/**` or `.claude/agents/custom-*.md`.
 
-## Spec launcher (batch)
+## Running many specs at once
 
-For when you have a list of specs and want them all running:
+Want a whole batch of specs to run from one rail? Use **Batch** mode:
 
-1. On the Dashboard, click **Launch many** at the top of the SpecsBoard.
-2. Select specs via checkbox.
-3. Pick a batch-level profile and (optionally) override per spec.
-4. Hit **Launch**.
+1. Drag all the specs you want onto a single rail.
+2. Switch that rail's mode to **Batch**.
+3. Press **▶ Play**.
 
-The hub assigns specs to rails round-robin and starts them. You can monitor everything in the Jobs page.
+The rail launches one `/specrails:batch-implement` job that works through every assigned spec in dependency-aware waves. Monitor progress on the Jobs page. Because a project runs one job at a time, this is also the way to chain a list of specs without juggling multiple rails.
 
 ## Stopping everything
 
 If something looks wrong:
 
-- **One rail** — Stop button on the rail header.
-- **All rails in the active project** — Pause queue in Project Settings (queues new jobs but lets in-flight ones complete) or kill the hub: `specrails-hub stop`.
-- **Everything** — Quit the desktop app, or `specrails-hub stop`.
+- **One rail** — click **Stop** on the rail header.
+- **Auto-pause on budget** — if you set a daily budget (project or hub-wide), the queue automatically pauses once that day's spend hits the cap. Configure it under [Budget](customizing.md#budget).
+- **Everything** — quit the desktop app, or run `specrails-hub stop`.
 
 ## Where to go next
 
 - [Tracking cost](tracking-cost.md) — see what each rail run is costing you.
 - [Customising the hub](customizing.md) — daily budget, per-job alerts, telemetry.
-- [Agents Studio internals](internals/profiles.md) — for power users.
+- [Using Codex](codex.md) — run rails on the Codex CLI.
+- [Agent profile internals](internals/profiles.md) — for power users.

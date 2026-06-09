@@ -146,12 +146,13 @@ describe('ProposeSpecModal', () => {
     expect(button).not.toBeDisabled()
   })
 
-  it('exposes a Quick / Explore segmented control with Quick selected by default', () => {
+  it('exposes a Quick / Explore / Raw segmented control with Quick selected by default', () => {
     render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
     const tabs = screen.getAllByRole('tab')
-    expect(tabs).toHaveLength(2)
+    expect(tabs).toHaveLength(3)
     const quickTab = tabs.find((t) => t.textContent?.toLowerCase().includes('quick'))
     expect(quickTab).toHaveAttribute('aria-selected', 'true')
+    expect(tabs.some((t) => t.textContent?.toLowerCase().includes('raw'))).toBe(true)
   })
 
   it('renames the action button to Continue in Explore mode', () => {
@@ -434,5 +435,130 @@ describe('ProposeSpecModal', () => {
     await waitFor(() => {
       expect(mockRegisterFastSpec).toHaveBeenCalledWith('req-fast', expect.objectContaining({ projectId: 'proj-1' }))
     })
+  })
+
+  // ─── Raw mode ("free") ──────────────────────────────────────────────────────
+
+  const selectRawMode = () => {
+    const rawTab = screen.getAllByRole('tab').find((t) => t.textContent?.toLowerCase().includes('raw'))!
+    fireEvent.click(rawTab)
+  }
+
+  it('Raw mode hides the model/scope pickers and shows the priority group + title + Create button', () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    selectRawMode()
+    expect(screen.getByTestId('raw-priority-group')).toBeInTheDocument()
+    expect(screen.getByTestId('raw-title-input')).toBeInTheDocument()
+    expect(screen.queryByTestId('context-scope-slider')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /create/i })).toBeInTheDocument()
+    // Submit is disabled until the body has text.
+    expect(screen.getByRole('button', { name: /create/i })).toBeDisabled()
+  })
+
+  it('Raw mode auto-derives the title from the first non-empty line of the body', () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    selectRawMode()
+    const body = screen.getByLabelText('Raw spec body')
+    fireEvent.change(body, { target: { value: 'Add a CSV export button\nin the reports page' } })
+    expect((screen.getByTestId('raw-title-input') as HTMLInputElement).value).toBe('Add a CSV export button')
+  })
+
+  it('Raw mode posts to /tickets/from-prompt with description, default priority and structured=false', async () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    selectRawMode()
+    const body = screen.getByLabelText('Raw spec body')
+    fireEvent.change(body, { target: { value: 'Raw prompt body text' } })
+    fireEvent.click(screen.getByRole('button', { name: /create/i }))
+
+    await waitFor(() => {
+      const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
+        .find((c) => typeof c[0] === 'string' && c[0].includes('/tickets/from-prompt'))
+      expect(call).toBeTruthy()
+      const payload = JSON.parse((call![1] as { body: string }).body)
+      expect(payload.description).toBe('Raw prompt body text')
+      expect(payload.priority).toBe('medium')
+      expect(payload.structured).toBe(false)
+    })
+    expect(onCloseMock).toHaveBeenCalled()
+    // The Quick path's /generate-spec must NOT fire in Raw mode.
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/tickets/generate-spec'),
+      expect.anything(),
+    )
+    // Raw mode never hands off to Explore either.
+    expect(mockStartWithMessage).not.toHaveBeenCalled()
+  })
+
+  it('Raw mode sends the selected priority and an explicit title override', async () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    selectRawMode()
+    fireEvent.change(screen.getByLabelText('Raw spec body'), { target: { value: 'auto title here' } })
+    fireEvent.change(screen.getByTestId('raw-title-input'), { target: { value: 'Explicit Title' } })
+    const high = screen.getAllByRole('radio').find((r) => r.textContent?.toLowerCase() === 'high')!
+    fireEvent.click(high)
+    expect(high).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(screen.getByRole('button', { name: /create/i }))
+
+    await waitFor(() => {
+      const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
+        .find((c) => typeof c[0] === 'string' && c[0].includes('/tickets/from-prompt'))
+      const payload = JSON.parse((call![1] as { body: string }).body)
+      expect(payload.title).toBe('Explicit Title')
+      expect(payload.priority).toBe('high')
+    })
+  })
+
+  it('Raw mode adds a label via Enter and includes it in the payload', async () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    selectRawMode()
+    fireEvent.change(screen.getByLabelText('Raw spec body'), { target: { value: 'body text' } })
+    const labelInput = screen.getByTestId('raw-label-input')
+    fireEvent.change(labelInput, { target: { value: 'urgent' } })
+    fireEvent.keyDown(labelInput, { key: 'Enter' })
+    expect(screen.getByText('urgent')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /create/i }))
+
+    await waitFor(() => {
+      const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
+        .find((c) => typeof c[0] === 'string' && c[0].includes('/tickets/from-prompt'))
+      const payload = JSON.parse((call![1] as { body: string }).body)
+      expect(payload.labels).toEqual(['urgent'])
+    })
+  })
+
+  it('Raw priority pills support arrow-key navigation', () => {
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    selectRawMode()
+    const group = screen.getByTestId('raw-priority-group')
+    const medium = screen.getAllByRole('radio').find((r) => r.textContent?.toLowerCase() === 'medium')!
+    expect(medium).toHaveAttribute('aria-checked', 'true')
+    // ArrowLeft from medium → high
+    fireEvent.keyDown(medium, { key: 'ArrowLeft' })
+    const high = screen.getAllByRole('radio').find((r) => r.textContent?.toLowerCase() === 'high')!
+    expect(high).toHaveAttribute('aria-checked', 'true')
+    expect(group).toBeInTheDocument()
+  })
+
+  it('shows a Raw error toast and does not close when from-prompt fails', async () => {
+    ;(global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/default-spec-model')) {
+        return Promise.resolve({ ok: true, json: async () => ({ model: 'sonnet', provider: 'claude', allowed: [{ value: 'sonnet', label: 'Claude Sonnet' }] }) })
+      }
+      if (typeof url === 'string' && url.includes('/tickets/from-prompt')) {
+        return Promise.resolve({ ok: false, json: async () => ({ error: 'boom' }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) })
+    })
+    render(<ProposeSpecModal open={true} onClose={onCloseMock} tickets={emptyTickets} />)
+    selectRawMode()
+    fireEvent.change(screen.getByLabelText('Raw spec body'), { target: { value: 'will fail' } })
+    fireEvent.click(screen.getByRole('button', { name: /create/i }))
+
+    await waitFor(() => {
+      expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls.some(
+        (c) => typeof c[0] === 'string' && c[0].includes('/tickets/from-prompt'),
+      )).toBe(true)
+    })
+    expect(onCloseMock).not.toHaveBeenCalled()
   })
 })

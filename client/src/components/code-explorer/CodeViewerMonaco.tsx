@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useActiveTheme } from '../../context/ThemeContext'
 import { ensureMonacoEnvironment, defineMonacoThemeFor } from '../../lib/monaco-setup'
 
@@ -12,6 +12,19 @@ function InnerEditor({ content, language }: InnerProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const editorRef = useRef<unknown>(null)
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
+  const [loadError, setLoadError] = useState(false)
+
+  // The create effect runs once but monaco-editor loads ASYNC. Read the latest
+  // content/language/theme from refs at create time so a file switched (or theme
+  // changed) before the chunk resolved is not rendered with the stale initial
+  // values — the [content]/[language]/[theme] update effects below no-op while
+  // editorRef is still null.
+  const contentRef = useRef(content)
+  const languageRef = useRef(language)
+  const themeRef = useRef(theme)
+  useEffect(() => { contentRef.current = content }, [content])
+  useEffect(() => { languageRef.current = language }, [language])
+  useEffect(() => { themeRef.current = theme }, [theme])
 
   useEffect(() => {
     let disposed = false
@@ -19,10 +32,10 @@ function InnerEditor({ content, language }: InnerProps) {
     import('monaco-editor').then((monaco) => {
       if (disposed || !hostRef.current) return
       monacoRef.current = monaco
-      const monacoTheme = defineMonacoThemeFor(monaco, theme)
+      const monacoTheme = defineMonacoThemeFor(monaco, themeRef.current)
       const editor = monaco.editor.create(hostRef.current, {
-        value: content,
-        language,
+        value: contentRef.current,
+        language: languageRef.current,
         readOnly: true,
         theme: monacoTheme,
         minimap: { enabled: false },
@@ -32,6 +45,11 @@ function InnerEditor({ content, language }: InnerProps) {
         fontSize: 13,
       })
       editorRef.current = editor
+    }).catch(() => {
+      // Stale chunk after a deploy / network blip / worker failure: surface an
+      // error + reload affordance instead of a permanently blank pane plus an
+      // unhandled promise rejection.
+      if (!disposed) setLoadError(true)
     })
     return () => {
       disposed = true
@@ -62,6 +80,20 @@ function InnerEditor({ content, language }: InnerProps) {
     monaco.editor.setTheme(monacoTheme)
   }, [theme])
 
+  if (loadError) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-sm text-muted-foreground" data-testid="monaco-load-error">
+        <span>Failed to load the code viewer.</span>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded-md bg-accent-primary/15 px-3 py-1 text-xs text-accent-primary hover:bg-accent-primary/25"
+        >
+          Reload
+        </button>
+      </div>
+    )
+  }
   return <div ref={hostRef} className="w-full h-full" data-testid="monaco-host" />
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileText, FilePlus2, FileMinus2, GitCommitHorizontal } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
+import { useHub } from '../../hooks/useHub'
 import { FEATURE_CODE_EXPLORER } from '../../lib/feature-flags'
 
 interface ProvenanceRow {
@@ -20,17 +21,22 @@ export function TicketFilesTouched({ ticketId, onClose }: Props) {
   // Hooks must run unconditionally and in a stable order — declare them before
   // any early return (Rules of Hooks). The feature gate is applied below.
   const navigate = useNavigate()
+  const { activeProjectId } = useHub()
   const [rows, setRows] = useState<ProvenanceRow[] | null>(null)
 
   useEffect(() => {
     if (!FEATURE_CODE_EXPLORER) return
-    let cancelled = false
-    fetch(`${getApiBase()}/code/provenance?ticketId=${ticketId}`)
+    // activeProjectId in deps: ticket ids are per-project sequential (collisions
+    // across projects are the norm), so a project switch with the same numeric id
+    // must refetch — otherwise the modal shows the previous project's files.
+    const ctrl = new AbortController()
+    setRows(null)
+    fetch(`${getApiBase()}/code/provenance?ticketId=${ticketId}`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: ProvenanceRow[]) => { if (!cancelled) setRows(Array.isArray(data) ? data : []) })
-      .catch(() => { if (!cancelled) setRows([]) })
-    return () => { cancelled = true }
-  }, [ticketId])
+      .then((data: ProvenanceRow[]) => { setRows(Array.isArray(data) ? data : []) })
+      .catch((err: unknown) => { if ((err as { name?: string })?.name !== 'AbortError') setRows([]) })
+    return () => ctrl.abort()
+  }, [ticketId, activeProjectId])
 
   if (!FEATURE_CODE_EXPLORER) return null
   if (!rows || rows.length === 0) return null

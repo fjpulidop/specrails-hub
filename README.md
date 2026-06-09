@@ -10,7 +10,7 @@
 [![license](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-339933?logo=node.js&logoColor=white&style=flat-square)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white&style=flat-square)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=black&style=flat-square)](https://react.dev)
+[![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black&style=flat-square)](https://react.dev)
 [![Desktop](https://img.shields.io/badge/Desktop-Tauri-ffc131?logo=tauri&logoColor=black&style=flat-square)](https://tauri.app)
 [![providers](https://img.shields.io/badge/agents-Claude%20%2B%20Codex-ff7a59?style=flat-square)](#-bring-your-own-agent)
 
@@ -25,7 +25,7 @@
 **specrails-hub** turns *"I'll just let the AI do it"* into a workflow you can **see, steer, and trust**. It's a local-first dashboard and CLI that sits on top of [**specrails-core**](https://github.com/fjpulidop/specrails-core) and gives you **one window for all your projects**:
 
 - 💬 Shape a spec in conversation with an AI, or generate one in a single shot.
-- 🛤️ Drag specs onto **execution rails** and run them — many in parallel.
+- 🛤️ Drag specs onto **execution rails** and run them — one job at a time per project, in parallel across projects.
 - 🤖 Watch the **Architect → Developer → Reviewer → Ship** pipeline stream live.
 - 💰 See exactly **what each agent cost you** this week, per provider, per ticket.
 
@@ -51,7 +51,7 @@
 
 | | |
 |---|---|
-| 🛤️ **Execution rails** | Each rail is an independent lane. Run multiple specs **in parallel**, each with its own **agent profile** (which agents, which models, how tasks route). |
+| 🛤️ **Execution rails** | Each rail is an independent lane. Within a project, jobs run **one at a time** (rails let you queue and organise the work); true parallelism is **across projects**. Each rail carries its own **agent profile** (which agents, which models, how tasks route). |
 | 🧩 **Agent profiles** | A per-project, declarative catalog that tells the implement pipeline which agents to run and at what model — snapshotted per job so concurrent rails stay isolated. |
 | 📡 **Live job detail** | A premium ticket-identity header, live duration ticker, incremental turns/tokens, and authoritative cost on exit. |
 | 🔌 **Plugins** | A per-project marketplace of MCP-based integrations (**Serena** semantic code-nav bundled today). Additive by design — installing plugin N+1 never disturbs plugin N. |
@@ -60,7 +60,7 @@
 
 | | |
 |---|---|
-| 📊 **Analytics** | Every billable AI invocation — across rails, Quick, Explore, AI edits, and file summaries — is recorded for **both Claude and Codex**. Burn-rate hero, daily timeline, top tickets, model breakdown, cost-vs-turns scatter. |
+| 📊 **Analytics** | Every billable AI invocation — across rails, Quick, Explore, AI edits, SMASH, and file summaries — is recorded for **both Claude and Codex**. Burn-rate hero, daily timeline, top tickets, model breakdown, cost-vs-turns scatter. |
 | 🧮 **Honest numbers** | Claude cost is the provider-billed figure; Codex cost is **estimated** from a local rate-card (the CLI doesn't report it) and clearly flagged with a `~`. Token totals include the cache tiers, so the figures actually reconcile. |
 | 📤 **Exports** | One-click CSV/JSON, plus per-ticket spending deep-links. |
 
@@ -69,7 +69,7 @@
 | | |
 |---|---|
 | 🖥️ **Terminal panel** | A real VS-Code-style bottom panel (`Cmd/Ctrl+J`) powered by `node-pty` + xterm.js — WebGL rendering, search, ligatures, image inline, drag-drop paths, and OSC 133 shell integration. |
-| 🎨 **Themes** | Three built-ins — `dracula`, `aurora-light`, `obsidian-dark` — applied before React hydrates (no flash). |
+| 🎨 **Themes** | Five built-ins — `specrails` (default), `dracula`, `aurora-light`, `obsidian-dark`, `matrix` — applied before React hydrates (no flash). |
 | 🧭 **Code explorer** | A read-only, non-developer-friendly file tree + Monaco viewer with plain-language AI summaries and *"touched by AI"* provenance chips. |
 | 💬 **Minimizable chats** | Park an Explore or AI-Edit session into a dock chip and pick it back up later — never lost across refreshes or project switches. |
 
@@ -129,7 +129,7 @@ specrails-hub add /path/to/your/project
 #   http://127.0.0.1:4200
 ```
 
-If a project doesn't have specrails-core yet, a **5-step setup wizard** installs it for you — one flow, no tier picker, ~1 minute on a warm cache.
+If a project doesn't have specrails-core yet, a **3-step setup wizard** (Configure → Install → Done) installs it for you — one flow, no tier picker, ~1 minute on a warm cache.
 
 > 💡 **Prefer a desktop app?** Grab a signed macOS or Windows build — see [Desktop app](#%EF%B8%8F-desktop-app). It bundles the server, so there's no separate `start`.
 
@@ -152,7 +152,7 @@ When the hub is running, the CLI talks to it over HTTP + WebSocket; when it isn'
 
 - 🟩 **Node.js 20+**
 - 🤖 **At least one AI CLI** on your `PATH`:
-  - **[Claude Code](https://claude.com/claude-code)** — the `claude` binary. Authenticate with `ANTHROPIC_API_KEY`.
+  - **[Claude Code](https://claude.com/claude-code)** — the `claude` binary, signed in (via Claude subscription login or an `ANTHROPIC_API_KEY`).
   - **[Codex CLI](https://developers.openai.com/codex)** ≥ 0.128.0 — the `codex` binary. Run `codex login` or set `OPENAI_API_KEY`.
 - 🌿 **git**
 - 🧪 *(optional)* **`uv`** — only if you want the Serena plugin
@@ -168,7 +168,7 @@ A clean **three-layer TypeScript monorepo** — one Express process runs in *hub
 
 ```
 🗄️  server/   Express 5 + WebSocket + SQLite (better-sqlite3)   · the brain
-🎨  client/   React 18 + Vite + Tailwind v4                      · the dashboard
+🎨  client/   React 19 + Vite + Tailwind v4                      · the dashboard
 ⌨️  cli/      specrails-hub command bridge                       · the terminal door
 ```
 
@@ -222,9 +222,11 @@ npm run dev                        # 🚀 server :4200 + client :4201, hot reloa
 
 ## 🖥️ Desktop app
 
-Signed, notarized builds for **macOS (Apple Silicon)** and **Windows (x64)** are published at:
+Desktop builds for **macOS (Apple Silicon)**, **Windows (x64)**, and **Windows (arm64)** are published at:
 
 > 📥 `https://specrails.dev/downloads/specrails-hub/latest/`
+
+The macOS build is **signed + notarized**. The Windows installers are **unsigned in v1** — SmartScreen flags them, so click **More info → Run anyway**. (Authenticode signing is a planned follow-up.)
 
 `npm run build:desktop` produces the `.app` / `.dmg` / `.exe`, but does **not** assemble the bundled runtimes — that app falls back to your system PATH and downloads a Playwright Chromium on first use. To build a self-contained app the way CI does (**macOS arm64 only**):
 
@@ -244,7 +246,7 @@ BUNDLE_CHROMIUM=true npm run build:desktop:local
 ## 🔒 Security model
 
 - 🏠 Binds to `127.0.0.1` only — **do not expose to a network**.
-- 🙅 No authentication (single-user local tool by design).
+- 🔑 A hub token is **auto-generated on first run** and persisted to `~/.specrails/hub.token` (mode `0600`). Every `/api/*` route requires it (except `/api/health` and `/api/hub/token`), and WebSocket upgrades carry it as a subprotocol. The browser client fetches it same-origin — there's nothing to configure.
 - 🧷 Parameterised SQL everywhere — never string-interpolated.
 - 🧬 Reserved files in your project (`.mcp.json`, `.specrails/plugins/state.json`, `.specrails/profiles/.user-preferred.json`) are mutated **surgically** — read → modify only owned keys → atomic temp+rename — so adding plugin N+1 never disturbs plugin N.
 

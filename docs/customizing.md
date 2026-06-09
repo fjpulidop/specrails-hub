@@ -6,13 +6,15 @@ Every setting you can change, grouped by where you'll find it.
 
 Open **Hub Settings** (gear icon at the bottom of the Arc sidebar) → **Appearance**.
 
-Three built-in themes:
+Five built-in themes:
 
 | Theme | Vibe |
 |-------|------|
-| **Dracula** *(default)* | Dark purple, original specrails palette |
-| **Aurora Light** | Light theme, soft pastels |
-| **Obsidian Dark** | Dark neutral, high contrast |
+| **SpecRails** *(default)* | Brand theme — deep navy-indigo with saturated cyan accents |
+| **Dracula** | The original — dark purple-tinted with vivid neon accents |
+| **Aurora Light** | Premium light — Linear-inspired indigo on warm off-white |
+| **Obsidian Dark** | Premium dark — near-black blue-tinted with electric accents |
+| **Matrix** | Phosphor terminal — soft mint on green-tinted near-black |
 
 The selection is hub-wide (one theme across all projects) and applies instantly:
 
@@ -21,23 +23,30 @@ The selection is hub-wide (one theme across all projects) and applies instantly:
 - Recharts charts in Analytics recolour live.
 - Syntax-highlighted code blocks recolour live.
 
-There's an inline anti-FOUC script in `index.html` so a page refresh never shows a flash of the wrong theme.
+There's an inline anti-FOUC script in `client/index.html` so a page refresh never shows a flash of the wrong theme.
 
 The active theme persists to `hub_settings.ui_theme` on the server and mirrors to `localStorage` so the desktop app and browser stay in sync if you use both.
 
-> Want a fourth theme? It's a small contribution — see `client/src/lib/themes.ts` and `internals/architecture.md` for the contract.
+> Want a sixth theme? It's a small contribution — see `client/src/lib/themes.ts` and [internals/architecture.md](internals/architecture.md) for the contract.
 
-## Sidebar pin
+## Sidebars
 
-The left Arc sidebar has three states:
+Both sidebars cycle through the same three states with their pin icon:
 
-- **Collapsed** — narrow strip of icons.
-- **Hover-expand** — collapses by default, expands on hover.
 - **Pinned-open** — always wide.
+- **Pinned-collapsed** — always a narrow strip of icons.
+- **Unpinned** *(default)* — collapsed strip that expands on hover.
 
-Cycle through them with the pin icon at the top, or `Cmd+B` / `Ctrl+B`. State is per-machine (local UI preference, not synced).
+Keyboard shortcuts:
 
-The right project sidebar (Chat) has a parallel mode toggle with `Cmd+Shift+B` / `Ctrl+Shift+B`.
+| Shortcut | Action |
+|----------|--------|
+| `Cmd+B` / `Ctrl+B` | Cycle the **right** project sidebar (Chat) |
+| `⌥⌘B` / `Ctrl+Alt+B` | Cycle the **left** Arc sidebar |
+
+State is per-machine (local UI preference, not synced).
+
+> Press `?` anywhere for the full keyboard-shortcuts cheatsheet. `Cmd+K` / `Ctrl+K` opens the command palette; `Cmd+J` / `Ctrl+J` toggles the terminal panel.
 
 ## Per-project settings
 
@@ -47,10 +56,18 @@ Open **Settings** from the project navbar (top right of any project page).
 
 | Setting | Behaviour |
 |---------|-----------|
-| **Daily budget (USD)** | Hub pauses the queue when the rolling 24-hour spend exceeds this. Blank = no cap. |
-| **Per-job alert threshold (USD)** | OS notification when a single job exceeds this. Blank = disabled. |
+| **Daily budget (USD)** | The queue auto-pauses when this project's spend for the current calendar day exceeds the cap. Blank = no cap. |
+| **Per-job cost alert (USD)** | OS notification when a single job in this project exceeds this amount. Blank = disabled. |
 
-When the daily budget is hit, you see a banner on the Dashboard. Resume by raising the budget, clearing it, or waiting for the rolling window to slide.
+The daily counter is the sum of completed-job cost since midnight, so it resets at the start of each calendar day. When the cap is hit you see a "Daily budget exceeded — Queue is paused" banner on the project (plus a toast). Resume by raising or clearing the budget (and waiting for the next day if you've genuinely spent it).
+
+### Rail pre-prompt
+
+A custom instruction appended to every **Implement** and **Batch-implement** rail job, after the ticket context and before execution. Use it for stable project guidance that should accompany every rail run (e.g. "keep migrations backward compatible, add tests for every change"). Leave it blank for none.
+
+### Ultracode pre-prompt
+
+The instruction sent to Claude for **Ultracode** rails (Claude-only). Ultracode skips the OpenSpec pipeline — it hands Claude this pre-prompt plus the spec text and lets it implement autonomously. The spec text is appended automatically after the pre-prompt. Leave it blank to use the built-in default.
 
 ### Telemetry
 
@@ -64,7 +81,7 @@ When telemetry is on, the **Diagnostic ZIP** button appears on every job's detai
 
 Retention: raw blobs > 7 days old are compacted at startup (file deleted, aggregates kept).
 
-Scope: rails only. The sidebar chat, Explore, AI Edit, and the setup wizard are not instrumented.
+Scope: rails only. The sidebar chat, Explore, AI Edit, and the setup wizard are not instrumented (telemetry env injection happens only in the queue manager).
 
 ### Terminal panel
 
@@ -72,8 +89,8 @@ Hot-reload semantics: font family/size, copy-on-select, long-running command thr
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| Font family | `Menlo`, `Monaco`, `monospace` | Terminal font |
-| Font size | 13 px | Cmd+= / Cmd+- live-zooms within a session |
+| Font family | `'DM Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace` | Terminal font |
+| Font size | 12 px | Cmd+= / Cmd+- live-zooms within a session |
 | Copy on select | off | Auto-copy when text is selected |
 | Render mode | auto | `auto` picks WebGL when available; falls back to canvas on context loss |
 | Shell integration | on | Inject OSC 133 / 1337 shim per shell |
@@ -83,60 +100,67 @@ Hot-reload semantics: font family/size, copy-on-select, long-running command thr
 
 Project overrides win per-field; missing fields fall back to hub defaults; missing hub defaults fall back to built-ins.
 
-See [docs/terminal.md](terminal.md) for the full reference of keyboard shortcuts and shell integration.
+See [terminal.md](terminal.md) for the full reference of keyboard shortcuts and shell integration.
 
 ## Hub-wide settings
 
-Open **Hub Settings** from the Arc sidebar.
+Open **Hub Settings** from the Arc sidebar. These apply across every project.
 
-### Appearance
+| Section | What it does |
+|---------|--------------|
+| **Appearance** | Theme picker — see above. |
+| **Registered Projects** | The project registry. Re-resolve, rename, or remove projects. |
+| **specrails-tech** | Base URL for the external specrails-tech agents service (default `http://localhost:3000`). |
+| **Budget & Alerts** | Hub-wide daily budget (a global spend cap across all projects — queues auto-pause when exceeded) plus a per-job cost alert threshold. Distinct from the per-project budget. |
+| **OS Notifications** | Native desktop notifications when jobs complete or fail. Notifications only fire when the tab isn't focused. Filter on all / completed-only / failed-only. |
+| **Outbound Webhooks** | Notify external tools (Slack, Zapier, CI/CD) on hub events. Requests are signed with `X-Specrails-Signature` when a secret is set. |
+| **Terminal Panel** | The same terminal fields as per-project, applied hub-wide as defaults. Per-project values override them. |
+| **Onboarding** | Re-run the welcome tour. |
+| **Hub Information** | Version, paths, and diagnostics. |
 
-- **Theme** — see above.
+## Authentication
 
-### Default Claude model
+There is no token to configure — the hub manages it for you.
 
-The model used for all pipeline jobs unless a project or profile overrides. Default: `claude-sonnet-4-6`.
+On first run the hub generates a token and persists it to `~/.specrails/hub.token` (mode `0600`). Every `/api/*` route requires it (the only exceptions are `/api/health` and `/api/hub/token`), and WebSocket upgrades carry it as a subprotocol. The browser client fetches the token same-origin, so you never see it.
 
-### Terminal panel defaults
-
-Same fields as the per-project terminal settings. These are the hub-wide defaults; per-project values override them.
-
-### Authentication token
-
-Optional bearer token to protect the hub API. Default: none (single-user local tool).
-
-> Important: the hub binds to `127.0.0.1`. Even without a token, it's not exposed to your network. Setting a token only adds a second line of defence (e.g. for shared dev machines).
+The hub binds to `127.0.0.1` only, so it's never exposed to your network. To rotate the token, stop the hub, delete `~/.specrails/hub.token`, and start it again — a fresh token is generated on the next boot.
 
 ## Environment variables
 
-Most settings live in the UI. A few hub-level switches are env-only because they're guardrails ops people want to flip without opening the dashboard:
+Most settings live in the UI. A few hub-level switches are env-only because they're guardrails ops people want to flip without opening the dashboard.
 
 ### Server-side (read at hub startup or by spawned children)
 
 | Variable | Effect |
 |----------|--------|
-| `SPECRAILS_DIR` | Override `~/.specrails/` data directory location |
-| `SPECRAILS_CORE_BIN` | Override the path to the `specrails-core` binary (default: `npx specrails-core`) |
-| `SPECRAILS_TECH_URL` | Override the `specrails-tech` proxy URL |
-| `SPECRAILS_AGENTS_SECTION=false` | Hide the Agents tab from every project |
-| `SPECRAILS_PLUGINS_SECTION=false` | Hide the Integrations tab from every project |
+| `SPECRAILS_CORE_BIN` | Override the `specrails-core` binary (default: `npx --yes --prefer-online specrails-core@latest`) |
+| `SPECRAILS_TECH_URL` | Override the specrails-tech proxy base URL |
+| `SPECRAILS_AGENTS_SECTION=false` | Hide the Agents section from every project |
+| `SPECRAILS_PLUGINS_SECTION=false` | Hide the Integrations section from every project |
 | `SPECRAILS_TERMINAL_PANEL=false` | Disable the bottom terminal panel everywhere |
-| `SPECRAILS_SMASH=0` | Disable SMASH spec decomposition (server returns 409 on the endpoints) |
-| `SPECRAILS_EXPLORE_CONTRACT_REFINE=0` | Hub-wide kill switch for Contract Refine (auto-fire + retry endpoint) |
+| `SPECRAILS_CODE_EXPLORER=false` | Disable the read-only Code section server-side |
+| `SPECRAILS_BROWSER_CAPTURE=false` | Disable Add-Spec-from-browser capture |
+| `SPECRAILS_HUB_CODEX_BETA=0` | Emergency rollback — disable the Codex provider |
+| `SPECRAILS_SMASH=0` | Kill switch for SMASH spec decomposition (`0` / `false` / `off`; endpoints return 409) |
+| `SPECRAILS_EXPLORE_CONTRACT_REFINE=0` | Hub-wide kill switch for Contract Refine (auto-fire + retry endpoint; accepts `0` / `false` / `off`) |
 | `SPECRAILS_EXPLORE_LEGACY_CWD=1` | Force Explore spawns to use the project root instead of the hub-managed `explore-cwd/` |
-| `SPECRAILS_ALLOW_LOCAL_WEBHOOKS=1` | Allow webhooks to target loopback / private network addresses |
-| `NODE_ENV=production` | Production server behaviour |
+| `SPECRAILS_FILE_SUMMARY_MODEL` | Override the model used for Code-section file summaries |
+| `SPECRAILS_ALLOW_LOCAL_WEBHOOKS=1` | Allow outbound webhooks to target loopback / private-network addresses |
 
 ### Client-side (Vite — set at build time)
 
+These feature flags are **default ON**. Set the flag to `false` to hide the feature.
+
 | Variable | Effect |
 |----------|--------|
-| `VITE_FEATURE_TERMINAL_PANEL=true` | Surface the bottom terminal panel |
-| `VITE_FEATURE_AGENTS_SECTION=true` | Surface the Agents tab in the project navbar |
-| `VITE_FEATURE_EXPLORE_REVIEW=true` | Enable the Review step in the Explore shell |
+| `VITE_FEATURE_TERMINAL_PANEL=false` | Hide the bottom terminal panel |
+| `VITE_FEATURE_AGENTS_SECTION=false` | Hide the Agents section |
+| `VITE_FEATURE_CODE_EXPLORER=false` | Hide the read-only Code section |
+| `VITE_FEATURE_EXPLORE_REVIEW=false` | Disable the Review step in the Explore shell |
 | `VITE_FEATURE_EXPLORE_PREMIUM_UX=false` | Disable the "Conectando…/Pensando…/Consultando código…" pills above the Explore streaming bubble |
 
-> **Port:** the hub doesn't read an env var for its port — use the `--port <n>` flag on `specrails-hub start` instead.
+> **Port:** the hub doesn't read an env var for its port — use the `--port <n>` global flag: `specrails-hub --port 5000 start`.
 
 Set them in the shell that launches the hub. Desktop app users can set them in their shell rc files since the desktop app inherits the launchd PATH and env.
 
@@ -146,11 +170,11 @@ To wipe all hub state (project registry, settings, theme) but keep your project 
 
 ```bash
 specrails-hub stop
-rm -rf ~/.specrails/hub.sqlite ~/.specrails/projects/
+rm -rf ~/.specrails/hub.sqlite* ~/.specrails/projects/
 specrails-hub start
 ```
 
-This deletes the project registry and every per-project SQLite. Your project directories on disk and their `.specrails/` folders (specs, profiles, plugins) are untouched.
+The `hub.sqlite*` glob also removes the SQLite WAL/SHM sidecars. This deletes the project registry and every per-project SQLite. Your project directories on disk and their `.specrails/` folders (specs, profiles, plugins) are untouched. `hub.token` and `manager.pid` regenerate harmlessly on the next start.
 
 For a more surgical reset (e.g. clear job history for one project but keep the registration), see [internals/operations-runbook.md](internals/operations-runbook.md).
 

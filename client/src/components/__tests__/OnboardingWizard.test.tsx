@@ -3,6 +3,16 @@ import { screen, fireEvent } from '@testing-library/react'
 import { render } from '../../test-utils'
 import { OnboardingWizard, hasSeenOnboarding, resetOnboarding } from '../OnboardingWizard'
 
+const STEP_TITLES = [
+  'Welcome to specrails-hub',
+  'Turn ideas into specs',
+  'Run the pipeline on rails',
+  'Bring your own agent',
+  'Track every cent',
+  'Make it your workspace',
+  'Move at the speed of thought',
+]
+
 describe('OnboardingWizard', () => {
   let onClose: ReturnType<typeof vi.fn>
 
@@ -13,7 +23,7 @@ describe('OnboardingWizard', () => {
 
   it('renders the first step when open', () => {
     render(<OnboardingWizard open={true} onClose={onClose} />)
-    expect(screen.getByText('Welcome to specrails-hub')).toBeTruthy()
+    expect(screen.getByText(STEP_TITLES[0])).toBeTruthy()
     expect(screen.getByTestId('onboarding-wizard')).toBeTruthy()
   })
 
@@ -25,46 +35,39 @@ describe('OnboardingWizard', () => {
   it('navigates to the next step on Next click', () => {
     render(<OnboardingWizard open={true} onClose={onClose} />)
     fireEvent.click(screen.getByTestId('onboarding-next'))
-    expect(screen.getByText('Specialized Agents')).toBeTruthy()
+    expect(screen.getByText(STEP_TITLES[1])).toBeTruthy()
   })
 
   it('navigates back on Back click', () => {
     render(<OnboardingWizard open={true} onClose={onClose} />)
-    // Go to step 2
     fireEvent.click(screen.getByTestId('onboarding-next'))
-    expect(screen.getByText('Specialized Agents')).toBeTruthy()
-    // Go back
+    expect(screen.getByText(STEP_TITLES[1])).toBeTruthy()
     fireEvent.click(screen.getByTestId('onboarding-back'))
-    expect(screen.getByText('Welcome to specrails-hub')).toBeTruthy()
+    expect(screen.getByText(STEP_TITLES[0])).toBeTruthy()
   })
 
-  it('navigates through all 4 steps', () => {
+  it('navigates through all 7 steps', () => {
     render(<OnboardingWizard open={true} onClose={onClose} />)
-    const titles = [
-      'Welcome to specrails-hub',
-      'Specialized Agents',
-      'Multi-Project Hub',
-      'Command Palette',
-    ]
-    expect(screen.getByText(titles[0])).toBeTruthy()
-    for (let i = 1; i < titles.length; i++) {
+    expect(screen.getByText(STEP_TITLES[0])).toBeTruthy()
+    for (let i = 1; i < STEP_TITLES.length; i++) {
       fireEvent.click(screen.getByTestId('onboarding-next'))
-      expect(screen.getByText(titles[i])).toBeTruthy()
+      expect(screen.getByText(STEP_TITLES[i])).toBeTruthy()
     }
   })
 
-  it('closes and dismisses on "Get Started" (last step)', () => {
+  it('shows "Get Started" on the last step and dismisses on click', () => {
     render(<OnboardingWizard open={true} onClose={onClose} />)
-    // Navigate to the last step (4 steps total, so 3 clicks)
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < STEP_TITLES.length - 1; i++) {
       fireEvent.click(screen.getByTestId('onboarding-next'))
     }
     expect(screen.getByText('Get Started')).toBeTruthy()
     fireEvent.click(screen.getByTestId('onboarding-next'))
     expect(onClose).toHaveBeenCalled()
+    // Completing the whole tour counts as "seen".
+    expect(hasSeenOnboarding()).toBe(true)
   })
 
-  it('dismisses on close when "Don\'t show again" is checked', () => {
+  it('dismisses on skip when "Don\'t show again" is checked', () => {
     render(<OnboardingWizard open={true} onClose={onClose} />)
     fireEvent.click(screen.getByTestId('onboarding-dismiss-checkbox'))
     fireEvent.click(screen.getByTestId('onboarding-skip'))
@@ -86,12 +89,21 @@ describe('OnboardingWizard', () => {
     expect(screen.queryByTestId('onboarding-dismiss-checkbox')).toBeNull()
   })
 
-  it('step dots allow jumping to a specific step', () => {
+  it('shows Back instead of Skip after the first step', () => {
     render(<OnboardingWizard open={true} onClose={onClose} />)
-    const dots = screen.getAllByRole('button', { name: /Go to step/ })
-    expect(dots).toHaveLength(4)
-    fireEvent.click(dots[3]) // Jump to step 4
-    expect(screen.getByText('Command Palette')).toBeTruthy()
+    expect(screen.getByTestId('onboarding-skip')).toBeTruthy()
+    expect(screen.queryByTestId('onboarding-back')).toBeNull()
+    fireEvent.click(screen.getByTestId('onboarding-next'))
+    expect(screen.queryByTestId('onboarding-skip')).toBeNull()
+    expect(screen.getByTestId('onboarding-back')).toBeTruthy()
+  })
+
+  it('left-nav step buttons allow jumping to a specific step', () => {
+    render(<OnboardingWizard open={true} onClose={onClose} />)
+    const navButtons = screen.getAllByRole('button', { name: /^Go to step/ })
+    expect(navButtons).toHaveLength(STEP_TITLES.length)
+    fireEvent.click(navButtons[STEP_TITLES.length - 1]) // jump to last step
+    expect(screen.getByText(STEP_TITLES[STEP_TITLES.length - 1])).toBeTruthy()
   })
 })
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getApiBase } from '../lib/api'
+import { useHub } from '../hooks/useHub'
 import { useTicketDetailModal } from '../context/TicketDetailModalContext'
 import type { TicketSpendingSummary, Surface } from '../types/spending'
 import { SURFACE_LABEL } from '../types/spending'
@@ -25,16 +26,20 @@ function fmtDur(ms: number): string {
 export function TicketSpendingLine({ ticketId }: Props) {
   const [summary, setSummary] = useState<TicketSpendingSummary | null>(null)
   const navigate = useNavigate()
+  const { activeProjectId } = useHub()
   const { closeTicketDetail } = useTicketDetailModal()
 
   useEffect(() => {
+    // activeProjectId in deps: per-project ticket ids collide, so a project
+    // switch with the same id must refetch the new project's spending.
     const ctrl = new AbortController()
+    setSummary(null)
     fetch(`${getApiBase()}/tickets/${ticketId}/spending-summary`, { signal: ctrl.signal })
       .then((r) => r.ok ? r.json() as Promise<TicketSpendingSummary> : null)
       .then((d) => { if (d) setSummary(d) })
       .catch(() => { /* ignore */ })
     return () => ctrl.abort()
-  }, [ticketId])
+  }, [ticketId, activeProjectId])
 
   if (!summary || !summary.bySurface || !summary.totalRuns || summary.totalRuns === 0) return null
 

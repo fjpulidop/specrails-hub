@@ -115,8 +115,10 @@ export class ProjectRegistry {
       try { getTerminalManager().killAllForProject(id) } catch { /* ignore */ }
       // Close the ticket file watcher
       ctx.ticketWatcher.close().catch(() => { /* ignore */ })
-      // Detach the code-explorer file watcher
-      try { ctx.fileSummaryManager.detachWatcher(id) } catch { /* ignore */ }
+      // Tear down the code-explorer summary manager: aborts any in-flight
+      // provider child, rejects queued work, and detaches the watcher — BEFORE
+      // db.close() so a completing generation can't write to the closed handle.
+      try { ctx.fileSummaryManager.dispose() } catch { /* ignore */ }
       // Delete telemetry blob files for this project
       try {
         const telemetryDir = path.join(os.homedir(), '.specrails', 'projects', ctx.project.slug, 'telemetry')
@@ -159,9 +161,9 @@ export class ProjectRegistry {
       try { ctx.queueManager.shutdown() } catch { /* ignore */ }
       try { ctx.chatManager.shutdown() } catch { /* ignore */ }
       void ctx.browserCaptureManager.shutdown().catch(() => { /* ignore */ })
-      // Release chokidar watchers (fsevents/inotify handles) so a restart does
-      // not leak them — removeProject() does this per-project; mirror it here.
-      try { ctx.fileSummaryManager.detachWatcher(ctx.project.id) } catch { /* ignore */ }
+      // Release chokidar watchers + abort in-flight generations so a restart
+      // does not leak handles/children — mirror removeProject()'s per-project teardown.
+      try { ctx.fileSummaryManager.dispose() } catch { /* ignore */ }
       ctx.ticketWatcher.close().catch(() => { /* ignore */ })
     }
   }

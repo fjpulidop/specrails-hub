@@ -187,6 +187,16 @@ export function SpecCard({
           Review
         </Badge>
       ) : null}
+      {ticket.source === 'free-prompt' ? (
+        <Badge
+          variant="outline"
+          className="text-[9px] shrink-0 uppercase border-accent-info/50 text-accent-info"
+          title="Raw spec — no AI generation at intake"
+          data-testid={`raw-badge-${ticket.id}`}
+        >
+          Raw
+        </Badge>
+      ) : null}
       {isDraft ? (
         <Badge variant="outline" className="text-[9px] shrink-0 border-accent-secondary/60 text-accent-secondary">
           Draft

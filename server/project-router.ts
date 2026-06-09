@@ -279,6 +279,21 @@ export function deriveFallbackShortSummary(title: string, description: string): 
 }
 
 /**
+ * Lightly structure a raw free-form prompt (the "Raw" Add-Spec mode) when the
+ * user opts in. We deliberately do NOT fabricate spec sections — a raw prompt
+ * stays the user's own words. The only transform: when the body has no leading
+ * markdown heading, prefix a single neutral `## Overview` heading so the spec
+ * renders with a section title downstream. Returns the (trimmed) input
+ * unchanged when it already starts with a heading or is empty.
+ */
+export function lightlyStructurePrompt(text: string): string {
+  const trimmed = text.trim()
+  if (!trimmed) return trimmed
+  if (/^#{1,6}\s+/.test(trimmed)) return trimmed
+  return `## Overview\n\n${trimmed}`
+}
+
+/**
  * Fold an `acceptanceCriteria` array into a ticket description body, writing
  * (or replacing) a `## Acceptance Criteria` section.
  *
@@ -2573,6 +2588,111 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       }
     } catch (err) {
       console.error('[project-router] from-draft create error:', err)
+      res.status(500).json({ error: 'Failed to create ticket' })
+    }
+  })
+
+  // POST /:projectId/tickets/from-prompt — Create a spec directly from a
+  // free-form prompt (the "Raw" Add-Spec mode). NO AI is invoked: the user's
+  // text becomes the ticket description verbatim. The ticket lands as
+  // status='todo' (ready for rails) with source='free-prompt'. There is no
+  // ai_invocations row (nothing was billed) and no contract-refine (no origin
+  // conversation, no description format to refine).
+  router.post('/:projectId/tickets/from-prompt', async (req: Request, res: Response) => {
+    const body = req.body ?? {}
+    const rawDescription = typeof body.description === 'string' ? body.description.trim() : ''
+    if (!rawDescription) {
+      res.status(400).json({ error: 'description is required' }); return
+    }
+    // Optional light-structuring (v1: the client always sends `false`; the flag
+    // keeps the contract stable for a future non-generative structuring pass).
+    const structured = body.structured === true
+    const description = structured ? lightlyStructurePrompt(rawDescription) : rawDescription
+
+    // Title: explicit value wins; otherwise derive a single-line summary from
+    // the body (reusing the deterministic Explore-draft summarizer).
+    const providedTitle = typeof body.title === 'string' ? body.title.trim() : ''
+    const title = providedTitle || generateAutoTitle([{ role: 'user', content: rawDescription }])
+
+    const labels = Array.isArray(body.labels)
+      ? (body.labels as unknown[]).filter((l): l is string => typeof l === 'string')
+      : []
+
+    // Priority: validate against the allowed set; default 'medium'. A
+    // status='todo' ticket MUST carry a non-null priority (see
+    // validatePriorityForStatus), so we never accept null here.
+    const priority = isValidPriority(body.priority) ? body.priority : 'medium'
+    const validationError = validatePriorityForStatus('todo', priority)
+    if (validationError) {
+      res.status(400).json({ error: validationError }); return
+    }
+
+    const pendingSpecId = typeof body.pendingSpecId === 'string' ? body.pendingSpecId : null
+    const shortSummary = deriveFallbackShortSummary(title, description)
+
+    try {
+      const filePath = ticketPath(req)
+      const now = new Date().toISOString()
+      let created: Ticket | undefined
+      const store = mutateStore(filePath, (s) => {
+        const id = s.next_id++
+        const ticket: Ticket = {
+          id,
+          title,
+          description,
+          status: 'todo',
+          priority,
+          labels,
+          assignee: null,
+          prerequisites: [],
+          metadata: {},
+          comments: [],
+          origin_conversation_id: null,
+          is_epic: false,
+          parent_epic_id: null,
+          execution_order: null,
+          short_summary: shortSummary,
+          created_at: now,
+          updated_at: now,
+          created_by: 'hub',
+          source: 'free-prompt',
+        }
+        s.tickets[String(id)] = ticket
+        created = ticket
+      })
+
+      const { broadcast, ticketWatcher, project } = ctx(req)
+      ticketWatcher.notifyHubWrite(store.revision)
+
+      // Migrate attachments from pendingSpecId → real ticket id (mirrors the
+      // generate-spec / from-draft flow). Must complete before broadcasting so
+      // listeners see the populated attachments[].
+      if (pendingSpecId && created) {
+        try {
+          const migrated = await attachmentManager.renameTicketDir({
+            slug: project.slug,
+            pendingId: pendingSpecId,
+            realTicketId: created.id,
+            projectPath: project.path,
+          })
+          if (migrated.length > 0) {
+            created.attachments = migrated
+          }
+        } catch (err) {
+          console.error('[project-router] from-prompt attachment migration error:', err)
+        }
+      }
+
+      const msg: TicketCreatedMessage = {
+        type: 'ticket_created',
+        ticket: created! as unknown as LocalTicket,
+        projectId: project.id,
+        timestamp: new Date().toISOString(),
+      }
+      broadcast(msg)
+      res.status(201).json({ ticket: created!, revision: store.revision })
+    } catch (err) {
+      console.error('[project-router] from-prompt create error:', err)
       res.status(500).json({ error: 'Failed to create ticket' })
     }
   })

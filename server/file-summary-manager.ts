@@ -21,7 +21,7 @@ export interface SummaryPayload {
   summary: string
   language: SummaryLanguage
   generatedAt: string
-  generatedBy: { model: string; promptVersion: 1; truncated?: boolean }
+  generatedBy: { model: string; promptVersion: number; truncated?: boolean }
   triggeredBy: { kind: 'job' | 'user'; id: string; ticketId: number | null }
 }
 
@@ -63,7 +63,9 @@ export interface GenerateOutput {
 export interface FileSummaryDeps {
   db: DbInstance
   broadcast: (msg: WsMessage) => void
-  generate: (input: GenerateInput) => Promise<GenerateOutput>
+  /** Generate a summary. The optional AbortSignal lets the manager tear down an
+   *  in-flight provider child when the project is removed / the hub shuts down. */
+  generate: (input: GenerateInput, signal?: AbortSignal) => Promise<GenerateOutput>
   monthToDateSpend: (projectId: string) => number
   monthlyBudgetUsd: () => number
   /** Hub-wide summary language. Defaults to 'en' when omitted. */
@@ -89,6 +91,8 @@ type EnqueueResult =
   | 'skipped:hash'
   | 'skipped:budget'
   | 'skipped:per-job-cap'
+  | 'skipped:ttl'
+  | 'skipped:not-found'
 
 const SUMMARIES_REL = path.join('.specrails', 'file-summaries')
 // Current summary prompt version. Bump when buildSystemPrompt changes materially
@@ -224,6 +228,24 @@ interface WatcherState {
   watcher: FSWatcher
 }
 
+// Hub-wide concurrency is shared across EVERY FileSummaryManager instance.
+// Production constructs one manager per project (each with its own db/broadcast/
+// generate), so a per-instance counter would only ever cap per-project. This
+// module-level state makes the documented "hub-wide 8" ceiling real: all live
+// managers share one in-flight count, and freeing a slot re-pumps every live
+// manager so a blocked project's queue advances.
+const HUB = {
+  inFlight: 0,
+  managers: new Set<FileSummaryManager>(),
+}
+
+/** Test-only: reset the shared hub-wide counter/registry between unit tests so
+ *  module-level state never leaks across cases. */
+export function __resetHubSummaryStateForTests(): void {
+  HUB.inFlight = 0
+  HUB.managers.clear()
+}
+
 export class FileSummaryManager {
   private readonly deps: FileSummaryDeps
   private readonly perProjectConcurrency: number
@@ -232,12 +254,20 @@ export class FileSummaryManager {
   private readonly queueTtlMs: number
   private readonly maxJobCounters: number
 
-  // Per-project queue, per-project in-flight count, hub-wide in-flight count.
+  // Per-project queue, per-project in-flight count. Hub-wide in-flight lives in
+  // the module-level HUB so it is shared across all per-project instances.
   private readonly queues = new Map<string, QueueEntry[]>()
   private readonly inFlightPerProject = new Map<string, number>()
-  private hubInFlight = 0
   private readonly jobCounter = new Map<string, number>()
   private readonly watchers = new Map<string, WatcherState>()
+  // Dedupe key (`projectId:relPath`) → in-flight enqueue promise. A second
+  // enqueue for the same file rides the first instead of double-spawning the
+  // provider and double-billing ai_invocations.
+  private readonly inFlightByKey = new Map<string, Promise<EnqueueResult>>()
+  // AbortControllers for in-flight generations so dispose() can tear down the
+  // provider child instead of orphaning it past project removal.
+  private readonly activeControllers = new Set<AbortController>()
+  private _disposed = false
   // Per-project SUPERSET of relPaths that have a summary on disk. Seeded from
   // the summaries dir at attachWatcher and only ever added to (on write), so a
   // path absent from the set provably has no summary — letting the chokidar
@@ -254,9 +284,28 @@ export class FileSummaryManager {
     this.perJobCap = opts.perJobCap ?? 50
     this.queueTtlMs = opts.queueTtlMs ?? 5 * 60 * 1000
     this.maxJobCounters = opts.maxJobCounters ?? MAX_JOB_COUNTERS
+    HUB.managers.add(this)
   }
 
-  async enqueue(req: EnqueueRequest): Promise<EnqueueResult> {
+  // NOT async: returning the in-flight promise verbatim is what makes the dedupe
+  // a true coalesce (the second caller gets the SAME promise, not a wrapper).
+  enqueue(req: EnqueueRequest): Promise<EnqueueResult> {
+    // Per-(project,relPath) in-flight dedupe: a second enqueue for the same file
+    // while one is still running coalesces onto the first promise, so the
+    // provider is spawned once and ai_invocations is billed once (fixes
+    // concurrent-regenerate double-billing across tabs/clients).
+    const dedupeKey = `${req.projectId}:${req.relPath}`
+    const existing = this.inFlightByKey.get(dedupeKey)
+    if (existing) return existing
+    const p = this._enqueueInner(req)
+    this.inFlightByKey.set(dedupeKey, p)
+    void p.catch(() => undefined).finally(() => {
+      if (this.inFlightByKey.get(dedupeKey) === p) this.inFlightByKey.delete(dedupeKey)
+    })
+    return p
+  }
+
+  private async _enqueueInner(req: EnqueueRequest): Promise<EnqueueResult> {
     const absolutePath = path.join(req.projectPath, req.relPath)
 
     // Step 1: file readability check.
@@ -265,12 +314,12 @@ export class FileSummaryManager {
       const stat = fs.statSync(absolutePath)
       if (!stat.isFile()) {
         this.emitSkipped(req, 'not-found')
-        return 'skipped:hash'
+        return 'skipped:not-found'
       }
       newHash = await computeFileHash(absolutePath)
     } catch {
       this.emitSkipped(req, 'not-found')
-      return 'skipped:hash'
+      return 'skipped:not-found'
     }
 
     // Step 2: hash gate. Skip regeneration only when content, language AND prompt
@@ -291,20 +340,17 @@ export class FileSummaryManager {
       return 'skipped:hash'
     }
 
-    // Step 3: per-job cap.
+    // Step 3: per-job cap — PRE-CHECK ONLY. The counter is incremented in pump()
+    // when a generation actually STARTS, so budget-skipped / TTL-dropped / failed
+    // requests never consume a per-job slot (the cap counts generations, not
+    // attempts). pump() re-checks the cap at start to catch the case where
+    // several requests passed this pre-check before any started.
     if (req.jobId) {
       const count = this.jobCounter.get(req.jobId) ?? 0
       if (count >= this.perJobCap) {
         this.emitSkipped(req, 'per-job-cap')
         return 'skipped:per-job-cap'
       }
-      // Bound the map: drop the oldest counters if it grows unreasonably large
-      // over a long hub session (the cap is best-effort, so a reset is harmless).
-      if (!this.jobCounter.has(req.jobId) && this.jobCounter.size >= this.maxJobCounters) {
-        const oldest = this.jobCounter.keys().next().value
-        if (oldest !== undefined) this.jobCounter.delete(oldest)
-      }
-      this.jobCounter.set(req.jobId, count + 1)
     }
 
     // Step 4: budget cap. Applies to job- AND user-triggered requests; the only
@@ -338,21 +384,51 @@ export class FileSummaryManager {
   }
 
   private pump(projectId: string): void {
+    if (this._disposed) return
     const queue = this.queues.get(projectId) ?? []
     while (queue.length > 0) {
-      if (this.hubInFlight >= this.hubConcurrency) break
+      if (HUB.inFlight >= this.hubConcurrency) break
       const perProject = this.inFlightPerProject.get(projectId) ?? 0
       if (perProject >= this.perProjectConcurrency) break
       const entry = queue.shift()!
-      // TTL check before starting.
       const now = (this.deps.now ?? Date.now)()
+      // TTL drop before starting. Distinct 'skipped:ttl' (not 'skipped:hash') so
+      // the regenerate route can tell the user it was dropped, not silently 202.
       if (now - entry.enqueuedAt > this.queueTtlMs) {
         this.emitSkipped(entry.req, 'ttl')
-        entry.resolve('skipped:hash')
+        entry.resolve('skipped:ttl')
         continue
       }
+      // Budget re-check at dequeue: an entry that crossed the monthly cap while
+      // waiting in the queue is skipped instead of spending, bounding the
+      // concurrent-overshoot window to the in-flight set.
+      if (!entry.req.overrideBudget) {
+        const spend = this.deps.monthToDateSpend(entry.req.projectId)
+        const budget = this.deps.monthlyBudgetUsd()
+        if (spend >= budget) {
+          this.emitSkipped(entry.req, 'budget')
+          entry.resolve('skipped:budget')
+          continue
+        }
+      }
+      // Per-job cap re-check + increment at START, so the counter measures
+      // generations actually run (not enqueue attempts) and several requests that
+      // passed the enqueue pre-check can't collectively exceed the cap.
+      if (entry.req.jobId) {
+        const count = this.jobCounter.get(entry.req.jobId) ?? 0
+        if (count >= this.perJobCap) {
+          this.emitSkipped(entry.req, 'per-job-cap')
+          entry.resolve('skipped:per-job-cap')
+          continue
+        }
+        if (!this.jobCounter.has(entry.req.jobId) && this.jobCounter.size >= this.maxJobCounters) {
+          const oldest = this.jobCounter.keys().next().value
+          if (oldest !== undefined) this.jobCounter.delete(oldest)
+        }
+        this.jobCounter.set(entry.req.jobId, count + 1)
+      }
       this.inFlightPerProject.set(projectId, perProject + 1)
-      this.hubInFlight += 1
+      HUB.inFlight += 1
       const p = this.runOne(entry)
         .catch((err) => entry.reject(err))
         .finally(() => {
@@ -360,14 +436,22 @@ export class FileSummaryManager {
             projectId,
             (this.inFlightPerProject.get(projectId) ?? 1) - 1,
           )
-          this.hubInFlight -= 1
+          HUB.inFlight -= 1
           this.pending.delete(p)
           this.pump(projectId)
+          // A freed hub-wide slot may unblock OTHER projects' managers.
+          for (const m of HUB.managers) if (m !== this) m._drainAll()
         })
       this.pending.add(p)
     }
     if (queue.length === 0) this.queues.delete(projectId)
     else this.queues.set(projectId, queue)
+  }
+
+  /** Pump every project queue this manager owns (used when a hub-wide slot frees
+   *  up in a different manager). */
+  private _drainAll(): void {
+    for (const pid of [...this.queues.keys()]) this.pump(pid)
   }
 
   private async runOne(entry: QueueEntry): Promise<void> {
@@ -384,7 +468,7 @@ export class FileSummaryManager {
       fileHash = entry.newHash || (await computeFileHash(absolutePath))
     } catch {
       this.emitSkipped(req, 'not-found')
-      entry.resolve('skipped:hash')
+      entry.resolve('skipped:not-found')
       return
     }
 
@@ -399,13 +483,21 @@ export class FileSummaryManager {
     }
 
     const lang: SummaryLanguage = (this.deps.language?.() ?? 'en')
+    const controller = new AbortController()
+    this.activeControllers.add(controller)
     try {
       const out = await this.deps.generate({
         relPath: req.relPath,
         contents: promptContents,
         truncated,
         language: lang,
-      })
+      }, controller.signal)
+      // The project may have been removed (and its DB closed) while the provider
+      // ran. Skip all DB/disk/broadcast work so we never touch a closed handle.
+      if (this._disposed) {
+        entry.resolve('failed')
+        return
+      }
       const payload: SummaryPayload = {
         schemaVersion: 1,
         path: req.relPath,
@@ -413,7 +505,7 @@ export class FileSummaryManager {
         summary: out.summary,
         language: lang,
         generatedAt: new Date((this.deps.now ?? Date.now)()).toISOString(),
-        generatedBy: { model: out.model, promptVersion: 1, truncated },
+        generatedBy: { model: out.model, promptVersion: CURRENT_PROMPT_VERSION, truncated },
         triggeredBy: req.triggeredBy,
       }
       writeSummary(req.projectPath, req.relPath, payload)
@@ -451,25 +543,37 @@ export class FileSummaryManager {
       this.deps.broadcast({ type: 'spending.invalidated', projectId: req.projectId })
       entry.resolve('enqueued')
     } catch (err) {
+      // Disposed mid-flight (project removed) — DB is closed; skip all writes.
+      if (this._disposed) {
+        entry.resolve('failed')
+        return
+      }
       const reason = err instanceof Error ? err.message : String(err)
+      // A timeout/abort kills the child AFTER the provider may have billed tokens.
+      // The generator attaches whatever usage it captured so the failed row (and
+      // therefore the monthly-budget reader) accounts for that real spend instead
+      // of recording a misleading $0.
+      const partial = (err as { partial?: Partial<GenerateOutput> }).partial
       try {
         recordInvocation(this.deps.db, {
           id: randomUUID(),
           project_id: req.projectId,
-          provider: this.deps.providerId?.() ?? 'claude',
+          provider: partial?.provider ?? this.deps.providerId?.() ?? 'claude',
           surface: 'file-summary' as Surface,
           surface_ref_id: req.jobId ?? null,
           ticket_id: req.triggeredBy.ticketId,
           status: 'failed',
           started_at: startedIso,
           finished_at: new Date((this.deps.now ?? Date.now)()).toISOString(),
-          model: undefined,
-          total_cost_usd: 0,
-          tokens_in: 0,
-          tokens_out: 0,
-          duration_ms: 0,
+          model: partial?.model,
+          total_cost_usd: partial?.costUsd ?? 0,
+          tokens_in: partial?.tokensIn ?? 0,
+          tokens_out: partial?.tokensOut ?? 0,
+          tokens_cache_read: partial?.tokensCacheRead,
+          tokens_cache_create: partial?.tokensCacheCreate,
+          duration_ms: partial?.durationMs ?? 0,
           num_turns: 1,
-          total_cost_usd_estimated: false,
+          total_cost_usd_estimated: !!partial?.costEstimated,
         })
       } catch (recErr) {
         // ai_invocations write failures must not crash the manager, but log so
@@ -486,6 +590,8 @@ export class FileSummaryManager {
       // Resolve with 'failed' (not 'enqueued') so a caller awaiting enqueue()
       // can distinguish a failed generation from a successful one.
       entry.resolve('failed')
+    } finally {
+      this.activeControllers.delete(controller)
     }
   }
 
@@ -498,6 +604,11 @@ export class FileSummaryManager {
   attachWatcher(projectId: string, projectPath: string): void {
     if (this.watchers.has(projectId)) return
     this.knownSummaries.set(projectId, this.scanKnownSummaries(projectPath))
+    // Reclaim summary JSON files whose source file was renamed/deleted since the
+    // last session. Runs once per project per session (attachWatcher is
+    // idempotent) and is capped at 200/pass inside sweepOrphans. The chokidar
+    // watcher only sees 'change', never 'unlink', so this is the only reaper.
+    try { sweepOrphans(projectPath) } catch { /* best effort */ }
     // CRITICAL: prune build/dep trees (node_modules, dist, target, src-tauri/target,
     // dot-dirs, …) from the recursive watch. Watching a Rust/Tauri `target/` tree
     // opened ~10k file descriptors and broke terminal spawning under fd pressure.
@@ -549,14 +660,39 @@ export class FileSummaryManager {
     this.knownSummaries.delete(projectId)
   }
 
-  /** Close every watcher. Called on graceful server shutdown so chokidar's
-   *  underlying fsevents/inotify handles are released, never leaked. */
-  disposeAll(): void {
+  /** Full teardown for a single manager: stop accepting work, abort any in-flight
+   *  provider child (so it is not orphaned past project removal), reject queued
+   *  entries, close watchers, and leave the shared hub registry. Call from
+   *  ProjectRegistry.removeProject (before db.close) and from shutdown(). After
+   *  this, runOne's `_disposed` guard skips all DB/disk writes. Idempotent. */
+  dispose(): void {
+    if (this._disposed) return
+    this._disposed = true
+    HUB.managers.delete(this)
+    // Abort in-flight generations → generator treeKills the provider child.
+    for (const c of this.activeControllers) {
+      try { c.abort() } catch { /* best effort */ }
+    }
+    this.activeControllers.clear()
+    // Reject still-queued entries so awaiting callers settle (skipped, not hung).
+    for (const [, queue] of this.queues) {
+      for (const entry of queue) {
+        try { this.emitSkipped(entry.req, 'not-found'); entry.resolve('skipped:not-found') } catch { /* best effort */ }
+      }
+    }
+    this.queues.clear()
+    this.inFlightByKey.clear()
     for (const [, state] of this.watchers) {
       try { void state.watcher.close() } catch { /* best effort */ }
     }
     this.watchers.clear()
     this.knownSummaries.clear()
+  }
+
+  /** Close every watcher. Called on graceful server shutdown so chokidar's
+   *  underlying fsevents/inotify handles are released, never leaked. */
+  disposeAll(): void {
+    this.dispose()
   }
 
   async flush(): Promise<void> {

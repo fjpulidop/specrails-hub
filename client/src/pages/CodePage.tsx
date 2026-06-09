@@ -161,6 +161,7 @@ export default function CodePage() {
     <div ref={containerRef} className="flex h-full w-full" data-testid="code-page">
       <aside className="overflow-hidden flex flex-col shrink-0" style={{ width: treeWidth }}>
         <FileTree
+          key={activeProjectId ?? 'no-project'}
           onOpenFile={onOpenFile}
           selectedPath={relPath}
           filterJobId={jobId}

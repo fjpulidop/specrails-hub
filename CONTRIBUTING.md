@@ -4,10 +4,11 @@ Thank you for your interest in contributing to specrails-hub. This document cove
 
 ## Prerequisites
 
-- **Node.js** >= 20 (matches the specrails-core ≥ 4.2.0 engine requirement)
-- **npm** >= 10
-- **claude** CLI on your PATH ([Claude Code](https://claude.ai/claude-code)) — needed to test job spawning
-- **OS:** macOS, Linux, or Windows 10/11 (1809+). The hub is cross-platform; the desktop build ships as `.dmg` (macOS) and `.exe`/`.msi` (Windows). See [docs/windows.md](docs/windows.md) for Windows-specific notes.
+- **Node.js** >= 20 (hub requirement, declared in `package.json` engines; CI runs Node 20)
+- **npm** 9+
+- **claude** CLI on your PATH ([Claude Code](https://claude.com/claude-code)) — needed to test job spawning
+- **codex** CLI on your PATH (optional) — second supported provider; needed only to test the multi-provider paths. See [docs/codex.md](docs/codex.md) and the internals guide [docs/internals/adding-a-provider.md](docs/internals/adding-a-provider.md).
+- **OS:** macOS, Linux, or Windows 10/11 (1809+). The hub is cross-platform; the desktop build ships as `.dmg` (macOS) and `.exe`/`.msi` (Windows). See [docs/platforms/windows.md](docs/platforms/windows.md) for Windows-specific notes.
 
 ## Local Setup
 
@@ -24,6 +25,16 @@ cd client && npm install && cd ..
 
 > **Note:** This repo has two separate `node_modules` trees — one at the root (server + CLI) and one inside `client/` (Vite + React). Both installs are required. If you see `sh: tsc: command not found` during `npm run build`, one of them is missing.
 
+### Git hooks
+
+Enable the repo's git hooks so a secret scan runs before every commit (it mirrors the gitleaks gate CI enforces) plus a commit-message helper:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This wires up `.githooks/pre-commit` (staged-file secret scan) and `.githooks/prepare-commit-msg`. Do this once after cloning to avoid pushing secrets that CI will reject.
+
 ## Project Structure
 
 ```
@@ -31,10 +42,13 @@ specrails-hub/
 ├── cli/          # CLI bridge (specrails-hub command)
 ├── client/       # Web UI (Vite + React + Tailwind v4)
 ├── server/       # Express server (API + WebSocket + SQLite)
+├── src-tauri/    # Tauri v2 desktop shell (Rust host + bundling)
 ├── docs/         # Documentation portal source
 ├── CLAUDE.md     # Claude Code project instructions
 └── CONTRIBUTING.md
 ```
+
+> The desktop app is built with [Tauri v2](https://tauri.app). Most PRs don't touch it; if you do, `npm run dev:desktop` runs the desktop build in dev and `npm run build:desktop` produces a bundle.
 
 ## Running Locally
 
@@ -49,9 +63,11 @@ The client (port 4201) proxies all `/api` and `/hooks` requests to the server (p
 ## Running Tests
 
 ```bash
-npm test             # Run vitest (server + CLI tests)
+npm test             # Run vitest (server + CLI tests), then the core-compat contract check
 npm run test:watch   # Vitest in watch mode
 ```
+
+`npm test` runs `vitest run` and then `tsx scripts/check-core-compat.ts`, which validates the hub's checkpoints/verbs against specrails-core (it exits 0 cleanly if core isn't installed locally).
 
 Run a single file:
 
@@ -60,6 +76,31 @@ npx vitest run server/db.test.ts
 ```
 
 Tests use `:memory:` SQLite databases. No cleanup or external services required.
+
+## Coverage
+
+**Coverage is a hard CI gate — PRs below threshold are blocked.** Mirror the CI checks locally before pushing:
+
+```bash
+npm run test:coverage              # server + CLI coverage
+cd client && npm run test:coverage # client coverage
+```
+
+Enforced thresholds:
+
+| Scope  | Lines | Functions | Statements | Branches |
+|--------|-------|-----------|------------|----------|
+| Global | 70%   | 70%       | 70%        | —        |
+| Server | 80%   | 80%       | 80%        | 70%      |
+| Client | 80%   | 70%       | 80%        | —        |
+
+If a change drops coverage below these, add tests until every threshold passes — never lower the thresholds.
+
+You can reproduce the full CI run with one command:
+
+```bash
+npm run ci   # typecheck + npm test + server coverage + client coverage
+```
 
 ## TypeScript Check
 
@@ -75,7 +116,10 @@ Both `server/` and `client/` have separate TypeScript configurations. Typecheck 
 2. Make your changes. Keep PRs small and focused — one concern per PR.
 3. Run `npm run typecheck` — fix any TypeScript errors.
 4. Run `npm test` — all tests must pass.
-5. Run `npm run build` — verify there are no build errors.
+5. Run `npm run test:coverage` (and `cd client && npm run test:coverage`) — every threshold must pass.
+6. Run `npm run build` — verify there are no build errors.
+
+Tip: `npm run ci` runs typecheck + tests + both coverage gates in one shot.
 
 ## Conventions
 
@@ -110,7 +154,7 @@ feat!: change WebSocket message protocol format
 
 - Target the `main` branch.
 - Write a clear PR description: what problem does it solve, how was it tested.
-- CI must pass (typecheck + vitest) before merge.
+- CI must pass before merge: a **gitleaks** secret scan, **typecheck**, **tests** (`npm test`), and the **coverage gates** (server + client). The coverage gate is the most common contributor PR failure — run it locally first.
 - One approving review required.
 - Tag your PR with the appropriate label (`feat`, `fix`, `docs`, `chore`).
 
@@ -119,7 +163,7 @@ feat!: change WebSocket message protocol format
 - Write tests for all critical paths
 - Use real SQLite `:memory:` databases — do not mock the database
 - Server-side tests go in `server/*.test.ts`
-- Client-side tests go in `client/src/**/__tests__/*.test.tsx`
+- Client-side tests match `client/src/**/*.test.ts` or `*.test.tsx` — colocated next to the source they cover, or under a `__tests__/` folder
 
 ```typescript
 // Good: real in-memory DB
@@ -135,6 +179,12 @@ Use [GitHub Issues](https://github.com/fjpulidop/specrails-hub/issues). Include:
 - Your OS and Node.js version
 - The command you ran
 - The full error output or screenshot
+
+**Found a security vulnerability?** Do not open a public issue — follow the disclosure process in [SECURITY.md](SECURITY.md).
+
+## Code of Conduct
+
+By participating in this project you agree to abide by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 

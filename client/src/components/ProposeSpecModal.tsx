@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
-import { Sparkles, Send, Zap, MessagesSquare, Globe, Ratio } from 'lucide-react'
+import { Sparkles, Send, Zap, MessagesSquare, Globe, Ratio, PenLine } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
@@ -10,7 +10,7 @@ import { deleteAllAttachments } from '../lib/attachments'
 import { RichAttachmentEditor, type RichAttachmentEditorHandle } from './RichAttachmentEditor'
 import { SpecModelPicker, useDefaultSpecModel } from './explore-spec/SpecModelPicker'
 import { AiEngineSelector } from './AiEngineSelector'
-import type { LocalTicket } from '../types'
+import type { LocalTicket, TicketPriority } from '../types'
 import { ContextScopeChecks } from './ContextScopeChecks'
 import { ContextScopeSlider } from './ContextScopeSlider'
 import { isSmashCapable } from '../lib/provider-capabilities'
@@ -18,7 +18,7 @@ import { getLastEngine, setLastEngine } from '../lib/last-engine'
 import { useContextScope } from '../hooks/useContextScope'
 import { useContextBudget } from '../hooks/useContextBudget'
 import { useQuickContractRefineLast } from '../hooks/useQuickContractRefineLast'
-import { quickHintForScope, tierFromScope, submitAccentForTier, type ContextScope } from '../types/context-scope'
+import { quickHintForScope, tierFromScope, submitAccentForTier, type ContextScope, type SpecMode } from '../types/context-scope'
 import { BrowserCaptureModal } from './browser-capture/BrowserCaptureModal'
 import { CapturedDomPanel } from './browser-capture/CapturedDomPanel'
 import { isBrowserCaptureEnabled, type CaptureResult, type CapturedDom } from '../lib/browser-capture'
@@ -40,7 +40,19 @@ interface BrowserCaptureEntry {
   breakpoints?: BrowserCaptureBreakpoint[]
 }
 
-type SpecMode = 'quick' | 'explore'
+/** Premium presentation classes for the Raw-mode priority pill selector.
+ *  Distinct from the board cards' `PRIORITY_VARIANT` — tuned for the modal
+ *  surface (info/muted palette). Semantic theme tokens only. */
+const RAW_PRIORITY_CLASS: Record<TicketPriority, string> = {
+  critical: 'bg-destructive/15 text-destructive',
+  high: 'bg-accent-warning/15 text-accent-warning',
+  medium: 'bg-accent-info/15 text-accent-info',
+  low: 'bg-muted text-muted-foreground',
+}
+const RAW_PRIORITY_LABEL: Record<TicketPriority, string> = {
+  critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low',
+}
+const RAW_PRIORITY_ORDER: readonly TicketPriority[] = ['critical', 'high', 'medium', 'low']
 
 export interface ExploreLaunchPayload {
   idea: string
@@ -91,6 +103,14 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
   const editorRef = useRef<RichAttachmentEditorHandle | null>(null)
   const submittedRef = useRef(false)
   const scopeTouchedRef = useRef(false)
+
+  // Raw mode ("free") — the user's prompt is saved verbatim as a spec, no AI.
+  // Title auto-derives from the first non-empty line of the body until the user
+  // edits it (titleTouchedRef). Priority defaults to medium; labels optional.
+  const [title, setTitle] = useState('')
+  const titleTouchedRef = useRef(false)
+  const [priority, setPriority] = useState<TicketPriority>('medium')
+  const [labels, setLabels] = useState<string[]>([])
 
   // AI Engine (multi-provider). null until the first fetch resolves the
   // project's providers; then initialised to the last-used engine (default =
@@ -156,8 +176,12 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
       setEngine(null)
       setBrowserOpen(false)
       setCaptures([])
+      setTitle('')
+      setPriority('medium')
+      setLabels([])
       submittedRef.current = false
       scopeTouchedRef.current = false
+      titleTouchedRef.current = false
       // defer to let dialog mount; reset any user-resized height so the modal
       // always opens at the configured minHeight, then focus the editor.
       setTimeout(() => {
@@ -237,6 +261,53 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     const projectId = activeProjectIdRef.current
     if (!projectId) return
 
+    // Raw mode: persist the prompt verbatim as a spec ticket. No AI runs — a
+    // direct create against /tickets/from-prompt (status='todo', ready for
+    // rails). The editor text is the description; title falls back to a
+    // server-derived single line when left blank.
+    if (mode === 'free') {
+      // Raw mode is self-contained: the spec body is exactly the editor text
+      // and only the editor's own attachments ride along (browser captures are
+      // a Quick/Explore concept and are intentionally ignored here, even if the
+      // user switched modes after capturing).
+      const description = editorRef.current?.getPlainText().trim() ?? ''
+      if (!description) return
+      const rawAttachmentIds = editorRef.current?.getAttachmentIds() ?? []
+      submittedRef.current = true // suppress attachment cleanup on close
+      setIsSubmitting(true)
+      try {
+        const res = await fetch(`${API_ORIGIN}/api/projects/${projectId}/tickets/from-prompt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            description,
+            title: title.trim() || undefined,
+            labels: labels.length > 0 ? labels : undefined,
+            priority,
+            structured: false,
+            attachmentIds: rawAttachmentIds,
+            pendingSpecId,
+          }),
+        })
+        if (!res.ok) {
+          submittedRef.current = false
+          toast.error('Failed to create spec')
+          return
+        }
+        const data = await res.json().catch(() => ({})) as { ticket?: { id?: number } }
+        const newId = data.ticket?.id
+        toast.success(newId ? `Saved as #${newId} · Raw spec ready for rails` : 'Raw spec created')
+        onClose()
+      } catch (err) {
+        submittedRef.current = false
+        console.error('[ProposeSpec] from-prompt failed:', err)
+        toast.error('Failed to create spec')
+      } finally {
+        setIsSubmitting(false)
+      }
+      return
+    }
+
     // Explore mode: hand off to the parent (which owns the overlay
     // lifecycle so the conversation can survive modal close — i.e. minimize
     // to dock). Attachments uploaded into pendingSpecId are carried through
@@ -312,7 +383,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     } finally {
       setIsSubmitting(false)
     }
-  }, [mode, tickets, tracker, pendingSpecId, onClose, onExploreLaunch, model, quickRefine, scope, effectiveProvider, captures])
+  }, [mode, tickets, tracker, pendingSpecId, onClose, onExploreLaunch, model, quickRefine, scope, effectiveProvider, captures, title, priority, labels])
 
   return (
     <>
@@ -337,51 +408,173 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
           <div className="flex flex-col p-5 gap-4 flex-1 min-h-0 overflow-y-auto">
             <div className="flex items-center justify-between gap-3">
               <ModeSegmented value={mode} onChange={setMode} fullCodebase={scope.full} />
-              <div className="flex items-center gap-2">
-                <AiEngineSelector
-                  value={effectiveProvider ?? 'claude'}
-                  providers={providers}
-                  onChange={handleEngineChange}
-                  disabled={modelLoading}
-                  ariaLabel="AI engine for this spec"
-                />
-                <SpecModelPicker
-                  value={model}
-                  allowed={allowed}
-                  loading={modelLoading}
-                  onChange={setModel}
-                />
-              </div>
+              {mode !== 'free' && (
+                <div className="flex items-center gap-2">
+                  <AiEngineSelector
+                    value={effectiveProvider ?? 'claude'}
+                    providers={providers}
+                    onChange={handleEngineChange}
+                    disabled={modelLoading}
+                    ariaLabel="AI engine for this spec"
+                  />
+                  <SpecModelPicker
+                    value={model}
+                    allowed={allowed}
+                    loading={modelLoading}
+                    onChange={setModel}
+                  />
+                </div>
+              )}
             </div>
 
-            <div className="space-y-3">
-              <ContextScopeSlider
-                value={scope}
-                onChange={handleScopeChange}
-                budget={budget}
-                budgetError={budgetError}
-                model={model ?? 'sonnet'}
-                maxPresetId={mode === 'quick' ? 'max' : 'hub'}
-                smashCapable={smashCapable}
-              />
-              <ContextScopeChecks scope={scope} mode={mode} onChange={handleScopeChange} label="Fine-tune" showSummary={false} />
-            </div>
+            {mode !== 'free' && (
+              <div className="space-y-3">
+                <ContextScopeSlider
+                  value={scope}
+                  onChange={handleScopeChange}
+                  budget={budget}
+                  budgetError={budgetError}
+                  model={model ?? 'sonnet'}
+                  maxPresetId={mode === 'quick' ? 'max' : 'hub'}
+                  smashCapable={smashCapable}
+                />
+                <ContextScopeChecks scope={scope} mode={mode} onChange={handleScopeChange} label="Fine-tune" showSummary={false} />
+              </div>
+            )}
+
+            {mode === 'free' && (
+              <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-1 duration-150">
+                {/* Title — auto-derived from the first line of the body, editable. */}
+                <div className="flex items-center gap-3">
+                  <label htmlFor="raw-spec-title" className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                    Title
+                  </label>
+                  <input
+                    id="raw-spec-title"
+                    type="text"
+                    value={title}
+                    onChange={(e) => {
+                      // Any edit hands the field to the user: stop auto-deriving.
+                      // If they leave it blank, the server derives a title from
+                      // the body on submit (no dead/empty-title state).
+                      titleTouchedRef.current = true
+                      setTitle(e.target.value)
+                    }}
+                    placeholder="Auto-filled from your prompt…"
+                    data-testid="raw-title-input"
+                    className="flex-1 h-8 px-2.5 rounded-md bg-card/40 border border-border/40 text-sm text-foreground placeholder-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-info/40 focus-visible:border-accent-info/60 transition-colors"
+                  />
+                </div>
+
+                {/* Priority pills + optional labels. */}
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">Priority</span>
+                    <div
+                      role="radiogroup"
+                      aria-label="Priority"
+                      data-testid="raw-priority-group"
+                      className="inline-flex items-center gap-1 p-1 rounded-lg border border-border/50 bg-card/40"
+                    >
+                      {RAW_PRIORITY_ORDER.map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          role="radio"
+                          aria-checked={priority === p}
+                          tabIndex={priority === p ? 0 : -1}
+                          onClick={() => setPriority(p)}
+                          onKeyDown={(e) => {
+                            const i = RAW_PRIORITY_ORDER.indexOf(priority)
+                            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                              e.preventDefault()
+                              setPriority(RAW_PRIORITY_ORDER[Math.min(i + 1, RAW_PRIORITY_ORDER.length - 1)])
+                            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                              e.preventDefault()
+                              setPriority(RAW_PRIORITY_ORDER[Math.max(i - 1, 0)])
+                            }
+                          }}
+                          className={`px-2 py-1 rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-info/40 ${
+                            priority === p ? RAW_PRIORITY_CLASS[p] : 'text-muted-foreground hover:text-foreground hover:bg-card/60'
+                          }`}
+                        >
+                          {RAW_PRIORITY_LABEL[p]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-1 min-w-[12rem]">
+                    <span className="text-xs font-medium text-muted-foreground">Labels</span>
+                    <div className="flex-1 flex items-center flex-wrap gap-1 px-2 py-1 rounded-md border border-border/40 bg-card/40">
+                      {labels.map((label) => (
+                        <span
+                          key={label}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-accent-info/15 text-accent-info text-[10px] font-medium"
+                        >
+                          {label}
+                          <button
+                            type="button"
+                            aria-label={`Remove label ${label}`}
+                            onClick={() => setLabels((ls) => ls.filter((l) => l !== label))}
+                            className="text-accent-info/60 hover:text-accent-info"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <input
+                        type="text"
+                        aria-label="Add label"
+                        data-testid="raw-label-input"
+                        placeholder={labels.length ? '' : 'optional…'}
+                        className="flex-1 min-w-[4rem] bg-transparent text-xs text-foreground placeholder-muted-foreground/50 focus-visible:outline-none"
+                        onKeyDown={(e) => {
+                          const el = e.target as HTMLInputElement
+                          const v = el.value.trim()
+                          if (e.key === 'Enter' && v) {
+                            e.preventDefault()
+                            setLabels((ls) => (ls.includes(v) ? ls : [...ls, v]))
+                            el.value = ''
+                          } else if (e.key === 'Backspace' && !v && labels.length) {
+                            setLabels((ls) => ls.slice(0, -1))
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <p className="text-sm text-muted-foreground">
               {mode === 'quick'
                 ? 'Describe the feature or change. Attach mockups, briefs, or data for more context.'
-                : 'Describe a rough idea. Claude will help you shape it through conversation — you decide when to commit.'}
+                : mode === 'explore'
+                  ? 'Describe a rough idea. Claude will help you shape it through conversation — you decide when to commit.'
+                  : 'Your prompt, as-is — saved as a spec ticket. No AI runs now; drag it to a rail to build it.'}
             </p>
             <RichAttachmentEditor
               ref={editorRef}
               ticketKey={pendingSpecId}
               placeholder={mode === 'quick'
                 ? "e.g. Add a dark mode toggle to the settings page that persists the user's preference..."
-                : "e.g. dark mode — not sure where the toggle should live or how to persist it…"}
-              minHeight={160}
+                : mode === 'explore'
+                  ? "e.g. dark mode — not sure where the toggle should live or how to persist it…"
+                  : 'Describe the feature, change, or idea. Markdown, images, and files supported…'}
+              minHeight={mode === 'free' ? 220 : 160}
               autoFocus
-              ariaLabel="Spec idea"
-              onChange={() => setHasText((editorRef.current?.getPlainText().length ?? 0) > 0)}
+              ariaLabel={mode === 'free' ? 'Raw spec body' : 'Spec idea'}
+              onChange={() => {
+                const text = editorRef.current?.getPlainText() ?? ''
+                setHasText(text.trim().length > 0)
+                // Raw mode: keep the title in sync with the first non-empty line
+                // until the user takes over the field.
+                if (mode === 'free' && !titleTouchedRef.current) {
+                  const firstLine = text.split('\n').find((l) => l.trim().length > 0)?.trim().slice(0, 120) ?? ''
+                  setTitle(firstLine)
+                }
+              }}
               onAttachmentAdded={() => setAttachmentCount((c) => c + 1)}
               onAttachmentRemoved={(a) => {
                 setAttachmentCount((c) => Math.max(0, c - 1))
@@ -390,7 +583,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
               onUnsupportedFile={(f) => toast.error(`Unsupported file type: ${f.name}`)}
               onUploadError={(err, f) => toast.error(`Upload failed for ${f.name}: ${err.message}`)}
               onSubmit={handleSubmit}
-              footerExtra={browserCaptureEnabled && activeProjectId ? (
+              footerExtra={mode !== 'free' && browserCaptureEnabled && activeProjectId ? (
                 <button
                   type="button"
                   onClick={() => setBrowserOpen(true)}
@@ -403,7 +596,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                 </button>
               ) : undefined}
             />
-            {captures.length > 0 && (
+            {mode !== 'free' && captures.length > 0 && (
               <div className="space-y-3" data-testid="captured-dom-list">
                 {captures.map((c) => (
                   <div key={c.domAttachmentId} className="space-y-1.5">
@@ -451,11 +644,12 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                 size="sm"
                 onClick={handleSubmit}
                 disabled={!canSubmit}
-                className={`gap-1.5 ${submitAccentForTier(tier)}`}
+                title={!canSubmit ? 'Write a prompt first' : undefined}
+                className={`gap-1.5 ${mode === 'free' ? 'bg-accent-info text-white hover:bg-accent-info/90' : submitAccentForTier(tier)}`}
                 data-testid="propose-submit"
               >
-                <Send className="w-3.5 h-3.5" />
-                {mode === 'quick' ? 'Generate Spec' : 'Continue'}
+                {mode === 'free' ? <PenLine className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+                {mode === 'quick' ? 'Generate Spec' : mode === 'explore' ? 'Continue' : 'Create'}
               </Button>
             </div>
           </div>
@@ -493,6 +687,13 @@ function ModeSegmented({
         label="Explore"
         hint="interactive"
         onClick={() => onChange('explore')}
+      />
+      <ModeOption
+        active={value === 'free'}
+        icon={<PenLine className="w-3.5 h-3.5" />}
+        label="Raw"
+        hint="no AI"
+        onClick={() => onChange('free')}
       />
     </div>
   )

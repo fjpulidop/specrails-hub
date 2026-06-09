@@ -290,4 +290,23 @@ describe('SpecCard', () => {
       expect(container.innerHTML).toMatch(/accent-secondary/)
     })
   })
+
+  describe('Raw badge', () => {
+    it('renders a Raw badge for a free-prompt ticket', () => {
+      render(<SpecCard ticket={makeTicket({ source: 'free-prompt' })} onClick={onClickMock} />)
+      expect(screen.getByTestId('raw-badge-42')).toBeInTheDocument()
+      expect(screen.getByText('Raw')).toBeInTheDocument()
+    })
+
+    it('shows the priority pill alongside the Raw badge', () => {
+      render(<SpecCard ticket={makeTicket({ source: 'free-prompt', priority: 'high' })} onClick={onClickMock} />)
+      expect(screen.getByTestId('raw-badge-42')).toBeInTheDocument()
+      expect(screen.getByText('high')).toBeInTheDocument()
+    })
+
+    it('does not render a Raw badge for non-free-prompt tickets', () => {
+      render(<SpecCard ticket={makeTicket({ source: 'propose-spec' })} onClick={onClickMock} />)
+      expect(screen.queryByTestId('raw-badge-42')).not.toBeInTheDocument()
+    })
+  })
 })

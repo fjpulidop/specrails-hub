@@ -7,6 +7,7 @@ import Database from 'better-sqlite3'
 import type { DbInstance } from './db'
 import {
   snapshotWorkingTree,
+  resolveHeadSha,
   diffAgainstSnapshot,
   collectDiffPatches,
   recordProvenanceForJob,
@@ -78,6 +79,35 @@ describe('snapshotWorkingTree', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it('freezes the HEAD sha even when the tree is clean (no stash ref)', () => {
+    const dir = initGitRepo()
+    try {
+      const head = execSync('git rev-parse HEAD', { cwd: dir, encoding: 'utf8' }).trim()
+      const snap = snapshotWorkingTree(dir)
+      expect(snap.ref).toBe('')
+      expect(snap.headSha).toBe(head)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('resolveHeadSha', () => {
+  it('returns the 40-char HEAD sha inside a repo and "" outside one', () => {
+    const dir = initGitRepo()
+    try {
+      expect(resolveHeadSha(dir)).toMatch(/^[0-9a-f]{40}$/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+    const nonRepo = mkdtempSync(join(tmpdir(), 'fp-norepo-'))
+    try {
+      expect(resolveHeadSha(nonRepo)).toBe('')
+    } finally {
+      rmSync(nonRepo, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('diffAgainstSnapshot', () => {
@@ -103,6 +133,39 @@ describe('diffAgainstSnapshot', () => {
       expect(byPath.get('m.txt')?.status).toBe('M')
       expect(byPath.get('d.txt')?.status).toBe('D')
       expect(byPath.get('added.txt')?.status).toBe('A')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('clean tree + committing job: recovers the delta via the frozen headSha (regression for lost provenance)', () => {
+    const dir = initGitRepo()
+    try {
+      // Clean tree at snapshot time → no stash ref, headSha frozen at pre-job HEAD.
+      const snap = snapshotWorkingTree(dir)
+      expect(snap.ref).toBe('')
+
+      // Job creates + modifies + COMMITS its output, advancing HEAD past the work.
+      writeFileSync(join(dir, 'feature.txt'), 'feature\n')
+      appendFileSync(join(dir, 'a.txt'), 'edit by job\n')
+      execSync('git add -A', { cwd: dir })
+      execSync('git commit -q -m "job output"', { cwd: dir })
+
+      // Old behavior (no baseSha) diffs against the ADVANCED live HEAD → empty,
+      // which is exactly how all provenance was silently lost.
+      const stale = diffAgainstSnapshot(dir, snap.ref, snap.untracked)
+      expect(stale).toEqual([])
+
+      // Fixed: passing the frozen headSha recovers created + modified rows.
+      const entries = diffAgainstSnapshot(dir, snap.ref, snap.untracked, snap.headSha)
+      const byPath = new Map(entries.map((e) => [e.path, e]))
+      expect(byPath.get('feature.txt')?.status).toBe('A')
+      expect(byPath.get('a.txt')?.status).toBe('M')
+
+      // Patches are likewise recovered (collectDiffPatches honours baseSha).
+      const patches = collectDiffPatches(dir, snap.ref, entries, snap.headSha)
+      expect(patches.get('a.txt')?.patch).toContain('edit by job')
+      expect(collectDiffPatches(dir, snap.ref, entries).get('a.txt')).toBeUndefined()
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

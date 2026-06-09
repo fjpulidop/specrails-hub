@@ -251,6 +251,16 @@ export function TicketPostitCard({
                 Epic{epicChildrenCount ? ` · ${epicChildrenCount}` : ''}
               </Badge>
             )}
+            {ticket.source === 'free-prompt' && (
+              <Badge
+                variant="outline"
+                className="h-4 px-1.5 text-[9px] uppercase border-accent-info/50 text-accent-info"
+                title="Raw spec — no AI generation at intake"
+                data-testid={`raw-badge-${ticket.id}`}
+              >
+                Raw
+              </Badge>
+            )}
             {ticket.priority && !isDraft && (
               <Badge variant={PRIORITY_VARIANT[ticket.priority]} className="h-4 px-1.5 text-[9px] uppercase">
                 {ticket.priority}

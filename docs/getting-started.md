@@ -4,11 +4,10 @@ This guide walks you from "I just heard about specrails-hub" to "I just shipped 
 
 ## What you'll need
 
-- **Node.js 20+** on your PATH
-- **`claude` CLI** ([Claude Code](https://claude.com/claude-code)) signed in
-- **`git`**
-- An `ANTHROPIC_API_KEY` set in your shell so Claude can authenticate
+- **An AI CLI signed in** — either [Claude Code](https://claude.com/claude-code) (via Claude subscription login or an `ANTHROPIC_API_KEY`) or the Codex CLI. You can use one or both — see [Codex](codex.md).
 - A project you want to work on (any Git repository works)
+
+If you install with **npm** (Option 2 below) you'll also need **Node.js 20+** and **`git`** on your PATH. The **desktop app** bundles its own Node and Git runtimes, so you don't need those installed separately.
 
 That's it. specrails-hub will install specrails-core in your project on first run if it isn't there yet.
 
@@ -44,8 +43,9 @@ There are two ways. Pick whichever feels natural.
 
 1. Click **+** in the left sidebar.
 2. Enter the absolute path to your project (e.g. `/Users/you/repos/my-app`).
-3. The prerequisites panel verifies `node`, `npm`, `npx`, `git`. If anything's missing, the panel surfaces OS-aware install commands you can copy.
-4. Click **Add**.
+3. Pick your **AI providers**. Check **Claude**, **Codex**, or both — when you select both, the first one becomes the project default. The provider set is fixed once the project is created.
+4. The prerequisites panel verifies `node`, `npm`, `npx`, `git`. If anything's missing, the panel surfaces OS-aware install commands you can copy.
+5. Click **Add**.
 
 **From the CLI:**
 
@@ -59,10 +59,10 @@ specrails-hub list   # verify
 The setup wizard runs automatically. Three steps:
 
 1. **Configure** — choose which agents to install (the baseline trio `sr-architect`, `sr-developer`, `sr-reviewer` is always selected; optional agents like Test Writer or Security Reviewer are opt-in). Pick a model preset (Balanced / Budget / Max) and optionally override the model per agent.
-2. **Install** — the hub runs the installer (`npx specrails-core@latest init --from-config`) and streams the output live.
+2. **Install** — the hub runs the installer (`npx specrails-core@latest init --yes --from-config <config>`) non-interactively and streams the output live.
 3. **Done** — a summary tells you how many agents and commands landed. Click **Continue to project**.
 
-That's the whole onboarding. No tier picker, no second wizard. You can re-run the install later from the Settings page if you want to change agents or models.
+That's the whole onboarding. No tier picker, no second wizard. You can manage agents and their per-agent models later from the **Agents** page (Profiles tab).
 
 ## Your first spec
 
@@ -77,17 +77,17 @@ When you already know what you want:
 3. (Optional) toggle **Enrich with Contract Layer** to get a structured block of names, data shapes, invariants, and a file touch list appended to the description.
 4. Hit Enter.
 
-Claude generates the full spec in one turn. A small toast at the bottom right shows live cost / turns / cancel.
+Your AI CLI generates the full spec in one turn. A small toast at the bottom right shows the project, the spec title, and live elapsed time ("Generating… 0:12") — it turns into a success or failure toast (with a **View** action) when generation finishes.
 
-### Explore mode — converse with Claude
+### Explore mode — converse with the AI
 
 When the spec needs shaping:
 
 1. Click **+ Add Spec → Explore**.
-2. (Optional) pick a context preset from the slider — `Minimal` (just your message) up to `Hub` (project files + MCPs + Contract Layer enrichment).
-3. Type a starting message. Claude responds with a live draft below.
+2. (Optional) pick a context preset from the slider — `Minimal` (just your message) up to `Hub` (the full codebase + Contract Layer enrichment + project and user-approved MCPs).
+3. Type a starting message. The AI responds with a live draft below.
 4. Iterate. Each turn updates the draft.
-5. Click **Save as Draft** to come back later, or **Commit** when the draft looks right.
+5. Click **Save as Draft** to come back later, or **Create Spec** when the draft looks right.
 
 The committed spec lands on your board with status `todo`.
 
@@ -96,10 +96,10 @@ The committed spec lands on your board with status `todo`.
 The right pane of the Dashboard is your **Rails** — execution lanes:
 
 1. Drag a spec card from the left pane onto a Rail.
-2. (Optional) pick an **agent profile** from the rail header. Without one, the rail runs in legacy mode (single orchestrator, no per-agent overrides).
+2. (Optional) pick an **agent profile** from the rail header. This picker only appears once the project has profiles (create them on the **Agents** page); otherwise the rail runs in legacy mode (single orchestrator, no per-agent overrides).
 3. Press **▶ Play** on the rail.
 
-The rail flips to running. The Jobs page (in the project navbar at the top) streams Claude's output live. You'll see the pipeline phases progress: Architect → Developer → Reviewer → Ship.
+The rail flips to running. The Jobs page (right sidebar) streams the AI's output live. When the slash command defines them, you'll see the pipeline phases progress: Architect → Developer → Reviewer → Ship.
 
 Token usage, duration, and cost are tracked per turn and surface in:
 
@@ -112,6 +112,8 @@ Token usage, duration, and cost are tracked per turn and surface in:
 - **[Creating specs](creating-specs.md)** — drafts, SMASH (decompose epics), Continue Editing (refine specs in place), Compare (side-by-side review).
 - **[Running pipelines](running-pipelines.md)** — agent profiles, plugins (Serena), telemetry export.
 - **[Tracking cost](tracking-cost.md)** — analytics deep dive and CSV exports.
+- **[Codex](codex.md)** — using the Codex CLI as a provider, alongside or instead of Claude.
+- **[Terminal panel](terminal.md)** — the built-in per-project terminal (toggle with `Cmd/Ctrl+J`).
 - **[Customising the hub](customizing.md)** — themes, terminal settings, kill switches.
 - **[CLI reference](cli.md)** — drive specrails-hub from the terminal.
 
@@ -131,7 +133,7 @@ On macOS, this usually means the hub was launched from Finder/Dock and didn't pi
 
 **The setup wizard fails on `npx specrails-core@latest init`**
 
-Most likely Node is missing or your `ANTHROPIC_API_KEY` isn't set in the shell environment that launched the hub. Click **Copy diagnostics** in the install-instructions modal — that prints the resolved PATH, where the hub found each tool, and login-shell status. Paste it into a bug report if you can't figure it out.
+Most likely Node is missing from the shell environment that launched the hub, or your AI CLI isn't authenticated (sign in to the `claude` CLI or set `ANTHROPIC_API_KEY`; for Codex, sign in to the `codex` CLI). Click **Copy diagnostics** in the install-instructions modal — that prints the resolved PATH, where the hub found each tool, and login-shell status. Paste it into a bug report if you can't figure it out.
 
 **More**
 

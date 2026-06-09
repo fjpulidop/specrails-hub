@@ -60,6 +60,29 @@ export interface WorkingTreeSnapshot {
   ref: string
   /** Untracked paths present at snapshot time (excluded from "created" later). */
   untracked: string[]
+  /** HEAD commit SHA captured at snapshot time, or '' when git failed / unborn
+   *  HEAD. Used as the diff base when `ref` is empty (clean tree): a job that
+   *  commits its work advances HEAD, so diffing against live HEAD at exit would
+   *  report nothing — the frozen pre-job SHA preserves the real delta. */
+  headSha: string
+}
+
+/** Resolve the current HEAD commit SHA. Best-effort: '' on any git failure
+ *  (no repo, unborn HEAD, no git, timeout). */
+export function resolveHeadSha(cwd: string): string {
+  try {
+    const out = execSync('git rev-parse HEAD', {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: GIT_TIMEOUT_MS,
+      maxBuffer: GIT_MAX_BUFFER,
+      env: GIT_EXEC_ENV,
+    })
+    return out.trim()
+  } catch {
+    return ''
+  }
 }
 
 /** List untracked, non-ignored paths in the working tree. Best-effort: any git
@@ -100,17 +123,24 @@ export function snapshotWorkingTree(cwd: string): WorkingTreeSnapshot {
     ref = ''
   }
   // Capture the untracked set NOW so the post-job diff can tell rail-created
-  // files apart from files that were already untracked before the job ran.
-  return { ref, untracked: listUntracked(cwd) }
+  // files apart from files that were already untracked before the job ran. Also
+  // freeze the HEAD SHA so a job that commits from a clean tree is still diffed
+  // against its true starting point (not the post-commit HEAD).
+  return { ref, untracked: listUntracked(cwd), headSha: resolveHeadSha(cwd) }
 }
 
 export function diffAgainstSnapshot(
   cwd: string,
   snapshotRef: string,
   untrackedBefore?: string[],
+  baseSha?: string,
 ): DiffEntry[] {
   const hasSnap = snapshotRef && snapshotRef.length > 0
-  const ref = hasSnap ? snapshotRef : 'HEAD'
+  // When there is no stash ref (clean tree at snapshot time), prefer the frozen
+  // pre-job HEAD SHA over the literal 'HEAD'. A job that commits its output
+  // advances HEAD, so `git diff HEAD` at exit would report nothing — the frozen
+  // base recovers the real created/modified/deleted set.
+  const ref = hasSnap ? snapshotRef : (baseSha && baseSha.length > 0 ? baseSha : 'HEAD')
   let out = ''
   try {
     // --find-renames so rename detection is deterministic regardless of the
@@ -237,11 +267,16 @@ function addedFilePatch(cwd: string, relPath: string): string {
   ].join('\n')
 }
 
-export function collectDiffPatches(cwd: string, snapshotRef: string, diff: DiffEntry[]): Map<string, StoredPatch> {
+export function collectDiffPatches(cwd: string, snapshotRef: string, diff: DiffEntry[], baseSha?: string): Map<string, StoredPatch> {
   const patches = new Map<string, StoredPatch>()
   if (diff.length === 0) return patches
 
-  const ref = snapshotRef && snapshotRef.length > 0 ? snapshotRef : 'HEAD'
+  // Same frozen-base fallback as diffAgainstSnapshot: a clean-tree snapshot has
+  // no stash ref, so use the pre-job HEAD SHA to capture patches for committed
+  // work instead of diffing against the (advanced) live HEAD.
+  const ref = snapshotRef && snapshotRef.length > 0
+    ? snapshotRef
+    : (baseSha && baseSha.length > 0 ? baseSha : 'HEAD')
   // Cap the number of per-file git spawns: each runs synchronously on the event
   // loop. Beyond the cap, provenance rows are still recorded (by the caller) but
   // patches are skipped — the UI renders "diff unavailable" for them.
