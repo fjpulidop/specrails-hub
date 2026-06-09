@@ -45,6 +45,20 @@ function wrap(ui: React.ReactNode, ids: number[] = [42]) {
 }
 
 describe('TicketPostitCard', () => {
+  it('renders a Review badge when needs_review is set', () => {
+    render(
+      wrap(
+        <TicketPostitCard
+          ticket={makeTicket({ status: 'done', needs_review: true })}
+          rails={makeRails()}
+          onClick={() => {}}
+          onMoveToRail={() => {}}
+        />,
+      ),
+    )
+    expect(screen.getByTestId('needs-review-badge-42')).toBeInTheDocument()
+  })
+
   it('renders id, title, priority, and summary when present', () => {
     render(
       wrap(

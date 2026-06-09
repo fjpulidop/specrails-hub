@@ -591,6 +591,9 @@ export interface LocalTicket {
   updated_at: string
   created_by: string
   source: string
+  /** Hub-managed: a job that had already marked this spec `done` then failed —
+   *  the spec stays in Done but the board flags it for review. See ticket-store. */
+  needs_review?: boolean
 }
 
 export interface TicketCreatedMessage {

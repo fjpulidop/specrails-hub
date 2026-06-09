@@ -46,6 +46,14 @@ export interface Ticket {
   updated_at: string
   created_by: string
   source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'hub' | 'explore-draft' | 'specs-smash'
+  /**
+   * Hub-managed review flag. Set when a job had already marked this spec `done`
+   * (the agent reached its Ship phase) but the job then failed / was canceled /
+   * was zombie-killed — so the spec stays in the Done column but the board warns
+   * it may be incomplete. Cleared on the next clean completion. specrails-core
+   * never reads or writes this field.
+   */
+  needs_review?: boolean
 }
 
 export interface TicketStore {
@@ -268,7 +276,58 @@ function writeStore(filePath: string, store: TicketStore): void {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true })
   }
-  fs.writeFileSync(filePath, JSON.stringify(store, null, 2), 'utf-8')
+  // Atomic write: serialise to a sibling temp file then rename over the target.
+  // A crash mid-write can only leave the (ignored) temp file truncated — the
+  // real store is replaced in one atomic rename, never left half-written. Always
+  // runs under the advisory lock (mutateStore/withLock), so the fixed temp name
+  // cannot collide with a concurrent writer in this process.
+  const tmp = filePath + '.tmp'
+  fs.writeFileSync(tmp, JSON.stringify(store, null, 2), 'utf-8')
+  fs.renameSync(tmp, filePath)
+}
+
+export type JobOutcome = 'completed' | 'failed' | 'canceled' | 'zombie_terminated'
+
+/**
+ * Apply a finished job's outcome to the referenced tickets, in place, and return
+ * the ids that actually changed (so the caller can broadcast just those).
+ *
+ * - `completed`: promote `todo`/`in_progress` → `done` (never resurrect a `draft`
+ *   or a `cancelled` spec into Done); clear any stale `needs_review` flag.
+ * - `failed`/`canceled`/`zombie_terminated`: revert an `in_progress` spec → `todo`
+ *   (back to the Specs column). If the agent had already marked it `done` (its
+ *   Ship phase ran, then the process died), keep it `done` but set `needs_review`
+ *   so the board flags it for review.
+ */
+export function applyJobOutcomeToTickets(
+  store: TicketStore,
+  ticketIds: readonly number[],
+  outcome: JobOutcome,
+  now: string,
+): number[] {
+  const changed: number[] = []
+  for (const tid of ticketIds) {
+    const ticket = store.tickets[String(tid)]
+    if (!ticket) continue
+    if (outcome === 'completed') {
+      const promotable = ticket.status === 'todo' || ticket.status === 'in_progress'
+      const clearWarning = ticket.needs_review === true
+      if (!promotable && !clearWarning) continue
+      if (promotable) ticket.status = 'done'
+      if (clearWarning) delete ticket.needs_review
+      ticket.updated_at = now
+      changed.push(tid)
+    } else if (ticket.status === 'in_progress') {
+      ticket.status = 'todo'
+      ticket.updated_at = now
+      changed.push(tid)
+    } else if (ticket.status === 'done' && ticket.needs_review !== true) {
+      ticket.needs_review = true
+      ticket.updated_at = now
+      changed.push(tid)
+    }
+  }
+  return changed
 }
 
 /** Execute a read-modify-write cycle with advisory locking */

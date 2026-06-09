@@ -7,6 +7,10 @@
 //   - openspec:  concat <project>/openspec/specs/**/spec.md into the system prompt
 //   - full:      allow Read/Grep/Glob (Bash is never auto-allowed)
 //   - mcp:       Explore-only — spawn from <project> so .mcp.json is honored
+//   - userMcp:   Explore-only — inject the user's own already-approved MCP
+//                servers (claude: ~/.claude.json user+local scope, fed via
+//                `--mcp-config`; codex: ~/.codex is read natively). Independent
+//                of `mcp` (project `.mcp.json`) and does NOT change the spawn cwd.
 //
 // Persistence: `queue_state.add_spec_context_scope_last` (per-project) holds
 // the last-used scope. `chat_conversations.context_scope` (per-conversation,
@@ -24,6 +28,11 @@ export interface ContextScope {
   /** Whether the Contract Refine post-commit turn should fire for the spec
    *  committed from this conversation. See openspec/changes/add-spec-context-slider. */
   contractRefine: boolean
+  /** Explore-only: inject the user's own already-approved MCP servers into the
+   *  spawn. Optional for backward compatibility — legacy scopes (and every
+   *  preset literal) omit it and are treated as `false`. See
+   *  `server/user-mcp-config.ts`. */
+  userMcp?: boolean
 }
 
 // Maximum tokens worth of concatenated spec content injected per section
@@ -42,6 +51,7 @@ export function defaultBootScope(mode: SpecMode): ContextScope {
     full: mode === 'explore',
     mcp: false,
     contractRefine: false,
+    userMcp: false,
   }
 }
 
@@ -59,6 +69,7 @@ export function normalizeContextScope(
     full: typeof v.full === 'boolean' ? v.full : fallback.full,
     mcp: typeof v.mcp === 'boolean' ? v.mcp : fallback.mcp,
     contractRefine: typeof v.contractRefine === 'boolean' ? v.contractRefine : fallback.contractRefine,
+    userMcp: typeof v.userMcp === 'boolean' ? v.userMcp : (fallback.userMcp ?? false),
   }
 }
 
@@ -82,6 +93,7 @@ export function setLastContextScope(db: DbInstance, scope: ContextScope): void {
     full: !!scope.full,
     mcp: !!scope.mcp,
     contractRefine: !!scope.contractRefine,
+    userMcp: !!scope.userMcp,
   })
   db.prepare(
     `INSERT OR REPLACE INTO queue_state (key, value) VALUES ('add_spec_context_scope_last', ?)`,
@@ -109,7 +121,7 @@ export function getConversationContextScope(
   try {
     const parsed = JSON.parse(row.context_scope)
     return normalizeContextScope(parsed, {
-      specrails: false, openspec: false, full: true, mcp: false, contractRefine: false,
+      specrails: false, openspec: false, full: true, mcp: false, contractRefine: false, userMcp: false,
     })
   } catch {
     return null

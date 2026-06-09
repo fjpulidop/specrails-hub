@@ -9,13 +9,13 @@ describe('context-scope client helpers', () => {
   describe('defaultBootScope', () => {
     it('Quick boots: specrails ON, full/mcp/contractRefine OFF', () => {
       expect(defaultBootScope('quick')).toEqual({
-        specrails: true, openspec: false, full: false, mcp: false, contractRefine: false,
+        specrails: true, openspec: false, full: false, mcp: false, contractRefine: false, userMcp: false,
       })
     })
 
     it('Explore boots: specrails+full ON, mcp/contractRefine OFF (no project defaults)', () => {
       expect(defaultBootScope('explore')).toEqual({
-        specrails: true, openspec: false, full: true, mcp: false, contractRefine: false,
+        specrails: true, openspec: false, full: true, mcp: false, contractRefine: false, userMcp: false,
       })
     })
   })

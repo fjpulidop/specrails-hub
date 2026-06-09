@@ -332,6 +332,10 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
     })
   }, [toViewport, hoverRect, runCapture])
 
+  const onBackdropClick = useCallback((e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) onClose()
+  }, [onClose])
+
   if (!open || typeof document === 'undefined') return null
 
   const selectionStyle = box
@@ -356,7 +360,21 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
   const macOverlay = isMacTauriOverlay()
 
   return createPortal(
-    <div className="fixed inset-0 z-[80] flex flex-col bg-background-deep/95 backdrop-blur-sm pointer-events-auto" role="dialog" aria-modal="true" aria-label="Browser capture">
+    // Translucent backdrop gutter — clicking it closes the capture modal and
+    // returns to Add Spec. The Add Spec modal stays mounted underneath.
+    <div
+      className="fixed inset-0 z-[80] bg-background-deep/50 backdrop-blur-sm pointer-events-auto"
+      onClick={onBackdropClick}
+    >
+      {/* Near-full-bleed panel with hairline border. stopPropagation so only
+          clicking the gutter (outside this div) triggers the backdrop close. */}
+      <div
+        className="absolute inset-2 flex flex-col border border-border rounded-lg bg-background-deep overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Browser capture"
+        onClick={(e) => e.stopPropagation()}
+      >
       {markup ? (
         <AnnotationEditor
           result={markup}
@@ -555,6 +573,7 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
       )}
       </>
       )}
+      </div>
     </div>,
     document.body,
   )

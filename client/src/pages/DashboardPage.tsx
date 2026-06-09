@@ -18,7 +18,7 @@ import { arrayMove } from '@dnd-kit/sortable'
 import { toast } from 'sonner'
 import { useTickets } from '../hooks/useTickets'
 import { SpecsBoard } from '../components/SpecsBoard'
-import { RailsBoard, type RailState, isRailSortId, extractRailId } from '../components/RailsBoard'
+import { RailsBoard, type RailState, applyRailJobOutcome, isRailSortId, extractRailId } from '../components/RailsBoard'
 import { DashboardSplitter } from '../components/DashboardSplitter'
 import { useDashboardSplit } from '../hooks/useDashboardSplit'
 import { TicketDetailModal } from '../components/TicketDetailModal'
@@ -272,24 +272,16 @@ export default function DashboardPage() {
     if (m.projectId !== activeProjectIdRef.current) return
     if (m.type === 'rail.job_completed') {
       const targetIndex = m.railIndex ?? 0
-      const completedTicketIds = new Set(m.ticketIds ?? [])
+      // Strip this job's tickets from the rail on every terminal outcome so they
+      // return to the Specs / Done column instead of being stranded on the rail.
+      updateRails((prev) => applyRailJobOutcome(prev, targetIndex, m.ticketIds ?? []))
 
-      if (m.status === 'completed' && completedTicketIds.size > 0) {
-        updateRails((prev) => prev.map((r, idx) => {
-          if (idx !== targetIndex) return r
-          return { ...r, status: 'idle', activeJobId: undefined, ticketIds: r.ticketIds.filter((id) => !completedTicketIds.has(id)) }
-        }))
-      } else if (m.status === 'failed') {
-        updateRails((prev) => prev.map((r, idx) => (idx === targetIndex ? { ...r, status: 'failed', activeJobId: undefined } : r)))
+      if (m.status === 'completed') {
+        toast.info(`Rail ${targetIndex + 1} completed`)
+      } else if (m.status === 'failed' || m.status === 'zombie_terminated') {
+        toast.error(`Rail ${targetIndex + 1} failed — specs returned to Specs`)
       } else {
-        updateRails((prev) => prev.map((r, idx) => (idx === targetIndex ? { ...r, status: 'idle', activeJobId: undefined } : r)))
-      }
-
-      const statusLabel = m.status === 'completed' ? 'completed' : m.status === 'failed' ? 'failed' : m.status ?? 'finished'
-      if (m.status === 'failed') {
-        toast.error(`Rail ${targetIndex + 1} failed`)
-      } else {
-        toast.info(`Rail ${targetIndex + 1} ${statusLabel}`)
+        toast.info(`Rail ${targetIndex + 1} ${m.status ?? 'finished'} — specs returned to Specs`)
       }
     }
   }, [updateRails])

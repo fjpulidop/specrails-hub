@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { RAIL_SORT_PREFIX, railSortId, isRailSortId, extractRailId } from '../RailsBoard'
+import { RAIL_SORT_PREFIX, railSortId, isRailSortId, extractRailId, applyRailJobOutcome, type RailState } from '../RailsBoard'
+
+function rail(overrides: Partial<RailState> = {}): RailState {
+  return { id: 'rail-1', label: 'Rail 1', ticketIds: [], mode: 'implement', status: 'idle', ...overrides }
+}
 
 describe('RailsBoard utilities', () => {
   describe('railSortId', () => {
@@ -29,6 +33,45 @@ describe('RailsBoard utilities', () => {
 
     it('returns empty string when sort id equals only the prefix', () => {
       expect(extractRailId(RAIL_SORT_PREFIX)).toBe('')
+    })
+  })
+
+  describe('applyRailJobOutcome', () => {
+    it('returns the rail specs to Specs on a failed run (strips job tickets, resets to idle)', () => {
+      const rails = [rail({ ticketIds: [5, 7], status: 'running', activeJobId: 'job-1' })]
+      const next = applyRailJobOutcome(rails, 0, [5, 7])
+      expect(next[0].ticketIds).toEqual([])
+      expect(next[0].status).toBe('idle')
+      expect(next[0].activeJobId).toBeUndefined()
+    })
+
+    it('strips only this job’s ticket on a partial ultracode rail (others stay)', () => {
+      const rails = [rail({ ticketIds: [5, 7, 9], status: 'running' })]
+      const next = applyRailJobOutcome(rails, 0, [7])
+      expect(next[0].ticketIds).toEqual([5, 9])
+    })
+
+    it('clears the whole rail when the message carries no ticket ids', () => {
+      const rails = [rail({ ticketIds: [5, 7], status: 'running' })]
+      const next = applyRailJobOutcome(rails, 0, [])
+      expect(next[0].ticketIds).toEqual([])
+    })
+
+    it('only touches the target rail', () => {
+      const rails = [
+        rail({ id: 'rail-1', ticketIds: [1], status: 'running' }),
+        rail({ id: 'rail-2', ticketIds: [2], status: 'running' }),
+      ]
+      const next = applyRailJobOutcome(rails, 1, [2])
+      expect(next[0]).toBe(rails[0]) // untouched reference
+      expect(next[1].ticketIds).toEqual([])
+    })
+
+    it('removes the completed spec on success (it surfaces in the Done column)', () => {
+      const rails = [rail({ ticketIds: [5, 7], status: 'running', activeJobId: 'job-1' })]
+      const next = applyRailJobOutcome(rails, 0, [5])
+      expect(next[0].ticketIds).toEqual([7])
+      expect(next[0].status).toBe('idle')
     })
   })
 })

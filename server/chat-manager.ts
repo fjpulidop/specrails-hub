@@ -17,6 +17,7 @@ import {
   buildScopedSystemPromptPrefix, toolFlagsForScope, normalizeContextScope,
   defaultBootScope, type ContextScope,
 } from './context-scope'
+import { buildUserMcpArgs } from './user-mcp-config'
 
 const COMMAND_INSTRUCTION =
   'When you want to suggest a SpecRails command for the user to execute, wrap it in a command block like this: ' +
@@ -542,6 +543,19 @@ export class ChatManager {
     const scopeFlags = conversationScope && adapter.id === 'claude'
       ? toolFlagsForScope(conversationScope).args
       : []
+    // Inject the user's OWN already-approved MCP servers when scope.userMcp is
+    // on. Claude-only via `--mcp-config` (codex reads ~/.codex natively, so
+    // buildUserMcpArgs returns []). Independent of the `mcp` toggle (project
+    // .mcp.json) and does not change the spawn cwd. See server/user-mcp-config.ts.
+    if (conversationScope?.userMcp && adapter.id === 'claude' && this._cwd && this._projectSlug) {
+      scopeFlags.push(
+        ...buildUserMcpArgs({
+          adapterId: adapter.id,
+          projectPath: this._cwd,
+          slug: this._projectSlug,
+        }),
+      )
+    }
     let promptForAdapter = resolvedText
     if (conversation.kind === 'explore' && adapter.id === 'codex' && conversationScope && this._cwd) {
       const scopedContext = buildScopedSystemPromptPrefix(conversationScope, this._cwd)
@@ -716,6 +730,10 @@ export class ChatManager {
                     model,
                     sessionId: capturedSessionId,
                     maxTurns: options?.maxTurns,
+                    // Preserve scope-driven flags (tool gating + user MCP
+                    // `--mcp-config`) on respawn; without this the resumed turn
+                    // silently drops them.
+                    extraArgs: scopeFlags,
                   })
                 : args
             console.warn(`[chat-manager] explore crash respawn for ${conversationId}`)

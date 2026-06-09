@@ -1380,8 +1380,14 @@ export class QueueManager {
       emitLine('stdout', `[process exited with code ${code ?? 'unknown'}]`)
     }
 
-    // Notify webhook handler (if any) about job completion/failure/cancellation
-    if (this._onJobFinished && (finalStatus === 'completed' || finalStatus === 'failed' || finalStatus === 'canceled')) {
+    // Notify webhook handler (if any) about job completion/failure/cancellation.
+    // zombie_terminated is included so a timed-out rail job still releases its
+    // tickets (revert/flag) and clears its in-memory railJobs entry instead of
+    // wedging the rail card in 'running' until a server restart.
+    if (
+      this._onJobFinished &&
+      (finalStatus === 'completed' || finalStatus === 'failed' || finalStatus === 'canceled' || finalStatus === 'zombie_terminated')
+    ) {
       let costUsd: number | undefined
       try {
         costUsd = this._db

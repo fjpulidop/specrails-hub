@@ -12,7 +12,15 @@ vi.mock('tree-kill', () => ({
   default: vi.fn(),
 }))
 
+// Mock user-mcp-config so the chat-manager WIRING is tested without touching the
+// real ~/.claude.json or the filesystem. The module's own read/merge/write logic
+// is covered exhaustively in user-mcp-config.test.ts.
+vi.mock('./user-mcp-config', () => ({
+  buildUserMcpArgs: vi.fn(() => []),
+}))
+
 import { spawn as mockSpawn, execSync as mockExecSync } from 'child_process'
+import { buildUserMcpArgs as mockBuildUserMcpArgs } from './user-mcp-config'
 import treeKill from 'tree-kill'
 import { ChatManager } from './chat-manager'
 import { initDb, createConversation, getConversation, createJob, finishJob } from './db'
@@ -871,6 +879,82 @@ describe('ChatManager', () => {
       await sendPromise
     })
 
+    it('injects --mcp-config when scope.userMcp=true (claude)', async () => {
+      vi.mocked(mockBuildUserMcpArgs).mockReturnValue(['--mcp-config', '/fake/user-mcp.json'])
+      const cmExplore = new ChatManager(
+        broadcast, db, projectPath, 'P', 'claude', 'proj-x', 'slug-x',
+      )
+      const convId = 'conv-explore-usermcp-on'
+      createConversation(db, {
+        id: convId, model: 'sonnet', kind: 'explore',
+        contextScope: { specrails: false, openspec: false, full: false, mcp: false, contractRefine: false, userMcp: true },
+      })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const sendPromise = cmExplore.sendMessage(convId, 'hi', { lightweight: true })
+      await Promise.resolve(); await Promise.resolve()
+
+      // Wiring: builder invoked with the resolved adapter id + project path + slug.
+      expect(mockBuildUserMcpArgs).toHaveBeenCalledWith({
+        adapterId: 'claude', projectPath, slug: 'slug-x',
+      })
+      const args = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      const i = args.indexOf('--mcp-config')
+      expect(i).toBeGreaterThanOrEqual(0)
+      expect(args[i + 1]).toBe('/fake/user-mcp.json')
+
+      pushLine(child, assistantEvent('hi'))
+      pushLine(child, resultEvent('sess'))
+      await finishProcess(child, 0)
+      await sendPromise
+    })
+
+    it('does NOT inject --mcp-config when scope.userMcp is off (default explore)', async () => {
+      const cmExplore = new ChatManager(
+        broadcast, db, projectPath, 'P', 'claude', 'proj-x', 'slug-x',
+      )
+      const convId = 'conv-explore-usermcp-off'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const sendPromise = cmExplore.sendMessage(convId, 'hi', { lightweight: true })
+      await Promise.resolve(); await Promise.resolve()
+
+      expect(mockBuildUserMcpArgs).not.toHaveBeenCalled()
+      const args = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      expect(args).not.toContain('--mcp-config')
+
+      pushLine(child, assistantEvent('hi'))
+      pushLine(child, resultEvent('sess'))
+      await finishProcess(child, 0)
+      await sendPromise
+    })
+
+    it('does NOT inject --mcp-config for a codex conversation even when userMcp=true', async () => {
+      const cmExplore = new ChatManager(
+        broadcast, db, projectPath, 'P', 'codex', 'proj-x', 'slug-x',
+      )
+      const convId = 'conv-explore-usermcp-codex'
+      createConversation(db, {
+        id: convId, model: 'gpt-5.4-mini', kind: 'explore',
+        contextScope: { specrails: false, openspec: false, full: false, mcp: false, contractRefine: false, userMcp: true },
+      })
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const sendPromise = cmExplore.sendMessage(convId, 'hi', { lightweight: true })
+      await Promise.resolve(); await Promise.resolve()
+
+      // Guard is claude-only; codex reads ~/.codex natively so no injection.
+      expect(mockBuildUserMcpArgs).not.toHaveBeenCalled()
+      const args = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      expect(args).not.toContain('--mcp-config')
+
+      pushLine(child, JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'hi' } }))
+      pushLine(child, JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } }))
+      await finishProcess(child, 0)
+      await sendPromise
+    })
+
     it('falls back to project path when SPECRAILS_EXPLORE_LEGACY_CWD=1', async () => {
       process.env.SPECRAILS_EXPLORE_LEGACY_CWD = '1'
       const cmExplore = new ChatManager(
@@ -992,6 +1076,37 @@ describe('ChatManager', () => {
       const errsForConv = errs.filter((e) => e.conversationId === convId)
       expect(errsForConv).toHaveLength(0)
       expect(vi.mocked(mockSpawn)).toHaveBeenCalledTimes(2)
+    })
+
+    it('crash respawn via chat-resume preserves --mcp-config (userMcp)', async () => {
+      vi.mocked(mockBuildUserMcpArgs).mockReturnValue(['--mcp-config', '/fake/user-mcp.json'])
+      const cmL = new ChatManager(broadcast, db, '/tmp/proj', 'P', 'claude', 'pid-um', 'sl-um')
+      const convId = 'conv-usermcp-crash'
+      createConversation(db, {
+        id: convId, model: 'sonnet', kind: 'explore',
+        contextScope: { specrails: false, openspec: false, full: false, mcp: false, contractRefine: false, userMcp: true },
+      })
+      const first = createMockChildProcess()
+      const second = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValueOnce(first as any).mockReturnValueOnce(second as any)
+      const sendPromise = cmL.sendMessage(convId, 'hi', { lightweight: true })
+      await Promise.resolve(); await Promise.resolve()
+      // Capture a session id so the respawn takes the chat-resume path (the one
+      // that previously dropped extraArgs), then crash before a result.
+      pushLine(first, JSON.stringify({ type: 'system', session_id: 'sess-1' }))
+      await finishProcess(first, 1)
+      await Promise.resolve(); await Promise.resolve()
+
+      const respawnArgs = vi.mocked(mockSpawn).mock.calls[1][1] as string[]
+      expect(respawnArgs).toContain('--resume') // confirms the chat-resume branch
+      const i = respawnArgs.indexOf('--mcp-config')
+      expect(i).toBeGreaterThanOrEqual(0)
+      expect(respawnArgs[i + 1]).toBe('/fake/user-mcp.json')
+
+      pushLine(second, assistantEvent('recovered'))
+      pushLine(second, resultEvent('sess-after'))
+      await finishProcess(second, 0)
+      await sendPromise
     })
 
     it('second crash surfaces chat_error', async () => {

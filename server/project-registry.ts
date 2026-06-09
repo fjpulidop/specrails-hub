@@ -18,7 +18,7 @@ import { TicketWatcher } from './ticket-watcher'
 import { getTerminalManager } from './terminal-manager'
 import { BrowserCaptureManager } from './browser-capture-manager'
 import { removeExploreCwd } from './explore-cwd-manager'
-import { resolveTicketStoragePath, mutateStore } from './ticket-store'
+import { resolveTicketStoragePath, mutateStore, applyJobOutcomeToTickets, type JobOutcome } from './ticket-store'
 import type { WsMessage, TicketUpdatedMessage } from './types'
 import {
   initHubDb,
@@ -257,51 +257,34 @@ export class ProjectRegistry {
           if (matches) completedTicketIds = matches.map((m) => parseInt(m.slice(1), 10))
         }
 
-        // Mark tickets as done when job completed successfully
-        if (status === 'completed' && completedTicketIds.length > 0) {
+        // Apply the job outcome to its tickets. Success promotes todo/in_progress
+        // → done (→ Specs Done); failure/cancel/zombie reverts in_progress → todo
+        // (→ Specs) or flags an already-done spec for review. zombie_terminated is
+        // treated as a failure here (and is included in the _onJobExit callback
+        // guard) so a timed-out rail releases its specs instead of stranding them.
+        if (
+          completedTicketIds.length > 0 &&
+          (status === 'completed' || status === 'failed' || status === 'canceled' || status === 'zombie_terminated')
+        ) {
           try {
             const ticketFile = resolveTicketStoragePath(project.path)
-            mutateStore(ticketFile, (store) => {
-              for (const tid of completedTicketIds) {
-                const ticket = store.tickets[String(tid)]
-                if (ticket && ticket.status !== 'done') {
-                  ticket.status = 'done'
-                  ticket.updated_at = new Date().toISOString()
-                  boundBroadcast({
-                    type: 'ticket_updated',
-                    ticket: ticket as unknown as import('./types').LocalTicket,
-                    projectId: project.id,
-                    timestamp: ticket.updated_at,
-                  } as TicketUpdatedMessage)
-                }
-              }
+            const now = new Date().toISOString()
+            let changedIds: number[] = []
+            const store = mutateStore(ticketFile, (s) => {
+              changedIds = applyJobOutcomeToTickets(s, completedTicketIds, status as JobOutcome, now)
             })
+            for (const tid of changedIds) {
+              const ticket = store.tickets[String(tid)]
+              if (!ticket) continue
+              boundBroadcast({
+                type: 'ticket_updated',
+                ticket: ticket as unknown as import('./types').LocalTicket,
+                projectId: project.id,
+                timestamp: ticket.updated_at,
+              } as TicketUpdatedMessage)
+            }
           } catch (err) {
-            console.error('[project-registry] failed to mark rail tickets as done:', err)
-          }
-        }
-
-        // Revert tickets to todo when job was canceled or failed
-        if ((status === 'canceled' || status === 'failed') && completedTicketIds.length > 0) {
-          try {
-            const ticketFile = resolveTicketStoragePath(project.path)
-            mutateStore(ticketFile, (store) => {
-              for (const tid of completedTicketIds) {
-                const ticket = store.tickets[String(tid)]
-                if (ticket && ticket.status === 'in_progress') {
-                  ticket.status = 'todo'
-                  ticket.updated_at = new Date().toISOString()
-                  boundBroadcast({
-                    type: 'ticket_updated',
-                    ticket: ticket as unknown as import('./types').LocalTicket,
-                    projectId: project.id,
-                    timestamp: ticket.updated_at,
-                  } as TicketUpdatedMessage)
-                }
-              }
-            })
-          } catch (err) {
-            console.error('[project-registry] failed to revert rail tickets:', err)
+            console.error('[project-registry] failed to apply job outcome to tickets:', err)
           }
         }
 

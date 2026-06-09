@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Link2, ArrowRight, Crown, Trash2, MessageSquare } from 'lucide-react'
+import { Link2, ArrowRight, Crown, Trash2, MessageSquare, AlertTriangle } from 'lucide-react'
 import { Badge } from './ui/badge'
 import { MoveToRailPopover } from './MoveToRailPopover'
 import { useMinimizedChats } from '../context/MinimizedChatsContext'
@@ -234,6 +234,17 @@ export function TicketPostitCard({
             )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            {ticket.needs_review && (
+              <Badge
+                variant="outline"
+                className="h-4 gap-1 px-1.5 text-[9px] uppercase border-accent-warning/60 text-accent-warning bg-accent-warning/10"
+                title="This spec was marked done but its job ended in failure — review it"
+                data-testid={`needs-review-badge-${ticket.id}`}
+              >
+                <AlertTriangle className="w-2.5 h-2.5" aria-hidden />
+                Review
+              </Badge>
+            )}
             {isEpic && (
               <Badge variant="outline" className="h-4 gap-1 px-1.5 text-[9px] border-accent-highlight/40 text-accent-highlight">
                 <Crown className="w-2.5 h-2.5" aria-hidden />

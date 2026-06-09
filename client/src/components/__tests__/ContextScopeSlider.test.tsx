@@ -101,6 +101,12 @@ describe('ContextScopeSlider', () => {
     expect(PRESETS[5].scope.contractRefine).toBe(true)
   })
 
+  it('userMcp is only enabled by the Hub preset', () => {
+    for (let i = 0; i < 5; i++) expect(PRESETS[i].scope.userMcp ?? false).toBe(false)
+    expect(PRESETS[5].id).toBe('hub')
+    expect(PRESETS[5].scope.userMcp).toBe(true)
+  })
+
   it('shows the SMASH-capable hint when contractRefine is on (Max preset)', () => {
     render(<ContextScopeSlider value={MAX_SCOPE} onChange={() => {}} />)
     const hint = screen.getByTestId('scope-smash-hint')
