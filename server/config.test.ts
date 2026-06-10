@@ -14,7 +14,7 @@ vi.mock('child_process', async () => {
   }
 })
 
-import { getConfig, fetchIssues } from './config'
+import { getConfig, fetchIssues, __resetTrackerDetectionCacheForTest } from './config'
 
 const mockExecSync = execSync as ReturnType<typeof vi.fn>
 const mockExecFileSync = execFileSync as ReturnType<typeof vi.fn>
@@ -30,6 +30,7 @@ let readFileSyncSpy: any
 describe('getConfig', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    __resetTrackerDetectionCacheForTest()
     mockExecSync.mockReturnValue(Buffer.from(''))
     existsSyncSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(false)
     readdirSyncSpy = vi.spyOn(fs, 'readdirSync').mockReturnValue([])
@@ -179,6 +180,7 @@ describe('getConfig', () => {
 describe('getConfig with db parameter', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    __resetTrackerDetectionCacheForTest()
     mockExecSync.mockReturnValue(Buffer.from(''))
     existsSyncSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(false)
     readdirSyncSpy = vi.spyOn(fs, 'readdirSync').mockReturnValue([])
@@ -238,6 +240,7 @@ describe('getConfig with db parameter', () => {
 describe('getConfig with phases in command frontmatter', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    __resetTrackerDetectionCacheForTest()
     mockExecSync.mockReturnValue(Buffer.from(''))
     existsSyncSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(true)
     readdirSyncSpy = vi.spyOn(fs, 'readdirSync').mockReturnValue(['implement.md'] as unknown as fs.Dirent[])
@@ -260,6 +263,94 @@ describe('getConfig with phases in command frontmatter', () => {
     expect(config.commands[0].phases[0].key).toBe('architect')
     expect(config.commands[0].phases[0].label).toBe('Architect')
     expect(config.commands[0].phases[1].key).toBe('developer')
+  })
+})
+
+describe('tracker detection memo (H19)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    __resetTrackerDetectionCacheForTest()
+    existsSyncSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(false)
+    readdirSyncSpy = vi.spyOn(fs, 'readdirSync').mockReturnValue([])
+    readFileSyncSpy = vi.spyOn(fs, 'readFileSync').mockReturnValue('')
+  })
+
+  afterEach(() => {
+    existsSyncSpy.mockRestore()
+    readdirSyncSpy.mockRestore()
+    readFileSyncSpy.mockRestore()
+    vi.useRealTimers()
+  })
+
+  function mockTrackerProbes(counters: { gh: number; jira: number }) {
+    mockExecSync.mockImplementation((cmd: string) => {
+      if (cmd === 'which gh') { counters.gh++; return Buffer.from('/usr/bin/gh') }
+      if (cmd === 'gh auth status') return Buffer.from('Logged in')
+      if (cmd === 'which jira') { counters.jira++; throw new Error('not found') }
+      return Buffer.from('')
+    })
+  }
+
+  it('probes gh/jira once and reuses the result across getConfig calls within the TTL', () => {
+    const counters = { gh: 0, jira: 0 }
+    mockTrackerProbes(counters)
+
+    const first = getConfig('/project/one')
+    const second = getConfig('/project/two')
+
+    expect(counters.gh).toBe(1)
+    expect(counters.jira).toBe(1)
+    expect(second.issueTracker.github).toEqual(first.issueTracker.github)
+    expect(second.issueTracker.github.authenticated).toBe(true)
+  })
+
+  it('still probes the project-dependent git remote on every call', () => {
+    const counters = { gh: 0, jira: 0 }
+    let gitCalls = 0
+    mockExecSync.mockImplementation((cmd: string) => {
+      if (cmd === 'which gh') { counters.gh++; return Buffer.from('/usr/bin/gh') }
+      if (cmd === 'gh auth status') return Buffer.from('Logged in')
+      if (cmd === 'which jira') throw new Error('not found')
+      if (cmd === 'git remote get-url origin') { gitCalls++; return Buffer.from('https://github.com/o/r.git') }
+      return Buffer.from('')
+    })
+
+    getConfig('/project/one')
+    getConfig('/project/two')
+
+    expect(counters.gh).toBe(1)
+    expect(gitCalls).toBe(2)
+  })
+
+  it('re-probes after the TTL expires', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+    const counters = { gh: 0, jira: 0 }
+    mockTrackerProbes(counters)
+
+    getConfig('/project/one')
+    expect(counters.gh).toBe(1)
+
+    // Within TTL — cached.
+    vi.setSystemTime(new Date('2026-01-01T00:00:30Z'))
+    getConfig('/project/one')
+    expect(counters.gh).toBe(1)
+
+    // Past TTL — re-probed.
+    vi.setSystemTime(new Date('2026-01-01T00:01:01Z'))
+    getConfig('/project/one')
+    expect(counters.gh).toBe(2)
+  })
+
+  it('re-probes after an explicit cache reset', () => {
+    const counters = { gh: 0, jira: 0 }
+    mockTrackerProbes(counters)
+
+    getConfig('/project/one')
+    __resetTrackerDetectionCacheForTest()
+    getConfig('/project/one')
+
+    expect(counters.gh).toBe(2)
   })
 })
 

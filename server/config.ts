@@ -76,6 +76,30 @@ function detectJira(): IssueTrackerInfo {
   return { available: true, authenticated: true }
 }
 
+// H19: `which gh` + `gh auth status` (a network round-trip, 0.3-2s) + `which
+// jira` are project-independent but ran synchronously on every getConfig()
+// call — once per project in the startup loadAll() and again on each
+// GET /config | GET /issues — blocking the single event loop hub-wide.
+// Memoize with a short TTL (same pattern as setup-prerequisites.ts) so startup
+// probes once and hot request paths reuse the cached result; auth/install
+// changes surface after at most TTL.
+let _trackerCache: { at: number; github: IssueTrackerInfo; jira: IssueTrackerInfo } | null = null
+const TRACKER_CACHE_TTL_MS = 60_000
+
+function detectTrackers(): { github: IssueTrackerInfo; jira: IssueTrackerInfo } {
+  const now = Date.now()
+  if (_trackerCache && now - _trackerCache.at < TRACKER_CACHE_TTL_MS) {
+    return _trackerCache
+  }
+  _trackerCache = { at: now, github: detectGithub(), jira: detectJira() }
+  return _trackerCache
+}
+
+/** Test-only: clear the tracker-detection memo so each test re-probes. */
+export function __resetTrackerDetectionCacheForTest(): void {
+  _trackerCache = null
+}
+
 function getGitRepoName(projectRoot?: string): string | null {
   const output = runCommand('git remote get-url origin', projectRoot)
   if (!output) return null
@@ -242,8 +266,7 @@ export function getConfig(cwd: string, db?: any, projectName?: string): ProjectC
   const commandsDir = path.join(projectRoot, '.claude', 'commands', 'sr')
   const commands = scanCommands(commandsDir)
 
-  const github = detectGithub()
-  const jira = detectJira()
+  const { github, jira } = detectTrackers()
   const repo = getGitRepoName(projectRoot)
 
   const persisted = db ? loadPersistedConfig(db) : { active: null, labelFilter: '' }
