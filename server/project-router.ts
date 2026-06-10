@@ -385,17 +385,34 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
 
   // ─── Hooks ──────────────────────────────────────────────────────────────────
 
-  // Mount hooks router under each project
+  // Per-ProjectContext sub-router memo. Keyed on the ctx object (WeakMap) so a
+  // removed+re-added project gets a fresh router, instead of rebuilding the
+  // router on every request (H18).
+  function memoizedSubRouter(
+    cache: WeakMap<object, Router>,
+    projectCtx: ProjectContext,
+    factory: () => Router
+  ): Router {
+    let sub = cache.get(projectCtx)
+    if (!sub) {
+      sub = factory()
+      cache.set(projectCtx, sub)
+    }
+    return sub
+  }
+
+  // Mount hooks router under each project — the hot path while jobs stream.
+  const hooksRouterByCtx = new WeakMap<object, Router>()
   router.use('/:projectId/hooks', (req: Request, res: Response, next: NextFunction) => {
     const projectCtx = ctx(req)
-    const hooksRouter = createHooksRouter(
+    const hooksRouter = memoizedSubRouter(hooksRouterByCtx, projectCtx, () => createHooksRouter(
       projectCtx.broadcast,
       projectCtx.db,
       {
         get current() { return projectCtx.queueManager.getActiveJobId() },
         set current(_: string | null) { /* managed by QueueManager */ },
       }
-    )
+    ))
     hooksRouter(req, res, next)
   })
 
@@ -412,23 +429,16 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   router.use('/:projectId/plugins', pluginsRouter)
 
   // Mount Code-Explorer router. FileSummaryManager comes from ProjectContext.
-  // Memoize per ProjectContext (keyed on the object so a removed+re-added
-  // project gets a fresh router) instead of rebuilding the router on every
-  // /code/* request.
   const codeRouterByCtx = new WeakMap<object, Router>()
   router.use('/:projectId/code', (req: Request, res: Response, next: NextFunction) => {
     const projectCtx = ctx(req)
-    let codeRouter = codeRouterByCtx.get(projectCtx)
-    if (!codeRouter) {
-      codeRouter = createCodeExplorerRouter({
-        db: projectCtx.db,
-        projectPath: projectCtx.project.path,
-        projectId: projectCtx.project.id,
-        broadcast: projectCtx.broadcast,
-        fileSummaryManager: projectCtx.fileSummaryManager,
-      })
-      codeRouterByCtx.set(projectCtx, codeRouter)
-    }
+    const codeRouter = memoizedSubRouter(codeRouterByCtx, projectCtx, () => createCodeExplorerRouter({
+      db: projectCtx.db,
+      projectPath: projectCtx.project.path,
+      projectId: projectCtx.project.id,
+      broadcast: projectCtx.broadcast,
+      fileSummaryManager: projectCtx.fileSummaryManager,
+    }))
     codeRouter(req, res, next)
   })
 
