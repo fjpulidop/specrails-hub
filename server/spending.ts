@@ -213,8 +213,6 @@ function eachDay(fromIso: string, toIso: string): string[] {
   return out
 }
 
-interface RowAggSurface { surface: Surface; cnt: number; cost: number | null }
-interface RowAggModel { model: string | null; cnt: number; cost: number | null }
 interface RowAggDay { day: string; surface: Surface; cost: number | null }
 interface RowAggTicket {
   ticket_id: number | null
@@ -262,28 +260,30 @@ export function getSpending(
     ? ((summaryRow.totalCost - prevRow.totalCost) / prevRow.totalCost) * 100
     : null
 
-  // bySurface
-  const surfaceRows = db.prepare(`
-    SELECT surface, COUNT(*) AS cnt, COALESCE(SUM(total_cost_usd), 0) AS cost
-    FROM ai_invocations WHERE ${where.sql}
-    GROUP BY surface
-  `).all(...where.params) as RowAggSurface[]
-  const bySurface: BySurfaceCount[] = ALL_SURFACES.map((s) => {
-    const row = surfaceRows.find((r) => r.surface === s)
-    return { surface: s, count: row?.cnt ?? 0, costUsd: row?.cost ?? 0 }
-  })
-
-  // byModel (top 10)
+  // byModel (top 10) + per-mode dominant models — one GROUP BY model, surface
+  // query serves both (H24: previously byModel plus two per-mode dominant-model
+  // queries re-scanned the same rows).
   const modelRows = db.prepare(`
-    SELECT model, COUNT(*) AS cnt, COALESCE(SUM(total_cost_usd), 0) AS cost
+    SELECT model, surface, COUNT(*) AS cnt, COALESCE(SUM(total_cost_usd), 0) AS cost
     FROM ai_invocations WHERE ${where.sql} AND model IS NOT NULL
-    GROUP BY model ORDER BY cost DESC LIMIT 10
-  `).all(...where.params) as RowAggModel[]
-  const byModel: ByModelEntry[] = modelRows.map((r) => ({
-    model: r.model ?? 'unknown',
-    count: r.cnt,
-    costUsd: r.cost ?? 0,
-  }))
+    GROUP BY model, surface
+  `).all(...where.params) as Array<{ model: string; surface: Surface; cnt: number; cost: number | null }>
+  const modelTotals = new Map<string, { cnt: number; cost: number }>()
+  for (const r of modelRows) {
+    const agg = modelTotals.get(r.model) ?? { cnt: 0, cost: 0 }
+    agg.cnt += r.cnt
+    agg.cost += r.cost ?? 0
+    modelTotals.set(r.model, agg)
+  }
+  const byModel: ByModelEntry[] = Array.from(modelTotals.entries())
+    .map(([model, t]) => ({ model, count: t.cnt, costUsd: t.cost }))
+    .sort((a, b) => b.costUsd - a.costUsd)
+    .slice(0, 10)
+  const dominantBySurface = new Map<Surface, { model: string; cnt: number }>()
+  for (const r of modelRows) {
+    const cur = dominantBySurface.get(r.surface)
+    if (!cur || r.cnt > cur.cnt) dominantBySurface.set(r.surface, { model: r.model, cnt: r.cnt })
+  }
 
   // dailyTimeline (zero-filled, stacked by surface)
   const dayRows = db.prepare(`
@@ -321,52 +321,51 @@ export function getSpending(
   }
   const dailyTimeline = Array.from(dayMap.values())
 
-  // byMode (Quick vs Explore)
+  // byMode (Quick vs Explore) — one GROUP BY surface query for both modes;
+  // dominant models come from modelRows and sparklines from dayRows, which
+  // already carry exactly these aggregates (H24: previously 3 extra queries
+  // per mode re-scanned the same rows).
+  // M18: count DISTINCT tickets, not rows. An Explore session writes one
+  // ai_invocations row per turn (and contract-refine adds another), all
+  // back-filled with the same ticket_id — so SUM(ticket_id IS NOT NULL) counted
+  // turns and inflated "N created". avgCostPerSpec is likewise per-spec:
+  // total success cost of ticket-bearing rows / distinct successful tickets.
+  const modeAggRows = db.prepare(`
+    SELECT
+      surface,
+      COUNT(*) AS totalRuns,
+      COUNT(DISTINCT ticket_id) AS ticketsCreated,
+      COALESCE(SUM(total_cost_usd), 0) AS totalCost,
+      COALESCE(SUM(CASE WHEN status = 'success' AND ticket_id IS NOT NULL THEN total_cost_usd ELSE 0 END), 0) AS specCostSum,
+      COUNT(DISTINCT CASE WHEN status = 'success' AND ticket_id IS NOT NULL THEN ticket_id END) AS specCount,
+      AVG(CASE WHEN status = 'success' THEN duration_ms END) AS avgDur
+    FROM ai_invocations WHERE ${where.sql} AND surface IN ('quick-spec', 'explore-spec')
+    GROUP BY surface
+  `).all(...where.params) as Array<{
+    surface: Surface
+    totalRuns: number
+    ticketsCreated: number | null
+    totalCost: number
+    specCostSum: number
+    specCount: number
+    avgDur: number | null
+  }>
+  const modeAggBySurface = new Map(modeAggRows.map((r) => [r.surface, r]))
+  const costByDaySurface = new Map<string, number>()
+  for (const r of dayRows) costByDaySurface.set(`${r.day}|${r.surface}`, r.cost ?? 0)
   const byMode: ByModeEntry[] = (['quick-spec', 'explore-spec'] as const).map((surface) => {
     const modeKey: 'quick' | 'explore' = surface === 'quick-spec' ? 'quick' : 'explore'
-    // M18: count DISTINCT tickets, not rows. An Explore session writes one
-    // ai_invocations row per turn (and contract-refine adds another), all
-    // back-filled with the same ticket_id — so SUM(ticket_id IS NOT NULL) counted
-    // turns and inflated "N created". avgCostPerSpec is likewise per-spec:
-    // total success cost of ticket-bearing rows / distinct successful tickets.
-    const r = db.prepare(`
-      SELECT
-        COUNT(*) AS totalRuns,
-        COUNT(DISTINCT ticket_id) AS ticketsCreated,
-        COALESCE(SUM(total_cost_usd), 0) AS totalCost,
-        COALESCE(SUM(CASE WHEN status = 'success' AND ticket_id IS NOT NULL THEN total_cost_usd ELSE 0 END), 0) AS specCostSum,
-        COUNT(DISTINCT CASE WHEN status = 'success' AND ticket_id IS NOT NULL THEN ticket_id END) AS specCount,
-        AVG(CASE WHEN status = 'success' THEN duration_ms END) AS avgDur
-      FROM ai_invocations WHERE ${where.sql} AND surface = ?
-    `).get(...where.params, surface) as {
-      totalRuns: number
-      ticketsCreated: number | null
-      totalCost: number
-      specCostSum: number
-      specCount: number
-      avgDur: number | null
-    }
-    const avgCostPerSpec = r.specCount > 0 ? r.specCostSum / r.specCount : null
-    const dom = db.prepare(`
-      SELECT model, COUNT(*) AS cnt FROM ai_invocations
-      WHERE ${where.sql} AND surface = ? AND model IS NOT NULL
-      GROUP BY model ORDER BY cnt DESC LIMIT 1
-    `).get(...where.params, surface) as { model: string | null; cnt: number } | undefined
-    const sparkRows = db.prepare(`
-      SELECT substr(started_at, 1, 10) AS day, COALESCE(SUM(total_cost_usd), 0) AS cost
-      FROM ai_invocations WHERE ${where.sql} AND surface = ?
-      GROUP BY day
-    `).all(...where.params, surface) as Array<{ day: string; cost: number }>
-    const sparkMap = new Map(sparkRows.map((s) => [s.day, s.cost]))
-    const sparkline = days.map((d) => sparkMap.get(d) ?? 0)
+    const r = modeAggBySurface.get(surface)
+    const avgCostPerSpec = r && r.specCount > 0 ? r.specCostSum / r.specCount : null
+    const sparkline = days.map((d) => costByDaySurface.get(`${d}|${surface}`) ?? 0)
     return {
       mode: modeKey,
-      totalRuns: r.totalRuns,
-      ticketsCreated: r.ticketsCreated ?? 0,
-      totalCostUsd: r.totalCost,
+      totalRuns: r?.totalRuns ?? 0,
+      ticketsCreated: r?.ticketsCreated ?? 0,
+      totalCostUsd: r?.totalCost ?? 0,
       avgCostPerSpec,
-      avgDurationMs: r.avgDur,
-      dominantModel: dom?.model ?? null,
+      avgDurationMs: r?.avgDur ?? null,
+      dominantModel: dominantBySurface.get(surface)?.model ?? null,
       sparkline,
     }
   })
@@ -430,6 +429,21 @@ export function getSpending(
   const topTickets = Array.from(ticketMap.values())
     .sort((a, b) => b.totalCostUsd - a.totalCostUsd)
     .slice(0, 10)
+
+  // bySurface — derived from ticketRows (same WHERE, grouped by
+  // ticket_id+surface): summing across tickets equals a GROUP BY surface
+  // (H24: previously a dedicated query re-scanned the same rows).
+  const surfaceTotals = new Map<Surface, { cnt: number; cost: number }>()
+  for (const r of ticketRows) {
+    const agg = surfaceTotals.get(r.surface) ?? { cnt: 0, cost: 0 }
+    agg.cnt += r.cnt
+    agg.cost += r.cost ?? 0
+    surfaceTotals.set(r.surface, agg)
+  }
+  const bySurface: BySurfaceCount[] = ALL_SURFACES.map((s) => {
+    const t = surfaceTotals.get(s)
+    return { surface: s, count: t?.cnt ?? 0, costUsd: t?.cost ?? 0 }
+  })
 
   // tracking start (project's first invocation)
   const trackingRow = db.prepare(`
