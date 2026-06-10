@@ -9,7 +9,11 @@ permissions:
   contents: write
 
 env:
-  NODE_BUNDLE_VERSION: "22.x"
+  # Exact pin (was floating latest-v22.x resolved at build time) so rebuilding a
+  # tag is reproducible and the three platform jobs of one release always embed
+  # the same Node. Each job still verifies the download against the SHASUMS256.txt
+  # of this version. Bump deliberately via PR.
+  NODE_BUNDLE_VERSION: "v22.22.3"
   GIT_BUNDLE_VERSION: "2.49.0"
   # Hostinger stores large desktop installers twice: once in latest/ and once
   # in a versioned folder. Keep the current and previous version on Hostinger;
@@ -68,10 +72,7 @@ jobs:
       - name: Download and verify Node.js ${{ env.NODE_BUNDLE_VERSION }} (macOS arm64)
         run: |
           set -euo pipefail
-          # NOTE: macOS runners ship BSD grep (no -P). Use -oE (extended) for portability.
-          NODE_VERSION=$(curl -fsSL "https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt" \
-            | grep 'node-v.*-darwin-arm64\.tar\.gz$' | awk '{print $2}' \
-            | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+          NODE_VERSION="${NODE_BUNDLE_VERSION}"
           TARBALL="node-${NODE_VERSION}-darwin-arm64.tar.gz"
           URL="https://nodejs.org/dist/${NODE_VERSION}/${TARBALL}"
           echo "Downloading Node.js ${NODE_VERSION} (macOS arm64)..."
@@ -354,9 +355,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          NODE_VERSION=$(curl -fsSL "https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt" \
-            | grep 'node-v.*-win-x64\.zip$' | awk '{print $2}' \
-            | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+          NODE_VERSION="${NODE_BUNDLE_VERSION}"
           ZIPFILE="node-${NODE_VERSION}-win-x64.zip"
           URL="https://nodejs.org/dist/${NODE_VERSION}/${ZIPFILE}"
           echo "Downloading Node.js ${NODE_VERSION} (Windows x64)..."
@@ -523,9 +522,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          NODE_VERSION=$(curl -fsSL "https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt" \
-            | grep 'node-v.*-win-arm64\.zip$' | awk '{print $2}' \
-            | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+          NODE_VERSION="${NODE_BUNDLE_VERSION}"
           ZIPFILE="node-${NODE_VERSION}-win-arm64.zip"
           URL="https://nodejs.org/dist/${NODE_VERSION}/${ZIPFILE}"
           echo "Downloading Node.js ${NODE_VERSION} (Windows arm64)..."
