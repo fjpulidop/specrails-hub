@@ -31,7 +31,10 @@ jobs:
       - run: npm ci
       - run: cd client && npm ci
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run check-core-compat
+      # Single vitest pass: the coverage run below executes the full server+cli
+      # suite with thresholds enforced, so a plain `npm test` here would run the
+      # same 100+ files twice (check-core-compat is kept as its own step above).
       - name: Coverage (enforced — fails if below 70% global / 80% server thresholds)
         run: npm run test:coverage
       - name: Upload coverage report
