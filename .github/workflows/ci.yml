@@ -28,6 +28,11 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          # Two npm trees (root + client/) — key the cache on both lockfiles so
+          # client-only dependency changes also refresh it.
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
       - run: npm ci
       - run: cd client && npm ci
       - run: npm run typecheck
