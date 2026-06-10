@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.65.3](https://github.com/fjpulidop/specrails-hub/compare/v1.65.2...v1.65.3) (2026-06-10)
+
+
+### Bug Fixes
+
+* **release:** use explicit FTPS for Hostinger curl steps ([#366](https://github.com/fjpulidop/specrails-hub/issues/366)) ([0a409d9](https://github.com/fjpulidop/specrails-hub/commit/0a409d99285fe02ba7a83612266f403d7b50ea7d))
+
 ## [1.65.2](https://github.com/fjpulidop/specrails-hub/compare/v1.65.1...v1.65.2) (2026-06-10)
 
 
