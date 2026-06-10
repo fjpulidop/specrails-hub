@@ -32,7 +32,7 @@
     "assemble-runtimes": "node scripts/assemble-runtimes-local.mjs",
     "build:desktop:local": "npm run assemble-runtimes && npm run build:desktop",
     "generate-icons": "tauri icon src-tauri/icons/icon.svg",
-    "typecheck": "tsc --noEmit && cd client && tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.cli.json --noEmit && cd client && tsc --noEmit",
     "check-core-compat": "tsx scripts/check-core-compat.ts",
     "test": "vitest run && tsx scripts/check-core-compat.ts",
     "test:watch": "vitest",
