@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.65.2](https://github.com/fjpulidop/specrails-hub/compare/v1.65.1...v1.65.2) (2026-06-10)
+
+
+### Bug Fixes
+
+* audit H1 quick wins — single-pass CI, event-loop probe hardening, prompt-cache split, core pin, dead code removal ([#364](https://github.com/fjpulidop/specrails-hub/issues/364)) ([883f6b5](https://github.com/fjpulidop/specrails-hub/commit/883f6b57908b54ecc3b4bb60c2e9064767a62fa9))
+
 ## [1.65.1](https://github.com/fjpulidop/specrails-hub/compare/v1.65.0...v1.65.1) (2026-06-10)
 
 
