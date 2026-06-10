@@ -49,6 +49,7 @@ import treeKill from 'tree-kill'
 import { existsSync, readdirSync, rmSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs'
 import { detectCLISync } from './core-compat'
 import { SetupManager, CHECKPOINTS, QUICK_CHECKPOINTS, computeSummary, sweepLegacySrCommands, validateInstalledCore } from './setup-manager'
+import { CORE_PACKAGE_SPEC } from './core-package'
 
 function createMockChildProcess() {
   const child = new EventEmitter() as any
@@ -201,7 +202,7 @@ describe('SetupManager', () => {
   // ─── startInstall ──────────────────────────────────────────────────────────
 
   describe('startInstall', () => {
-    it('spawns npx specrails-core@latest init --yes --root-dir when no config exists', () => {
+    it('spawns npx specrails-core (pinned spec) init --yes --root-dir when no config exists', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
       vi.mocked(existsSync).mockReturnValue(false)
@@ -210,12 +211,12 @@ describe('SetupManager', () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'npx',
-        ['--yes', '--prefer-online', 'specrails-core@latest', 'init', '--yes', '--root-dir', '/path/to/project'],
+        ['--yes', '--prefer-online', CORE_PACKAGE_SPEC, 'init', '--yes', '--root-dir', '/path/to/project'],
         expect.objectContaining({ cwd: '/path/to/project' })
       )
     })
 
-    it('spawns npx specrails-core@latest init --from-config when config exists', () => {
+    it('spawns npx specrails-core (pinned spec) init --from-config when config exists', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
       vi.mocked(existsSync).mockReturnValue(true)
@@ -224,7 +225,7 @@ describe('SetupManager', () => {
 
       const [, spawnArgs, spawnOpts] = vi.mocked(mockSpawn).mock.calls[0]
       expect(spawnArgs).toEqual(
-        expect.arrayContaining(['--yes', '--prefer-online', 'specrails-core@latest', 'init', '--yes', '--from-config'])
+        expect.arrayContaining(['--yes', '--prefer-online', CORE_PACKAGE_SPEC, 'init', '--yes', '--from-config'])
       )
       const fromConfigIdx = (spawnArgs as string[]).indexOf('--from-config')
       expect(fromConfigIdx).toBeGreaterThanOrEqual(0)
@@ -718,7 +719,7 @@ describe('SetupManager', () => {
       )
     })
 
-    it('spawns npx specrails-core@latest init --from-config <configPath>', () => {
+    it('spawns npx specrails-core (pinned spec) init --from-config <configPath>', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
 
@@ -726,7 +727,7 @@ describe('SetupManager', () => {
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'npx',
-        expect.arrayContaining(['specrails-core@latest', 'init', '--from-config']),
+        expect.arrayContaining([CORE_PACKAGE_SPEC, 'init', '--from-config']),
         expect.objectContaining({ cwd: '/path/to/project' })
       )
     })
