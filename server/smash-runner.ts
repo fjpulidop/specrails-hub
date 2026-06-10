@@ -52,6 +52,7 @@ export type SmashFailureReason =
   | 'timeout'
   | 'invalid-output'
   | 'mutation-failed'
+  | 'in-progress'
 
 export interface SmashDeps {
   db: DbInstance
@@ -349,9 +350,13 @@ export function applySmashUndo(
     }
     target.is_epic = false
     // Restore the pre-SMASH status from metadata if available.
+    // B61: 'done' was missing from this whitelist, so undoing a SMASH on a ticket
+    // that was 'done' before silently demoted it to 'todo'. Include every valid
+    // non-epic status.
     const md = (target.metadata ?? {}) as { pre_smash_status?: string }
     if (md.pre_smash_status === 'todo' || md.pre_smash_status === 'in_progress'
-        || md.pre_smash_status === 'cancelled' || md.pre_smash_status === 'draft') {
+        || md.pre_smash_status === 'cancelled' || md.pre_smash_status === 'draft'
+        || md.pre_smash_status === 'done') {
       target.status = md.pre_smash_status
     } else {
       target.status = 'todo'
@@ -478,6 +483,12 @@ function recordChildrenInvocations(
 /**
  * Fire a SMASH attempt for a single ticket.
  */
+// B60: in-process guard against concurrent SMASH of the same ticket. Eligibility
+// is checked pre-spawn (not under the store lock), so two near-simultaneous
+// requests would both pass the gate and each spawn a child set → duplicates.
+// Keyed by `${projectId}:${ticketId}` so distinct projects don't collide.
+const _smashInFlight = new Set<string>()
+
 export async function runSmash(
   deps: SmashDeps,
   ticketId: number,
@@ -494,6 +505,16 @@ export async function runSmash(
   if (isSpecsSmashKillSwitchActive()) {
     return { ok: false, reason: 'disabled', ticketId, runId }
   }
+
+  // B60: reject a concurrent SMASH of the same ticket. The has-check + add are
+  // synchronous (no await between them), so they close the TOCTOU window the
+  // pre-flight eligibility check leaves open. Released in the finally below.
+  const inFlightKey = `${deps.projectId}:${ticketId}`
+  if (_smashInFlight.has(inFlightKey)) {
+    return { ok: false, reason: 'in-progress', ticketId, runId }
+  }
+  _smashInFlight.add(inFlightKey)
+  try {
 
   // Pre-flight: read store and check eligibility.
   const filePath = resolveTicketStoragePath(deps.projectPath)
@@ -686,6 +707,10 @@ export async function runSmash(
     ticketId,
     runId,
     childrenIds: applied.children.map((c) => c.id),
+  }
+  } finally {
+    // B60: always release the in-flight guard (success, failure, or throw).
+    _smashInFlight.delete(inFlightKey)
   }
 }
 

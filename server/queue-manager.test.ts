@@ -172,6 +172,25 @@ describe('QueueManager', () => {
       expect(() => qm.cancel('no-such-id')).toThrow(JobNotFoundError)
     })
 
+    it('M20: canceling a queued job fires onJobFinished(canceled) for rail cleanup', () => {
+      vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+      vi.mocked(mockSpawn).mockReturnValue(createMockChildProcess() as any)
+      vi.mocked(mockUuidV4)
+        .mockReturnValueOnce('job-running' as any)
+        .mockReturnValueOnce('job-queued' as any)
+      const onJobFinished = vi.fn()
+      const qm2 = new QueueManager(broadcast, undefined, undefined, undefined, { onJobFinished })
+
+      qm2.enqueue('/implement #1') // takes the active slot
+      qm2.enqueue('/implement #2') // stays queued
+
+      const result = qm2.cancel('job-queued')
+
+      expect(result).toBe('canceled')
+      // Previously this callback never fired for a queued cancel, leaving rails stuck.
+      expect(onJobFinished).toHaveBeenCalledWith('job-queued', 'canceled', undefined)
+    })
+
     it('on a completed job: throws JobAlreadyTerminalError', async () => {
       vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
       const child = createMockChildProcess()

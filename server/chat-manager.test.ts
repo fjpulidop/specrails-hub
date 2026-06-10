@@ -316,6 +316,27 @@ describe('ChatManager', () => {
     await sendPromise
   })
 
+  it('M13: rejects a concurrent second turn during the explore-slot await (no double spawn)', async () => {
+    const convId = 'conv-m13'
+    createConversation(db, { id: convId, model: 'claude-sonnet-4-5', kind: 'explore' })
+    vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
+    const child = createMockChildProcess()
+    vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+    // First turn reserves synchronously, then suspends on the explore-slot await.
+    const p1 = cm.sendMessage(convId, 'first')
+    // Second turn runs synchronously up to the guard, sees the reservation, bails.
+    const p2 = cm.sendMessage(convId, 'second')
+
+    await p2 // resolves quickly (rejected by the reservation guard)
+    await finishProcess(child, 0)
+    await p1
+
+    // Without the synchronous reservation both would have passed the has()-guards
+    // during the await and spawned twice.
+    expect(mockSpawn).toHaveBeenCalledTimes(1)
+  })
+
   // ─── Test 11: abort on non-active conversation does nothing ────────────────
 
   it('abort on non-active conversation does nothing', () => {

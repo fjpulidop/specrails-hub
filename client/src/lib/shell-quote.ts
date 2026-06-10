@@ -13,13 +13,13 @@ export function quotePosix(path: string): string {
 }
 
 /**
- * Windows cmd.exe: wrap in double quotes; escape inner double quotes by
- * doubling them (`""`). Caret-escape cmd metacharacters that retain their
- * meaning even inside double quotes (the percent sign and the caret itself).
+ * Windows cmd.exe ONLY: wrap in double quotes; escape inner double quotes by
+ * doubling (`""`) and caret-escape cmd metacharacters (`%`, `^`).
  *
- * This is conservative — it works for both cmd.exe and PowerShell when the
- * argument is going to be pasted into the terminal as a string, since both
- * accept double-quoted paths as a single token.
+ * ⚠️ NOT safe for PowerShell (M3): inside a PowerShell double-quoted string,
+ * `$(...)` and backtick are interpolated, so a path like `$(calc.exe).txt` would
+ * execute once the line reaches the prompt. Use `quoteWindowsPowerShell` for
+ * PowerShell. Retained only for callers that KNOW the target shell is cmd.exe.
  */
 export function quoteWindowsCmd(path: string): string {
   const escaped = path
@@ -30,12 +30,22 @@ export function quoteWindowsCmd(path: string): string {
 }
 
 /**
- * Pick the right quoting for the host runtime. We default to POSIX outside of
- * Windows; callers that know the target shell explicitly can use the specific
- * function.
+ * Windows PowerShell: single-quote the path. PowerShell single-quoted strings
+ * perform NO interpolation — `$`, `$(...)`, and backtick are all literal — so
+ * this is injection-safe (M3). Inner single quotes are doubled (`''`).
+ */
+export function quoteWindowsPowerShell(path: string): string {
+  return `'${path.replace(/'/g, "''")}'`
+}
+
+/**
+ * Pick the right quoting for the host runtime. POSIX outside Windows; on Windows
+ * we quote for PowerShell — the integrated terminal's default shell
+ * (server resolveShell → powershell.exe) — which (unlike cmd.exe) interpolates
+ * inside double quotes, so cmd-style quoting would be an injection sink (M3).
  */
 export function quoteForHost(path: string, isWindows: boolean): string {
-  return isWindows ? quoteWindowsCmd(path) : quotePosix(path)
+  return isWindows ? quoteWindowsPowerShell(path) : quotePosix(path)
 }
 
 /** Join multiple paths separated by spaces, each individually quoted. */

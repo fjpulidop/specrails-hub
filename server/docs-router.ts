@@ -161,9 +161,17 @@ function buildCategories(docsDir: string): DocCategory[] {
 }
 
 function isValidCategorySlug(cat: string): boolean {
-  // basename(cat) === cat guards against traversal; the existence check is
-  // done by the route handler.
-  return cat.length > 0 && cat === path.basename(cat) && !cat.includes('/') && !cat.includes('\\')
+  // basename(cat) === cat guards against slashes, but `path.basename('..') === '..'`,
+  // so '.'/'..' slip through and `path.join(docsDir, '..', ...)` escapes one level
+  // up (B4). Reject the dot segments explicitly.
+  return (
+    cat.length > 0 &&
+    cat !== '.' &&
+    cat !== '..' &&
+    cat === path.basename(cat) &&
+    !cat.includes('/') &&
+    !cat.includes('\\')
+  )
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -198,6 +206,14 @@ export function createDocsRouter(): Router {
       category === TOP_LEVEL_CATEGORY_SLUG
         ? path.join(docsDir, `${safeSlug}.md`)
         : path.join(docsDir, category, `${safeSlug}.md`)
+
+    // B4: defence-in-depth — never serve a file resolved outside docsDir, even
+    // if a future change loosens the slug/category validation above.
+    const rel = path.relative(path.resolve(docsDir), path.resolve(filePath))
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      res.status(404).json({ error: 'Document not found' })
+      return
+    }
 
     if (!fs.existsSync(filePath)) {
       res.status(404).json({ error: 'Document not found' })

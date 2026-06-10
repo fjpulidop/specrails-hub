@@ -57,11 +57,16 @@ function loadSpecOrder(projectId: string | null): number[] | null {
 
 function saveSpecOrder(projectId: string | null, ids: number[] | null) {
   if (!projectId) return
-  if (ids) {
-    localStorage.setItem(`specrails-hub:spec-order:${projectId}`, JSON.stringify(ids))
-  } else {
-    localStorage.removeItem(`specrails-hub:spec-order:${projectId}`)
-  }
+  // B23: these run inside setState updaters; an uncaught throw (quota exceeded,
+  // Safari private mode) would crash the Dashboard render. Persistence is
+  // best-effort — losing it is acceptable, crashing is not.
+  try {
+    if (ids) {
+      localStorage.setItem(`specrails-hub:spec-order:${projectId}`, JSON.stringify(ids))
+    } else {
+      localStorage.removeItem(`specrails-hub:spec-order:${projectId}`)
+    }
+  } catch { /* non-fatal */ }
 }
 
 interface PersistedRail {
@@ -87,7 +92,10 @@ function loadRails(projectId: string | null): RailState[] | null {
 
 function saveRails(projectId: string | null, rails: RailState[]) {
   if (!projectId) return
-  localStorage.setItem(`specrails-hub:rails:${projectId}`, JSON.stringify(rails))
+  // B23: best-effort persistence (see saveSpecOrder) — never crash the render.
+  try {
+    localStorage.setItem(`specrails-hub:rails:${projectId}`, JSON.stringify(rails))
+  } catch { /* non-fatal */ }
 }
 
 export default function DashboardPage() {
@@ -678,9 +686,17 @@ export default function DashboardPage() {
     const rail = rails[railIndex]
     if (rail.ticketIds.length === 0) return
 
+    // M24: capture the API base ONCE up front. getApiBase() is a module-level
+    // store that flips on project switch; evaluating it on both sides of the
+    // await below let a mid-flight switch (e.g. hub.project_added auto-activation,
+    // a minimized-chat restore) send the ticket sync to project A but the launch
+    // POST to project B — spawning a --dangerously-skip-permissions pipeline on the
+    // wrong repo. Pinning the base keeps both calls on the project the user aimed at.
+    const base = getApiBase()
+
     // Sync ticket assignments to server before launching
     try {
-      await fetch(`${getApiBase()}/rails/${railIndex}/tickets`, {
+      await fetch(`${base}/rails/${railIndex}/tickets`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticketIds: rail.ticketIds }),
@@ -692,7 +708,7 @@ export default function DashboardPage() {
 
     // Launch via rails API — server handles job tracking + rail.job_completed events
     try {
-      const res = await fetch(`${getApiBase()}/rails/${railIndex}/launch`, {
+      const res = await fetch(`${base}/rails/${railIndex}/launch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

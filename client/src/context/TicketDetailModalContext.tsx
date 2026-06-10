@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react'
 import { useTickets } from '../hooks/useTickets'
+import { useHub } from '../hooks/useHub'
 import { SplitViewShell } from '../components/SplitViewShell'
 import { TicketDetailModal } from '../components/TicketDetailModal'
 
@@ -103,6 +104,16 @@ const COMPARE_VIEWPORT_MIN = 900
 export function TicketDetailModalProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reduceSplit, INITIAL_STATE)
   const { tickets, updateTicket, deleteTicket } = useTickets()
+  const { activeProjectId } = useHub()
+
+  // M22: this provider sits ABOVE the project-keyed route boundary, so an open
+  // modal / split-view survives a project switch. Ticket ids are per-project
+  // sequential integers (they collide across projects), so `tickets.find(id ===
+  // leftId)` would silently re-bind to a DIFFERENT project's ticket with the same
+  // id — and Save would PATCH the wrong project. Close everything on switch.
+  useEffect(() => {
+    dispatch({ type: 'closeAll' })
+  }, [activeProjectId])
 
   const openTicketDetail = useCallback((id: number) => dispatch({ type: 'openCentered', id }), [])
   const closeTicketDetail = useCallback(() => dispatch({ type: 'closeAll' }), [])

@@ -124,6 +124,14 @@ describe('getHubAnalytics', () => {
     expect(result.period.label).toBe('Last 30 days')
   })
 
+  it('B42: period=custom with malformed dates does not throw (RangeError guard)', () => {
+    const registry = makeRegistry([{ id: 'p1', name: 'A', db: makeProjectDb([{ costUsd: 0.01, status: 'completed' }]) }])
+    // Garbage from/to — previously flowed into new Date(...).toISOString() → 500.
+    expect(() => getHubAnalytics(registry, { period: 'custom', from: 'not-a-date', to: 'xx' })).not.toThrow()
+    // A valid single bound is honored without throwing either.
+    expect(() => getHubAnalytics(registry, { period: 'custom', from: '2026-01-01', to: 'garbage' })).not.toThrow()
+  })
+
   it('jobsToday and costToday reflect only today\'s data', () => {
     const today = new Date().toISOString().slice(0, 10)
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)

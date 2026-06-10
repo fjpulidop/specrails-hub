@@ -332,4 +332,62 @@ describe('getSpending edge cases', () => {
     const r = getSpending(db, 'p1', { period: 'all', ticketId: 7 })
     expect(r.summary.totalCostUsd).toBe(1)
   })
+
+  // M18: byMode counts DISTINCT tickets, not rows.
+  it('byMode ticketsCreated counts distinct tickets, not turn rows', () => {
+    const now = new Date().toISOString()
+    // One Explore spec, 3 turn-rows all back-filled with the same ticket_id.
+    seed(db, [
+      { id: 'e1', surface: 'explore-spec', status: 'success', ticket_id: 42, total_cost_usd: 1, conversation_id: 'c1', started_at: now },
+      { id: 'e2', surface: 'explore-spec', status: 'success', ticket_id: 42, total_cost_usd: 2, conversation_id: 'c1', started_at: now },
+      { id: 'e3', surface: 'explore-spec', status: 'success', ticket_id: 42, total_cost_usd: 3, conversation_id: 'c1', started_at: now },
+    ])
+    const r = getSpending(db, 'p1', { period: 'all' })
+    const explore = r.byMode.find((m) => m.mode === 'explore')!
+    expect(explore.totalRuns).toBe(3)        // 3 turn rows
+    expect(explore.ticketsCreated).toBe(1)   // but only ONE ticket
+    // avgCostPerSpec = total success ticket cost (6) / distinct successful tickets (1)
+    expect(explore.avgCostPerSpec).toBeCloseTo(6)
+  })
+})
+
+describe('daily timeline (B58/B63)', () => {
+  let db: DbInstance
+  beforeEach(() => { db = initDb(':memory:') })
+
+  it('B58: timeline stacks file-summary cost into fileSummaryCostUsd', () => {
+    const now = new Date().toISOString()
+    seed(db, [
+      { id: 'fs', surface: 'file-summary', status: 'success', total_cost_usd: 0.5, started_at: now },
+    ])
+    const r = getSpending(db, 'p1', { period: '30d' })
+    const total = r.dailyTimeline.reduce((s, d) => s + d.fileSummaryCostUsd, 0)
+    expect(total).toBeCloseTo(0.5)
+  })
+
+  it('B63: period "all" does not zero-fill from 1970 (bounded timeline)', () => {
+    const now = new Date().toISOString()
+    seed(db, [{ id: 'a', surface: 'job', status: 'success', total_cost_usd: 1, started_at: now }])
+    const r = getSpending(db, 'p1', { period: 'all' })
+    // Clamped to the first day with data → a handful of entries, not ~20k.
+    expect(r.dailyTimeline.length).toBeLessThan(5)
+  })
+
+  it('B63: period "all" with no data yields an empty-ish timeline, not 20k days', () => {
+    const r = getSpending(db, 'p1', { period: 'all' })
+    expect(r.dailyTimeline.length).toBeLessThanOrEqual(1)
+  })
+})
+
+describe('parseSpendingFilters surface validation (M17)', () => {
+  it('accepts smash and file-summary surfaces', () => {
+    expect(parseSpendingFilters({ surface: 'smash' }).surface).toEqual(['smash'])
+    expect(parseSpendingFilters({ surface: 'file-summary' }).surface).toEqual(['file-summary'])
+  })
+  it('keeps mixed valid surfaces intact (does not silently drop smash)', () => {
+    expect(parseSpendingFilters({ surface: 'job,smash' }).surface).toEqual(['job', 'smash'])
+  })
+  it('drops unknown surfaces', () => {
+    expect(parseSpendingFilters({ surface: 'job,bogus' }).surface).toEqual(['job'])
+  })
 })

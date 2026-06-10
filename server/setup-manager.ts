@@ -7,6 +7,7 @@ import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
 import { findCoreContract, detectCLISync, CLIProvider } from './core-compat'
 import { spawnAiCli } from './util/cli-prompt'
+import { spawnCli } from './util/win-spawn'
 import { formatMissingSetupPrerequisites } from './setup-prerequisites'
 import { getAdapter } from './providers'
 import type { ProviderAdapter, SpawnAction } from './providers/types'
@@ -58,12 +59,15 @@ function buildCoreArgs(args: string[]): { bin: string; fullArgs: string[] } {
 function spawnCoreInit(args: string[], cwd: string): ChildProcess {
   const { bin, fullArgs } = buildCoreArgs(['init', ...args])
   console.log(`[SetupManager] spawning core: ${bin} ${fullArgs.join(' ')} (cwd=${cwd}) (SPECRAILS_CORE_BIN=${process.env.SPECRAILS_CORE_BIN ?? '<unset>'})`)
-  return spawn(bin, fullArgs, {
+  // M15: use the cross-spawn wrapper instead of `spawn(..., { shell: win32 })`.
+  // With shell:true, Node concatenates the argv into one cmd.exe command line and
+  // does NOT quote individual args, so `--from-config C:\Users\John Doe\...yaml`
+  // (and `--root-dir <path with spaces>`) split on the space and break install on
+  // any Windows account/project path containing a space. cross-spawn resolves the
+  // .cmd shim AND quotes each arg, so spaces (and newlines) survive intact.
+  return spawnCli(bin, fullArgs, {
     cwd,
     env: process.env,
-    // npx / specrails-hub / claude / codex are .cmd shims on Windows;
-    // Node requires shell: true for .cmd after CVE-2024-27980.
-    shell: process.platform === 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 }

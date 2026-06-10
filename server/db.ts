@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import Database from 'better-sqlite3'
 import type { JobRow, EventRow, StatsRow, JobStatus, JobPriority, ChatConversationRow, ChatMessageRow, ActivityItem } from './types'
+import { secureDir, secureDbFile } from './util/secure-fs'
 
 // ─── Proposal types ───────────────────────────────────────────────────────────
 
@@ -597,8 +598,19 @@ function applyMigrations(db: DbInstance): void {
   for (let i = 0; i < MIGRATIONS.length; i++) {
     const version = i + 1
     if (!appliedVersions.has(version)) {
-      MIGRATIONS[i](db)
-      db.prepare('INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)').run(version)
+      // M8: run each migration body and its version INSERT atomically. SQLite DDL
+      // is transactional, so a crash/failure mid-migration now rolls back the
+      // whole body instead of leaving a half-applied schema with the version
+      // unrecorded — which under the old code re-ran a bare `ALTER TABLE ADD
+      // COLUMN` on next startup and bricked it forever with 'duplicate column
+      // name'. With this, a failed migration leaves nothing applied and re-runs
+      // cleanly. (Pre-existing half-applied DBs are contained by the per-project
+      // load isolation in project-registry.ts — one bad DB no longer kills the hub.)
+      const tx = db.transaction(() => {
+        MIGRATIONS[i](db)
+        db.prepare('INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)').run(version)
+      })
+      tx()
     }
   }
 }
@@ -609,6 +621,7 @@ export function initDb(dbPath: string): DbInstance {
   if (dbPath !== ':memory:') {
     const dir = path.dirname(dbPath)
     fs.mkdirSync(dir, { recursive: true })
+    secureDir(dir) // H-13: owner-only data dir
   }
 
   const db = new Database(dbPath)
@@ -616,6 +629,11 @@ export function initDb(dbPath: string): DbInstance {
   db.pragma('foreign_keys = ON')
 
   applyMigrations(db)
+
+  // H-13: restrict the db + its WAL sidecars to 0600 (jobs.sqlite holds chat
+  // transcripts and verbatim terminal command history). After migrations the
+  // WAL/SHM files exist, so this covers them too.
+  secureDbFile(dbPath)
 
   // Orphan sweep: mark any running jobs as failed on startup
   db.prepare(
@@ -764,7 +782,24 @@ export function getJobEvents(
 }
 
 export function deleteJob(db: DbInstance, jobId: string): void {
-  db.prepare('DELETE FROM jobs WHERE id = ?').run(jobId)
+  // M7: jobs.depends_on_job_id REFERENCES jobs(id) with no ON DELETE action and
+  // foreign_keys=ON, so deleting a pipeline parent throws 'FOREIGN KEY
+  // constraint failed' and the job becomes undeletable from the UI. Clear inbound
+  // references first, in the same transaction as the delete, so it always
+  // succeeds (children keep running; they just lose the now-irrelevant pointer).
+  const tx = db.transaction((id: string) => {
+    db.prepare('UPDATE jobs SET depends_on_job_id = NULL WHERE depends_on_job_id = ?').run(id)
+    // B41: events/job_phases cascade on the jobs FK, but telemetry_blobs/
+    // telemetry_summaries (keyed `jobId`), job_profiles and file_provenance
+    // (keyed `job_id`) have no FK — without these they accumulate forever. (The
+    // on-disk .ndjson.gz blob is reclaimed by the 7-day startup compactor.)
+    db.prepare('DELETE FROM telemetry_blobs WHERE jobId = ?').run(id)
+    db.prepare('DELETE FROM telemetry_summaries WHERE jobId = ?').run(id)
+    db.prepare('DELETE FROM job_profiles WHERE job_id = ?').run(id)
+    db.prepare('DELETE FROM file_provenance WHERE job_id = ?').run(id)
+    db.prepare('DELETE FROM jobs WHERE id = ?').run(id)
+  })
+  tx(jobId)
 }
 
 export function purgeJobs(
@@ -785,13 +820,26 @@ export function purgeJobs(
 
   const where = conditions.join(' AND ')
 
-  // Delete associated events first
-  db.prepare(`DELETE FROM events WHERE job_id IN (SELECT id FROM jobs WHERE ${where})`).run(...params)
-  // Delete associated phases
-  db.prepare(`DELETE FROM job_phases WHERE job_id IN (SELECT id FROM jobs WHERE ${where})`).run(...params)
-  // Delete the jobs
-  const result = db.prepare(`DELETE FROM jobs WHERE ${where}`).run(...params)
-  return result.changes
+  // M6: run the whole purge atomically. Previously these statements ran without a
+  // transaction, so when the final `DELETE FROM jobs` aborted on the
+  // depends_on_job_id FK (a purged job still referenced by a non-purged one), the
+  // events/phases deletes had already committed — destroying log history while
+  // deleting zero job rows, and a misleading 500. The transaction rolls back on
+  // any failure, and NULL-ing inbound references first makes the delete succeed.
+  const tx = db.transaction(() => {
+    const sel = `SELECT id FROM jobs WHERE ${where}`
+    db.prepare(`DELETE FROM events WHERE job_id IN (${sel})`).run(...params)
+    db.prepare(`DELETE FROM job_phases WHERE job_id IN (${sel})`).run(...params)
+    // B41: also purge the no-FK orphan tables for the same jobs.
+    db.prepare(`DELETE FROM telemetry_blobs WHERE jobId IN (${sel})`).run(...params)
+    db.prepare(`DELETE FROM telemetry_summaries WHERE jobId IN (${sel})`).run(...params)
+    db.prepare(`DELETE FROM job_profiles WHERE job_id IN (${sel})`).run(...params)
+    db.prepare(`DELETE FROM file_provenance WHERE job_id IN (${sel})`).run(...params)
+    // Clear inbound FK references from NON-purged jobs to purged jobs.
+    db.prepare(`UPDATE jobs SET depends_on_job_id = NULL WHERE depends_on_job_id IN (${sel})`).run(...params)
+    return db.prepare(`DELETE FROM jobs WHERE ${where}`).run(...params).changes
+  })
+  return tx() as number
 }
 
 // ─── Activity feed ────────────────────────────────────────────────────────────

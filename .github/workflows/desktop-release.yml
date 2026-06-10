@@ -11,6 +11,10 @@ permissions:
 env:
   NODE_BUNDLE_VERSION: "22.x"
   GIT_BUNDLE_VERSION: "2.49.0"
+  # Hostinger stores large desktop installers twice: once in latest/ and once
+  # in a versioned folder. Keep the current and previous version on Hostinger;
+  # GitHub Releases remains the long-term archive.
+  HOSTINGER_VERSIONED_RELEASES_TO_KEEP: "2"
   # Bundle a Chromium build for the embedded browser-capture feature ("Add Spec
   # from browser"). Default OFF: when unset/false the desktop app falls back to a
   # Playwright-managed Chromium downloaded on first use (server/chromium-resolver.ts
@@ -891,19 +895,91 @@ jobs:
           if ! gh release view "${TAG}" >/dev/null 2>&1; then
             gh release create "${TAG}" --title "SpecRails Hub ${TAG}" --notes "SpecRails Hub ${TAG}"
           fi
-          gh release upload "${TAG}" updater/* --clobber
+          # GitHub Releases is the durable archive. Hostinger only retains the
+          # current and previous versioned folders to stay within its quota.
+          gh release upload "${TAG}" updater/* artifacts/canonical/* --clobber
 
-      # Pre-existing versioned upload. Uploads only the canonical-named
-      # installers (artifacts/canonical/) — the per-job subdirectories with
-      # raw Tauri filenames stay out so the versioned folder mirrors what
-      # consumers expect.
+      # Prune old Hostinger archives before uploading the next ~1.8 GB release.
+      # Without retention, every release permanently consumes another ~1.8 GB
+      # and Hostinger eventually aborts uploads with FTP 451 I/O errors.
+      - name: Prune old versioned installers from Hostinger
+        env:
+          HOST: ${{ secrets.HOSTINGER_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          root="domains/specrails.dev/public_html/downloads/specrails-hub"
+          current="${{ steps.vars.outputs.tag }}"
+          keep_total="${HOSTINGER_VERSIONED_RELEASES_TO_KEEP}"
+
+          if [[ ! "${keep_total}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "HOSTINGER_VERSIONED_RELEASES_TO_KEEP must be a positive integer"
+            exit 1
+          fi
+
+          mapfile -t versions < <(
+            curl --fail --silent --show-error --ftp-pasv --ssl-reqd \
+              --user "${FTP_USER}:${FTP_PASS}" \
+              "ftps://${HOST}/${root}/" --list-only \
+              | tr -d '\r' \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+              | grep -Fvx "${current}" \
+              | sort -V || true
+          )
+
+          # The incoming release occupies one retention slot.
+          keep_existing=$((keep_total - 1))
+          prune_count=$((${#versions[@]} - keep_existing))
+          if (( prune_count <= 0 )); then
+            echo "No old versioned Hostinger releases to prune"
+            exit 0
+          fi
+
+          for version in "${versions[@]:0:prune_count}"; do
+            echo "Pruning Hostinger archive: ${version}"
+            remote="${root}/${version}"
+            mapfile -t files < <(
+              curl --fail --silent --show-error --ftp-pasv --ssl-reqd \
+                --user "${FTP_USER}:${FTP_PASS}" \
+                "ftps://${HOST}/${remote}/" --list-only \
+                | tr -d '\r'
+            )
+
+            quote_args=()
+            for file in "${files[@]}"; do
+              [[ -z "${file}" ]] && continue
+              if [[ "${file}" == */* || "${file}" == "." || "${file}" == ".." ]]; then
+                echo "Refusing to delete unexpected entry in ${remote}: ${file}"
+                exit 1
+              fi
+              quote_args+=(--quote "DELE ${remote}/${file}")
+            done
+            quote_args+=(--quote "RMD ${remote}")
+
+            curl --fail --silent --show-error --ftp-pasv --ssl-reqd \
+              --user "${FTP_USER}:${FTP_PASS}" \
+              "${quote_args[@]}" \
+              "ftps://${HOST}/" \
+              --output /dev/null
+          done
+
+      # Upload only the canonical-named installers (artifacts/canonical/). The
+      # per-job subdirectories with raw Tauri filenames stay out so the
+      # versioned folder mirrors what consumers expect.
       - name: Deploy versioned installers to Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.HOSTINGER_HOST }}
           username: ${{ secrets.HOSTINGER_USER }}
           password: ${{ secrets.HOSTINGER_PASSWORD }}
-          protocol: ftp
+          # A4: FTPS (FTP over explicit TLS) so the Hostinger credentials and the
+          # installer/manifest bytes are encrypted in transit. Plaintext `ftp`
+          # leaked both to any on-path observer between the runner and Hostinger,
+          # who could then replace the (unsigned Windows) installer + its manifest
+          # sha256. If Hostinger ever rejects explicit FTPS on this host, revert to
+          # `ftp` AND move first-install distribution to the signed GitHub Release.
+          protocol: ftps
           local-dir: ./artifacts/canonical/
           server-dir: domains/specrails.dev/public_html/downloads/specrails-hub/${{ steps.vars.outputs.tag }}/
 
@@ -933,7 +1009,7 @@ jobs:
           # List the directory. Returns just filenames when using --list-only.
           # Match .dmg (mac), .exe (Windows NSIS), .msi (Windows MSI). Do NOT
           # delete manifest.json (it gets overwritten) or .htaccess (server-managed).
-          stale="$(curl -s --ftp-pasv --user "${FTP_USER}:${FTP_PASS}" "ftp://${HOST}/${remote}" --list-only | grep -E '\.(dmg|exe|msi)$' || true)"
+          stale="$(curl -s --ftp-pasv --ssl-reqd --user "${FTP_USER}:${FTP_PASS}" "ftps://${HOST}/${remote}" --list-only | grep -E '\.(dmg|exe|msi)$' || true)"
           if [[ -z "${stale}" ]]; then
             echo "No stale installer files in latest/"
             exit 0
@@ -941,9 +1017,9 @@ jobs:
           while IFS= read -r f; do
             [[ -z "${f}" ]] && continue
             echo "Deleting stale: ${f}"
-            curl -s --ftp-pasv --user "${FTP_USER}:${FTP_PASS}" \
+            curl -s --ftp-pasv --ssl-reqd --user "${FTP_USER}:${FTP_PASS}" \
               -Q "DELE ${remote}${f}" \
-              "ftp://${HOST}/${remote}" || echo "  (DELE failed for ${f}; continuing)"
+              "ftps://${HOST}/${remote}" || echo "  (DELE failed for ${f}; continuing)"
           done <<< "${stale}"
 
       - name: Upload new installers to latest/
@@ -961,10 +1037,10 @@ jobs:
             "${{ steps.rename.outputs.msi_x64_path }}" \
             "${{ steps.rename.outputs.exe_arm64_path }}" \
             "${{ steps.rename.outputs.msi_arm64_path }}"; do
-            curl --fail --silent --show-error --ftp-pasv --ftp-create-dirs \
+            curl --fail --silent --show-error --ftp-pasv --ssl-reqd --ftp-create-dirs \
               --user "${FTP_USER}:${FTP_PASS}" \
               -T "${file}" \
-              "ftp://${HOST}/${remote}"
+              "ftps://${HOST}/${remote}"
             echo "Uploaded $(basename "${file}") to ${remote}"
           done
 
@@ -1007,10 +1083,10 @@ jobs:
           remote="domains/specrails.dev/public_html/downloads/specrails-hub/latest/"
           # --ftp-create-dirs is defensive; latest/ should already exist from
           # the previous step but we keep the flag for idempotency.
-          curl --fail --silent --show-error --ftp-pasv --ftp-create-dirs \
+          curl --fail --silent --show-error --ftp-pasv --ssl-reqd --ftp-create-dirs \
             --user "${FTP_USER}:${FTP_PASS}" \
             -T manifest/manifest.json \
-            "ftp://${HOST}/${remote}"
+            "ftps://${HOST}/${remote}"
           echo "Uploaded manifest.json to ${remote}"
 
       - name: Verify manifest.json is reachable and valid JSON

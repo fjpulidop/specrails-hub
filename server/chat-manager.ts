@@ -92,6 +92,11 @@ export class ChatManager {
   private _broadcast: (msg: WsMessage) => void
   private _db: DbInstance
   private _activeProcesses: Map<string, ChildProcess>
+  /** M13: conversations with a turn in-flight but not yet spawned. Closes the
+   *  TOCTOU window between sendMessage's initial guard and `_activeProcesses.set`
+   *  across the explore-slot/attachment awaits, so a second concurrent POST for
+   *  the same conversation is rejected instead of double-spawning. */
+  private _reservedTurns: Set<string> = new Set()
   private _buffers: Map<string, string>
   private _emittedProposals: Map<string, Set<string>>
   private _abortingConversations: Set<string>
@@ -265,7 +270,13 @@ export class ChatManager {
 
   private async _waitForExploreSlot(conversationId: string): Promise<'ok' | 'busy'> {
     if (this._countStreamingExplore() < EXPLORE_MAX_CONCURRENCY) return 'ok'
-    // Try to evict an idle victim first.
+    // M14: a streaming slot is freed only when a STREAMING turn ends. The old code
+    // evicted an idle (non-streaming) victim and immediately returned 'ok' — but
+    // _findIdleExploreVictim skips streaming entries, so the victim holds no live
+    // slot and the count is unchanged. That admitted a 6th concurrent turn (and,
+    // repeated per idle/minimized entry, made the effective cap 5 + idle-count =
+    // unbounded CLI spawning). Now: prune the idle entry (memory hygiene + kill any
+    // stray child) but only grant the slot if the streaming count actually dropped.
     const victim = this._findIdleExploreVictim(conversationId)
     if (victim) {
       const child = this._activeProcesses.get(victim)
@@ -274,9 +285,9 @@ export class ChatManager {
       }
       this._clearIdleTimer(victim)
       this._exploreLifecycle.delete(victim)
-      return 'ok'
+      if (this._countStreamingExplore() < EXPLORE_MAX_CONCURRENCY) return 'ok'
     }
-    // No idle victim — queue with timeout.
+    // Still at cap — queue with timeout until a streaming turn completes.
     return new Promise<'ok' | 'busy'>((resolve) => {
       const timeoutTimer = setTimeout(() => {
         const idx = this._exploreQueue.findIndex((q) => q.conversationId === conversationId)
@@ -444,8 +455,8 @@ export class ChatManager {
   }
 
   async sendMessage(conversationId: string, userText: string, options?: SendMessageOptions): Promise<void> {
-    if (this._activeProcesses.has(conversationId)) {
-      console.warn(`[ChatManager] conversation ${conversationId} already has an active stream`)
+    if (this._activeProcesses.has(conversationId) || this._reservedTurns.has(conversationId)) {
+      console.warn(`[ChatManager] conversation ${conversationId} already has an active or pending stream`)
       return
     }
 
@@ -470,6 +481,11 @@ export class ChatManager {
       return
     }
 
+    // M13: reserve synchronously before the explore-slot / attachment awaits.
+    // Released in the finally at the end of the method — by then either
+    // _activeProcesses owns the guard (spawn succeeded) or the turn bailed out.
+    this._reservedTurns.add(conversationId)
+    try {
     // Explore: enforce per-project concurrency cap before doing any work.
     if (conversation.kind === 'explore') {
       const slot = await this._waitForExploreSlot(conversationId)
@@ -908,6 +924,12 @@ export class ChatManager {
       }
       child.on('close', onClose)
     })
+    } finally {
+      // M13: release the synchronous reservation. After _activeProcesses.set the
+      // active-process map is the guard; on any early return / throw before that,
+      // this frees the conversation for a retry.
+      this._reservedTurns.delete(conversationId)
+    }
   }
 
   abort(conversationId: string): void {

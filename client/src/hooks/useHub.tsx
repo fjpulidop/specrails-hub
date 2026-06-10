@@ -66,6 +66,12 @@ function writeSavedProjectId(id: string | null): void {
   } catch { /* ignore */ }
 }
 
+// B22: the last-active project was persisted but never read back, so a refresh
+// always activated the first-added project. This restores it.
+function readSavedProjectId(): string | null {
+  try { return localStorage.getItem(ACTIVE_PROJECT_KEY) } catch { return null }
+}
+
 export function HubProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<HubProject[]>([])
   const [activeProjectId, setActiveProjectIdRaw] = useState<string | null>(null)
@@ -119,7 +125,17 @@ export function HubProvider({ children }: { children: ReactNode }) {
       const incoming = msg.projects as HubProject[]
       setProjects(incoming)
       setActiveProjectIdRaw((prev) => {
-        const next = (prev && incoming.find((p) => p.id === prev)) ? prev : (incoming.length > 0 ? incoming[0].id : null)
+        let next: string | null
+        if (prev && incoming.find((p) => p.id === prev)) {
+          next = prev
+        } else {
+          // B22: on first resolution prefer the persisted last-active project,
+          // falling back to the first project when it's gone / unset.
+          const saved = readSavedProjectId()
+          next = (saved && incoming.find((p) => p.id === saved))
+            ? saved
+            : (incoming.length > 0 ? incoming[0].id : null)
+        }
         writeSavedProjectId(next)
         setApiActiveProjectId(next)
         return next

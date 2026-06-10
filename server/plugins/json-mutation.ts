@@ -17,16 +17,21 @@ export async function withFileLock<T>(filePath: string, fn: () => Promise<T>): P
   const previous = _locks.get(key) ?? Promise.resolve()
   let release: () => void
   const next = new Promise<void>((resolve) => { release = resolve })
-  _locks.set(key, previous.then(() => next))
+  // B74: hold the SAME promise reference we store, so the finally can compare by
+  // identity. The old code rebuilt `previous.then(() => next)` in the finally — a
+  // fresh promise that never matched, so the cleanup never ran and `_locks` grew
+  // one entry per distinct file path forever.
+  const chained = previous.then(() => next)
+  _locks.set(key, chained)
   try {
     await previous
     return await fn()
   } finally {
     release!()
-    // Cleanup if we're still the tail of the queue.
-    if (_locks.get(key) === previous.then(() => next)) {
-      // The expression above is a fresh promise; comparing to it never matches.
-      // We use a safer cleanup based on identity below.
+    // Drop the entry only if no later caller has chained onto us (i.e. we are
+    // still the tail). Otherwise their chain depends on ours — leave it.
+    if (_locks.get(key) === chained) {
+      _locks.delete(key)
     }
   }
 }

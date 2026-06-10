@@ -96,20 +96,40 @@ const LOCK_STALE_MS = 10_000 // 10 seconds
 
 // ─── Path resolution ─────────────────────────────────────────────────────────
 
+/** True when `candidate` resolves to a path inside (or equal to) `root`. */
+function isContainedIn(root: string, candidate: string): boolean {
+  const normalizedRoot = path.resolve(root)
+  const rel = path.relative(normalizedRoot, candidate)
+  // Inside the root: relative path is non-empty, does not climb out with '..',
+  // and is not absolute (which path.relative returns when on a different drive).
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel)
+}
+
 export function resolveTicketStoragePath(projectPath: string): string {
+  const fallback = path.resolve(projectPath, DEFAULT_STORAGE_PATH)
   // Try to read ticketProvider.storagePath from integration-contract.json
   const contractPath = path.join(projectPath, '.claude', 'integration-contract.json')
   if (fs.existsSync(contractPath)) {
     try {
       const contract = JSON.parse(fs.readFileSync(contractPath, 'utf-8'))
       if (contract.ticketProvider?.storagePath) {
-        return path.resolve(projectPath, contract.ticketProvider.storagePath)
+        const resolved = path.resolve(projectPath, contract.ticketProvider.storagePath)
+        // A2: integration-contract.json is read FROM THE PROJECT REPO and is
+        // therefore untrusted (a hostile repo added as a project). path.resolve
+        // lets an absolute or '../../..'-escaping storagePath redirect the ticket
+        // store to ANY file on disk — and every ticket mutation then overwrites
+        // that file via writeStore(). Reject anything outside the project root
+        // and fall back to the default location.
+        if (isContainedIn(projectPath, resolved)) {
+          return resolved
+        }
+        console.warn(`[ticket-store] ignoring out-of-project storagePath from integration-contract.json: ${contract.ticketProvider.storagePath}`)
       }
     } catch {
       // Fall through to default
     }
   }
-  return path.resolve(projectPath, DEFAULT_STORAGE_PATH)
+  return fallback
 }
 
 // ─── Advisory file locking ───────────────────────────────────────────────────

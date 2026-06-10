@@ -61,6 +61,10 @@ export function useProjectCache<T>({
   const [isLoading, setIsLoading] = useState(isFirstLoad)
   const fetcherRef = useRef(fetcher)
   fetcherRef.current = fetcher
+  // B27: track the live key so a late-resolving manual refresh can detect a
+  // project switch and avoid writing the previous project's data into state.
+  const keyRef = useRef(key)
+  keyRef.current = key
 
   // On project switch: restore from cache instantly, then refresh
   useEffect(() => {
@@ -112,9 +116,12 @@ export function useProjectCache<T>({
 
   const refresh = useCallback(() => {
     if (!key) return
+    const refreshKey = key
     fetcherRef.current().then((fresh) => {
-      globalCache.set(key, fresh)
-      setData(fresh)
+      // Always cache under the key the fetch was issued for…
+      globalCache.set(refreshKey, fresh)
+      // …but only push into live state if we're still on that project (B27).
+      if (keyRef.current === refreshKey) setData(fresh)
     }).catch(() => {})
   }, [key])
 

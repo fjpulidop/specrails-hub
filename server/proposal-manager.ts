@@ -18,6 +18,7 @@ export class ProposalManager {
   private _cwd: string
   private _activeProcesses: Map<string, ChildProcess>
   private _buffers: Map<string, string>
+  private _disposed = false
 
   constructor(broadcast: (msg: WsMessage) => void, db: DbInstance, cwd: string) {
     this._broadcast = broadcast
@@ -29,6 +30,20 @@ export class ProposalManager {
 
   isActive(proposalId: string): boolean {
     return this._activeProcesses.has(proposalId)
+  }
+
+  /**
+   * Tear down before the project's DB is closed (M12). Disposes so in-flight
+   * close/error handlers skip their updateProposal DB writes (which would throw
+   * on the closed connection and crash the hub), and SIGTERMs orphaned children.
+   */
+  shutdown(): void {
+    this._disposed = true
+    for (const child of this._activeProcesses.values()) {
+      if (child.pid) { try { treeKill(child.pid, 'SIGTERM') } catch { /* ignore */ } }
+    }
+    this._activeProcesses.clear()
+    this._buffers.clear()
   }
 
   async startExploration(proposalId: string, idea: string): Promise<void> {
@@ -269,6 +284,7 @@ export class ProposalManager {
         console.error(`[ProposalManager] spawn failed for ${proposalId}: ${err.message}`)
         this._activeProcesses.delete(proposalId)
         this._buffers.delete(proposalId)
+        if (this._disposed) { resolve(); return } // M12: project removed mid-flight; DB closing
         this._broadcastError(proposalId, `Failed to launch claude: ${err.message}`)
         onError()
         resolve()
@@ -278,6 +294,7 @@ export class ProposalManager {
         const fullText = this._buffers.get(proposalId) ?? ''
         this._activeProcesses.delete(proposalId)
         this._buffers.delete(proposalId)
+        if (this._disposed) { resolve(); return } // M12: project removed mid-flight; DB closing
 
         if (code === 0) {
           onSuccess(fullText, capturedSessionId)

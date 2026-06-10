@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
 import {
   initDb,
   createJob,
@@ -9,6 +12,9 @@ import {
   getJob,
   getJobEvents,
   deleteJob,
+  purgeJobs,
+  upsertTelemetryBlob,
+  getTelemetryBlob,
   getStats,
   createProposal,
   getProposal,
@@ -609,5 +615,93 @@ describe('project settings — ultracode pre-prompt', () => {
   it('getUltracodePrePrompt returns the trimmed override when set', () => {
     updateProjectSettings(db, { ultraPrePrompt: '  Custom instruction.  ' })
     expect(getUltracodePrePrompt(db)).toBe('Custom instruction.')
+  })
+
+  // ─── Fase 0 / audit: data integrity (M6/M7/M8) ───────────────────────────────
+
+  describe('deleteJob with pipeline FK (M7)', () => {
+    const now = new Date().toISOString()
+
+    it('deletes a parent job referenced by a child without throwing', () => {
+      createJob(db, { id: 'parent', command: 'c', started_at: now })
+      createJob(db, { id: 'child', command: 'c', started_at: now, depends_on_job_id: 'parent' })
+
+      expect(() => deleteJob(db, 'parent')).not.toThrow()
+      expect(getJob(db, 'parent')).toBeUndefined()
+      // Child survives with its now-dangling reference cleared.
+      const child = getJob(db, 'child')
+      expect(child).toBeDefined()
+      expect(child!.depends_on_job_id).toBeNull()
+    })
+  })
+
+  describe('purgeJobs FK + atomicity (M6)', () => {
+    const now = new Date().toISOString()
+
+    it('purges a terminal parent still referenced by a non-terminal child', () => {
+      createJob(db, { id: 'p', command: 'c', started_at: now })
+      db.prepare("UPDATE jobs SET status = 'completed' WHERE id = ?").run('p')
+      createJob(db, { id: 'c', command: 'c', started_at: now, depends_on_job_id: 'p' }) // running
+      appendEvent(db, 'p', 1, { event_type: 'log', source: 'stdout', payload: 'hi' })
+
+      const purged = purgeJobs(db)
+      expect(purged).toBe(1)
+      expect(getJob(db, 'p')).toBeUndefined()
+      // Non-terminal child survives, reference cleared, parent's events gone.
+      const child = getJob(db, 'c')
+      expect(child).toBeDefined()
+      expect(child!.depends_on_job_id).toBeNull()
+      expect(getJobEvents(db, 'p')).toEqual([])
+    })
+
+    it('purges a chain of two terminal jobs (parent + child)', () => {
+      createJob(db, { id: 'a', command: 'c', started_at: now })
+      createJob(db, { id: 'b', command: 'c', started_at: now, depends_on_job_id: 'a' })
+      db.prepare("UPDATE jobs SET status = 'completed'").run()
+
+      const purged = purgeJobs(db)
+      expect(purged).toBe(2)
+      expect(getJob(db, 'a')).toBeUndefined()
+      expect(getJob(db, 'b')).toBeUndefined()
+    })
+
+    it('B41: deleteJob removes the job\'s orphan-prone telemetry rows', () => {
+      createJob(db, { id: 'jt', command: 'c', started_at: now })
+      upsertTelemetryBlob(db, { jobId: 'jt', path: '/x.ndjson.gz', byteSize: 0, startedAt: 1, endedAt: 1, state: 'active' })
+      expect(getTelemetryBlob(db, 'jt')).toBeDefined()
+
+      deleteJob(db, 'jt')
+      expect(getJob(db, 'jt')).toBeUndefined()
+      expect(getTelemetryBlob(db, 'jt')).toBeUndefined() // no longer orphaned
+    })
+
+    it('B41: purgeJobs removes telemetry rows for purged jobs', () => {
+      createJob(db, { id: 'jp', command: 'c', started_at: now })
+      db.prepare("UPDATE jobs SET status = 'completed' WHERE id = ?").run('jp')
+      upsertTelemetryBlob(db, { jobId: 'jp', path: '/y.ndjson.gz', byteSize: 0, startedAt: 1, endedAt: 1, state: 'active' })
+
+      purgeJobs(db)
+      expect(getTelemetryBlob(db, 'jp')).toBeUndefined()
+    })
+  })
+
+  describe('migration runner idempotency (M8)', () => {
+    it('re-initializing the same on-disk db does not throw', () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'db-m8-'))
+      const dbPath = path.join(dir, 'jobs.sqlite')
+      try {
+        const d1 = initDb(dbPath)
+        d1.close()
+        // Second init re-runs the migration check against an already-migrated db.
+        let d2: DbInstance | undefined
+        expect(() => { d2 = initDb(dbPath) }).not.toThrow()
+        // And it is fully usable.
+        createJob(d2!, { id: 'x', command: 'c', started_at: new Date().toISOString() })
+        expect(getJob(d2!, 'x')).toBeDefined()
+        d2!.close()
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true })
+      }
+    })
   })
 })

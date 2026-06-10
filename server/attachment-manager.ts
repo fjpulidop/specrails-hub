@@ -78,7 +78,15 @@ export class AttachmentManager {
   }
 
   ticketDir(slug: string, ticketKey: string | number): string {
-    return path.join(this.attachmentsRoot(slug), String(ticketKey))
+    const key = String(ticketKey)
+    // B5: ticketKey is sometimes a client-supplied pendingSpecId (req.body),
+    // and this dir is the target of fs.renameSync/rmSync. Reject path separators
+    // and dot segments so it can't escape the attachments root into an arbitrary
+    // directory move/delete.
+    if (key === '' || key === '.' || key === '..' || key !== path.basename(key) || key.includes('/') || key.includes('\\')) {
+      throw new Error(`Invalid attachment ticket key: ${JSON.stringify(key)}`)
+    }
+    return path.join(this.attachmentsRoot(slug), key)
   }
 
   private sidecarPath(slug: string, ticketKey: string | number, attachmentId: string): string {

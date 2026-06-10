@@ -250,6 +250,15 @@ describe('appendContractLayerToDescription', () => {
     const out = appendContractLayerToDescription('user body\n\n\n', sampleLayer)
     expect(out.startsWith('user body\n\n---\n\n## Contract Layer')).toBe(true)
   })
+
+  it('B59: re-appending REPLACES an existing Contract Layer instead of duplicating', () => {
+    const once = appendContractLayerToDescription('user body', sampleLayer)
+    const twice = appendContractLayerToDescription(once, sampleLayer)
+    // Exactly one Contract Layer separator, and the user body is preserved once.
+    const occurrences = twice.split(CONTRACT_LAYER_SEPARATOR).length - 1
+    expect(occurrences).toBe(1)
+    expect(twice.startsWith('user body')).toBe(true)
+  })
 })
 
 describe('hasContractLayer / splitDescriptionAtContractLayer', () => {

@@ -64,6 +64,7 @@ export class AgentRefineManager {
   private _adapter: ProviderAdapter
   private _activeProcesses = new Map<string, ChildProcess>()
   private _bodyBuffers = new Map<string, string>()
+  private _disposed = false
 
   constructor(
     broadcast: (msg: WsMessage) => void,
@@ -81,6 +82,22 @@ export class AgentRefineManager {
 
   isActive(refineId: string): boolean {
     return this._activeProcesses.has(refineId)
+  }
+
+  /**
+   * Tear down before the project's DB is closed (M12). Marks the manager disposed
+   * so in-flight close/error handlers short-circuit instead of writing to a
+   * closed connection (which throws synchronously inside the EventEmitter and,
+   * with no uncaughtException handler, crashes the whole hub), and SIGTERMs any
+   * orphaned refine child. Idempotent.
+   */
+  shutdown(): void {
+    this._disposed = true
+    for (const child of this._activeProcesses.values()) {
+      if (child.pid) { try { treeKill(child.pid, 'SIGTERM') } catch { /* ignore */ } }
+    }
+    this._activeProcesses.clear()
+    this._bodyBuffers.clear()
   }
 
   /** Start a new refine session for the given custom agent. */
@@ -314,6 +331,7 @@ export class AgentRefineManager {
       child.on('error', (err) => {
         this._activeProcesses.delete(refineId)
         this._bodyBuffers.delete(refineId)
+        if (this._disposed) { resolve(); return } // M12: project removed mid-flight; DB closing
         this._emitError(refineId, `Failed to launch claude: ${err.message}`)
         updateRefineSession(this._db, refineId, { status: 'error', phase: 'idle' })
         resolve()
@@ -322,6 +340,7 @@ export class AgentRefineManager {
         this._activeProcesses.delete(refineId)
         const fullDraft = this._bodyBuffers.get(refineId) ?? ''
         this._bodyBuffers.delete(refineId)
+        if (this._disposed) { resolve(); return } // M12: project removed mid-flight; DB closing
 
         // ai_invocations capture (surface='ai-edit'). One row per refine turn.
         if (this._projectId) {

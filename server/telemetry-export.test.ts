@@ -3,7 +3,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import zlib from 'zlib'
-import { createDiagnosticZip } from './telemetry-export'
+import { createDiagnosticZip, redactSecrets } from './telemetry-export'
 import type { DiagnosticZipOpts } from './telemetry-export'
 import type { JobRow, EventRow } from './types'
 import type { TelemetryBlobRow } from './db'
@@ -322,5 +322,22 @@ describe('createDiagnosticZip — optional job fields', () => {
     })
     const str = buf.toString('utf-8')
     expect(str).toContain('NOT_JSON')
+  })
+})
+
+describe('redactSecrets (B52)', () => {
+  it('redacts KEY=VALUE secrets', () => {
+    expect(redactSecrets('export ANTHROPIC_API_KEY=sk-ant-abc123xyz')).toContain('[REDACTED]')
+    expect(redactSecrets('export ANTHROPIC_API_KEY=sk-ant-abc123xyz')).not.toContain('abc123xyz')
+    expect(redactSecrets('GITHUB_TOKEN: ghp_aaaaaaaaaaaaaaaaaaaa')).toContain('[REDACTED]')
+  })
+  it('redacts provider key prefixes and bearer tokens', () => {
+    expect(redactSecrets('key sk-abcdefghijklmnopqrstu used')).toContain('sk-[REDACTED]')
+    expect(redactSecrets('Authorization: Bearer abcdef0123456789xyz')).toContain('Bearer [REDACTED]')
+    expect(redactSecrets('token ghp_0123456789abcdef0123')).toContain('gh_[REDACTED]')
+  })
+  it('leaves ordinary log text untouched', () => {
+    const line = 'Running phase architect on ticket #42 (2 turns)'
+    expect(redactSecrets(line)).toBe(line)
   })
 })

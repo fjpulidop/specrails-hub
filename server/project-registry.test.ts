@@ -104,6 +104,19 @@ describe('ProjectRegistry', () => {
       registry.loadAll()
       expect(registry.listContexts()).toHaveLength(0)
     })
+
+    it('M9: a single failing project DB does not abort loading the rest', () => {
+      addProject(hubDb, { id: 'good', slug: 'good', name: 'Good', path: '/path/good' })
+      addProject(hubDb, { id: 'bad', slug: 'bad', name: 'Bad', path: '/path/bad' })
+      // Corrupt the bad project's db_path so initDb throws (ENOTDIR: /dev/null is
+      // not a directory, so mkdirSync of its parent fails).
+      hubDb.prepare('UPDATE projects SET db_path = ? WHERE id = ?').run('/dev/null/jobs.sqlite', 'bad')
+
+      expect(() => registry.loadAll()).not.toThrow()
+      expect(registry.getContext('good')).toBeDefined()
+      expect(registry.getContext('bad')).toBeUndefined()
+      expect(registry.listFailedProjects().map((f) => f.project.id)).toContain('bad')
+    })
   })
 
   // ─── addProject ────────────────────────────────────────────────────────────
@@ -181,6 +194,19 @@ describe('ProjectRegistry', () => {
       expect(qmShutdown).toHaveBeenCalled()
       expect(cmShutdown).toHaveBeenCalled()
       expect(smAbort).toHaveBeenCalledWith('p1')
+    })
+
+    it('M12: also disposes proposal/agentRefine/specLauncher before db.close()', () => {
+      registry.addProject({ id: 'p1', slug: 'my-proj', name: 'My Proj', path: '/path/to/proj' })
+      const ctx = registry.getContext('p1')!
+      const pmShutdown = vi.fn(); const arShutdown = vi.fn(); const slShutdown = vi.fn()
+      ;(ctx.proposalManager as unknown as { shutdown: unknown }).shutdown = pmShutdown
+      ;(ctx.agentRefineManager as unknown as { shutdown: unknown }).shutdown = arShutdown
+      ;(ctx.specLauncherManager as unknown as { shutdown: unknown }).shutdown = slShutdown
+      registry.removeProject('p1')
+      expect(pmShutdown).toHaveBeenCalled()
+      expect(arShutdown).toHaveBeenCalled()
+      expect(slShutdown).toHaveBeenCalled()
     })
   })
 

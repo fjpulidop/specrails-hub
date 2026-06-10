@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { execSync } from 'child_process'
+import { execSync, execFileSync } from 'child_process'
 import type { PhaseDefinition } from './types'
 
 export interface CommandInfo {
@@ -34,6 +34,25 @@ export interface ProjectConfig {
 function runCommand(cmd: string, cwd?: string): string | null {
   try {
     return execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, cwd }).toString().trim()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Run a command with an explicit argv array via `execFileSync` — NO shell (H-12).
+ *
+ * `runCommand` routes through `/bin/sh -c`, so any shell metacharacter in an
+ * interpolated value is a command-injection sink. `fetchIssues` builds its
+ * arguments from HTTP query params (`search`/`label`) and the git remote, so it
+ * MUST use this argv form: each argument is passed literally to the program and
+ * the shell never sees it. `runCommand` is retained only for fixed, constant
+ * detection commands (`which gh`, `gh auth status`, `git remote get-url origin`)
+ * that carry no user input.
+ */
+function runCommandArgs(file: string, args: string[], cwd?: string): string | null {
+  try {
+    return execFileSync(file, args, { stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, cwd }).toString().trim()
   } catch {
     return null
   }
@@ -264,12 +283,12 @@ export function fetchIssues(
   opts: { search?: string; label?: string; repo?: string | null; cwd?: string }
 ): IssueItem[] {
   if (tracker === 'github') {
-    const args = ['gh', 'issue', 'list', '--json', 'number,title,labels,body,url', '--limit', '50']
+    const args = ['issue', 'list', '--json', 'number,title,labels,body,url', '--limit', '50']
     if (opts.repo) args.push('--repo', opts.repo)
     if (opts.label) args.push('--label', opts.label)
     if (opts.search) args.push('--search', opts.search)
 
-    const output = runCommand(args.join(' '), opts.cwd)
+    const output = runCommandArgs('gh', args, opts.cwd)
     if (!output) return []
 
     try {
@@ -294,10 +313,10 @@ export function fetchIssues(
 
   if (tracker === 'jira') {
     const jql = opts.search ? `summary ~ "${opts.search}"` : ''
-    const args = ['jira', 'issue', 'list', '--plain', '--columns', 'KEY,SUMMARY,LABELS,STATUS']
+    const args = ['issue', 'list', '--plain', '--columns', 'KEY,SUMMARY,LABELS,STATUS']
     if (jql) args.push('--jql', jql)
 
-    const output = runCommand(args.join(' '))
+    const output = runCommandArgs('jira', args)
     if (!output) return []
 
     // Parse plain text output: KEY  SUMMARY  LABELS  STATUS

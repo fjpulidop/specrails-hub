@@ -31,6 +31,7 @@ export interface DailyEntry {
   exploreCostUsd: number
   aiEditCostUsd: number
   smashCostUsd: number
+  fileSummaryCostUsd: number
   totalCostUsd: number
 }
 export interface ScatterPoint {
@@ -290,11 +291,20 @@ export function getSpending(
     FROM ai_invocations WHERE ${where.sql}
     GROUP BY day, surface
   `).all(...where.params) as RowAggDay[]
-  const days = eachDay(range.from, range.to)
+  // B63: period 'all' resolves range.from to 1970, which would make eachDay emit
+  // ~20,000 zero-filled days (a huge payload + 20k-bar chart). Clamp the zero-fill
+  // start to the first day that actually has data (or a single day when empty).
+  let timelineFrom = range.from
+  if (filters.period === 'all') {
+    timelineFrom = dayRows.length > 0
+      ? dayRows.reduce((min, r) => (r.day < min ? r.day : min), dayRows[0].day)
+      : range.to.slice(0, 10)
+  }
+  const days = eachDay(timelineFrom, range.to)
   const dayMap = new Map<string, DailyEntry>()
   for (const day of days) {
     dayMap.set(day, {
-      date: day, jobsCostUsd: 0, quickCostUsd: 0, exploreCostUsd: 0, aiEditCostUsd: 0, smashCostUsd: 0, totalCostUsd: 0,
+      date: day, jobsCostUsd: 0, quickCostUsd: 0, exploreCostUsd: 0, aiEditCostUsd: 0, smashCostUsd: 0, fileSummaryCostUsd: 0, totalCostUsd: 0,
     })
   }
   for (const r of dayRows) {
@@ -306,6 +316,7 @@ export function getSpending(
     else if (r.surface === 'explore-spec') entry.exploreCostUsd += c
     else if (r.surface === 'ai-edit') entry.aiEditCostUsd += c
     else if (r.surface === 'smash') entry.smashCostUsd += c
+    else if (r.surface === 'file-summary') entry.fileSummaryCostUsd += c // B58
     entry.totalCostUsd += c
   }
   const dailyTimeline = Array.from(dayMap.values())
@@ -313,21 +324,29 @@ export function getSpending(
   // byMode (Quick vs Explore)
   const byMode: ByModeEntry[] = (['quick-spec', 'explore-spec'] as const).map((surface) => {
     const modeKey: 'quick' | 'explore' = surface === 'quick-spec' ? 'quick' : 'explore'
+    // M18: count DISTINCT tickets, not rows. An Explore session writes one
+    // ai_invocations row per turn (and contract-refine adds another), all
+    // back-filled with the same ticket_id — so SUM(ticket_id IS NOT NULL) counted
+    // turns and inflated "N created". avgCostPerSpec is likewise per-spec:
+    // total success cost of ticket-bearing rows / distinct successful tickets.
     const r = db.prepare(`
       SELECT
         COUNT(*) AS totalRuns,
-        SUM(CASE WHEN ticket_id IS NOT NULL THEN 1 ELSE 0 END) AS ticketsCreated,
+        COUNT(DISTINCT ticket_id) AS ticketsCreated,
         COALESCE(SUM(total_cost_usd), 0) AS totalCost,
-        AVG(CASE WHEN status = 'success' AND ticket_id IS NOT NULL THEN total_cost_usd END) AS avgCostPerSpec,
+        COALESCE(SUM(CASE WHEN status = 'success' AND ticket_id IS NOT NULL THEN total_cost_usd ELSE 0 END), 0) AS specCostSum,
+        COUNT(DISTINCT CASE WHEN status = 'success' AND ticket_id IS NOT NULL THEN ticket_id END) AS specCount,
         AVG(CASE WHEN status = 'success' THEN duration_ms END) AS avgDur
       FROM ai_invocations WHERE ${where.sql} AND surface = ?
     `).get(...where.params, surface) as {
       totalRuns: number
       ticketsCreated: number | null
       totalCost: number
-      avgCostPerSpec: number | null
+      specCostSum: number
+      specCount: number
       avgDur: number | null
     }
+    const avgCostPerSpec = r.specCount > 0 ? r.specCostSum / r.specCount : null
     const dom = db.prepare(`
       SELECT model, COUNT(*) AS cnt FROM ai_invocations
       WHERE ${where.sql} AND surface = ? AND model IS NOT NULL
@@ -345,7 +364,7 @@ export function getSpending(
       totalRuns: r.totalRuns,
       ticketsCreated: r.ticketsCreated ?? 0,
       totalCostUsd: r.totalCost,
-      avgCostPerSpec: r.avgCostPerSpec,
+      avgCostPerSpec,
       avgDurationMs: r.avgDur,
       dominantModel: dom?.model ?? null,
       sparkline,
@@ -559,8 +578,12 @@ export function parseSpendingFilters(query: Record<string, unknown>): SpendingFi
   if (typeof query.from === 'string') f.from = query.from
   if (typeof query.to === 'string') f.to = query.to
   if (typeof query.surface === 'string') {
+    // M17: validate against the canonical surface list. The old hardcoded subset
+    // silently dropped 'smash'/'file-summary' — clicking those chips produced an
+    // empty filter array, so buildWhere applied NO surface condition and the UI
+    // showed ALL-surface totals while claiming a single-surface filter was active.
     f.surface = query.surface.split(',').filter((s) =>
-      ['job', 'quick-spec', 'explore-spec', 'ai-edit'].includes(s)
+      (ALL_SURFACES as string[]).includes(s)
     ) as Surface[]
   }
   if (typeof query.model === 'string') {
