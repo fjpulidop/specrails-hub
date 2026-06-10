@@ -23,6 +23,7 @@ import { spawn as mockSpawn, execSync as mockExecSync } from 'child_process'
 import { buildUserMcpArgs as mockBuildUserMcpArgs } from './user-mcp-config'
 import treeKill from 'tree-kill'
 import { ChatManager } from './chat-manager'
+import { __resetBinaryProbeCacheForTest } from './binary-probe'
 import { initDb, createConversation, getConversation, createJob, finishJob } from './db'
 
 const MCP_SCOPE = { specrails: false, openspec: false, full: false, mcp: true, contractRefine: false }
@@ -80,6 +81,7 @@ describe('ChatManager', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+    __resetBinaryProbeCacheForTest()
     vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
     db = initDb(':memory:')
     broadcast = vi.fn()

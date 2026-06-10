@@ -1,4 +1,4 @@
-import { execSync, ChildProcess } from 'child_process'
+import { ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
 import treeKill from 'tree-kill'
 import type { WsMessage } from './types'
@@ -18,23 +18,12 @@ import {
   defaultBootScope, type ContextScope,
 } from './context-scope'
 import { buildUserMcpArgs } from './user-mcp-config'
+import { binaryOnPath } from './binary-probe'
 
 const COMMAND_INSTRUCTION =
   'When you want to suggest a SpecRails command for the user to execute, wrap it in a command block like this: ' +
   ':::command\n/specrails:implement #42\n::: ' +
   'The user will be prompted to confirm before the command runs.'
-
-// Windows has no `which`; probe via `where` instead.
-const _WHICH_CMD = process.platform === 'win32' ? 'where' : 'which'
-
-function binaryOnPath(binary: string): boolean {
-  try {
-    execSync(`${_WHICH_CMD} ${binary}`, { stdio: 'ignore' })
-    return true
-  } catch {
-    return false
-  }
-}
 
 function extractCommandProposals(text: string): string[] {
   const regex = /:::command\s*\n([\s\S]*?):::/g
