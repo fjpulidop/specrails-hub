@@ -290,6 +290,37 @@ describe('SetupManager', () => {
       expect(vi.mocked(mockSpawn)).not.toHaveBeenCalled()
     })
 
+    it('H19: passes a hard timeout to the core runtime probe spawnSync', () => {
+      const child = createMockChildProcess()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      sm.startInstall('p1', '/path/to/project')
+
+      const probeCall = vi.mocked(mockSpawnSync).mock.calls.find(
+        ([, args]) => Array.isArray(args) && (args as string[]).includes('version'),
+      )
+      expect(probeCall).toBeDefined()
+      expect(probeCall![2]).toEqual(expect.objectContaining({ timeout: 60_000 }))
+    })
+
+    it('H19: degrades to setup_error mentioning the registry when the probe times out', () => {
+      vi.mocked(mockSpawnSync).mockReturnValue({
+        error: Object.assign(new Error('spawnSync npx ETIMEDOUT'), { code: 'ETIMEDOUT' }),
+        status: null,
+        signal: 'SIGTERM',
+        stdout: '',
+        stderr: '',
+      } as any)
+
+      sm.startInstall('p1', '/path/to/project')
+
+      const errors = getBroadcastedByType(broadcast, 'setup_error')
+      expect(errors).toHaveLength(1)
+      expect(errors[0].error).toContain('timed out after 60s')
+      expect(errors[0].error).toContain('npm registry unreachable')
+      expect(vi.mocked(mockSpawn)).not.toHaveBeenCalled()
+    })
+
     it('fails before spawn when Git is missing from PATH', async () => {
       const prereqs = await import('./setup-prerequisites')
       vi.mocked(prereqs.formatMissingSetupPrerequisites).mockReturnValueOnce(

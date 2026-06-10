@@ -35,6 +35,7 @@ function resolveCoreBinary(bin: string): string {
     env: process.env,
     shell: process.platform === 'win32',
     encoding: 'utf-8',
+    timeout: 5_000,
   })
   if (result.error || (result.status ?? 1) !== 0) return bin
 
@@ -72,6 +73,14 @@ function spawnCoreInit(args: string[], cwd: string): ChildProcess {
   })
 }
 
+// H19: hard cap on the runtime probe. `npx --yes --prefer-online
+// specrails-core@latest version` does a network round-trip to the npm
+// registry, and spawnSync blocks the single event loop — without a timeout a
+// hung network froze the WHOLE hub indefinitely during Add Project. On
+// timeout the probe degrades to ok:false, which the install paths surface as
+// a setup_error instead of hanging.
+const CORE_PROBE_TIMEOUT_MS = 60_000
+
 function probeCoreRuntimeVersion(cwd: string): { ok: boolean; bin: string; version?: string; error?: string } {
   const { bin, fullArgs } = buildCoreArgs(['version'])
   const result = spawnSync(bin, fullArgs, {
@@ -79,10 +88,18 @@ function probeCoreRuntimeVersion(cwd: string): { ok: boolean; bin: string; versi
     env: process.env,
     shell: process.platform === 'win32',
     encoding: 'utf-8',
+    timeout: CORE_PROBE_TIMEOUT_MS,
   })
 
   if (result.error) {
-    return { ok: false, bin, error: result.error.message }
+    const timedOut = (result.error as NodeJS.ErrnoException).code === 'ETIMEDOUT'
+    return {
+      ok: false,
+      bin,
+      error: timedOut
+        ? `probe timed out after ${CORE_PROBE_TIMEOUT_MS / 1000}s — npm registry unreachable?`
+        : result.error.message,
+    }
   }
   if ((result.status ?? 1) !== 0) {
     const stderr = typeof result.stderr === 'string' ? result.stderr.trim() : ''
