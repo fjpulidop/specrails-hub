@@ -352,10 +352,41 @@ export class ChatManager {
     return this._specDraftStates.get(conversationId) ?? null
   }
 
+  /**
+   * Sidebar system prompt. MUST stay byte-stable across consecutive
+   * invocations for the same project name so Anthropic's automatic prompt
+   * cache hits across turns within the 5-minute TTL window — the same
+   * constraint `_buildLightweightSystemPrompt` documents for Explore.
+   *
+   * DO NOT inject timestamps, live job stats, recent-job summaries, costs,
+   * or any per-invocation data here. The volatile dashboard snapshot is
+   * prepended to the user turn instead (see `_buildDashboardContextBlock`
+   * and its callsite in `sendMessage`).
+   */
   private _buildSystemPrompt(): string {
     const name = this._projectName ?? 'this project'
 
-    let contextSection = ''
+    return (
+      `You are a project assistant for the "${name}" specrails project with full access to this repository via Claude Code. ` +
+      `You can help answer questions about the codebase, explain SpecRails concepts, and suggest commands to run.` +
+      `\n\nIMPORTANT: You have explicit permission to read and write .specrails/local-tickets.json — ` +
+      `this is the project's local ticket store managed by specrails-hub. It is NOT sensitive. ` +
+      `When creating or updating tickets, write directly to this JSON file.` +
+      `\n\nUser messages may begin with a "## Current Dashboard Context" section. It is injected by the dashboard, ` +
+      `not typed by the user — treat it as live, authoritative project state (active job, recent jobs, stats, costs) ` +
+      `when answering.` +
+      `\n\n` +
+      COMMAND_INSTRUCTION
+    )
+  }
+
+  /**
+   * Volatile dashboard snapshot (active job, recent jobs, stats, costs) for
+   * sidebar turns. Prepended to the user turn rather than the system prompt
+   * so the cacheable `--system-prompt` prefix stays byte-stable.
+   * Returns '' when stats can't be read (context is best-effort).
+   */
+  private _buildDashboardContextBlock(): string {
     try {
       const stats = getStats(this._db)
       const { jobs: recentJobs } = listJobs(this._db, { limit: 5 })
@@ -383,8 +414,8 @@ export class ChatManager {
           ? Math.round(((stats.totalJobs - stats.failedJobs) / stats.totalJobs) * 100)
           : null
 
-      contextSection =
-        `\n\n## Current Dashboard Context\n\n` +
+      return (
+        `## Current Dashboard Context\n\n` +
         `### Active Job\n${activeLine}\n\n` +
         (jobLines.length > 0 ? `### Recent Jobs\n${jobLines.join('\n')}\n\n` : '') +
         `### Project Stats\n` +
@@ -393,20 +424,11 @@ export class ChatManager {
         (successRate != null ? `- Overall success rate: ${successRate}%\n` : '') +
         `- Total cost: $${stats.totalCostUsd.toFixed(3)}\n` +
         `- Cost today: $${stats.costToday.toFixed(3)}`
+      )
     } catch {
       // Context is best-effort; fall back gracefully
+      return ''
     }
-
-    return (
-      `You are a project assistant for the "${name}" specrails project with full access to this repository via Claude Code. ` +
-      `You can help answer questions about the codebase, explain SpecRails concepts, and suggest commands to run.` +
-      `\n\nIMPORTANT: You have explicit permission to read and write .specrails/local-tickets.json — ` +
-      `this is the project's local ticket store managed by specrails-hub. It is NOT sensitive. ` +
-      `When creating or updating tickets, write directly to this JSON file.` +
-      contextSection +
-      `\n\n` +
-      COMMAND_INSTRUCTION
-    )
   }
 
   /**
@@ -569,6 +591,19 @@ export class ChatManager {
           `Project context selected in Add Spec. Use it to avoid duplicate specs and to make project-specific recommendations.\n\n` +
           `${scopedContext}\n\n` +
           `## User turn\n\n${resolvedText}`
+      }
+    }
+    // Sidebar turns: the volatile dashboard snapshot lives in the user turn
+    // (not --system-prompt) so the cacheable system-prompt prefix stays
+    // byte-stable across turns — same pattern as the codex scoped-context
+    // prepend above. Gated on systemPromptArg: adapters without it (codex)
+    // drop the system prompt for chat turns entirely (argv stays
+    // user-text-only by design), so they never saw the dashboard block and
+    // must not start receiving it here.
+    if (!lightweight && adapter.capabilities.systemPromptArg) {
+      const dashboardContext = this._buildDashboardContextBlock()
+      if (dashboardContext) {
+        promptForAdapter = `${dashboardContext}\n\n## User turn\n\n${promptForAdapter}`
       }
     }
     let args = adapter.buildArgs(action, {
