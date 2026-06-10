@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.65.1](https://github.com/fjpulidop/specrails-hub/compare/v1.65.0...v1.65.1) (2026-06-10)
+
+
+### Bug Fixes
+
+* **security:** comprehensive security, platform & correctness hardening ([#362](https://github.com/fjpulidop/specrails-hub/issues/362)) ([5dcc146](https://github.com/fjpulidop/specrails-hub/commit/5dcc14694147e49aa39ee850cfa11efe652691e7))
+
 ## [1.65.0](https://github.com/fjpulidop/specrails-hub/compare/v1.64.0...v1.65.0) (2026-06-09)
 
 
