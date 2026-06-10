@@ -1350,16 +1350,6 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
     setupManager.startInstall(project.id, project.path)
   })
 
-  router.post('/:projectId/setup/quick-install', (req: Request, res: Response) => {
-    const { project, setupManager } = ctx(req)
-    if (setupManager.isInstalling(project.id)) {
-      res.status(409).json({ error: 'Install already in progress' }); return
-    }
-    const installConfig = req.body ?? {}
-    res.status(202).json({ ok: true })
-    setupManager.startQuickInstall(project.id, project.path, installConfig)
-  })
-
   router.post('/:projectId/enrich/start', (req: Request, res: Response) => {
     const { project, setupManager } = ctx(req)
     if (setupManager.isEnriching(project.id)) {

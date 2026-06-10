@@ -227,8 +227,7 @@ The setup wizard is a three-step flow (Configure / Install / Done). The `enrich/
 | Method | Path | Notes |
 |--------|------|-------|
 | `POST` | `/setup/install-config` | Write `.specrails/install-config.yaml` to the project |
-| `POST` | `/setup/install` | Run `npx … specrails-core@latest init --from-config <file>` |
-| `POST` | `/setup/quick-install` | Convenience: write config + install in one call |
+| `POST` | `/setup/install` | Run `npx … specrails-core@^4.6.0 init --from-config <file>` |
 | `POST` | `/setup/start` | Legacy setup-chat session start |
 | `POST` | `/setup/message` | Legacy setup-chat turn |
 | `POST` | `/enrich/start` | Legacy AI-enrich session start |

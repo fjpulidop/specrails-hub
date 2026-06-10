@@ -699,128 +699,6 @@ describe('SetupManager', () => {
     })
   })
 
-  // ─── startQuickInstall ──────────────────────────────────────────────────────
-
-  describe('startQuickInstall', () => {
-    it('writes install-config.yaml before spawning', () => {
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
-
-      sm.startQuickInstall('p1', '/path/to/project', { provider: 'claude', tier: 'quick' })
-
-      expect(vi.mocked(mkdirSync)).toHaveBeenCalledWith(
-        expect.stringContaining('.specrails'),
-        { recursive: true }
-      )
-      expect(vi.mocked(writeFileSync)).toHaveBeenCalledWith(
-        expect.stringContaining('install-config.yaml'),
-        expect.any(String),
-        'utf-8'
-      )
-    })
-
-    it('spawns npx specrails-core (pinned spec) init --from-config <configPath>', () => {
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
-
-      sm.startQuickInstall('p1', '/path/to/project', { provider: 'claude' })
-
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'npx',
-        expect.arrayContaining([CORE_PACKAGE_SPEC, 'init', '--from-config']),
-        expect.objectContaining({ cwd: '/path/to/project' })
-      )
-    })
-
-    it('broadcasts config_written checkpoint immediately', () => {
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
-
-      sm.startQuickInstall('p1', '/path/to/project', {})
-
-      const checkpoints = getBroadcastedByType(broadcast, 'setup_checkpoint')
-      expect(checkpoints.some((c) => c.checkpoint === 'config_written' && c.status === 'done')).toBe(true)
-    })
-
-    it('broadcasts setup_install_done on exit 0', async () => {
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
-
-      sm.startQuickInstall('p1', '/path/to/project', {})
-      await finishProcess(child, 0)
-
-      const done = getBroadcastedByType(broadcast, 'setup_install_done')
-      expect(done).toHaveLength(1)
-    })
-
-    it('completes quick_complete checkpoint on exit 0', async () => {
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
-
-      sm.startQuickInstall('p1', '/path/to/project', {})
-      await finishProcess(child, 0)
-
-      const checkpoints = getBroadcastedByType(broadcast, 'setup_checkpoint')
-      expect(checkpoints.some((c) => c.checkpoint === 'quick_complete' && c.status === 'done')).toBe(true)
-    })
-
-    it('broadcasts setup_error on non-zero exit', async () => {
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
-
-      sm.startQuickInstall('p1', '/path/to/project', {})
-      pushErrorLine(child, 'npm error code EPERM')
-      await finishProcess(child, 1)
-
-      const errors = getBroadcastedByType(broadcast, 'setup_error')
-      expect(errors).toHaveLength(1)
-      expect(errors[0].error).toContain('--from-config')
-      expect(errors[0].error).toContain('Recent output:')
-      expect(errors[0].error).toContain('npm error code EPERM')
-    })
-
-    it('getCheckpointStatus returns 3 checkpoints for quick tier', () => {
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
-
-      sm.startQuickInstall('p1', '/path/to/project', {})
-      const statuses = sm.getCheckpointStatus('p1', '/path/to/project')
-      expect(statuses).toHaveLength(3)
-    })
-
-    it('getInstallTier returns quick after startQuickInstall', () => {
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
-
-      sm.startQuickInstall('p1', '/path/to/project', {})
-      expect(sm.getInstallTier('p1')).toBe('quick')
-    })
-
-    it('broadcasts setup_error when writeFileSync throws', () => {
-      vi.mocked(writeFileSync).mockImplementation(() => { throw new Error('Permission denied') })
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
-
-      sm.startQuickInstall('p1', '/path/to/project', {})
-
-      const errors = getBroadcastedByType(broadcast, 'setup_error')
-      expect(errors).toHaveLength(1)
-      expect(errors[0].error).toContain('install-config.yaml')
-      // spawn should not be called since config write failed
-      expect(mockSpawn).not.toHaveBeenCalled()
-    })
-
-    it('does not start install twice for same project', () => {
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
-
-      sm.startQuickInstall('p1', '/path/to/project', {})
-      sm.startQuickInstall('p1', '/path/to/project', {})
-
-      expect(mockSpawn).toHaveBeenCalledTimes(1)
-    })
-  })
-
   // ─── resumeEnrich ──────────────────────────────────────────────────────────
 
   describe('resumeEnrich', () => {
@@ -952,11 +830,13 @@ describe('SetupManager', () => {
       expect(statuses).toHaveLength(7)
     })
 
-    it('returns 3 checkpoints after startQuickInstall (quick tier)', () => {
+    it('returns 3 checkpoints after startInstall with a quick-tier config', () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
+      vi.mocked(existsSync).mockImplementation((p: any) => String(p).includes('install-config.yaml'))
+      vi.mocked(readFileSync).mockReturnValue('version: 1\ntier: quick\nagents:\n  selected: [sr-architect]' as any)
 
-      sm.startQuickInstall('p1', '/path/to/project', {})
+      sm.startInstall('p1', '/path/to/project')
       const statuses = sm.getCheckpointStatus('p1', '/path/to/project')
       expect(statuses).toHaveLength(3)
     })
@@ -1495,27 +1375,6 @@ describe('SetupManager', () => {
       expect(turnDone).toHaveLength(0)
     })
 
-    it('startQuickInstall broadcasts setup_install_done with summary field', async () => {
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
-      vi.mocked(existsSync).mockImplementation((p: any) =>
-        String(p).includes('.claude/agents')
-      )
-      vi.mocked(readdirSync).mockImplementation((p: any) => {
-        if (String(p).endsWith('.claude/agents'))
-          return ['sr-architect.md', 'sr-developer.md'] as any
-        return []
-      })
-
-      sm.startQuickInstall('p1', '/path/to/project', {})
-      await finishProcess(child, 0)
-
-      const done = getBroadcastedByType(broadcast, 'setup_install_done')
-      expect(done).toHaveLength(1)
-      expect(done[0]).toHaveProperty('summary')
-      expect(done[0].summary.agents).toBe(2)
-    })
-
     it('summary falls back to zeros when agents dir does not exist', async () => {
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
@@ -1540,55 +1399,6 @@ describe('SetupManager', () => {
       'agents:',
       '  selected: [sr-architect, sr-developer]',
     ].join('\n')
-
-    it('startQuickInstall does not re-copy agent templates after specrails-core finishes', async () => {
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
-      vi.mocked(existsSync).mockImplementation((p) => {
-        const s = String(p)
-        if (s.includes('install-config.yaml')) return true
-        if (s.includes('setup-templates/agents')) return true
-        if (s.includes('setup-templates/personas')) return false
-        if (s.includes('setup-templates/commands/specrails')) return true
-        return false
-      })
-      vi.mocked(readFileSync).mockReturnValue(quickConfig)
-      vi.mocked(readdirSync).mockImplementation((p) => {
-        const s = String(p)
-        if (s.includes('setup-templates/agents')) return ['sr-architect.md', 'sr-developer.md', 'sr-reviewer.md'] as any
-        if (s.includes('setup-templates/commands/specrails')) return ['implement.md', 'doctor.md'] as any
-        return []
-      })
-
-      sm.startQuickInstall('p1', '/path/to/project', { tier: 'quick', agents: { selected: ['sr-architect', 'sr-developer'] } })
-      await finishProcess(child, 0)
-
-      expect(vi.mocked(copyFileSync).mock.calls).toHaveLength(0)
-    })
-
-    it('startQuickInstall does not re-copy command templates after specrails-core finishes', async () => {
-      const child = createMockChildProcess()
-      vi.mocked(mockSpawn).mockReturnValue(child as any)
-      vi.mocked(existsSync).mockImplementation((p) => {
-        const s = String(p)
-        if (s.includes('install-config.yaml')) return true
-        if (s.includes('setup-templates/agents')) return false
-        if (s.includes('setup-templates/personas')) return false
-        if (s.includes('setup-templates/commands/specrails')) return true
-        return false
-      })
-      vi.mocked(readFileSync).mockReturnValue(quickConfig)
-      vi.mocked(readdirSync).mockImplementation((p) => {
-        const s = String(p)
-        if (s.includes('setup-templates/commands/specrails')) return ['implement.md', 'batch-implement.md'] as any
-        return []
-      })
-
-      sm.startQuickInstall('p1', '/path/to/project', { tier: 'quick' })
-      await finishProcess(child, 0)
-
-      expect(vi.mocked(copyFileSync).mock.calls).toHaveLength(0)
-    })
 
     it('startInstall reads tier from config but leaves quick-tier placement to specrails-core', async () => {
       const child = createMockChildProcess()
