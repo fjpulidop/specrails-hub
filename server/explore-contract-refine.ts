@@ -438,7 +438,13 @@ export function appendContractLayerToDescription(
   userBody: string,
   layer: ContractLayer,
 ): string {
-  const trimmed = userBody.replace(/\s+$/, '')
+  // B59: a Contract Refine retry must REPLACE an existing Contract Layer, not
+  // append a second one. If the body already carries a layer, strip it down to
+  // the user-authored part first so re-running is idempotent.
+  const base = hasContractLayer(userBody)
+    ? splitDescriptionAtContractLayer(userBody).user
+    : userBody
+  const trimmed = base.replace(/\s+$/, '')
   return `${trimmed}${CONTRACT_LAYER_SEPARATOR}${renderContractLayerMarkdown(layer)}`
 }
 

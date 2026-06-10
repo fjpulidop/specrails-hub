@@ -481,10 +481,28 @@ export class QueueManager {
       }
       job.status = 'canceled'
       job.finishedAt = new Date().toISOString()
+      // B47: a queued job's per-job selection entries are consumed only when the
+      // job STARTS (_resolveJobAdapter et al.). Cancelling it while queued means
+      // it never starts, so drop them here to avoid leaking map entries forever.
+      this._jobProviderSelection.delete(jobId)
+      this._jobModelSelection.delete(jobId)
+      this._jobProfileSelection.delete(jobId)
       this._skipDependents(jobId, `Parent job ${jobId} was canceled`)
       this._recomputePositions()
       this._persistJob(job)
       this._broadcastQueueState()
+      // M20: a queued cancel never reached _onJobFinished (only the running path
+      // does, via _kill→_onJobExit), so a rail-launched queued job left its
+      // railJobs entry stuck 'running' forever and dropped the job.canceled
+      // webhook + rail.job_completed broadcast. Fire the callback here too; it is
+      // exit-status-driven and idempotent on tickets.
+      if (this._onJobFinished) {
+        try {
+          this._onJobFinished(jobId, 'canceled', undefined)
+        } catch (err) {
+          console.error(`[QueueManager] onJobFinished(canceled) failed for ${jobId}: ${(err as Error).message}`)
+        }
+      }
       return 'canceled'
     }
 
@@ -689,8 +707,22 @@ export class QueueManager {
     if (readyIndex === -1) return
 
     const nextJobId = this._queue.splice(readyIndex, 1)[0]
+    // A3: reserve the active slot SYNCHRONOUSLY, before _startJob's awaits
+    // (plugin verify, profile snapshot). Otherwise a second _drainQueue triggered
+    // during those awaits (a concurrent /spawn, or the synchronous N-job loop of
+    // an Ultracode rail launch) still sees _activeJobId === null and starts a
+    // second job in the same working tree, with _activeProcess/_activeJobId then
+    // clobbered so cancel/zombie-kill hits the wrong child.
+    this._activeJobId = nextJobId
     this._recomputePositions()
-    this._startJob(nextJobId)
+    void this._startJob(nextJobId).catch((err) => {
+      console.error(`[QueueManager] _startJob(${nextJobId}) threw before spawn: ${(err as Error)?.message}`)
+      // Only release if we never established a child (else _onJobExit owns cleanup).
+      if (this._activeJobId === nextJobId && this._activeProcess === null) {
+        this._activeJobId = null
+        this._drainQueue()
+      }
+    })
   }
 
   /**
@@ -713,7 +745,13 @@ export class QueueManager {
 
   private async _startJob(jobId: string): Promise<void> {
     const job = this._jobs.get(jobId)
-    if (!job) return
+    if (!job) {
+      // Job vanished between the synchronous slot reservation in _drainQueue and
+      // here — release the reserved slot and move on (A3).
+      if (this._activeJobId === jobId) this._activeJobId = null
+      this._drainQueue()
+      return
+    }
 
     // Per-job adapter (multi-provider). `this._adapter` stays the project
     // primary; everything in this spawn (binary, argv, model, profile, OTEL,
@@ -1179,6 +1217,14 @@ export class QueueManager {
     const snapshot = this._snapshotRefs.get(jobId)
     this._snapshotRefs.delete(jobId)
 
+    // A3: release the active slot for THIS job before any early return, so a
+    // disposed/unknown-job exit can never leave the slot reserved (which would
+    // wedge the queue). Guarded by identity in case a stale exit fires late.
+    if (this._activeJobId === jobId) {
+      this._activeProcess = null
+      this._activeJobId = null
+    }
+
     // The manager was torn down (e.g. project removed) while the child was
     // still running. The DB may be closed; skip all bookkeeping to avoid an
     // uncaught throw inside this EventEmitter 'close' listener.
@@ -1212,8 +1258,8 @@ export class QueueManager {
       job.resultText = lastResultEvent.result
     }
 
-    this._activeProcess = null
-    this._activeJobId = null
+    // (_activeProcess/_activeJobId already released above, before the early
+    // returns, so the slot is freed on every exit path — A3.)
 
     if (this._db) {
       // Adapter-driven result finalisation handles tokens, cost (or pricing-

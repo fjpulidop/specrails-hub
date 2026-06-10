@@ -15,7 +15,8 @@ import { ProjectRegistry } from './project-registry'
 import { createHubRouter } from './hub-router'
 import { createProjectRouter } from './project-router'
 import { createDocsRouter } from './docs-router'
-import { requireAuth, loadOrGenerateToken, tokenFromUpgradeRequest } from './auth'
+import { requireAuth, requireLoopback, hostValidationMiddleware, safeEqual, loadOrGenerateToken, tokenFromUpgradeRequest } from './auth'
+import { shouldDeliverToSubscriber, parseSubscribeFrame } from './ws-routing'
 import { getTerminalManager } from './terminal-manager'
 import { cleanupStaleShimDirs } from './terminal-shell-integration'
 import { isBrowserCaptureEnabled } from './feature-flags'
@@ -111,6 +112,10 @@ function removePidFile(): void {
 
 const app = express()
 
+// Host-header validation (H-08) — first barrier, anti DNS-rebinding.
+// Implementation in auth.ts (unit-tested there); index.ts is coverage-excluded.
+app.use(hostValidationMiddleware)
+
 // ─── CORS — allow only localhost origins (CRIT-02) ────────────────────────────
 
 // Tauri's desktop WebView exposes two different origin formats:
@@ -155,6 +160,11 @@ app.use(express.json({ limit: '1mb' }))
 const server = http.createServer(app)
 const wsServerOptions = {
   noServer: true,
+  // Cap inbound frame size (H-10). Shared by the main, terminal and browser WS
+  // servers. Terminal/browser input frames (keystrokes, control JSON, pastes)
+  // are tiny; 1 MB tolerates a large bracketed paste while bounding the memory
+  // a single malicious frame can force the sidecar to buffer.
+  maxPayload: 1024 * 1024,
   handleProtocols: (protocols: Set<string>) => {
     if (protocols.has('specrails-hub')) return 'specrails-hub'
 
@@ -169,7 +179,31 @@ const wsServerOptions = {
 const wss = new WebSocketServer(wsServerOptions)
 const terminalWss = new WebSocketServer(wsServerOptions)
 const browserWss = new WebSocketServer(wsServerOptions)
-const clients = new Set<WebSocket>()
+
+// ─── Per-connection WS state (H-09 / H-10) ────────────────────────────────────
+//
+// H-09: project isolation must be enforced SERVER-SIDE, not only client-side.
+// Each connection may declare the project it is interested in via a
+// `{ type: 'subscribe', projectId }` control frame; `broadcast` then routes a
+// project-scoped message only to connections subscribed to that project (plus
+// connections that have NOT declared a subscription — back-compat, they get
+// everything exactly like before). Hub-level messages (no projectId) always go
+// to everyone. The current web client does not send `subscribe`, so it keeps
+// receiving everything and the existing client-side filter stays as a redundant
+// second layer. The Mobile Gateway will subscribe per device, turning this into
+// a hard authorization boundary instead of an opt-in optimization.
+//
+// H-10: skip sending to a client whose outbound buffer is already saturated so a
+// single slow/stalled consumer can't make the sidecar buffer unboundedly.
+interface WsConnState {
+  subscribedProjectId: string | null
+}
+const clients = new Map<WebSocket, WsConnState>()
+
+// 8 MB: a healthy client drains far faster than we produce; crossing this means
+// the socket is stalled. Dropping an event is safe — clients reconcile via the
+// REST polling paths — and far better than an unbounded memory leak.
+const WS_BACKPRESSURE_LIMIT_BYTES = 8 * 1024 * 1024
 
 const TERMINAL_WS_RE = /^\/ws\/terminal\/([0-9a-f-]+)$/i
 const BROWSER_WS_RE = /^\/ws\/browser\/([0-9a-f-]+)$/i
@@ -184,17 +218,22 @@ function authorizeUpgrade(request: http.IncomingMessage): 'ok' | 'forbidden' | '
   if (!isAllowedBrowserOrigin(origin)) return 'forbidden'
 
   const provided = tokenFromUpgradeRequest(request)
-  if (!provided || provided !== loadOrGenerateToken()) return 'unauthorized'
+  if (!provided || !safeEqual(provided, loadOrGenerateToken())) return 'unauthorized'
 
   return 'ok'
 }
 
 function broadcast(msg: WsMessage): void {
   const data = JSON.stringify(msg)
-  for (const client of clients) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(data)
-    }
+  // Project-scoped messages carry a projectId; hub-level messages do not.
+  const msgProjectId = (msg as { projectId?: string }).projectId
+  for (const [client, state] of clients) {
+    if (client.readyState !== WebSocket.OPEN) continue
+    // H-09: route project-scoped messages only to matching/undeclared subscribers.
+    if (!shouldDeliverToSubscriber(msgProjectId, state.subscribedProjectId)) continue
+    // H-10: drop for a back-pressured client instead of growing its buffer.
+    if (client.bufferedAmount > WS_BACKPRESSURE_LIMIT_BYTES) continue
+    client.send(data)
   }
 }
 
@@ -330,7 +369,10 @@ server.on('upgrade', (request, socket, head) => {
 
 // ─── Docs portal (available in all modes) ────────────────────────────────────
 
-app.use('/api/docs', createDocsRouter())
+// Loopback-only (H-04): docs are unauthenticated by design (no token needed to
+// read them), so a loopback guard is the only thing standing between them and
+// the network the day the bind changes.
+app.use('/api/docs', requireLoopback, createDocsRouter())
 
 // ─── Auth — protect all /api/* except /api/health and /api/hub/token ─────────
 // (CRIT-01) Token is served publicly so the local client can bootstrap itself.
@@ -345,7 +387,14 @@ app.get('/api/health', (_req, res) => {
   })
 })
 
-app.get('/api/hub/token', (_req, res) => {
+// Loopback-only (H-03): this is the most sensitive endpoint — it hands out the
+// master token, which grants terminals/spawn/fs/admin. It must stay public (no
+// token) so the local client can bootstrap. Two complementary guards protect it:
+// `requireLoopback` rejects a non-local PEER (matters if the bind ever changes
+// from 127.0.0.1), and the Host-header guard above rejects DNS-rebinding (where
+// the peer IS loopback — the victim's own browser — but the Host is the
+// attacker's domain). Neither alone is sufficient; together they close both.
+app.get('/api/hub/token', requireLoopback, (_req, res) => {
   res.json({ token: loadOrGenerateToken() })
 })
 
@@ -387,9 +436,14 @@ function applyWsRateLimiting(ws: WebSocket): void {
   _registry = registry
   _getProjectCount = () => registry.listContexts().length
 
-  // OTLP/JSON receiver — must be mounted before auth middleware would block it,
-  // but after CORS. Requires auth (already applied globally above via requireAuth).
-  app.use('/otlp', createTelemetryRouter(registry))
+  // OTLP/JSON receiver — INTENTIONALLY UNAUTHENTICATED (H-01/H-02). The spawned
+  // claude/codex CLIs post telemetry here with no auth header (queue-manager sets
+  // OTEL_EXPORTER_OTLP_ENDPOINT but no OTEL_EXPORTER_OTLP_HEADERS), so it cannot
+  // be put behind requireAuth. It is also NOT covered by `app.use('/api', ...)`
+  // — that middleware is path-scoped to /api, and /otlp is a sibling path (the
+  // old comment here claiming otherwise was wrong). It is protected instead by
+  // `requireLoopback` (children always connect via 127.0.0.1) + the loopback bind.
+  app.use('/otlp', requireLoopback, createTelemetryRouter(registry))
 
   // Run telemetry compaction at startup after registry is hydrated
   runCompactionForAll(registry).catch((err) => {
@@ -410,8 +464,18 @@ function applyWsRateLimiting(ws: WebSocket): void {
   })
 
   wss.on('connection', (ws: WebSocket) => {
-    clients.add(ws)
+    const state: WsConnState = { subscribedProjectId: null }
+    clients.set(ws, state)
     applyWsRateLimiting(ws)
+
+    // H-09: honor an optional `{ type: 'subscribe', projectId }` control frame so
+    // a connection can scope itself to one project's events. Anything else on the
+    // inbound channel is ignored (the main event WS is otherwise server→client).
+    ws.on('message', (data: Buffer | string) => {
+      const txt = typeof data === 'string' ? data : data.toString('utf8')
+      const frame = parseSubscribeFrame(txt)
+      if (frame.subscribe) state.subscribedProjectId = frame.projectId
+    })
 
     // Send hub state init
     const projects = registry.listContexts().map((ctx) => ctx.project)

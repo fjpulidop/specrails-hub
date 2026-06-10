@@ -53,7 +53,19 @@ export function useWebSocket(
     connect()
     return () => {
       if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current)
-      wsRef.current?.close()
+      const ws = wsRef.current
+      if (ws) {
+        // B24: detach handlers BEFORE close(). Otherwise this intentional close
+        // fires ws.onclose, which schedules a setTimeout(connect) reconnect after
+        // the component has unmounted — a leaked ghost socket. StrictMode's
+        // mount→unmount→mount double-invoke triggers this on every mount.
+        ws.onopen = null
+        ws.onmessage = null
+        ws.onclose = null
+        ws.onerror = null
+        ws.close()
+      }
+      wsRef.current = null
     }
   }, [connect])
 

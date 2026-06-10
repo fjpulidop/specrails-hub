@@ -64,6 +64,9 @@ export class ProjectRegistry {
   private _broadcast: (msg: WsMessage) => void
   private _webhookManager: WebhookManager
   private _hubPort: number
+  // M9: projects whose per-project DB failed to load at startup (corrupt, locked,
+  // or migration-stuck). They stay registered but have no live context.
+  private _failedProjects: Map<string, { project: ProjectRow; error: string }>
 
   constructor(broadcast: (msg: WsMessage) => void, hubDbPath?: string, hubPort?: number) {
     this._broadcast = broadcast
@@ -71,6 +74,7 @@ export class ProjectRegistry {
     this._contexts = new Map()
     this._webhookManager = new WebhookManager(this._hubDb)
     this._hubPort = hubPort ?? 4200
+    this._failedProjects = new Map()
   }
 
   get hubDb(): DbInstance {
@@ -80,8 +84,24 @@ export class ProjectRegistry {
   loadAll(): void {
     const projects = listProjects(this._hubDb)
     for (const project of projects) {
-      this._loadProjectContext(project)
+      try {
+        this._loadProjectContext(project)
+        this._failedProjects.delete(project.id)
+      } catch (err) {
+        // M9: a single corrupt / locked / migration-stuck per-project jobs.sqlite
+        // must NOT crash the whole hub at startup (previously it did, killing
+        // every other project + the UI in a restart loop). Log it, record it as
+        // failed-to-load, and keep loading the rest.
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error(`[project-registry] failed to load project ${project.id} (${project.slug}): ${msg}`)
+        this._failedProjects.set(project.id, { project, error: msg })
+      }
     }
+  }
+
+  /** Projects whose per-project DB failed to load at startup (M9). */
+  listFailedProjects(): { project: ProjectRow; error: string }[] {
+    return Array.from(this._failedProjects.values())
   }
 
   addProject(opts: {
@@ -109,6 +129,14 @@ export class ProjectRegistry {
       try { ctx.queueManager.shutdown() } catch { /* ignore */ }
       try { ctx.chatManager.shutdown() } catch { /* ignore */ }
       try { ctx.setupManager.abort(id) } catch { /* ignore */ }
+      // M12: these three also spawn children that outlive removeProject. Proposal
+      // and AgentRefine write to the per-project DB in their close handlers — if
+      // not disposed before db.close() they throw on the closed connection and
+      // (no uncaughtException handler) crash the entire hub. SpecLauncher has no
+      // DB but its --dangerously-skip-permissions child keeps burning spend.
+      try { ctx.proposalManager.shutdown() } catch { /* ignore */ }
+      try { ctx.agentRefineManager.shutdown() } catch { /* ignore */ }
+      try { ctx.specLauncherManager.shutdown() } catch { /* ignore */ }
       // Tear down the embedded browser (closes pages + persistent context).
       void ctx.browserCaptureManager.shutdown().catch(() => { /* ignore */ })
       // Kill any terminal sessions belonging to this project
@@ -119,17 +147,25 @@ export class ProjectRegistry {
       // provider child, rejects queued work, and detaches the watcher — BEFORE
       // db.close() so a completing generation can't write to the closed handle.
       try { ctx.fileSummaryManager.dispose() } catch { /* ignore */ }
-      // Delete telemetry blob files for this project
-      try {
-        const telemetryDir = path.join(os.homedir(), '.specrails', 'projects', ctx.project.slug, 'telemetry')
-        if (fs.existsSync(telemetryDir)) {
-          fs.rmSync(telemetryDir, { recursive: true, force: true })
-        }
-      } catch { /* ignore — non-fatal */ }
       // Drop the hub-managed Explore Spec cwd (CLAUDE.md + symlink to project)
       try { removeExploreCwd(ctx.project.slug) } catch { /* ignore — non-fatal */ }
-      // Close the DB connection
+      // Close the DB connection BEFORE removing the project's data dir below.
       try { ctx.db.close() } catch { /* ignore */ }
+      // B54: remove the ENTIRE hub-managed data dir for this project, not just
+      // the telemetry subdir. It also holds user-mcp.json (a copy of the user's
+      // MCP config that can contain API keys), profile snapshots, codex-home, and
+      // terminal shim dirs — all secret-bearing residue that previously survived
+      // project removal. Guard on a non-empty slug so we never rm the projects/
+      // root itself.
+      try {
+        const slug = ctx.project.slug
+        if (slug && slug.trim() && !slug.includes('/') && !slug.includes('..')) {
+          const projectDir = path.join(os.homedir(), '.specrails', 'projects', slug)
+          if (fs.existsSync(projectDir)) {
+            fs.rmSync(projectDir, { recursive: true, force: true })
+          }
+        }
+      } catch { /* ignore — non-fatal */ }
       this._contexts.delete(id)
     }
     removeProjectFromHub(this._hubDb, id)
@@ -160,6 +196,9 @@ export class ProjectRegistry {
     for (const ctx of this._contexts.values()) {
       try { ctx.queueManager.shutdown() } catch { /* ignore */ }
       try { ctx.chatManager.shutdown() } catch { /* ignore */ }
+      try { ctx.proposalManager.shutdown() } catch { /* ignore */ }
+      try { ctx.agentRefineManager.shutdown() } catch { /* ignore */ }
+      try { ctx.specLauncherManager.shutdown() } catch { /* ignore */ }
       void ctx.browserCaptureManager.shutdown().catch(() => { /* ignore */ })
       // Release chokidar watchers + abort in-flight generations so a restart
       // does not leak handles/children — mirror removeProject()'s per-project teardown.

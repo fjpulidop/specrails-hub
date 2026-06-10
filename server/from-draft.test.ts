@@ -144,6 +144,23 @@ describe('POST /tickets/from-draft', () => {
     )
   })
 
+  it('B62: a second commit for the same conversation does not insert a duplicate', async () => {
+    const app = createApp(ctx)
+    const r1 = await request(app)
+      .post('/api/projects/proj-1/tickets/from-draft')
+      .send({ title: 'A', conversationId: 'conv-dup' })
+    const r2 = await request(app)
+      .post('/api/projects/proj-1/tickets/from-draft')
+      .send({ title: 'A again', conversationId: 'conv-dup' })
+    expect(r1.status).toBe(201)
+    // Idempotent on the conversation: same ticket id, no second row.
+    expect(r2.body.ticket.id).toBe(r1.body.ticket.id)
+    const listed = await request(app).get('/api/projects/proj-1/tickets')
+    const matching = (listed.body.tickets as Array<{ origin_conversation_id?: string }>)
+      .filter((t) => t.origin_conversation_id === 'conv-dup')
+    expect(matching).toHaveLength(1)
+  })
+
   it('drops non-string labels', async () => {
     const app = createApp(ctx)
     const res = await request(app)

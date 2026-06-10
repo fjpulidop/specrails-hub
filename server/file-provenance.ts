@@ -52,6 +52,16 @@ const GIT_EXEC_ENV = (() => {
   env.GIT_TERMINAL_PROMPT = '0'
   env.GIT_ASKPASS = 'echo'
   env.GCM_INTERACTIVE = 'never'
+  // M2: these git calls run INSIDE the project repo (cwd = project.path) for every
+  // queued job, and git honors the repo's own .git/config. A hostile repo added as
+  // a project can ship `[core] fsmonitor = <script>` (or a hook) that git executes
+  // during index refresh (stash create / diff / status) → RCE on job spawn. Strip
+  // system config and override the hook-bearing keys for ALL invocations via
+  // GIT_CONFIG_PARAMETERS (same precedence as `-c`, so it wins over the repo's
+  // local config). Disabling fsmonitor only costs a perf hint; provenance reads
+  // never need hooks.
+  env.GIT_CONFIG_NOSYSTEM = '1'
+  env.GIT_CONFIG_PARAMETERS = "'core.fsmonitor=false' 'core.hooksPath=/dev/null' 'protocol.ext.allow=user'"
   return env
 })()
 

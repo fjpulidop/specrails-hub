@@ -430,6 +430,29 @@ describe('resolveTicketStoragePath', () => {
     const result = resolveTicketStoragePath(tmpDir)
     expect(result).toBe(path.resolve(tmpDir, '.specrails/local-tickets.json'))
   })
+
+  // A2: a hostile repo's integration-contract.json must not redirect the store
+  // outside the project root (would make every ticket write overwrite that file).
+  it('rejects a ../-escaping storagePath and falls back to default', () => {
+    const claudeDir = path.join(tmpDir, '.claude')
+    fs.mkdirSync(claudeDir, { recursive: true })
+    fs.writeFileSync(path.join(claudeDir, 'integration-contract.json'), JSON.stringify({
+      ticketProvider: { storagePath: '../../../../../../tmp/pwned.json' },
+    }))
+    const result = resolveTicketStoragePath(tmpDir)
+    expect(result).toBe(path.resolve(tmpDir, '.specrails/local-tickets.json'))
+  })
+
+  it('rejects an absolute out-of-project storagePath and falls back to default', () => {
+    const outside = path.join(os.tmpdir(), `evil-${process.pid}.json`)
+    const claudeDir = path.join(tmpDir, '.claude')
+    fs.mkdirSync(claudeDir, { recursive: true })
+    fs.writeFileSync(path.join(claudeDir, 'integration-contract.json'), JSON.stringify({
+      ticketProvider: { storagePath: outside },
+    }))
+    const result = resolveTicketStoragePath(tmpDir)
+    expect(result).toBe(path.resolve(tmpDir, '.specrails/local-tickets.json'))
+  })
 })
 
 // ─── isValidStatus / isValidPriority ─────────────────────────────────────────

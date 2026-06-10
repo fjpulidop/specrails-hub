@@ -266,6 +266,21 @@ describe('applySmashUndo', () => {
     expect((store.tickets['1'].metadata as { pre_smash_status?: string }).pre_smash_status).toBeUndefined()
   })
 
+  it('B61: restores a pre-SMASH "done" status instead of demoting to todo', () => {
+    seedTicket(projectPath, { id: 1, status: 'done' })
+    const filePath = resolveTicketStoragePath(projectPath)
+    applySmashToStore(
+      filePath,
+      1,
+      [{ title: 'A', description: 'da', priority: 'high', executionOrder: 1, rationale: 'r' }],
+      '2026-05-16T12:00:00Z',
+      'sr-specs-smash',
+    )
+    const undone = applySmashUndo(filePath, 1, '2026-05-16T12:00:00Z', '2026-05-16T12:00:30Z')
+    expect(undone.epic?.is_epic).toBe(false)
+    expect(undone.epic?.status).toBe('done') // not demoted to 'todo'
+  })
+
   it('is a no-op when ticket is not an épica', () => {
     seedTicket(projectPath, { id: 1 })
     const filePath = resolveTicketStoragePath(projectPath)
@@ -392,6 +407,28 @@ describe('runSmash', () => {
     for (const row of rows) {
       expect(row.total_cost_usd).toBeCloseTo(0.0005, 5)
     }
+  })
+
+  it('B60: rejects a concurrent SMASH of the same ticket (in-progress guard)', async () => {
+    seedTicket(projectPath, { id: 1 })
+    const deps = {
+      db,
+      projectId: 'proj-1',
+      projectSlug: 'proj-1',
+      projectPath,
+      projectName: 'P',
+      broadcast: () => {},
+      spawn: fakeSpawn(streamLines(validSmashBlock(4))),
+      timeoutMs: 5000,
+    }
+    // p1 takes the in-flight slot synchronously (before its first await); the
+    // concurrent call sees it and is rejected instead of duplicating children.
+    const p1 = runSmash(deps, 1)
+    const r2 = await runSmash(deps, 1)
+    expect(r2.ok).toBe(false)
+    expect(r2.reason).toBe('in-progress')
+    const r1 = await p1
+    expect(r1.ok).toBe(true) // first one completes normally and releases the slot
   })
 
   it('completes successfully and inserts children', async () => {

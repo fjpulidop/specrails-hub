@@ -219,6 +219,19 @@ describe('docs-router', () => {
       expect([400, 404]).toContain(res.status)
     })
 
+    it('B4: rejects a ".." category and does not read one level above docsDir', async () => {
+      // Plant a markdown file one level above docsDir; '..' as the category would
+      // resolve there if the dot-segment guard were missing.
+      const aboveDir = path.dirname(docsDir)
+      fs.writeFileSync(path.join(aboveDir, 'secret.md'), '# Secret')
+      // URL-encode the dots so '..' reaches the route param instead of being
+      // collapsed by URL normalization before routing.
+      const res = await request(buildApp()).get('/docs/%2e%2e/secret')
+      expect([400, 404]).toContain(res.status)
+      // Ensure the secret content was never served.
+      expect(JSON.stringify(res.body)).not.toContain('Secret')
+    })
+
     it('returns 500 when readFileSync throws on an existing file', async () => {
       fs.writeFileSync(path.join(docsDir, 'read-error.md'), '# Content')
 

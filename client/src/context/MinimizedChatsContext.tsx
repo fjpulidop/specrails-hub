@@ -162,18 +162,19 @@ function readChatList(key: string): MinimizedChat[] {
   }
 }
 
+// B25: cap the chat list (drop oldest first). Applied to BOTH the in-memory dock
+// state and the persisted copy, so they never diverge — previously the cap lived
+// only here (persistence), so the in-memory dock could hold >MAX_PERSISTED chips
+// and the extras vanished silently on the next refresh.
+function capChats(chats: MinimizedChat[]): MinimizedChat[] {
+  if (chats.length <= MAX_PERSISTED) return chats
+  return [...chats].sort((a, b) => a.createdAt - b.createdAt).slice(chats.length - MAX_PERSISTED)
+}
+
 function writeChatList(key: string, chats: MinimizedChat[]): void {
   if (typeof window === 'undefined') return
   try {
-    // Cap at MAX_PERSISTED — drop oldest first so the dock can never grow
-    // into a localStorage quota issue after a long session.
-    const capped =
-      chats.length <= MAX_PERSISTED
-        ? chats
-        : [...chats]
-            .sort((a, b) => a.createdAt - b.createdAt)
-            .slice(chats.length - MAX_PERSISTED)
-    window.localStorage.setItem(key, JSON.stringify(capped))
+    window.localStorage.setItem(key, JSON.stringify(capChats(chats)))
   } catch {
     /* quota or storage unavailable — silent */
   }
@@ -360,7 +361,8 @@ export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
       setChats((prev) => {
         // Dedupe: re-parking a session that already has a chip must replace it,
         // never stack a second chip for the same conversation.
-        const next = [...prev.filter((c) => !sameSession(c, chat)), chat]
+        // B25: cap in memory too so the dock and localStorage stay in sync.
+        const next = capChats([...prev.filter((c) => !sameSession(c, chat)), chat])
         // Synchronous durability — the caller (e.g. SpecsBoard) clears its own
         // active-session store right after this returns, so the chip must be in
         // localStorage BEFORE we yield, or an immediate refresh would lose it.

@@ -517,8 +517,18 @@ export class PluginManager {
       // Orphan removal: no plugin code available. Best-effort cleanup of
       // recorded installedFiles + drop the state entry. We cannot know which
       // mcpServers keys belonged to this plugin, so we leave .mcp.json alone.
+      const root = path.resolve(projectPath)
       for (const rel of entry.installedFiles ?? []) {
-        const abs = path.join(projectPath, rel)
+        const abs = path.resolve(projectPath, rel)
+        // M5: installedFiles comes from state.json, which a hostile repo can
+        // ship. Without containment, `rel` of "../../../Users/victim/x" (or an
+        // absolute path) turns orphan removal into an arbitrary-file-deletion
+        // primitive. Skip anything that resolves outside the project root.
+        const within = path.relative(root, abs)
+        if (within === '' || within.startsWith('..') || path.isAbsolute(within)) {
+          console.warn(`[plugin-manager] skipping out-of-project installedFile during orphan removal: ${rel}`)
+          continue
+        }
         try { if (fs.existsSync(abs)) fs.unlinkSync(abs) } catch { /* ignore */ }
       }
     }

@@ -1,19 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
-import { execSync } from 'child_process'
+import { execSync, execFileSync } from 'child_process'
 
-// Mock child_process execSync to avoid real CLI calls
+// Mock child_process execSync/execFileSync to avoid real CLI calls.
+// Detection commands (which/auth status/git remote) go through execSync; the
+// issue-fetch path goes through execFileSync (argv form, no shell — H-12).
 vi.mock('child_process', async () => {
   const actual = await vi.importActual<typeof import('child_process')>('child_process')
   return {
     ...actual,
     execSync: vi.fn(),
+    execFileSync: vi.fn(),
   }
 })
 
 import { getConfig, fetchIssues } from './config'
 
 const mockExecSync = execSync as ReturnType<typeof vi.fn>
+const mockExecFileSync = execFileSync as ReturnType<typeof vi.fn>
 
 // Spy references — typed as any to avoid overloaded-signature inference conflicts
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -263,6 +267,7 @@ describe('fetchIssues', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     mockExecSync.mockReturnValue(Buffer.from(''))
+    mockExecFileSync.mockReturnValue(Buffer.from(''))
   })
 
   it('returns structured issues from gh issue list output', () => {
@@ -270,7 +275,7 @@ describe('fetchIssues', () => {
       { number: 42, title: 'Fix the bug', labels: [{ name: 'bug' }], body: 'Description', url: 'https://github.com/...' },
       { number: 43, title: 'Add feature', labels: [], body: '', url: 'https://github.com/...' },
     ])
-    mockExecSync.mockReturnValue(Buffer.from(mockOutput))
+    mockExecFileSync.mockReturnValue(Buffer.from(mockOutput))
 
     const issues = fetchIssues('github', {})
 
@@ -281,27 +286,44 @@ describe('fetchIssues', () => {
   })
 
   it('returns empty array when gh command fails', () => {
-    mockExecSync.mockImplementation(() => { throw new Error('gh not found') })
+    mockExecFileSync.mockImplementation(() => { throw new Error('gh not found') })
 
     const issues = fetchIssues('github', {})
 
     expect(issues).toEqual([])
   })
 
-  it('passes repo and label args to gh command', () => {
-    mockExecSync.mockReturnValue(Buffer.from('[]'))
+  it('passes repo and label args to gh as a literal argv array (no shell)', () => {
+    mockExecFileSync.mockReturnValue(Buffer.from('[]'))
 
     fetchIssues('github', { repo: 'owner/repo', label: 'bug', search: 'auth' })
 
-    const callArgs = mockExecSync.mock.calls[0][0]
-    expect(callArgs).toContain('--repo owner/repo')
-    expect(callArgs).toContain('--label bug')
-    expect(callArgs).toContain('--search auth')
+    // execFileSync(file, args, opts) — file is the program, args is the argv.
+    const [file, argv] = mockExecFileSync.mock.calls[0]
+    expect(file).toBe('gh')
+    expect(argv).toEqual(expect.arrayContaining(['--repo', 'owner/repo', '--label', 'bug', '--search', 'auth']))
+    // The whole thing is never collapsed into a single shell string.
+    expect(typeof argv).not.toBe('string')
+  })
+
+  it('H-12: shell metacharacters in search are passed as one literal arg, not executed', () => {
+    mockExecFileSync.mockReturnValue(Buffer.from('[]'))
+
+    const malicious = '$(touch /tmp/pwned); rm -rf ~'
+    fetchIssues('github', { search: malicious })
+
+    const [file, argv] = mockExecFileSync.mock.calls[0]
+    expect(file).toBe('gh')
+    // The payload survives intact as a single argument — gh treats it as a
+    // literal search term, the shell never sees it.
+    const searchIdx = (argv as string[]).indexOf('--search')
+    expect(searchIdx).toBeGreaterThanOrEqual(0)
+    expect((argv as string[])[searchIdx + 1]).toBe(malicious)
   })
 
   it('returns issues from jira tracker', () => {
     const jiraOutput = `KEY\tSUMMARY\tLABELS\tSTATUS\nPROJ-1\tFix auth bug\tbug,urgent\tOpen\nPROJ-2\tAdd dashboard\t\tIn Progress`
-    mockExecSync.mockReturnValue(Buffer.from(jiraOutput))
+    mockExecFileSync.mockReturnValue(Buffer.from(jiraOutput))
 
     const issues = fetchIssues('jira', {})
 
@@ -313,21 +335,23 @@ describe('fetchIssues', () => {
   })
 
   it('returns empty array when jira command fails', () => {
-    mockExecSync.mockImplementation(() => { throw new Error('jira not found') })
+    mockExecFileSync.mockImplementation(() => { throw new Error('jira not found') })
 
     const issues = fetchIssues('jira', {})
 
     expect(issues).toEqual([])
   })
 
-  it('passes search query to jira command', () => {
-    mockExecSync.mockReturnValue(Buffer.from('KEY\tSUMMARY\tLABELS\tSTATUS'))
+  it('passes search query to jira as a literal --jql argv element', () => {
+    mockExecFileSync.mockReturnValue(Buffer.from('KEY\tSUMMARY\tLABELS\tSTATUS'))
 
     fetchIssues('jira', { search: 'auth' })
 
-    const callArgs = mockExecSync.mock.calls[0][0]
-    expect(callArgs).toContain('--jql')
-    expect(callArgs).toContain('auth')
+    const [file, argv] = mockExecFileSync.mock.calls[0]
+    expect(file).toBe('jira')
+    const jqlIdx = (argv as string[]).indexOf('--jql')
+    expect(jqlIdx).toBeGreaterThanOrEqual(0)
+    expect((argv as string[])[jqlIdx + 1]).toBe('summary ~ "auth"')
   })
 
   it('returns empty array for unsupported tracker', () => {

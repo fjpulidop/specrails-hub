@@ -592,7 +592,9 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   })
 
   router.get('/:projectId/jobs', (req: Request, res: Response) => {
-    const limit = Math.min(parseInt(String(req.query.limit ?? '50'), 10) || 50, 200)
+    // Clamp to [1, 200] (H-11): a negative limit is LIMIT -1 in SQLite, which
+    // means UNLIMITED — without the lower bound `?limit=-1` dumps the whole table.
+    const limit = Math.max(1, Math.min(parseInt(String(req.query.limit ?? '50'), 10) || 50, 200))
     const offset = parseInt(String(req.query.offset ?? '0'), 10) || 0
     const status = req.query.status as string | undefined
     const from = req.query.from as string | undefined
@@ -835,7 +837,12 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   // ─── Raw invocations table ───────────────────────────────────────────────────
   router.get('/:projectId/invocations', (req: Request, res: Response) => {
     const filters = parseSpendingFilters(req.query as Record<string, unknown>)
-    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined
+    // Clamp to [1, 10000] when provided (H-11): a negative/NaN limit becomes
+    // SQLite LIMIT -1 (unlimited) and dumps the entire invocations table.
+    const rawLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined
+    const limit = rawLimit !== undefined && Number.isFinite(rawLimit)
+      ? Math.max(1, Math.min(rawLimit, 10_000))
+      : undefined
     const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : undefined
     try {
       const result = getInvocations(ctx(req).db, ctx(req).project.id, {
@@ -2476,6 +2483,21 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
           created = flipTarget
           wasFlip = true
           return
+        }
+        // B62: from-draft is idempotent only while the ticket is still a draft.
+        // After a successful commit the draft is 'todo', so the draft lookup above
+        // no longer matches and a second from-draft for the same conversation
+        // would insert a DUPLICATE ticket. If a (now non-draft) ticket already
+        // originates from this conversation, return it instead of re-inserting.
+        if (conversationId) {
+          const alreadyCommitted = Object.values(s.tickets).find(
+            (t) => t.origin_conversation_id === conversationId,
+          )
+          if (alreadyCommitted) {
+            created = alreadyCommitted
+            wasFlip = true // treat as in-place: broadcast ticket_updated, not created
+            return
+          }
         }
         // Legacy: insert new ticket
         const id = s.next_id++

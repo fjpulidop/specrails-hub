@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useCallback, useLayoutEffect, useId } from 'react'
 import { toast } from 'sonner'
 import { getApiBase } from '../lib/api'
 import { useSharedWebSocket } from './useSharedWebSocket'
@@ -38,7 +38,13 @@ export function useTickets() {
   // Track known ticket IDs so we can detect net-new additions on full refresh
   const knownIdsRef = useRef<Set<number>>(new Set())
 
-  const { registerHandler, unregisterHandler } = useSharedWebSocket()
+  const { registerHandler, unregisterHandler, connectionStatus } = useSharedWebSocket()
+  // M21: the shared WS handler registry is keyed by string id. The old fixed id
+  // 'tickets' meant the THREE simultaneously-mounted useTickets() instances
+  // (TicketDetailModalProvider, useCompareUrlSync, DashboardPage) clobbered and
+  // deleted each other's registration — silently killing live ticket updates on
+  // the board. A per-instance id lets them coexist.
+  const handlerId = useId()
 
   // ── Fetch tickets from API ────────────────────────────────────────────────
 
@@ -205,9 +211,20 @@ export function useTickets() {
   }, [refetch])
 
   useLayoutEffect(() => {
-    registerHandler('tickets', handleMessage)
-    return () => unregisterHandler('tickets')
-  }, [handleMessage, registerHandler, unregisterHandler])
+    registerHandler(`tickets-${handlerId}`, handleMessage)
+    return () => unregisterHandler(`tickets-${handlerId}`)
+  }, [handleMessage, registerHandler, unregisterHandler, handlerId])
+
+  // B26: ticket_* events arriving while the socket was down are lost, leaving the
+  // board stale until the next manual action. Refetch on every (re)connect after
+  // the first, so a server restart / network blip self-heals.
+  const prevConnRef = useRef(connectionStatus)
+  useEffect(() => {
+    if (prevConnRef.current !== 'connected' && connectionStatus === 'connected') {
+      if (activeProjectIdRef.current) refetch()
+    }
+    prevConnRef.current = connectionStatus
+  }, [connectionStatus, refetch])
 
   // ── CRUD mutations ────────────────────────────────────────────────────────
 

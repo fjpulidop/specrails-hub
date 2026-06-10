@@ -6,7 +6,7 @@ import fs from 'fs'
 // Mock fs so we don't touch the real ~/.specrails/hub.token during tests
 vi.mock('fs')
 
-import { requireAuth, getServerToken, _resetTokenForTest, loadOrGenerateToken, tokenFromUpgradeRequest } from './auth'
+import { requireAuth, getServerToken, _resetTokenForTest, loadOrGenerateToken, tokenFromUpgradeRequest, safeEqual, isLoopbackAddress, requireLoopback, isAllowedHost, hostValidationMiddleware } from './auth'
 
 const mockFs = fs as typeof fs & {
   existsSync: ReturnType<typeof vi.fn>
@@ -167,6 +167,112 @@ describe('CORS middleware', () => {
     // The corsMiddleware is not imported here — tested via index integration.
     // This is a placeholder that ensures the CORS tests are tracked.
     expect(true).toBe(true)
+  })
+})
+
+// ─── Fase 0 hardening helpers ────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockResponse(): any {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const res: any = { statusCode: 200, body: undefined }
+  res.status = vi.fn((code: number) => { res.statusCode = code; return res })
+  res.json = vi.fn((body: unknown) => { res.body = body; return res })
+  return res
+}
+
+describe('safeEqual (H-05 constant-time compare)', () => {
+  it('returns true for identical strings', () => {
+    expect(safeEqual('a'.repeat(64), 'a'.repeat(64))).toBe(true)
+  })
+  it('returns false for same-length differing strings', () => {
+    expect(safeEqual('a'.repeat(64), 'b' + 'a'.repeat(63))).toBe(false)
+  })
+  it('returns false for different-length strings (no throw)', () => {
+    expect(safeEqual('abc', 'abcd')).toBe(false)
+  })
+  it('returns true for two empty strings', () => {
+    expect(safeEqual('', '')).toBe(true)
+  })
+})
+
+describe('isLoopbackAddress (H-02/03/04)', () => {
+  it.each([
+    ['127.0.0.1', true],
+    ['127.0.0.5', true],
+    ['::1', true],
+    ['::ffff:127.0.0.1', true],
+    ['192.168.1.10', false],
+    ['10.0.0.1', false],
+    ['', false],
+    [undefined, false],
+  ] as const)('%s → %s', (addr, expected) => {
+    expect(isLoopbackAddress(addr)).toBe(expected)
+  })
+})
+
+describe('requireLoopback middleware', () => {
+  it('calls next() for a loopback peer', () => {
+    const next = vi.fn()
+    const res = mockResponse()
+    requireLoopback({ socket: { remoteAddress: '127.0.0.1' } } as never, res, next)
+    expect(next).toHaveBeenCalledOnce()
+    expect(res.status).not.toHaveBeenCalled()
+  })
+  it('403s a non-loopback peer', () => {
+    const next = vi.fn()
+    const res = mockResponse()
+    requireLoopback({ socket: { remoteAddress: '203.0.113.7' } } as never, res, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(res.statusCode).toBe(403)
+    expect(res.body.error).toMatch(/loopback/i)
+  })
+  it('403s when the socket has no remoteAddress', () => {
+    const next = vi.fn()
+    const res = mockResponse()
+    requireLoopback({ socket: {} } as never, res, next)
+    expect(res.statusCode).toBe(403)
+  })
+})
+
+describe('isAllowedHost (H-08 anti DNS-rebinding)', () => {
+  it.each([
+    ['localhost:4200', true],
+    ['localhost:4201', true],
+    ['127.0.0.1:4200', true],
+    ['127.0.0.1', true],
+    ['tauri.localhost', true],
+    ['[::1]:4200', true],
+    [undefined, true],
+    ['evil.com:4200', false],
+    ['evil.com', false],
+    ['attacker.localhost.evil.com', false],
+    ['127.0.0.1.evil.com', false],
+  ] as const)('%s → %s', (host, expected) => {
+    expect(isAllowedHost(host)).toBe(expected)
+  })
+})
+
+describe('hostValidationMiddleware', () => {
+  it('calls next() for an allowed host', () => {
+    const next = vi.fn()
+    const res = mockResponse()
+    hostValidationMiddleware({ headers: { host: 'localhost:4200' } } as never, res, next)
+    expect(next).toHaveBeenCalledOnce()
+  })
+  it('calls next() when Host is absent', () => {
+    const next = vi.fn()
+    const res = mockResponse()
+    hostValidationMiddleware({ headers: {} } as never, res, next)
+    expect(next).toHaveBeenCalledOnce()
+  })
+  it('403s a rebinding Host', () => {
+    const next = vi.fn()
+    const res = mockResponse()
+    hostValidationMiddleware({ headers: { host: 'evil.com:4200' } } as never, res, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(res.statusCode).toBe(403)
+    expect(res.body.error).toMatch(/Host/i)
   })
 })
 

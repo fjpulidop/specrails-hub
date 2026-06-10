@@ -222,9 +222,26 @@ function buildLogsFromEvents(events: EventRow[]): string {
       // Payload isn't JSON — use raw string as-is
     }
 
-    lines.push(`[${ts}] [${src}] ${text}`)
+    lines.push(`[${ts}] [${src}] ${redactSecrets(text)}`)
   }
   return lines.join('\n') + '\n'
+}
+
+/**
+ * Best-effort redaction of obvious secrets from diagnostic log text (B52). The
+ * exported ZIP is meant to be shared (support, bug reports), but the CLI event
+ * log can echo `export ANTHROPIC_API_KEY=...`, Bearer tokens, or provider keys.
+ * This scrubs the common shapes without destroying the log's diagnostic value.
+ */
+export function redactSecrets(text: string): string {
+  return text
+    // KEY=VALUE / TOKEN: VALUE for anything ending in API_KEY/TOKEN/SECRET/PASSWORD/ACCESS_KEY
+    .replace(/\b([A-Za-z0-9_]*(?:API_KEY|TOKEN|SECRET|PASSWORD|ACCESS_KEY))(\s*[=:]\s*)(["']?)[^\s"']+\3/gi, '$1$2[REDACTED]')
+    // Provider key prefixes (Anthropic/OpenAI sk-..., GitHub gh*_...)
+    .replace(/\bsk-[A-Za-z0-9_-]{16,}/g, 'sk-[REDACTED]')
+    .replace(/\bgh[pousr]_[A-Za-z0-9]{16,}/g, 'gh_[REDACTED]')
+    // Authorization: Bearer <token>
+    .replace(/\b(Bearer)\s+[A-Za-z0-9._-]{12,}/gi, '$1 [REDACTED]')
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

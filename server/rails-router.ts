@@ -269,36 +269,43 @@ export function createRailsRouter(): Router {
 
     const c = ctx(req)
 
-    // Find the active rail job for this rail index
-    let targetJobId: string | undefined
-    for (const [jobId, meta] of c.railJobs.entries()) {
-      if (meta.railIndex === railIndex) {
-        targetJobId = jobId
-        break
-      }
-    }
+    // M19: an Ultracode rail registers ONE queue job per ticket. The old code
+    // stopped only the FIRST matching job, so the remaining N-1 jobs kept running
+    // and billing while the UI showed the rail stopped. Collect ALL jobs for this
+    // rail index and cancel each (running → kill, queued → cancel).
+    const targetJobIds = Array.from(c.railJobs.entries())
+      .filter(([, meta]) => meta.railIndex === railIndex)
+      .map(([jobId]) => jobId)
 
-    if (!targetJobId) {
+    if (targetJobIds.length === 0) {
       res.status(404).json({ error: 'No active rail job found for this rail' }); return
     }
 
-    try {
-      c.queueManager.cancel(targetJobId)
-      c.railJobs.delete(targetJobId)
+    let canceledCount = 0
+    for (const jobId of targetJobIds) {
+      try {
+        c.queueManager.cancel(jobId)
+        canceledCount++
+      } catch (err) {
+        // Already terminal / unknown — clean up the stale entry regardless so the
+        // rail card can't get wedged 'running' (this was the unrecoverable case).
+        console.warn(`[rails-router] stop: cancel(${jobId}) failed: ${(err as Error).message}`)
+      }
+      c.railJobs.delete(jobId)
+    }
 
+    // Broadcast one stop per job so every rail card reconciles.
+    for (const jobId of targetJobIds) {
       const stopMsg: RailJobStoppedMessage = {
         type: 'rail.job_stopped',
         projectId: c.project.id,
         railIndex,
-        jobId: targetJobId,
+        jobId,
       }
       c.broadcast(stopMsg)
-
-      res.json({ ok: true, jobId: targetJobId })
-    } catch (err) {
-      console.error('[rails-router] stop error:', err)
-      res.status(500).json({ error: 'Failed to stop rail job' })
     }
+
+    res.json({ ok: true, jobIds: targetJobIds, canceled: canceledCount })
   })
 
   return router

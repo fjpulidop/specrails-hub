@@ -9,6 +9,10 @@ import { getTelemetryBlob, upsertTelemetryBlob } from './db'
 
 // 10 MB uncompressed cap per job blob
 const BLOB_SIZE_CAP = 10 * 1024 * 1024
+// B2: the soft cap above only dropped `logs`, so traces/metrics could grow a
+// per-job blob without bound (disk-fill DoS). This hard cap bounds the TOTAL
+// blob across ALL signals while still letting traces/metrics outlive logs.
+const BLOB_HARD_CAP = 50 * 1024 * 1024
 
 // Bounded in-memory append queue per (projectId, jobId) key — protects the
 // Express event loop from a burst of OTLP payloads all trying to gzip-append
@@ -187,8 +191,10 @@ async function handleIngest(
   const filePath = blobPath(project.slug, jobId)
   const now = Date.now()
 
-  // Cap enforcement: drop logs once 10 MB is reached
-  if (state.uncompressedSize >= BLOB_SIZE_CAP && signal === 'logs') {
+  // Cap enforcement: drop logs once the 10 MB soft cap is reached (B2: and drop
+  // ANY signal — traces/metrics included — once the 50 MB hard cap is reached, so
+  // a job streaming endless spans can't fill the disk).
+  if (state.uncompressedSize >= BLOB_HARD_CAP || (state.uncompressedSize >= BLOB_SIZE_CAP && signal === 'logs')) {
     res.status(200).json({ ok: true, dropped: true })
     return
   }

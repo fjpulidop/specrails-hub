@@ -45,9 +45,15 @@ function resolveBounds(opts: AnalyticsOpts): { current: DateBounds; label: strin
     return { current: { from: null, to: null }, label: 'All time' }
   }
   if (opts.period === 'custom') {
+    // B42: from/to are unvalidated query params. A malformed date flows into
+    // buildWhere's `new Date(bounds.to).toISOString()` and throws an unhandled
+    // RangeError ("Invalid time value") → 500. Drop any unparseable bound (and
+    // fall back to all-time when neither is valid) instead of crashing.
+    const validFrom = opts.from && !Number.isNaN(Date.parse(opts.from)) ? opts.from : null
+    const validTo = opts.to && !Number.isNaN(Date.parse(opts.to)) ? opts.to : null
     return {
-      current: { from: opts.from!, to: opts.to! },
-      label: `${opts.from} to ${opts.to}`,
+      current: { from: validFrom, to: validTo },
+      label: validFrom || validTo ? `${validFrom ?? '…'} to ${validTo ?? '…'}` : 'All time',
     }
   }
 

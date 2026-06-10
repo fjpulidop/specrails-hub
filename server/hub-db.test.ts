@@ -335,6 +335,15 @@ describe('hub-db', () => {
       expect(updateAgent(db, 'missing', { status: 'busy' })).toBeUndefined()
     })
 
+    it('B72: ignores keys outside the column allow-list (no SQL injection via key)', () => {
+      addAgent(db, makeAgentOpts())
+      // A runtime caller passing an attacker-influenced key — cast past the type.
+      const malicious = { name: 'Renamed', 'status = \'x\'; DROP TABLE agents; --': 'pwn' } as unknown as Parameters<typeof updateAgent>[2]
+      expect(() => updateAgent(db, 'agent-1', malicious)).not.toThrow()
+      // The legit column applied; the agents table still exists and is queryable.
+      expect(getAgent(db, 'agent-1')?.name).toBe('Renamed')
+    })
+
     it('returns the current row when no updates given', () => {
       addAgent(db, makeAgentOpts())
       const result = updateAgent(db, 'agent-1', {})

@@ -3,6 +3,7 @@ import path from 'path'
 import os from 'os'
 import Database from 'better-sqlite3'
 import type { DbInstance } from './db'
+import { secureDir, secureDbFile } from './util/secure-fs'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -254,12 +255,17 @@ function applyHubMigrations(db: DbInstance): void {
 export function initHubDb(dbPath: string = getHubDbPath()): DbInstance {
   const dir = path.dirname(dbPath)
   fs.mkdirSync(dir, { recursive: true })
+  if (dbPath !== ':memory:') secureDir(dir) // H-13: owner-only ~/.specrails
 
   const db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
 
   applyHubMigrations(db)
+
+  // H-13: hub.sqlite stores webhook HMAC secrets in plaintext — restrict it
+  // (and its WAL sidecars) to owner read/write.
+  if (dbPath !== ':memory:') secureDbFile(dbPath)
   return db
 }
 
@@ -366,12 +372,20 @@ export function addAgent(
   return db.prepare('SELECT * FROM agents WHERE id = ?').get(agent.id) as AgentRow
 }
 
+// B72: column names are interpolated into the SET clause below. TS restricts the
+// keys at compile time, but a runtime caller passing an attacker-influenced
+// object would otherwise inject SQL via the key. Gate on an explicit allow-list.
+const UPDATABLE_AGENT_COLUMNS = new Set<string>([
+  'name', 'role', 'status', 'current_job_id', 'last_heartbeat_at', 'config',
+])
+
 export function updateAgent(
   db: DbInstance,
   id: string,
   updates: Partial<Pick<AgentRow, 'name' | 'role' | 'status' | 'current_job_id' | 'last_heartbeat_at' | 'config'>>
 ): AgentRow | undefined {
-  const fields = Object.keys(updates) as (keyof typeof updates)[]
+  const fields = (Object.keys(updates) as (keyof typeof updates)[])
+    .filter((f) => UPDATABLE_AGENT_COLUMNS.has(f as string))
   if (fields.length === 0) return getAgent(db, id)
 
   const setClauses = fields.map((f) => `${f} = ?`).join(', ')

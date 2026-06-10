@@ -81,6 +81,19 @@ describe('AttachmentManager', () => {
 
   // ─── upload ────────────────────────────────────────────────────────────────
 
+  describe('ticketDir path safety (B5)', () => {
+    it('rejects ticket keys with path traversal segments', () => {
+      expect(() => manager.ticketDir('proj', '../../../etc')).toThrow(/Invalid attachment ticket key/)
+      expect(() => manager.ticketDir('proj', '..')).toThrow(/Invalid attachment ticket key/)
+      expect(() => manager.ticketDir('proj', 'a/b')).toThrow(/Invalid attachment ticket key/)
+      expect(() => manager.ticketDir('proj', 'a\\b')).toThrow(/Invalid attachment ticket key/)
+    })
+    it('accepts normal numeric and pending-spec keys', () => {
+      expect(() => manager.ticketDir('proj', 1)).not.toThrow()
+      expect(() => manager.ticketDir('proj', 'spec-abc123')).not.toThrow()
+    })
+  })
+
   describe('upload', () => {
     it('stores file and sidecar, returns Attachment', async () => {
       const attachment = await manager.upload({

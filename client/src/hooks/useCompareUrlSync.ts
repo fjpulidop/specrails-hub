@@ -76,6 +76,14 @@ export function useCompareUrlSync() {
 
   // ─── Write URL params on state change ─────────────────────────────────────
   useEffect(() => {
+    // B21: do not touch the params until the initial restore has had its chance.
+    // On a cold load the restore-effect bails while tickets are still loading
+    // (length 0); without this guard, this effect would run first, see split
+    // state not-yet-hydrated, and strip ?compare/?compareOrigin — so refresh
+    // could never restore a comparison. The restore-effect handles clearing
+    // genuinely-stale params itself.
+    if (!didRestoreRef.current) return
+
     const params = new URLSearchParams(location.search)
     const hadCompare = params.has('compare')
     const inSplit = state.originSide !== null

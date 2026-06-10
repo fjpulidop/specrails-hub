@@ -256,3 +256,64 @@ describe('rails-router POST /:railIndex/launch ultracode mode', () => {
     expect((enqueue.mock.calls[0][2] as { model?: string }).model).toBeUndefined()
   })
 })
+
+describe('rails-router POST /:railIndex/stop (M19)', () => {
+  let db: DbInstance
+  beforeEach(() => { db = initDb(':memory:') })
+  afterEach(() => { db.close() })
+
+  function appWithRailJobs(railJobs: Map<string, unknown>, cancel: ReturnType<typeof vi.fn>) {
+    const app = express()
+    app.use(express.json())
+    app.use((req, _res, next) => {
+      ;(req as unknown as { projectCtx: unknown }).projectCtx = {
+        db, railJobs,
+        project: { id: 'p1', slug: 's1', provider: 'claude', providers: ['claude'] },
+        queueManager: { cancel },
+        broadcast: () => {},
+      }
+      next()
+    })
+    app.use('/rails', createRailsRouter())
+    return app
+  }
+
+  it('cancels ALL jobs of the rail, not just the first', async () => {
+    // Ultracode rail registered 3 jobs under railIndex 0 (+ one for another rail).
+    const railJobs = new Map<string, unknown>([
+      ['job-a', { railIndex: 0, mode: 'ultracode', ticketIds: [1] }],
+      ['job-b', { railIndex: 0, mode: 'ultracode', ticketIds: [2] }],
+      ['job-c', { railIndex: 0, mode: 'ultracode', ticketIds: [3] }],
+      ['other', { railIndex: 1, mode: 'ultracode', ticketIds: [9] }],
+    ])
+    const cancel = vi.fn().mockReturnValue('canceled')
+
+    const res = await request(appWithRailJobs(railJobs, cancel)).post('/rails/0/stop').send({})
+
+    expect(res.status).toBe(200)
+    expect(cancel).toHaveBeenCalledTimes(3)
+    expect(res.body.jobIds).toEqual(['job-a', 'job-b', 'job-c'])
+    // All rail-0 entries removed; the other rail's entry is untouched.
+    expect(railJobs.has('job-a')).toBe(false)
+    expect(railJobs.has('job-b')).toBe(false)
+    expect(railJobs.has('job-c')).toBe(false)
+    expect(railJobs.has('other')).toBe(true)
+  })
+
+  it('still clears stale entries when cancel throws (unrecoverable-rail fix)', async () => {
+    const railJobs = new Map<string, unknown>([
+      ['stale', { railIndex: 0, mode: 'ultracode', ticketIds: [1] }],
+    ])
+    const cancel = vi.fn().mockImplementation(() => { throw new Error('already terminal') })
+
+    const res = await request(appWithRailJobs(railJobs, cancel)).post('/rails/0/stop').send({})
+
+    expect(res.status).toBe(200)
+    expect(railJobs.has('stale')).toBe(false) // cleaned up despite the throw
+  })
+
+  it('404s when the rail has no jobs', async () => {
+    const res = await request(appWithRailJobs(new Map(), vi.fn())).post('/rails/0/stop').send({})
+    expect(res.status).toBe(404)
+  })
+})

@@ -3,6 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Content-Security-Policy (B7). 'unsafe-inline'/'unsafe-eval' are required by
+      the inline anti-FOUC script, Tailwind's injected styles, the Vite dev runtime,
+      and Monaco — so script/style stay permissive. The value comes from locking
+      down what we CAN without breaking the app: connect only to self + the local
+      sidecar (http/ws on localhost/127.0.0.1) and https/wss; no <object>, no
+      <base> hijack, and no framing (anti-clickjacking).
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* https: wss:; worker-src 'self' blob:; child-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    />
     <title>Specrails</title>
     <!--
       Anti-FOUC: read the cached theme synchronously and apply it to <html>

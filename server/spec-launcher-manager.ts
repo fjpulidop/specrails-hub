@@ -24,6 +24,20 @@ export class SpecLauncherManager {
     return this._activeProcesses.has(launchId)
   }
 
+  /**
+   * Tear down before the project is removed (M12). This manager holds no DB
+   * handle (its close handler only broadcasts), so it cannot crash the hub — but
+   * an orphaned `/opsx:ff` child runs with --dangerously-skip-permissions against
+   * a removed project and keeps burning spend, so SIGTERM it. Idempotent.
+   */
+  shutdown(): void {
+    for (const child of this._activeProcesses.values()) {
+      if (child.pid) { try { treeKill(child.pid, 'SIGTERM') } catch { /* ignore */ } }
+    }
+    this._activeProcesses.clear()
+    this._buffers.clear()
+  }
+
   async launch(launchId: string, description: string): Promise<void> {
     const rawCommand = `/opsx:ff ${description}`
     const prompt = resolveCommand(rawCommand, this._cwd)
