@@ -911,6 +911,8 @@ jobs:
           # current and previous versioned folders to stay within its quota.
           gh release upload "${TAG}" updater/* artifacts/canonical/* --clobber
 
+      # curl uses ftp:// + --ssl-reqd for explicit FTPS on port 21. ftps://
+      # selects implicit FTPS on port 990, which Hostinger does not expose.
       # Prune old Hostinger archives before uploading the next ~1.8 GB release.
       # Without retention, every release permanently consumes another ~1.8 GB
       # and Hostinger eventually aborts uploads with FTP 451 I/O errors.
@@ -933,7 +935,7 @@ jobs:
           mapfile -t versions < <(
             curl --fail --silent --show-error --ftp-pasv --ssl-reqd \
               --user "${FTP_USER}:${FTP_PASS}" \
-              "ftps://${HOST}/${root}/" --list-only \
+              "ftp://${HOST}/${root}/" --list-only \
               | tr -d '\r' \
               | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
               | grep -Fvx "${current}" \
@@ -954,7 +956,7 @@ jobs:
             mapfile -t files < <(
               curl --fail --silent --show-error --ftp-pasv --ssl-reqd \
                 --user "${FTP_USER}:${FTP_PASS}" \
-                "ftps://${HOST}/${remote}/" --list-only \
+                "ftp://${HOST}/${remote}/" --list-only \
                 | tr -d '\r'
             )
 
@@ -972,7 +974,7 @@ jobs:
             curl --fail --silent --show-error --ftp-pasv --ssl-reqd \
               --user "${FTP_USER}:${FTP_PASS}" \
               "${quote_args[@]}" \
-              "ftps://${HOST}/" \
+              "ftp://${HOST}/" \
               --output /dev/null
           done
 
@@ -1021,7 +1023,7 @@ jobs:
           # List the directory. Returns just filenames when using --list-only.
           # Match .dmg (mac), .exe (Windows NSIS), .msi (Windows MSI). Do NOT
           # delete manifest.json (it gets overwritten) or .htaccess (server-managed).
-          stale="$(curl -s --ftp-pasv --ssl-reqd --user "${FTP_USER}:${FTP_PASS}" "ftps://${HOST}/${remote}" --list-only | grep -E '\.(dmg|exe|msi)$' || true)"
+          stale="$(curl -s --ftp-pasv --ssl-reqd --user "${FTP_USER}:${FTP_PASS}" "ftp://${HOST}/${remote}" --list-only | grep -E '\.(dmg|exe|msi)$' || true)"
           if [[ -z "${stale}" ]]; then
             echo "No stale installer files in latest/"
             exit 0
@@ -1031,7 +1033,7 @@ jobs:
             echo "Deleting stale: ${f}"
             curl -s --ftp-pasv --ssl-reqd --user "${FTP_USER}:${FTP_PASS}" \
               -Q "DELE ${remote}${f}" \
-              "ftps://${HOST}/${remote}" || echo "  (DELE failed for ${f}; continuing)"
+              "ftp://${HOST}/${remote}" || echo "  (DELE failed for ${f}; continuing)"
           done <<< "${stale}"
 
       - name: Upload new installers to latest/
@@ -1052,7 +1054,7 @@ jobs:
             curl --fail --silent --show-error --ftp-pasv --ssl-reqd --ftp-create-dirs \
               --user "${FTP_USER}:${FTP_PASS}" \
               -T "${file}" \
-              "ftps://${HOST}/${remote}"
+              "ftp://${HOST}/${remote}"
             echo "Uploaded $(basename "${file}") to ${remote}"
           done
 
@@ -1098,7 +1100,7 @@ jobs:
           curl --fail --silent --show-error --ftp-pasv --ssl-reqd --ftp-create-dirs \
             --user "${FTP_USER}:${FTP_PASS}" \
             -T manifest/manifest.json \
-            "ftps://${HOST}/${remote}"
+            "ftp://${HOST}/${remote}"
           echo "Uploaded manifest.json to ${remote}"
 
       - name: Verify manifest.json is reachable and valid JSON
