@@ -32,14 +32,14 @@
     "assemble-runtimes": "node scripts/assemble-runtimes-local.mjs",
     "build:desktop:local": "npm run assemble-runtimes && npm run build:desktop",
     "generate-icons": "tauri icon src-tauri/icons/icon.svg",
-    "typecheck": "tsc --noEmit && cd client && tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.cli.json --noEmit && cd client && tsc --noEmit",
     "check-core-compat": "tsx scripts/check-core-compat.ts",
     "test": "vitest run && tsx scripts/check-core-compat.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:client": "cd client && npx vitest run",
     "test:all": "vitest run && cd client && npx vitest run",
-    "ci": "npm run typecheck && npm test && npm run test:coverage && cd client && npm run test:coverage"
+    "ci": "npm run typecheck && npm run check-core-compat && npm run test:coverage && cd client && npm run test:coverage"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",

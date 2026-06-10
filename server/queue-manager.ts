@@ -1,4 +1,4 @@
-import { execSync, ChildProcess } from 'child_process'
+import { ChildProcess } from 'child_process'
 import fsNode from 'fs'
 import pathNode from 'path'
 import { createInterface } from 'readline'
@@ -28,6 +28,7 @@ import type { JobResult } from './db'
 import type { CommandInfo } from './config'
 import { attachmentManager, USER_ATTACHMENT_SYSTEM_NOTE } from './attachment-manager'
 import { extractTicketIdsFromCommand, readStore, resolveTicketStoragePath } from './ticket-store'
+import { binaryOnPath } from './binary-probe'
 
 // ─── Telemetry env helpers ────────────────────────────────────────────────────
 
@@ -114,28 +115,6 @@ export class JobAlreadyTerminalError extends Error {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Windows has no `which`; probe via `where` instead. Both exit non-zero
-// when the command is missing, which the try/catch relies on.
-const _WHICH_CMD = process.platform === 'win32' ? 'where' : 'which'
-
-function claudeOnPath(): boolean {
-  try {
-    execSync(`${_WHICH_CMD} claude`, { stdio: 'ignore' })
-    return true
-  } catch {
-    return false
-  }
-}
-
-function codexOnPath(): boolean {
-  try {
-    execSync(`${_WHICH_CMD} codex`, { stdio: 'ignore' })
-    return true
-  } catch {
-    return false
-  }
-}
 
 function extractDisplayText(event: Record<string, unknown>): string | null {
   const type = event.type as string
@@ -397,18 +376,14 @@ export class QueueManager {
     const enqueueAdapter =
       resolvedOpts?.provider ? getAdapter(resolvedOpts.provider) : this._adapter
     if (enqueueAdapter.id === 'codex') {
-      if (!codexOnPath()) throw new CodexNotFoundError()
+      if (!binaryOnPath('codex')) throw new CodexNotFoundError()
     } else if (enqueueAdapter.id === 'claude') {
-      if (!claudeOnPath()) throw new ClaudeNotFoundError()
-    } else {
+      if (!binaryOnPath('claude')) throw new ClaudeNotFoundError()
+    } else if (!binaryOnPath(enqueueAdapter.binary)) {
       // Future providers reuse the same pattern: a quick `which` probe via
       // the adapter's binary. We don't throw a typed *NotFoundError because
       // none has been declared; the adapter's id surfaces in the error.
-      try {
-        execSync(`${_WHICH_CMD} ${enqueueAdapter.binary}`, { stdio: 'ignore' })
-      } catch {
-        throw new Error(`${enqueueAdapter.binary} binary not found`)
-      }
+      throw new Error(`${enqueueAdapter.binary} binary not found`)
     }
 
     const id = uuidv4()

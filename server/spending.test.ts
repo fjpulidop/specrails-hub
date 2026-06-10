@@ -351,6 +351,68 @@ describe('getSpending edge cases', () => {
   })
 })
 
+describe('H24 derived aggregates', () => {
+  let db: DbInstance
+  beforeEach(() => { db = initDb(':memory:') })
+
+  it('byModel aggregates counts and cost across surfaces, ordered by cost desc', () => {
+    const now = new Date().toISOString()
+    seed(db, [
+      { id: 'a', surface: 'job', model: 'sonnet', total_cost_usd: 1, started_at: now },
+      { id: 'b', surface: 'quick-spec', model: 'sonnet', total_cost_usd: 2, started_at: now },
+      { id: 'c', surface: 'job', model: 'opus', total_cost_usd: 5, started_at: now },
+    ])
+    const r = getSpending(db, 'p1', { period: 'all' })
+    expect(r.byModel).toEqual([
+      { model: 'opus', count: 1, costUsd: 5 },
+      { model: 'sonnet', count: 2, costUsd: 3 },
+    ])
+  })
+
+  it('byMode dominantModel picks the most frequent model per surface', () => {
+    const now = new Date().toISOString()
+    seed(db, [
+      { id: 'a', surface: 'quick-spec', model: 'haiku', total_cost_usd: 0.1, started_at: now },
+      { id: 'b', surface: 'quick-spec', model: 'haiku', total_cost_usd: 0.1, started_at: now },
+      { id: 'c', surface: 'quick-spec', model: 'opus', total_cost_usd: 9, started_at: now },
+      { id: 'd', surface: 'explore-spec', model: 'sonnet', total_cost_usd: 0.5, started_at: now },
+      { id: 'e', surface: 'job', model: 'opus', total_cost_usd: 1, started_at: now },
+    ])
+    const r = getSpending(db, 'p1', { period: 'all' })
+    expect(r.byMode.find((m) => m.mode === 'quick')!.dominantModel).toBe('haiku')
+    expect(r.byMode.find((m) => m.mode === 'explore')!.dominantModel).toBe('sonnet')
+  })
+
+  it('byMode sparkline matches the dailyTimeline per-surface costs', () => {
+    const today = new Date()
+    const yesterday = new Date(today.getTime() - 86_400_000).toISOString()
+    seed(db, [
+      { id: 'a', surface: 'quick-spec', total_cost_usd: 0.4, started_at: yesterday },
+      { id: 'b', surface: 'quick-spec', total_cost_usd: 0.6, started_at: today.toISOString() },
+      { id: 'c', surface: 'explore-spec', total_cost_usd: 2, started_at: today.toISOString() },
+    ])
+    const r = getSpending(db, 'p1', { period: '7d' })
+    const quick = r.byMode.find((m) => m.mode === 'quick')!
+    expect(quick.sparkline).toHaveLength(r.dailyTimeline.length)
+    expect(quick.sparkline).toEqual(r.dailyTimeline.map((d) => d.quickCostUsd))
+    const explore = r.byMode.find((m) => m.mode === 'explore')!
+    expect(explore.sparkline).toEqual(r.dailyTimeline.map((d) => d.exploreCostUsd))
+  })
+
+  it('bySurface counts rows with null cost and zero-fills absent surfaces', () => {
+    const now = new Date().toISOString()
+    seed(db, [
+      { id: 'a', surface: 'job', total_cost_usd: null, started_at: now },
+      { id: 'b', surface: 'job', total_cost_usd: 3, started_at: now },
+    ])
+    const r = getSpending(db, 'p1', { period: 'all' })
+    const job = r.bySurface.find((s) => s.surface === 'job')!
+    expect(job.count).toBe(2)
+    expect(job.costUsd).toBeCloseTo(3)
+    expect(r.bySurface.find((s) => s.surface === 'smash')).toEqual({ surface: 'smash', count: 0, costUsd: 0 })
+  })
+})
+
 describe('daily timeline (B58/B63)', () => {
   let db: DbInstance
   beforeEach(() => { db = initDb(':memory:') })

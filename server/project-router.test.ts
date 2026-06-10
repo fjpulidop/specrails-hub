@@ -183,6 +183,32 @@ describe('project-router', () => {
     })
   })
 
+  // ─── Hooks mount (H18: memoized per ProjectContext) ─────────────────────────
+
+  describe('hooks sub-router mount', () => {
+    it('serves hook events across repeated requests through the memoized router', async () => {
+      const ctx = makeContext(db)
+      const { app } = createApp(new Map([['proj-1', ctx]]))
+
+      // First request constructs the sub-router; second hits the WeakMap memo.
+      const first = await request(app)
+        .post('/api/projects/proj-1/hooks/events')
+        .send({ event: 'agent_start', agent: 'architect' })
+      const second = await request(app)
+        .post('/api/projects/proj-1/hooks/events')
+        .send({ event: 'agent_stop', agent: 'architect' })
+
+      expect(first.status).toBe(200)
+      expect(second.status).toBe(200)
+      expect(ctx.broadcast).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'phase', phase: 'architect', state: 'running' })
+      )
+      expect(ctx.broadcast).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'phase', phase: 'architect', state: 'done' })
+      )
+    })
+  })
+
   // ─── POST /spawn ────────────────────────────────────────────────────────────
 
   describe('POST /spawn', () => {

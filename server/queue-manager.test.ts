@@ -30,6 +30,7 @@ import { spawn as mockSpawn, execSync as mockExecSync } from 'child_process'
 import treeKill from 'tree-kill'
 import { newId as mockUuidV4 } from './ids'
 import { QueueManager, ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
+import { __resetBinaryProbeCacheForTest } from './binary-probe'
 import { attachmentManager } from './attachment-manager'
 import type { WsMessage } from './types'
 
@@ -64,6 +65,7 @@ describe('QueueManager', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+    __resetBinaryProbeCacheForTest()
     broadcast = vi.fn()
     qm = new QueueManager(broadcast)
   })

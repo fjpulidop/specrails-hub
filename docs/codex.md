@@ -92,7 +92,7 @@ spawns, no overrides.
 | **Project dir** | `.claude/` | `.codex/` |
 | **Instructions file** | `CLAUDE.md` | `AGENTS.md` |
 | **Agent format** | `.claude/agents/<id>.md` with `model:` frontmatter | `.codex/skills/<id>/SKILL.md` Skill format |
-| **Agent profiles** | Full support (rail `RailProfileSelector`, `ProfilePicker`) | **None** — codex rails force the profile to `null`; the Agents section is Claude-only |
+| **Agent profiles** | Full support (rail `RailProfileSelector`) | **None** — codex rails force the profile to `null`; the Agents section is Claude-only |
 | **Contract Refine** | Claude-only (it `--resume`s the Explore session and runs `/specrails:contract-refine`) | **Skipped** — toggling "Enrich with Contract Layer" on a codex spec is a no-op |
 | **MCP registration** | Surgical merge of `<project>/.mcp.json` | `codex mcp add` against per-project `CODEX_HOME=~/.specrails/projects/<slug>/codex-home/` (isolated) |
 | **Session resume** | `--resume <session_id>` | `exec resume <thread_id>` |

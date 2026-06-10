@@ -23,6 +23,7 @@ import { spawn as mockSpawn, execSync as mockExecSync } from 'child_process'
 import { buildUserMcpArgs as mockBuildUserMcpArgs } from './user-mcp-config'
 import treeKill from 'tree-kill'
 import { ChatManager } from './chat-manager'
+import { __resetBinaryProbeCacheForTest } from './binary-probe'
 import { initDb, createConversation, getConversation, createJob, finishJob } from './db'
 
 const MCP_SCOPE = { specrails: false, openspec: false, full: false, mcp: true, contractRefine: false }
@@ -80,6 +81,7 @@ describe('ChatManager', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+    __resetBinaryProbeCacheForTest()
     vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
     db = initDb(':memory:')
     broadcast = vi.fn()
@@ -370,8 +372,11 @@ describe('ChatManager', () => {
       expect(systemPrompt).toContain('my-cool-project')
     })
 
-    it('system prompt includes dashboard context section when jobs exist', async () => {
-      createJob(db, { id: 'job-ctx-1', command: '/specrails:implement #42', started_at: new Date().toISOString() })
+    it('dashboard context is prepended to the user turn, not the system prompt', async () => {
+      // NOTE: '#77' (not '#42') — COMMAND_INSTRUCTION's static example contains
+      // the literal '/specrails:implement #42', which would defeat the
+      // negative assertion on the system prompt below.
+      createJob(db, { id: 'job-ctx-1', command: '/specrails:implement #77', started_at: new Date().toISOString() })
       finishJob(db, 'job-ctx-1', { exit_code: 0, status: 'completed', total_cost_usd: 0.05, duration_ms: 30000 })
 
       const cmWithName = new ChatManager(broadcast, db, undefined, 'test-project')
@@ -389,11 +394,16 @@ describe('ChatManager', () => {
       await sendPromise
 
       const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
-      const sysPromptIdx = spawnArgs.indexOf('--system-prompt')
-      const systemPrompt = spawnArgs[sysPromptIdx + 1]
-      expect(systemPrompt).toContain('Dashboard Context')
-      expect(systemPrompt).toContain('Recent Jobs')
-      expect(systemPrompt).toContain('/specrails:implement #42')
+      const prompt = spawnArgs[spawnArgs.indexOf('-p') + 1]
+      expect(prompt).toContain('## Current Dashboard Context')
+      expect(prompt).toContain('Recent Jobs')
+      expect(prompt).toContain('/specrails:implement #77')
+      expect(prompt).toContain('## User turn\n\nWhat ran recently?')
+      // Volatile stats must NOT leak into the cacheable system prompt
+      const systemPrompt = spawnArgs[spawnArgs.indexOf('--system-prompt') + 1]
+      expect(systemPrompt).not.toContain('Recent Jobs')
+      expect(systemPrompt).not.toContain('/specrails:implement #77')
+      expect(systemPrompt).not.toContain('Total cost:')
     })
 
     it('success rate uses all-time failedJobs count, not just recent jobs', async () => {
@@ -422,10 +432,9 @@ describe('ChatManager', () => {
       await sendPromise
 
       const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
-      const sysPromptIdx = spawnArgs.indexOf('--system-prompt')
-      const systemPrompt = spawnArgs[sysPromptIdx + 1]
+      const prompt = spawnArgs[spawnArgs.indexOf('-p') + 1]
       // 8 out of 10 = 80%
-      expect(systemPrompt).toContain('success rate: 80%')
+      expect(prompt).toContain('success rate: 80%')
     })
 
     it('system prompt still works gracefully when DB is empty', async () => {
@@ -452,7 +461,7 @@ describe('ChatManager', () => {
       expect(systemPrompt).toContain('empty-project')
     })
 
-    it('system prompt is refreshed on each sendMessage call', async () => {
+    it('system prompt is byte-stable across turns while dashboard context refreshes in the user turn', async () => {
       createJob(db, { id: 'job-ctx-seq-1', command: '/specrails:implement #1', started_at: new Date().toISOString() })
       finishJob(db, 'job-ctx-seq-1', { exit_code: 0, status: 'completed', total_cost_usd: 0.01, duration_ms: 5000 })
 
@@ -488,17 +497,17 @@ describe('ChatManager', () => {
       const mainCalls = allSpawnCalls.filter((c) => (c[1] as string[]).includes('--system-prompt'))
       expect(mainCalls.length).toBeGreaterThanOrEqual(2)
 
-      const getPrompt = (call: unknown[]) => {
+      const getArg = (call: unknown[], flag: string) => {
         const args = call[1] as string[]
-        const idx = args.indexOf('--system-prompt')
-        return args[idx + 1]
+        return args[args.indexOf(flag) + 1]
       }
-      const prompt1 = getPrompt(mainCalls[0])
-      const prompt2 = getPrompt(mainCalls[1])
-      // Second prompt should mention the new job
-      expect(prompt2).toContain('/specrails:review #7')
-      // First prompt should not have mentioned it yet
-      expect(prompt1).not.toContain('/specrails:review #7')
+      // The cacheable --system-prompt prefix must be byte-identical across turns
+      expect(getArg(mainCalls[0], '--system-prompt')).toBe(getArg(mainCalls[1], '--system-prompt'))
+      // The dashboard block in the user turn refreshes: turn 2 sees the new job
+      const userPrompt1 = getArg(mainCalls[0], '-p')
+      const userPrompt2 = getArg(mainCalls[1], '-p')
+      expect(userPrompt2).toContain('/specrails:review #7')
+      expect(userPrompt1).not.toContain('/specrails:review #7')
     })
   })
 
@@ -1241,6 +1250,58 @@ describe('ChatManager', () => {
       expect(out).not.toMatch(/\$\d+\.\d{3}/)
       expect(out).not.toMatch(/Total jobs:/)
       expect(out).not.toMatch(/Jobs today:/)
+    })
+  })
+
+  // ─── Sidebar system prompt byte stability (H20) ───────────────────────────
+
+  describe('Sidebar system prompt', () => {
+    it('is byte-stable across consecutive invocations even as jobs accumulate', () => {
+      const cmA = new ChatManager(broadcast, db, undefined, 'StableProject')
+      const build = (cmA as unknown as { _buildSystemPrompt: () => string })._buildSystemPrompt.bind(cmA)
+      const a = build()
+      createJob(db, { id: 'job-stable-1', command: '/specrails:implement #9', started_at: new Date().toISOString() })
+      finishJob(db, 'job-stable-1', { exit_code: 0, status: 'completed', total_cost_usd: 0.03, duration_ms: 4000 })
+      const b = build()
+      expect(a).toBe(b)
+    })
+
+    it('contains no timestamps, dates, costs or job stats', () => {
+      createJob(db, { id: 'job-stable-2', command: '/specrails:implement #10', started_at: new Date().toISOString() })
+      finishJob(db, 'job-stable-2', { exit_code: 0, status: 'completed', total_cost_usd: 0.04, duration_ms: 4000 })
+      const cmA = new ChatManager(broadcast, db, undefined, 'StableProject')
+      const build = (cmA as unknown as { _buildSystemPrompt: () => string })._buildSystemPrompt.bind(cmA)
+      const out = build()
+      expect(out).not.toMatch(/\d{4}-\d{2}-\d{2}/)
+      expect(out).not.toMatch(/\$\d+\.\d{3}/)
+      expect(out).not.toMatch(/Total jobs:/)
+      expect(out).not.toMatch(/Jobs today:/)
+      // Identity + command instruction stay in the static prefix
+      expect(out).toContain('StableProject')
+      expect(out).toContain(':::command')
+    })
+
+    it('lightweight turns do not get the dashboard context prepend', async () => {
+      createJob(db, { id: 'job-lw-1', command: '/specrails:implement #11', started_at: new Date().toISOString() })
+      finishJob(db, 'job-lw-1', { exit_code: 0, status: 'completed', total_cost_usd: 0.02, duration_ms: 3000 })
+
+      const convId = setupConversation()
+      const child = createMockChildProcess()
+      const titleChild = createMockChildProcess()
+      vi.mocked(mockSpawn)
+        .mockReturnValueOnce(child as any)
+        .mockReturnValueOnce(titleChild as any)
+
+      const sendPromise = cm.sendMessage(convId, 'Quick question', { lightweight: true })
+      pushLine(child, assistantEvent('Answer'))
+      pushLine(child, resultEvent('sess-lw-1'))
+      await finishProcess(child, 0)
+      await sendPromise
+
+      const spawnArgs = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      const prompt = spawnArgs[spawnArgs.indexOf('-p') + 1]
+      expect(prompt).toBe('Quick question')
+      expect(prompt).not.toContain('Current Dashboard Context')
     })
   })
 })
