@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.66.0](https://github.com/fjpulidop/specrails-hub/compare/v1.65.4...v1.66.0) (2026-06-11)
+
+
+### Features
+
+* **mobile:** add Mobile Gateway with QR pairing and device management ([#370](https://github.com/fjpulidop/specrails-hub/issues/370)) ([34d8e99](https://github.com/fjpulidop/specrails-hub/commit/34d8e99eca61198561ea6e6f7f5d9287aace5f70))
+
 ## [1.65.4](https://github.com/fjpulidop/specrails-hub/compare/v1.65.3...v1.65.4) (2026-06-11)
 
 
