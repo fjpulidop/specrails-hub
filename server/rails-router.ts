@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express'
 import type { ProjectContext } from './project-registry'
-import { getRails, getRail, setRailTickets, setRailProfile, setRailEngine } from './rails-store'
+import { getRails, getRail, setRailTickets, setRailProfile, setRailEngine, setRailName, type RailState } from './rails-store'
 import { ClaudeNotFoundError, CodexNotFoundError } from './queue-manager'
 import { validateRequestedProvider } from './provider-selection'
-import type { RailJobStartedMessage, RailJobStoppedMessage } from './types'
+import type { RailJobStartedMessage, RailJobStoppedMessage, RailUpdatedMessage } from './types'
 
 // Extend Express Request to carry resolved ProjectContext (declared in project-router)
 declare module 'express-serve-static-core' {
@@ -22,6 +22,32 @@ export function createRailsRouter(): Router {
 
   function ctx(req: Request): ProjectContext {
     return req.projectCtx!
+  }
+
+  // Broadcast the full post-mutation rail snapshot so every connected client
+  // (desktop dashboard + mobile companion) reflects non-launch rail changes
+  // live — ticket reassignments, renames, mode/profile/engine edits. Re-reads
+  // the canonical rail (getRail) so the snapshot always carries the CURRENT
+  // name — a mutation return value (e.g. setRailTickets) omits it, which would
+  // otherwise broadcast name:null and clobber the rail's label on receivers.
+  function broadcastRailUpdated(
+    c: ProjectContext,
+    railIndex: number,
+    changed: RailUpdatedMessage['changed'],
+  ): void {
+    const rail: RailState = getRail(c.db, railIndex)
+    const msg: RailUpdatedMessage = {
+      type: 'rail.updated',
+      projectId: c.project.id,
+      railIndex: rail.railIndex,
+      changed,
+      ticketIds: rail.ticketIds,
+      name: rail.name ?? null,
+      mode: rail.mode,
+      profileName: rail.profileName ?? null,
+      aiEngine: rail.aiEngine ?? null,
+    }
+    c.broadcast(msg)
   }
 
   // GET /rails — list all rail assignments + active job info
@@ -67,6 +93,7 @@ export function createRailsRouter(): Router {
       // setRailTickets re-reads the current value), so it isn't silently wiped.
       const aiEngine = 'aiEngine' in body ? body.aiEngine : undefined
       const rail = setRailTickets(c.db, railIndex, ticketIds as number[], mode, profileName, aiEngine)
+      broadcastRailUpdated(c, railIndex, 'tickets')
       res.json({ rail })
     } catch (err) {
       console.error('[rails-router] set rail tickets error:', err)
@@ -92,6 +119,7 @@ export function createRailsRouter(): Router {
     const c = ctx(req)
     try {
       const rail = setRailProfile(c.db, railIndex, value)
+      broadcastRailUpdated(c, railIndex, 'profile')
       res.json({ rail })
     } catch (err) {
       console.error('[rails-router] set rail profile error:', err)
@@ -119,10 +147,41 @@ export function createRailsRouter(): Router {
     }
     try {
       const rail = setRailEngine(c.db, railIndex, value)
+      broadcastRailUpdated(c, railIndex, 'engine')
       res.json({ rail })
     } catch (err) {
       console.error('[rails-router] set rail engine error:', err)
       res.status(500).json({ error: 'Failed to update rail engine' })
+    }
+  })
+
+  // PUT /rails/:railIndex/name — set the rail's display name (the "Rail "-suffix)
+  // Body: { name: string | null } (empty/null clears it back to the default label)
+  router.put('/:railIndex/name', (req: Request, res: Response) => {
+    const railIndex = parseInt(req.params.railIndex as string, 10)
+    if (isNaN(railIndex) || railIndex < 0) {
+      res.status(400).json({ error: 'Invalid rail index' }); return
+    }
+    const body = req.body ?? {}
+    if (!('name' in body)) {
+      res.status(400).json({ error: "body must include 'name' (string or null)" }); return
+    }
+    const value = body.name
+    if (value !== null && typeof value !== 'string') {
+      res.status(400).json({ error: 'name must be a string or null' }); return
+    }
+    // Guard against unbounded labels (UI shows a short chip).
+    if (typeof value === 'string' && value.length > 60) {
+      res.status(400).json({ error: 'name must be 60 characters or fewer' }); return
+    }
+    const c = ctx(req)
+    try {
+      const rail = setRailName(c.db, railIndex, value)
+      broadcastRailUpdated(c, railIndex, 'name')
+      res.json({ rail })
+    } catch (err) {
+      console.error('[rails-router] set rail name error:', err)
+      res.status(500).json({ error: 'Failed to update rail name' })
     }
   })
 

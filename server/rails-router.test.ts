@@ -10,6 +10,7 @@ function appWith(
   opts?: {
     providers?: ('claude' | 'codex')[]
     queueManager?: { enqueue: (...args: unknown[]) => unknown }
+    broadcast?: (msg: unknown) => void
   },
 ) {
   const providers = opts?.providers ?? ['claude']
@@ -23,7 +24,7 @@ function appWith(
       railJobs: new Map(),
       project: { id: 'p1', slug: 's1', provider: providers[0], providers },
       queueManager: opts?.queueManager,
-      broadcast: () => { /* noop */ },
+      broadcast: opts?.broadcast ?? (() => { /* noop */ }),
     }
     next()
   })
@@ -87,6 +88,99 @@ describe('rails-router PUT /:railIndex/tickets', () => {
       .put('/rails/0/tickets').send({ ticketIds: [3] })
     expect(res.status).toBe(200)
     expect(getRail(db, 0).aiEngine).toBe('codex')
+  })
+})
+
+describe('rails-router PUT /:railIndex/name', () => {
+  let db: DbInstance
+  beforeEach(() => { db = initDb(':memory:') })
+  afterEach(() => { db.close() })
+
+  it('sets a rail name (even with no tickets assigned)', async () => {
+    const res = await request(appWith(db)).put('/rails/0/name').send({ name: 'Backend' })
+    expect(res.status).toBe(200)
+    expect(res.body.rail.name).toBe('Backend')
+    expect(getRail(db, 0).name).toBe('Backend')
+  })
+
+  it('clears the name when null', async () => {
+    await request(appWith(db)).put('/rails/0/name').send({ name: 'X' })
+    const res = await request(appWith(db)).put('/rails/0/name').send({ name: null })
+    expect(res.status).toBe(200)
+    expect(getRail(db, 0).name).toBeNull()
+  })
+
+  it('rejects a body without name', async () => {
+    const res = await request(appWith(db)).put('/rails/0/name').send({})
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects a non-string, non-null name', async () => {
+    const res = await request(appWith(db)).put('/rails/0/name').send({ name: 42 })
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects an over-long name', async () => {
+    const res = await request(appWith(db)).put('/rails/0/name').send({ name: 'x'.repeat(61) })
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects an invalid rail index', async () => {
+    const res = await request(appWith(db)).put('/rails/-1/name').send({ name: 'X' })
+    expect(res.status).toBe(400)
+  })
+})
+
+describe('rails-router rail.updated broadcasts', () => {
+  let db: DbInstance
+  beforeEach(() => { db = initDb(':memory:') })
+  afterEach(() => { db.close() })
+
+  type RailUpdated = { type: string; railIndex: number; changed: string; ticketIds: number[]; name: string | null; aiEngine: string | null }
+  const lastRailUpdated = (calls: unknown[][]): RailUpdated | undefined =>
+    [...calls].reverse().map((c) => c[0] as RailUpdated).find((m) => m?.type === 'rail.updated')
+
+  it('broadcasts changed:tickets with the new ticketIds on a tickets PUT', async () => {
+    const broadcast = vi.fn()
+    const res = await request(appWith(db, { broadcast })).put('/rails/0/tickets').send({ ticketIds: [1, 2] })
+    expect(res.status).toBe(200)
+    const msg = lastRailUpdated(broadcast.mock.calls)
+    expect(msg).toBeDefined()
+    expect(msg!.changed).toBe('tickets')
+    expect(msg!.railIndex).toBe(0)
+    expect(msg!.ticketIds).toEqual([1, 2])
+  })
+
+  it('broadcasts changed:name and carries the current ticketIds (so receivers do not drop them)', async () => {
+    setRailTickets(db, 1, [7, 8])
+    const broadcast = vi.fn()
+    const res = await request(appWith(db, { broadcast })).put('/rails/1/name').send({ name: 'Bugfixes' })
+    expect(res.status).toBe(200)
+    const msg = lastRailUpdated(broadcast.mock.calls)
+    expect(msg!.changed).toBe('name')
+    expect(msg!.name).toBe('Bugfixes')
+    // The snapshot still carries the rail's tickets — critical so a rename never
+    // looks like an empty-rail update to the desktop merge.
+    expect(msg!.ticketIds).toEqual([7, 8])
+  })
+
+  it('a tickets-change broadcast preserves the previously-set name', async () => {
+    await request(appWith(db)).put('/rails/2/name').send({ name: 'Named' })
+    const broadcast = vi.fn()
+    await request(appWith(db, { broadcast })).put('/rails/2/tickets').send({ ticketIds: [3] })
+    const msg = lastRailUpdated(broadcast.mock.calls)
+    expect(msg!.changed).toBe('tickets')
+    expect(msg!.name).toBe('Named')
+  })
+
+  it('broadcasts changed:engine on an engine PUT', async () => {
+    setRailTickets(db, 0, [1])
+    const broadcast = vi.fn()
+    await request(appWith(db, { providers: ['claude', 'codex'], broadcast }))
+      .put('/rails/0/engine').send({ aiEngine: 'codex' })
+    const msg = lastRailUpdated(broadcast.mock.calls)
+    expect(msg!.changed).toBe('engine')
+    expect(msg!.aiEngine ?? null).toBe('codex')
   })
 })
 

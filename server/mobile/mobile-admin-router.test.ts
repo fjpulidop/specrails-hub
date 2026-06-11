@@ -1,0 +1,90 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import express from 'express'
+import request from 'supertest'
+import { initHubDb, setHubSetting } from '../hub-db'
+import type { DbInstance } from '../db'
+import type { WsMessage } from '../types'
+import { MobileGateway } from './mobile-gateway'
+import { createMobileAdminRouter } from './mobile-admin-router'
+
+describe('mobile-admin-router', () => {
+  let db: DbInstance
+  let gw: MobileGateway
+  let app: express.Express
+  let events: WsMessage[]
+
+  beforeEach(() => {
+    db = initHubDb(':memory:')
+    setHubSetting(db, 'mobile.mdns_enabled', 'false')
+    events = []
+    gw = new MobileGateway({ hubDb: db, hubPort: 4200, broadcast: (m) => events.push(m), bindHost: '127.0.0.1', port: 0 })
+    app = express()
+    app.use(express.json())
+    app.use('/api/hub/mobile', createMobileAdminRouter({ gateway: gw, hubDb: db, broadcast: (m) => events.push(m) }))
+  })
+
+  afterEach(async () => { await gw.stop() })
+
+  it('status → enable → status running', async () => {
+    let res = await request(app).get('/api/hub/mobile/status')
+    expect(res.status).toBe(200)
+    expect(res.body.running).toBe(false)
+
+    res = await request(app).post('/api/hub/mobile/enable')
+    expect(res.status).toBe(200)
+    expect(res.body.running).toBe(true)
+    expect(res.body.port).toBeGreaterThan(0)
+  })
+
+  it('pairing-session requires the gateway running', async () => {
+    const res = await request(app).post('/api/hub/mobile/pairing-session')
+    expect(res.status).toBe(409)
+  })
+
+  it('end-to-end: enable, pair, list devices, revoke', async () => {
+    await request(app).post('/api/hub/mobile/enable')
+
+    const session = await request(app).post('/api/hub/mobile/pairing-session')
+    expect(session.status).toBe(200)
+    expect(session.body.qr.secret).toBeTruthy()
+
+    // Simulate the phone claiming + desktop approving.
+    gw.pairing!.claim(session.body.qr.secret, { name: 'iPhone', platform: 'ios' }, '1.2.3.4')
+    const desktopState = await request(app).get('/api/hub/mobile/pairing-session')
+    expect(desktopState.body.status).toBe('claimed')
+
+    const approve = await request(app).post('/api/hub/mobile/pairing-session/approve')
+    expect(approve.status).toBe(200)
+
+    const devices = await request(app).get('/api/hub/mobile/devices')
+    expect(devices.body.devices).toHaveLength(1)
+    const id = devices.body.devices[0].id
+
+    const del = await request(app).delete(`/api/hub/mobile/devices/${id}`)
+    expect(del.status).toBe(200)
+    expect(del.body.ok).toBe(true)
+    expect(events.some((e) => e.type === 'mobile.device_revoked')).toBe(true)
+  })
+
+  it('rejects an invalid device id', async () => {
+    const res = await request(app).delete('/api/hub/mobile/devices/has spaces!')
+    expect(res.status).toBe(400)
+  })
+
+  it('deny + cancel pairing session', async () => {
+    await request(app).post('/api/hub/mobile/enable')
+    await request(app).post('/api/hub/mobile/pairing-session')
+    expect((await request(app).post('/api/hub/mobile/pairing-session/deny')).status).toBe(200)
+    expect((await request(app).delete('/api/hub/mobile/pairing-session')).status).toBe(200)
+  })
+
+  it('cert rotate + disable', async () => {
+    await request(app).post('/api/hub/mobile/enable')
+    const rot = await request(app).post('/api/hub/mobile/cert/rotate')
+    expect(rot.status).toBe(200)
+    expect(rot.body.certFingerprint).toMatch(/^[0-9a-f]{64}$/)
+    const dis = await request(app).post('/api/hub/mobile/disable')
+    expect(dis.status).toBe(200)
+    expect(dis.body.running).toBe(false)
+  })
+})

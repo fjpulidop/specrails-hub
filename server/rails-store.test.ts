@@ -5,6 +5,7 @@ import {
   getRail,
   setRailTickets,
   setRailProfile,
+  setRailName,
 } from './rails-store'
 
 let db: DbInstance
@@ -139,5 +140,59 @@ describe('setRailProfile', () => {
     setRailProfile(db, 0, 'data-heavy')
     expect(getRail(db, 0).profileName).toBe('data-heavy')
     expect(getRail(db, 1).profileName).toBe('default')
+  })
+})
+
+describe('setRailName', () => {
+  it('defaults name to null on a fresh rail', () => {
+    expect(getRail(db, 0).name).toBeNull()
+    expect(getRails(db).every((r) => r.name === null)).toBe(true)
+  })
+
+  it('persists a name independent of ticket assignment (even on an empty rail)', () => {
+    setRailName(db, 0, 'Backend')
+    expect(getRail(db, 0).name).toBe('Backend')
+    // Survives via getRails too
+    expect(getRails(db)[0].name).toBe('Backend')
+    // The rail still has no tickets — name lives in rail_meta, not the rows.
+    expect(getRail(db, 0).ticketIds).toEqual([])
+  })
+
+  it('keeps the name across ticket reassignment (delete-then-reinsert)', () => {
+    setRailName(db, 1, 'Bugfixes')
+    setRailTickets(db, 1, [3, 4])
+    setRailTickets(db, 1, [5])
+    expect(getRail(db, 1).name).toBe('Bugfixes')
+  })
+
+  it('trims whitespace and clears to null on empty/whitespace input', () => {
+    setRailName(db, 2, '  Spaced  ')
+    expect(getRail(db, 2).name).toBe('Spaced')
+    setRailName(db, 2, '   ')
+    expect(getRail(db, 2).name).toBeNull()
+    setRailName(db, 2, 'Again')
+    setRailName(db, 2, null)
+    expect(getRail(db, 2).name).toBeNull()
+  })
+
+  it('upserts (second call overwrites the first)', () => {
+    setRailName(db, 0, 'First')
+    setRailName(db, 0, 'Second')
+    expect(getRail(db, 0).name).toBe('Second')
+  })
+
+  it('isolates names per rail', () => {
+    setRailName(db, 0, 'A')
+    setRailName(db, 1, 'B')
+    expect(getRail(db, 0).name).toBe('A')
+    expect(getRail(db, 1).name).toBe('B')
+    expect(getRail(db, 2).name).toBeNull()
+  })
+
+  it('returns the post-mutation state with the new name', () => {
+    setRailTickets(db, 0, [9])
+    const out = setRailName(db, 0, 'Named')
+    expect(out.name).toBe('Named')
+    expect(out.ticketIds).toEqual([9])
   })
 })

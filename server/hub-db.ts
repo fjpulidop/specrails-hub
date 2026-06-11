@@ -239,6 +239,29 @@ function applyHubMigrations(db: DbInstance): void {
         upd.run(value, r.id)
       }
     },
+    // Migration 12: mobile companion devices. Each paired phone/tablet gets a
+    // hashed per-device bearer token (never the master hub token), scoped to
+    // `companion`, bound to the gateway cert fingerprint active at pair time
+    // (rotating the cert revokes every device), with a sliding-expiry last_seen
+    // and a one-tap revoke (revoked_at). See server/mobile/* for the gateway.
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS mobile_devices (
+          id               TEXT PRIMARY KEY,
+          name             TEXT NOT NULL,
+          platform         TEXT NOT NULL,
+          token_hash       TEXT NOT NULL,
+          scopes           TEXT NOT NULL DEFAULT 'companion',
+          cert_fingerprint TEXT NOT NULL,
+          created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+          last_seen_at     TEXT,
+          last_ip          TEXT,
+          revoked_at       TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_mobile_devices_token ON mobile_devices(token_hash);
+      `)
+    },
   ]
 
   for (let i = 0; i < migrations.length; i++) {

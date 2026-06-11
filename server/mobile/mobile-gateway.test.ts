@@ -1,0 +1,90 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import net from 'net'
+import { initHubDb, setHubSetting, getHubSetting } from '../hub-db'
+import type { DbInstance } from '../db'
+import type { WsMessage } from '../types'
+import { listDevices } from './mobile-devices'
+import { MobileGateway } from './mobile-gateway'
+
+describe('MobileGateway', () => {
+  let db: DbInstance
+  let events: WsMessage[]
+  let gw: MobileGateway
+
+  beforeEach(() => {
+    db = initHubDb(':memory:')
+    setHubSetting(db, 'mobile.mdns_enabled', 'false') // skip multicast in tests
+    events = []
+    gw = new MobileGateway({
+      hubDb: db,
+      hubPort: 4200,
+      broadcast: (m) => { events.push(m) },
+      bindHost: '127.0.0.1',
+      port: 0, // ephemeral
+    })
+  })
+
+  afterEach(async () => {
+    await gw.stop()
+  })
+
+  it('starts on an ephemeral port and reports status', async () => {
+    expect(gw.running).toBe(false)
+    const status = await gw.setEnabled(true)
+    expect(status.running).toBe(true)
+    expect(status.port).toBeGreaterThan(0)
+    expect(status.certFingerprint).toMatch(/^[0-9a-f]{64}$/)
+    expect(getHubSetting(db, 'mobile.enabled')).toBe('true')
+    // broadcast a gateway_state event
+    expect(events.some((e) => e.type === 'mobile.gateway_state')).toBe(true)
+  })
+
+  it('start() is idempotent', async () => {
+    await gw.start()
+    const port = gw.status().port
+    await gw.start()
+    expect(gw.status().port).toBe(port)
+  })
+
+  it('full pairing flow persists a device, then rotateCert revokes it', async () => {
+    await gw.start()
+    const qr = gw.pairing!.createSession()
+    expect(gw.pairing!.claim(qr.secret, { name: 'iPhone', platform: 'ios' }, '1.2.3.4').ok).toBe(true)
+    expect(gw.pairing!.approve().ok).toBe(true)
+
+    let devices = listDevices(db)
+    expect(devices).toHaveLength(1)
+    expect(devices[0].revoked).toBe(false)
+    expect(events.some((e) => e.type === 'mobile.device_paired')).toBe(true)
+    expect(events.some((e) => e.type === 'mobile.pair_requested')).toBe(true)
+
+    const fpBefore = gw.status().certFingerprint
+    await gw.rotateCert()
+    devices = listDevices(db)
+    expect(devices[0].revoked).toBe(true)
+    expect(gw.status().certFingerprint).not.toBe(fpBefore)
+  })
+
+  it('disable stops the listener', async () => {
+    await gw.setEnabled(true)
+    expect(gw.running).toBe(true)
+    await gw.setEnabled(false)
+    expect(gw.running).toBe(false)
+    expect(getHubSetting(db, 'mobile.enabled')).toBe('false')
+  })
+
+  it('isEnabledSetting reflects the persisted flag', () => {
+    expect(gw.isEnabledSetting()).toBe(false)
+    setHubSetting(db, 'mobile.enabled', 'true')
+    expect(gw.isEnabledSetting()).toBe(true)
+  })
+
+  it('rejects start() when the port is already in use (no crash)', async () => {
+    const blocker = net.createServer()
+    await new Promise<void>((r) => blocker.listen(0, '127.0.0.1', r))
+    const port = (blocker.address() as { port: number }).port
+    const gw2 = new MobileGateway({ hubDb: db, hubPort: 4200, broadcast: () => {}, bindHost: '127.0.0.1', port })
+    await expect(gw2.start()).rejects.toThrow(/in use/i)
+    await new Promise<void>((r) => blocker.close(() => r()))
+  })
+})

@@ -20,6 +20,7 @@ import { shouldDeliverToSubscriber, parseSubscribeFrame } from './ws-routing'
 import { getTerminalManager } from './terminal-manager'
 import { cleanupStaleShimDirs } from './terminal-shell-integration'
 import { isBrowserCaptureEnabled } from './feature-flags'
+import { MobileGateway, createMobileAdminRouter, getMobileEventBus } from './mobile'
 import type { BrowserWsClient } from './browser-capture-manager'
 import type { BrowserInputEvent } from './browser-capture-types'
 import { createTelemetryRouter } from './telemetry-receiver'
@@ -235,6 +236,9 @@ function broadcast(msg: WsMessage): void {
     if (client.bufferedAmount > WS_BACKPRESSURE_LIMIT_BYTES) continue
     client.send(data)
   }
+  // Fan a copy to the Mobile Gateway's in-process bus (no-op when no phone is
+  // attached). publish() swallows mobile-side errors so the main loop is safe.
+  getMobileEventBus().publish(msg)
 }
 
 // ─── Health endpoint state (populated by hub bootstrap below) ────────────────
@@ -243,6 +247,8 @@ let _getProjectCount: () => number = () => 0
 /** Captured by the hub bootstrap block so graceful shutdown can tear down every
  *  project's spawners (rail/chat children) instead of orphaning them. */
 let _registry: ProjectRegistry | null = null
+/** The mobile companion gateway (off by default); torn down on shutdown. */
+let _mobileGateway: MobileGateway | null = null
 
 server.on('upgrade', (request, socket, head) => {
   const urlStr = request.url ?? '/'
@@ -450,6 +456,21 @@ function applyWsRateLimiting(ws: WebSocket): void {
     console.error('[telemetry-compactor] startup compaction error:', err)
   })
 
+  // ─── Mobile companion gateway (off by default; boot if previously enabled) ──
+  // Second HTTPS+WSS listener in THIS process; the main server stays loopback.
+  // The control plane is desktop-only: loopback + (via /api below) requireAuth.
+  // Mounted before /api/hub so its sub-path is unambiguous.
+  const mobileGateway = new MobileGateway({ hubDb: registry.hubDb, hubPort: port, broadcast })
+  _mobileGateway = mobileGateway
+  app.use('/api/hub/mobile', requireLoopback, createMobileAdminRouter({
+    gateway: mobileGateway,
+    hubDb: registry.hubDb,
+    broadcast,
+  }))
+  if (mobileGateway.isEnabledSetting()) {
+    mobileGateway.start().catch((err) => console.error('[mobile-gateway] boot start failed:', err))
+  }
+
   // Hub-level routes
   app.use('/api/hub', createHubRouter(registry, broadcast))
 
@@ -553,6 +574,9 @@ async function shutdown(): Promise<void> {
   } catch { /* ignore */ }
   try {
     await getTerminalManager().shutdown()
+  } catch { /* ignore */ }
+  try {
+    await _mobileGateway?.stop()
   } catch { /* ignore */ }
   try { wss.close() } catch { /* ignore */ }
   try { terminalWss.close() } catch { /* ignore */ }
