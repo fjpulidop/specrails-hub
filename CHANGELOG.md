@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.65.4](https://github.com/fjpulidop/specrails-hub/compare/v1.65.3...v1.65.4) (2026-06-11)
+
+
+### Bug Fixes
+
+* **release:** restore proven Hostinger FTP deployment ([#368](https://github.com/fjpulidop/specrails-hub/issues/368)) ([f82cb4c](https://github.com/fjpulidop/specrails-hub/commit/f82cb4c8ad2ac75fc71f7538355d20ce56ea92b7))
+
 ## [1.65.3](https://github.com/fjpulidop/specrails-hub/compare/v1.65.2...v1.65.3) (2026-06-10)
 
 
