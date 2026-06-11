@@ -19,7 +19,8 @@ import { getTerminalManager } from './terminal-manager'
 import { BrowserCaptureManager } from './browser-capture-manager'
 import { removeExploreCwd } from './explore-cwd-manager'
 import { resolveTicketStoragePath, mutateStore, applyJobOutcomeToTickets, type JobOutcome } from './ticket-store'
-import type { WsMessage, TicketUpdatedMessage } from './types'
+import type { WsMessage, TicketUpdatedMessage, RailUpdatedMessage } from './types'
+import { getRails, setRailTickets } from './rails-store'
 import {
   initHubDb,
   getHubDbPath,
@@ -326,6 +327,40 @@ export class ProjectRegistry {
             }
           } catch (err) {
             console.error('[project-registry] failed to apply job outcome to tickets:', err)
+          }
+        }
+
+        // Release the job's tickets from any rail that still holds them. The
+        // server `rails` table is the source of truth for mobile clients (the
+        // desktop strips its localStorage copy on rail.job_completed) — without
+        // this, a finished spec stays stranded on the rail forever. Runs on
+        // every terminal outcome, mirroring the desktop: success → spec is
+        // done; failure/cancel/zombie → spec returns to the board. Scans ALL
+        // rails (not just railMeta.railIndex) so it also heals after a server
+        // restart, when the in-memory railJobs map is lost.
+        if (
+          completedTicketIds.length > 0 &&
+          (status === 'completed' || status === 'failed' || status === 'canceled' || status === 'zombie_terminated')
+        ) {
+          try {
+            for (const rail of getRails(db)) {
+              const remaining = rail.ticketIds.filter((id) => !completedTicketIds.includes(id))
+              if (remaining.length === rail.ticketIds.length) continue
+              setRailTickets(db, rail.railIndex, remaining, rail.mode, rail.profileName, rail.aiEngine)
+              boundBroadcast({
+                type: 'rail.updated',
+                projectId: project.id,
+                railIndex: rail.railIndex,
+                changed: 'tickets',
+                ticketIds: remaining,
+                name: rail.name ?? null,
+                mode: rail.mode,
+                profileName: rail.profileName ?? null,
+                aiEngine: rail.aiEngine ?? null,
+              } as RailUpdatedMessage)
+            }
+          } catch (err) {
+            console.error('[project-registry] failed to release rail tickets after job exit:', err)
           }
         }
 

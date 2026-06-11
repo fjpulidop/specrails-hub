@@ -54,6 +54,13 @@ describe('db', () => {
       expect(names).toContain('schema_migrations')
     })
 
+    it('creates the rail_meta table (migration 28) with rail_index + name', () => {
+      const db = makeDb()
+      const cols = (db.prepare('PRAGMA table_info(rail_meta)').all() as { name: string }[]).map((c) => c.name)
+      expect(cols).toContain('rail_index')
+      expect(cols).toContain('name')
+    })
+
     it('orphan detection marks running jobs as failed on initDb', () => {
       // Simulate: a DB already has a 'running' job (from a previous crashed session).
       // When initDb runs on that DB, it should mark the running job as 'failed'.

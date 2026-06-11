@@ -725,6 +725,27 @@ export interface RailJobCompletedMessage {
   ticketIds: number[]
 }
 
+/**
+ * A rail's configuration changed (ticket assignments, name, mode, profile or
+ * engine) via a non-launch mutation. Broadcast so every connected client
+ * (desktop dashboard + mobile companion) reflects the change live. Carries the
+ * full post-mutation rail snapshot so receivers need no follow-up fetch.
+ */
+export interface RailUpdatedMessage {
+  type: 'rail.updated'
+  projectId: string
+  railIndex: number
+  /** Which field this mutation changed. Receivers that keep local un-synced
+   *  state (the desktop dashboard) adopt `ticketIds` ONLY when changed==='tickets',
+   *  so a rename never clobbers a rail's locally-dragged assignments. */
+  changed: 'tickets' | 'name' | 'profile' | 'engine'
+  ticketIds: number[]
+  name: string | null
+  mode: string
+  profileName: string | null
+  aiEngine: string | null
+}
+
 // ─── Plugin system ──────────────────────────────────────────────────────────
 
 export interface PluginRequirement {
@@ -987,7 +1008,7 @@ export type WsMessage =
   | TicketCreatedMessage | TicketUpdatedMessage | TicketDeletedMessage
   | TicketAiEditStreamMessage | TicketAiEditDoneMessage | TicketAiEditErrorMessage
   | SpecGenStreamMessage | SpecGenDoneMessage | SpecGenErrorMessage
-  | RailJobStartedMessage | RailJobStoppedMessage | RailJobCompletedMessage
+  | RailJobStartedMessage | RailJobStoppedMessage | RailJobCompletedMessage | RailUpdatedMessage
   | AgentRefineStreamMessage | AgentRefinePhaseMessage | AgentRefineReadyMessage
   | AgentRefineTestMessage | AgentRefineErrorMessage | AgentRefineCancelledMessage
   | AgentRefineAppliedMessage
@@ -1000,6 +1021,8 @@ export type WsMessage =
   | SmashFailedMessage | SmashUndoneMessage
   | FileProvenanceUpdatedMessage
   | FileSummaryUpdatedMessage | FileSummaryFailedMessage | FileSummarySkippedMessage
+  | MobilePairRequestedMessage | MobileDevicePairedMessage
+  | MobileDeviceRevokedMessage | MobileGatewayStateMessage
 
 export interface FileProvenanceUpdatedMessage {
   type: 'file.provenance_updated'
@@ -1037,6 +1060,37 @@ export interface FileSummarySkippedMessage {
 export interface SpendingInvalidatedMessage {
   type: 'spending.invalidated'
   projectId: string
+}
+
+// ─── Mobile companion (hub-level, no projectId — desktop UI only) ─────────────
+// These never reach a phone (the gateway WS bridge drops unknown types); they
+// drive the live desktop pairing UI over the existing /ws.
+
+export interface MobilePairRequestedMessage {
+  type: 'mobile.pair_requested'
+  deviceName: string
+  platform: 'ios' | 'android'
+  timestamp: string
+}
+
+export interface MobileDevicePairedMessage {
+  type: 'mobile.device_paired'
+  deviceId: string
+  name: string
+  timestamp: string
+}
+
+export interface MobileDeviceRevokedMessage {
+  type: 'mobile.device_revoked'
+  deviceId: string
+  timestamp: string
+}
+
+export interface MobileGatewayStateMessage {
+  type: 'mobile.gateway_state'
+  running: boolean
+  port: number
+  timestamp: string
 }
 
 // ─── SPECs SMASH ─────────────────────────────────────────────────────────────

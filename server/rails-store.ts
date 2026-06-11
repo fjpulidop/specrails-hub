@@ -8,6 +8,19 @@ export interface RailState {
   profileName?: string | null
   /** Optional AI engine override (multi-provider projects). null/undefined = project's primary provider. */
   aiEngine?: string | null
+  /** User-given display name (suffix after "Rail "), synced desktop ⇄ mobile. null = default "Rail N". */
+  name?: string | null
+}
+
+/** Read the per-rail display names from rail_meta into a lookup map. */
+function railNames(db: DbInstance): Map<number, string | null> {
+  const rows = db.prepare('SELECT rail_index, name FROM rail_meta').all() as {
+    rail_index: number
+    name: string | null
+  }[]
+  const map = new Map<number, string | null>()
+  for (const r of rows) map.set(r.rail_index, r.name)
+  return map
 }
 
 // ─── Queries ─────────────────────────────────────────────────────────────────
@@ -42,6 +55,7 @@ export function getRails(db: DbInstance): RailState[] {
     map.get(row.rail_index)!.ticketIds.push(row.ticket_id)
   }
 
+  const names = railNames(db)
   return [0, 1, 2].map((railIndex) => {
     const rail = map.get(railIndex)
     return {
@@ -50,6 +64,7 @@ export function getRails(db: DbInstance): RailState[] {
       mode: rail?.mode ?? 'implement',
       profileName: rail?.profileName ?? null,
       aiEngine: rail?.aiEngine ?? null,
+      name: names.get(railIndex) ?? null,
     }
   })
 }
@@ -67,12 +82,17 @@ export function getRail(db: DbInstance, railIndex: number): RailState {
       ai_engine: string | null
     }[]
 
+  const meta = db.prepare('SELECT name FROM rail_meta WHERE rail_index = ?').get(railIndex) as
+    | { name: string | null }
+    | undefined
+
   return {
     railIndex,
     ticketIds: rows.map((r) => r.ticket_id),
     mode: rows[0]?.mode ?? 'implement',
     profileName: rows[0]?.profile_name ?? null,
     aiEngine: rows[0]?.ai_engine ?? null,
+    name: meta?.name ?? null,
   }
 }
 
@@ -142,4 +162,23 @@ export function setRailEngine(
   }
   db.prepare('UPDATE rails SET ai_engine = ? WHERE rail_index = ?').run(aiEngine, railIndex)
   return { ...current, aiEngine }
+}
+
+/**
+ * Set a rail's display name (the "Rail "-suffix the user types). Stored in
+ * rail_meta (ticket-independent) so even an empty rail keeps its name. Pass
+ * an empty/whitespace name to clear it back to the default "Rail N" label.
+ */
+export function setRailName(
+  db: DbInstance,
+  railIndex: number,
+  name: string | null,
+): RailState {
+  const trimmed = typeof name === 'string' ? name.trim() : null
+  const value = trimmed && trimmed.length > 0 ? trimmed : null
+  db.prepare(
+    `INSERT INTO rail_meta (rail_index, name) VALUES (?, ?)
+     ON CONFLICT(rail_index) DO UPDATE SET name = excluded.name`
+  ).run(railIndex, value)
+  return { ...getRail(db, railIndex), name: value }
 }

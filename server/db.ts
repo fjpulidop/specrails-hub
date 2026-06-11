@@ -578,6 +578,22 @@ const MIGRATIONS: Migration[] = [
       `)
     }
   },
+
+  // Migration 28: rail_meta — per-rail display name, keyed by rail_index.
+  // The `rails` table stores name-less ticket rows (and has NO rows for an
+  // empty rail), so a rail's user-given name can't live there — a renamed but
+  // empty rail would lose its name. rail_meta is a separate, ticket-independent
+  // store so every rail (0/1/2) keeps its name regardless of assignments.
+  // NULL name = client falls back to the default "Rail N" label. This backs the
+  // desktop ⇄ mobile rail-name sync (broadcast via rail.updated).
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS rail_meta (
+        rail_index  INTEGER PRIMARY KEY,
+        name        TEXT
+      );
+    `)
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {

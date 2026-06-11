@@ -193,6 +193,40 @@ export default function DashboardPage() {
     return () => { cancelled = true }
   }, [activeProjectId, connectionStatus])
 
+  // ── Adopt server-side rail names on load/switch (desktop ⇄ mobile sync) ──────
+  // Names only — never ticketIds — so a fresh load can't clobber locally-dragged
+  // assignments. A null server name leaves the local label untouched (so an
+  // existing desktop-only custom label survives until explicitly renamed).
+  useEffect(() => {
+    if (!activeProjectId) return
+    let cancelled = false
+    fetch(`${getApiBase()}/rails`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { rails?: { railIndex: number; name?: string | null }[] } | null) => {
+        if (cancelled || !data?.rails) return
+        const nameByIndex = new Map<number, string | null>()
+        for (const r of data.rails) nameByIndex.set(r.railIndex, r.name ?? null)
+        setRails((prev) => {
+          let changed = false
+          const next = prev.map((r) => {
+            const n = parseInt(r.id.replace('rail-', ''), 10)
+            if (n < 1 || n > 3) return r
+            const name = nameByIndex.get(n - 1) ?? null
+            if (!name) return r
+            const label = `Rail ${name}`
+            if (label === r.label) return r
+            changed = true
+            return { ...r, label }
+          })
+          if (!changed) return prev
+          saveRails(activeProjectId, next)
+          return next
+        })
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [activeProjectId])
+
   // ── Auto-remove done tickets from rails ──────────────────────────────────────
   // When ticket status changes to 'done' (via WS ticket_updated, re-fetch, etc.),
   // strip those tickets from rails so they appear in Done Specs instead.
@@ -268,6 +302,17 @@ export default function DashboardPage() {
 
   const handleRenameRail = useCallback((railId: string, newLabel: string) => {
     updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, label: `Rail ${newLabel}` } : r)))
+    // Sync the name to the server so the mobile companion (and any other
+    // desktop client) reflects it live via rail.updated. Only the canonical
+    // rails 0..2 exist server-side; locally-added rails (rail-4+) are skipped.
+    const n = parseInt(railId.replace('rail-', ''), 10)
+    if (n >= 1 && n <= 3) {
+      fetch(`${getApiBase()}/rails/${n - 1}/name`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newLabel }),
+      }).catch(() => { /* best-effort; localStorage already holds the label */ })
+    }
   }, [updateRails])
 
 
@@ -276,8 +321,29 @@ export default function DashboardPage() {
   useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
 
   const handleRailWsMessage = useCallback((msg: unknown) => {
-    const m = msg as { type?: string; projectId?: string; railIndex?: number; status?: string; ticketIds?: number[] }
+    const m = msg as {
+      type?: string; projectId?: string; railIndex?: number; status?: string
+      ticketIds?: number[]; changed?: 'tickets' | 'name' | 'profile' | 'engine'; name?: string | null
+    }
     if (m.projectId !== activeProjectIdRef.current) return
+
+    // A rail's config changed elsewhere (mobile companion / another desktop).
+    // Adopt the name on every variant; adopt ticketIds ONLY on a tickets-change
+    // so a remote rename never wipes this client's locally-dragged assignments.
+    if (m.type === 'rail.updated') {
+      const idx = m.railIndex ?? 0
+      const railId = `rail-${idx + 1}`
+      const serverTicketIds = m.ticketIds ?? []
+      const label = m.name ? `Rail ${m.name}` : `Rail ${idx + 1}`
+      updateRails((prev) => prev.map((r) => {
+        if (r.id !== railId) return r
+        // A running rail keeps its launched ticket set; still adopt the name.
+        if (m.changed !== 'tickets' || r.status === 'running') return { ...r, label }
+        return { ...r, label, ticketIds: serverTicketIds }
+      }))
+      return
+    }
+
     if (m.type === 'rail.job_completed') {
       const targetIndex = m.railIndex ?? 0
       // Strip this job's tickets from the rail on every terminal outcome so they

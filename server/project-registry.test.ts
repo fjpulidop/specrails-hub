@@ -59,6 +59,7 @@ vi.mock('./config', () => ({
 }))
 
 import { ProjectRegistry } from './project-registry'
+import { setRailTickets, getRail } from './rails-store'
 import { initHubDb, addProject, listProjects, getProject } from './hub-db'
 import type { DbInstance } from './db'
 import type { WsMessage } from './types'
@@ -372,6 +373,50 @@ describe('ProjectRegistry', () => {
 
       // The onJobFinished callback should not throw even if job row doesn't exist
       expect(() => options.onJobFinished('fake-job', 'completed', 0.05)).not.toThrow()
+    })
+
+    it('onJobFinished releases the finished job tickets from rails and broadcasts rail.updated', async () => {
+      const { QueueManager } = await import('./queue-manager')
+      const ctx = registry.addProject({ id: 'rr-1', slug: 'rr-proj', name: 'RR', path: '/rr' })
+
+      // Rail 0 holds tickets 5 and 7; the finishing job implements only #5.
+      setRailTickets(ctx.db, 0, [5, 7])
+      ctx.db.prepare(
+        `INSERT OR REPLACE INTO jobs (id, command, started_at, status) VALUES (?, ?, ?, 'completed')`
+      ).run('rjob-1', '/specrails:implement #5 --yes', new Date().toISOString())
+
+      const constructorCalls = vi.mocked(QueueManager).mock.calls
+      const lastCall = constructorCalls[constructorCalls.length - 1]
+      const options = lastCall[4] as any
+
+      broadcast.mockClear()
+      options.onJobFinished('rjob-1', 'completed', 0.01)
+
+      // Server rails table released #5 but kept #7 (mobile reads this table).
+      expect(getRail(ctx.db, 0).ticketIds).toEqual([7])
+      const msg = broadcast.mock.calls.map((c) => c[0] as any).find((m) => m.type === 'rail.updated')
+      expect(msg).toBeDefined()
+      expect(msg.changed).toBe('tickets')
+      expect(msg.railIndex).toBe(0)
+      expect(msg.ticketIds).toEqual([7])
+    })
+
+    it('onJobFinished releases rail tickets on failure too (specs return to the board)', async () => {
+      const { QueueManager } = await import('./queue-manager')
+      const ctx = registry.addProject({ id: 'rr-2', slug: 'rr-proj-2', name: 'RR2', path: '/rr2' })
+
+      setRailTickets(ctx.db, 1, [9])
+      ctx.db.prepare(
+        `INSERT OR REPLACE INTO jobs (id, command, started_at, status) VALUES (?, ?, ?, 'failed')`
+      ).run('rjob-2', '/specrails:implement #9 --yes', new Date().toISOString())
+
+      const constructorCalls = vi.mocked(QueueManager).mock.calls
+      const lastCall = constructorCalls[constructorCalls.length - 1]
+      const options = lastCall[4] as any
+
+      options.onJobFinished('rjob-2', 'failed', null)
+
+      expect(getRail(ctx.db, 1).ticketIds).toEqual([])
     })
   })
 

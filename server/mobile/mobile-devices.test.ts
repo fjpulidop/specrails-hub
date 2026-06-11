@@ -1,0 +1,78 @@
+import { describe, it, expect, beforeEach } from 'vitest'
+import { initHubDb } from '../hub-db'
+import type { DbInstance } from '../db'
+import {
+  hashToken,
+  createDevice,
+  getActiveDeviceByTokenHash,
+  listDevices,
+  revokeDevice,
+  revokeAllDevices,
+  touchDevice,
+  sweepExpiredDevices,
+} from './mobile-devices'
+
+describe('mobile-devices', () => {
+  let db: DbInstance
+  beforeEach(() => {
+    db = initHubDb(':memory:')
+  })
+
+  it('hashToken is deterministic sha256 hex', () => {
+    expect(hashToken('abc')).toBe(hashToken('abc'))
+    expect(hashToken('abc')).toMatch(/^[0-9a-f]{64}$/)
+    expect(hashToken('abc')).not.toBe(hashToken('abd'))
+  })
+
+  it('creates and resolves an active device by token hash', () => {
+    const token = 'tok-123'
+    const row = createDevice(db, { name: 'iPhone', platform: 'ios', tokenHash: hashToken(token), certFingerprint: 'fp1' })
+    expect(row.id).toBeTruthy()
+    const found = getActiveDeviceByTokenHash(db, hashToken(token))
+    expect(found?.id).toBe(row.id)
+    expect(found?.scopes).toBe('companion')
+    expect(getActiveDeviceByTokenHash(db, hashToken('other'))).toBeUndefined()
+  })
+
+  it('revoked devices resolve as undefined', () => {
+    const row = createDevice(db, { name: 'A', platform: 'android', tokenHash: hashToken('t'), certFingerprint: 'fp' })
+    expect(revokeDevice(db, row.id)).toBe(true)
+    expect(revokeDevice(db, row.id)).toBe(false) // idempotent (already revoked)
+    expect(getActiveDeviceByTokenHash(db, hashToken('t'))).toBeUndefined()
+  })
+
+  it('lists devices (public shape, no token_hash) newest-first', () => {
+    createDevice(db, { name: 'A', platform: 'ios', tokenHash: hashToken('a'), certFingerprint: 'fp' })
+    createDevice(db, { name: 'B', platform: 'ios', tokenHash: hashToken('b'), certFingerprint: 'fp' })
+    const list = listDevices(db)
+    expect(list).toHaveLength(2)
+    expect(Object.keys(list[0])).not.toContain('token_hash')
+    expect(list[0]).toHaveProperty('revoked', false)
+  })
+
+  it('revokeAllDevices revokes every active device', () => {
+    createDevice(db, { name: 'A', platform: 'ios', tokenHash: hashToken('a'), certFingerprint: 'fp' })
+    createDevice(db, { name: 'B', platform: 'ios', tokenHash: hashToken('b'), certFingerprint: 'fp' })
+    expect(revokeAllDevices(db)).toBe(2)
+    expect(listDevices(db).every((d) => d.revoked)).toBe(true)
+  })
+
+  it('touchDevice updates last_seen_at/last_ip', () => {
+    const row = createDevice(db, { name: 'A', platform: 'ios', tokenHash: hashToken('a'), certFingerprint: 'fp' })
+    touchDevice(db, row.id, '192.168.1.5')
+    const found = getActiveDeviceByTokenHash(db, hashToken('a'))
+    expect(found?.last_ip).toBe('192.168.1.5')
+    expect(found?.last_seen_at).toBeTruthy()
+  })
+
+  it('sweepExpiredDevices revokes devices older than the window', () => {
+    const row = createDevice(db, { name: 'old', platform: 'ios', tokenHash: hashToken('a'), certFingerprint: 'fp' })
+    // Backdate created_at beyond 90 days.
+    db.prepare("UPDATE mobile_devices SET created_at = datetime('now', '-100 days') WHERE id = ?").run(row.id)
+    expect(sweepExpiredDevices(db, 90)).toBe(1)
+    expect(getActiveDeviceByTokenHash(db, hashToken('a'))).toBeUndefined()
+    // A fresh device is untouched.
+    createDevice(db, { name: 'new', platform: 'ios', tokenHash: hashToken('b'), certFingerprint: 'fp' })
+    expect(sweepExpiredDevices(db, 90)).toBe(0)
+  })
+})
