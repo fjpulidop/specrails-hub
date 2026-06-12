@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.0.0](https://github.com/fjpulidop/specrails-desktop/compare/v1.67.0...v2.0.0) (2026-06-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* /api/hub/* moved to /api/* (desktop router mounted at /api before the project router); auth header X-Hub-Token is now X-Desktop-Token and the WS subprotocols are specrails-desktop / desktop-token.<token>; the webhook/WS event hub_daily_budget_exceeded is now desktop_daily_budget_exceeded; the npm package and binary are now specrails-desktop; health/state report mode 'super'.
+
+### Features
+
+* rebrand Specrails Hub to Specrails Desktop ([#374](https://github.com/fjpulidop/specrails-desktop/issues/374)) ([289ed1d](https://github.com/fjpulidop/specrails-desktop/commit/289ed1d6b10d9033039948cfdd2760247a6d9439))
+
+
+### Bug Fixes
+
+* give the divergent vendored profile schema its own $id ([#376](https://github.com/fjpulidop/specrails-desktop/issues/376)) ([7750580](https://github.com/fjpulidop/specrails-desktop/commit/77505803536ace92571417ace1ce68bb10bfea1c))
+
 ## [1.67.0](https://github.com/fjpulidop/specrails-hub/compare/v1.66.0...v1.67.0) (2026-06-12)
 
 
