@@ -1,0 +1,177 @@
+{
+  "page": {
+    "title": "エージェント",
+    "subtitle": "このプロジェクトのエージェントプロファイルとカタログ（アップストリーム + カスタム）を管理します。",
+    "tabs": {
+      "profiles": "プロファイル",
+      "usage": "使用状況",
+      "catalog": "カタログ"
+    },
+    "banner": {
+      "title": "プロファイル対応パイプラインには specrails-core {{required}}+ が必要です",
+      "body": "このプロジェクトのバージョンは <code>{{version}}</code> です。プロジェクト内で <code>{{command}}</code> を実行するとプロファイルモードが有効になります。ここで作成したプロファイルは保存されますが、core を更新するまでパイプラインには影響しません。",
+      "unknownVersion": "不明"
+    }
+  },
+  "catalog": {
+    "loading": "カタログを読み込み中…",
+    "aiEditChipLabel": "AI編集 · {{agentId}}",
+    "errors": {
+      "loadFailed": "カタログの読み込みに失敗しました: {{status}}",
+      "bodyLoadFailed": "エージェント本文の読み込みに失敗しました: {{status}}",
+      "generateFailed": "生成に失敗しました: {{status}}",
+      "agentLoadFailed": "読み込みに失敗しました: {{status}}"
+    },
+    "templates": {
+      "title": "エージェントテンプレートライブラリ",
+      "countOf": "{{shown}} / {{total}}",
+      "description": "エンジニアリング、プロダクト、科学、医療、法務など、厳選されたテンプレートから始められます。1つ選んで Studio で開き、確認・編集してから保存してください。",
+      "searchPlaceholder": "名前、説明、タグ、カテゴリで検索…",
+      "allCategories": "すべて",
+      "tagFilter": "タグフィルター:",
+      "noMatch": "フィルターに一致するテンプレートはありません。",
+      "clearFilters": "フィルターをクリア",
+      "openInStudio": "Studio で開く →",
+      "tip": "ヒント: カードのタグをクリックすると、そのタグで絞り込めます。"
+    },
+    "generate": {
+      "title": "カスタムエージェントを生成",
+      "agentIdLabel": "エージェント ID",
+      "agentIdHint": "<code>custom-</code> で始まる必要があります。",
+      "descriptionLabel": "このエージェントの役割を記述してください",
+      "descriptionPlaceholder": "例: Terraform/IaC の変更をレビューし、マージ前にセキュリティ設定ミス、過剰な IAM 権限、公開 S3 バケットを指摘する。保守的かつ簡潔に。",
+      "note": "Claude が完全な <code>.md</code> 本文をドラフトします。Studio で確認し、保存前に編集できます。ワンショットの claude 呼び出しが起動され、最大 90 秒かかることがあります。",
+      "generating": "生成中…",
+      "generateButton": "生成"
+    },
+    "empty": {
+      "title": "エージェントがインストールされていません",
+      "body": "このプロジェクトで <code>{{command}}</code> を実行してアップストリームのエージェントをインストールするか、今すぐカスタムエージェントを作成してください。"
+    },
+    "actions": {
+      "template": "テンプレート",
+      "templateTitle": "テンプレートから始める",
+      "generate": "生成",
+      "generateWithClaude": "Claude で生成",
+      "blank": "ブランク",
+      "blankTitle": "空のテンプレートから始める"
+    },
+    "sidebar": {
+      "title": "カタログ",
+      "createLabel": "カスタムエージェントを作成:"
+    },
+    "sections": {
+      "upstream": "アップストリーム ({{count}})",
+      "upstreamDescription": "specrails-core 付属。読み取り専用です。",
+      "custom": "カスタム ({{count}})",
+      "customDescription": "このプロジェクトの custom-*.md ファイルです。上のテンプレート / 生成 / ブランクから作成できます。",
+      "noCustomAgents": "カスタムエージェントはまだありません。"
+    },
+    "detail": {
+      "defaultModel": "デフォルトモデル: {{model}}",
+      "aiEdit": "AI編集",
+      "aiEditTitle": "AI でこのエージェントを反復的に改良",
+      "readOnly": "読み取り専用",
+      "editableHint": "編集可能 — 上の「編集」を使用"
+    },
+    "kind": {
+      "upstream": "アップストリーム",
+      "custom": "カスタム"
+    }
+  },
+  "profiles": {
+    "loading": "プロファイルを読み込み中…",
+    "selectPrompt": "編集するプロファイルを選択してください",
+    "errors": {
+      "listFailed": "一覧の取得に失敗しました: {{status}}",
+      "loadFailed": "読み込みに失敗しました: {{status}}",
+      "migrationFailed": "移行に失敗しました: {{status}}",
+      "createFailed": "作成に失敗しました: {{status}}",
+      "duplicateFailed": "複製に失敗しました: {{status}}",
+      "deleteFailed": "削除に失敗しました: {{status}}",
+      "saveFailed": "保存に失敗しました: {{status}}"
+    },
+    "toasts": {
+      "migrated": "プロファイルを移行しました",
+      "migratedDescription": "現在のエージェントから default プロファイルを作成しました",
+      "migrationFailed": "移行に失敗しました",
+      "created": "プロファイルを作成しました",
+      "createFailed": "プロファイルの作成に失敗しました",
+      "duplicated": "プロファイルを複製しました",
+      "duplicatedDescription": "{{from}} → {{to}}",
+      "duplicateFailed": "プロファイルの複製に失敗しました",
+      "deleted": "プロファイルを削除しました",
+      "deleteFailed": "プロファイルの削除に失敗しました",
+      "saved": "プロファイルを保存しました",
+      "saveFailed": "プロファイルの保存に失敗しました",
+      "savedWithUntargeted": "未ターゲットのエージェントを含むプロファイルを保存しました",
+      "savedWithUntargetedDescription": "ルーティングルールが次のエージェントを指していません: {{agents}}。実行させたい場合は、タグルールを追加するか default ルールのターゲットを変更してください。"
+    },
+    "createDialog": {
+      "title": "新規プロファイル",
+      "description": "小文字のケバブケース名（英小文字、数字、ハイフン）を指定してください。",
+      "confirmLabel": "作成",
+      "invalidHint": "先頭は英小文字または数字で、英小文字・数字・ハイフンのみ使用できます。"
+    },
+    "duplicateDialog": {
+      "title": "「{{name}}」を複製",
+      "description": "新しいプロファイルの名前。",
+      "invalidHint": "小文字のケバブケースのみ。"
+    },
+    "deleteDialog": {
+      "title": "プロファイル「{{name}}」を削除しますか？",
+      "description": "この操作は元に戻せません。このプロファイルで起動済みのジョブはスナップショットを保持します。今後の起動は解決順序にフォールバックします。"
+    },
+    "empty": {
+      "title": "プロファイルはまだありません",
+      "body": "プロファイルを使うと、オーケストレーター + エージェント + ルーティングの組み合わせを保存し、レールごとに選択できます。",
+      "migrateButton": "現在のエージェントから移行",
+      "blankButton": "空のプロファイル",
+      "migrateExplainer": "「移行」は既存の <code>.claude/agents/</code> フロントマターのモデルを読み取り、現在の動作をそのまま再現する <code>default</code> プロファイルを作成します — 損失ゼロです。"
+    },
+    "sidebar": {
+      "title": "プロファイル",
+      "teamDefault": "（チームデフォルト）"
+    },
+    "editorFooter": {
+      "fixValidationIssues": "保存する前に検証エラーを修正してください",
+      "issuesToResolve_one": "未解決の問題が {{count}} 件",
+      "issuesToResolve_other": "未解決の問題が {{count}} 件"
+    }
+  },
+  "usage": {
+    "title": "プロファイル使用状況",
+    "windowLabel": "{{days}}日",
+    "subtitleEmpty": "選択した期間にプロファイルごとに起動されたジョブ数。",
+    "subtitle": "過去 {{count}} 日間にプロファイルごとに起動されたジョブ数。",
+    "empty": "プロファイル指定のジョブはまだありません。",
+    "jobsTooltip": "ジョブ",
+    "jobsLabel_one": "ジョブ",
+    "jobsLabel_other": "ジョブ",
+    "successRateTooltip": "成功率",
+    "okSuffix": "ok",
+    "avgDurationTooltip": "平均実行時間",
+    "avgTokensTooltip": "平均トークン数",
+    "tokensSuffix": "tok"
+  },
+  "routingRule": {
+    "addTitle": "ルーティングルールを追加",
+    "editTitle": "ルーティングルールを編集",
+    "addDescription": "小文字ケバブケースのタグでマッチするルーティングルールを追加します。",
+    "editDescription": "このルールのタグまたはターゲットエージェントを更新します。",
+    "tagsLabel": "タグ",
+    "tagsHint": "カンマ区切り。<code>frontend</code> や <code>api-design</code> のような小文字ケバブケースを使用してください。",
+    "invalidTags_one": "無効なタグ: {{tags}}。タグには英小文字・数字・ハイフンのみ使用できます。",
+    "invalidTags_other": "無効なタグ: {{tags}}。タグには英小文字・数字・ハイフンのみ使用できます。",
+    "routeToLabel": "ルーティング先",
+    "routeToHint": "このプロファイルのチェーンに含まれるエージェントのみルーティング先に指定できます。",
+    "addRule": "ルールを追加",
+    "saveChanges": "変更を保存"
+  },
+  "railSelectors": {
+    "profileTitle": "このレールのエージェントプロファイル",
+    "noProfile": "プロファイルなし",
+    "modelTitle": "この ultracode レールのモデル",
+    "engineTitle": "このレールの AI エンジン"
+  }
+}

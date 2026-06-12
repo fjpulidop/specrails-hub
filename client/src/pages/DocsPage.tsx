@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -42,6 +43,7 @@ function DocsSidebar({
   activeCategory?: string
   activeSlug?: string
 }) {
+  const { t } = useTranslation('integrations')
   return (
     <nav className="w-56 flex-shrink-0 border-r border-border overflow-y-auto py-4 px-3">
       <Link
@@ -49,7 +51,7 @@ function DocsSidebar({
         className="flex items-center gap-2 mb-4 px-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
       >
         <BookOpen className="w-3.5 h-3.5" />
-        Documentation
+        {t('docs.title')}
       </Link>
 
       <div className="space-y-4">
@@ -66,7 +68,7 @@ function DocsSidebar({
               )}
             </div>
             {cat.docs.length === 0 ? (
-              <p className="px-2 text-xs text-muted-foreground italic">No docs yet</p>
+              <p className="px-2 text-xs text-muted-foreground italic">{t('docs.sidebarEmpty')}</p>
             ) : (
               <ul className="space-y-0.5">
                 {cat.docs.map((doc) => {
@@ -100,16 +102,21 @@ function DocsSidebar({
 // ─── Index view ───────────────────────────────────────────────────────────────
 
 function DocsIndex({ categories }: { categories: DocCategory[] }) {
+  const { t } = useTranslation('integrations')
   const total = categories.reduce((sum, c) => sum + c.docs.length, 0)
+  const nonEmptyCategories = categories.filter((c) => c.docs.length > 0).length
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-6">
       <div className="mb-8">
-        <h1 className="text-xl font-bold mb-2">Documentation</h1>
+        <h1 className="text-xl font-bold mb-2">{t('docs.title')}</h1>
         <p className="text-sm text-muted-foreground">
           {total === 0
-            ? 'No documents available. The bundled docs ship under docs/ in the repo — drop Markdown files there or under ~/.specrails/docs/ to extend them.'
-            : `${total} document${total !== 1 ? 's' : ''} across ${categories.filter((c) => c.docs.length > 0).length} categor${categories.filter((c) => c.docs.length > 0).length === 1 ? 'y' : 'ies'}.`}
+            ? t('docs.indexEmpty')
+            : t('docs.summary', {
+                documents: t('docs.documentCount', { count: total }),
+                categories: t('docs.categoryCount', { count: nonEmptyCategories }),
+              })}
         </p>
       </div>
 
@@ -120,7 +127,7 @@ function DocsIndex({ categories }: { categories: DocCategory[] }) {
               {cat.name}
             </h2>
             {cat.docs.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic pl-2">No documents in this category yet.</p>
+              <p className="text-xs text-muted-foreground italic pl-2">{t('docs.categoryEmpty')}</p>
             ) : (
               <ul className="space-y-1">
                 {cat.docs.map((doc) => (
@@ -167,6 +174,7 @@ function DocView({
 }) {
   // Stale-while-revalidate: keep the previous doc on screen while fetching
   // the next one so navigation between docs doesn't flicker.
+  const { t } = useTranslation('integrations')
   const [doc, setDoc] = useState<DocContent | null>(null)
   const [error, setError] = useState<string | null>(null)
   const requestRef = useRef(0)
@@ -195,7 +203,7 @@ function DocView({
       })
       .catch((err: unknown) => {
         if (requestId !== requestRef.current) return
-        setError(err instanceof Error ? err.message : 'Failed to load document')
+        setError(err instanceof Error ? err.message : t('docs.loadError'))
       })
   }, [category, slug, navigate, scrollContainerRef])
 

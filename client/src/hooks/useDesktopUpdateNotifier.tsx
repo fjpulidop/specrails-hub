@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { check, type DownloadEvent, type Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
 import { DownloadCloud, Cog, Check, AlertTriangle } from 'lucide-react'
+import i18n from '../lib/i18n'
 
 const DISMISSED_UPDATE_KEY = 'specrails-hub:dismissedDesktopUpdateVersion'
 const UPDATE_TOAST_ID = 'specrails-hub-desktop-update'
@@ -54,8 +56,8 @@ function createMockUpdate(): DesktopUpdate {
 }
 
 function formatBytes(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (bytes < 1024 * 1024) return i18n.t('commands:update.units.kb', { value: Math.max(1, Math.round(bytes / 1024)) })
+  return i18n.t('commands:update.units.mb', { value: (bytes / (1024 * 1024)).toFixed(1) })
 }
 
 function readDismissedVersion(): string | null {
@@ -139,6 +141,7 @@ export function DesktopUpdateToast({
   update: DesktopUpdate
   onClose?: () => void
 }) {
+  const { t } = useTranslation('commands')
   const [state, setState] = useState<UpdateToastState>('available')
   const [downloaded, setDownloaded] = useState(0)
   const [total, setTotal] = useState<number | null>(null)
@@ -166,14 +169,14 @@ export function DesktopUpdateToast({
 
       setState('ready')
     } catch (err) {
-      setError((err as Error).message || 'Could not install update')
+      setError((err as Error).message || t('update.errors.installFailed'))
       setState('error')
     }
   }
 
   function handleRestart() {
     if (update.isMock) {
-      toast.success('Mock update ready — restart skipped', { duration: 2500 })
+      toast.success(t('update.mockReady'), { duration: 2500 })
       toast.dismiss(UPDATE_TOAST_ID)
       onClose?.()
       return
@@ -194,38 +197,38 @@ export function DesktopUpdateToast({
 
   const title =
     state === 'downloading'
-      ? 'Downloading update'
+      ? t('update.title.downloading')
       : state === 'installing'
-        ? 'Installing update'
+        ? t('update.title.installing')
         : state === 'ready'
-          ? 'Update ready'
+          ? t('update.title.ready')
           : state === 'error'
-            ? 'Update failed'
-            : 'Update available'
+            ? t('update.title.error')
+            : t('update.title.available')
 
   const description =
     state === 'available'
-      ? 'A new version of SpecRails Hub is ready to install.'
+      ? t('update.desc.available')
       : state === 'downloading'
         ? progress == null
-          ? `Fetching ${formatBytes(downloaded)}…`
-          : `${progress}% · ${formatBytes(downloaded)} of ${formatBytes(total ?? 0)}`
+          ? t('update.desc.fetching', { size: formatBytes(downloaded) })
+          : t('update.desc.progress', { percent: progress, downloaded: formatBytes(downloaded), total: formatBytes(total ?? 0) })
         : state === 'installing'
-          ? 'Verifying signature and finishing up…'
+          ? t('update.desc.installing')
           : state === 'ready'
-            ? `Restart to launch version ${update.version}.`
-            : (error && error.length <= 80 ? error : 'Couldn’t complete the update. Please try again.')
+            ? t('update.desc.ready', { version: update.version })
+            : (error && error.length <= 80 ? error : t('update.desc.errorFallback'))
 
   // Right-hand pill: version delta when idle, status word while working, hidden on error.
   const pill =
     state === 'available'
       ? `${update.currentVersion} → ${update.version}`
       : state === 'downloading'
-        ? 'Downloading'
+        ? t('update.pill.downloading')
         : state === 'installing'
-          ? 'Installing'
+          ? t('update.pill.installing')
           : state === 'ready'
-            ? 'Ready'
+            ? t('update.pill.ready')
             : null
 
   return (
@@ -273,7 +276,7 @@ export function DesktopUpdateToast({
               className="inline-grid h-7 min-w-[64px] place-items-center rounded-lg border border-[color:var(--u-accent)]/45 bg-[color:var(--u-accent)]/15 px-3 text-[11px] font-semibold leading-none text-foreground transition-colors hover:bg-[color:var(--u-accent)]/25"
               onClick={handleRestart}
             >
-              Restart
+              {t('update.actions.restart')}
             </button>
             <button
               type="button"
@@ -283,7 +286,7 @@ export function DesktopUpdateToast({
                 onClose?.()
               }}
             >
-              Later
+              {t('update.actions.later')}
             </button>
           </>
         ) : (
@@ -294,7 +297,7 @@ export function DesktopUpdateToast({
               disabled={busy}
               onClick={() => void installUpdate()}
             >
-              {state === 'installing' ? 'Installing…' : state === 'error' ? 'Try again' : 'Update'}
+              {state === 'installing' ? t('update.actions.installing') : state === 'error' ? t('update.actions.tryAgain') : t('update.actions.update')}
             </button>
             <button
               type="button"
@@ -305,7 +308,7 @@ export function DesktopUpdateToast({
                 onClose?.()
               }}
             >
-              Dismiss
+              {t('update.actions.dismiss')}
             </button>
           </>
         )}

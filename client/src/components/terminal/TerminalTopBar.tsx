@@ -1,4 +1,5 @@
 import { Plus, Trash2, Maximize2, Minimize2, Sparkles, Globe, Code2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 import { PanelChevronButton } from './PanelChevronButton'
 import type { PanelVisibility } from '../../context/TerminalsContext'
@@ -32,11 +33,13 @@ export function TerminalTopBar({
   onConfigureBrowser, onConfigureScript,
   onKillActive, onToggleMaximize, onCollapse,
 }: TerminalTopBarProps) {
+  const { t } = useTranslation('terminal')
   const multiProvider = !!providers && providers.length > 1
   const cliDisplayName = provider === 'codex' ? 'Codex' : 'Claude'
+  const maxTerminalsLabel = t('topBar.maxTerminals', { max: 10 })
   const cliLabel = canCreate
-    ? (multiProvider ? 'Open AI CLI in new terminal' : `Open ${cliDisplayName} in new terminal`)
-    : 'Max 10 terminals per project'
+    ? (multiProvider ? t('topBar.openCliMulti') : t('topBar.openCli', { cli: cliDisplayName }))
+    : maxTerminalsLabel
   return (
     <div
       className={cn(
@@ -47,7 +50,7 @@ export function TerminalTopBar({
       )}
     >
       <div className="flex items-center gap-2 pl-1">
-        <span className="font-medium text-foreground">Terminal</span>
+        <span className="font-medium text-foreground">{t('topBar.title')}</span>
       </div>
       <div className="flex items-center gap-0.5">
         <ActionButton
@@ -58,14 +61,14 @@ export function TerminalTopBar({
           <Sparkles className="h-3.5 w-3.5" />
         </ActionButton>
         <ActionButton
-          label="Open in browser"
+          label={t('topBar.openInBrowser')}
           onClick={onOpenBrowser}
           onContextMenu={(ev) => { ev.preventDefault(); onConfigureBrowser({ x: ev.clientX, y: ev.clientY }) }}
         >
           <Globe className="h-3.5 w-3.5" />
         </ActionButton>
         <ActionButton
-          label={pasteScriptDisabled ? 'No active terminal to paste into' : 'Paste quick script into active terminal'}
+          label={pasteScriptDisabled ? t('topBar.pasteScriptNoActive') : t('topBar.pasteScript')}
           disabled={pasteScriptDisabled}
           onClick={onPasteScript}
           onContextMenu={(ev) => { ev.preventDefault(); onConfigureScript({ x: ev.clientX, y: ev.clientY }) }}
@@ -73,21 +76,21 @@ export function TerminalTopBar({
           <Code2 className="h-3.5 w-3.5" />
         </ActionButton>
         <ActionButton
-          label={canCreate ? 'New terminal' : 'Max 10 terminals per project'}
+          label={canCreate ? t('topBar.newTerminal') : maxTerminalsLabel}
           disabled={!canCreate}
           onClick={onCreate}
         >
           <Plus className="h-3.5 w-3.5" />
         </ActionButton>
         <ActionButton
-          label="Kill active terminal"
+          label={t('topBar.killActive')}
           disabled={!hasActive}
           onClick={onKillActive}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </ActionButton>
         <ActionButton
-          label={visibility === 'maximized' ? 'Restore panel' : 'Maximize panel'}
+          label={visibility === 'maximized' ? t('topBar.restorePanel') : t('topBar.maximizePanel')}
           onClick={onToggleMaximize}
         >
           {visibility === 'maximized'

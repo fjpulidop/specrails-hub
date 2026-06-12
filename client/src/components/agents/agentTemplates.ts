@@ -9,6 +9,8 @@
  * break silently.
  */
 
+import i18n from '../../lib/i18n'
+
 export type AgentTemplateCategory =
   | 'Software Engineering'
   | 'Testing & QA'
@@ -78,7 +80,7 @@ ${workflowLines}
 `
 }
 
-export const AGENT_TEMPLATES: AgentTemplate[] = [
+const TEMPLATE_DEFS: AgentTemplate[] = [
   // ─── Software Engineering ────────────────────────────────────────────────
   {
     id: 'security-reviewer',
@@ -1263,6 +1265,23 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     }),
   },
 ]
+
+/**
+ * Public catalog. `label` and `blurb` are exposed as live getters that resolve
+ * through i18next at access time, so any consumer that re-renders after a hot
+ * language switch picks up the translated copy. Prompt `body` content (and
+ * `nameHint`, a technical id) is intentionally NOT translated — it is LLM
+ * prompt material, not UI copy.
+ */
+export const AGENT_TEMPLATES: AgentTemplate[] = TEMPLATE_DEFS.map((tpl) => ({
+  ...tpl,
+  get label() {
+    return i18n.t(`agentstudio:templates.${tpl.id}.label`, { defaultValue: tpl.label })
+  },
+  get blurb() {
+    return i18n.t(`agentstudio:templates.${tpl.id}.blurb`, { defaultValue: tpl.blurb })
+  },
+}))
 
 // Flat list of all unique tags across templates (for filter chip rendering).
 export const ALL_TEMPLATE_TAGS: string[] = Array.from(

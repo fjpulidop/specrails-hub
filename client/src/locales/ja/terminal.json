@@ -1,0 +1,75 @@
+{
+  "topBar": {
+    "title": "ターミナル",
+    "openCliMulti": "新しいターミナルで AI CLI を開く",
+    "openCli": "新しいターミナルで {{cli}} を開く",
+    "maxTerminals": "ターミナルはプロジェクトあたり最大 {{max}} 件",
+    "openInBrowser": "ブラウザで開く",
+    "pasteScript": "クイックスクリプトをアクティブなターミナルに貼り付け",
+    "pasteScriptNoActive": "貼り付け先のアクティブなターミナルがありません",
+    "newTerminal": "新しいターミナル",
+    "killActive": "アクティブなターミナルを強制終了",
+    "restorePanel": "パネルを復元",
+    "maximizePanel": "パネルを最大化"
+  },
+  "panelChevron": {
+    "collapse": "ターミナルパネルを折りたたむ",
+    "expand": "ターミナルパネルを展開"
+  },
+  "dragHandle": {
+    "resize": "ターミナルパネルのサイズを変更"
+  },
+  "sidebar": {
+    "rename": "{{name}} の名前を変更",
+    "close": "{{name}} を閉じる"
+  },
+  "emptyState": {
+    "noTerminals": "このプロジェクトにはまだターミナルがありません。",
+    "newTerminal": "新しいターミナル"
+  },
+  "search": {
+    "placeholder": "検索",
+    "previous": "前へ (Shift+Enter)",
+    "next": "次へ (Enter)",
+    "matchCase": "大文字と小文字を区別",
+    "regex": "正規表現",
+    "wholeWord": "単語単位",
+    "close": "閉じる (Esc)"
+  },
+  "contextMenu": {
+    "paste": "貼り付け",
+    "selectAll": "すべて選択",
+    "clear": "クリア",
+    "search": "検索…",
+    "saveScrollback": "スクロールバックをファイルに保存…",
+    "openPath": "{{path}} を開く"
+  },
+  "cliMenu": {
+    "open": "{{name}} を開く"
+  },
+  "shortcutMenu": {
+    "configureBrowserUrl": "設定でブラウザ URL を構成…",
+    "editQuickScript": "設定でクイックスクリプトを編集…"
+  },
+  "errors": {
+    "limitReached": "ターミナル数の上限に達しました (最大 {{max}})。",
+    "spawnFailed": "シェルの起動に失敗しました — ハブのファイルディスクリプタが不足している可能性があります。ハブを再起動してみてください。",
+    "invalidName": "ターミナル名が無効です。",
+    "openFailed": "ターミナルを開けませんでした。",
+    "serverUnreachable": "ターミナルを開くためにサーバーへ接続できませんでした。",
+    "exitedImmediately": "ターミナルが直ちに終了しました — シェルの起動に失敗した可能性があります。繰り返し発生する場合はハブを再起動してください。"
+  },
+  "session": {
+    "processExited": "[プロセスが終了しました]",
+    "processExitedWithCode": "[プロセスが終了しました (コード {{code}})]"
+  },
+  "notifications": {
+    "commandFinished": "コマンドが完了しました",
+    "commandFinishedNamed": "{{command}} が完了しました",
+    "finishedBody": "exit {{code}} · 所要 {{elapsed}}"
+  },
+  "duration": {
+    "seconds": "{{seconds}}s",
+    "minutesSeconds": "{{minutes}}m {{seconds}}s"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "actions": {
+    "save": "保存",
+    "cancel": "取消",
+    "close": "关闭",
+    "delete": "删除",
+    "confirm": "确认",
+    "retry": "重试",
+    "search": "搜索",
+    "copy": "复制",
+    "copied": "已复制",
+    "back": "返回",
+    "next": "下一步",
+    "done": "完成",
+    "open": "打开",
+    "add": "添加",
+    "remove": "移除",
+    "edit": "编辑",
+    "rename": "重命名",
+    "duplicate": "创建副本",
+    "refresh": "刷新",
+    "export": "导出",
+    "discard": "丢弃",
+    "minimize": "最小化",
+    "expand": "展开",
+    "collapse": "收起",
+    "viewAll": "查看全部",
+    "learnMore": "了解更多"
+  },
+  "states": {
+    "loading": "加载中…",
+    "saving": "保存中…",
+    "error": "错误",
+    "empty": "暂无数据",
+    "none": "无",
+    "unknown": "未知",
+    "yes": "是",
+    "no": "否",
+    "on": "开",
+    "off": "关",
+    "enabled": "已启用",
+    "disabled": "已禁用"
+  },
+  "status": {
+    "queued": "已排队",
+    "running": "运行中",
+    "completed": "已完成",
+    "failed": "失败",
+    "canceled": "已取消",
+    "draft": "草稿"
+  }
+}

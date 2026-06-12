@@ -1,0 +1,55 @@
+{
+  "shell": {
+    "backAriaLabel": "Back (Esc)",
+    "apply": "Apply",
+    "somethingWentWrong": "Something went wrong",
+    "quickPrompts": "Quick prompts",
+    "workingOnRefinement": "Working on your refinement…",
+    "history": "History",
+    "viewCurrentContent": "View current content",
+    "conversation": "Conversation",
+    "applied": "Applied.",
+    "you": "You",
+    "autoTestResult": "Auto-test result",
+    "ai": "AI",
+    "refinementReady": "Refinement ready — review the diff on the right.",
+    "diffPreview": "Diff preview",
+    "proposedChanges": "Proposed changes",
+    "wordLevelDiff": "word-level diff",
+    "forceApply": "Force apply",
+    "conflict": {
+      "diskChanged": "The file changed on disk while you were editing. Apply was blocked.",
+      "nameChanged": "The AI changed the agent name. Renaming is a separate explicit action — adjust the draft or rename in Studio."
+    },
+    "discardDialog": {
+      "ariaLabel": "Discard changes?",
+      "title": "Discard refinement?",
+      "body": "The current draft will be cancelled and not applied.",
+      "keepEditing": "Keep editing"
+    },
+    "composer": {
+      "sendAriaLabel": "Send (⌘⏎)",
+      "kbdSubmit": "submit",
+      "kbdCancel": "cancel"
+    }
+  },
+  "composer": {
+    "title": "AI Edit",
+    "placeholder": "Describe the changes you want…",
+    "submit": "Submit",
+    "unsupportedFileType": "Unsupported file type: {{name}}",
+    "uploadFailed": "Upload failed for {{name}}: {{message}}"
+  },
+  "diffView": {
+    "inserted": "inserted",
+    "removed": "removed"
+  },
+  "refine": {
+    "serverError": "Server error ({{status}})",
+    "connectionFailed": "Connection failed: {{message}}",
+    "applyFailed": "Apply failed ({{status}})",
+    "loadAgentFailed": "Failed to load agent ({{status}})",
+    "loadSessionFailed": "Failed to load session ({{status}})",
+    "rehydrateFailed": "Failed to restore session: {{message}}"
+  }
+}

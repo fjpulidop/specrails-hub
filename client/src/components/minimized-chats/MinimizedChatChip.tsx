@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { MessagesSquare, Sparkles, X } from 'lucide-react'
 import type { MinimizedChat, MinimizedChatKind } from '../../context/MinimizedChatsContext'
 
@@ -27,6 +28,7 @@ export function MinimizedChatChip({
   onRestore: () => void
   onClose: () => void
 }) {
+  const { t } = useTranslation('chat')
   const visibleLabel = trimLabel(chat.label)
   return (
     <div
@@ -39,21 +41,21 @@ export function MinimizedChatChip({
         type="button"
         onClick={onRestore}
         className="min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/50 rounded overflow-hidden"
-        aria-label={`Restore ${chat.label}`}
+        aria-label={t('chip.restore', { label: chat.label })}
         title={chat.label}
       >
         <div className="text-sm font-medium text-foreground truncate">
           {visibleLabel}
         </div>
         <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
-          Continue editing · {projectName}
+          {t('chip.continueEditing', { projectName })}
         </div>
       </button>
       <button
         type="button"
         onClick={onClose}
         className="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/50"
-        aria-label={`Close ${chat.label}`}
+        aria-label={t('chip.close', { label: chat.label })}
       >
         <X className="w-3.5 h-3.5" />
       </button>
@@ -62,11 +64,12 @@ export function MinimizedChatChip({
 }
 
 function KindIcon({ kind }: { kind: MinimizedChatKind }) {
+  const { t } = useTranslation('chat')
   const Icon = kind === 'ai-edit' ? Sparkles : MessagesSquare
   return (
     <Icon
       className="w-4 h-4 text-accent-primary flex-shrink-0 mt-0.5"
-      aria-label={kind === 'ai-edit' ? 'AI Edit' : 'Explore Spec'}
+      aria-label={kind === 'ai-edit' ? t('chip.kindAiEdit') : t('chip.kindExploreSpec')}
     />
   )
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog'
@@ -23,6 +24,7 @@ interface CreateTicketModalProps {
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export function CreateTicketModal({ open, allLabels, onClose, onCreate }: CreateTicketModalProps) {
+  const { t } = useTranslation('tickets')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState<TicketStatus>('todo')
@@ -81,25 +83,25 @@ export function CreateTicketModal({ open, allLabels, onClose, onCreate }: Create
     })
     setSaving(false)
     if (ok) {
-      toast.success('Ticket created')
+      toast.success(t('createModal.toast.created'))
       onClose()
     } else {
-      toast.error('Failed to create ticket')
+      toast.error(t('createModal.toast.createFailed'))
     }
-  }, [title, description, status, priority, labels, onCreate, onClose])
+  }, [title, description, status, priority, labels, onCreate, onClose, t])
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg glass-card">
         <DialogHeader>
-          <DialogTitle>Create Ticket</DialogTitle>
+          <DialogTitle>{t('createModal.title')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
           {/* Title */}
           <div>
             <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">
-              Title <span className="text-red-400">*</span>
+              {t('fields.title')} <span className="text-red-400">*</span>
             </label>
             <input
               ref={titleRef}
@@ -108,7 +110,7 @@ export function CreateTicketModal({ open, allLabels, onClose, onCreate }: Create
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && title.trim()) handleSubmit()
               }}
-              placeholder="Ticket title..."
+              placeholder={t('createModal.titlePlaceholder')}
               className="w-full h-8 rounded border border-border bg-input px-3 text-xs text-foreground placeholder:text-muted-foreground"
             />
           </div>
@@ -116,48 +118,48 @@ export function CreateTicketModal({ open, allLabels, onClose, onCreate }: Create
           {/* Description */}
           <div>
             <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">
-              Description
+              {t('fields.description')}
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
-              placeholder="Markdown description..."
+              placeholder={t('fields.markdownPlaceholder')}
               className="w-full rounded border border-border bg-input px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground resize-y min-h-[80px]"
             />
-            <span className="text-[9px] text-muted-foreground mt-0.5 block">Supports markdown</span>
+            <span className="text-[9px] text-muted-foreground mt-0.5 block">{t('fields.supportsMarkdown')}</span>
           </div>
 
           {/* Status + Priority row */}
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">
-                Status
+                {t('fields.status')}
               </label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as TicketStatus)}
                 className="w-full h-7 rounded border border-border bg-input px-2 text-xs text-foreground"
               >
-                <option value="todo">Todo</option>
-                <option value="in_progress">In Progress</option>
-                <option value="done">Done</option>
-                <option value="cancelled">Cancelled</option>
+                <option value="todo">{t('ticketStatus.todo')}</option>
+                <option value="in_progress">{t('ticketStatus.inProgress')}</option>
+                <option value="done">{t('ticketStatus.done')}</option>
+                <option value="cancelled">{t('ticketStatus.cancelled')}</option>
               </select>
             </div>
             <div className="flex-1">
               <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">
-                Priority
+                {t('fields.priority')}
               </label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as TicketPriority)}
                 className="w-full h-7 rounded border border-border bg-input px-2 text-xs text-foreground"
               >
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
+                <option value="critical">{t('priority.critical')}</option>
+                <option value="high">{t('priority.high')}</option>
+                <option value="medium">{t('priority.medium')}</option>
+                <option value="low">{t('priority.low')}</option>
               </select>
             </div>
           </div>
@@ -165,7 +167,7 @@ export function CreateTicketModal({ open, allLabels, onClose, onCreate }: Create
           {/* Labels */}
           <div>
             <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">
-              Labels
+              {t('fields.labels')}
             </label>
             <div className="flex flex-wrap gap-1 mb-1.5">
               {labels.map((label) => (
@@ -195,7 +197,7 @@ export function CreateTicketModal({ open, allLabels, onClose, onCreate }: Create
                     addLabel(labelInput)
                   }
                 }}
-                placeholder="Type to add labels..."
+                placeholder={t('createModal.labelsPlaceholder')}
                 className="w-full h-6 rounded border border-border bg-input px-2 text-[10px] text-foreground placeholder:text-muted-foreground"
               />
               {labelSuggestions.length > 0 && (
@@ -221,7 +223,7 @@ export function CreateTicketModal({ open, allLabels, onClose, onCreate }: Create
 
         <DialogFooter>
           <Button variant="ghost" size="sm" onClick={onClose}>
-            Cancel
+            {t('common:actions.cancel')}
           </Button>
           <Button
             size="sm"
@@ -229,7 +231,7 @@ export function CreateTicketModal({ open, allLabels, onClose, onCreate }: Create
             disabled={saving || !title.trim()}
           >
             <Plus className="w-3.5 h-3.5 mr-1" />
-            {saving ? 'Creating...' : 'Create'}
+            {saving ? t('createModal.creating') : t('createModal.create')}
           </Button>
         </DialogFooter>
       </DialogContent>

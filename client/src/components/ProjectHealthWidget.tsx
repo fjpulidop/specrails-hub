@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useTranslation, Trans } from 'react-i18next'
 import { GitCommit, CheckCircle2, XCircle, AlertCircle, Clock, TriangleAlert } from 'lucide-react'
 import { RadialBarChart, RadialBar, ResponsiveContainer, Tooltip } from 'recharts'
 import { useProjectCache } from '../hooks/useProjectCache'
@@ -46,6 +47,7 @@ interface ProjectMetrics {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function HealthScoreGauge({ score }: { score: number }) {
+  const { t } = useTranslation('nav')
   const color = score >= 80 ? '#50fa7b' : score >= 50 ? '#f1fa8c' : '#ff5555'
   const data = [{ name: 'score', value: score, fill: color }]
 
@@ -70,7 +72,7 @@ function HealthScoreGauge({ score }: { score: number }) {
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-xl font-bold font-mono" style={{ color }}>{score}</span>
-          <span className="text-[9px] text-muted-foreground uppercase tracking-wider">health</span>
+          <span className="text-[9px] text-muted-foreground uppercase tracking-wider">{t('healthWidget.healthLabel')}</span>
         </div>
       </div>
     </div>
@@ -78,11 +80,12 @@ function HealthScoreGauge({ score }: { score: number }) {
 }
 
 function CoverageBar({ pct }: { pct: number | null }) {
+  const { t } = useTranslation('nav')
   if (pct === null) {
     return (
       <div className="flex items-center gap-2">
         <div className="flex-1 h-1.5 rounded-full bg-muted/30" />
-        <span className="text-xs text-muted-foreground font-mono w-10 text-right">n/a</span>
+        <span className="text-xs text-muted-foreground font-mono w-10 text-right">{t('healthWidget.notAvailable')}</span>
       </div>
     )
   }
@@ -113,11 +116,12 @@ function FactorRow({ ok, label }: { ok: boolean; label: string }) {
 }
 
 function PipelineStatusBadge({ status }: { status: string | null }) {
-  if (!status) return <span className="text-xs text-muted-foreground">No jobs yet</span>
+  const { t } = useTranslation('nav')
+  if (!status) return <span className="text-xs text-muted-foreground">{t('healthWidget.noJobsYet')}</span>
   const map: Record<string, { icon: React.ReactNode; label: string; cls: string }> = {
-    completed: { icon: <CheckCircle2 className="w-3 h-3" />, label: 'Completed', cls: 'text-[#50fa7b]' },
-    failed: { icon: <XCircle className="w-3 h-3" />, label: 'Failed', cls: 'text-[#ff5555]' },
-    canceled: { icon: <AlertCircle className="w-3 h-3" />, label: 'Canceled', cls: 'text-[#f1fa8c]' },
+    completed: { icon: <CheckCircle2 className="w-3 h-3" />, label: t('common:status.completed'), cls: 'text-[#50fa7b]' },
+    failed: { icon: <XCircle className="w-3 h-3" />, label: t('common:status.failed'), cls: 'text-[#ff5555]' },
+    canceled: { icon: <AlertCircle className="w-3 h-3" />, label: t('common:status.canceled'), cls: 'text-[#f1fa8c]' },
   }
   const entry = map[status] ?? { icon: <Clock className="w-3 h-3" />, label: status, cls: 'text-muted-foreground' }
   return (
@@ -129,20 +133,26 @@ function PipelineStatusBadge({ status }: { status: string | null }) {
 }
 
 function FailureWarningBanner({ patterns }: { patterns: FailurePattern[] }) {
+  const { t } = useTranslation('nav')
   if (patterns.length === 0) return null
   return (
     <div className="mx-4 mb-3 rounded-lg border border-[#ff5555]/30 bg-[#ff5555]/10 px-3 py-2 flex flex-col gap-1">
       <div className="flex items-center gap-1.5">
         <TriangleAlert className="w-3.5 h-3.5 text-[#ff5555] flex-shrink-0" />
-        <span className="text-xs font-semibold text-[#ff5555]">Recurring failures detected</span>
+        <span className="text-xs font-semibold text-[#ff5555]">{t('healthWidget.recurringFailures')}</span>
       </div>
       <ul className="space-y-0.5 pl-5">
         {patterns.map((p) => (
           <li key={p.command} className="text-[11px] text-foreground/70">
-            <span className="font-mono text-foreground/90">{p.command}</span>
-            {' '}has failed{' '}
-            <span className="font-semibold text-[#ff5555]">{p.count}×</span>
-            {' '}this week — possible project issue.
+            <Trans
+              ns="nav"
+              i18nKey="healthWidget.failurePattern"
+              values={{ command: p.command, count: p.count }}
+              components={{
+                cmd: <span className="font-mono text-foreground/90" />,
+                times: <span className="font-semibold text-[#ff5555]" />,
+              }}
+            />
           </li>
         ))}
       </ul>
@@ -150,18 +160,19 @@ function FailureWarningBanner({ patterns }: { patterns: FailurePattern[] }) {
   )
 }
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const ms = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(ms / 60000)
-  if (mins < 60) return `${mins}m ago`
+  if (mins < 60) return t('healthWidget.minutesAgo', { count: mins })
   const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
+  if (hrs < 24) return t('healthWidget.hoursAgo', { count: hrs })
+  return t('healthWidget.daysAgo', { count: Math.floor(hrs / 24) })
 }
 
 // ─── Main widget ──────────────────────────────────────────────────────────────
 
 export function ProjectHealthWidget() {
+  const { t } = useTranslation('nav')
   const { activeProjectId } = useHub()
 
   const { data: metrics, isFirstLoad } = useProjectCache<ProjectMetrics | null>({
@@ -199,10 +210,10 @@ export function ProjectHealthWidget() {
         <div className="flex items-start gap-4">
           <HealthScoreGauge score={healthScore} />
           <div className="flex flex-col gap-1 pt-1">
-            <FactorRow ok={healthFactors.hasCoverage} label="Coverage available" />
-            <FactorRow ok={healthFactors.coverageGood} label="Coverage ≥ 70%" />
-            <FactorRow ok={healthFactors.pipelineHealthy} label="Last pipeline green" />
-            <FactorRow ok={healthFactors.hasRecentActivity} label="Active this week" />
+            <FactorRow ok={healthFactors.hasCoverage} label={t('healthWidget.factorCoverageAvailable')} />
+            <FactorRow ok={healthFactors.coverageGood} label={t('healthWidget.factorCoverageGood')} />
+            <FactorRow ok={healthFactors.pipelineHealthy} label={t('healthWidget.factorPipelineGreen')} />
+            <FactorRow ok={healthFactors.hasRecentActivity} label={t('healthWidget.factorActiveWeek')} />
           </div>
         </div>
 
@@ -210,30 +221,30 @@ export function ProjectHealthWidget() {
         <div className="flex flex-col gap-3 justify-center">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Coverage</span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{t('healthWidget.coverage')}</span>
             </div>
             <div className="space-y-1">
               <div className="flex items-center gap-1 mb-0.5">
-                <span className="text-[10px] text-muted-foreground w-16">Lines</span>
+                <span className="text-[10px] text-muted-foreground w-16">{t('healthWidget.lines')}</span>
                 <CoverageBar pct={coverage.lines} />
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] text-muted-foreground w-16">Functions</span>
+                <span className="text-[10px] text-muted-foreground w-16">{t('healthWidget.functions')}</span>
                 <CoverageBar pct={coverage.functions} />
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] text-muted-foreground w-16">Branches</span>
+                <span className="text-[10px] text-muted-foreground w-16">{t('healthWidget.branches')}</span>
                 <CoverageBar pct={coverage.branches} />
               </div>
             </div>
           </div>
 
           <div>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Last pipeline</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{t('healthWidget.lastPipeline')}</span>
             <div className="flex items-center gap-2 mt-1">
               <PipelineStatusBadge status={pipeline.lastJobStatus} />
               {pipeline.lastJobAt && (
-                <span className="text-[10px] text-muted-foreground">{timeAgo(pipeline.lastJobAt)}</span>
+                <span className="text-[10px] text-muted-foreground">{timeAgo(pipeline.lastJobAt, t)}</span>
               )}
             </div>
             {pipeline.lastJobCommand && (
@@ -248,10 +259,10 @@ export function ProjectHealthWidget() {
         <div className="flex flex-col gap-1.5">
           <span className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
             <GitCommit className="w-3 h-3" />
-            Recent commits
+            {t('healthWidget.recentCommits')}
           </span>
           {recentCommits.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No git history found</p>
+            <p className="text-xs text-muted-foreground">{t('healthWidget.noGitHistory')}</p>
           ) : (
             <ul className="space-y-1.5">
               {recentCommits.slice(0, 5).map((commit) => (

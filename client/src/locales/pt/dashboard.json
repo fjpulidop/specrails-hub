@@ -1,0 +1,62 @@
+{
+  "toasts": {
+    "railAdded": "Rail {{n}} adicionado",
+    "railRemoved": "{{rail}} removido",
+    "railCompleted": "Rail {{n}} concluído",
+    "railFailed": "Rail {{n}} falhou — specs devolvidas a Specs",
+    "railEnded": "Rail {{n}} {{status}} — specs devolvidas a Specs",
+    "alreadyOnRail": "Já está em {{rail}}",
+    "movedToRail": "Movido para {{rail}}",
+    "railRunningStopFirst": "{{rail}} está em execução — pare-o antes de remover",
+    "removedFromRail": "Removido de {{rail}}",
+    "queuedOnRail": "Em fila em {{rail}}",
+    "queuedOnRailDescription": "O rail está atualmente em execução",
+    "railStopped": "{{rail}} parado",
+    "stopFailed": "Falha ao parar o rail",
+    "syncTicketsFailed": "Falha ao sincronizar os tickets do rail",
+    "launchFailed": "Falha ao lançar o rail",
+    "launchNetworkError": "Erro de rede ao lançar o rail",
+    "railLaunched": "{{rail}} lançado",
+    "launchDescription_one": "{{mode}} com {{count}} spec",
+    "launchDescription_other": "{{mode}} com {{count}} specs"
+  },
+  "railsBoard": {
+    "title": "Rails",
+    "runningCount_one": "{{count}} em execução",
+    "runningCount_other": "{{count}} em execução"
+  },
+  "railControls": {
+    "viewJobLog": "Ver log do job",
+    "log": "Log",
+    "implement": "Implementar",
+    "batch": "Batch",
+    "ultra": "Ultra",
+    "ultraTitle": "Ultracode — o Claude implementa a spec de forma autónoma, sem pipeline",
+    "stop": "Parar",
+    "play": "Iniciar",
+    "failedRetry": "O job falhou — clique para repetir",
+    "addSpecsFirst": "Adicione primeiro specs a este rail"
+  },
+  "railRow": {
+    "moveToSpecs": "Mover para Specs",
+    "deleteRail": "Eliminar {{label}}",
+    "dropHere": "Largar aqui",
+    "dropOnThisRail": "Largar neste rail",
+    "dragSpecsHere": "Arraste specs para aqui"
+  },
+  "ultracodeDialog": {
+    "title": "Lançar em modo Ultracode",
+    "context_one": "{{rail}} · {{count}} spec",
+    "context_other": "{{rail}} · {{count}} specs",
+    "noPipelineTitle": "Sem pipeline OpenSpec.",
+    "noPipelineBody": "O fluxo estruturado architect → developer → reviewer é totalmente ignorado.",
+    "autonomyTitle": "Autonomia nativa do Claude.",
+    "autonomyBody": "O Claude trabalha por conta própria com agentes nativos e workflows dinâmicos.",
+    "costTitle": "Custo variável.",
+    "costBody": "O gasto depende do que o Claude decidir fazer — pode ser superior ao esperado.",
+    "continue": "Continuar"
+  },
+  "useRails": {
+    "fetchFailed": "Falha ao obter os rails: {{status}}"
+  }
+}

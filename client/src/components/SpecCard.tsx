@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Trash2, AlertTriangle } from 'lucide-react'
@@ -43,6 +44,7 @@ export function SpecCard({
   onLongPress,
   onDelete,
 }: SpecCardProps) {
+  const { t } = useTranslation('specs')
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: ticket.id,
     disabled: dragDisabled || jiggleMode, // disable DnD while in jiggle mode
@@ -151,7 +153,7 @@ export function SpecCard({
           className="text-[9px] shrink-0 border-accent-highlight/60 text-accent-highlight bg-accent-highlight/10"
           data-testid={`epic-badge-${ticket.id}`}
         >
-          Epic · {epicChildrenCount ?? 0}
+          {t('badges.epicWithCount', { count: epicChildrenCount ?? 0 })}
         </Badge>
       ) : null}
       {parentEpicTitle && ticket.parent_epic_id != null ? (
@@ -170,7 +172,7 @@ export function SpecCard({
             }
           }}
           className="inline-flex items-center rounded-md border border-accent-secondary/40 text-accent-secondary bg-accent-secondary/5 hover:bg-accent-secondary/15 hover:border-accent-secondary/60 px-1.5 py-0.5 text-[9px] font-medium shrink-0 max-w-[12rem] truncate transition-colors cursor-pointer"
-          title={`Open parent Epic #${ticket.parent_epic_id} · ${parentEpicTitle}`}
+          title={t('badges.openParentEpicTitle', { id: ticket.parent_epic_id, title: parentEpicTitle })}
           data-testid={`epic-child-pill-${ticket.id}`}
         >
           ↑ #{ticket.parent_epic_id} {parentEpicTitle}
@@ -180,37 +182,37 @@ export function SpecCard({
         <Badge
           variant="outline"
           className="text-[9px] shrink-0 gap-1 border-accent-warning/60 text-accent-warning bg-accent-warning/10"
-          title="This spec was marked done but its job ended in failure — review it"
+          title={t('badges.needsReviewTitle')}
           data-testid={`needs-review-badge-${ticket.id}`}
         >
           <AlertTriangle className="w-2.5 h-2.5" aria-hidden />
-          Review
+          {t('badges.review')}
         </Badge>
       ) : null}
       {ticket.source === 'free-prompt' ? (
         <Badge
           variant="outline"
           className="text-[9px] shrink-0 uppercase border-accent-info/50 text-accent-info"
-          title="Raw spec — no AI generation at intake"
+          title={t('badges.rawTitle')}
           data-testid={`raw-badge-${ticket.id}`}
         >
-          Raw
+          {t('badges.raw')}
         </Badge>
       ) : null}
       {isDraft ? (
         <Badge variant="outline" className="text-[9px] shrink-0 border-accent-secondary/60 text-accent-secondary">
-          Draft
+          {t('common:status.draft')}
         </Badge>
       ) : contractRefining ? (
         <Badge
           variant="outline"
           className="text-[9px] shrink-0 border-accent-highlight/70 text-accent-highlight bg-accent-highlight/10"
         >
-          Contract
+          {t('badges.contract')}
         </Badge>
       ) : ticket.priority ? (
         <Badge variant={PRIORITY_VARIANT[ticket.priority]} className="text-[9px] shrink-0">
-          {ticket.priority}
+          {t(`priority.${ticket.priority}`)}
         </Badge>
       ) : null}
 
@@ -221,8 +223,8 @@ export function SpecCard({
           onClick={handleDelete}
           onPointerDown={(e) => e.stopPropagation()}
           className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md hover:bg-red-600 transition-colors z-10"
-          title={`Delete spec #${ticket.id}`}
-          aria-label={`Delete spec #${ticket.id}`}
+          title={t('card.deleteSpec', { id: ticket.id })}
+          aria-label={t('card.deleteSpec', { id: ticket.id })}
           data-testid={`spec-card-delete-${ticket.id}`}
         >
           <Trash2 className="w-2.5 h-2.5" />

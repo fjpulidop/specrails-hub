@@ -1,0 +1,114 @@
+{
+  "board": {
+    "title": "スペック",
+    "dropHere": "ここにドロップ",
+    "emptyNoSpecs": "スペックはまだありません",
+    "emptyNoLabelMatch": "アクティブなラベルに一致するスペックはありません",
+    "emptyNoActiveSpecs": "アクティブなスペックはありません",
+    "emptyHint": "「+ 追加」をクリックして開始",
+    "dropToMarkDone": "ドロップして完了にする",
+    "emptyNoDoneLabelMatch": "アクティブなラベルに一致する完了スペックはありません",
+    "emptyNoCompleted": "完了したスペックはまだありません",
+    "untitledSpec": "無題のスペック"
+  },
+  "status": {
+    "todo": "Todo",
+    "inProgress": "進行中",
+    "done": "完了",
+    "cancelled": "キャンセル"
+  },
+  "priority": {
+    "critical": "クリティカル",
+    "high": "高",
+    "medium": "中",
+    "low": "低"
+  },
+  "badges": {
+    "epic": "エピック",
+    "epicWithCount": "エピック · {{count}}",
+    "subSpec": "↑ Sub-Spec",
+    "review": "レビュー",
+    "needsReviewTitle": "このスペックは完了とマークされましたが、ジョブが失敗で終了しました — 確認してください",
+    "raw": "Raw",
+    "rawTitle": "Raw スペック — 取り込み時に AI 生成なし",
+    "contract": "Contract",
+    "openParentEpicTitle": "親エピック #{{id}} を開く · {{title}}"
+  },
+  "card": {
+    "deleteSpec": "スペック #{{id}} を削除",
+    "deleteTicket": "チケット #{{id}} を削除",
+    "ticketFallbackLabel": "チケット #{{id}}",
+    "dependsOn": "{{count}} 件に依存",
+    "continueEditing": "編集を続ける",
+    "continueEditingTitle": "このスペックの編集を続ける",
+    "moveToRail": "レールに移動"
+  },
+  "emptyState": {
+    "noTickets": "チケットはまだありません",
+    "noTicketsHint": "最初のチケットを作成するか、プロダクトバックログコマンドを実行してチケットを生成してください",
+    "createFirst": "最初のチケットを作成"
+  },
+  "errors": {
+    "loadFailed": "チケットの読み込みに失敗しました"
+  },
+  "listView": {
+    "status": {
+      "draft": "下書き",
+      "todo": "Todo",
+      "inProgress": "進行中",
+      "done": "完了",
+      "cancelled": "キャンセル"
+    },
+    "filterAll": "すべて ({{count}})",
+    "statusWithCount": "{{status}} ({{count}})",
+    "allLabels": "すべてのラベル",
+    "searchPlaceholder": "検索...",
+    "columns": {
+      "status": "ステータス",
+      "title": "タイトル",
+      "priority": "優先度",
+      "labels": "ラベル",
+      "updated": "更新"
+    },
+    "noMatch": "フィルターに一致するチケットはありません",
+    "clearFilters": "フィルターをクリア",
+    "loadMore": "さらに読み込む（残り {{count}} 件）"
+  },
+  "gridView": {
+    "emptyTodo": "未着手のチケットはありません",
+    "emptyInProgress": "進行中のものはありません",
+    "emptyDone": "完了したチケットはありません",
+    "cancelledSection": "キャンセル ({{count}})"
+  },
+  "statusFilter": {
+    "ariaLabel": "ステータスで絞り込み",
+    "all": "すべて",
+    "todo": "ToDo",
+    "done": "完了"
+  },
+  "sortControl": {
+    "modeAriaLabel": "並べ替えモード",
+    "tooltip": "並べ替え: {{mode}}",
+    "toggleDirAriaLabel": "並べ替え方向を切り替え",
+    "ascending": "昇順",
+    "descending": "降順",
+    "modes": {
+      "default": "デフォルト",
+      "ticketId": "チケット #",
+      "priority": "優先度"
+    }
+  },
+  "viewTier": {
+    "ariaLabel": "スペック表示",
+    "listView": "リスト表示",
+    "postitView": "付箋表示"
+  },
+  "labelFilter": {
+    "ariaLabel": "ラベルで絞り込み",
+    "all": "すべて",
+    "empty": "このプロジェクトにラベルはありません。",
+    "selected_one": "{{count}} 件のラベル",
+    "selected_other": "{{count}} 件のラベル",
+    "clear": "クリア"
+  }
+}

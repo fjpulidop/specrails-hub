@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronRight, Code2, Palette, Pipette, Network, X } from 'lucide-react'
 import { domSummary, type CapturedDom } from '../../lib/browser-capture'
 
@@ -44,6 +45,7 @@ function HighlightedHtml({ html }: { html: string }) {
  * one click away and travel to the AI as an attachment.
  */
 export function CapturedDomPanel({ dom, onRemove }: CapturedDomPanelProps) {
+  const { t } = useTranslation('browser')
   const [openPanel, setOpenPanel] = useState(false)
   const [openCss, setOpenCss] = useState(false)
   const [openTokens, setOpenTokens] = useState(false)
@@ -80,16 +82,16 @@ export function CapturedDomPanel({ dom, onRemove }: CapturedDomPanelProps) {
         >
           <ChevronRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${openPanel ? 'rotate-90' : ''}`} />
           <Code2 className="w-3.5 h-3.5 shrink-0 text-accent-secondary" />
-          <span className="truncate font-medium">Captured page · {dom.title || host}</span>
+          <span className="truncate font-medium">{t('domPanel.header', { title: dom.title || host })}</span>
         </button>
         <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
-          {summary.nodeCount} elements{dom.css ? ' · CSS' : ''}{hasTokens ? ' · tokens' : ''}{hasNetwork ? ` · ${requests.length} req` : ''}{summary.truncated ? ' · truncated' : ''}
+          {t('domPanel.badge.elements', { count: summary.nodeCount })}{dom.css ? ' · CSS' : ''}{hasTokens ? ` · ${t('domPanel.badge.tokens')}` : ''}{hasNetwork ? ` · ${t('domPanel.badge.requests', { count: requests.length })}` : ''}{summary.truncated ? ` · ${t('domPanel.badge.truncated')}` : ''}
         </span>
         {onRemove && (
           <button
             type="button"
             onClick={onRemove}
-            aria-label="Remove captured page context"
+            aria-label={t('domPanel.removeLabel')}
             className="shrink-0 text-muted-foreground/60 hover:text-destructive transition-colors"
           >
             <X className="w-3.5 h-3.5" />
@@ -105,7 +107,7 @@ export function CapturedDomPanel({ dom, onRemove }: CapturedDomPanelProps) {
             className="max-h-64 overflow-auto px-3 pb-3 text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono"
             data-testid="captured-dom-html"
           >
-            {dom.html ? <HighlightedHtml html={dom.html} /> : '(no markup captured)'}
+            {dom.html ? <HighlightedHtml html={dom.html} /> : t('domPanel.noMarkup')}
           </pre>
           {dom.css && (
             <div className="border-t border-accent-secondary/30">
@@ -117,7 +119,7 @@ export function CapturedDomPanel({ dom, onRemove }: CapturedDomPanelProps) {
               >
                 <ChevronRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${openCss ? 'rotate-90' : ''}`} />
                 <Palette className="w-3.5 h-3.5 shrink-0 text-accent-highlight" />
-                <span className="font-medium">Applied CSS{dom.cssTruncated ? ' (truncated)' : ''}</span>
+                <span className="font-medium">{dom.cssTruncated ? t('domPanel.appliedCssTruncated') : t('domPanel.appliedCss')}</span>
               </button>
               {openCss && (
                 <pre
@@ -139,7 +141,7 @@ export function CapturedDomPanel({ dom, onRemove }: CapturedDomPanelProps) {
               >
                 <ChevronRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${openTokens ? 'rotate-90' : ''}`} />
                 <Pipette className="w-3.5 h-3.5 shrink-0 text-accent-highlight" />
-                <span className="font-medium">Design tokens</span>
+                <span className="font-medium">{t('domPanel.designTokens')}</span>
               </button>
               {openTokens && (
                 <div className="px-3 pb-3 space-y-2" data-testid="captured-dom-tokens">
@@ -169,7 +171,7 @@ export function CapturedDomPanel({ dom, onRemove }: CapturedDomPanelProps) {
                   )}
                   {tokens.fonts.length > 0 && (
                     <div className="text-[11px] text-muted-foreground">
-                      Fonts: <span className="font-mono text-foreground/80 break-all">{tokens.fonts.join(', ')}</span>
+                      {t('domPanel.fonts')} <span className="font-mono text-foreground/80 break-all">{tokens.fonts.join(', ')}</span>
                     </div>
                   )}
                   <button
@@ -177,7 +179,7 @@ export function CapturedDomPanel({ dom, onRemove }: CapturedDomPanelProps) {
                     onClick={copyTokens}
                     className="text-[10px] text-accent-info hover:underline"
                   >
-                    {copied ? 'Copied!' : 'Copy as JSON'}
+                    {copied ? t('domPanel.copied') : t('domPanel.copyJson')}
                   </button>
                 </div>
               )}
@@ -193,7 +195,7 @@ export function CapturedDomPanel({ dom, onRemove }: CapturedDomPanelProps) {
               >
                 <ChevronRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${openNet ? 'rotate-90' : ''}`} />
                 <Network className="w-3.5 h-3.5 shrink-0 text-accent-info" />
-                <span className="font-medium">Network · {requests.length} request{requests.length === 1 ? '' : 's'}</span>
+                <span className="font-medium">{t('domPanel.network', { count: requests.length })}</span>
               </button>
               {openNet && (
                 <div className="max-h-64 overflow-auto px-3 pb-3 space-y-1.5" data-testid="captured-dom-network">

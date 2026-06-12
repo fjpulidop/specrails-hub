@@ -27,6 +27,7 @@ import { DEFAULT_TERMINAL_SETTINGS, TERMINAL_FONT_SIZE_MAX, TERMINAL_FONT_SIZE_M
 import { ingestMark, disposeSession as disposeMarksSession, getMarks } from '../lib/command-mark-store'
 import { notifyCommandFinished, shouldNotify } from '../lib/terminal-notifications'
 import { toast } from 'sonner'
+import i18n from '../lib/i18n'
 import { API_ORIGIN } from '../lib/origin'
 import { WS_URL } from '../lib/ws-url'
 import { getHubTokenProtocol } from '../lib/auth'
@@ -349,10 +350,10 @@ export function TerminalsProvider({ children, activeProjectId }: ProviderProps) 
         let reason = ''
         try { reason = ((await res.json()) as { error?: string })?.error ?? '' } catch { /* non-JSON body */ }
         toast.error(
-          reason === 'terminal_limit_exceeded' ? `Terminal limit reached (max ${TERMINAL_MAX_PER_PROJECT}).`
-            : reason === 'terminal_spawn_failed' ? 'The shell failed to start — the hub may be low on file descriptors. Try restarting the hub.'
-            : reason === 'terminal_name_invalid' ? 'Invalid terminal name.'
-            : 'Failed to open terminal.',
+          reason === 'terminal_limit_exceeded' ? i18n.t('terminal:errors.limitReached', { max: TERMINAL_MAX_PER_PROJECT })
+            : reason === 'terminal_spawn_failed' ? i18n.t('terminal:errors.spawnFailed')
+            : reason === 'terminal_name_invalid' ? i18n.t('terminal:errors.invalidName')
+            : i18n.t('terminal:errors.openFailed'),
         )
         return null
       }
@@ -372,7 +373,7 @@ export function TerminalsProvider({ children, activeProjectId }: ProviderProps) 
       }))
       return session
     } catch {
-      toast.error('Could not reach the server to open a terminal.')
+      toast.error(i18n.t('terminal:errors.serverUnreachable'))
       return null
     }
   }, [updateProject])
@@ -847,11 +848,13 @@ function ensureXtermForSession(
     if (h.exitShown) return
     h.exitShown = true
     try {
-      const codeStr = code === null ? '' : ` (code ${code})`
-      h.term.write(`\r\n\x1b[2m[process exited${codeStr}]\x1b[0m\r\n`)
+      const exitedText = code === null
+        ? i18n.t('terminal:session.processExited')
+        : i18n.t('terminal:session.processExitedWithCode', { code })
+      h.term.write(`\r\n\x1b[2m${exitedText}\x1b[0m\r\n`)
     } catch { /* ignore */ }
     if (early && !h.gotUserInput) {
-      toast.error('Terminal exited immediately — the shell may have failed to start. If this keeps happening, restart the hub.')
+      toast.error(i18n.t('terminal:errors.exitedImmediately'))
     }
   }
 

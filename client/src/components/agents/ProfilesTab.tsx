@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { Plus, Trash2, Copy, Save, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getApiBase } from '../../lib/api'
@@ -8,6 +9,7 @@ import { ConfirmDialog, PromptDialog } from './PromptDialog'
 import type { Profile, ProfileListEntry } from './types'
 
 export function ProfilesTab() {
+  const { t } = useTranslation('agents')
   const [profiles, setProfiles] = useState<ProfileListEntry[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [editing, setEditing] = useState<Profile | null>(null)
@@ -25,7 +27,7 @@ export function ProfilesTab() {
     setError(null)
     try {
       const profilesRes = await fetch(`${getApiBase()}/profiles`)
-      if (!profilesRes.ok) throw new Error(`List failed: ${profilesRes.status}`)
+      if (!profilesRes.ok) throw new Error(t('profiles.errors.listFailed', { status: profilesRes.status }))
       const profilesData = (await profilesRes.json()) as { profiles: ProfileListEntry[] }
       setProfiles(profilesData.profiles)
       if (profilesData.profiles.length > 0 && !selected) {
@@ -50,7 +52,7 @@ export function ProfilesTab() {
     let cancelled = false
     fetch(`${getApiBase()}/profiles/${encodeURIComponent(selected)}`)
       .then((r) => {
-        if (!r.ok) throw new Error(`Load failed: ${r.status}`)
+        if (!r.ok) throw new Error(t('profiles.errors.loadFailed', { status: r.status }))
         return r.json() as Promise<{ profile: Profile }>
       })
       .then((data) => {
@@ -73,17 +75,17 @@ export function ProfilesTab() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? `Migration failed: ${res.status}`)
+        throw new Error(err.error ?? t('profiles.errors.migrationFailed', { status: res.status }))
       }
       await refresh()
       setSelected('default')
-      toast.success('Profile migrated', {
-        description: 'default profile created from your current agents',
+      toast.success(t('profiles.toasts.migrated'), {
+        description: t('profiles.toasts.migratedDescription'),
       })
     } catch (e) {
       const message = (e as Error).message
       setError(message)
-      toast.error('Migration failed', { description: message })
+      toast.error(t('profiles.toasts.migrationFailed'), { description: message })
     } finally {
       setSaving(false)
     }
@@ -115,15 +117,15 @@ export function ProfilesTab() {
         })
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
-          throw new Error(err.error ?? `Create failed: ${res.status}`)
+          throw new Error(err.error ?? t('profiles.errors.createFailed', { status: res.status }))
         }
         await refresh()
         setSelected(trimmed)
-        toast.success('Profile created', { description: trimmed })
+        toast.success(t('profiles.toasts.created'), { description: trimmed })
       } catch (e) {
         const message = (e as Error).message
         setError(message)
-        toast.error('Failed to create profile', { description: message })
+        toast.error(t('profiles.toasts.createFailed'), { description: message })
       } finally {
         setSaving(false)
       }
@@ -147,15 +149,17 @@ export function ProfilesTab() {
         )
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
-          throw new Error(err.error ?? `Duplicate failed: ${res.status}`)
+          throw new Error(err.error ?? t('profiles.errors.duplicateFailed', { status: res.status }))
         }
         await refresh()
         setSelected(newName)
-        toast.success('Profile duplicated', { description: `${from} → ${newName}` })
+        toast.success(t('profiles.toasts.duplicated'), {
+          description: t('profiles.toasts.duplicatedDescription', { from, to: newName }),
+        })
       } catch (e) {
         const message = (e as Error).message
         setError(message)
-        toast.error('Failed to duplicate profile', { description: message })
+        toast.error(t('profiles.toasts.duplicateFailed'), { description: message })
       } finally {
         setSaving(false)
       }
@@ -174,15 +178,15 @@ export function ProfilesTab() {
         })
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
-          throw new Error(err.error ?? `Delete failed: ${res.status}`)
+          throw new Error(err.error ?? t('profiles.errors.deleteFailed', { status: res.status }))
         }
         setSelected((prev) => (prev === name ? null : prev))
         await refresh()
-        toast.success('Profile deleted', { description: name })
+        toast.success(t('profiles.toasts.deleted'), { description: name })
       } catch (e) {
         const message = (e as Error).message
         setError(message)
-        toast.error('Failed to delete profile', { description: message })
+        toast.error(t('profiles.toasts.deleteFailed'), { description: message })
       } finally {
         setSaving(false)
       }
@@ -205,49 +209,51 @@ export function ProfilesTab() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? `Save failed: ${res.status}`)
+        throw new Error(err.error ?? t('profiles.errors.saveFailed', { status: res.status }))
       }
       setEditing(profile)
       if (missingRouting.length > 0) {
-        toast.warning('Profile saved with untargeted agents', {
-          description: `No routing rule points to: ${missingRouting.join(', ')}. Add a tag rule or retarget the default rule if you want them to run.`,
+        toast.warning(t('profiles.toasts.savedWithUntargeted'), {
+          description: t('profiles.toasts.savedWithUntargetedDescription', {
+            agents: missingRouting.join(', '),
+          }),
           duration: 6000,
         })
       } else {
-        toast.success('Profile saved', { description: profile.name })
+        toast.success(t('profiles.toasts.saved'), { description: profile.name })
       }
     } catch (e) {
       const message = (e as Error).message
       setError(message)
-      toast.error('Failed to save profile', { description: message })
+      toast.error(t('profiles.toasts.saveFailed'), { description: message })
     } finally {
       setSaving(false)
     }
-  }, [])
+  }, [t])
 
   const dialogs = (
     <>
       <PromptDialog
         open={createDialog}
-        title="New profile"
-        description="Pick a lowercase kebab-case name (letters, digits, and hyphens)."
+        title={t('profiles.createDialog.title')}
+        description={t('profiles.createDialog.description')}
         placeholder="my-profile"
-        confirmLabel="Create"
+        confirmLabel={t('profiles.createDialog.confirmLabel')}
         inputPattern={/^[a-z0-9][a-z0-9-]*$/}
-        inputInvalidHint="Must start with a letter or digit and contain only lowercase letters, digits, and hyphens."
+        inputInvalidHint={t('profiles.createDialog.invalidHint')}
         onConfirm={(v) => void doCreate(v)}
         onCancel={() => setCreateDialog(false)}
       />
       {duplicateDialog && (
         <PromptDialog
           open={true}
-          title={`Duplicate "${duplicateDialog.from}"`}
-          description="Name for the new profile."
+          title={t('profiles.duplicateDialog.title', { name: duplicateDialog.from })}
+          description={t('profiles.duplicateDialog.description')}
           placeholder={`${duplicateDialog.from}-copy`}
           initialValue={`${duplicateDialog.from}-copy`}
-          confirmLabel="Duplicate"
+          confirmLabel={t('common:actions.duplicate')}
           inputPattern={/^[a-z0-9][a-z0-9-]*$/}
-          inputInvalidHint="Lowercase kebab-case only."
+          inputInvalidHint={t('profiles.duplicateDialog.invalidHint')}
           onConfirm={(v) => void doDuplicate(duplicateDialog.from, v)}
           onCancel={() => setDuplicateDialog(null)}
         />
@@ -255,9 +261,9 @@ export function ProfilesTab() {
       {deleteDialog && (
         <ConfirmDialog
           open={true}
-          title={`Delete profile "${deleteDialog.name}"?`}
-          description="This cannot be undone. Jobs already launched with this profile keep their snapshot; future launches will fall back to the resolution order."
-          confirmLabel="Delete"
+          title={t('profiles.deleteDialog.title', { name: deleteDialog.name })}
+          description={t('profiles.deleteDialog.description')}
+          confirmLabel={t('common:actions.delete')}
           destructive
           onConfirm={() => void doRemove(deleteDialog.name)}
           onCancel={() => setDeleteDialog(null)}
@@ -269,7 +275,7 @@ export function ProfilesTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-sm text-muted-foreground">Loading profiles…</p>
+        <p className="text-sm text-muted-foreground">{t('profiles.loading')}</p>
       </div>
     )
   }
@@ -280,22 +286,24 @@ export function ProfilesTab() {
       {dialogs}
       <div className="flex items-center justify-center h-full">
         <div className="text-center max-w-md">
-          <div className="text-sm font-medium text-foreground">No profiles yet</div>
+          <div className="text-sm font-medium text-foreground">{t('profiles.empty.title')}</div>
           <div className="text-xs text-muted-foreground mt-1 mb-4">
-            Profiles let you save orchestrator + agent + routing combinations and pick one per rail.
+            {t('profiles.empty.body')}
           </div>
           <div className="flex items-center gap-2 justify-center">
             <Button size="sm" onClick={migrateFromSettings} disabled={saving}>
-              <Wand2 className="w-3.5 h-3.5 mr-1.5" /> Migrate from current agents
+              <Wand2 className="w-3.5 h-3.5 mr-1.5" /> {t('profiles.empty.migrateButton')}
             </Button>
             <Button size="sm" variant="ghost" onClick={createNew} disabled={saving}>
-              <Plus className="w-3.5 h-3.5 mr-1.5" /> Blank profile
+              <Plus className="w-3.5 h-3.5 mr-1.5" /> {t('profiles.empty.blankButton')}
             </Button>
           </div>
           <div className="text-[11px] text-muted-foreground/70 mt-3">
-            "Migrate" reads your existing <code className="text-foreground">.claude/agents/</code>{' '}
-            frontmatter models and creates a <code className="text-foreground">default</code> profile
-            mirroring today's behavior — zero-loss.
+            <Trans
+              t={t}
+              i18nKey="profiles.empty.migrateExplainer"
+              components={{ code: <code className="text-foreground" /> }}
+            />
           </div>
           {error && <div className="mt-3 text-xs text-red-400">{error}</div>}
         </div>
@@ -312,7 +320,7 @@ export function ProfilesTab() {
       <aside className="w-64 flex-shrink-0 border-r border-border flex flex-col">
         <div className="p-3 flex items-center justify-between">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Profiles
+            {t('profiles.sidebar.title')}
           </div>
           <Button size="sm" variant="ghost" onClick={createNew} disabled={saving}>
             <Plus className="w-3.5 h-3.5" />
@@ -340,14 +348,14 @@ export function ProfilesTab() {
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span className="truncate font-medium">{p.name}</span>
                   {p.isDefault && (
-                    <span className="text-[10px] text-muted-foreground">(team default)</span>
+                    <span className="text-[10px] text-muted-foreground">{t('profiles.sidebar.teamDefault')}</span>
                   )}
                 </div>
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     type="button"
                     className="p-1 hover:bg-accent rounded"
-                    title="Duplicate"
+                    title={t('common:actions.duplicate')}
                     onClick={(e) => {
                       e.stopPropagation()
                       void duplicate(p.name)
@@ -359,7 +367,7 @@ export function ProfilesTab() {
                     <button
                       type="button"
                       className="p-1 hover:bg-red-500/20 text-red-400 rounded"
-                      title="Delete"
+                      title={t('common:actions.delete')}
                       onClick={(e) => {
                         e.stopPropagation()
                         void remove(p.name)
@@ -395,15 +403,15 @@ export function ProfilesTab() {
                   size="sm"
                   onClick={() => void save(editing, agentsMissingRouting)}
                   disabled={saving || validationIssues.length > 0}
-                  title={validationIssues.length > 0 ? 'Fix validation issues before saving' : undefined}
+                  title={validationIssues.length > 0 ? t('profiles.editorFooter.fixValidationIssues') : undefined}
                 >
                   <Save className="w-3.5 h-3.5 mr-1.5" />
-                  Save
+                  {t('common:actions.save')}
                 </Button>
-                {saving && <span className="text-xs text-muted-foreground">Saving…</span>}
+                {saving && <span className="text-xs text-muted-foreground">{t('common:states.saving')}</span>}
                 {validationIssues.length > 0 && (
                   <span className="text-xs text-yellow-500">
-                    {validationIssues.length} {validationIssues.length === 1 ? 'issue' : 'issues'} to resolve
+                    {t('profiles.editorFooter.issuesToResolve', { count: validationIssues.length })}
                   </span>
                 )}
               </div>
@@ -411,7 +419,7 @@ export function ProfilesTab() {
           />
         ) : (
           <div className="flex items-center justify-center h-full">
-            <p className="text-sm text-muted-foreground">Select a profile to edit</p>
+            <p className="text-sm text-muted-foreground">{t('profiles.selectPrompt')}</p>
           </div>
         )}
       </main>

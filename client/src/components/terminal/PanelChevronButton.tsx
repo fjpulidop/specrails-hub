@@ -1,4 +1,5 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 
 interface PanelChevronButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -14,11 +15,12 @@ interface PanelChevronButtonProps extends ButtonHTMLAttributes<HTMLButtonElement
  */
 export const PanelChevronButton = forwardRef<HTMLButtonElement, PanelChevronButtonProps>(
   function PanelChevronButton({ isOpen, className, ...rest }, ref) {
+    const { t } = useTranslation('terminal')
     return (
       <button
         ref={ref}
         type="button"
-        aria-label={isOpen ? 'Collapse terminal panel' : 'Expand terminal panel'}
+        aria-label={isOpen ? t('panelChevron.collapse') : t('panelChevron.expand')}
         aria-expanded={isOpen}
         className={cn(
           'panel-chevron',

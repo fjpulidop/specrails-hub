@@ -6,36 +6,37 @@ import { FEATURE_AGENTS_SECTION } from '../lib/feature-flags'
 
 export interface Shortcut {
   keys: string          // Display string, e.g. "G P" or "?"
-  description: string
+  /** i18n key in the `commands` namespace — translated at render time by the cheatsheet. */
+  descriptionKey: string
   category: 'navigation' | 'actions' | 'general'
 }
 
 // All registered shortcuts for the cheatsheet
 export const SHORTCUTS: Shortcut[] = [
   // General
-  { keys: '?', description: 'Show keyboard shortcuts', category: 'general' },
-  { keys: 'Esc', description: 'Close modal / sidebar', category: 'general' },
-  { keys: '⌘B', description: 'Toggle right sidebar', category: 'general' },
-  { keys: '⌥⌘B', description: 'Toggle left sidebar', category: 'general' },
-  { keys: '⌘J', description: 'Toggle terminal panel', category: 'general' },
+  { keys: '?', descriptionKey: 'shortcuts.items.showCheatsheet', category: 'general' },
+  { keys: 'Esc', descriptionKey: 'shortcuts.items.closeModal', category: 'general' },
+  { keys: '⌘B', descriptionKey: 'shortcuts.items.toggleRightSidebar', category: 'general' },
+  { keys: '⌥⌘B', descriptionKey: 'shortcuts.items.toggleLeftSidebar', category: 'general' },
+  { keys: '⌘J', descriptionKey: 'shortcuts.items.toggleTerminal', category: 'general' },
   {
     keys: FEATURE_AGENTS_SECTION ? '⌘1–5' : '⌘1–4',
-    description: FEATURE_AGENTS_SECTION
-      ? 'Navigate to project page (Dashboard/Jobs/Analytics/Agents/Settings)'
-      : 'Navigate to project page (Dashboard/Jobs/Analytics/Settings)',
+    descriptionKey: FEATURE_AGENTS_SECTION
+      ? 'shortcuts.items.navigateProjectPageWithAgents'
+      : 'shortcuts.items.navigateProjectPage',
     category: 'general',
   },
-  { keys: '⌥⌘1–9', description: 'Switch to project by position', category: 'general' },
+  { keys: '⌥⌘1–9', descriptionKey: 'shortcuts.items.switchProject', category: 'general' },
 
   // Navigation
-  { keys: 'G D', description: 'Go to Dashboard', category: 'navigation' },
-  { keys: 'G J', description: 'Go to Activity / Jobs', category: 'navigation' },
-  { keys: 'G A', description: 'Go to Analytics', category: 'navigation' },
-  { keys: 'G S', description: 'Go to Settings', category: 'navigation' },
+  { keys: 'G D', descriptionKey: 'shortcuts.items.goDashboard', category: 'navigation' },
+  { keys: 'G J', descriptionKey: 'shortcuts.items.goActivity', category: 'navigation' },
+  { keys: 'G A', descriptionKey: 'shortcuts.items.goAnalytics', category: 'navigation' },
+  { keys: 'G S', descriptionKey: 'shortcuts.items.goSettings', category: 'navigation' },
 
   // Actions (contextual)
-  { keys: 'J', description: 'Next item in list', category: 'actions' },
-  { keys: 'K', description: 'Previous item in list', category: 'actions' },
+  { keys: 'J', descriptionKey: 'shortcuts.items.nextItem', category: 'actions' },
+  { keys: 'K', descriptionKey: 'shortcuts.items.prevItem', category: 'actions' },
 ]
 
 // ─── Input detection ─────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   DndContext,
   closestCorners,
@@ -27,43 +28,45 @@ import type { LocalTicket, TicketStatus, TicketPriority } from '../types'
 
 interface ColumnConfig {
   status: TicketStatus
-  title: string
+  /** i18n key (specs namespace) for the column header label. */
+  titleKey: string
   headerClass: string
-  emptyText: string
+  /** i18n key (specs namespace) for the empty-column text. */
+  emptyKey: string
   columnBg: string
 }
 
 const COLUMNS: ColumnConfig[] = [
   {
     status: 'todo',
-    title: 'Todo',
+    titleKey: 'status.todo',
     headerClass: 'text-slate-400 border-b-slate-500/40',
-    emptyText: 'No tickets to do',
+    emptyKey: 'gridView.emptyTodo',
     columnBg: 'bg-slate-800/20',
   },
   {
     status: 'in_progress',
-    title: 'In Progress',
+    titleKey: 'status.inProgress',
     headerClass: 'text-blue-400 border-b-blue-500/40',
-    emptyText: 'Nothing in progress',
+    emptyKey: 'gridView.emptyInProgress',
     columnBg: 'bg-blue-900/10',
   },
   {
     status: 'done',
-    title: 'Done',
+    titleKey: 'status.done',
     headerClass: 'text-emerald-400 border-b-emerald-500/40',
-    emptyText: 'No completed tickets',
+    emptyKey: 'gridView.emptyDone',
     columnBg: 'bg-emerald-900/10',
   },
 ]
 
 // ─── Priority badge ─────────────────────────────────────────────────────────
 
-const PRIORITY_STYLES: Record<TicketPriority, { className: string; label: string }> = {
-  critical: { className: 'bg-red-500/15 text-red-400 border-red-500/30', label: 'critical' },
-  high: { className: 'bg-orange-500/15 text-orange-400 border-orange-500/30', label: 'high' },
-  medium: { className: '', label: '' },
-  low: { className: 'bg-gray-500/15 text-gray-400 border-gray-500/30', label: 'low' },
+const PRIORITY_STYLES: Record<TicketPriority, { className: string }> = {
+  critical: { className: 'bg-red-500/15 text-red-400 border-red-500/30' },
+  high: { className: 'bg-orange-500/15 text-orange-400 border-orange-500/30' },
+  medium: { className: '' },
+  low: { className: 'bg-gray-500/15 text-gray-400 border-gray-500/30' },
 }
 
 // ─── Sortable kanban card ───────────────────────────────────────────────────
@@ -131,6 +134,7 @@ function KanbanCard({
   isDragOverlay,
   dragHandleProps,
 }: KanbanCardProps & { dragHandleProps?: Record<string, unknown> }) {
+  const { t } = useTranslation('specs')
   const priorityInfo = ticket.priority ? PRIORITY_STYLES[ticket.priority] : null
   const isDraft = ticket.status === 'draft'
 
@@ -184,16 +188,16 @@ function KanbanCard({
 
             {isDraft ? (
               <span className="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium border border-accent-secondary/60 text-accent-secondary bg-accent-secondary/10">
-                Draft
+                {t('common:status.draft')}
               </span>
-            ) : priorityInfo && ticket.priority !== 'medium' && priorityInfo.label && (
+            ) : priorityInfo && ticket.priority && ticket.priority !== 'medium' && (
               <span
                 className={cn(
                   'inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium border',
                   priorityInfo.className,
                 )}
               >
-                {priorityInfo.label}
+                {t(`priority.${ticket.priority}`)}
               </span>
             )}
 
@@ -202,7 +206,7 @@ function KanbanCard({
                 className="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium border border-accent-highlight/60 text-accent-highlight bg-accent-highlight/10"
                 data-testid={`epic-badge-grid-${ticket.id}`}
               >
-                Epic
+                {t('badges.epic')}
               </span>
             )}
             {ticket.parent_epic_id != null && (
@@ -210,7 +214,7 @@ function KanbanCard({
                 className="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium border border-accent-secondary/40 text-accent-secondary"
                 data-testid={`epic-child-pill-grid-${ticket.id}`}
               >
-                ↑ Sub-Spec
+                {t('badges.subSpec')}
               </span>
             )}
 
@@ -253,6 +257,7 @@ function KanbanColumn({
   onStatusChange,
   onPriorityChange,
 }: KanbanColumnProps) {
+  const { t } = useTranslation('specs')
   const sortableIds = tickets.map((t) => `ticket-${t.id}`)
 
   return (
@@ -267,7 +272,7 @@ function KanbanColumn({
         <div className="flex items-center gap-1.5">
           <TicketStatusDot status={config.status} />
           <span className="text-[10px] font-semibold uppercase tracking-wider">
-            {config.title}
+            {t(config.titleKey)}
           </span>
         </div>
         <span className="text-[10px] font-mono text-muted-foreground/60">
@@ -281,7 +286,7 @@ function KanbanColumn({
           {tickets.length === 0 ? (
             <div className="flex items-center justify-center h-full min-h-[60px]">
               <p className="text-[10px] text-muted-foreground/40 italic">
-                {config.emptyText}
+                {t(config.emptyKey)}
               </p>
             </div>
           ) : (
@@ -325,6 +330,7 @@ export function TicketGridView({
   onPriorityChange,
   onCreateClick,
 }: TicketGridViewProps) {
+  const { t } = useTranslation('specs')
   const [activeId, setActiveId] = useState<string | null>(null)
 
   const sensors = useSensors(
@@ -423,7 +429,7 @@ export function TicketGridView({
     return (
       <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center space-y-1.5">
         <AlertTriangle className="w-6 h-6 text-red-400 mx-auto" />
-        <p className="text-sm font-medium text-red-400">Failed to load tickets</p>
+        <p className="text-sm font-medium text-red-400">{t('errors.loadFailed')}</p>
         <p className="text-xs text-red-400/70">{error}</p>
       </div>
     )
@@ -434,9 +440,9 @@ export function TicketGridView({
       <div className="rounded-lg border border-dashed border-border/40 bg-card/50 p-8 text-center space-y-3">
         <Ticket className="w-8 h-8 text-muted-foreground/30 mx-auto" />
         <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">No tickets yet</p>
+          <p className="text-sm font-medium text-muted-foreground">{t('emptyState.noTickets')}</p>
           <p className="text-xs text-muted-foreground/60">
-            Create your first ticket or run a product backlog command to populate tickets
+            {t('emptyState.noTicketsHint')}
           </p>
         </div>
         {onCreateClick && (
@@ -446,7 +452,7 @@ export function TicketGridView({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-accent/60 text-foreground hover:bg-accent transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            Create your first ticket
+            {t('emptyState.createFirst')}
           </button>
         )}
       </div>
@@ -479,7 +485,7 @@ export function TicketGridView({
       {columnTickets.cancelled.length > 0 && (
         <div className="mt-3 rounded-lg bg-red-950/10 p-2">
           <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider px-1 mb-1.5">
-            Cancelled ({columnTickets.cancelled.length})
+            {t('gridView.cancelledSection', { count: columnTickets.cancelled.length })}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {columnTickets.cancelled.map((ticket) => (

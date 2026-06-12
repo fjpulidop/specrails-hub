@@ -1,0 +1,412 @@
+{
+  "studio": {
+    "loadingAgent": "正在加载 Agent…",
+    "modeCreate": "新建自定义 Agent",
+    "modeEdit": "编辑自定义 Agent",
+    "create": "创建",
+    "unsaved": "● 未保存",
+    "resumeAiEdit": "继续 AI 编辑",
+    "resumeAiEditTitle": "将此草稿交还给 AI 编辑浮层",
+    "loadingAiDraft": "正在加载 AI 草稿…",
+    "testButton": "测试",
+    "testButtonTitle": "用示例任务测试此 Agent",
+    "historyButton": "历史",
+    "historyButtonTitle": "版本历史",
+    "deleteConfirm": {
+      "title": "删除 Agent“{{agentId}}”？",
+      "description": "这会从磁盘上删除该 .md 文件。版本历史仍保留在数据库中——若日后需要恢复内容，可新建一个自定义 Agent。"
+    },
+    "errors": {
+      "loadDraftFailed": "加载草稿失败：{{status}}",
+      "loadFailed": "加载失败：{{status}}",
+      "saveFailed": "保存失败：{{status}}",
+      "deleteFailed": "删除失败：{{status}}",
+      "testFailed": "测试失败：{{status}}"
+    },
+    "toasts": {
+      "agentCreated": "Agent 已创建",
+      "agentSaved": "Agent 已保存",
+      "agentDeleted": "Agent 已删除",
+      "createFailed": "创建 Agent 失败",
+      "saveFailed": "保存 Agent 失败",
+      "deleteFailed": "删除 Agent 失败"
+    },
+    "validation": {
+      "namePattern": "名称必须以 <code>custom-</code> 开头，且只能包含小写字母、数字和连字符。",
+      "missingFrontmatter": "缺少 YAML frontmatter（第一行需要起始的 <code>---</code>）。"
+    },
+    "sampleTasks": {
+      "pick": "—— 选择一个示例任务 ——",
+      "terraform": "Terraform：公开的 S3 存储桶",
+      "sqlInjection": "代码评审：SQL 注入",
+      "accessibility": "前端：无障碍",
+      "schemaChange": "数据：schema 变更",
+      "slowQuery": "性能：慢查询"
+    },
+    "testPane": {
+      "header": "测试 Agent",
+      "sampleTaskLabel": "示例任务",
+      "placeholder": "描述该 Agent 应该做什么，或在上方选择一个示例。",
+      "run": "运行",
+      "running": "运行中…",
+      "sandboxNote": "沙箱运行；不写入任何文件。",
+      "tokens_one": "<mono>{{count}}</mono> 个 token",
+      "tokens_other": "<mono>{{count}}</mono> 个 token",
+      "emptyHint": "针对当前草稿运行一个示例任务，输出会显示在这里。"
+    },
+    "versions": {
+      "header": "版本历史",
+      "empty": "此 Agent 暂无历史版本记录。",
+      "restoreHint": "点击某个版本可将其内容恢复到编辑器中（仍需手动保存）。"
+    }
+  },
+  "refine": {
+    "eyebrow": "AI 编辑",
+    "headline": "优化你的 Agent",
+    "streamingHeadline": "正在优化你的 Agent…",
+    "placeholderInitial": "描述如何优化此 Agent…",
+    "placeholderFollowUp": "发送后续优化指令…",
+    "viewCurrentBody": "查看当前 Agent 正文",
+    "appliedAsVersion": "已应用为版本 {{version}}。",
+    "openInStudio": "在 Studio 中打开草稿进行手动编辑",
+    "chips": {
+      "tightenTools": "收紧工具列表",
+      "stricterPersonality": "让人格设定更严格",
+      "workflowSection": "添加 Workflow 协议章节",
+      "sharpenDescription": "精简并锐化描述",
+      "matchDeveloperStyle": "对齐 sr-developer 的风格"
+    }
+  },
+  "profileEditor": {
+    "validation": {
+      "missingBaseline": "缺少必需的基线 Agent：{{agent}}",
+      "multipleDefaultRules": "路由最多只能有一条默认规则（发现 {{found}} 条）",
+      "defaultRuleNotLast": "默认路由规则必须是最后一条",
+      "unknownRoutingAgent": "路由引用了不在链中的 Agent：{{agent}}",
+      "invalidTags": "路由规则 {{agent}} 包含无效标签：{{tags}}（请使用小写 kebab-case）"
+    },
+    "validationSummary_one": "{{count}} 个校验问题",
+    "validationSummary_other": "{{count}} 个校验问题",
+    "nameLabel": "名称",
+    "descriptionLabel": "描述",
+    "descriptionPlaceholder": "这个 Profile 用来做什么？",
+    "orchestrator": {
+      "heading": "编排器",
+      "description": "两个命令共用的顶层模型。batch-implement 会按 feature 委派给 implement，因此它启动的每条 rail 都会继承此 Profile 的 Agent 链。"
+    },
+    "agentChain": {
+      "heading": "Agent 链（{{n}}）",
+      "addTitle": "从目录中添加 Agent",
+      "addDisabledTitle": "目录中的所有 Agent 都已在链中",
+      "pickFromCatalog": "从目录选择（{{n}} 个可用）",
+      "emptyCatalog": "目录中没有更多 Agent。请在 Agent 目录标签页中添加自定义 Agent。",
+      "kind": {
+        "upstream": "上游",
+        "custom": "自定义"
+      }
+    },
+    "routing": {
+      "heading": "路由（{{n}}）",
+      "addDefault": "添加默认规则",
+      "addRule": "添加规则",
+      "needAgentsTitle": "请先添加至少一个 Agent，再创建路由规则",
+      "explainer": "首条匹配的规则生效。规则可编辑、可删除；存在默认兜底规则时它始终位于最后。如果路由留空，流水线会回退到链中第一个开发者类型的 Agent。",
+      "untargetedTitle": "链中存在未被路由指向的 Agent",
+      "untargetedDetail": "没有路由规则指向：<mono>{{agents}}</mono>。如需让它们运行，请添加标签规则或调整默认规则的目标。"
+    },
+    "agentRow": {
+      "dragTitle": "拖动以重新排序",
+      "dragHandleAria": "拖动手柄",
+      "pinnedFirst": "首位",
+      "pinnedFirstTitle": "固定在首位——流水线始终从 sr-architect 开始",
+      "pinnedLast": "末位",
+      "pinnedLastTitle": "固定在末位——合并阶段始终最后运行",
+      "required": "必需",
+      "requiredRemoveTitle": "必需的基线 Agent——流水线依赖此行"
+    },
+    "routingRow": {
+      "everythingElse": "其余所有",
+      "defaultTargetAria": "默认路由目标（核心，只读）",
+      "defaultTargetTitle": "核心兜底——不可编辑",
+      "targetAria": "规则 {{ordinal}} 的路由目标",
+      "editTitle": "编辑规则",
+      "editAria": "编辑规则 {{ordinal}}",
+      "moveDown": "下移",
+      "moveUp": "上移",
+      "coreDefaultBadge": "核心 · 默认",
+      "coreDefaultTitle": "核心兜底——流水线的最终兜底规则，固定指向 sr-developer"
+    }
+  },
+  "agentSelector": {
+    "selectedCount": "已选择 {{selected}} / {{total}} 个 Agent",
+    "selectAll": "全选",
+    "coreBadge": "核心",
+    "categories": {
+      "architecture": "架构",
+      "development": "开发",
+      "review": "评审",
+      "product": "产品",
+      "utilities": "工具"
+    },
+    "agents": {
+      "sr-architect": {
+        "name": "架构师",
+        "description": "架构设计、变更 spec、实现规划"
+      },
+      "sr-developer": {
+        "name": "开发者",
+        "description": "覆盖所有层的全栈实现"
+      },
+      "sr-frontend-developer": {
+        "name": "前端开发",
+        "description": "前端实现（React、Vue、Angular 等）"
+      },
+      "sr-backend-developer": {
+        "name": "后端开发",
+        "description": "后端专精（API、数据库、服务）"
+      },
+      "sr-reviewer": {
+        "name": "评审员",
+        "description": "通用代码评审——最终质量门禁"
+      },
+      "sr-frontend-reviewer": {
+        "name": "前端评审",
+        "description": "前端评审（UI、无障碍、性能）"
+      },
+      "sr-backend-reviewer": {
+        "name": "后端评审",
+        "description": "后端评审（API、安全、可扩展性）"
+      },
+      "sr-security-reviewer": {
+        "name": "安全评审",
+        "description": "安全分析——OWASP、漏洞、安全加固"
+      },
+      "sr-performance-reviewer": {
+        "name": "性能评审",
+        "description": "性能分析——性能剖析、瓶颈、优化"
+      },
+      "sr-product-manager": {
+        "name": "产品经理",
+        "description": "产品探索、VPC 用户画像、backlog 管理"
+      },
+      "sr-product-analyst": {
+        "name": "产品分析师",
+        "description": "Backlog 分析、spec 缺口分析、报告"
+      },
+      "sr-test-writer": {
+        "name": "测试编写者",
+        "description": "全面的测试生成（单元、集成、E2E）"
+      },
+      "sr-doc-sync": {
+        "name": "文档同步",
+        "description": "文档同步——保持文档与代码一致"
+      },
+      "sr-merge-resolver": {
+        "name": "合并冲突解决器",
+        "description": "具备上下文感知的合并冲突解决"
+      }
+    }
+  },
+  "templates": {
+    "security-reviewer": {
+      "label": "安全评审员",
+      "blurb": "在 diff 交付前发现认证、注入与数据泄露问题。"
+    },
+    "performance-profiler": {
+      "label": "性能剖析师",
+      "blurb": "发现热点路径、N+1 查询、无界循环、bundle 膨胀。"
+    },
+    "data-engineer": {
+      "label": "数据工程师",
+      "blurb": "Schema 迁移、ETL 流水线、数据转换。"
+    },
+    "ui-ux-polisher": {
+      "label": "UI / UX 打磨师",
+      "blurb": "无障碍、间距、空状态、错误处理。"
+    },
+    "api-designer": {
+      "label": "API 设计师",
+      "blurb": "版本管理、分页、错误结构、向后兼容。"
+    },
+    "database-architect": {
+      "label": "数据库架构师",
+      "blurb": "索引、规范化与反规范化、查询模式。"
+    },
+    "devops-sre": {
+      "label": "DevOps / SRE",
+      "blurb": "CI/CD、可观测性、事故响应准备、运维手册。"
+    },
+    "mobile-engineer": {
+      "label": "移动端工程师",
+      "blurb": "iOS + Android 模式、离线优先、电量友好。"
+    },
+    "ml-engineer": {
+      "label": "机器学习工程师",
+      "blurb": "流水线、评估、可复现性、漂移监控。"
+    },
+    "accessibility-auditor": {
+      "label": "无障碍审计员",
+      "blurb": "WCAG 2.2 评审：对比度、焦点、ARIA、键盘。"
+    },
+    "qa-test-strategist": {
+      "label": "QA 测试策略师",
+      "blurb": "测试计划：单元 / 集成 / E2E 划分、覆盖率缺口。"
+    },
+    "load-tester": {
+      "label": "负载 / 压力测试员",
+      "blurb": "容量规划、k6 / Locust 场景、瓶颈排查。"
+    },
+    "integration-tester": {
+      "label": "集成测试员",
+      "blurb": "跨服务契约、测试夹具、减少偶发失败。"
+    },
+    "regression-hunter": {
+      "label": "回归猎手",
+      "blurb": "二分定位、复现问题、先写出会失败的测试。"
+    },
+    "data-analyst": {
+      "label": "数据分析师",
+      "blurb": "把模糊的问题变成查询和可读的结论。"
+    },
+    "etl-reviewer": {
+      "label": "ETL 流水线评审",
+      "blurb": "幂等性、数据回填、迟到数据。"
+    },
+    "dashboard-designer": {
+      "label": "仪表盘设计师",
+      "blurb": "一眼看懂的仪表盘、诚实的坐标轴、每张图对应一个行动。"
+    },
+    "iac-reviewer": {
+      "label": "IaC / 云评审",
+      "blurb": "Terraform / CloudFormation：IAM、公网暴露、成本。"
+    },
+    "compliance-reviewer": {
+      "label": "合规评审",
+      "blurb": "针对数据流的 GDPR / SOC2 / HIPAA 相关检查。"
+    },
+    "threat-modeler": {
+      "label": "威胁建模师",
+      "blurb": "对架构图进行 STRIDE / LINDDUN 分析。"
+    },
+    "product-manager": {
+      "label": "产品经理",
+      "blurb": "问题界定、PRD、优先级排序。"
+    },
+    "ux-researcher": {
+      "label": "UX 研究员",
+      "blurb": "访谈脚本、可用性测试计划、结果综合。"
+    },
+    "technical-writer": {
+      "label": "技术写作者",
+      "blurb": "真正有人读的文档——教程、参考、更新日志。"
+    },
+    "design-reviewer": {
+      "label": "设计系统评审",
+      "blurb": "Token 漂移、组件误用、跨流程一致性。"
+    },
+    "financial-analyst": {
+      "label": "财务分析师",
+      "blurb": "单位经济模型、同期群模型、情景分析。"
+    },
+    "pricing-strategist": {
+      "label": "定价策略师",
+      "blurb": "分层、打包、支付意愿研究。"
+    },
+    "market-researcher": {
+      "label": "市场研究员",
+      "blurb": "TAM/SAM/SOM、竞争格局图、客户细分。"
+    },
+    "ops-optimizer": {
+      "label": "运营优化师",
+      "blurb": "周期时间、瓶颈定位、自动化候选项。"
+    },
+    "seo-auditor": {
+      "label": "SEO 审计员",
+      "blurb": "技术 + 内容 SEO：可索引性、信息架构、意图匹配。"
+    },
+    "growth-hacker": {
+      "label": "增长实验师",
+      "blurb": "漏斗诊断、提升实验、激活闭环。"
+    },
+    "social-strategist": {
+      "label": "社交媒体策略师",
+      "blurb": "适配渠道的内容、编辑日历、语调一致性。"
+    },
+    "literature-reviewer": {
+      "label": "文献综述员",
+      "blurb": "系统性综述摘要、引用图谱、矛盾发现。"
+    },
+    "experiment-designer": {
+      "label": "实验设计师",
+      "blurb": "假设、对照、样本量、预注册。"
+    },
+    "statistical-analyst": {
+      "label": "统计分析师",
+      "blurb": "选对检验方法，报告效应量而不只是 p 值。"
+    },
+    "scientific-writer": {
+      "label": "科学写作者",
+      "blurb": "IMRaD 结构、坦诚的局限性、可读的摘要。"
+    },
+    "curriculum-designer": {
+      "label": "课程设计师",
+      "blurb": "学习目标 → 教学活动 → 评估。"
+    },
+    "assessment-author": {
+      "label": "测评编写者",
+      "blurb": "衡量理解而非记忆的题目。"
+    },
+    "tutor-explainer": {
+      "label": "导师 / 讲解者",
+      "blurb": "费曼式的简明讲解，配有完整例题。"
+    },
+    "clinical-guideline-reviewer": {
+      "label": "临床指南评审",
+      "blurb": "将临床实践与最新循证指南对照。"
+    },
+    "medical-summarizer": {
+      "label": "医学文献摘要员",
+      "blurb": "面向临床医生的摘要：变化点与证据质量。"
+    },
+    "protocol-designer": {
+      "label": "方案设计师",
+      "blurb": "临床方案：终点指标、入组标准、安全性。"
+    },
+    "contract-reviewer": {
+      "label": "合同评审",
+      "blurb": "标记高风险条款，并解释其实际含义。"
+    },
+    "privacy-counsel": {
+      "label": "隐私顾问",
+      "blurb": "将 GDPR / CCPA / LGPD 应用到具体流程。"
+    },
+    "copy-editor": {
+      "label": "文字编辑",
+      "blurb": "逐行润色：语气、节奏，删减 30% 而不失原意。"
+    },
+    "brand-voice-guardian": {
+      "label": "品牌语调守护者",
+      "blurb": "执行语调规则，捕捉偏离品牌的措辞。"
+    },
+    "creative-brainstormer": {
+      "label": "创意头脑风暴师",
+      "blurb": "先发散后收敛，礼貌地挑战固有观念。"
+    },
+    "hiring-interviewer": {
+      "label": "招聘面试官",
+      "blurb": "结构化面试，聚焦信号，规避偏见。"
+    },
+    "strategic-planner": {
+      "label": "战略规划师",
+      "blurb": "目标 → 押注 → 指标；剔除个人偏好项目。"
+    },
+    "coach-1on1": {
+      "label": "1:1 教练",
+      "blurb": "帮助组织反馈、规划职业成长、应对艰难对话。"
+    },
+    "meeting-facilitator": {
+      "label": "会议主持人",
+      "blurb": "产出决策而非汇报的会议议程。"
+    }
+  }
+}

@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { toast } from 'sonner'
+import i18n from '../lib/i18n'
 import { useSharedWebSocket } from './useSharedWebSocket'
 import { API_ORIGIN } from '../lib/origin'
 import type { LocalTicket } from '../types'
@@ -28,13 +29,18 @@ async function fireRetry(projectId: string, ticketId: number): Promise<void> {
       method: 'POST',
     })
     if (res.ok) {
-      toast.loading('Afinando contrato…', { id: toastIdFor(ticketId) })
+      toast.loading(i18n.t('activity:contractRefine.refining'), { id: toastIdFor(ticketId) })
     } else {
       const body = await res.json().catch(() => ({})) as { error?: string }
-      toast.error(`Retry rejected${body.error ? `: ${body.error}` : ''}`, { id: toastIdFor(ticketId) })
+      toast.error(
+        body.error
+          ? i18n.t('activity:contractRefine.retryRejectedWithError', { error: body.error })
+          : i18n.t('activity:contractRefine.retryRejected'),
+        { id: toastIdFor(ticketId) },
+      )
     }
   } catch (err) {
-    toast.error(`Retry failed: ${(err as Error).message}`, { id: toastIdFor(ticketId) })
+    toast.error(i18n.t('activity:contractRefine.retryFailed', { message: (err as Error).message }), { id: toastIdFor(ticketId) })
   }
 }
 
@@ -52,11 +58,11 @@ export function ContractRefineTrackerProvider({ children }: { children: ReactNod
     const reason = (msg.reason as string | undefined) ?? 'unknown'
     if (typeof ticketId !== 'number' || !projectId) return
     projectByTicketRef.current.set(ticketId, projectId)
-    toast.error('Contract layer skipped — ticket saved without it', {
+    toast.error(i18n.t('activity:contractRefine.skipped'), {
       id: toastIdFor(ticketId),
-      description: `Reason: ${reason}`,
+      description: i18n.t('activity:contractRefine.reason', { reason }),
       action: {
-        label: 'Reintentar',
+        label: i18n.t('common:actions.retry'),
         onClick: () => void fireRetry(projectId, ticketId),
       },
       duration: 15_000,
@@ -71,7 +77,7 @@ export function ContractRefineTrackerProvider({ children }: { children: ReactNod
     // If the updated description carries a Contract Layer, dismiss any error
     // toast for this ticket and show a brief success confirmation.
     if (typeof ticket.description === 'string' && ticket.description.includes(CONTRACT_LAYER_MARKER)) {
-      toast.success(`Contract layer added · ${ticket.title || `#${ticket.id}`}`, {
+      toast.success(i18n.t('activity:contractRefine.added', { title: ticket.title || `#${ticket.id}` }), {
         id: toastIdFor(ticket.id),
         duration: 3_500,
       })

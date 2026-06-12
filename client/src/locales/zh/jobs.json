@@ -1,0 +1,201 @@
+{
+  "statusLabel": {
+    "running": "运行中",
+    "completed": "已完成",
+    "done": "完成",
+    "failed": "失败",
+    "canceled": "已取消",
+    "queued": "排队中",
+    "zombie": "僵尸",
+    "skipped": "已跳过"
+  },
+  "statusTooltip": {
+    "running": "任务正在执行",
+    "completed": "任务已成功完成",
+    "failed": "任务以非零退出码结束",
+    "canceled": "任务已被手动取消",
+    "queued": "任务正在队列中等待",
+    "queuedToRun": "任务正在等待运行",
+    "zombie": "任务因长时间无活动而被自动终止",
+    "skipped": "因流水线中的上游任务失败，此任务被跳过"
+  },
+  "statusName": {
+    "running": "运行中",
+    "completed": "已完成",
+    "failed": "失败",
+    "canceled": "已取消",
+    "zombie_terminated": "僵尸",
+    "queued": "排队中",
+    "skipped": "已跳过"
+  },
+  "page": {
+    "title": "任务",
+    "exportJobs": "导出任务",
+    "proposalDeleted": "提案已删除",
+    "proposal": {
+      "title": "提案",
+      "noContent": "暂无提案内容。",
+      "githubIssue": "GitHub Issue："
+    }
+  },
+  "detail": {
+    "breadcrumbDashboard": "Dashboard",
+    "breadcrumbJob": "任务 #{{id}}",
+    "notFound": "未找到任务",
+    "notFoundDescription": "任务 ID“{{id}}”不存在",
+    "backToDashboard": "返回 Dashboard",
+    "startedAgo": "开始于 {{timeAgo}}",
+    "queuedWaiting": "已排队——等待开始",
+    "exportDiagnostic": "导出诊断",
+    "exportDiagnosticAria": "导出诊断包",
+    "exportDiagnosticTooltip": "下载包含此任务遥测、日志和摘要的 ZIP",
+    "reExecute": "重新执行",
+    "reExecuteTooltip": "用相同命令启动一个新任务",
+    "cancelJob": "取消任务",
+    "cancelJobTooltip": "向运行中的进程发送 SIGTERM。任务将被标记为已取消。",
+    "toast": {
+      "jobDeleted": "任务已删除",
+      "cancelSignalSent": "已发送取消信号",
+      "cancelSignalSentDescription": "任务将在下一个安全点停止",
+      "failed": "失败",
+      "networkError": "网络错误",
+      "exportFailed": "导出失败",
+      "exportFailedHttp": "导出失败（HTTP {{status}}）",
+      "jobRequeued": "任务已重新排队",
+      "spawnFailed": "启动任务失败"
+    }
+  },
+  "statusPanel": {
+    "inProgress": "任务进行中",
+    "completed": "任务已完成",
+    "failed": "任务失败",
+    "duration": "时长",
+    "cost": "成本",
+    "turns": "轮次",
+    "tokens": "Token",
+    "filesCount_one": "{{count}} 个文件",
+    "filesCount_other": "{{count}} 个文件",
+    "pipelineTotal": "流水线合计（{{count}} 个阶段）",
+    "totalCost": "总成本",
+    "totalTokens": "总 token 数",
+    "filesModified": "修改的文件"
+  },
+  "ticketHeader": {
+    "showMore": "+ 还有 {{count}} 个",
+    "showLess": "收起",
+    "deletedTicket": "#{{id}}（已删除）",
+    "deletedTooltip": "工单已不存在"
+  },
+  "modal": {
+    "openInNewTab": "在新标签页中打开",
+    "notFound": "未找到任务",
+    "cancelConfirmTitle": "取消任务？",
+    "cancelConfirmDescription": "任务将在下一个安全点停止。此操作无法撤销。",
+    "keepRunning": "继续运行",
+    "cancelJob": "取消任务",
+    "toast": {
+      "cancelSignalSent": "已发送取消信号",
+      "cancelSignalSentDescription": "任务将在下一个安全点停止",
+      "cancelFailed": "取消失败",
+      "networkError": "网络错误"
+    }
+  },
+  "comparison": {
+    "title": "任务对比",
+    "jobN": "任务 {{n}}",
+    "loadFailed": "加载对比失败：{{error}}",
+    "duration": "时长",
+    "cost": "成本",
+    "tokensOut": "输出 token",
+    "tokensIn": "输入 token",
+    "cacheRead": "缓存读取",
+    "model": "模型",
+    "phasesDone": "完成阶段数",
+    "betterValueHint": "绿色高亮表示更优值"
+  },
+  "recent": {
+    "emptyTitle": "暂无任务",
+    "emptyDescription": "在上方运行命令后，任务历史会显示在这里",
+    "filterAll": "全部（{{count}}）",
+    "filterStatus": "{{status}}（{{count}}）",
+    "fromDate": "开始日期",
+    "toDate": "结束日期",
+    "clear": "清除",
+    "exitCompareMode": "退出对比模式",
+    "compareTwoJobs": "对比 2 个任务",
+    "clearJobs": "清空任务",
+    "selectTwoToCompare": "选择 2 个任务进行对比",
+    "selectOneMore": "再选择 1 个任务",
+    "readyToCompare": "就绪——点击对比",
+    "compareAction": "对比 →",
+    "colStatus": "状态",
+    "colCommand": "命令",
+    "colDuration": "时长",
+    "colTokens": "Token",
+    "colCost": "成本",
+    "colStarted": "开始时间",
+    "profileTooltip": "Profile：{{name}}",
+    "pipelinePart": "属于某个流水线",
+    "pipelineDependsOn": "（依赖上一步）",
+    "deleteProposal": "删除提案",
+    "loadMore": "加载更多（剩余 {{count}} 个）",
+    "priority": {
+      "critical": "紧急",
+      "high": "高",
+      "normal": "普通",
+      "low": "低"
+    },
+    "clearModal": {
+      "title": "清空任务",
+      "jobsInHistory_one": "历史中有 {{count}} 个任务",
+      "jobsInHistory_other": "历史中有 {{count}} 个任务",
+      "clearAll_one": "清空全部 {{count}} 个任务",
+      "clearAll_other": "清空全部 {{count}} 个任务",
+      "orByRange": "或按日期范围清除：",
+      "fromPlaceholder": "开始",
+      "toPlaceholder": "结束",
+      "clearInRange_one": "清除范围内 {{count}} 个任务",
+      "clearInRange_other": "清除范围内 {{count}} 个任务",
+      "clearRange": "清除范围"
+    },
+    "deleteProposalConfirm": {
+      "title": "删除提案？",
+      "description": "将永久删除 1 个提案。此操作无法撤销。"
+    },
+    "toast": {
+      "cleared_one": "已清除 {{count}} 个任务",
+      "cleared_other": "已清除 {{count}} 个任务",
+      "clearFailed": "清除任务失败",
+      "networkError": "网络错误"
+    }
+  },
+  "activeJob": {
+    "none": "没有进行中的任务",
+    "noneHint": "在下方选择一个命令以启动任务",
+    "exitCode": "退出码 {{code}}",
+    "cancelTooltip": "向运行中的 claude 进程发送 SIGTERM",
+    "viewLogs": "查看日志",
+    "toast": {
+      "cancelRequested": "已请求取消任务",
+      "cancelRequestedDescription": "正在向进程发送 SIGTERM",
+      "cancelFailed": "取消任务失败",
+      "networkError": "取消任务时发生网络错误"
+    }
+  },
+  "logViewer": {
+    "loading": "正在加载日志…",
+    "empty": "暂无日志输出",
+    "filterPlaceholder": "筛选日志…",
+    "copySuccess": "日志已复制到剪贴板",
+    "copyFailed": "复制日志失败",
+    "lineCount": "{{filtered}} / {{total}} 行",
+    "jumpToBottom": "跳到底部",
+    "phaseLines_one": "{{count}} 行",
+    "phaseLines_other": "{{count}} 行",
+    "noMatchingLines": "没有匹配的行",
+    "noOutput": "无输出",
+    "completed": "已完成",
+    "turns_one": "{{count}} 轮",
+    "turns_other": "{{count}} 轮"
+  }
+}

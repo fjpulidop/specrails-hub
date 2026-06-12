@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { TooltipProvider } from './ui/tooltip'
 import { StatusBar } from './StatusBar'
 import { ChatPanel } from './ChatPanel'
@@ -20,6 +21,7 @@ interface ProjectLayoutProps {
 }
 
 export function ProjectLayout({ project }: ProjectLayoutProps) {
+  const { t } = useTranslation('nav')
   const { connectionStatus } = usePipeline()
   const chat = useChat()
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
@@ -33,24 +35,33 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
       const msg = raw as { type: string; projectId?: string; jobId?: string; cost?: number; threshold?: number; dailySpend?: number; budget?: number; queuePaused?: boolean; hubDailySpend?: number; hubBudget?: number }
       if (msg.projectId !== undefined && msg.projectId !== '' && msg.projectId !== projectIdRef.current) return
       if (msg.type === 'cost_alert') {
-        toast.warning('Cost alert', {
-          description: `Job cost $${(msg.cost ?? 0).toFixed(4)} — threshold is $${(msg.threshold ?? 0).toFixed(2)}`,
+        toast.warning(t('costAlerts.costAlertTitle'), {
+          description: t('costAlerts.costAlertDescription', {
+            cost: (msg.cost ?? 0).toFixed(4),
+            threshold: (msg.threshold ?? 0).toFixed(2),
+          }),
         })
       } else if (msg.type === 'daily_budget_exceeded') {
-        toast.error('Daily budget exceeded', {
-          description: `Spent $${(msg.dailySpend ?? 0).toFixed(2)} of $${(msg.budget ?? 0).toFixed(2)} today. Queue paused.`,
+        toast.error(t('costAlerts.dailyBudgetTitle'), {
+          description: t('costAlerts.dailyBudgetDescription', {
+            spent: (msg.dailySpend ?? 0).toFixed(2),
+            budget: (msg.budget ?? 0).toFixed(2),
+          }),
           duration: Infinity,
         })
         setBudgetExceeded({ dailySpend: msg.dailySpend ?? 0, budget: msg.budget ?? 0 })
       } else if (msg.type === 'hub_daily_budget_exceeded') {
-        toast.error('Hub daily budget exceeded', {
-          description: `Total hub spend $${(msg.hubDailySpend ?? 0).toFixed(2)} of $${(msg.hubBudget ?? 0).toFixed(2)}. Queue paused.`,
+        toast.error(t('costAlerts.hubBudgetTitle'), {
+          description: t('costAlerts.hubBudgetDescription', {
+            spent: (msg.hubDailySpend ?? 0).toFixed(2),
+            budget: (msg.hubBudget ?? 0).toFixed(2),
+          }),
           duration: Infinity,
         })
       }
     })
     return () => unregisterHandler(id)
-  }, [project.id, registerHandler, unregisterHandler])
+  }, [project.id, registerHandler, unregisterHandler, t])
 
   // ─── Terminal panel integration ─────────────────────────────────────────────
   const terminals = useTerminals()
@@ -90,14 +101,17 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
         {budgetExceeded && (
           <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-destructive/20 text-xs">
             <span className="text-destructive font-medium">
-              Daily budget exceeded — spent ${budgetExceeded.dailySpend.toFixed(2)} of ${budgetExceeded.budget.toFixed(2)}. Queue is paused.
+              {t('costAlerts.bannerMessage', {
+                spent: budgetExceeded.dailySpend.toFixed(2),
+                budget: budgetExceeded.budget.toFixed(2),
+              })}
             </span>
             <button
               type="button"
               onClick={() => setBudgetExceeded(null)}
               className="text-muted-foreground hover:text-foreground ml-4 shrink-0"
             >
-              Dismiss
+              {t('costAlerts.dismiss')}
             </button>
           </div>
         )}

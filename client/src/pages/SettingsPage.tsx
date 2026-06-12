@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
+import { useTranslation, Trans } from 'react-i18next'
 import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card'
@@ -17,6 +18,7 @@ interface ProjectSettings {
 }
 
 export default function SettingsPage() {
+  const { t } = useTranslation('settings')
   const { activeProjectId } = useHub()
   const location = useLocation()
   // SettingsPage is only mounted in hub mode; telemetry toggle is hub-only
@@ -133,7 +135,7 @@ export default function SettingsPage() {
     try {
       const parsed = dailyBudget.trim() === '' ? null : parseFloat(dailyBudget)
       if (parsed !== null && (isNaN(parsed) || parsed <= 0)) {
-        toast.error('Enter a positive number or leave blank to disable')
+        toast.error(t('budget.invalidNumber'))
         return
       }
       const res = await fetch(`${getApiBase()}/budget`, {
@@ -142,9 +144,9 @@ export default function SettingsPage() {
         body: JSON.stringify({ dailyBudgetUsd: parsed }),
       })
       if (!res.ok) throw new Error('Failed to save')
-      toast.success(parsed == null ? 'Daily budget removed' : `Daily budget set to $${parsed}`)
+      toast.success(parsed == null ? t('budget.dailyRemoved') : t('budget.dailySet', { amount: parsed }))
     } catch (err) {
-      toast.error('Failed to save budget', { description: (err as Error).message })
+      toast.error(t('budget.saveBudgetFailed'), { description: (err as Error).message })
     } finally {
       setIsSavingBudget(false)
     }
@@ -155,7 +157,7 @@ export default function SettingsPage() {
     try {
       const parsed = jobCostThreshold.trim() === '' ? null : parseFloat(jobCostThreshold)
       if (parsed !== null && (isNaN(parsed) || parsed <= 0)) {
-        toast.error('Enter a positive number or leave blank to disable')
+        toast.error(t('budget.invalidNumber'))
         return
       }
       const res = await fetch(`${getApiBase()}/budget`, {
@@ -164,9 +166,9 @@ export default function SettingsPage() {
         body: JSON.stringify({ jobCostThresholdUsd: parsed }),
       })
       if (!res.ok) throw new Error('Failed to save')
-      toast.success(parsed == null ? 'Per-job cost alert disabled' : `Alert set for jobs over $${parsed}`)
+      toast.success(parsed == null ? t('budget.perJobAlertDisabled') : t('budget.alertSet', { amount: parsed }))
     } catch (err) {
-      toast.error('Failed to save threshold', { description: (err as Error).message })
+      toast.error(t('budget.saveThresholdFailed'), { description: (err as Error).message })
     } finally {
       setIsSavingJobThreshold(false)
     }
@@ -183,10 +185,10 @@ export default function SettingsPage() {
         body: JSON.stringify({ pipelineTelemetryEnabled: enabled }),
       })
       if (!res.ok) throw new Error('Failed to save')
-      toast.success(enabled ? 'Pipeline telemetry enabled' : 'Pipeline telemetry disabled')
+      toast.success(enabled ? t('telemetry.enabled') : t('telemetry.disabled'))
     } catch (err) {
       setTelemetryEnabled(prev)
-      toast.error('Failed to save telemetry setting', { description: (err as Error).message })
+      toast.error(t('telemetry.saveFailed'), { description: (err as Error).message })
     } finally {
       setIsSavingTelemetry(false)
     }
@@ -204,9 +206,9 @@ export default function SettingsPage() {
       const data = await res.json() as { settings?: ProjectSettings }
       const savedValue = data.settings?.prePrompt ?? ''
       setPrePrompt(savedValue)
-      toast.success(savedValue.trim() === '' ? 'Pre-prompt cleared' : 'Pre-prompt saved')
+      toast.success(savedValue.trim() === '' ? t('prePrompt.cleared') : t('prePrompt.saved'))
     } catch (err) {
-      toast.error('Failed to save pre-prompt', { description: (err as Error).message })
+      toast.error(t('prePrompt.saveFailed'), { description: (err as Error).message })
     } finally {
       setIsSavingPrePrompt(false)
     }
@@ -224,9 +226,9 @@ export default function SettingsPage() {
       const data = await res.json() as { settings?: ProjectSettings }
       const savedValue = data.settings?.ultraPrePrompt ?? ''
       setUltraPrePrompt(savedValue)
-      toast.success(savedValue.trim() === '' ? 'Ultra pre-prompt reset to default' : 'Ultra pre-prompt saved')
+      toast.success(savedValue.trim() === '' ? t('ultraPrePrompt.resetToDefault') : t('ultraPrePrompt.saved'))
     } catch (err) {
-      toast.error('Failed to save Ultra pre-prompt', { description: (err as Error).message })
+      toast.error(t('ultraPrePrompt.saveFailed'), { description: (err as Error).message })
     } finally {
       setIsSavingUltraPrePrompt(false)
     }
@@ -245,7 +247,7 @@ export default function SettingsPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
       <div>
-        <h1 className="text-base font-semibold">Project Settings</h1>
+        <h1 className="text-base font-semibold">{t('page.title')}</h1>
         {config && (
           <p className="text-xs text-muted-foreground mt-1">
             {config.project.name}
@@ -258,24 +260,27 @@ export default function SettingsPage() {
       {isHubMode && (
         <Card>
           <CardHeader>
-            <CardTitle>Pipeline Telemetry</CardTitle>
+            <CardTitle>{t('telemetry.title')}</CardTitle>
             <CardDescription>
-              Capture token usage, phase durations, and subagent activity for diagnostic export. Off by default.
+              {t('telemetry.description')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <p className="text-xs font-medium">Enable pipeline telemetry</p>
+                <p className="text-xs font-medium">{t('telemetry.toggleLabel')}</p>
                 <p className="text-[10px] text-muted-foreground">
-                  When on, OTEL data from pipeline jobs is captured locally. Use the{' '}
-                  <span className="font-mono">Export diagnostic</span> button on any job card to download.
+                  <Trans
+                    ns="settings"
+                    i18nKey="telemetry.toggleDescription"
+                    components={{ mono: <span className="font-mono" /> }}
+                  />
                 </p>
               </div>
               <button
                 type="button"
                 role="switch"
-                aria-label="Enable pipeline telemetry"
+                aria-label={t('telemetry.toggleLabel')}
                 aria-checked={telemetryEnabled}
                 disabled={isSavingTelemetry}
                 onClick={() => saveTelemetryToggle(!telemetryEnabled)}
@@ -296,25 +301,25 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Rail Pre-prompt</CardTitle>
+          <CardTitle>{t('prePrompt.title')}</CardTitle>
           <CardDescription>
-            Extra project-specific instructions appended to implement and batch-implement rail jobs after the ticket context and before execution.
+            {t('prePrompt.description')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2">
             <label htmlFor="project-pre-prompt" className="text-xs font-medium">
-              Pre-prompt
+              {t('prePrompt.label')}
             </label>
             <textarea
               id="project-pre-prompt"
               value={prePrompt}
               onChange={(e) => setPrePrompt(e.target.value)}
-              placeholder="Example: Prefer incremental changes, keep migrations backward compatible, and add tests for every rail change."
+              placeholder={t('prePrompt.placeholder')}
               className="min-h-32 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20"
             />
             <p className="text-xs text-muted-foreground">
-              Use this for stable project guidance that should accompany every rail implementation run.
+              {t('prePrompt.helper')}
             </p>
           </div>
           <div className="flex justify-end">
@@ -325,7 +330,7 @@ export default function SettingsPage() {
               disabled={isSavingPrePrompt}
               onClick={savePrePrompt}
             >
-              {isSavingPrePrompt ? 'Saving...' : 'Save pre-prompt'}
+              {isSavingPrePrompt ? t('common:states.saving') : t('prePrompt.saveButton')}
             </Button>
           </div>
         </CardContent>
@@ -333,25 +338,25 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Ultracode pre-prompt</CardTitle>
+          <CardTitle>{t('ultraPrePrompt.title')}</CardTitle>
           <CardDescription>
-            Instruction sent to Claude in Ultracode (Claude-only rails). Ultracode skips the OpenSpec pipeline — it hands Claude this pre-prompt plus the spec text and lets it implement autonomously. Leave blank to use the built-in default.
+            {t('ultraPrePrompt.description')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2">
             <label htmlFor="project-ultra-pre-prompt" className="text-xs font-medium">
-              Ultra pre-prompt
+              {t('ultraPrePrompt.label')}
             </label>
             <textarea
               id="project-ultra-pre-prompt"
               value={ultraPrePrompt}
               onChange={(e) => setUltraPrePrompt(e.target.value)}
-              placeholder="Leave blank to use the default Ultracode instruction."
+              placeholder={t('ultraPrePrompt.placeholder')}
               className="min-h-32 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20"
             />
             <p className="text-xs text-muted-foreground">
-              The spec text is appended automatically after this pre-prompt. Empty = default.
+              {t('ultraPrePrompt.helper')}
             </p>
           </div>
           <div className="flex justify-end">
@@ -362,7 +367,7 @@ export default function SettingsPage() {
               disabled={isSavingUltraPrePrompt}
               onClick={saveUltraPrePrompt}
             >
-              {isSavingUltraPrePrompt ? 'Saving...' : 'Save Ultra pre-prompt'}
+              {isSavingUltraPrePrompt ? t('common:states.saving') : t('ultraPrePrompt.saveButton')}
             </Button>
           </div>
         </CardContent>
@@ -371,18 +376,18 @@ export default function SettingsPage() {
       {/* Budget Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Budget</CardTitle>
+          <CardTitle>{t('budget.title')}</CardTitle>
           <CardDescription>
-            Set a daily spend cap for this project. The queue auto-pauses when the limit is hit.
+            {t('budget.description')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
               <div>
-                <label className="text-xs font-medium">Daily budget (USD)</label>
+                <label className="text-xs font-medium">{t('budget.dailyLabel')}</label>
                 <p className="text-xs text-muted-foreground">
-                  Leave blank to disable. Spend is calculated over the last 24 hours.
+                  {t('budget.dailyHelper')}
                 </p>
               </div>
               <Input
@@ -391,7 +396,7 @@ export default function SettingsPage() {
                 step="0.01"
                 value={dailyBudget}
                 onChange={(e) => setDailyBudget(e.target.value)}
-                placeholder="e.g. 5.00"
+                placeholder={t('budget.dailyPlaceholder')}
                 className="h-8 text-xs font-mono"
               />
               <div className="flex justify-end">
@@ -402,16 +407,16 @@ export default function SettingsPage() {
                   disabled={isSavingBudget}
                   onClick={saveDailyBudget}
                 >
-                  {isSavingBudget ? 'Saving...' : 'Save'}
+                  {isSavingBudget ? t('common:states.saving') : t('common:actions.save')}
                 </Button>
               </div>
             </div>
 
             <div className="space-y-2">
               <div>
-                <label className="text-xs font-medium">Per-job cost alert (USD)</label>
+                <label className="text-xs font-medium">{t('budget.perJobLabel')}</label>
                 <p className="text-xs text-muted-foreground">
-                  Alert when a single job in this project exceeds this amount.
+                  {t('budget.perJobHelper')}
                 </p>
               </div>
               <Input
@@ -420,7 +425,7 @@ export default function SettingsPage() {
                 step="0.01"
                 value={jobCostThreshold}
                 onChange={(e) => setJobCostThreshold(e.target.value)}
-                placeholder="e.g. 0.50"
+                placeholder={t('budget.perJobPlaceholder')}
                 className="h-8 text-xs font-mono"
               />
               <div className="flex justify-end">
@@ -431,7 +436,7 @@ export default function SettingsPage() {
                   disabled={isSavingJobThreshold}
                   onClick={saveJobCostThreshold}
                 >
-                  {isSavingJobThreshold ? 'Saving...' : 'Save'}
+                  {isSavingJobThreshold ? t('common:states.saving') : t('common:actions.save')}
                 </Button>
               </div>
             </div>

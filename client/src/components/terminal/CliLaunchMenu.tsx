@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { providerLabel } from '../../lib/provider-capabilities'
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
  * Matches ShortcutContextMenu styling so it feels native to the panel.
  */
 export function CliLaunchMenu({ x, y, providers, onSelect, onClose }: Props) {
+  const { t } = useTranslation('terminal')
   const ref = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export function CliLaunchMenu({ x, y, providers, onSelect, onClose }: Props) {
           onClick={() => { onSelect(p as 'claude' | 'codex'); onClose() }}
           className="w-full text-left px-3 py-1.5 text-[#f8f8f2] hover:bg-[#44475a]"
         >
-          Open {providerLabel(p)}
+          {t('cliMenu.open', { name: providerLabel(p) })}
         </button>
       ))}
     </div>

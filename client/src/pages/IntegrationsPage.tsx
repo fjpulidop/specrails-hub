@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation, Trans } from 'react-i18next'
 import { Puzzle, AlertTriangle, CheckCircle2, XCircle, Trash2, Download, Loader2 } from 'lucide-react'
 import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
@@ -54,6 +55,7 @@ interface PluginEvent {
 }
 
 export default function IntegrationsPage() {
+  const { t } = useTranslation('integrations')
   const { activeProjectId } = useHub()
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
   const projectIdRef = useRef(activeProjectId)
@@ -99,7 +101,7 @@ export default function IntegrationsPage() {
   if (!activeProjectId) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
-        Select a project to manage integrations.
+        {t('page.selectProject')}
       </div>
     )
   }
@@ -109,9 +111,9 @@ export default function IntegrationsPage() {
       <div className="flex-shrink-0 border-b border-border px-6 pt-4 pb-3 flex items-center gap-2">
         <Puzzle className="w-4 h-4 text-accent-primary" />
         <div className="flex-1">
-          <h1 className="text-lg font-semibold">Integrations</h1>
+          <h1 className="text-lg font-semibold">{t('page.title')}</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Per-project plugins. Each project decides which integrations to enable independently.
+            {t('page.subtitle')}
           </p>
         </div>
       </div>
@@ -139,7 +141,7 @@ export default function IntegrationsPage() {
             {orphans.length > 0 && (
               <div className="mt-10">
                 <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                  <AlertTriangle className="w-3.5 h-3.5" /> Deprecated
+                  <AlertTriangle className="w-3.5 h-3.5" /> {t('page.deprecated')}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {orphans.map((p) => (
@@ -166,6 +168,7 @@ function Card({
   onInstall: () => void
   onCloseInstall: () => void
 }) {
+  const { t } = useTranslation('integrations')
   const [showUninstall, setShowUninstall] = useState(false)
 
   return (
@@ -179,22 +182,22 @@ function Card({
             </span>
             {plugin.status === 'installed' && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-success/20 text-accent-success flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Active
+                <CheckCircle2 className="w-3 h-3" /> {t('card.statusActive')}
               </span>
             )}
             {plugin.status === 'deactivated' && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex items-center gap-1">
-                <XCircle className="w-3 h-3" /> Deactivated
+                <XCircle className="w-3 h-3" /> {t('card.statusDeactivated')}
               </span>
             )}
             {plugin.status === 'degraded' && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-warning/20 text-accent-warning flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" /> Degraded
+                <AlertTriangle className="w-3 h-3" /> {t('card.statusDegraded')}
               </span>
             )}
             {plugin.updateAvailable && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-info/20 text-accent-info flex items-center gap-1">
-                <Download className="w-3 h-3" /> Update available
+                <Download className="w-3 h-3" /> {t('card.updateAvailable')}
               </span>
             )}
           </div>
@@ -214,7 +217,7 @@ function Card({
 
       {plugin.requirements.length > 0 && (
         <div className="text-[10px] text-muted-foreground">
-          Requires: {plugin.requirements.map((r) => `${r.name}${r.minVersion ? ` ≥ ${r.minVersion}` : ''}`).join(', ')}
+          {t('card.requires', { list: plugin.requirements.map((r) => `${r.name}${r.minVersion ? ` ≥ ${r.minVersion}` : ''}`).join(', ') })}
         </div>
       )}
 
@@ -225,7 +228,7 @@ function Card({
       )}
       {plugin.status === 'deactivated' && (
         <div className="text-[11px] text-muted-foreground leading-relaxed">
-          Installed but deactivated — Claude won't load it next session. Toggle <strong>Active</strong> to re-enable.
+          <Trans t={t} i18nKey="card.deactivatedHint" components={{ strong: <strong /> }} />
         </div>
       )}
       {plugin.marketplaceConflicts && plugin.marketplaceConflicts.length > 0 && (
@@ -243,7 +246,7 @@ function Card({
             onClick={onInstall}
             className="text-xs px-3 py-1.5 rounded-md bg-accent-primary text-white hover:opacity-90"
           >
-            Install
+            {t('card.install')}
           </button>
         ) : (
           <>
@@ -253,7 +256,7 @@ function Card({
               onClick={() => setShowUninstall(true)}
               className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-destructive/10 hover:text-destructive flex items-center gap-1.5"
             >
-              <Trash2 className="w-3 h-3" /> Uninstall
+              <Trash2 className="w-3 h-3" /> {t('card.uninstall')}
             </button>
           </>
         )}
@@ -274,6 +277,7 @@ function Card({
 }
 
 function ActiveToggle({ pluginName, active }: { pluginName: string; active: boolean }) {
+  const { t } = useTranslation('integrations')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const click = async () => {
@@ -297,7 +301,7 @@ function ActiveToggle({ pluginName, active }: { pluginName: string; active: bool
         className={`relative inline-flex items-center h-5 w-9 rounded-full transition-colors disabled:opacity-50 ${
           active ? 'bg-accent-success' : 'bg-muted'
         }`}
-        title={active ? 'Active — click to deactivate' : 'Deactivated — click to activate'}
+        title={active ? t('toggle.titleActive') : t('toggle.titleDeactivated')}
       >
         <span
           className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
@@ -305,21 +309,24 @@ function ActiveToggle({ pluginName, active }: { pluginName: string; active: bool
           }`}
         />
       </button>
-      <span className="text-[10px] text-muted-foreground">{active ? 'Active' : 'Off'}</span>
+      <span className="text-[10px] text-muted-foreground">{active ? t('card.statusActive') : t('common:states.off')}</span>
       {error && <span className="text-[10px] text-destructive">{error}</span>}
     </div>
   )
 }
 
 function CachedButDisabledNotice({ keys }: { keys: string[] }) {
+  const { t } = useTranslation('integrations')
   return (
     <div className="text-[11px] rounded-md border border-yellow-500/30 bg-yellow-500/5 p-2 leading-relaxed space-y-1">
       <div className="flex items-start gap-1.5">
         <AlertTriangle className="w-3 h-3 text-yellow-500 mt-0.5 flex-shrink-0" />
         <span>
-          Claude has the marketplace plugin <strong>installed but disabled</strong> in its cache. It may still resolve
-          the server from <code className="bg-muted px-1 rounded">~/.claude/plugins/cache/...</code> even though the
-          toggle is off. To force project-scoped only, uninstall the marketplace plugin from Claude:
+          <Trans
+            t={t}
+            i18nKey="cachedNotice.body"
+            components={{ strong: <strong />, code: <code className="bg-muted px-1 rounded" /> }}
+          />
         </span>
       </div>
       <div className="pl-5 space-y-0.5">
@@ -330,13 +337,14 @@ function CachedButDisabledNotice({ keys }: { keys: string[] }) {
         ))}
       </div>
       <div className="pl-5 text-[10px] text-muted-foreground">
-        Run inside an active Claude session, then restart Claude in this project.
+        {t('cachedNotice.runInstruction')}
       </div>
     </div>
   )
 }
 
 function UpdateAvailable({ pluginName }: { pluginName: string }) {
+  const { t } = useTranslation('integrations')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const click = async () => {
@@ -353,9 +361,11 @@ function UpdateAvailable({ pluginName }: { pluginName: string }) {
       <div className="flex items-start gap-1.5">
         <Download className="w-3 h-3 text-accent-info mt-0.5 flex-shrink-0" />
         <span>
-          The bundled manifest changed since you installed (likely an upstream rename). Re-write{' '}
-          <code className="bg-muted px-1 rounded">.mcp.json</code> with the canonical entry — surgical, only the plugin's
-          owned keys are touched.
+          <Trans
+            t={t}
+            i18nKey="update.body"
+            components={{ code: <code className="bg-muted px-1 rounded" /> }}
+          />
         </span>
       </div>
       <button
@@ -365,7 +375,7 @@ function UpdateAvailable({ pluginName }: { pluginName: string }) {
         className="text-[10px] px-2 py-0.5 rounded border border-accent-info/40 hover:bg-accent-info/10 disabled:opacity-50 flex items-center gap-1"
       >
         {busy && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
-        Update <code>.mcp.json</code> entry
+        <Trans t={t} i18nKey="update.button" components={{ code: <code /> }} />
       </button>
       {error && <div className="text-destructive text-[10px]">{error}</div>}
     </div>
@@ -374,6 +384,7 @@ function UpdateAvailable({ pluginName }: { pluginName: string }) {
 
 
 function ConflictResolver({ pluginName, conflicts }: { pluginName: string; conflicts: string[] }) {
+  const { t } = useTranslation('integrations')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const disable = async (key: string) => {
@@ -396,9 +407,12 @@ function ConflictResolver({ pluginName, conflicts }: { pluginName: string; confl
       <div className="flex items-start gap-1.5">
         <AlertTriangle className="w-3 h-3 text-yellow-500 mt-0.5 flex-shrink-0" />
         <span>
-          <strong>{pluginName}</strong> is also enabled globally via Claude's plugin marketplace, which shadows this
-          project-scoped install. To make this card go Active, disable the global version below — it can be re-enabled
-          from Claude any time.
+          <Trans
+            t={t}
+            i18nKey="conflict.body"
+            values={{ name: pluginName }}
+            components={{ strong: <strong /> }}
+          />
         </span>
       </div>
       <div className="flex flex-wrap gap-1.5 pt-1">
@@ -411,7 +425,7 @@ function ConflictResolver({ pluginName, conflicts }: { pluginName: string; confl
             className="text-[10px] px-2 py-0.5 rounded border border-yellow-500/40 hover:bg-yellow-500/10 disabled:opacity-50 flex items-center gap-1"
           >
             {busy === key && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
-            Disable <code>{key}</code>
+            <Trans t={t} i18nKey="conflict.disableButton" values={{ key }} components={{ code: <code /> }} />
           </button>
         ))}
       </div>
@@ -421,6 +435,7 @@ function ConflictResolver({ pluginName, conflicts }: { pluginName: string; confl
 }
 
 function OrphanCard({ plugin, onRemoved }: { plugin: PluginCard; onRemoved: () => void }) {
+  const { t } = useTranslation('integrations')
   const [busy, setBusy] = useState(false)
   const remove = async () => {
     setBusy(true)
@@ -434,7 +449,7 @@ function OrphanCard({ plugin, onRemoved }: { plugin: PluginCard; onRemoved: () =
       <div className="flex items-center gap-2">
         <h3 className="text-sm font-semibold">{plugin.name}</h3>
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-500">
-          Orphan
+          {t('orphan.badge')}
         </span>
       </div>
       <p className="text-xs text-muted-foreground">{plugin.description}</p>
@@ -445,7 +460,7 @@ function OrphanCard({ plugin, onRemoved }: { plugin: PluginCard; onRemoved: () =
           onClick={remove}
           className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-destructive/10 hover:text-destructive flex items-center gap-1.5"
         >
-          <Trash2 className="w-3 h-3" /> Remove orphan
+          <Trash2 className="w-3 h-3" /> {t('orphan.removeButton')}
         </button>
       </div>
     </div>
@@ -453,6 +468,7 @@ function OrphanCard({ plugin, onRemoved }: { plugin: PluginCard; onRemoved: () =
 }
 
 function InstallDialog({ pluginName, onClose }: { pluginName: string; onClose: () => void }) {
+  const { t } = useTranslation('integrations')
   const [preview, setPreview] = useState<PreviewResult | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [installing, setInstalling] = useState(false)
@@ -498,11 +514,11 @@ function InstallDialog({ pluginName, onClose }: { pluginName: string; onClose: (
 
   const installPrereq = async (prereq: string) => {
     setInstallingPrereq(prereq)
-    setPrereqLogs([`Installing ${prereq}…`])
+    setPrereqLogs([t('installDialog.installingPrereq', { name: prereq })])
     try {
       await fetch(`${getApiBase()}/plugins/_prerequisites/${prereq}/install`, { method: 'POST' })
     } catch (err) {
-      setPrereqLogs((cur) => [...cur, `Failed to start: ${(err as Error).message}`])
+      setPrereqLogs((cur) => [...cur, t('installDialog.prereqStartFailed', { message: (err as Error).message })])
       setInstallingPrereq(null)
     }
   }
@@ -524,11 +540,11 @@ function InstallDialog({ pluginName, onClose }: { pluginName: string; onClose: (
   }
 
   return (
-    <ModalShell onClose={onClose} title={`Install ${pluginName}`}>
+    <ModalShell onClose={onClose} title={t('installDialog.title', { name: pluginName })}>
       {previewError && <div className="text-xs text-destructive">{previewError}</div>}
       {!preview && !previewError && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="w-3 h-3 animate-spin" /> Computing changes…
+          <Loader2 className="w-3 h-3 animate-spin" /> {t('installDialog.computingChanges')}
         </div>
       )}
       {preview && (
@@ -540,7 +556,7 @@ function InstallDialog({ pluginName, onClose }: { pluginName: string; onClose: (
             </div>
           )}
           <section>
-            <h4 className="text-xs font-semibold mb-1.5">Files that will change</h4>
+            <h4 className="text-xs font-semibold mb-1.5">{t('installDialog.filesHeading')}</h4>
             <ul className="text-xs space-y-0.5 font-mono">
               {preview.files.map((f, i) => (
                 <li key={i} className={f.op === 'create' ? 'text-accent-success' : 'text-accent-info'}>
@@ -552,7 +568,7 @@ function InstallDialog({ pluginName, onClose }: { pluginName: string; onClose: (
           </section>
           {preview.requirements.length > 0 && (
             <section>
-              <h4 className="text-xs font-semibold mb-1.5">Prerequisites</h4>
+              <h4 className="text-xs font-semibold mb-1.5">{t('installDialog.prerequisites')}</h4>
               <ul className="text-xs space-y-1">
                 {preview.requirements.map((r) => {
                   const ok = r.installed && r.executable && r.meetsMinimum
@@ -572,7 +588,7 @@ function InstallDialog({ pluginName, onClose }: { pluginName: string; onClose: (
                           className="ml-auto text-[10px] px-2 py-0.5 rounded border border-border hover:bg-muted disabled:opacity-50 flex items-center gap-1"
                         >
                           {installingPrereq === r.name && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
-                          Auto-install
+                          {t('installDialog.autoInstall')}
                         </button>
                       )}
                     </li>
@@ -588,7 +604,7 @@ function InstallDialog({ pluginName, onClose }: { pluginName: string; onClose: (
           )}
           {logs.length > 0 && (
             <section>
-              <h4 className="text-xs font-semibold mb-1.5">Progress</h4>
+              <h4 className="text-xs font-semibold mb-1.5">{t('installDialog.progress')}</h4>
               <pre className="text-[11px] bg-muted/40 rounded p-2 max-h-32 overflow-auto font-mono">
                 {logs.join('\n')}
               </pre>
@@ -599,7 +615,7 @@ function InstallDialog({ pluginName, onClose }: { pluginName: string; onClose: (
       )}
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onClose} className="text-xs px-3 py-1.5 rounded-md border border-border">
-          Cancel
+          {t('common:actions.cancel')}
         </button>
         <button
           type="button"
@@ -608,7 +624,7 @@ function InstallDialog({ pluginName, onClose }: { pluginName: string; onClose: (
           className="text-xs px-3 py-1.5 rounded-md bg-accent-primary text-white disabled:opacity-50 flex items-center gap-1.5"
         >
           {installing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-          Install
+          {t('card.install')}
         </button>
       </div>
     </ModalShell>
@@ -624,6 +640,7 @@ function UninstallDialog({
   onClose: () => void
   onUninstalled: () => void
 }) {
+  const { t } = useTranslation('integrations')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const submit = async () => {
@@ -637,12 +654,12 @@ function UninstallDialog({
     } finally { setBusy(false) }
   }
   return (
-    <ModalShell onClose={onClose} title={`Uninstall ${pluginName}?`}>
-      <p className="text-xs">This will revert plugin-managed entries in <code>.mcp.json</code> and remove any plugin-created files. Your code, history, and other plugins are not affected.</p>
+    <ModalShell onClose={onClose} title={t('uninstallDialog.title', { name: pluginName })}>
+      <p className="text-xs"><Trans t={t} i18nKey="uninstallDialog.body" components={{ code: <code /> }} /></p>
       {error && <div className="text-xs text-destructive">{error}</div>}
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onClose} className="text-xs px-3 py-1.5 rounded-md border border-border">
-          Cancel
+          {t('common:actions.cancel')}
         </button>
         <button
           type="button"
@@ -651,7 +668,7 @@ function UninstallDialog({
           className="text-xs px-3 py-1.5 rounded-md bg-destructive text-white disabled:opacity-50 flex items-center gap-1.5"
         >
           {busy && <Loader2 className="w-3 h-3 animate-spin" />}
-          Uninstall
+          {t('card.uninstall')}
         </button>
       </div>
     </ModalShell>
@@ -680,22 +697,24 @@ function SkeletonGrid() {
 }
 
 function ErrorState({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation('integrations')
   return (
     <div className="flex flex-col items-center justify-center py-12 gap-3 text-sm text-muted-foreground">
       <AlertTriangle className="w-5 h-5 text-destructive" />
-      <p>Failed to load plugins.</p>
+      <p>{t('page.loadError')}</p>
       <button type="button" onClick={onRetry} className="text-xs px-3 py-1.5 rounded-md border border-border">
-        Retry
+        {t('common:actions.retry')}
       </button>
     </div>
   )
 }
 
 function EmptyState() {
+  const { t } = useTranslation('integrations')
   return (
     <div className="flex flex-col items-center justify-center py-12 gap-2 text-sm text-muted-foreground">
       <Puzzle className="w-6 h-6" />
-      <p>No plugins are bundled with this hub build.</p>
+      <p>{t('page.empty')}</p>
     </div>
   )
 }

@@ -1,19 +1,20 @@
 import { PanelLeft, PanelRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 import { useSidebarPin } from '../context/SidebarPinContext'
 import type { SidebarMode } from '../context/SidebarPinContext'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 
-const LEFT_LABEL: Record<SidebarMode, string> = {
-  'pinned-open': 'Collapse left sidebar (keep pinned)',
-  'pinned-collapsed': 'Unpin left sidebar',
-  'unpinned': 'Pin left sidebar open',
+const LEFT_LABEL_KEY: Record<SidebarMode, string> = {
+  'pinned-open': 'sidebarPin.left.pinnedOpen',
+  'pinned-collapsed': 'sidebarPin.left.pinnedCollapsed',
+  'unpinned': 'sidebarPin.left.unpinned',
 }
 
-const RIGHT_LABEL: Record<SidebarMode, string> = {
-  'pinned-open': 'Collapse right sidebar (keep pinned)',
-  'pinned-collapsed': 'Unpin right sidebar',
-  'unpinned': 'Pin right sidebar open',
+const RIGHT_LABEL_KEY: Record<SidebarMode, string> = {
+  'pinned-open': 'sidebarPin.right.pinnedOpen',
+  'pinned-collapsed': 'sidebarPin.right.pinnedCollapsed',
+  'unpinned': 'sidebarPin.right.unpinned',
 }
 
 function SidebarButton({
@@ -58,6 +59,7 @@ function SidebarButton({
 }
 
 export function ProjectNavbar() {
+  const { t } = useTranslation('nav')
   const { leftMode, rightMode, cycleLeftMode, cycleRightMode } = useSidebarPin()
 
   return (
@@ -66,14 +68,14 @@ export function ProjectNavbar() {
         <SidebarButton
           mode={leftMode}
           onToggle={cycleLeftMode}
-          label={LEFT_LABEL[leftMode]}
+          label={t(LEFT_LABEL_KEY[leftMode])}
           shortcut="⌥⌘B"
           icon={PanelLeft}
         />
         <SidebarButton
           mode={rightMode}
           onToggle={cycleRightMode}
-          label={RIGHT_LABEL[rightMode]}
+          label={t(RIGHT_LABEL_KEY[rightMode])}
           shortcut="⌘B"
           icon={PanelRight}
         />

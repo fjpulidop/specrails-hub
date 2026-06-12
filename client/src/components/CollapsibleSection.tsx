@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ChevronRight, GripVertical, Pin, PinOff } from 'lucide-react'
@@ -31,6 +32,7 @@ export function CollapsibleSection({
   trailing,
   children,
 }: CollapsibleSectionProps) {
+  const { t } = useTranslation('nav')
   const {
     attributes,
     listeners,
@@ -62,7 +64,7 @@ export function CollapsibleSection({
         <button
           type="button"
           className="flex items-center justify-center w-5 h-5 rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/30 transition-colors cursor-grab active:cursor-grabbing shrink-0"
-          aria-label="Drag to reorder"
+          aria-label={t('collapsibleSection.dragToReorder')}
           data-testid={`drag-handle-${id}`}
           {...attributes}
           {...listeners}
@@ -105,14 +107,14 @@ export function CollapsibleSection({
                   ? 'text-accent-info bg-accent-info/10 hover:bg-accent-info/20'
                   : 'text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/30',
               )}
-              aria-label={pinned ? 'Unpin section (will collapse by default)' : 'Pin section (will stay expanded)'}
+              aria-label={pinned ? t('collapsibleSection.unpinAria') : t('collapsibleSection.pinAria')}
               data-testid={`pin-${id}`}
             >
               {pinned ? <Pin className="w-3 h-3" /> : <PinOff className="w-3 h-3" />}
             </button>
           </TooltipTrigger>
           <TooltipContent side="top">
-            <p className="text-xs">{pinned ? 'Unpin (collapse by default)' : 'Pin open (stay expanded)'}</p>
+            <p className="text-xs">{pinned ? t('collapsibleSection.unpinTooltip') : t('collapsibleSection.pinTooltip')}</p>
           </TooltipContent>
         </Tooltip>
 

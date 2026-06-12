@@ -1,0 +1,57 @@
+{
+  "panel": {
+    "openChat": "打开聊天",
+    "dragToResize": "拖动以调整大小",
+    "tabTitle": "聊天 {{n}}",
+    "startConversation": "开始关于此项目的对话",
+    "noConversations": "暂无对话",
+    "newConversation": "新建对话",
+    "suggestions": {
+      "projectStatus": "项目状态如何？",
+      "recentFailures": "显示最近失败的任务",
+      "commands": "我应该运行哪些命令？",
+      "explainCodebase": "讲解一下代码库"
+    }
+  },
+  "header": {
+    "fallbackTitle": "聊天",
+    "newConversation": "新建对话",
+    "deleteConversation": "删除对话",
+    "restorePanel": "还原聊天面板",
+    "maximizePanel": "最大化聊天面板",
+    "closeChat": "关闭聊天"
+  },
+  "input": {
+    "placeholder": "输入消息...",
+    "send": "发送",
+    "stop": "停止",
+    "modelLocked": "对话进行中无法更换模型"
+  },
+  "messageList": {
+    "contextLoaded": "上下文已加载 — 随时可以帮你",
+    "noMessages": "暂无消息",
+    "askAnything": "向 Claude 询问关于项目的任何问题",
+    "suggestions": {
+      "currentStatus": "当前项目状态如何？",
+      "recentFailures": "显示最近失败的任务",
+      "testsToRun": "我应该运行哪些测试？",
+      "mainArchitecture": "讲解一下主要架构"
+    }
+  },
+  "errors": {
+    "sendFailed": "发送消息失败"
+  },
+  "dock": {
+    "minimizedSessions_one": "{{count}} 个已最小化的会话",
+    "minimizedSessions_other": "{{count}} 个已最小化的会话",
+    "minimizedCount": "{{count}} 个已最小化",
+    "unknownProject": "未知项目"
+  },
+  "chip": {
+    "restore": "还原 {{label}}",
+    "close": "关闭 {{label}}",
+    "continueEditing": "继续编辑 · {{projectName}}",
+    "kindAiEdit": "AI 编辑",
+    "kindExploreSpec": "Explore Spec"
+  }
+}

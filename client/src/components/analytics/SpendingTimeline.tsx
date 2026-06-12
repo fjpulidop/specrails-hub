@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import type { SpendingResponse } from '../../types/spending'
 
@@ -7,31 +8,43 @@ interface Props {
 }
 
 export function SpendingTimeline({ data, loading }: Props) {
+  const { t } = useTranslation('analytics')
   if (loading && !data) {
     return <div className="h-[220px] rounded-xl border border-border/40 bg-card/40 animate-pulse" />
   }
   if (!data) return null
 
+  // Series labels double as recharts dataKeys and tooltip display names.
+  const labels = {
+    jobs: t('surfaces.job'),
+    explore: t('surfaces.exploreSpec'),
+    quick: t('surfaces.quickSpec'),
+    refine: t('surfaces.aiEdit'),
+    fileSummaries: t('surfaces.fileSummary'),
+  }
+
   const chartData = data.dailyTimeline.map((d) => ({
     date: d.date.slice(5), // MM-DD
-    Jobs: d.jobsCostUsd,
-    Explore: d.exploreCostUsd,
-    Quick: d.quickCostUsd,
-    Refine: d.aiEditCostUsd,
-    'File summaries': d.fileSummaryCostUsd ?? 0,
+    [labels.jobs]: d.jobsCostUsd,
+    [labels.explore]: d.exploreCostUsd,
+    [labels.quick]: d.quickCostUsd,
+    [labels.refine]: d.aiEditCostUsd,
+    [labels.fileSummaries]: d.fileSummaryCostUsd ?? 0,
   }))
 
-  const isEmpty = chartData.every((d) => d.Jobs + d.Explore + d.Quick + d.Refine + d['File summaries'] === 0)
+  const isEmpty = data.dailyTimeline.every(
+    (d) => d.jobsCostUsd + d.exploreCostUsd + d.quickCostUsd + d.aiEditCostUsd + (d.fileSummaryCostUsd ?? 0) === 0
+  )
 
   return (
     <div className="rounded-xl border border-border/50 bg-card/40 p-4">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Daily timeline</h2>
-        <span className="text-[10px] text-muted-foreground/70">stacked by surface</span>
+        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('timeline.title')}</h2>
+        <span className="text-[10px] text-muted-foreground/70">{t('timeline.subtitle')}</span>
       </div>
       {isEmpty ? (
         <div className="h-40 flex items-center justify-center text-xs text-muted-foreground/70">
-          No spend in this period.
+          {t('timeline.empty')}
         </div>
       ) : (
         <div className="h-[220px]">
@@ -44,11 +57,11 @@ export function SpendingTimeline({ data, loading }: Props) {
                 contentStyle={{ backgroundColor: 'var(--popover)', border: '1px solid var(--border)', fontSize: 11, borderRadius: 6 }}
                 formatter={(value: unknown, name: unknown) => [`$${typeof value === 'number' ? value.toFixed(2) : '—'}`, String(name)]}
               />
-              <Bar dataKey="Jobs" stackId="a" fill="var(--accent-info, #5fa8d3)" />
-              <Bar dataKey="Explore" stackId="a" fill="var(--accent-highlight, #c084fc)" />
-              <Bar dataKey="Quick" stackId="a" fill="var(--accent-secondary, #f7768e)" />
-              <Bar dataKey="Refine" stackId="a" fill="var(--accent-success, #50fa7b)" />
-              <Bar dataKey="File summaries" stackId="a" fill="var(--accent-warning, #f1fa8c)" />
+              <Bar dataKey={labels.jobs} stackId="a" fill="var(--accent-info, #5fa8d3)" />
+              <Bar dataKey={labels.explore} stackId="a" fill="var(--accent-highlight, #c084fc)" />
+              <Bar dataKey={labels.quick} stackId="a" fill="var(--accent-secondary, #f7768e)" />
+              <Bar dataKey={labels.refine} stackId="a" fill="var(--accent-success, #50fa7b)" />
+              <Bar dataKey={labels.fileSummaries} stackId="a" fill="var(--accent-warning, #f1fa8c)" />
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Button } from './ui/button'
 
 interface ChatHeaderProps {
@@ -25,11 +26,12 @@ export function ChatHeader({
   onDeleteConversation,
   hasActiveConversation,
 }: ChatHeaderProps) {
+  const { t } = useTranslation('chat')
   return (
     <div className="flex h-9 shrink-0 items-center justify-between border-b border-border/30 px-2.5">
       <div className="flex min-w-0 items-center gap-1.5">
         <span className="truncate text-xs font-medium text-foreground">
-          {title ?? 'Chat'}
+          {title ?? t('header.fallbackTitle')}
         </span>
         {projectName && (
           <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-medium bg-accent-primary/15 text-accent-primary/80 leading-none">
@@ -42,7 +44,7 @@ export function ChatHeader({
           size="icon"
           variant="ghost"
           disabled={!canCreateNew}
-          title="New conversation"
+          title={t('header.newConversation')}
           className="h-6 w-6"
           onClick={onNewConversation}
         >
@@ -52,7 +54,7 @@ export function ChatHeader({
           <Button
             size="icon"
             variant="ghost"
-            title="Delete conversation"
+            title={t('header.deleteConversation')}
             className="h-6 w-6 text-muted-foreground hover:text-destructive"
             onClick={onDeleteConversation}
           >
@@ -65,7 +67,7 @@ export function ChatHeader({
           <Button
             size="icon"
             variant="ghost"
-            title="Restore chat panel"
+            title={t('header.restorePanel')}
             className="h-6 w-6 text-muted-foreground hover:text-foreground"
             onClick={onRestore}
           >
@@ -78,7 +80,7 @@ export function ChatHeader({
           <Button
             size="icon"
             variant="ghost"
-            title="Maximize chat panel"
+            title={t('header.maximizePanel')}
             className="h-6 w-6 text-muted-foreground hover:text-foreground"
             onClick={onMaximize}
           >
@@ -91,7 +93,7 @@ export function ChatHeader({
         <Button
           size="icon"
           variant="ghost"
-          title="Close chat"
+          title={t('header.closeChat')}
           className="h-6 w-6 text-muted-foreground"
           onClick={onToggle}
         >

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowRightCircle, Circle, Play } from 'lucide-react'
 import type { RailState } from './RailsBoard'
 
@@ -25,6 +26,7 @@ const VERTICAL_GAP = 8
  * doesn't push work into a busy rail.
  */
 export function MoveToRailPopover({ rails, onMoveToRail, onClose, anchorRect }: MoveToRailPopoverProps) {
+  const { t } = useTranslation('tickets')
   const popoverRef = useRef<HTMLDivElement>(null)
   const [entered, setEntered] = useState(false)
 
@@ -73,7 +75,7 @@ export function MoveToRailPopover({ rails, onMoveToRail, onClose, anchorRect }: 
     <div
       ref={popoverRef}
       role="dialog"
-      aria-label="Move to rail"
+      aria-label={t('rail.popoverTitle')}
       data-testid="move-to-rail-popover"
       style={{
         top,
@@ -94,10 +96,10 @@ export function MoveToRailPopover({ rails, onMoveToRail, onClose, anchorRect }: 
       />
 
       <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium">
-        Move to rail
+        {t('rail.popoverTitle')}
       </div>
       {rails.length === 0 ? (
-        <div className="px-2 py-2 text-xs text-muted-foreground">No rails available.</div>
+        <div className="px-2 py-2 text-xs text-muted-foreground">{t('rail.noRails')}</div>
       ) : (
         <ul className="flex flex-col">
           {rails.map((rail) => {

@@ -1,0 +1,75 @@
+{
+  "topBar": {
+    "title": "终端",
+    "openCliMulti": "在新终端中打开 AI CLI",
+    "openCli": "在新终端中打开 {{cli}}",
+    "maxTerminals": "每个项目最多 {{max}} 个终端",
+    "openInBrowser": "在浏览器中打开",
+    "pasteScript": "将快捷脚本粘贴到当前终端",
+    "pasteScriptNoActive": "没有可粘贴的活动终端",
+    "newTerminal": "新建终端",
+    "killActive": "终止当前终端",
+    "restorePanel": "还原面板",
+    "maximizePanel": "最大化面板"
+  },
+  "panelChevron": {
+    "collapse": "收起终端面板",
+    "expand": "展开终端面板"
+  },
+  "dragHandle": {
+    "resize": "调整终端面板大小"
+  },
+  "sidebar": {
+    "rename": "重命名 {{name}}",
+    "close": "关闭 {{name}}"
+  },
+  "emptyState": {
+    "noTerminals": "此项目还没有终端。",
+    "newTerminal": "新建终端"
+  },
+  "search": {
+    "placeholder": "查找",
+    "previous": "上一个 (Shift+Enter)",
+    "next": "下一个 (Enter)",
+    "matchCase": "区分大小写",
+    "regex": "正则表达式",
+    "wholeWord": "全字匹配",
+    "close": "关闭 (Esc)"
+  },
+  "contextMenu": {
+    "paste": "粘贴",
+    "selectAll": "全选",
+    "clear": "清屏",
+    "search": "搜索…",
+    "saveScrollback": "将回滚内容保存到文件…",
+    "openPath": "打开 {{path}}"
+  },
+  "cliMenu": {
+    "open": "打开 {{name}}"
+  },
+  "shortcutMenu": {
+    "configureBrowserUrl": "在设置中配置浏览器 URL…",
+    "editQuickScript": "在设置中编辑快捷脚本…"
+  },
+  "errors": {
+    "limitReached": "已达到终端数量上限（最多 {{max}} 个）。",
+    "spawnFailed": "Shell 启动失败 — Hub 的文件描述符可能不足。请尝试重启 Hub。",
+    "invalidName": "终端名称无效。",
+    "openFailed": "打开终端失败。",
+    "serverUnreachable": "无法连接服务器以打开终端。",
+    "exitedImmediately": "终端立即退出 — Shell 可能启动失败。如果持续发生，请重启 Hub。"
+  },
+  "session": {
+    "processExited": "[进程已退出]",
+    "processExitedWithCode": "[进程已退出（代码 {{code}}）]"
+  },
+  "notifications": {
+    "commandFinished": "命令已完成",
+    "commandFinishedNamed": "{{command}} 已完成",
+    "finishedBody": "退出码 {{code}}，耗时 {{elapsed}}"
+  },
+  "duration": {
+    "seconds": "{{seconds}}s",
+    "minutesSeconds": "{{minutes}}m {{seconds}}s"
+  }
+}

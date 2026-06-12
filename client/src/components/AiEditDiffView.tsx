@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { diffWords } from 'diff'
 import { cn } from '../lib/utils'
 
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function AiEditDiffView({ original, proposed, className }: Props) {
+  const { t } = useTranslation('aiedit')
   const parts = useMemo(() => diffWords(original, proposed), [original, proposed])
 
   return (
@@ -25,7 +27,7 @@ export function AiEditDiffView({ original, proposed, className }: Props) {
             <span
               key={i}
               className="bg-green-500/20 text-green-200 rounded px-0.5"
-              aria-label="inserted"
+              aria-label={t('diffView.inserted')}
             >
               {p.value}
             </span>
@@ -38,7 +40,7 @@ export function AiEditDiffView({ original, proposed, className }: Props) {
             <span
               key={i}
               className="bg-red-500/15 text-red-300/90 line-through decoration-red-400/60 rounded px-0.5 opacity-80"
-              aria-label="removed"
+              aria-label={t('diffView.removed')}
             >
               {p.value}
             </span>

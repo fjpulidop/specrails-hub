@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { Terminal } from '@xterm/xterm'
 import { readClipboardText, writeClipboardText } from '../../lib/tauri-clipboard'
 
@@ -23,6 +24,7 @@ interface Props {
  * is enough.
  */
 export function TerminalContextMenu({ x, y, term, cwd, hasReveal, onClose, onOpenSearch, onReveal, onSaveScrollback }: Props) {
+  const { t } = useTranslation('terminal')
   const ref = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -83,17 +85,17 @@ export function TerminalContextMenu({ x, y, term, cwd, hasReveal, onClose, onOpe
       style={{ position: 'fixed', left: flippedX, top: flippedY, minWidth: 200 }}
       className="bg-[#1f1f29] border border-[#44475a] rounded-md shadow-lg py-1 z-50 text-sm"
     >
-      <Item onClick={copy} disabled={!hasSelection} label="Copy" shortcut="⌘C" />
-      <Item onClick={paste} label="Paste" shortcut="⌘V" />
-      <Item onClick={selectAll} label="Select All" shortcut="⌘A" />
+      <Item onClick={copy} disabled={!hasSelection} label={t('common:actions.copy')} shortcut="⌘C" />
+      <Item onClick={paste} label={t('contextMenu.paste')} shortcut="⌘V" />
+      <Item onClick={selectAll} label={t('contextMenu.selectAll')} shortcut="⌘A" />
       <Divider />
-      <Item onClick={clear} label="Clear" shortcut="⌘K" />
-      <Item onClick={search} label="Search…" shortcut="⌘F" />
-      <Item onClick={save} label="Save scrollback to file…" />
+      <Item onClick={clear} label={t('contextMenu.clear')} shortcut="⌘K" />
+      <Item onClick={search} label={t('contextMenu.search')} shortcut="⌘F" />
+      <Item onClick={save} label={t('contextMenu.saveScrollback')} />
       {cwd && hasReveal && (
         <>
           <Divider />
-          <Item onClick={reveal} label={`Open ${truncate(cwd, 40)}`} />
+          <Item onClick={reveal} label={t('contextMenu.openPath', { path: truncate(cwd, 40) })} />
         </>
       )}
     </div>

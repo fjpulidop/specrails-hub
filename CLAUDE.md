@@ -250,6 +250,22 @@ Hub-wide UI theme selectable from `GlobalSettingsPage > Appearance`. Three built
 
 **REST**: `GET /api/hub/theme` returns `{ theme }`; `PATCH /api/hub/theme` validates the body against the allow-list and returns 400 on rejection.
 
+### Internationalization (i18n)
+
+Hub-wide UI language selectable from `GlobalSettingsPage > Language`. Eight built-ins: `en`, `es`, `fr`, `de`, `pt`, `it`, `zh`, `ja`. Architecture deliberately mirrors the theme system.
+
+**Stack**: `i18next` + `react-i18next`, initialized in `client/src/lib/i18n.ts` (the registry: `LANGUAGE_IDS`, `LANGUAGES` descriptors with native names, `isLanguageId`, `DEFAULT_LANGUAGE='en'`). English resources load **eagerly** (`import.meta.glob('../locales/en/*.json', { eager: true })` — always-available fallback, synchronous init so jsdom tests render real strings without provider wrapping); other languages load **lazily** on first switch via dynamic import, then `i18n.changeLanguage` re-renders every `useTranslation` consumer — **hot switch, no restart**.
+
+**Locale layout**: `client/src/locales/<lang>/<namespace>.json` — one JSON file per namespace, filename = namespace name (`common`, `settings`, `jobs`, `specs`, `explore`, …). `common` is the default namespace (generic actions/states/status). Components use `useTranslation('<ns>')`; non-React modules use `i18n.t('<ns>:key')`.
+
+**First-run default = OS language**: `detectSystemLanguage()` matches `navigator.languages` base subtags (`es-ES`→`es`, `zh-Hans-CN`→`zh`) against the supported list. The server stores only an **explicit user choice** (`hub_settings.ui_language`); `GET /api/hub/language` returns `{ language: null }` when never chosen, and the client keeps following the OS language without persisting. An explicit pick in Settings persists via `PATCH /api/hub/language` (allow-list validated, 400 on rejection) and mirrors to `localStorage['specrails-hub:ui-language']`. `LanguageProvider` (`client/src/context/LanguageContext.tsx`, mounted in `App.tsx` inside `ThemeProvider`) reconciles server → client on mount and applies switches optimistically with revert-on-failure — same pattern as `ThemeContext`. `main.tsx` awaits `initI18n()` before first render so the first paint is already translated.
+
+**Dates**: user-facing date-fns calls pass `{ locale: getDateFnsLocale() }` (exported from `lib/i18n.ts`, maps every `LanguageId` to a date-fns locale).
+
+**Adding a language** requires only: (a) append to `LANGUAGE_IDS` + a descriptor to `LANGUAGES` in `client/src/lib/i18n.ts`, (b) create `client/src/locales/<id>/` mirroring every namespace in `locales/en/`, (c) extend `LANGUAGE_ID_ALLOWLIST` in `server/hub-router.ts`, (d) map a date-fns locale in `DATE_FNS_LOCALES`. No component-code changes (OCP). The key-parity test (`client/src/lib/__tests__/locale-parity.test.ts`) enforces that every locale mirrors the English namespaces, key tree, and `{{placeholders}}` exactly.
+
+**String hygiene**: no hardcoded user-visible strings in components — everything goes through `t()`. English is the source-of-truth locale. Do not concatenate translated fragments; use interpolation (`{{var}}`) and i18next plurals (`key_one`/`key_other`). `demo-mode/**` (separate dist-demo build) is exempt.
+
 ### Draft tickets (Save as Draft)
 
 In-progress Explore Spec sessions can be persisted as **draft tickets** so the user can resume an exploration later from the SpecsBoard.

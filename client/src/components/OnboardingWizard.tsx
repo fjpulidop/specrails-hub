@@ -1,4 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
+import { useTranslation, Trans } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import {
   Sparkles,
@@ -201,281 +203,299 @@ interface StepConfig {
   content: React.ReactNode
 }
 
-const STEPS: StepConfig[] = [
-  // 1 — Welcome
-  {
-    navLabel: 'Welcome',
-    icon: <Sparkles className="w-6 h-6" />,
-    accent: ACCENTS.primary,
-    title: 'Welcome to specrails-hub',
-    subtitle: 'Your local cockpit for shipping software with AI agents',
-    content: (
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          specrails-hub turns an idea into shipped code — and lets you <span className="text-foreground font-medium">see, steer, and trust</span> every
-          step. Draft a spec by talking to an AI, drop it on an execution rail, and hit Play. The pipeline handles
-          architecture, implementation, review and the pull request, streaming its work live the whole way.
-        </p>
-        <Callout accent={ACCENTS.primary} label="The core loop">
-          <FlowStrip
-            steps={[
-              { label: 'Add Spec', cls: 'text-accent-info' },
-              { label: 'Drop in a Rail', cls: 'text-accent-success' },
-              { label: 'Hit Play', cls: 'text-accent-warning' },
-              { label: 'Ship', cls: 'text-accent-secondary' },
-            ]}
-          />
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Each spec flows through <span className="text-foreground">Architect → Developer → Reviewer → Ship</span> automatically.
+function buildSteps(t: TFunction): StepConfig[] {
+  return [
+    // 1 — Welcome
+    {
+      navLabel: t('onboarding.welcome.nav'),
+      icon: <Sparkles className="w-6 h-6" />,
+      accent: ACCENTS.primary,
+      title: t('onboarding.welcome.title'),
+      subtitle: t('onboarding.welcome.subtitle'),
+      content: (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            <Trans t={t} i18nKey="onboarding.welcome.intro" components={{ b: <span className="text-foreground font-medium" /> }} />
           </p>
-        </Callout>
-        <div className="flex gap-3 items-start">
-          <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0 text-accent-success" />
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            <span className="text-foreground font-medium">100% local · single user · no accounts.</span> Everything runs on your
-            machine. Your code never leaves the laptop unless <span className="italic">you</span> spawn an agent against it.
-          </p>
-        </div>
-        <p className="text-xs text-muted-foreground italic">This quick tour walks through everything the hub can do — about a minute.</p>
-      </div>
-    ),
-  },
-
-  // 2 — Author specs
-  {
-    navLabel: 'Author specs',
-    icon: <MessageSquare className="w-6 h-6" />,
-    accent: ACCENTS.info,
-    title: 'Turn ideas into specs',
-    subtitle: 'Six ways to capture exactly what you want built',
-    content: (
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          A <span className="text-foreground font-medium">spec</span> is a description of work you want done. Author one however suits the moment —
-          from a quick one-liner to a full conversation with the AI.
-        </p>
-        <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
-          <Feature icon={<MessageSquare className="w-4 h-4" />} label="Explore — converse" accent={ACCENTS.info}>
-            Describe what you want in a chat; a live draft rebuilds itself every turn. A preset slider tunes how much project
-            context the AI sees — from your message only, up to the full codebase plus your MCP servers.
-          </Feature>
-          <Feature icon={<Zap className="w-4 h-4" />} label="Quick — one shot" accent={ACCENTS.info}>
-            Already know what you want? Generate a complete spec in a single turn. Optionally enrich it with a Contract Layer:
-            exact names, data shapes, invariants and a file-touch list so the agents don&apos;t reinvent anything.
-          </Feature>
-          <Feature icon={<Globe className="w-4 h-4" />} label="From a website" accent={ACCENTS.info}>
-            Opens an embedded browser. Hover-select an element or drag a rectangle, and the screenshot, DOM and applied CSS
-            become attachments. The desktop build ships its own Chromium, so it works offline.
-          </Feature>
-          <Feature icon={<Scissors className="w-4 h-4" />} label="SMASH a big epic" accent={ACCENTS.info}>
-            Explode a large spec into a family of smaller sub-specs in one click — each child carries a short summary on its card.
-          </Feature>
-          <Feature icon={<Save className="w-4 h-4" />} label="Drafts &amp; Continue Editing" accent={ACCENTS.info}>
-            Park an in-progress exploration as a draft ticket and resume it later; reopen any spec back in Explore to keep refining it.
-          </Feature>
-          <Feature icon={<Columns2 className="w-4 h-4" />} label="Compare side by side" accent={ACCENTS.info}>
-            Drag a spec to the screen edge and a picker of your other specs slides in — review two of them together, tablet-style.
-          </Feature>
-        </div>
-      </div>
-    ),
-  },
-
-  // 3 — Run the pipeline (rails)
-  {
-    navLabel: 'Run on rails',
-    icon: <Workflow className="w-6 h-6" />,
-    accent: ACCENTS.success,
-    title: 'Run the pipeline on rails',
-    subtitle: 'Organize specs into lanes, then launch the agents',
-    content: (
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          The right side of the Dashboard is your <span className="text-foreground font-medium">Rails</span> — execution lanes. Drag a spec card onto a
-          rail and press <span className="text-accent-warning font-medium">▶ Play</span> to launch an implementation job.
-        </p>
-        <Callout accent={ACCENTS.success} label="What each job runs">
-          <FlowStrip
-            steps={[
-              { label: 'Architect', cls: 'text-accent-info' },
-              { label: 'Developer', cls: 'text-accent-success' },
-              { label: 'Reviewer', cls: 'text-accent-warning' },
-              { label: 'Ship', cls: 'text-accent-secondary' },
-            ]}
-          />
-          <p className="mt-2 text-[11px] text-muted-foreground">Every phase streams its logs live as it works.</p>
-        </Callout>
-        <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
-          <Feature icon={<GitBranch className="w-4 h-4" />} label="Pick how a rail runs" accent={ACCENTS.success}>
-            Each rail chooses a mode: <span className="text-foreground">Implement</span> (the full structured pipeline),
-            <span className="text-foreground"> Batch</span> (several specs in sequence), or <span className="text-foreground">Ultracode</span>
-            {' '}(Claude works autonomously, no fixed pipeline).
-          </Feature>
-          <Feature icon={<Bot className="w-4 h-4" />} label="Agent profiles" accent={ACCENTS.success}>
-            A per-project, declarative catalog that decides which agents run and which model each one uses — picked per rail and
-            snapshotted per job so concurrent work stays isolated.
-          </Feature>
-          <Feature icon={<Gauge className="w-4 h-4" />} label="Live job detail" accent={ACCENTS.success}>
-            Every job shows a ticket-identity header, a live duration ticker and running turn/token counts, with the authoritative
-            cost resolved on exit.
-          </Feature>
-          <Feature icon={<FolderOpen className="w-4 h-4" />} label="Many projects, isolated" accent={ACCENTS.success}>
-            Each project has its own database and job queue. Run different projects at the same time and switch between them from the
-            left sidebar — your place is remembered per project.
-          </Feature>
-        </div>
-      </div>
-    ),
-  },
-
-  // 4 — Providers
-  {
-    navLabel: 'Your agent',
-    icon: <Bot className="w-6 h-6" />,
-    accent: ACCENTS.secondary,
-    title: 'Bring your own agent',
-    subtitle: 'Claude Code and Codex, as first-class engines',
-    content: (
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          The hub treats <span className="text-foreground font-medium">Claude Code</span> and <span className="text-foreground font-medium">Codex CLI</span>
-          {' '}as interchangeable engines behind one contract. A project can install one or both — the choice is made at install time.
-        </p>
-        <div className="rounded-lg border border-border/40 overflow-hidden text-xs">
-          <div className="grid grid-cols-[1.4fr_1fr_1fr] bg-card/40">
-            <div className="px-3 py-2 font-semibold text-muted-foreground">Capability</div>
-            <div className="px-3 py-2 font-semibold text-accent-secondary text-center">Claude Code</div>
-            <div className="px-3 py-2 font-semibold text-accent-success text-center">Codex CLI</div>
+          <Callout accent={ACCENTS.primary} label={t('onboarding.welcome.coreLoopLabel')}>
+            <FlowStrip
+              steps={[
+                { label: t('onboarding.flow.addSpec'), cls: 'text-accent-info' },
+                { label: t('onboarding.flow.dropInRail'), cls: 'text-accent-success' },
+                { label: t('onboarding.flow.hitPlay'), cls: 'text-accent-warning' },
+                { label: t('onboarding.flow.ship'), cls: 'text-accent-secondary' },
+              ]}
+            />
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              <Trans t={t} i18nKey="onboarding.welcome.flowCaption" components={{ b: <span className="text-foreground" /> }} />
+            </p>
+          </Callout>
+          <div className="flex gap-3 items-start">
+            <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0 text-accent-success" />
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              <Trans
+                t={t}
+                i18nKey="onboarding.welcome.localNote"
+                components={{ b: <span className="text-foreground font-medium" />, i: <span className="italic" /> }}
+              />
+            </p>
           </div>
-          {[
-            ['Streaming & session resume', 'Native', 'Native'],
-            ['Cost reporting', 'Provider-billed', 'Estimated (~)'],
-            ['Telemetry (OTEL)', 'Native', 'Synthesized'],
-            ['Agent profiles', 'Yes', '—'],
-          ].map((row) => (
-            <div key={row[0]} className="grid grid-cols-[1.4fr_1fr_1fr] border-t border-border/30">
-              <div className="px-3 py-2 text-foreground/90">{row[0]}</div>
-              <div className="px-3 py-2 text-center text-muted-foreground">{row[1]}</div>
-              <div className="px-3 py-2 text-center text-muted-foreground">{row[2]}</div>
+          <p className="text-xs text-muted-foreground italic">{t('onboarding.welcome.tourNote')}</p>
+        </div>
+      ),
+    },
+
+    // 2 — Author specs
+    {
+      navLabel: t('onboarding.authorSpecs.nav'),
+      icon: <MessageSquare className="w-6 h-6" />,
+      accent: ACCENTS.info,
+      title: t('onboarding.authorSpecs.title'),
+      subtitle: t('onboarding.authorSpecs.subtitle'),
+      content: (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            <Trans t={t} i18nKey="onboarding.authorSpecs.intro" components={{ b: <span className="text-foreground font-medium" /> }} />
+          </p>
+          <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
+            <Feature icon={<MessageSquare className="w-4 h-4" />} label={t('onboarding.authorSpecs.exploreLabel')} accent={ACCENTS.info}>
+              {t('onboarding.authorSpecs.exploreBody')}
+            </Feature>
+            <Feature icon={<Zap className="w-4 h-4" />} label={t('onboarding.authorSpecs.quickLabel')} accent={ACCENTS.info}>
+              {t('onboarding.authorSpecs.quickBody')}
+            </Feature>
+            <Feature icon={<Globe className="w-4 h-4" />} label={t('onboarding.authorSpecs.websiteLabel')} accent={ACCENTS.info}>
+              {t('onboarding.authorSpecs.websiteBody')}
+            </Feature>
+            <Feature icon={<Scissors className="w-4 h-4" />} label={t('onboarding.authorSpecs.smashLabel')} accent={ACCENTS.info}>
+              {t('onboarding.authorSpecs.smashBody')}
+            </Feature>
+            <Feature icon={<Save className="w-4 h-4" />} label={t('onboarding.authorSpecs.draftsLabel')} accent={ACCENTS.info}>
+              {t('onboarding.authorSpecs.draftsBody')}
+            </Feature>
+            <Feature icon={<Columns2 className="w-4 h-4" />} label={t('onboarding.authorSpecs.compareLabel')} accent={ACCENTS.info}>
+              {t('onboarding.authorSpecs.compareBody')}
+            </Feature>
+          </div>
+        </div>
+      ),
+    },
+
+    // 3 — Run the pipeline (rails)
+    {
+      navLabel: t('onboarding.rails.nav'),
+      icon: <Workflow className="w-6 h-6" />,
+      accent: ACCENTS.success,
+      title: t('onboarding.rails.title'),
+      subtitle: t('onboarding.rails.subtitle'),
+      content: (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            <Trans
+              t={t}
+              i18nKey="onboarding.rails.intro"
+              components={{
+                b: <span className="text-foreground font-medium" />,
+                play: <span className="text-accent-warning font-medium" />,
+              }}
+            />
+          </p>
+          <Callout accent={ACCENTS.success} label={t('onboarding.rails.jobLabel')}>
+            <FlowStrip
+              steps={[
+                { label: t('onboarding.flow.architect'), cls: 'text-accent-info' },
+                { label: t('onboarding.flow.developer'), cls: 'text-accent-success' },
+                { label: t('onboarding.flow.reviewer'), cls: 'text-accent-warning' },
+                { label: t('onboarding.flow.ship'), cls: 'text-accent-secondary' },
+              ]}
+            />
+            <p className="mt-2 text-[11px] text-muted-foreground">{t('onboarding.rails.flowCaption')}</p>
+          </Callout>
+          <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
+            <Feature icon={<GitBranch className="w-4 h-4" />} label={t('onboarding.rails.modeLabel')} accent={ACCENTS.success}>
+              <Trans t={t} i18nKey="onboarding.rails.modeBody" components={{ b: <span className="text-foreground" /> }} />
+            </Feature>
+            <Feature icon={<Bot className="w-4 h-4" />} label={t('onboarding.rails.profilesLabel')} accent={ACCENTS.success}>
+              {t('onboarding.rails.profilesBody')}
+            </Feature>
+            <Feature icon={<Gauge className="w-4 h-4" />} label={t('onboarding.rails.jobDetailLabel')} accent={ACCENTS.success}>
+              {t('onboarding.rails.jobDetailBody')}
+            </Feature>
+            <Feature icon={<FolderOpen className="w-4 h-4" />} label={t('onboarding.rails.isolationLabel')} accent={ACCENTS.success}>
+              {t('onboarding.rails.isolationBody')}
+            </Feature>
+          </div>
+        </div>
+      ),
+    },
+
+    // 4 — Providers
+    {
+      navLabel: t('onboarding.providers.nav'),
+      icon: <Bot className="w-6 h-6" />,
+      accent: ACCENTS.secondary,
+      title: t('onboarding.providers.title'),
+      subtitle: t('onboarding.providers.subtitle'),
+      content: (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            <Trans t={t} i18nKey="onboarding.providers.intro" components={{ b: <span className="text-foreground font-medium" /> }} />
+          </p>
+          <div className="rounded-lg border border-border/40 overflow-hidden text-xs">
+            <div className="grid grid-cols-[1.4fr_1fr_1fr] bg-card/40">
+              <div className="px-3 py-2 font-semibold text-muted-foreground">{t('onboarding.providers.table.capability')}</div>
+              <div className="px-3 py-2 font-semibold text-accent-secondary text-center">Claude Code</div>
+              <div className="px-3 py-2 font-semibold text-accent-success text-center">Codex CLI</div>
             </div>
-          ))}
-        </div>
-        <Callout accent={ACCENTS.secondary} label="When both are installed">
-          Pick the engine <span className="text-foreground">per spec, per rail, or per terminal launch</span>. The hub remembers your
-          last choice per project. Codex cost is estimated from a local rate-card and always flagged with a <span className="font-mono">~</span>.
-        </Callout>
-      </div>
-    ),
-  },
-
-  // 5 — Cost
-  {
-    navLabel: 'Track cost',
-    icon: <Coins className="w-6 h-6" />,
-    accent: ACCENTS.warning,
-    title: 'Track every cent',
-    subtitle: 'Every billable invocation, recorded and visualized',
-    content: (
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Every AI invocation — across rails, Quick, Explore, AI edits, SMASH and file summaries — is recorded for
-          <span className="text-foreground font-medium"> both Claude and Codex</span>. No more guessing what the agents cost.
-        </p>
-        <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
-          <Feature icon={<Gauge className="w-4 h-4" />} label="Analytics page" accent={ACCENTS.warning}>
-            A burn-rate hero, daily timeline, top tickets, model breakdown and a cost-vs-turns scatter. Filter by period
-            (7d / 30d / 90d / All) and by surface.
-          </Feature>
-          <Feature icon={<Receipt className="w-4 h-4" />} label="Per-ticket spending" accent={ACCENTS.warning}>
-            Each spec&apos;s detail shows what it cost and how many turns it took, deep-linking into Analytics filtered to that ticket.
-          </Feature>
-          <Feature icon={<DollarSign className="w-4 h-4" />} label="Honest numbers" accent={ACCENTS.warning}>
-            Claude cost is the provider-billed figure; Codex is estimated and flagged with <span className="font-mono">~</span>. Token totals
-            include the cache tiers, so the figures actually reconcile.
-          </Feature>
-          <Feature icon={<Wallet className="w-4 h-4" />} label="Budgets &amp; alerts" accent={ACCENTS.warning}>
-            Set a daily budget and a per-job cost alert; the hub auto-pauses the queue when you cross the line. Export anything to CSV or JSON.
-          </Feature>
-        </div>
-      </div>
-    ),
-  },
-
-  // 6 — Workspace
-  {
-    navLabel: 'Workspace',
-    icon: <Boxes className="w-6 h-6" />,
-    accent: ACCENTS.highlight,
-    title: 'Make it your workspace',
-    subtitle: 'Everything you need without leaving the window',
-    content: (
-      <div className="space-y-4">
-        <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
-          <Feature icon={<Terminal className="w-4 h-4" />} label="Terminal panel" accent={ACCENTS.highlight}>
-            A real VS-Code-style terminal at the bottom (<Kbd>{MOD}</Kbd> <Kbd>J</Kbd>) — WebGL rendering, search, inline images,
-            drag-drop paths and shell integration. Up to 10 sessions per project.
-          </Feature>
-          <Feature icon={<FileCode className="w-4 h-4" />} label="Code explorer" accent={ACCENTS.highlight}>
-            A read-only file tree and Monaco viewer with plain-language AI summaries and &ldquo;touched by AI&rdquo; provenance chips,
-            so anyone can follow what changed and why.
-          </Feature>
-          <Feature icon={<Plug className="w-4 h-4" />} label="Integrations" accent={ACCENTS.highlight}>
-            A per-project marketplace of MCP integrations — Serena semantic code-navigation is bundled. Installs are additive:
-            adding one never disturbs another.
-          </Feature>
-          <Feature icon={<Palette className="w-4 h-4" />} label="Themes" accent={ACCENTS.highlight}>
-            Five built-in themes — specrails (default), dracula, aurora-light, obsidian-dark and matrix — applied before the UI
-            paints, so there&apos;s no flash. Change them in Settings → Appearance.
-          </Feature>
-          <Feature icon={<Layers className="w-4 h-4" />} label="Minimizable chats" accent={ACCENTS.highlight}>
-            Park an Explore or AI-Edit session into a dock chip and pick it back up later — never lost across refreshes or project switches.
-          </Feature>
-          <Feature icon={<Rocket className="w-4 h-4" />} label="Desktop or browser" accent={ACCENTS.highlight}>
-            Run the hub in your browser, or grab the signed desktop app (macOS &amp; Windows) that bundles its own server and runtimes.
-          </Feature>
-        </div>
-      </div>
-    ),
-  },
-
-  // 7 — Move fast / get started
-  {
-    navLabel: 'Move fast',
-    icon: <Command className="w-6 h-6" />,
-    accent: ACCENTS.primary,
-    title: 'Move at the speed of thought',
-    subtitle: 'Keyboard-first, everywhere',
-    content: (
-      <div className="space-y-4">
-        <Callout accent={ACCENTS.primary} label="Command palette">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-foreground">Press</span> <Kbd>{MOD}</Kbd> <span className="text-muted-foreground">+</span> <Kbd>K</Kbd>
-            <span className="text-muted-foreground">anywhere</span>
+            {[
+              [t('onboarding.providers.table.streamingResume'), t('onboarding.providers.table.native'), t('onboarding.providers.table.native')],
+              [t('onboarding.providers.table.costReporting'), t('onboarding.providers.table.providerBilled'), t('onboarding.providers.table.estimated')],
+              [t('onboarding.providers.table.telemetry'), t('onboarding.providers.table.native'), t('onboarding.providers.table.synthesized')],
+              [t('onboarding.providers.table.agentProfiles'), t('common:states.yes'), '—'],
+            ].map((row) => (
+              <div key={row[0]} className="grid grid-cols-[1.4fr_1fr_1fr] border-t border-border/30">
+                <div className="px-3 py-2 text-foreground/90">{row[0]}</div>
+                <div className="px-3 py-2 text-center text-muted-foreground">{row[1]}</div>
+                <div className="px-3 py-2 text-center text-muted-foreground">{row[2]}</div>
+              </div>
+            ))}
           </div>
-          Switch projects, run spec commands, jump to any page and find recent jobs — all with fuzzy search.
-        </Callout>
-        <div className="grid sm:grid-cols-2 gap-x-5 gap-y-3">
-          <Feature icon={<Terminal className="w-4 h-4" />} label="Terminal panel" accent={ACCENTS.primary}>
-            Toggle with <Kbd>{MOD}</Kbd> <Kbd>J</Kbd>.
-          </Feature>
-          <Feature icon={<Keyboard className="w-4 h-4" />} label="All shortcuts" accent={ACCENTS.primary}>
-            Press <Kbd>?</Kbd> to see the full cheat-sheet.
-          </Feature>
-          <Feature icon={<MessageSquare className="w-4 h-4" />} label="Chat sidebar" accent={ACCENTS.primary}>
-            Toggle the right sidebar with <Kbd>{MOD}</Kbd> <Kbd>B</Kbd>.
-          </Feature>
-          <Feature icon={<FolderOpen className="w-4 h-4" />} label="Projects sidebar" accent={ACCENTS.primary}>
-            Toggle the left Arc sidebar with <Kbd>{ALT}</Kbd> <Kbd>{MOD}</Kbd> <Kbd>B</Kbd>.
-          </Feature>
+          <Callout accent={ACCENTS.secondary} label={t('onboarding.providers.calloutLabel')}>
+            <Trans
+              t={t}
+              i18nKey="onboarding.providers.calloutBody"
+              components={{ b: <span className="text-foreground" />, mono: <span className="font-mono" /> }}
+            />
+          </Callout>
         </div>
-        <Callout accent={ACCENTS.primary}>
-          <span className="text-foreground font-medium">That&apos;s the tour.</span> Add a project from the left sidebar and ship your first
-          spec. You can reopen this walkthrough anytime from Settings.
-        </Callout>
-      </div>
-    ),
-  },
-]
+      ),
+    },
+
+    // 5 — Cost
+    {
+      navLabel: t('onboarding.cost.nav'),
+      icon: <Coins className="w-6 h-6" />,
+      accent: ACCENTS.warning,
+      title: t('onboarding.cost.title'),
+      subtitle: t('onboarding.cost.subtitle'),
+      content: (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            <Trans t={t} i18nKey="onboarding.cost.intro" components={{ b: <span className="text-foreground font-medium" /> }} />
+          </p>
+          <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
+            <Feature icon={<Gauge className="w-4 h-4" />} label={t('onboarding.cost.analyticsLabel')} accent={ACCENTS.warning}>
+              {t('onboarding.cost.analyticsBody')}
+            </Feature>
+            <Feature icon={<Receipt className="w-4 h-4" />} label={t('onboarding.cost.perTicketLabel')} accent={ACCENTS.warning}>
+              {t('onboarding.cost.perTicketBody')}
+            </Feature>
+            <Feature icon={<DollarSign className="w-4 h-4" />} label={t('onboarding.cost.honestLabel')} accent={ACCENTS.warning}>
+              <Trans t={t} i18nKey="onboarding.cost.honestBody" components={{ mono: <span className="font-mono" /> }} />
+            </Feature>
+            <Feature icon={<Wallet className="w-4 h-4" />} label={t('onboarding.cost.budgetsLabel')} accent={ACCENTS.warning}>
+              {t('onboarding.cost.budgetsBody')}
+            </Feature>
+          </div>
+        </div>
+      ),
+    },
+
+    // 6 — Workspace
+    {
+      navLabel: t('onboarding.workspace.nav'),
+      icon: <Boxes className="w-6 h-6" />,
+      accent: ACCENTS.highlight,
+      title: t('onboarding.workspace.title'),
+      subtitle: t('onboarding.workspace.subtitle'),
+      content: (
+        <div className="space-y-4">
+          <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
+            <Feature icon={<Terminal className="w-4 h-4" />} label={t('onboarding.workspace.terminalLabel')} accent={ACCENTS.highlight}>
+              <Trans
+                t={t}
+                i18nKey="onboarding.workspace.terminalBody"
+                components={{ mod: <Kbd>{MOD}</Kbd>, j: <Kbd>J</Kbd> }}
+              />
+            </Feature>
+            <Feature icon={<FileCode className="w-4 h-4" />} label={t('onboarding.workspace.codeLabel')} accent={ACCENTS.highlight}>
+              {t('onboarding.workspace.codeBody')}
+            </Feature>
+            <Feature icon={<Plug className="w-4 h-4" />} label={t('onboarding.workspace.integrationsLabel')} accent={ACCENTS.highlight}>
+              {t('onboarding.workspace.integrationsBody')}
+            </Feature>
+            <Feature icon={<Palette className="w-4 h-4" />} label={t('onboarding.workspace.themesLabel')} accent={ACCENTS.highlight}>
+              {t('onboarding.workspace.themesBody')}
+            </Feature>
+            <Feature icon={<Layers className="w-4 h-4" />} label={t('onboarding.workspace.chatsLabel')} accent={ACCENTS.highlight}>
+              {t('onboarding.workspace.chatsBody')}
+            </Feature>
+            <Feature icon={<Rocket className="w-4 h-4" />} label={t('onboarding.workspace.desktopLabel')} accent={ACCENTS.highlight}>
+              {t('onboarding.workspace.desktopBody')}
+            </Feature>
+          </div>
+        </div>
+      ),
+    },
+
+    // 7 — Move fast / get started
+    {
+      navLabel: t('onboarding.moveFast.nav'),
+      icon: <Command className="w-6 h-6" />,
+      accent: ACCENTS.primary,
+      title: t('onboarding.moveFast.title'),
+      subtitle: t('onboarding.moveFast.subtitle'),
+      content: (
+        <div className="space-y-4">
+          <Callout accent={ACCENTS.primary} label={t('onboarding.moveFast.paletteLabel')}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <Trans
+                t={t}
+                i18nKey="onboarding.moveFast.paletteShortcut"
+                components={{
+                  f: <span className="text-foreground" />,
+                  m: <span className="text-muted-foreground" />,
+                  mod: <Kbd>{MOD}</Kbd>,
+                  k: <Kbd>K</Kbd>,
+                }}
+              />
+            </div>
+            {t('onboarding.moveFast.paletteBody')}
+          </Callout>
+          <div className="grid sm:grid-cols-2 gap-x-5 gap-y-3">
+            <Feature icon={<Terminal className="w-4 h-4" />} label={t('onboarding.moveFast.terminalLabel')} accent={ACCENTS.primary}>
+              <Trans
+                t={t}
+                i18nKey="onboarding.moveFast.terminalBody"
+                components={{ mod: <Kbd>{MOD}</Kbd>, j: <Kbd>J</Kbd> }}
+              />
+            </Feature>
+            <Feature icon={<Keyboard className="w-4 h-4" />} label={t('onboarding.moveFast.shortcutsLabel')} accent={ACCENTS.primary}>
+              <Trans t={t} i18nKey="onboarding.moveFast.shortcutsBody" components={{ q: <Kbd>?</Kbd> }} />
+            </Feature>
+            <Feature icon={<MessageSquare className="w-4 h-4" />} label={t('onboarding.moveFast.chatLabel')} accent={ACCENTS.primary}>
+              <Trans
+                t={t}
+                i18nKey="onboarding.moveFast.chatBody"
+                components={{ mod: <Kbd>{MOD}</Kbd>, bkey: <Kbd>B</Kbd> }}
+              />
+            </Feature>
+            <Feature icon={<FolderOpen className="w-4 h-4" />} label={t('onboarding.moveFast.projectsLabel')} accent={ACCENTS.primary}>
+              <Trans
+                t={t}
+                i18nKey="onboarding.moveFast.projectsBody"
+                components={{ alt: <Kbd>{ALT}</Kbd>, mod: <Kbd>{MOD}</Kbd>, bkey: <Kbd>B</Kbd> }}
+              />
+            </Feature>
+          </div>
+          <Callout accent={ACCENTS.primary}>
+            <Trans t={t} i18nKey="onboarding.moveFast.outro" components={{ b: <span className="text-foreground font-medium" /> }} />
+          </Callout>
+        </div>
+      ),
+    },
+  ]
+}
 
 // ─── OnboardingWizard ─────────────────────────────────────────────────────────
 
@@ -485,12 +505,14 @@ interface OnboardingWizardProps {
 }
 
 export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
+  const { t } = useTranslation('setup')
   const [step, setStep] = useState(0)
   const [dontShowAgain, setDontShowAgain] = useState(false)
 
-  const current = STEPS[step]
+  const steps = useMemo(() => buildSteps(t), [t])
+  const current = steps[step]
   const isFirst = step === 0
-  const isLast = step === STEPS.length - 1
+  const isLast = step === steps.length - 1
 
   const handleClose = useCallback(() => {
     if (dontShowAgain) dismissOnboarding()
@@ -533,10 +555,10 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
                   <span className="text-accent-secondary">rails</span>
                   <span className="text-muted-foreground"> hub</span>
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Product tour</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{t('onboarding.productTour')}</p>
               </div>
               <ol className="space-y-0.5">
-                {STEPS.map((s, i) => {
+                {steps.map((s, i) => {
                   const isActive = i === step
                   const isDone = i < step
                   return (
@@ -544,7 +566,7 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
                       <button
                         type="button"
                         onClick={() => setStep(i)}
-                        aria-label={`Go to step ${i + 1}: ${s.navLabel}`}
+                        aria-label={t('onboarding.goToStep', { step: i + 1, label: s.navLabel })}
                         aria-current={isActive ? 'step' : undefined}
                         className={cn(
                           'w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors',
@@ -570,7 +592,7 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
                 })}
               </ol>
               <div className="mt-auto px-2.5 pt-4 text-[10px] text-muted-foreground">
-                Step {step + 1} of {STEPS.length}
+                {t('onboarding.stepCount', { current: step + 1, total: steps.length })}
               </div>
             </nav>
 
@@ -594,12 +616,12 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
 
                 {/* Mobile progress (left nav hidden) */}
                 <div className="md:hidden flex items-center gap-1.5 mb-5">
-                  {STEPS.map((s, i) => (
+                  {steps.map((s, i) => (
                     <button
                       key={s.navLabel}
                       type="button"
                       onClick={() => setStep(i)}
-                      aria-label={`Step ${i + 1}`}
+                      aria-label={t('onboarding.stepLabel', { step: i + 1 })}
                       className={cn('h-1.5 rounded-full transition-all', i === step ? cn('w-6', s.accent.bar) : 'w-1.5 bg-muted-foreground/30')}
                     />
                   ))}
@@ -622,7 +644,7 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
                         data-testid="onboarding-dismiss-checkbox"
                       />
                       <span className="text-[11px] text-muted-foreground group-hover:text-foreground transition-colors">
-                        Don&apos;t show this again
+                        {t('onboarding.dontShowAgain')}
                       </span>
                     </label>
                   )}
@@ -631,16 +653,16 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
                 <div className="flex items-center gap-2">
                   {isFirst ? (
                     <Button variant="ghost" size="sm" onClick={handleClose} className="text-xs text-muted-foreground" data-testid="onboarding-skip">
-                      Skip tour
+                      {t('onboarding.skipTour')}
                     </Button>
                   ) : (
                     <Button variant="ghost" size="sm" onClick={handleBack} className="text-xs" data-testid="onboarding-back">
                       <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-                      Back
+                      {t('common:actions.back')}
                     </Button>
                   )}
                   <Button size="sm" onClick={handleNext} className={cn('text-xs', current.accent.btn)} data-testid="onboarding-next">
-                    {isLast ? 'Get Started' : 'Next'}
+                    {isLast ? t('onboarding.getStarted') : t('common:actions.next')}
                     {!isLast && <ArrowRight className="w-3.5 h-3.5 ml-1" />}
                   </Button>
                 </div>

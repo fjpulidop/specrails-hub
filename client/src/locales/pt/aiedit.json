@@ -1,0 +1,55 @@
+{
+  "shell": {
+    "backAriaLabel": "Voltar (Esc)",
+    "apply": "Aplicar",
+    "somethingWentWrong": "Ocorreu um erro",
+    "quickPrompts": "Prompts rápidos",
+    "workingOnRefinement": "A trabalhar no seu refinamento…",
+    "history": "Histórico",
+    "viewCurrentContent": "Ver conteúdo atual",
+    "conversation": "Conversa",
+    "applied": "Aplicado.",
+    "you": "Você",
+    "autoTestResult": "Resultado do teste automático",
+    "ai": "IA",
+    "refinementReady": "Refinamento pronto — reveja o diff à direita.",
+    "diffPreview": "Pré-visualização do diff",
+    "proposedChanges": "Alterações propostas",
+    "wordLevelDiff": "diff ao nível da palavra",
+    "forceApply": "Forçar aplicação",
+    "conflict": {
+      "diskChanged": "O ficheiro foi alterado no disco enquanto editava. A aplicação foi bloqueada.",
+      "nameChanged": "A IA alterou o nome do agente. Renomear é uma ação explícita separada — ajuste o rascunho ou renomeie no Studio."
+    },
+    "discardDialog": {
+      "ariaLabel": "Descartar alterações?",
+      "title": "Descartar refinamento?",
+      "body": "O rascunho atual será cancelado e não será aplicado.",
+      "keepEditing": "Continuar a editar"
+    },
+    "composer": {
+      "sendAriaLabel": "Enviar (⌘⏎)",
+      "kbdSubmit": "submeter",
+      "kbdCancel": "cancelar"
+    }
+  },
+  "composer": {
+    "title": "Edição com IA",
+    "placeholder": "Descreva as alterações que pretende…",
+    "submit": "Submeter",
+    "unsupportedFileType": "Tipo de ficheiro não suportado: {{name}}",
+    "uploadFailed": "Falha no upload de {{name}}: {{message}}"
+  },
+  "diffView": {
+    "inserted": "inserido",
+    "removed": "removido"
+  },
+  "refine": {
+    "serverError": "Erro do servidor ({{status}})",
+    "connectionFailed": "Falha na ligação: {{message}}",
+    "applyFailed": "Falha ao aplicar ({{status}})",
+    "loadAgentFailed": "Falha ao carregar o agente ({{status}})",
+    "loadSessionFailed": "Falha ao carregar a sessão ({{status}})",
+    "rehydrateFailed": "Falha ao restaurar a sessão: {{message}}"
+  }
+}

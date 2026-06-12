@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { List, LayoutGrid, StickyNote } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { TicketListView } from './TicketListView'
@@ -19,10 +20,10 @@ interface TicketsSectionProps {
   onCreateClick?: () => void
 }
 
-const VIEW_MODES: { mode: TicketViewMode; icon: typeof List; label: string }[] = [
-  { mode: 'list', icon: List, label: 'List view' },
-  { mode: 'grid', icon: LayoutGrid, label: 'Grid view (Kanban)' },
-  { mode: 'postit', icon: StickyNote, label: 'Post-it view' },
+const VIEW_MODES: { mode: TicketViewMode; icon: typeof List; labelKey: string }[] = [
+  { mode: 'list', icon: List, labelKey: 'viewMode.list' },
+  { mode: 'grid', icon: LayoutGrid, labelKey: 'viewMode.grid' },
+  { mode: 'postit', icon: StickyNote, labelKey: 'viewMode.postit' },
 ]
 
 export function TicketsSection({
@@ -35,6 +36,7 @@ export function TicketsSection({
   onPriorityChange,
   onCreateClick,
 }: TicketsSectionProps) {
+  const { t } = useTranslation('tickets')
   const [viewMode, setViewMode] = useState<TicketViewMode>('list')
 
   const handleTicketClick = useCallback(
@@ -48,7 +50,7 @@ export function TicketsSection({
     <div className="space-y-2">
       {/* View mode toggle */}
       <div className="flex items-center justify-end gap-0.5">
-        {VIEW_MODES.map(({ mode, icon: Icon, label }) => (
+        {VIEW_MODES.map(({ mode, icon: Icon, labelKey }) => (
           <Tooltip key={mode}>
             <TooltipTrigger asChild>
               <button
@@ -63,7 +65,7 @@ export function TicketsSection({
                 <Icon className="w-3.5 h-3.5" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>{label}</TooltipContent>
+            <TooltipContent>{t(labelKey)}</TooltipContent>
           </Tooltip>
         ))}
       </div>

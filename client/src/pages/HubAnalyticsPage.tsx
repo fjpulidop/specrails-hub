@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { RefreshCw, TrendingUp } from 'lucide-react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from 'recharts'
 import { format } from 'date-fns'
+import { getDateFnsLocale } from '../lib/i18n'
 import type { HubAnalyticsResponse, AnalyticsPeriod } from '../types'
 import { PeriodSelector } from '../components/analytics/PeriodSelector'
 import { useActiveTheme } from '../context/ThemeContext'
@@ -10,26 +12,27 @@ import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 // ─── KPI Cards ────────────────────────────────────────────────────────────────
 
 function HubKpiCards({ kpi }: { kpi: HubAnalyticsResponse['kpi'] }) {
+  const { t } = useTranslation('analytics')
   const cards = [
     {
-      label: 'Total Cost',
+      label: t('hub.totalCost'),
       value: `$${kpi.totalCostUsd.toFixed(4)}`,
-      sub: `$${kpi.costToday.toFixed(4)} today`,
+      sub: t('hub.costToday', { value: `$${kpi.costToday.toFixed(4)}` }),
     },
     {
-      label: 'Total Jobs',
+      label: t('hub.totalJobs'),
       value: kpi.totalJobs.toLocaleString(),
-      sub: `${kpi.jobsToday} today`,
+      sub: t('hub.jobsToday', { n: kpi.jobsToday }),
     },
     {
-      label: 'Success Rate',
+      label: t('hub.successRate'),
       value: `${(kpi.successRate * 100).toFixed(1)}%`,
-      sub: 'across all projects',
+      sub: t('hub.acrossAllProjects'),
     },
     {
-      label: 'Avg Cost / Job',
+      label: t('hub.avgCostPerJob'),
       value: kpi.totalJobs > 0 ? `$${(kpi.totalCostUsd / kpi.totalJobs).toFixed(5)}` : '—',
-      sub: 'period average',
+      sub: t('hub.periodAverage'),
     },
   ]
 
@@ -49,6 +52,7 @@ function HubKpiCards({ kpi }: { kpi: HubAnalyticsResponse['kpi'] }) {
 // ─── Cost Timeline ────────────────────────────────────────────────────────────
 
 function HubCostTimeline({ data }: { data: HubAnalyticsResponse['costTimeline'] }) {
+  const { t } = useTranslation('analytics')
   const theme = useActiveTheme()
   const hasData = data.length > 0 && data.some((d) => d.costUsd > 0)
   const tickStep = Math.max(1, Math.floor(data.length / 7))
@@ -56,10 +60,10 @@ function HubCostTimeline({ data }: { data: HubAnalyticsResponse['costTimeline'] 
 
   return (
     <div className="rounded-lg border border-border/40 bg-card/50 p-4">
-      <h3 className="text-sm font-medium mb-3">Cross-Project Cost Over Time</h3>
+      <h3 className="text-sm font-medium mb-3">{t('hub.costOverTime')}</h3>
       {!hasData ? (
         <div className="h-[200px] flex items-center justify-center text-xs text-muted-foreground">
-          No cost data for this period
+          {t('hub.noCostData')}
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={200}>
@@ -68,7 +72,7 @@ function HubCostTimeline({ data }: { data: HubAnalyticsResponse['costTimeline'] 
             <XAxis
               dataKey="date"
               ticks={ticks}
-              tickFormatter={(d: string) => { try { return format(new Date(d), 'MMM d') } catch { return d } }}
+              tickFormatter={(d: string) => { try { return format(new Date(d), 'MMM d', { locale: getDateFnsLocale() }) } catch { return d } }}
               tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
               axisLine={false}
               tickLine={false}
@@ -108,12 +112,13 @@ function HubCostTimeline({ data }: { data: HubAnalyticsResponse['costTimeline'] 
 // ─── Project Breakdown Table ──────────────────────────────────────────────────
 
 function ProjectBreakdown({ projects }: { projects: HubAnalyticsResponse['projectBreakdown'] }) {
+  const { t } = useTranslation('analytics')
   const theme = useActiveTheme()
   if (projects.length === 0) {
     return (
       <div className="rounded-lg border border-border/40 bg-card/50 p-4">
-        <h3 className="text-sm font-medium mb-3">Project Comparison</h3>
-        <p className="text-xs text-muted-foreground">No projects registered.</p>
+        <h3 className="text-sm font-medium mb-3">{t('hub.projectComparison')}</h3>
+        <p className="text-xs text-muted-foreground">{t('hub.noProjects')}</p>
       </div>
     )
   }
@@ -122,7 +127,7 @@ function ProjectBreakdown({ projects }: { projects: HubAnalyticsResponse['projec
 
   return (
     <div className="rounded-lg border border-border/40 bg-card/50 p-4">
-      <h3 className="text-sm font-medium mb-4">Project Comparison</h3>
+      <h3 className="text-sm font-medium mb-4">{t('hub.projectComparison')}</h3>
       <div className="space-y-3">
         {projects.map((p, idx) => (
           <div key={p.projectId} className="space-y-1">
@@ -131,8 +136,8 @@ function ProjectBreakdown({ projects }: { projects: HubAnalyticsResponse['projec
                 {p.projectName}
               </span>
               <div className="flex items-center gap-4 text-muted-foreground">
-                <span>{p.totalJobs} jobs</span>
-                <span>{(p.successRate * 100).toFixed(0)}% success</span>
+                <span>{t('hub.jobsCount', { count: p.totalJobs })}</span>
+                <span>{t('hub.successPct', { pct: (p.successRate * 100).toFixed(0) })}</span>
                 <span className="font-mono text-foreground">${p.totalCostUsd.toFixed(4)}</span>
               </div>
             </div>
@@ -155,13 +160,14 @@ function ProjectBreakdown({ projects }: { projects: HubAnalyticsResponse['projec
 // ─── Per-Project Bar Chart ────────────────────────────────────────────────────
 
 function ProjectCostBar({ projects }: { projects: HubAnalyticsResponse['projectBreakdown'] }) {
+  const { t } = useTranslation('analytics')
   const theme = useActiveTheme()
   if (projects.length === 0) return null
   const data = projects.map((p) => ({ name: p.projectName.slice(0, 12), costUsd: p.totalCostUsd }))
 
   return (
     <div className="rounded-lg border border-border/40 bg-card/50 p-4">
-      <h3 className="text-sm font-medium mb-3">Cost by Project</h3>
+      <h3 className="text-sm font-medium mb-3">{t('hub.costByProject')}</h3>
       <ResponsiveContainer width="100%" height={180}>
         <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -198,6 +204,7 @@ function ProjectCostBar({ projects }: { projects: HubAnalyticsResponse['projectB
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function HubAnalyticsPage() {
+  const { t } = useTranslation('analytics')
   const [period, setPeriod] = useState<AnalyticsPeriod>('7d')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -253,7 +260,7 @@ export default function HubAnalyticsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-muted-foreground" />
-            <h1 className="text-sm font-semibold">Hub Analytics</h1>
+            <h1 className="text-sm font-semibold">{t('hub.title')}</h1>
             {data && (
               <span className="text-xs text-muted-foreground">{data.period.label}</span>
             )}
@@ -269,7 +276,7 @@ export default function HubAnalyticsPage() {
               onClick={() => load(period, from, to)}
               disabled={loading}
               className="flex items-center gap-1.5 h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
-              aria-label="Refresh analytics"
+              aria-label={t('hub.refreshAria')}
             >
               <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -279,7 +286,7 @@ export default function HubAnalyticsPage() {
         {/* Error */}
         {error && (
           <div className="rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-xs text-red-400">
-            Failed to load analytics: {error}
+            {t('hub.failedToLoad', { error })}
           </div>
         )}
 

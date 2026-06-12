@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { SpendingResponse } from '../../types/spending'
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function ModelBreakdown({ data, loading, onSelectModel, activeModel }: Props) {
+  const { t } = useTranslation('analytics')
   if (loading && !data) {
     return <div className="h-[220px] rounded-xl border border-border/40 bg-card/40 animate-pulse" />
   }
@@ -18,9 +20,9 @@ export function ModelBreakdown({ data, loading, onSelectModel, activeModel }: Pr
 
   return (
     <div className="rounded-xl border border-border/50 bg-card/40 p-4">
-      <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Models</h2>
+      <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">{t('models.title')}</h2>
       {top.length === 0 ? (
-        <div className="h-32 flex items-center justify-center text-xs text-muted-foreground/70">No models recorded.</div>
+        <div className="h-32 flex items-center justify-center text-xs text-muted-foreground/70">{t('models.empty')}</div>
       ) : (
         <ul className="space-y-1.5">
           {top.map((m) => {

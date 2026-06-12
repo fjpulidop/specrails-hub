@@ -1,0 +1,75 @@
+{
+  "topBar": {
+    "title": "Terminal",
+    "openCliMulti": "Abrir CLI de IA num novo terminal",
+    "openCli": "Abrir {{cli}} num novo terminal",
+    "maxTerminals": "Máx. {{max}} terminais por projeto",
+    "openInBrowser": "Abrir no browser",
+    "pasteScript": "Colar script rápido no terminal ativo",
+    "pasteScriptNoActive": "Não há terminal ativo onde colar",
+    "newTerminal": "Novo terminal",
+    "killActive": "Terminar o terminal ativo",
+    "restorePanel": "Restaurar painel",
+    "maximizePanel": "Maximizar painel"
+  },
+  "panelChevron": {
+    "collapse": "Recolher painel do terminal",
+    "expand": "Expandir painel do terminal"
+  },
+  "dragHandle": {
+    "resize": "Redimensionar painel do terminal"
+  },
+  "sidebar": {
+    "rename": "Renomear {{name}}",
+    "close": "Fechar {{name}}"
+  },
+  "emptyState": {
+    "noTerminals": "Ainda não há terminais para este projeto.",
+    "newTerminal": "Novo terminal"
+  },
+  "search": {
+    "placeholder": "Localizar",
+    "previous": "Anterior (Shift+Enter)",
+    "next": "Seguinte (Enter)",
+    "matchCase": "Maiúsculas/minúsculas",
+    "regex": "Regex",
+    "wholeWord": "Palavra inteira",
+    "close": "Fechar (Esc)"
+  },
+  "contextMenu": {
+    "paste": "Colar",
+    "selectAll": "Selecionar tudo",
+    "clear": "Limpar",
+    "search": "Pesquisar…",
+    "saveScrollback": "Guardar scrollback em ficheiro…",
+    "openPath": "Abrir {{path}}"
+  },
+  "cliMenu": {
+    "open": "Abrir {{name}}"
+  },
+  "shortcutMenu": {
+    "configureBrowserUrl": "Configurar URL do browser nas definições…",
+    "editQuickScript": "Editar script rápido nas definições…"
+  },
+  "errors": {
+    "limitReached": "Limite de terminais atingido (máx. {{max}}).",
+    "spawnFailed": "A shell não conseguiu arrancar — o hub pode estar com poucos descritores de ficheiros. Tente reiniciar o hub.",
+    "invalidName": "Nome de terminal inválido.",
+    "openFailed": "Falha ao abrir o terminal.",
+    "serverUnreachable": "Não foi possível contactar o servidor para abrir um terminal.",
+    "exitedImmediately": "O terminal terminou imediatamente — a shell pode não ter arrancado. Se continuar a acontecer, reinicie o hub."
+  },
+  "session": {
+    "processExited": "[processo terminado]",
+    "processExitedWithCode": "[processo terminado (código {{code}})]"
+  },
+  "notifications": {
+    "commandFinished": "Comando concluído",
+    "commandFinishedNamed": "{{command}} concluído",
+    "finishedBody": "exit {{code}} em {{elapsed}}"
+  },
+  "duration": {
+    "seconds": "{{seconds}}s",
+    "minutesSeconds": "{{minutes}}m {{seconds}}s"
+  }
+}

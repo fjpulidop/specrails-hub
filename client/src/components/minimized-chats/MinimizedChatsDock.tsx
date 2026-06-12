@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronUp } from 'lucide-react'
 import type { MinimizedChat } from '../../context/MinimizedChatsContext'
 import { MinimizedChatChip } from './MinimizedChatChip'
@@ -33,6 +34,7 @@ export function MinimizedChatsDock({
   onRestore: (id: string) => void
   onClose: (id: string) => void
 }) {
+  const { t } = useTranslation('chat')
   const projectsById = useMemo(() => {
     const m = new Map<string, string>()
     for (const p of projects) m.set(p.id, p.name)
@@ -54,7 +56,7 @@ export function MinimizedChatsDock({
   return (
     <div
       data-testid="minimized-chats-dock"
-      aria-label={`${ordered.length} minimized ${ordered.length === 1 ? 'session' : 'sessions'}`}
+      aria-label={t('dock.minimizedSessions', { count: ordered.length })}
       className={`fixed bottom-4 ${rightClass} z-[70] flex flex-col-reverse gap-2 w-[320px] max-w-[calc(100vw-15rem)] max-h-[70vh] overflow-y-auto pointer-events-none`}
     >
       {ordered.map((chat) => (
@@ -64,7 +66,7 @@ export function MinimizedChatsDock({
         >
           <MinimizedChatChip
             chat={chat}
-            projectName={projectsById.get(chat.projectId) ?? 'Unknown project'}
+            projectName={projectsById.get(chat.projectId) ?? t('dock.unknownProject')}
             onRestore={() => onRestore(chat.id)}
             onClose={() => onClose(chat.id)}
           />
@@ -73,7 +75,7 @@ export function MinimizedChatsDock({
       {ordered.length > 1 && (
         <div className="pointer-events-auto self-end inline-flex items-center gap-1 rounded-full bg-card/80 border border-border/40 px-2 py-0.5 text-[10px] text-muted-foreground backdrop-blur-sm">
           <ChevronUp className="w-3 h-3" />
-          {ordered.length} minimized
+          {t('dock.minimizedCount', { count: ordered.length })}
         </div>
       )}
     </div>

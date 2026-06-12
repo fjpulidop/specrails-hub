@@ -1,0 +1,201 @@
+{
+  "statusLabel": {
+    "running": "en ejecución",
+    "completed": "completado",
+    "done": "hecho",
+    "failed": "fallido",
+    "canceled": "cancelado",
+    "queued": "en cola",
+    "zombie": "zombie",
+    "skipped": "omitido"
+  },
+  "statusTooltip": {
+    "running": "El job se está ejecutando",
+    "completed": "El job se completó correctamente",
+    "failed": "El job terminó con un código de salida distinto de cero",
+    "canceled": "El job se canceló manualmente",
+    "queued": "El job está esperando en la cola",
+    "queuedToRun": "El job está esperando para ejecutarse",
+    "zombie": "El job se terminó automáticamente tras una inactividad prolongada",
+    "skipped": "El job se omitió porque falló un job padre del pipeline"
+  },
+  "statusName": {
+    "running": "en ejecución",
+    "completed": "completado",
+    "failed": "fallido",
+    "canceled": "cancelado",
+    "zombie_terminated": "zombie",
+    "queued": "en cola",
+    "skipped": "omitido"
+  },
+  "page": {
+    "title": "Jobs",
+    "exportJobs": "Exportar jobs",
+    "proposalDeleted": "Propuesta eliminada",
+    "proposal": {
+      "title": "Propuesta",
+      "noContent": "Aún no hay contenido de la propuesta.",
+      "githubIssue": "Issue de GitHub:"
+    }
+  },
+  "detail": {
+    "breadcrumbDashboard": "Dashboard",
+    "breadcrumbJob": "Job #{{id}}",
+    "notFound": "Job no encontrado",
+    "notFoundDescription": "El ID de job «{{id}}» no existe",
+    "backToDashboard": "Volver al Dashboard",
+    "startedAgo": "Iniciado {{timeAgo}}",
+    "queuedWaiting": "En cola — esperando para empezar",
+    "exportDiagnostic": "Exportar diagnóstico",
+    "exportDiagnosticAria": "Exportar paquete de diagnóstico",
+    "exportDiagnosticTooltip": "Descarga un ZIP con la telemetría, los logs y el resumen de este job",
+    "reExecute": "Reejecutar",
+    "reExecuteTooltip": "Lanza un nuevo job con el mismo comando",
+    "cancelJob": "Cancelar job",
+    "cancelJobTooltip": "Envía SIGTERM al proceso en ejecución. El job se marcará como cancelado.",
+    "toast": {
+      "jobDeleted": "Job eliminado",
+      "cancelSignalSent": "Señal de cancelación enviada",
+      "cancelSignalSentDescription": "El job se detendrá en el siguiente punto seguro",
+      "failed": "Error",
+      "networkError": "Error de red",
+      "exportFailed": "Error al exportar",
+      "exportFailedHttp": "Error al exportar (HTTP {{status}})",
+      "jobRequeued": "Job reencolado",
+      "spawnFailed": "No se pudo lanzar el job"
+    }
+  },
+  "statusPanel": {
+    "inProgress": "Job en curso",
+    "completed": "Job completado",
+    "failed": "Job fallido",
+    "duration": "Duración",
+    "cost": "Coste",
+    "turns": "Turnos",
+    "tokens": "Tokens",
+    "filesCount_one": "{{count}} archivo",
+    "filesCount_other": "{{count}} archivos",
+    "pipelineTotal": "Total del pipeline ({{count}} fases)",
+    "totalCost": "Coste total",
+    "totalTokens": "Tokens totales",
+    "filesModified": "Archivos modificados"
+  },
+  "ticketHeader": {
+    "showMore": "+ {{count}} más",
+    "showLess": "Mostrar menos",
+    "deletedTicket": "#{{id}} (eliminado)",
+    "deletedTooltip": "El ticket ya no existe"
+  },
+  "modal": {
+    "openInNewTab": "Abrir en pestaña nueva",
+    "notFound": "Job no encontrado",
+    "cancelConfirmTitle": "¿Cancelar el job?",
+    "cancelConfirmDescription": "El job se detendrá en el siguiente punto seguro. Esta acción no se puede deshacer.",
+    "keepRunning": "Seguir ejecutando",
+    "cancelJob": "Cancelar job",
+    "toast": {
+      "cancelSignalSent": "Señal de cancelación enviada",
+      "cancelSignalSentDescription": "El job se detendrá en el siguiente punto seguro",
+      "cancelFailed": "No se pudo cancelar",
+      "networkError": "Error de red"
+    }
+  },
+  "comparison": {
+    "title": "Comparación de jobs",
+    "jobN": "Job {{n}}",
+    "loadFailed": "No se pudo cargar la comparación: {{error}}",
+    "duration": "Duración",
+    "cost": "Coste",
+    "tokensOut": "Tokens de salida",
+    "tokensIn": "Tokens de entrada",
+    "cacheRead": "Lectura de caché",
+    "model": "Modelo",
+    "phasesDone": "Fases completadas",
+    "betterValueHint": "Los resaltados en verde indican mejor valor"
+  },
+  "recent": {
+    "emptyTitle": "Aún no hay jobs",
+    "emptyDescription": "Ejecuta un comando arriba para ver aquí tu historial de jobs",
+    "filterAll": "Todos ({{count}})",
+    "filterStatus": "{{status}} ({{count}})",
+    "fromDate": "Fecha de inicio",
+    "toDate": "Fecha de fin",
+    "clear": "Limpiar",
+    "exitCompareMode": "Salir del modo comparación",
+    "compareTwoJobs": "Comparar 2 jobs",
+    "clearJobs": "Limpiar jobs",
+    "selectTwoToCompare": "Selecciona 2 jobs para comparar",
+    "selectOneMore": "Selecciona 1 job más",
+    "readyToCompare": "Listo — haz clic en comparar",
+    "compareAction": "Comparar →",
+    "colStatus": "Estado",
+    "colCommand": "Comando",
+    "colDuration": "Duración",
+    "colTokens": "Tokens",
+    "colCost": "Coste",
+    "colStarted": "Inicio",
+    "profileTooltip": "Perfil: {{name}}",
+    "pipelinePart": "Parte de un pipeline",
+    "pipelineDependsOn": "(depende del paso anterior)",
+    "deleteProposal": "Eliminar propuesta",
+    "loadMore": "Cargar más ({{count}} restantes)",
+    "priority": {
+      "critical": "crítica",
+      "high": "alta",
+      "normal": "normal",
+      "low": "baja"
+    },
+    "clearModal": {
+      "title": "Limpiar jobs",
+      "jobsInHistory_one": "{{count}} job en el historial",
+      "jobsInHistory_other": "{{count}} jobs en el historial",
+      "clearAll_one": "Limpiar {{count}} job",
+      "clearAll_other": "Limpiar los {{count}} jobs",
+      "orByRange": "O limpiar por rango de fechas:",
+      "fromPlaceholder": "Desde",
+      "toPlaceholder": "Hasta",
+      "clearInRange_one": "Limpiar {{count}} job del rango",
+      "clearInRange_other": "Limpiar {{count}} jobs del rango",
+      "clearRange": "Limpiar rango"
+    },
+    "deleteProposalConfirm": {
+      "title": "¿Eliminar la propuesta?",
+      "description": "Se eliminará permanentemente 1 propuesta. Esta acción no se puede deshacer."
+    },
+    "toast": {
+      "cleared_one": "{{count}} job eliminado",
+      "cleared_other": "{{count}} jobs eliminados",
+      "clearFailed": "No se pudieron limpiar los jobs",
+      "networkError": "Error de red"
+    }
+  },
+  "activeJob": {
+    "none": "Ningún job activo",
+    "noneHint": "Selecciona un comando abajo para iniciar un job",
+    "exitCode": "exit {{code}}",
+    "cancelTooltip": "Envía SIGTERM al proceso de claude en ejecución",
+    "viewLogs": "Ver logs",
+    "toast": {
+      "cancelRequested": "Cancelación del job solicitada",
+      "cancelRequestedDescription": "Enviando SIGTERM al proceso",
+      "cancelFailed": "No se pudo cancelar el job",
+      "networkError": "Error de red al cancelar el job"
+    }
+  },
+  "logViewer": {
+    "loading": "Cargando logs...",
+    "empty": "Aún no hay salida de log",
+    "filterPlaceholder": "Filtrar logs...",
+    "copySuccess": "Log copiado al portapapeles",
+    "copyFailed": "No se pudo copiar el log",
+    "lineCount": "{{filtered}} / {{total}} líneas",
+    "jumpToBottom": "Ir al final",
+    "phaseLines_one": "{{count}} línea",
+    "phaseLines_other": "{{count}} líneas",
+    "noMatchingLines": "Ninguna línea coincide",
+    "noOutput": "Sin salida",
+    "completed": "Completado",
+    "turns_one": "{{count}} turno",
+    "turns_other": "{{count}} turnos"
+  }
+}

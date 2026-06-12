@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Toaster } from 'sonner'
 import { _registerRouteForcer } from './lib/route-memory'
 import DashboardPage from './pages/DashboardPage'
@@ -45,6 +46,7 @@ import { MinimizedChatsProvider } from './context/MinimizedChatsContext'
 import { TicketDetailModalProvider } from './context/TicketDetailModalContext'
 import { useCompareUrlSync } from './hooks/useCompareUrlSync'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
+import { LanguageProvider } from './context/LanguageContext'
 import { FEATURE_AGENTS_SECTION, FEATURE_CODE_EXPLORER, FEATURE_TERMINAL_PANEL } from './lib/feature-flags'
 
 // ─── Per-project route memory (in-memory only — resets on app restart) ───────
@@ -120,6 +122,7 @@ function useProjectRouteMemory(activeProjectId: string | null) {
 // ─── Hub app shell ────────────────────────────────────────────────────────────
 
 function HubApp() {
+  const { t } = useTranslation('common')
   const { projects, activeProjectId, isLoading, isSwitchingProject, setupProjectIds, completeSetupWizard, setActiveProjectId } = useHub()
   const { cycleLeftMode, cycleRightMode } = useSidebarPin()
   const navigate = useNavigate()
@@ -190,7 +193,7 @@ function HubApp() {
       <div className="flex h-full">
         <div className="w-11 border-r border-border bg-card/50 animate-pulse flex-shrink-0" />
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-muted-foreground">Loading...</p>
+          <p className="text-sm text-muted-foreground">{t('states.loading')}</p>
         </div>
       </div>
     )
@@ -226,7 +229,7 @@ function HubApp() {
               onSkip={() => completeSetupWizard(activeProject.id)}
             />
           ) : (
-            <Suspense fallback={<div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
+            <Suspense fallback={<div className="flex-1 flex items-center justify-center"><p className="text-sm text-muted-foreground">{t('states.loading')}</p></div>}>
               <Routes>
                 <Route path="/docs" element={<DocsPage />} />
                 <Route path="/docs/:category/:slug" element={<DocsPage />} />
@@ -268,7 +271,7 @@ function HubApp() {
       <Dialog open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
           <div className="flex-1 overflow-auto">
-            <Suspense fallback={<div className="flex items-center justify-center h-40"><p className="text-sm text-muted-foreground">Loading...</p></div>}>
+            <Suspense fallback={<div className="flex items-center justify-center h-40"><p className="text-sm text-muted-foreground">{t('states.loading')}</p></div>}>
               <HubAnalyticsPage />
             </Suspense>
           </div>
@@ -384,6 +387,7 @@ export default function App() {
       >
         <SharedWebSocketProvider url={WS_URL}>
           <ThemeProvider>
+            <LanguageProvider>
             {/* Theme-scoped decorative effects (e.g. matrix rain). Dispatcher
                 renders the matching effect or nothing. See
                 `components/theme-effects/ThemeEffectLayer.tsx`. */}
@@ -408,6 +412,7 @@ export default function App() {
                 </ContractRefineTrackerProvider>
               </SpecGenTrackerProvider>
             </HubProvider>
+            </LanguageProvider>
           </ThemeProvider>
         </SharedWebSocketProvider>
       </div>

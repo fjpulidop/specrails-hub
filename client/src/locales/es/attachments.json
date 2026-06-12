@@ -1,0 +1,41 @@
+{
+  "removeFile": "Quitar {{name}}",
+  "errors": {
+    "uploadFailed": "Error al subir ({{status}})",
+    "uploadFailedFile": "Error al subir: {{name}}",
+    "deleteFailed": "Error al eliminar ({{status}})",
+    "bulkDeleteFailed": "Error al eliminar en bloque ({{status}})",
+    "listFailed": "Error al listar ({{status}})",
+    "fetchFailed": "Error al obtener ({{status}})",
+    "removeFailed": "No se pudo quitar el adjunto",
+    "loadFailed": "No se pudo cargar el adjunto"
+  },
+  "chip": {
+    "uploading": "Subiendo…",
+    "genericFile": "archivo"
+  },
+  "editor": {
+    "attachFiles": "Adjuntar archivos",
+    "uploadingFiles_one": "Subiendo {{count}} archivo…",
+    "uploadingFiles_other": "Subiendo {{count}} archivos…",
+    "dropToAddContext": "Suelta para añadir contexto"
+  },
+  "section": {
+    "ariaLabel": "Adjuntos",
+    "title": "Recursos",
+    "fileCount_one": "{{count}} archivo",
+    "fileCount_other": "{{count}} archivos"
+  },
+  "lightbox": {
+    "preview": "Vista previa de {{name}}",
+    "backToHub": "Volver al hub",
+    "download": "Descargar",
+    "downloadFile": "Descargar {{name}}",
+    "loading": "Cargando adjunto...",
+    "loadError": "No se pudo cargar el adjunto: {{error}}",
+    "previewUnavailable": "Vista previa no disponible para este tipo de archivo."
+  },
+  "sessionBar": {
+    "empty": "No hay recursos fijados — suelta archivos o haz clic en Añadir"
+  }
+}

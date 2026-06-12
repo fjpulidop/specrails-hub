@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 import { FEATURE_CODE_EXPLORER } from '../../lib/feature-flags'
 
 interface CodeExplorerSettings {
@@ -10,6 +11,7 @@ interface CodeExplorerSettings {
 export function CodeSectionSettings() {
   if (!FEATURE_CODE_EXPLORER) return null
 
+  const { t } = useTranslation('settings')
   const [settings, setSettings] = useState<CodeExplorerSettings | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -37,7 +39,7 @@ export function CodeSectionSettings() {
       const updated = (await res.json()) as CodeExplorerSettings
       setSettings(updated)
     } catch (err) {
-      toast.error(`Failed to save: ${(err as Error).message}`)
+      toast.error(t('errors.saveFailed', { message: (err as Error).message }))
       setSettings(settings)
     } finally {
       setSaving(false)
@@ -51,11 +53,11 @@ export function CodeSectionSettings() {
   return (
     <div className="space-y-2">
       <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-        Code section
+        {t('codeSection.heading')}
       </h3>
       <div className="rounded-md border border-border p-3 space-y-3">
         <label className="flex items-center justify-between gap-3 text-xs">
-          <span className="text-muted-foreground">Summary language</span>
+          <span className="text-muted-foreground">{t('codeSection.summaryLanguage')}</span>
           <select
             value={settings.language}
             disabled={saving}
@@ -67,7 +69,7 @@ export function CodeSectionSettings() {
           </select>
         </label>
         <label className="flex items-center justify-between gap-3 text-xs">
-          <span className="text-muted-foreground">Monthly budget (USD)</span>
+          <span className="text-muted-foreground">{t('codeSection.monthlyBudget')}</span>
           <input
             type="number"
             min={0}
@@ -82,7 +84,7 @@ export function CodeSectionSettings() {
           />
         </label>
         <p className="text-[10px] text-muted-foreground/70">
-          Cap on `surface=file-summary` spend per calendar month. User-initiated regenerations can override.
+          {t('codeSection.budgetHelper')}
         </p>
       </div>
     </div>

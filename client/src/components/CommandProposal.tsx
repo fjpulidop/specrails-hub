@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
 
@@ -9,6 +10,7 @@ interface CommandProposalProps {
 }
 
 export function CommandProposal({ command, onRun, onDismiss }: CommandProposalProps) {
+  const { t } = useTranslation('addspec')
   const [ran, setRan] = useState(false)
 
   function handleRun() {
@@ -18,13 +20,13 @@ export function CommandProposal({ command, onRun, onDismiss }: CommandProposalPr
 
   return (
     <div className="my-2 rounded-md border border-accent-primary/30 bg-accent-primary/10 p-2.5 text-xs">
-      <div className="mb-2 font-medium text-accent-primary">Suggested command</div>
+      <div className="mb-2 font-medium text-accent-primary">{t('commandProposal.heading')}</div>
       <pre className="mb-2 overflow-x-auto rounded bg-background/60 px-2 py-1 font-mono text-accent-info">
         {command}
       </pre>
       <div className="flex items-center gap-2">
         {ran ? (
-          <span className="rounded bg-accent-success/20 px-2 py-0.5 text-accent-success">Queued</span>
+          <span className="rounded bg-accent-success/20 px-2 py-0.5 text-accent-success">{t('common:status.queued')}</span>
         ) : (
           <>
             <Button
@@ -33,7 +35,7 @@ export function CommandProposal({ command, onRun, onDismiss }: CommandProposalPr
               className={cn('h-6 px-2 text-xs')}
               onClick={handleRun}
             >
-              Run
+              {t('commandProposal.run')}
             </Button>
             <Button
               size="sm"
@@ -41,7 +43,7 @@ export function CommandProposal({ command, onRun, onDismiss }: CommandProposalPr
               className="h-6 px-2 text-xs"
               onClick={() => onDismiss(command)}
             >
-              Dismiss
+              {t('commandProposal.dismiss')}
             </Button>
           </>
         )}

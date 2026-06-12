@@ -1,0 +1,67 @@
+{
+  "page": {
+    "title": "Intégrations",
+    "subtitle": "Plugins par projet. Chaque projet choisit indépendamment les intégrations à activer.",
+    "selectProject": "Sélectionnez un projet pour gérer les intégrations.",
+    "deprecated": "Obsolète",
+    "loadError": "Échec du chargement des plugins.",
+    "empty": "Aucun plugin n'est inclus dans cette version du hub."
+  },
+  "card": {
+    "statusActive": "Actif",
+    "statusDeactivated": "Désactivé",
+    "statusDegraded": "Dégradé",
+    "updateAvailable": "Mise à jour disponible",
+    "requires": "Requiert : {{list}}",
+    "deactivatedHint": "Installé mais désactivé — Claude ne le chargera pas à la prochaine session. Basculez sur <strong>Actif</strong> pour le réactiver.",
+    "install": "Installer",
+    "uninstall": "Désinstaller"
+  },
+  "toggle": {
+    "titleActive": "Actif — cliquez pour désactiver",
+    "titleDeactivated": "Désactivé — cliquez pour activer"
+  },
+  "cachedNotice": {
+    "body": "Claude a le plugin du marketplace <strong>installé mais désactivé</strong> dans son cache. Il peut encore résoudre le serveur depuis <code>~/.claude/plugins/cache/...</code> même si l'interrupteur est désactivé. Pour forcer la portée projet uniquement, désinstallez le plugin du marketplace depuis Claude :",
+    "runInstruction": "Exécutez dans une session Claude active, puis redémarrez Claude dans ce projet."
+  },
+  "update": {
+    "body": "Le manifeste inclus a changé depuis votre installation (probablement un renommage en amont). Réécrivez <code>.mcp.json</code> avec l'entrée canonique — opération chirurgicale, seules les clés possédées par le plugin sont touchées.",
+    "button": "Mettre à jour l'entrée <code>.mcp.json</code>"
+  },
+  "conflict": {
+    "body": "<strong>{{name}}</strong> est aussi activé globalement via le marketplace de plugins de Claude, ce qui masque cette installation au niveau du projet. Pour que cette carte passe en Actif, désactivez la version globale ci-dessous — elle peut être réactivée depuis Claude à tout moment.",
+    "disableButton": "Désactiver <code>{{key}}</code>"
+  },
+  "orphan": {
+    "badge": "Orphelin",
+    "removeButton": "Supprimer l'orphelin"
+  },
+  "installDialog": {
+    "title": "Installer {{name}}",
+    "computingChanges": "Calcul des modifications…",
+    "filesHeading": "Fichiers qui seront modifiés",
+    "prerequisites": "Prérequis",
+    "autoInstall": "Installation automatique",
+    "progress": "Progression",
+    "installingPrereq": "Installation de {{name}}…",
+    "prereqStartFailed": "Échec du démarrage : {{message}}"
+  },
+  "uninstallDialog": {
+    "title": "Désinstaller {{name}} ?",
+    "body": "Cela annulera les entrées gérées par le plugin dans <code>.mcp.json</code> et supprimera les fichiers créés par le plugin. Votre code, votre historique et les autres plugins ne sont pas affectés."
+  },
+  "docs": {
+    "title": "Documentation",
+    "dialogDescription": "Parcourez la documentation incluse de specrails-hub. Utilisez la barre latérale pour passer d'un guide à l'autre.",
+    "sidebarEmpty": "Pas encore de docs",
+    "indexEmpty": "Aucun document disponible. Les docs incluses se trouvent sous docs/ dans le dépôt — déposez-y des fichiers Markdown, ou sous ~/.specrails/docs/, pour les compléter.",
+    "categoryEmpty": "Aucun document dans cette catégorie pour l'instant.",
+    "documentCount_one": "{{count}} document",
+    "documentCount_other": "{{count}} documents",
+    "categoryCount_one": "{{count}} catégorie",
+    "categoryCount_other": "{{count}} catégories",
+    "summary": "{{documents}} répartis dans {{categories}}.",
+    "loadError": "Échec du chargement du document"
+  }
+}

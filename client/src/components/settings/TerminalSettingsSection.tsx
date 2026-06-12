@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -28,6 +29,7 @@ interface ProjectResponse {
 const RENDER_MODES: TerminalRenderMode[] = ['auto', 'canvas', 'webgl']
 
 export function TerminalSettingsSection({ mode }: Props) {
+  const { t } = useTranslation('settings')
   const { activeProjectId } = useHub()
 
   // Saved (last server-confirmed) state.
@@ -118,7 +120,7 @@ export function TerminalSettingsSection({ mode }: Props) {
         }
         if (draft[k] !== savedResolved[k]) body[k] = draft[k]
       }
-      if (Object.keys(body).length === 0) { toast('Nothing to save'); setSaving(false); return }
+      if (Object.keys(body).length === 0) { toast(t('terminal.nothingToSave')); setSaving(false); return }
 
       if (mode === 'hub') {
         const res = await fetch('/api/hub/terminal-settings', {
@@ -130,7 +132,7 @@ export function TerminalSettingsSection({ mode }: Props) {
         const updated = (await res.json()) as TerminalSettings
         setHub(updated); setSavedResolved(updated); setDraft(updated); setClearedFields(new Set())
         dispatchTerminalSettingsUpdated({ mode: 'hub', projectId: null })
-        toast.success('Terminal settings saved')
+        toast.success(t('terminal.saved'))
       } else if (activeProjectId) {
         const res = await fetch(`/api/projects/${activeProjectId}/terminal-settings`, {
           method: 'PATCH',
@@ -142,10 +144,10 @@ export function TerminalSettingsSection({ mode }: Props) {
         setHub(updated.hubDefaults); setOverride(updated.override); setSavedResolved(updated.resolved); setDraft(updated.resolved)
         setClearedFields(new Set())
         dispatchTerminalSettingsUpdated({ mode: 'project', projectId: activeProjectId })
-        toast.success('Terminal settings saved')
+        toast.success(t('terminal.saved'))
       }
     } catch (err) {
-      toast.error(`Failed to save: ${(err as Error).message}`)
+      toast.error(t('errors.saveFailed', { message: (err as Error).message }))
     } finally {
       setSaving(false)
     }
@@ -157,27 +159,27 @@ export function TerminalSettingsSection({ mode }: Props) {
     return override[field] !== undefined
   }
 
-  if (loading) return <Card><CardContent>Loading…</CardContent></Card>
+  if (loading) return <Card><CardContent>{t('common:states.loading')}</CardContent></Card>
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Terminal panel</CardTitle>
+        <CardTitle>{t('terminal.title')}</CardTitle>
         <CardDescription>
           {mode === 'hub'
-            ? 'Hub-wide defaults applied to every project unless a per-project override is set.'
-            : 'Per-project overrides for the terminal panel. Leave a field unchanged to inherit the hub default.'}
+            ? t('terminal.hubDescription')
+            : t('terminal.projectDescription')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Field label="Font family" overridden={isOverridden('fontFamily')} onClear={() => clearOverride('fontFamily')} mode={mode}>
+        <Field label={t('terminal.fontFamily')} overridden={isOverridden('fontFamily')} onClear={() => clearOverride('fontFamily')} mode={mode}>
           <Input
             value={draft.fontFamily}
             onChange={(e) => setField('fontFamily', e.target.value)}
           />
         </Field>
 
-        <Field label={`Font size (${TERMINAL_FONT_SIZE_MIN}–${TERMINAL_FONT_SIZE_MAX})`} overridden={isOverridden('fontSize')} onClear={() => clearOverride('fontSize')} mode={mode}>
+        <Field label={t('terminal.fontSize', { min: TERMINAL_FONT_SIZE_MIN, max: TERMINAL_FONT_SIZE_MAX })} overridden={isOverridden('fontSize')} onClear={() => clearOverride('fontSize')} mode={mode}>
           <Input
             type="number"
             min={TERMINAL_FONT_SIZE_MIN}
@@ -187,7 +189,7 @@ export function TerminalSettingsSection({ mode }: Props) {
           />
         </Field>
 
-        <Field label="Render mode" overridden={isOverridden('renderMode')} onClear={() => clearOverride('renderMode')} mode={mode}>
+        <Field label={t('terminal.renderMode')} overridden={isOverridden('renderMode')} onClear={() => clearOverride('renderMode')} mode={mode}>
           <select
             value={draft.renderMode}
             onChange={(e) => setField('renderMode', e.target.value as TerminalRenderMode)}
@@ -198,7 +200,7 @@ export function TerminalSettingsSection({ mode }: Props) {
         </Field>
 
         <ToggleField
-          label="Copy on select"
+          label={t('terminal.copyOnSelect')}
           checked={draft.copyOnSelect}
           overridden={isOverridden('copyOnSelect')}
           onClear={() => clearOverride('copyOnSelect')}
@@ -207,7 +209,7 @@ export function TerminalSettingsSection({ mode }: Props) {
         />
 
         <ToggleField
-          label="Shell integration (OSC 133 marks)"
+          label={t('terminal.shellIntegration')}
           checked={draft.shellIntegrationEnabled}
           overridden={isOverridden('shellIntegrationEnabled')}
           onClear={() => clearOverride('shellIntegrationEnabled')}
@@ -216,7 +218,7 @@ export function TerminalSettingsSection({ mode }: Props) {
         />
 
         <ToggleField
-          label="Notify on long-running commands"
+          label={t('terminal.notifyLongRunning')}
           checked={draft.notifyOnCompletion}
           overridden={isOverridden('notifyOnCompletion')}
           onClear={() => clearOverride('notifyOnCompletion')}
@@ -224,7 +226,7 @@ export function TerminalSettingsSection({ mode }: Props) {
           mode={mode}
         />
 
-        <Field label="Long-command threshold (ms)" overridden={isOverridden('longCommandThresholdMs')} onClear={() => clearOverride('longCommandThresholdMs')} mode={mode}>
+        <Field label={t('terminal.longCommandThreshold')} overridden={isOverridden('longCommandThresholdMs')} onClear={() => clearOverride('longCommandThresholdMs')} mode={mode}>
           <Input
             type="number"
             min={1000}
@@ -234,7 +236,7 @@ export function TerminalSettingsSection({ mode }: Props) {
         </Field>
 
         <ToggleField
-          label="Inline image rendering (Sixel + iTerm2)"
+          label={t('terminal.imageRendering')}
           checked={draft.imageRendering}
           overridden={isOverridden('imageRendering')}
           onClear={() => clearOverride('imageRendering')}
@@ -242,7 +244,7 @@ export function TerminalSettingsSection({ mode }: Props) {
           mode={mode}
         />
 
-        <Field id="terminal-browser-shortcut-url" label="Browser shortcut URL" overridden={isOverridden('browserShortcutUrl')} onClear={() => clearOverride('browserShortcutUrl')} mode={mode}>
+        <Field id="terminal-browser-shortcut-url" label={t('terminal.browserShortcutUrl')} overridden={isOverridden('browserShortcutUrl')} onClear={() => clearOverride('browserShortcutUrl')} mode={mode}>
           <Input
             type="url"
             value={draft.browserShortcutUrl}
@@ -251,7 +253,7 @@ export function TerminalSettingsSection({ mode }: Props) {
           />
         </Field>
 
-        <Field id="terminal-quick-script" label="Quick script (pasted into active terminal — Enter manually)" overridden={isOverridden('quickScript')} onClear={() => clearOverride('quickScript')} mode={mode}>
+        <Field id="terminal-quick-script" label={t('terminal.quickScript')} overridden={isOverridden('quickScript')} onClear={() => clearOverride('quickScript')} mode={mode}>
           <textarea
             value={draft.quickScript}
             placeholder='echo "Hello World!"'
@@ -263,12 +265,12 @@ export function TerminalSettingsSection({ mode }: Props) {
 
         <div className="flex items-center gap-2 pt-2 border-t">
           <Button onClick={save} disabled={!dirty || saving}>
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? t('common:states.saving') : t('common:actions.save')}
           </Button>
           <Button variant="ghost" onClick={reset} disabled={!dirty || saving}>
-            Reset
+            {t('terminal.reset')}
           </Button>
-          {dirty && <span className="text-xs text-muted-foreground">Unsaved changes</span>}
+          {dirty && <span className="text-xs text-muted-foreground">{t('terminal.unsavedChanges')}</span>}
         </div>
       </CardContent>
     </Card>
@@ -276,29 +278,31 @@ export function TerminalSettingsSection({ mode }: Props) {
 }
 
 function Field({ id, label, overridden, onClear, mode, children }: { id?: string; label: string; overridden: boolean; onClear: () => void; mode: 'hub' | 'project'; children: React.ReactNode }) {
+  const { t } = useTranslation('settings')
   return (
     <div id={id} data-terminal-settings-anchor={id ? '' : undefined} className={id ? 'scroll-mt-4' : undefined}>
       <div className="flex justify-between items-center mb-1">
         <label className="text-sm font-medium">{label}</label>
         {mode === 'project' && overridden && (
-          <Button variant="ghost" size="sm" onClick={onClear}>Clear override</Button>
+          <Button variant="ghost" size="sm" onClick={onClear}>{t('terminal.clearOverride')}</Button>
         )}
       </div>
       {children}
       {mode === 'project' && !overridden && (
-        <p className="text-xs text-muted-foreground mt-1">Inheriting hub default</p>
+        <p className="text-xs text-muted-foreground mt-1">{t('terminal.inheritingDefault')}</p>
       )}
     </div>
   )
 }
 
 function ToggleField({ label, checked, overridden, onClear, onChange, mode }: { label: string; checked: boolean; overridden: boolean; onClear: () => void; onChange: (v: boolean) => void; mode: 'hub' | 'project' }) {
+  const { t } = useTranslation('settings')
   return (
     <div className="flex justify-between items-center">
       <label className="text-sm font-medium">{label}</label>
       <div className="flex items-center gap-2">
         {mode === 'project' && overridden && (
-          <Button variant="ghost" size="sm" onClick={onClear}>Clear</Button>
+          <Button variant="ghost" size="sm" onClick={onClear}>{t('terminal.clear')}</Button>
         )}
         <button
           type="button"

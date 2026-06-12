@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Send, Loader2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -38,6 +39,7 @@ export function SetupChat({
   streamingText,
   onSendMessage,
 }: SetupChatProps) {
+  const { t } = useTranslation('setup')
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -66,9 +68,9 @@ export function SetupChat({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border/30 flex-shrink-0">
-        <h3 className="text-xs font-semibold text-foreground">Setup assistant</h3>
+        <h3 className="text-xs font-semibold text-foreground">{t('setupChat.title')}</h3>
         <p className="text-[10px] text-muted-foreground mt-0.5">
-          Respond to prompts to configure your project
+          {t('setupChat.subtitle')}
         </p>
       </div>
 
@@ -80,7 +82,7 @@ export function SetupChat({
               <div className="w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center mx-auto">
                 <Loader2 className="w-4 h-4 text-accent-primary animate-spin" />
               </div>
-              <p className="text-xs text-muted-foreground">Setting up your project...</p>
+              <p className="text-xs text-muted-foreground">{t('setupChat.settingUp')}</p>
             </div>
           </div>
         )}
@@ -148,7 +150,7 @@ export function SetupChat({
               'focus:outline-none focus:ring-1 focus:ring-accent-primary/50',
               'min-h-[36px] max-h-24'
             )}
-            placeholder="Type a response..."
+            placeholder={t('setupChat.placeholder')}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -166,7 +168,7 @@ export function SetupChat({
           </Button>
         </div>
         <p className="text-[9px] text-muted-foreground mt-1.5">
-          Enter to send, Shift+Enter for new line
+          {t('setupChat.keyboardHint')}
         </p>
       </div>
     </div>

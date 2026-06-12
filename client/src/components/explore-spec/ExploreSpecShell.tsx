@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Check, Send, Loader2, Minus, Sparkles, X } from 'lucide-react'
 import { toast } from 'sonner'
 import ReactMarkdown from 'react-markdown'
@@ -131,6 +132,7 @@ export function ExploreSpecShell({
   onTicketCreated,
   contextScope,
 }: ExploreSpecShellProps) {
+  const { t } = useTranslation('explore')
   const chat = useChatContext()
   const { activeProjectId } = useHub()
   const [conversationId, setConversationId] = useState<string | null>(
@@ -478,17 +480,17 @@ export function ExploreSpecShell({
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({})) as { error?: string }
-        toast.error(err.error || 'Failed to save draft')
+        toast.error(err.error || t('shell.toasts.saveDraftFailed'))
         return false
       }
       const data = await res.json() as { ticket: LocalTicket }
-      toast.success(`Draft saved — #${data.ticket.id} ${data.ticket.title}`)
+      toast.success(t('shell.toasts.draftSaved', { id: data.ticket.id, title: data.ticket.title }))
       return true
     } catch {
-      toast.error('Network error saving draft')
+      toast.error(t('shell.toasts.draftNetworkError'))
       return false
     }
-  }, [conversationId, activeProjectId, draft.title, draft.description, draft.labels, editTicket])
+  }, [conversationId, activeProjectId, draft.title, draft.description, draft.labels, editTicket, t])
 
   const handleCreate = useCallback(async () => {
     if (isCreating) return
@@ -517,11 +519,11 @@ export function ExploreSpecShell({
         })
         if (!res.ok) {
           const err = await res.json().catch(() => ({})) as { error?: string }
-          toast.error(err.error || 'Failed to update spec')
+          toast.error(err.error || t('shell.toasts.updateSpecFailed'))
           return
         }
         const data = await res.json() as { ticket: LocalTicket }
-        toast.success(`Spec updated — #${data.ticket.id} ${data.ticket.title}`)
+        toast.success(t('shell.toasts.specUpdated', { id: data.ticket.id, title: data.ticket.title }))
         onTicketCreated?.(data.ticket)
         onClose()
         return
@@ -551,20 +553,20 @@ export function ExploreSpecShell({
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({})) as { error?: string }
-        toast.error(err.error || 'Failed to create spec')
+        toast.error(err.error || t('shell.toasts.createSpecFailed'))
         return
       }
       const data = await res.json() as { ticket: LocalTicket }
-      toast.success(`Spec created — #${data.ticket.id} ${data.ticket.title}`)
+      toast.success(t('shell.toasts.specCreated', { id: data.ticket.id, title: data.ticket.title }))
       onTicketCreated?.(data.ticket)
       onClose()
     } catch (err) {
-      toast.error('Network error creating spec')
+      toast.error(t('shell.toasts.createNetworkError'))
     } finally {
       setIsCreating(false)
       unmarkSpecGenInFlight(activeProjectId)
     }
-  }, [isCreating, draft, activeProjectId, onTicketCreated, onClose, pendingSpecId, editTicket, isRealSpecEdit, conversationId])
+  }, [isCreating, draft, activeProjectId, onTicketCreated, onClose, pendingSpecId, editTicket, isRealSpecEdit, conversationId, t])
 
   // Esc -> request close. (⌘⏎ is handled inside RichAttachmentEditor.)
   useEffect(() => {
@@ -609,7 +611,7 @@ export function ExploreSpecShell({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Explore Spec · interactive"
+        aria-label={t('shell.dialogAriaLabel')}
         className="m-auto w-full h-full max-w-[1600px] flex flex-col bg-background rounded-xl border border-border/40 shadow-2xl overflow-hidden"
       >
       {/* Header */}
@@ -618,15 +620,15 @@ export function ExploreSpecShell({
           type="button"
           onClick={requestClose}
           className="flex items-center gap-2 group p-1 -ml-1 rounded hover:bg-accent focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
-          aria-label="Back (Esc)"
+          aria-label={t('shell.backAriaLabel')}
         >
           <ArrowLeft className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
           <div className="text-left min-w-0">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 leading-none">
-              {editTicket ? `EDITING SPEC · #${editTicket.id}` : 'EXPLORE SPEC · interactive'}
+              {editTicket ? t('shell.editingEyebrow', { id: editTicket.id }) : t('shell.exploreEyebrow')}
             </div>
             <span className="text-sm font-medium text-foreground truncate block">
-              {draft.title || seedDraftTitle || 'New spec…'}
+              {draft.title || seedDraftTitle || t('shell.newSpecPlaceholder')}
             </span>
           </div>
         </button>
@@ -634,15 +636,17 @@ export function ExploreSpecShell({
           {contextScope ? (
             <span
               data-testid="explore-context-pill"
-              title="Active context scope for this Explore session"
+              title={t('shell.contextPillTitle')}
               className="hidden md:inline-flex items-center gap-1 px-2 py-1 rounded-full border border-border/50 bg-card/60 text-[10px] text-muted-foreground"
             >
-              Context: {[
-                contextScope.specrails && 'specrails',
-                contextScope.openspec && 'openspec',
-                contextScope.full && 'codebase',
-                contextScope.mcp && 'mcp',
-              ].filter(Boolean).join(', ') || 'minimal'}
+              {t('shell.contextPill', {
+                scopes: [
+                  contextScope.specrails && 'specrails',
+                  contextScope.openspec && 'openspec',
+                  contextScope.full && t('shell.contextScopeCodebase'),
+                  contextScope.mcp && 'mcp',
+                ].filter(Boolean).join(', ') || t('shell.contextScopeMinimal'),
+              })}
             </span>
           ) : null}
           <Button
@@ -654,11 +658,11 @@ export function ExploreSpecShell({
             }}
             disabled={turnCount < 2 || isCreating}
             className="gap-1.5"
-            aria-label="Save current exploration as draft"
+            aria-label={t('shell.saveAsDraftAriaLabel')}
             data-testid="explore-spec-save-draft"
-            title={turnCount < 2 ? 'Send at least one message before saving' : undefined}
+            title={turnCount < 2 ? t('shell.saveAsDraftDisabledTitle') : undefined}
           >
-            Save as Draft
+            {t('shell.saveAsDraft')}
           </Button>
           {REVIEW_ENABLED && draft.title.trim() && (
             <Button
@@ -667,10 +671,10 @@ export function ExploreSpecShell({
               onClick={() => setReviewOpen(true)}
               disabled={isCreating}
               className="gap-1.5"
-              aria-label="Review changes before creating spec"
+              aria-label={t('shell.reviewAriaLabel')}
               data-testid="explore-spec-review"
             >
-              Review →
+              {t('shell.review')}
             </Button>
           )}
           <Button
@@ -678,9 +682,9 @@ export function ExploreSpecShell({
             onClick={handleCreate}
             disabled={!draft.title.trim() || isCreating}
             className="gap-1.5"
-            aria-label={isRealSpecEdit ? 'Update spec with current draft' : 'Create spec from current draft'}
+            aria-label={isRealSpecEdit ? t('shell.updateSpecAriaLabel') : t('shell.createSpecAriaLabel')}
             data-testid="explore-spec-create"
-            title={!draft.title.trim() ? 'A title is needed to commit' : undefined}
+            title={!draft.title.trim() ? t('shell.createSpecDisabledTitle') : undefined}
           >
             {isCreating ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -689,20 +693,20 @@ export function ExploreSpecShell({
             ) : (
               <Check className="w-3.5 h-3.5" />
             )}
-            {isRealSpecEdit ? 'Update Spec' : 'Create Spec'}
+            {isRealSpecEdit ? t('shell.updateSpec') : t('shell.createSpec')}
           </Button>
           {onMinimize && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => onMinimize(conversationId, draft.title || seedDraftTitle || '')}
-              aria-label="Minimize"
+              aria-label={t('common:actions.minimize')}
               data-testid="explore-spec-minimize"
             >
               <Minus className="w-4 h-4" />
             </Button>
           )}
-          <Button variant="ghost" size="sm" onClick={requestClose} aria-label="Close">
+          <Button variant="ghost" size="sm" onClick={requestClose} aria-label={t('common:actions.close')}>
             <X className="w-4 h-4" />
           </Button>
         </div>
@@ -720,13 +724,13 @@ export function ExploreSpecShell({
           >
             {!conversation && editTicket && (
               <div className="text-xs text-muted-foreground/70 italic px-1 py-2">
-                Spec loaded on the right. Type a refinement to get started.
+                {t('shell.editModeIntro')}
               </div>
             )}
             {!conversation && !editTicket && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Starting conversation…
+                {t('shell.startingConversation')}
               </div>
             )}
             {conversation?.messages.map((m, i) => (
@@ -751,7 +755,7 @@ export function ExploreSpecShell({
 
           {/* Chips */}
           {chips.length > 0 && conversation && !conversation.isStreaming && (
-            <div role="group" aria-label="Suggested replies" className="flex-shrink-0 flex gap-1.5 px-5 pb-2 flex-wrap">
+            <div role="group" aria-label={t('shell.suggestedRepliesAriaLabel')} className="flex-shrink-0 flex gap-1.5 px-5 pb-2 flex-wrap">
               {chips.map((chip) => (
                 <button
                   key={chip}
@@ -774,16 +778,16 @@ export function ExploreSpecShell({
             <RichAttachmentEditor
               ref={composerRef}
               ticketKey={pendingSpecId}
-              placeholder={conversation?.isStreaming ? '' : 'Type your reply… drag files to attach'}
+              placeholder={conversation?.isStreaming ? '' : t('shell.composerPlaceholder')}
               minHeight={72}
-              ariaLabel="Spec idea"
+              ariaLabel={t('shell.composerAriaLabel')}
               onChange={() => {
                 const text = composerRef.current?.getPlainText() ?? ''
                 setHasComposerText(text.length > 0)
                 setComposerText(text)
               }}
-              onUnsupportedFile={(f) => toast.error(`Unsupported file type: ${f.name}`)}
-              onUploadError={(err, f) => toast.error(`Upload failed for ${f.name}: ${err.message}`)}
+              onUnsupportedFile={(f) => toast.error(t('shell.toasts.unsupportedFileType', { name: f.name }))}
+              onUploadError={(err, f) => toast.error(t('shell.toasts.uploadFailed', { name: f.name, message: err.message }))}
               onAttachmentRemoved={(a) => {
                 fetch(`${API_ORIGIN}/api/projects/${activeProjectId}/tickets/${pendingSpecId}/attachments/${a.id}`, { method: 'DELETE' }).catch(() => {})
                 // Drop from the accumulated list immediately so the panel
@@ -810,7 +814,7 @@ export function ExploreSpecShell({
                   className="gap-1.5 text-destructive hover:text-destructive"
                   data-testid="explore-stop-button"
                 >
-                  Stop
+                  {t('shell.stop')}
                   <span className="text-[10px] opacity-70 ml-1">⌘⏎</span>
                 </Button>
               ) : (
@@ -821,7 +825,7 @@ export function ExploreSpecShell({
                   className="gap-1.5"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  Send
+                  {t('shell.send')}
                   <span className="text-[10px] opacity-70 ml-1">⌘⏎</span>
                 </Button>
               )}
@@ -857,17 +861,17 @@ export function ExploreSpecShell({
       <Dialog open={confirmDiscard} onOpenChange={(o) => !o && setConfirmDiscard(false)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Save this exploration?</DialogTitle>
+            <DialogTitle>{t('shell.closePrompt.title')}</DialogTitle>
             <DialogDescription>
-              Save as Draft keeps the conversation so you can pick it up later from the board. Discard throws it away.
+              {t('shell.closePrompt.description')}
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 mt-2">
             <Button variant="ghost" size="sm" onClick={() => setConfirmDiscard(false)} data-testid="close-prompt-cancel">
-              Cancel
+              {t('common:actions.cancel')}
             </Button>
             <Button variant="destructive" size="sm" onClick={onClose} data-testid="close-prompt-discard">
-              Discard
+              {t('common:actions.discard')}
             </Button>
             <Button
               size="sm"
@@ -879,7 +883,7 @@ export function ExploreSpecShell({
               autoFocus
               data-testid="close-prompt-save-draft"
             >
-              Save as Draft
+              {t('shell.saveAsDraft')}
             </Button>
           </div>
         </DialogContent>
@@ -951,6 +955,7 @@ function formatChatTime(iso?: string): string | null {
 }
 
 function TurnBubble({ role, content, streaming, timestamp }: { role: 'user' | 'assistant' | 'system'; content: string; streaming?: boolean; timestamp?: string }) {
+  const { t } = useTranslation('explore')
   if (role === 'system') return null
   const isUser = role === 'user'
   const visible = isUser ? stripSlashPrefix(content) : content
@@ -961,7 +966,7 @@ function TurnBubble({ role, content, streaming, timestamp }: { role: 'user' | 'a
       <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${isUser ? 'bg-primary/10 text-foreground' : 'bg-card/60 border border-border/40'}`}>
         <div className="flex items-baseline justify-between gap-3 mb-1">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold">
-            {isUser ? 'You' : 'Claude'}
+            {isUser ? t('shell.you') : 'Claude'}
           </div>
           {timeLabel && (
             <div className="text-[10px] text-muted-foreground/50 font-mono tabular-nums">

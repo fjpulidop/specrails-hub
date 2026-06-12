@@ -1,0 +1,114 @@
+{
+  "board": {
+    "title": "Spec",
+    "dropHere": "Hier ablegen",
+    "emptyNoSpecs": "Noch keine Specs",
+    "emptyNoLabelMatch": "Keine Specs entsprechen den aktiven Labels",
+    "emptyNoActiveSpecs": "Keine aktiven Specs",
+    "emptyHint": "Klicke auf „+ Hinzufügen“, um loszulegen",
+    "dropToMarkDone": "Ablegen, um als fertig zu markieren",
+    "emptyNoDoneLabelMatch": "Keine fertigen Specs entsprechen den aktiven Labels",
+    "emptyNoCompleted": "Noch keine abgeschlossenen Specs",
+    "untitledSpec": "Unbenannte Spec"
+  },
+  "status": {
+    "todo": "To-do",
+    "inProgress": "In Arbeit",
+    "done": "Fertig",
+    "cancelled": "Abgebrochen"
+  },
+  "priority": {
+    "critical": "kritisch",
+    "high": "hoch",
+    "medium": "mittel",
+    "low": "niedrig"
+  },
+  "badges": {
+    "epic": "Epic",
+    "epicWithCount": "Epic · {{count}}",
+    "subSpec": "↑ Sub-Spec",
+    "review": "Review",
+    "needsReviewTitle": "Diese Spec wurde als fertig markiert, aber ihr Job ist fehlgeschlagen – bitte prüfen",
+    "raw": "Raw",
+    "rawTitle": "Raw-Spec – keine KI-Generierung bei der Erfassung",
+    "contract": "Contract",
+    "openParentEpicTitle": "Übergeordnetes Epic #{{id}} öffnen · {{title}}"
+  },
+  "card": {
+    "deleteSpec": "Spec #{{id}} löschen",
+    "deleteTicket": "Ticket #{{id}} löschen",
+    "ticketFallbackLabel": "Ticket #{{id}}",
+    "dependsOn": "Hängt von {{count}} ab",
+    "continueEditing": "Weiter bearbeiten",
+    "continueEditingTitle": "Diese Spec weiter bearbeiten",
+    "moveToRail": "Auf Rail verschieben"
+  },
+  "emptyState": {
+    "noTickets": "Noch keine Tickets",
+    "noTicketsHint": "Erstelle dein erstes Ticket oder führe einen Product-Backlog-Befehl aus, um Tickets zu befüllen",
+    "createFirst": "Erstes Ticket erstellen"
+  },
+  "errors": {
+    "loadFailed": "Tickets konnten nicht geladen werden"
+  },
+  "listView": {
+    "status": {
+      "draft": "Entwurf",
+      "todo": "To-do",
+      "inProgress": "in Arbeit",
+      "done": "fertig",
+      "cancelled": "abgebrochen"
+    },
+    "filterAll": "Alle ({{count}})",
+    "statusWithCount": "{{status}} ({{count}})",
+    "allLabels": "Alle Labels",
+    "searchPlaceholder": "Suchen…",
+    "columns": {
+      "status": "Status",
+      "title": "Titel",
+      "priority": "Priorität",
+      "labels": "Labels",
+      "updated": "Aktualisiert"
+    },
+    "noMatch": "Keine Tickets entsprechen deinen Filtern",
+    "clearFilters": "Filter zurücksetzen",
+    "loadMore": "Mehr laden ({{count}} verbleibend)"
+  },
+  "gridView": {
+    "emptyTodo": "Keine offenen Tickets",
+    "emptyInProgress": "Nichts in Arbeit",
+    "emptyDone": "Keine abgeschlossenen Tickets",
+    "cancelledSection": "Abgebrochen ({{count}})"
+  },
+  "statusFilter": {
+    "ariaLabel": "Nach Status filtern",
+    "all": "Alle",
+    "todo": "To-do",
+    "done": "Fertig"
+  },
+  "sortControl": {
+    "modeAriaLabel": "Sortiermodus",
+    "tooltip": "Sortierung: {{mode}}",
+    "toggleDirAriaLabel": "Sortierrichtung umschalten",
+    "ascending": "Aufsteigend",
+    "descending": "Absteigend",
+    "modes": {
+      "default": "Standard",
+      "ticketId": "Ticket #",
+      "priority": "Priorität"
+    }
+  },
+  "viewTier": {
+    "ariaLabel": "Spec-Ansicht",
+    "listView": "Listenansicht",
+    "postitView": "Post-it-Ansicht"
+  },
+  "labelFilter": {
+    "ariaLabel": "Nach Labels filtern",
+    "all": "Alle",
+    "empty": "Keine Labels in diesem Projekt.",
+    "selected_one": "{{count}} Label",
+    "selected_other": "{{count}} Labels",
+    "clear": "zurücksetzen"
+  }
+}

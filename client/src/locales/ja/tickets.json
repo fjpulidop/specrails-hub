@@ -1,0 +1,110 @@
+{
+  "priority": {
+    "critical": "クリティカル",
+    "high": "高",
+    "medium": "中",
+    "low": "低"
+  },
+  "ticketStatus": {
+    "todo": "Todo",
+    "inProgress": "進行中",
+    "done": "完了",
+    "cancelled": "キャンセル"
+  },
+  "source": {
+    "manual": "手動で作成",
+    "productBacklog": "プロダクトバックログから",
+    "proposeSpec": "スペック提案から",
+    "getBacklogSpecs": "バックログスペックから",
+    "freePrompt": "Raw プロンプトから"
+  },
+  "fields": {
+    "title": "タイトル",
+    "description": "説明",
+    "status": "ステータス",
+    "priority": "優先度",
+    "labels": "ラベル",
+    "markdownPlaceholder": "Markdown で説明...",
+    "supportsMarkdown": "Markdown 対応"
+  },
+  "meta": {
+    "createdAgo": "{{time}}に作成",
+    "updatedAgo": "{{time}}に更新"
+  },
+  "untitled": "無題",
+  "deleteDialog": {
+    "title": "チケットを削除",
+    "body": "<strong>#{{id}} {{title}}</strong> を削除してもよろしいですか？この操作は元に戻せません。"
+  },
+  "detailModal": {
+    "toast": {
+      "updated": "チケットを更新しました",
+      "updateFailed": "チケットの更新に失敗しました"
+    },
+    "compare": "比較",
+    "compareTooltip": "別のスペックと比較",
+    "doneEditing": "編集を終了",
+    "addDescription": "説明を追加...",
+    "prerequisites": "前提条件",
+    "addLabel": "ラベルを追加",
+    "addLabelPlaceholder": "ラベルを追加...",
+    "effort": "工数",
+    "assignee": "担当者",
+    "continueEditing": "編集を続ける",
+    "ticketFallbackLabel": "チケット #{{id}}"
+  },
+  "contractLayer": {
+    "title": "Contract Layer",
+    "populated": "{{n}}/5 件入力済み"
+  },
+  "rail": {
+    "moveToRail": "レールに移動",
+    "removeFromRail": "レールから削除",
+    "currentlyOn": "現在 {{rail}} 上にあります",
+    "popoverTitle": "レールに移動",
+    "noRails": "利用可能なレールがありません。"
+  },
+  "contextMenu": {
+    "ariaLabel": "チケット操作",
+    "deleteTicket": "チケットを削除",
+    "changeStatus": "ステータスを変更",
+    "statusOptions": "ステータスオプション",
+    "setPriority": "優先度を設定",
+    "priorityOptions": "優先度オプション"
+  },
+  "viewMode": {
+    "list": "リスト表示",
+    "grid": "グリッド表示（カンバン）",
+    "postit": "付箋表示"
+  },
+  "createModal": {
+    "title": "チケットを作成",
+    "titlePlaceholder": "チケットのタイトル...",
+    "labelsPlaceholder": "入力してラベルを追加...",
+    "create": "作成",
+    "creating": "作成中...",
+    "toast": {
+      "created": "チケットを作成しました",
+      "createFailed": "チケットの作成に失敗しました"
+    }
+  },
+  "comparePicker": {
+    "title": "比較対象を選択…",
+    "todoCount": "(Todo {{n}} 件)",
+    "searchPlaceholder": "Todo のスペックを検索…",
+    "noMatches": "一致する Todo スペックはありません",
+    "empty": "比較できる他の Todo スペックはありません"
+  },
+  "spendingLine": {
+    "ariaLabel": "アナリティクスでチケットの支出を表示",
+    "turns_one": "{{count}} ターン",
+    "turns_other": "{{count}} ターン",
+    "active": "アクティブ {{duration}}",
+    "breakdownItem": "{{n}} {{label}}"
+  },
+  "toasts": {
+    "newTicket": "新しいチケット: {{title}}",
+    "newTicketsAdded_one": "プロダクトディスカバリーから {{count}} 件の新しいチケットを追加しました",
+    "newTicketsAdded_other": "プロダクトディスカバリーから {{count}} 件の新しいチケットを追加しました"
+  }
+}

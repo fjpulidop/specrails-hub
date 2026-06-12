@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Check, Clock, ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '../lib/utils'
 
@@ -69,6 +70,7 @@ function CheckpointNode({ checkpoint, index }: { checkpoint: CheckpointState; in
 }
 
 export function CheckpointTracker({ checkpoints, logLines }: CheckpointTrackerProps) {
+  const { t } = useTranslation('setup')
   const [logsExpanded, setLogsExpanded] = useState(false)
 
   const doneCount = checkpoints.filter((c) => c.status === 'done').length
@@ -79,7 +81,7 @@ export function CheckpointTracker({ checkpoints, logLines }: CheckpointTrackerPr
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border/30 flex-shrink-0">
-        <h3 className="text-xs font-semibold text-foreground mb-2">Setup progress</h3>
+        <h3 className="text-xs font-semibold text-foreground mb-2">{t('checkpoints.title')}</h3>
         {/* Progress bar */}
         <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
           <div
@@ -89,7 +91,7 @@ export function CheckpointTracker({ checkpoints, logLines }: CheckpointTrackerPr
         </div>
         <div className="flex justify-between items-center mt-1">
           <span className="text-[10px] text-muted-foreground">
-            {doneCount} of {totalCount} complete
+            {t('checkpoints.progress', { done: doneCount, total: totalCount })}
           </span>
           <span className="text-[10px] text-muted-foreground">{progressPct}%</span>
         </div>
@@ -124,7 +126,7 @@ export function CheckpointTracker({ checkpoints, logLines }: CheckpointTrackerPr
           ) : (
             <ChevronRight className="w-3 h-3 flex-shrink-0" />
           )}
-          Raw log ({logLines.length} lines)
+          {t('checkpoints.rawLog', { count: logLines.length })}
         </button>
         {logsExpanded && (
           <div className="max-h-40 overflow-auto px-4 pb-3 font-mono text-[9px] text-muted-foreground space-y-0.5">

@@ -1,0 +1,41 @@
+{
+  "removeFile": "移除 {{name}}",
+  "errors": {
+    "uploadFailed": "上传失败（{{status}}）",
+    "uploadFailedFile": "上传失败：{{name}}",
+    "deleteFailed": "删除失败（{{status}}）",
+    "bulkDeleteFailed": "批量删除失败（{{status}}）",
+    "listFailed": "列表加载失败（{{status}}）",
+    "fetchFailed": "获取失败（{{status}}）",
+    "removeFailed": "移除附件失败",
+    "loadFailed": "加载附件失败"
+  },
+  "chip": {
+    "uploading": "上传中…",
+    "genericFile": "文件"
+  },
+  "editor": {
+    "attachFiles": "附加文件",
+    "uploadingFiles_one": "正在上传 {{count}} 个文件…",
+    "uploadingFiles_other": "正在上传 {{count}} 个文件…",
+    "dropToAddContext": "拖放以添加上下文"
+  },
+  "section": {
+    "ariaLabel": "附件",
+    "title": "资源",
+    "fileCount_one": "{{count}} 个文件",
+    "fileCount_other": "{{count}} 个文件"
+  },
+  "lightbox": {
+    "preview": "预览 {{name}}",
+    "backToHub": "返回 Hub",
+    "download": "下载",
+    "downloadFile": "下载 {{name}}",
+    "loading": "正在加载附件...",
+    "loadError": "无法加载附件：{{error}}",
+    "previewUnavailable": "此文件类型不支持预览。"
+  },
+  "sessionBar": {
+    "empty": "暂无固定资源 — 拖入文件或点击“添加”"
+  }
+}

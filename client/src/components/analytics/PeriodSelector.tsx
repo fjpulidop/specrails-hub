@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 import type { AnalyticsPeriod } from '../../types'
 
@@ -8,15 +9,16 @@ interface PeriodSelectorProps {
   onChange: (period: AnalyticsPeriod, from?: string, to?: string) => void
 }
 
-const PRESETS: { value: AnalyticsPeriod; label: string }[] = [
-  { value: '7d', label: '7d' },
-  { value: '30d', label: '30d' },
-  { value: '90d', label: '90d' },
-  { value: 'all', label: 'All' },
-  { value: 'custom', label: 'Custom' },
+const PRESETS: { value: AnalyticsPeriod; labelKey: string }[] = [
+  { value: '7d', labelKey: 'periods.d7' },
+  { value: '30d', labelKey: 'periods.d30' },
+  { value: '90d', labelKey: 'periods.d90' },
+  { value: 'all', labelKey: 'periods.all' },
+  { value: 'custom', labelKey: 'periods.custom' },
 ]
 
 export function PeriodSelector({ period, from, to, onChange }: PeriodSelectorProps) {
+  const { t } = useTranslation('analytics')
   function handlePreset(value: AnalyticsPeriod) {
     if (value === 'custom') {
       // Switch to custom without triggering fetch yet — wait for both dates
@@ -57,7 +59,7 @@ export function PeriodSelector({ period, from, to, onChange }: PeriodSelectorPro
                 : 'text-muted-foreground hover:text-foreground hover:bg-accent'
             )}
           >
-            {preset.label}
+            {t(preset.labelKey)}
           </button>
         ))}
       </div>
@@ -68,15 +70,15 @@ export function PeriodSelector({ period, from, to, onChange }: PeriodSelectorPro
             type="date"
             value={from}
             onChange={(e) => handleFromChange(e.target.value)}
-            aria-label="Start date"
+            aria-label={t('periods.startDate')}
             className="h-7 px-2 rounded-md text-xs bg-card border border-border text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
-          <span className="text-xs text-muted-foreground">to</span>
+          <span className="text-xs text-muted-foreground">{t('periods.to')}</span>
           <input
             type="date"
             value={to}
             onChange={(e) => handleToChange(e.target.value)}
-            aria-label="End date"
+            aria-label={t('periods.endDate')}
             className="h-7 px-2 rounded-md text-xs bg-card border border-border text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>

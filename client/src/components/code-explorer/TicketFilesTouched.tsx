@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { FileText, FilePlus2, FileMinus2, GitCommitHorizontal } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import { useHub } from '../../hooks/useHub'
@@ -20,6 +21,7 @@ interface Props {
 export function TicketFilesTouched({ ticketId, onClose }: Props) {
   // Hooks must run unconditionally and in a stable order — declare them before
   // any early return (Rules of Hooks). The feature gate is applied below.
+  const { t } = useTranslation('code')
   const navigate = useNavigate()
   const { activeProjectId } = useHub()
   const [rows, setRows] = useState<ProvenanceRow[] | null>(null)
@@ -44,7 +46,7 @@ export function TicketFilesTouched({ ticketId, onClose }: Props) {
   return (
     <div>
       <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1.5">
-        Files touched by this ticket
+        {t('ticketFiles.title')}
       </span>
       <ul className="space-y-1">
         {rows.map((row, idx) => {
@@ -62,13 +64,13 @@ export function TicketFilesTouched({ ticketId, onClose }: Props) {
                 <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 <span className="font-mono truncate flex-1">{row.path}</span>
                 {row.jobId && (
-                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground font-mono shrink-0" title={`Job ${row.jobId}`}>
+                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground font-mono shrink-0" title={t('ticketFiles.jobTitle', { jobId: row.jobId })}>
                     <GitCommitHorizontal className="h-3 w-3" />
                     {row.jobId.length > 10 ? row.jobId.slice(0, 10) : row.jobId}
                   </span>
                 )}
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider shrink-0">
-                  {row.kind}
+                  {t(`kind.${row.kind}`)}
                 </span>
               </button>
             </li>

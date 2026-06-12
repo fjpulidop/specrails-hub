@@ -1,0 +1,113 @@
+{
+  "page": {
+    "resizeFileTree": "Redimensionar árbol de archivos",
+    "selectFile": "Selecciona un archivo para previsualizarlo."
+  },
+  "resizer": {
+    "hint": "Arrastra para redimensionar. Doble clic para restablecer."
+  },
+  "toolbar": {
+    "scope": "Ámbito",
+    "allAi": "Toda la IA",
+    "spec": "Spec",
+    "ticketIdPlaceholder": "id",
+    "copyFilePath": "Copiar ruta del archivo",
+    "generateSummary": "Generar resumen",
+    "regenerateSummary": "Regenerar resumen",
+    "generating": "Generando…",
+    "regenerating": "Regenerando…",
+    "summaryUnavailable": "Resumen no disponible: {{reason}}",
+    "jobContext": "Contexto del job",
+    "clear": "Limpiar"
+  },
+  "provenancePanel": {
+    "jobTitle": "Job {{jobId}}",
+    "specTitle": "Spec #{{ticketId}}",
+    "touchedFiles_one": "{{count}} archivo tocado",
+    "touchedFiles_other": "{{count}} archivos tocados",
+    "log": "Log"
+  },
+  "kind": {
+    "created": "creado",
+    "modified": "modificado",
+    "deleted": "eliminado"
+  },
+  "action": {
+    "added": "añadido",
+    "changed": "cambiado",
+    "deleted": "eliminado"
+  },
+  "viewer": {
+    "loadingFile": "Cargando archivo…",
+    "showSummary": "Mostrar resumen",
+    "markdownViewMode": "Modo de vista de Markdown",
+    "preview": "Vista previa",
+    "raw": "Sin formato",
+    "missingFile": "Este archivo fue tocado por un job de IA pero ya no existe en el árbol de trabajo.",
+    "binaryFile": "Archivo binario.",
+    "tooLarge": "Archivo demasiado grande para previsualizar ({{size}} MB).",
+    "noContent": "No hay contenido disponible.",
+    "pathCopied": "Ruta copiada",
+    "copyPathFailed": "No se pudo copiar la ruta",
+    "budgetPrompt": "¿Ignorar el límite de presupuesto?"
+  },
+  "summary": {
+    "generationFailed": "Error al generar el resumen",
+    "skipped": "Resumen omitido: {{reason}}",
+    "unavailable": "Resumen no disponible: {{reason}}.",
+    "empty": "Aún no hay resumen para este archivo.",
+    "stale": "Obsoleto",
+    "hide": "Ocultar",
+    "reason": {
+      "missing": "archivo no encontrado",
+      "binary": "archivo binario",
+      "tooLarge": "archivo demasiado grande"
+    }
+  },
+  "history": {
+    "resize": "Redimensionar historial de cambios de IA",
+    "title_one": "Historial de cambios de IA · {{count}} cambio",
+    "title_other": "Historial de cambios de IA · {{count}} cambios",
+    "show": "Mostrar",
+    "hide": "Ocultar",
+    "unknownJob": "job desconocido",
+    "filterByJob": "Filtrar Código por el job {{jobId}}",
+    "diff": "Diff",
+    "openSpec": "Abrir spec #{{ticketId}}",
+    "specChip": "spec #{{ticketId}}",
+    "loadingDiff": "Cargando diff...",
+    "diffUnavailable": "Diff no disponible para este cambio histórico. Los jobs nuevos guardarán los parches automáticamente.",
+    "diffTruncated": "[diff truncado]"
+  },
+  "tree": {
+    "jobFiles": "Archivos del job",
+    "specFiles": "Archivos de la spec",
+    "touchedByAi": "Tocado por IA",
+    "allFiles": "Todos los archivos",
+    "collapseAll": "Contraer todas las carpetas",
+    "expandAll": "Expandir todas las carpetas",
+    "touchedCount_one": "{{count}} archivo tocado por IA",
+    "touchedCount_other": "{{count}} archivos tocados por IA",
+    "loadingFiles": "Cargando archivos…",
+    "emptyTouched": "Aún no hay archivos tocados por IA. Ejecuta un job o cambia a Todos los archivos.",
+    "showAllFiles": "Mostrar todos los archivos",
+    "noFiles": "No hay archivos.",
+    "folderTouched_one": "{{count}} archivo tocado por IA dentro de esta carpeta",
+    "folderTouched_other": "{{count}} archivos tocados por IA dentro de esta carpeta",
+    "jobTitle": "Job {{jobId}}",
+    "createdBySpec": "Creado al implementar la spec #{{id}}",
+    "modifiedBySpec": "Modificado al implementar la spec #{{id}}",
+    "latestTitleCreated": "El último job de IA añadió este archivo",
+    "latestTitleModified": "El último job de IA modificó este archivo",
+    "latestTitleDeleted": "El último job de IA eliminó este archivo"
+  },
+  "monaco": {
+    "loadFailed": "No se pudo cargar el visor de código.",
+    "reload": "Recargar",
+    "loadingEditor": "Cargando editor…"
+  },
+  "ticketFiles": {
+    "title": "Archivos tocados por este ticket",
+    "jobTitle": "Job {{jobId}}"
+  }
+}

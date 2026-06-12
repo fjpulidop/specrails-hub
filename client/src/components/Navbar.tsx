@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Settings, BookOpen, LayoutDashboard, BarChart3 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
@@ -10,6 +11,7 @@ interface CLIStatus {
 }
 
 function CLIBadge() {
+  const { t } = useTranslation('nav')
   const [status, setStatus] = useState<CLIStatus | null>(null)
 
   useEffect(() => {
@@ -26,7 +28,7 @@ function CLIBadge() {
       ? `Claude Code${status.version ? ` v${status.version}` : ''}`
       : status.provider === 'codex'
         ? `Codex CLI${status.version ? ` v${status.version}` : ''}`
-        : 'No AI CLI'
+        : t('navbar.noCli')
 
   const badgeClass =
     status.provider === 'claude'
@@ -37,8 +39,8 @@ function CLIBadge() {
 
   const tooltip =
     status.provider === null
-      ? 'No AI CLI detected. Install Claude Code or Codex CLI.'
-      : `Active CLI: ${label}`
+      ? t('navbar.noCliTooltip')
+      : t('navbar.activeCli', { label })
 
   return (
     <Tooltip>
@@ -58,6 +60,7 @@ function CLIBadge() {
 }
 
 export function Navbar() {
+  const { t } = useTranslation('nav')
   return (
     <nav className="relative z-50 h-11 flex items-center justify-between px-4 border-b border-border bg-card/50 backdrop-blur-sm">
       {/* Wordmark */}
@@ -84,7 +87,7 @@ export function Navbar() {
           }
         >
           <LayoutDashboard className="w-3.5 h-3.5" />
-          <span>Home</span>
+          <span>{t('navbar.home')}</span>
         </NavLink>
         <NavLink
           to="/analytics"
@@ -98,7 +101,7 @@ export function Navbar() {
           }
         >
           <BarChart3 className="w-3.5 h-3.5" />
-          <span>Analytics</span>
+          <span>{t('navbar.analytics')}</span>
         </NavLink>
       </div>
 
@@ -116,7 +119,7 @@ export function Navbar() {
               <BookOpen className="w-3.5 h-3.5" />
             </a>
           </TooltipTrigger>
-          <TooltipContent>Docs</TooltipContent>
+          <TooltipContent>{t('navbar.docs')}</TooltipContent>
         </Tooltip>
 
         <Tooltip>
@@ -135,7 +138,7 @@ export function Navbar() {
               <Settings className="w-3.5 h-3.5" />
             </NavLink>
           </TooltipTrigger>
-          <TooltipContent>Settings</TooltipContent>
+          <TooltipContent>{t('navbar.settings')}</TooltipContent>
         </Tooltip>
       </div>
     </nav>

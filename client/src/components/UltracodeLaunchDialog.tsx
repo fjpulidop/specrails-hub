@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Sparkles, GitBranch, Bot, DollarSign } from 'lucide-react'
 import {
   Dialog,
@@ -27,6 +28,7 @@ interface Props {
  * Continue is the affirmative (green) action; ⌘/Ctrl+Enter triggers it.
  */
 export function UltracodeLaunchDialog({ open, railLabel, specCount, model, onConfirm, onCancel }: Props) {
+  const { t } = useTranslation('dashboard')
   const confirmRef = useRef<HTMLButtonElement>(null)
 
   // ⌘/Ctrl + Enter confirms while the dialog is open.
@@ -55,9 +57,9 @@ export function UltracodeLaunchDialog({ open, railLabel, specCount, model, onCon
               <Sparkles className="h-4.5 w-4.5" />
             </span>
             <div className="text-left">
-              <DialogTitle className="text-base">Launch in Ultracode mode</DialogTitle>
+              <DialogTitle className="text-base">{t('ultracodeDialog.title')}</DialogTitle>
               <DialogDescription>
-                {railLabel} · {specCount} spec{specCount === 1 ? '' : 's'}
+                {t('ultracodeDialog.context', { rail: railLabel, count: specCount })}
                 {model ? ` · ${model}` : ''}
               </DialogDescription>
             </div>
@@ -67,28 +69,28 @@ export function UltracodeLaunchDialog({ open, railLabel, specCount, model, onCon
         <ul className="space-y-2.5 text-xs text-muted-foreground">
           <li className="flex items-start gap-2.5">
             <GitBranch className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-warning" />
-            <span><span className="font-medium text-foreground">No OpenSpec pipeline.</span> The structured architect → developer → reviewer flow is skipped entirely.</span>
+            <span><span className="font-medium text-foreground">{t('ultracodeDialog.noPipelineTitle')}</span>{' '}{t('ultracodeDialog.noPipelineBody')}</span>
           </li>
           <li className="flex items-start gap-2.5">
             <Bot className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-info" />
-            <span><span className="font-medium text-foreground">Native Claude autonomy.</span> Claude works on its own using native agents and dynamic workflows.</span>
+            <span><span className="font-medium text-foreground">{t('ultracodeDialog.autonomyTitle')}</span>{' '}{t('ultracodeDialog.autonomyBody')}</span>
           </li>
           <li className="flex items-start gap-2.5">
             <DollarSign className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-success" />
-            <span><span className="font-medium text-foreground">Variable cost.</span> Spend depends on what Claude decides to do — it can be higher than expected.</span>
+            <span><span className="font-medium text-foreground">{t('ultracodeDialog.costTitle')}</span>{' '}{t('ultracodeDialog.costBody')}</span>
           </li>
         </ul>
 
         <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="ghost" className="h-9" onClick={onCancel}>
-            Cancel
+            {t('common:actions.cancel')}
           </Button>
           <Button
             ref={confirmRef}
             className="h-9 gap-2 bg-emerald-500 text-white hover:bg-emerald-400 focus-visible:ring-emerald-400"
             onClick={onConfirm}
           >
-            Continue
+            {t('ultracodeDialog.continue')}
             <kbd className="hidden sm:inline-flex items-center rounded border border-white/30 bg-white/10 px-1 text-[9px] font-medium leading-4">⌘↵</kbd>
           </Button>
         </DialogFooter>

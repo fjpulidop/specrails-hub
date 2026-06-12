@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 import { Smartphone, ShieldCheck, Trash2 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { PairDeviceModal } from './PairDeviceModal'
@@ -33,6 +34,7 @@ function shortFp(fp: string | null): string {
 /** Hub-wide "Mobile companion" settings: enable the gateway, pair/revoke devices,
  *  rotate the cert identity. Loopback + auth enforced server-side. */
 export function MobileAccessSection() {
+  const { t } = useTranslation('settings')
   const [status, setStatus] = useState<MobileStatus | null>(null)
   const [devices, setDevices] = useState<MobileDevice[]>([])
   const [busy, setBusy] = useState(false)
@@ -69,7 +71,11 @@ export function MobileAccessSection() {
       }
       setStatus((await r.json()) as MobileStatus)
     } catch (e) {
-      toast.error(`Could not ${status.enabled ? 'disable' : 'enable'} mobile access: ${(e as Error).message}`)
+      toast.error(
+        status.enabled
+          ? t('mobile.disableFailed', { message: (e as Error).message })
+          : t('mobile.enableFailed', { message: (e as Error).message })
+      )
     } finally {
       setBusy(false)
     }
@@ -81,13 +87,13 @@ export function MobileAccessSection() {
   }
 
   async function resetIdentity(): Promise<void> {
-    if (!window.confirm('Reset the mobile identity? Every paired device will be revoked and must pair again.')) return
+    if (!window.confirm(t('mobile.resetConfirm'))) return
     setBusy(true)
     try {
       const r = await fetch('/api/hub/mobile/cert/rotate', { method: 'POST' })
       if (r.ok) setStatus((await r.json()) as MobileStatus)
       void loadDevices()
-      toast.success('Mobile identity reset')
+      toast.success(t('mobile.identityReset'))
     } finally {
       setBusy(false)
     }
@@ -98,21 +104,21 @@ export function MobileAccessSection() {
   return (
     <div className="space-y-3">
       <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-        <Smartphone className="h-3.5 w-3.5" /> Mobile companion
+        <Smartphone className="h-3.5 w-3.5" /> {t('mobile.heading')}
       </h3>
       <p className="text-sm text-muted-foreground">
-        Control this hub from the SpecRails Companion app on your phone, 100% over your local network. Off by default.
+        {t('mobile.description')}
       </p>
 
       <div className="flex items-center justify-between rounded-lg border border-border p-3">
         <div>
-          <div className="text-sm font-medium">{status.enabled ? 'Mobile access on' : 'Mobile access off'}</div>
+          <div className="text-sm font-medium">{status.enabled ? t('mobile.accessOn') : t('mobile.accessOff')}</div>
           <div className="text-xs text-muted-foreground">
-            {status.running ? `Listening on port ${status.port}` : 'Not listening'}
+            {status.running ? t('mobile.listeningOnPort', { port: status.port }) : t('mobile.notListening')}
           </div>
         </div>
         <Button variant={status.enabled ? 'outline' : 'default'} disabled={busy} onClick={toggleEnabled}>
-          {status.enabled ? 'Turn off' : 'Turn on'}
+          {status.enabled ? t('mobile.turnOff') : t('mobile.turnOn')}
         </Button>
       </div>
 
@@ -120,25 +126,25 @@ export function MobileAccessSection() {
         <>
           <div className="flex items-center justify-between">
             <Button onClick={() => setPairOpen(true)} className="gap-2">
-              <Smartphone className="h-4 w-4" /> Pair device
+              <Smartphone className="h-4 w-4" /> {t('mobile.pairDevice')}
             </Button>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5 text-accent-success" />
               <span title={status.certFingerprint ?? ''}>{shortFp(status.certFingerprint)}</span>
-              <button type="button" className="underline" onClick={resetIdentity} disabled={busy}>Reset</button>
+              <button type="button" className="underline" onClick={resetIdentity} disabled={busy}>{t('mobile.reset')}</button>
             </div>
           </div>
 
           {isWindows && (
             <p className="text-xs text-accent-warning">
-              Windows Firewall will ask to allow the SpecRails server on first enable — choose “Allow on private networks”.
+              {t('mobile.windowsFirewall')}
             </p>
           )}
 
           <div className="space-y-1">
-            <div className="text-xs font-semibold text-muted-foreground">Paired devices</div>
+            <div className="text-xs font-semibold text-muted-foreground">{t('mobile.pairedDevices')}</div>
             {devices.filter((d) => !d.revoked).length === 0 ? (
-              <div className="text-xs text-muted-foreground">No devices paired yet.</div>
+              <div className="text-xs text-muted-foreground">{t('mobile.noDevices')}</div>
             ) : (
               devices.filter((d) => !d.revoked).map((d) => (
                 <div key={d.id} className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2">
@@ -147,7 +153,7 @@ export function MobileAccessSection() {
                   </div>
                   <button
                     type="button"
-                    aria-label={`Revoke ${d.name}`}
+                    aria-label={t('mobile.revokeDevice', { name: d.name })}
                     className="text-muted-foreground hover:text-destructive"
                     onClick={() => revoke(d.id)}
                   >

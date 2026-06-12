@@ -1,0 +1,62 @@
+{
+  "toasts": {
+    "railAdded": "Rail {{n}} aggiunto",
+    "railRemoved": "{{rail}} rimosso",
+    "railCompleted": "Rail {{n}} completato",
+    "railFailed": "Rail {{n}} non riuscito — le spec sono tornate in Specs",
+    "railEnded": "Rail {{n}} {{status}} — le spec sono tornate in Specs",
+    "alreadyOnRail": "Già su {{rail}}",
+    "movedToRail": "Spostata su {{rail}}",
+    "railRunningStopFirst": "{{rail}} è in esecuzione — fermalo prima di rimuoverlo",
+    "removedFromRail": "Rimossa da {{rail}}",
+    "queuedOnRail": "In coda su {{rail}}",
+    "queuedOnRailDescription": "Il rail è attualmente in esecuzione",
+    "railStopped": "{{rail}} fermato",
+    "stopFailed": "Impossibile fermare il rail",
+    "syncTicketsFailed": "Impossibile sincronizzare i ticket del rail",
+    "launchFailed": "Impossibile avviare il rail",
+    "launchNetworkError": "Errore di rete durante l'avvio del rail",
+    "railLaunched": "{{rail}} avviato",
+    "launchDescription_one": "{{mode}} con {{count}} spec",
+    "launchDescription_other": "{{mode}} con {{count}} spec"
+  },
+  "railsBoard": {
+    "title": "Rails",
+    "runningCount_one": "{{count}} in esecuzione",
+    "runningCount_other": "{{count}} in esecuzione"
+  },
+  "railControls": {
+    "viewJobLog": "Visualizza log del job",
+    "log": "Log",
+    "implement": "Implementa",
+    "batch": "Batch",
+    "ultra": "Ultra",
+    "ultraTitle": "Ultracode — Claude implementa la spec in autonomia, senza pipeline",
+    "stop": "Stop",
+    "play": "Avvia",
+    "failedRetry": "Job non riuscito — clicca per riprovare",
+    "addSpecsFirst": "Aggiungi prima delle spec a questo rail"
+  },
+  "railRow": {
+    "moveToSpecs": "Sposta in Specs",
+    "deleteRail": "Elimina {{label}}",
+    "dropHere": "Rilascia qui",
+    "dropOnThisRail": "Rilascia su questo rail",
+    "dragSpecsHere": "Trascina qui le spec"
+  },
+  "ultracodeDialog": {
+    "title": "Avvia in modalità Ultracode",
+    "context_one": "{{rail}} · {{count}} spec",
+    "context_other": "{{rail}} · {{count}} spec",
+    "noPipelineTitle": "Nessuna pipeline OpenSpec.",
+    "noPipelineBody": "Il flusso strutturato architect → developer → reviewer viene saltato del tutto.",
+    "autonomyTitle": "Autonomia nativa di Claude.",
+    "autonomyBody": "Claude lavora in autonomia usando agenti nativi e workflow dinamici.",
+    "costTitle": "Costo variabile.",
+    "costBody": "La spesa dipende da cosa Claude decide di fare — può essere più alta del previsto.",
+    "continue": "Continua"
+  },
+  "useRails": {
+    "fetchFailed": "Impossibile recuperare i rail: {{status}}"
+  }
+}

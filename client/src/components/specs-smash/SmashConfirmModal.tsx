@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation, Trans } from 'react-i18next'
 import { Split, Zap, X } from 'lucide-react'
 
 import { Button } from '../ui/button'
@@ -19,25 +20,25 @@ export interface SmashConfirmModalProps {
   onConfirm: (mode: SmashMode) => void
 }
 
-const MODE_DESCRIPTION: Record<SmashMode, { title: string; bullet: string[]; eta: string }> = {
+const MODE_DESCRIPTION: Record<SmashMode, { titleKey: string; bulletKeys: string[]; etaKey: string }> = {
   simple: {
-    title: 'Simple',
-    bullet: [
-      'One-shot decomposition based solely on the spec title and description.',
-      'No codebase access — fast and deterministic.',
-      'Best for clean specs with a strong Contract Layer.',
+    titleKey: 'smashModal.modes.simple.title',
+    bulletKeys: [
+      'smashModal.modes.simple.bullet1',
+      'smashModal.modes.simple.bullet2',
+      'smashModal.modes.simple.bullet3',
     ],
-    eta: '~10-30s',
+    etaKey: 'smashModal.modes.simple.eta',
   },
   full: {
-    title: 'Full',
-    bullet: [
-      'Deep multi-turn decomposition with read-only codebase access — reads aggressively.',
-      'Each Sub-Spec is a super-spec: Background, Plan, Files, Edge Cases, Out-of-Scope, Tests.',
-      '4-10 acceptance criteria per Sub-Spec, grounded in real file paths.',
-      'Tokens are spent freely — quality over speed.',
+    titleKey: 'smashModal.modes.full.title',
+    bulletKeys: [
+      'smashModal.modes.full.bullet1',
+      'smashModal.modes.full.bullet2',
+      'smashModal.modes.full.bullet3',
+      'smashModal.modes.full.bullet4',
     ],
-    eta: '~3-10 min',
+    etaKey: 'smashModal.modes.full.eta',
   },
 }
 
@@ -50,6 +51,7 @@ export function SmashConfirmModal({
   onCancel,
   onConfirm,
 }: SmashConfirmModalProps) {
+  const { t } = useTranslation('activity')
   const [mode, setMode] = useState<SmashMode>('simple')
 
   if (!open) return null
@@ -69,7 +71,7 @@ export function SmashConfirmModal({
             <Split className="w-5 h-5 text-accent-highlight shrink-0 mt-0.5" aria-hidden />
             <div className="min-w-0">
               <h2 className="text-sm font-semibold text-foreground">
-                SMASH Spec into Sub-Specs
+                {t('smashModal.title')}
               </h2>
               <p className="text-[11px] text-muted-foreground truncate" title={ticketTitle}>
                 {ticketTitle}
@@ -80,7 +82,7 @@ export function SmashConfirmModal({
             type="button"
             onClick={onCancel}
             className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-surface/50 transition-colors shrink-0"
-            aria-label="Close"
+            aria-label={t('common:actions.close')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -89,14 +91,14 @@ export function SmashConfirmModal({
         {/* Re-SMASH warning */}
         {isReSmash && childrenCount > 0 && (
           <div className="mx-5 mt-4 rounded-md border border-accent-warning/40 bg-accent-warning/10 px-3 py-2 text-xs text-foreground">
-            ⚠️ This will delete the <strong>{childrenCount}</strong> current Sub-Specs and create new ones.
+            <Trans t={t} i18nKey="smashModal.reSmashWarning" count={childrenCount} />
           </div>
         )}
 
         {/* Mode picker */}
         <div className="px-5 py-4 space-y-3">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-            Decomposition mode
+            {t('smashModal.modePickerLabel')}
           </p>
           {(['simple', 'full'] as SmashMode[]).map((m) => {
             const meta = MODE_DESCRIPTION[m]
@@ -127,16 +129,16 @@ export function SmashConfirmModal({
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
                         {m === 'full' && <Zap className="w-3.5 h-3.5 text-accent-highlight" aria-hidden />}
-                        {meta.title}
+                        {t(meta.titleKey)}
                       </span>
                       <span className="text-[10px] text-muted-foreground tabular-nums">
-                        {meta.eta}
+                        {t(meta.etaKey)}
                       </span>
                     </div>
                     <ul className="space-y-0.5">
-                      {meta.bullet.map((b, i) => (
-                        <li key={i} className="text-[11px] text-foreground/70 leading-snug">
-                          • {b}
+                      {meta.bulletKeys.map((b) => (
+                        <li key={b} className="text-[11px] text-foreground/70 leading-snug">
+                          • {t(b)}
                         </li>
                       ))}
                     </ul>
@@ -150,7 +152,7 @@ export function SmashConfirmModal({
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border/30 bg-surface/20">
           <Button variant="ghost" size="sm" onClick={onCancel} disabled={submitting}>
-            Cancel
+            {t('common:actions.cancel')}
           </Button>
           <Button
             size="sm"
@@ -159,7 +161,7 @@ export function SmashConfirmModal({
             data-testid="smash-confirm-modal-continue"
           >
             <Split className="w-3.5 h-3.5 mr-1.5" />
-            {submitting ? 'Starting…' : isReSmash ? 'Confirm Re-SMASH' : 'SMASH'}
+            {submitting ? t('smashModal.starting') : isReSmash ? t('smashModal.confirmReSmash') : t('smashModal.smash')}
           </Button>
         </div>
       </div>

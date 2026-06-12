@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { CheckCircle2, ChevronDown, Loader2, XCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 import type { EventRow, JobSummary } from '../types'
 
@@ -114,6 +115,7 @@ export function JobStatusPanel({
   defaultOpen = true,
   pipelineTotals,
 }: JobStatusPanelProps) {
+  const { t } = useTranslation('jobs')
   const [open, setOpen] = useState(defaultOpen)
   const modifiedFiles = useMemo(() => extractModifiedFiles(events), [events])
 
@@ -167,7 +169,11 @@ export function JobStatusPanel({
       ? formatWallClock(job.started_at, now)
       : '—'
 
-  const headerLabel = isRunning ? 'Job in progress' : isSuccess ? 'Job completed' : 'Job failed'
+  const headerLabel = isRunning
+    ? t('statusPanel.inProgress')
+    : isSuccess
+      ? t('statusPanel.completed')
+      : t('statusPanel.failed')
 
   const frameClass = isRunning
     ? 'border-accent-info/20 bg-accent-info/5'
@@ -210,7 +216,7 @@ export function JobStatusPanel({
           )}
           {modifiedFiles.length > 0 && (
             <span>
-              {modifiedFiles.length} file{modifiedFiles.length !== 1 ? 's' : ''}
+              {t('statusPanel.filesCount', { count: modifiedFiles.length })}
             </span>
           )}
         </div>
@@ -228,18 +234,18 @@ export function JobStatusPanel({
         <div className="px-4 pb-4 space-y-3 border-t border-border/20">
           {/* Metric cards grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3">
-            <SummaryMetric label="Duration" value={durationDisplay} />
+            <SummaryMetric label={t('statusPanel.duration')} value={durationDisplay} />
             <SummaryMetric
-              label="Cost"
+              label={t('statusPanel.cost')}
               value={costDisplay}
               valueClass={costDimmed ? 'text-muted-foreground' : 'text-yellow-400'}
             />
             <SummaryMetric
-              label="Turns"
+              label={t('statusPanel.turns')}
               value={liveTurns != null ? `${turnsApproximate ? '~' : ''}${liveTurns}` : '—'}
             />
             <SummaryMetric
-              label="Tokens"
+              label={t('statusPanel.tokens')}
               value={liveTokens != null ? `${tokensApproximate ? '~' : ''}${(liveTokens / 1000).toFixed(1)}k` : '—'}
             />
           </div>
@@ -248,16 +254,16 @@ export function JobStatusPanel({
           {pipelineTotals && (
             <div>
               <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wider mb-1.5">
-                Pipeline total ({pipelineTotals.jobCount} phases)
+                {t('statusPanel.pipelineTotal', { count: pipelineTotals.jobCount })}
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <SummaryMetric
-                  label="Total cost"
+                  label={t('statusPanel.totalCost')}
                   value={`$${pipelineTotals.totalCostUsd.toFixed(4)}`}
                   valueClass="text-yellow-400"
                 />
                 <SummaryMetric
-                  label="Total tokens"
+                  label={t('statusPanel.totalTokens')}
                   value={`${((pipelineTotals.totalTokensIn +
                     pipelineTotals.totalTokensOut +
                     pipelineTotals.totalTokensCacheRead +
@@ -271,7 +277,7 @@ export function JobStatusPanel({
           {modifiedFiles.length > 0 && (
             <div>
               <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wider mb-1.5">
-                Files modified
+                {t('statusPanel.filesModified')}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {modifiedFiles.map((f) => (

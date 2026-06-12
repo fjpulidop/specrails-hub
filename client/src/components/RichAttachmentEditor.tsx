@@ -10,12 +10,14 @@ import {
   type ClipboardEvent,
   type ReactNode,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { Attachment } from '../types'
 import {
   ATTACHMENT_ACCEPT_MIME,
   isSupportedAttachmentFile,
   uploadAttachment,
 } from '../lib/attachments'
+import i18n from '../lib/i18n'
 import { cn } from '../lib/utils'
 import { AttachmentChip } from './AttachmentChip'
 
@@ -86,7 +88,7 @@ function buildPill(attachment: Attachment): HTMLSpanElement {
   label.className = 'max-w-[180px] truncate'
   const close = document.createElement('button')
   close.type = 'button'
-  close.setAttribute('aria-label', `Remove ${attachment.filename}`)
+  close.setAttribute('aria-label', i18n.t('attachments:removeFile', { name: attachment.filename }))
   close.dataset.role = 'pill-remove'
   close.className = 'text-accent-foreground/60 hover:text-destructive transition-colors leading-none'
   close.textContent = '×'
@@ -144,6 +146,7 @@ export const RichAttachmentEditor = forwardRef<RichAttachmentEditorHandle, RichA
     },
     ref,
   ) {
+    const { t } = useTranslation('attachments')
     const editorRef = useRef<HTMLDivElement | null>(null)
     const fileInputRef = useRef<HTMLInputElement | null>(null)
     const savedRangeRef = useRef<Range | null>(null)
@@ -563,12 +566,12 @@ export const RichAttachmentEditor = forwardRef<RichAttachmentEditorHandle, RichA
               className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border hover:bg-accent/40 transition-colors disabled:opacity-50"
             >
               <span aria-hidden>📎</span>
-              <span>Attach files</span>
+              <span>{t('editor.attachFiles')}</span>
             </button>
             {footerExtra}
           </div>
           {uploads.length > 0 && (
-            <span className="animate-pulse">Uploading {uploads.length} file{uploads.length > 1 ? 's' : ''}…</span>
+            <span className="animate-pulse">{t('editor.uploadingFiles', { count: uploads.length })}</span>
           )}
         </div>
 
@@ -598,7 +601,7 @@ export const RichAttachmentEditor = forwardRef<RichAttachmentEditorHandle, RichA
               'transition-opacity',
             )}
           >
-            Drop to add context
+            {t('editor.dropToAddContext')}
           </div>
         </div>
       </div>

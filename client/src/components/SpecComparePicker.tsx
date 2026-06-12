@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Search, Ticket as TicketIcon } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { TicketStatusDot } from './TicketStatusIndicator'
+import { getDateFnsLocale } from '../lib/i18n'
 import type { LocalTicket, TicketPriority } from '../types'
 
 interface SpecComparePickerProps {
@@ -21,7 +23,7 @@ const PRIORITY_STYLES: Record<TicketPriority, string> = {
 
 function formatRelTime(dateStr: string): string {
   try {
-    return formatDistanceToNow(new Date(dateStr), { addSuffix: true })
+    return formatDistanceToNow(new Date(dateStr), { addSuffix: true, locale: getDateFnsLocale() })
   } catch {
     return dateStr
   }
@@ -38,6 +40,7 @@ function formatRelTime(dateStr: string): string {
  * context and add a `mode='picker'` prop to all four dashboard views.
  */
 export function SpecComparePicker({ tickets, excludeIds, onSelect }: SpecComparePickerProps) {
+  const { t } = useTranslation('tickets')
   const [search, setSearch] = useState('')
 
   const filtered = useMemo(() => {
@@ -58,8 +61,8 @@ export function SpecComparePicker({ tickets, excludeIds, onSelect }: SpecCompare
       {/* Header */}
       <div className="px-4 py-3 border-b border-border/30 flex items-center gap-2">
         <TicketIcon className="w-3.5 h-3.5 text-muted-foreground" />
-        <span className="text-xs font-semibold text-foreground">Compare with…</span>
-        <span className="text-[10px] text-muted-foreground">({filtered.length} todo)</span>
+        <span className="text-xs font-semibold text-foreground">{t('comparePicker.title')}</span>
+        <span className="text-[10px] text-muted-foreground">{t('comparePicker.todoCount', { n: filtered.length })}</span>
       </div>
 
       {/* Search */}
@@ -70,7 +73,7 @@ export function SpecComparePicker({ tickets, excludeIds, onSelect }: SpecCompare
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search todo specs…"
+            placeholder={t('comparePicker.searchPlaceholder')}
             className="w-full h-7 rounded border border-border bg-input pl-7 pr-2 text-[11px] text-foreground placeholder:text-muted-foreground outline-none focus:border-accent-primary/60"
           />
         </div>
@@ -82,42 +85,42 @@ export function SpecComparePicker({ tickets, excludeIds, onSelect }: SpecCompare
           <div className="flex flex-col items-center justify-center h-full text-center px-4 py-8 gap-2">
             <TicketIcon className="w-6 h-6 text-muted-foreground/40" />
             <p className="text-xs text-muted-foreground">
-              {search.trim() ? 'No matching todo specs' : 'No other todo specs to compare'}
+              {search.trim() ? t('comparePicker.noMatches') : t('comparePicker.empty')}
             </p>
           </div>
         ) : (
           <ul className="divide-y divide-border/10">
-            {filtered.map((t) => (
-              <li key={t.id}>
+            {filtered.map((tk) => (
+              <li key={tk.id}>
                 <button
                   type="button"
-                  data-testid={`spec-compare-card-${t.id}`}
-                  onClick={() => onSelect(t.id)}
+                  data-testid={`spec-compare-card-${tk.id}`}
+                  onClick={() => onSelect(tk.id)}
                   className="w-full text-left px-4 py-2.5 hover:bg-accent/30 transition-colors flex items-start gap-2 group"
                 >
-                  <TicketStatusDot status={t.status} />
+                  <TicketStatusDot status={tk.status} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono text-muted-foreground">#{t.id}</span>
-                      {t.priority && PRIORITY_STYLES[t.priority] && (
+                      <span className="text-[10px] font-mono text-muted-foreground">#{tk.id}</span>
+                      {tk.priority && PRIORITY_STYLES[tk.priority] && (
                         <span
-                          className={`inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium border ${PRIORITY_STYLES[t.priority]}`}
+                          className={`inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium border ${PRIORITY_STYLES[tk.priority]}`}
                         >
-                          {t.priority}
+                          {t(`priority.${tk.priority}`)}
                         </span>
                       )}
                     </div>
                     <p className="mt-0.5 text-xs text-foreground truncate group-hover:text-accent-primary transition-colors">
-                      {t.title || 'Untitled'}
+                      {tk.title || t('untitled')}
                     </p>
-                    {t.description && (
+                    {tk.description && (
                       <p className="mt-0.5 text-[10px] text-muted-foreground line-clamp-1">
-                        {t.description.slice(0, 120)}
+                        {tk.description.slice(0, 120)}
                       </p>
                     )}
-                    {t.labels && t.labels.length > 0 && (
+                    {tk.labels && tk.labels.length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
-                        {t.labels.slice(0, 3).map((label) => (
+                        {tk.labels.slice(0, 3).map((label) => (
                           <span
                             key={label}
                             className="inline-flex items-center rounded px-1 py-0.5 text-[9px] bg-accent/40 text-foreground/60"
@@ -125,13 +128,13 @@ export function SpecComparePicker({ tickets, excludeIds, onSelect }: SpecCompare
                             {label}
                           </span>
                         ))}
-                        {t.labels.length > 3 && (
-                          <span className="text-[9px] text-muted-foreground">+{t.labels.length - 3}</span>
+                        {tk.labels.length > 3 && (
+                          <span className="text-[9px] text-muted-foreground">+{tk.labels.length - 3}</span>
                         )}
                       </div>
                     )}
                     <p className="mt-1 text-[9px] text-muted-foreground">
-                      Updated {formatRelTime(t.updated_at)}
+                      {t('meta.updatedAgo', { time: formatRelTime(tk.updated_at) })}
                     </p>
                   </div>
                 </button>

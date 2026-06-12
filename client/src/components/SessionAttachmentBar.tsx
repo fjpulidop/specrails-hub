@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { Attachment } from '../types'
 import { ATTACHMENT_ACCEPT_MIME, uploadAttachment } from '../lib/attachments'
 import { AttachmentChip } from './AttachmentChip'
@@ -27,6 +28,7 @@ export function SessionAttachmentBar({
   readOnly,
   className,
 }: Props) {
+  const { t } = useTranslation('attachments')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const activeAttachments = sessionIds
@@ -44,7 +46,7 @@ export function SessionAttachmentBar({
         const attachment = await uploadAttachment(ticketKey, file)
         onAddAttachment(attachment)
       } catch (err) {
-        onError?.(err instanceof Error ? err.message : `Upload failed: ${file.name}`)
+        onError?.(err instanceof Error ? err.message : t('errors.uploadFailedFile', { name: file.name }))
       }
     }
   }
@@ -61,7 +63,7 @@ export function SessionAttachmentBar({
       ))}
       {activeAttachments.length === 0 && (
         <span className="text-[11px] text-muted-foreground/60 italic pr-1">
-          No pinned resources — drop files or click Add
+          {t('sessionBar.empty')}
         </span>
       )}
       {!readOnly && (
@@ -73,7 +75,7 @@ export function SessionAttachmentBar({
             className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border/60 bg-card/30 hover:bg-accent/40 text-[11px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
           >
             <span aria-hidden>+</span>
-            <span>Add</span>
+            <span>{t('common:actions.add')}</span>
           </button>
           <input
             ref={fileInputRef}

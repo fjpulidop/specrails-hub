@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { formatDistanceToNow } from 'date-fns'
+import { Trans, useTranslation } from 'react-i18next'
 import { X, Pencil, Trash2, Save, Plus, XCircle, MessageSquare, ArrowRight, ArrowLeft, Columns2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { getDateFnsLocale } from '../lib/i18n'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
 import { AttachmentsSection } from './AttachmentsSection'
@@ -25,19 +27,19 @@ const DRAG_SNAP_THRESHOLD = 0.20 // 20% of viewport width
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const PRIORITY_OPTIONS: { value: TicketPriority; label: string; className: string }[] = [
-  { value: 'critical', label: 'Critical', className: 'text-red-400' },
-  { value: 'high', label: 'High', className: 'text-orange-400' },
-  { value: 'medium', label: 'Medium', className: 'text-yellow-400' },
-  { value: 'low', label: 'Low', className: 'text-slate-400' },
+const PRIORITY_OPTIONS: { value: TicketPriority; labelKey: string; className: string }[] = [
+  { value: 'critical', labelKey: 'priority.critical', className: 'text-red-400' },
+  { value: 'high', labelKey: 'priority.high', className: 'text-orange-400' },
+  { value: 'medium', labelKey: 'priority.medium', className: 'text-yellow-400' },
+  { value: 'low', labelKey: 'priority.low', className: 'text-slate-400' },
 ]
 
-const SOURCE_LABELS: Record<string, string> = {
-  manual: 'Created manually',
-  'product-backlog': 'From product backlog',
-  'propose-spec': 'From spec proposal',
-  'get-backlog-specs': 'From backlog specs',
-  'free-prompt': 'From Raw prompt',
+const SOURCE_LABEL_KEYS: Record<string, string> = {
+  manual: 'source.manual',
+  'product-backlog': 'source.productBacklog',
+  'propose-spec': 'source.proposeSpec',
+  'get-backlog-specs': 'source.getBacklogSpecs',
+  'free-prompt': 'source.freePrompt',
 }
 
 // ─── Props ──────────────────────────────────────────────────────────────────
@@ -81,6 +83,7 @@ export function TicketDetailModal({
   onRemoveFromRail,
   embedded = false,
 }: TicketDetailModalProps) {
+  const { t } = useTranslation('tickets')
   const { activeProjectId, projects } = useHub()
   const { enterSplit, state: splitState } = useTicketDetailModal()
   const inSplit = splitState.originSide !== null
@@ -209,12 +212,12 @@ export function TicketDetailModal({
     setSaving(false)
 
     if (ok) {
-      toast.success('Ticket updated')
+      toast.success(t('detailModal.toast.updated'))
       onClose()
     } else {
-      toast.error('Failed to update ticket')
+      toast.error(t('detailModal.toast.updateFailed'))
     }
-  }, [title, description, priority, labels, ticket, onSave, onClose])
+  }, [title, description, priority, labels, ticket, onSave, onClose, t])
 
   const handleDelete = useCallback(() => {
     onDelete(ticket.id)
@@ -336,7 +339,7 @@ export function TicketDetailModal({
                 onClick={() => setEditingTitle(true)}
                 className="group flex items-center gap-1.5 text-left w-full"
               >
-                <h2 className="text-sm font-semibold text-foreground truncate">{title || 'Untitled'}</h2>
+                <h2 className="text-sm font-semibold text-foreground truncate">{title || t('untitled')}</h2>
                 <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
               </button>
             )}
@@ -375,10 +378,10 @@ export function TicketDetailModal({
               className="shrink-0 mr-1 gap-1.5"
               data-testid="ticket-modal-compare"
               onClick={handleCompareClick}
-              title="Compare with another spec"
+              title={t('detailModal.compareTooltip')}
             >
               <Columns2 className="w-3.5 h-3.5" />
-              Compare
+              {t('detailModal.compare')}
             </Button>
           )}
 
@@ -401,7 +404,7 @@ export function TicketDetailModal({
               <div className="flex-1 flex flex-col">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    Description
+                    {t('fields.description')}
                   </span>
                   {!editingDescription && (
                     <button
@@ -410,7 +413,7 @@ export function TicketDetailModal({
                       className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
                     >
                       <Pencil className="w-2.5 h-2.5" />
-                      Edit
+                      {t('common:actions.edit')}
                     </button>
                   )}
                 </div>
@@ -422,7 +425,7 @@ export function TicketDetailModal({
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       className="w-full flex-1 rounded-lg border border-border bg-input px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground resize-none min-h-[300px]"
-                      placeholder="Markdown description..."
+                      placeholder={t('fields.markdownPlaceholder')}
                     />
                     <div className="flex items-center gap-1.5">
                       <Button
@@ -431,9 +434,9 @@ export function TicketDetailModal({
                         className="h-6 text-[10px]"
                         onClick={() => setEditingDescription(false)}
                       >
-                        Done editing
+                        {t('detailModal.doneEditing')}
                       </Button>
-                      <span className="text-[9px] text-muted-foreground">Supports markdown</span>
+                      <span className="text-[9px] text-muted-foreground">{t('fields.supportsMarkdown')}</span>
                     </div>
                   </div>
                 ) : description ? (
@@ -447,7 +450,7 @@ export function TicketDetailModal({
                     onClick={() => setEditingDescription(true)}
                     className="w-full rounded-lg border border-dashed border-border/40 bg-muted/10 px-3 py-4 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/20 transition-colors text-center"
                   >
-                    Add a description...
+                    {t('detailModal.addDescription')}
                   </button>
                 )}
               </div>
@@ -466,7 +469,7 @@ export function TicketDetailModal({
               {ticket.prerequisites && ticket.prerequisites.length > 0 && (
                 <div>
                   <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1.5">
-                    Prerequisites
+                    {t('detailModal.prerequisites')}
                   </span>
                   <div className="flex flex-wrap gap-1">
                     {ticket.prerequisites.map((id) => (
@@ -487,7 +490,7 @@ export function TicketDetailModal({
               {/* Priority selector */}
               <div>
                 <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1.5">
-                  Priority
+                  {t('fields.priority')}
                 </span>
                 <select
                   value={priority}
@@ -495,7 +498,7 @@ export function TicketDetailModal({
                   className="w-full h-7 rounded border border-border bg-input px-2 text-xs text-foreground"
                 >
                   {PRIORITY_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
                   ))}
                 </select>
               </div>
@@ -503,7 +506,7 @@ export function TicketDetailModal({
               {/* Labels */}
               <div>
                 <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1.5">
-                  Labels
+                  {t('fields.labels')}
                 </span>
                 <div className="flex flex-wrap gap-1 mb-1.5">
                   {labels.map((label) => (
@@ -543,7 +546,7 @@ export function TicketDetailModal({
                         setShowLabelInput(false)
                         setLabelInput('')
                       }}
-                      placeholder="Add label..."
+                      placeholder={t('detailModal.addLabelPlaceholder')}
                       className="w-full h-6 rounded border border-border bg-input px-2 text-[10px] text-foreground placeholder:text-muted-foreground"
                     />
                     {labelSuggestions.length > 0 && (
@@ -571,7 +574,7 @@ export function TicketDetailModal({
                     className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <Plus className="w-2.5 h-2.5" />
-                    Add label
+                    {t('detailModal.addLabel')}
                   </button>
                 )}
               </div>
@@ -589,7 +592,7 @@ export function TicketDetailModal({
               {ticket.metadata?.effort_level && (
                 <div>
                   <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-0.5">
-                    Effort
+                    {t('detailModal.effort')}
                   </span>
                   <span className="text-xs text-foreground/70">{ticket.metadata.effort_level}</span>
                 </div>
@@ -598,7 +601,7 @@ export function TicketDetailModal({
               {ticket.assignee && (
                 <div>
                   <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-0.5">
-                    Assignee
+                    {t('detailModal.assignee')}
                   </span>
                   <span className="text-xs text-foreground/70">{ticket.assignee}</span>
                 </div>
@@ -610,11 +613,11 @@ export function TicketDetailModal({
         {/* Footer */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-border/30">
           <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-            <span>Created {formatRelTime(ticket.created_at)}</span>
-            <span>Updated {formatRelTime(ticket.updated_at)}</span>
+            <span>{t('meta.createdAgo', { time: formatRelTime(ticket.created_at) })}</span>
+            <span>{t('meta.updatedAgo', { time: formatRelTime(ticket.updated_at) })}</span>
             {ticket.source && (
               <span className="bg-muted/30 rounded px-1.5 py-0.5">
-                {SOURCE_LABELS[ticket.source] ?? ticket.source}
+                {SOURCE_LABEL_KEYS[ticket.source] ? t(SOURCE_LABEL_KEYS[ticket.source]) : ticket.source}
               </span>
             )}
           </div>
@@ -626,7 +629,7 @@ export function TicketDetailModal({
               onClick={() => setShowDeleteConfirm(true)}
             >
               <Trash2 className="w-3 h-3 mr-1" />
-              Delete
+              {t('common:actions.delete')}
             </Button>
             {isDirty && (
               <Button
@@ -636,7 +639,7 @@ export function TicketDetailModal({
                 disabled={saving || !title.trim()}
               >
                 <Save className="w-3 h-3 mr-1" />
-                {saving ? 'Saving...' : 'Save'}
+                {saving ? t('common:states.saving') : t('common:actions.save')}
               </Button>
             )}
           </div>
@@ -647,20 +650,23 @@ export function TicketDetailModal({
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete ticket</DialogTitle>
+            <DialogTitle>{t('deleteDialog.title')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete{' '}
-              <span className="font-semibold text-foreground">#{ticket.id} {ticket.title}</span>?
-              This action cannot be undone.
+              <Trans
+                t={t}
+                i18nKey="deleteDialog.body"
+                values={{ id: ticket.id, title: ticket.title }}
+                components={{ strong: <span className="font-semibold text-foreground" /> }}
+              />
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(false)}>
-              Cancel
+              {t('common:actions.cancel')}
             </Button>
             <Button variant="destructive" size="sm" onClick={handleDelete}>
               <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-              Delete
+              {t('common:actions.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -679,7 +685,7 @@ export function TicketDetailModal({
 
 function formatRelTime(dateStr: string): string {
   try {
-    return formatDistanceToNow(new Date(dateStr), { addSuffix: true })
+    return formatDistanceToNow(new Date(dateStr), { addSuffix: true, locale: getDateFnsLocale() })
   } catch {
     return dateStr
   }
@@ -713,6 +719,7 @@ const EDITABLE_STATUSES = new Set(['draft', 'todo', 'backlog'])
  * See openspec/changes/replace-ai-edit-with-continue-editing/design.md D1+D8.
  */
 function ContinueEditingButton({ ticket, title, description, priority, labels, onClose }: ContinueEditingButtonProps) {
+  const { t } = useTranslation('tickets')
   const { triggerResume } = useMinimizedChats()
   const { activeProjectId } = useHub()
   const { closeTicketDetail } = useTicketDetailModal()
@@ -728,7 +735,7 @@ function ContinueEditingButton({ ticket, title, description, priority, labels, o
     triggerResume({
       kind: 'explore-spec',
       projectId: activeProjectId,
-      label: title || ticket.title || `Ticket #${ticket.id}`,
+      label: title || ticket.title || t('detailModal.ticketFallbackLabel', { id: ticket.id }),
       restoreRoute: '/',
       params: {
         initialIdea: '',
@@ -766,7 +773,7 @@ function ContinueEditingButton({ ticket, title, description, priority, labels, o
       data-testid="continue-editing"
     >
       <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
-      Continue Editing
+      {t('detailModal.continueEditing')}
     </Button>
   )
 }
@@ -787,6 +794,7 @@ interface RailAssignmentButtonProps {
  * whether the ticket is already assigned to a rail.
  */
 function RailAssignmentButton({ ticket, rails, onMoveToRail, onRemoveFromRail }: RailAssignmentButtonProps) {
+  const { t } = useTranslation('tickets')
   const [anchor, setAnchor] = useState<DOMRect | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const assignedRail = rails.find((r) => r.ticketIds.includes(ticket.id))
@@ -800,10 +808,10 @@ function RailAssignmentButton({ ticket, rails, onMoveToRail, onRemoveFromRail }:
         className="shrink-0 mr-2 gap-1.5 border-accent-warning/30 text-accent-warning hover:bg-accent-warning/10 hover:text-accent-warning"
         data-testid="modal-remove-from-rail"
         onClick={() => onRemoveFromRail(ticket.id)}
-        title={`Currently on ${assignedRail.label}`}
+        title={t('rail.currentlyOn', { rail: assignedRail.label })}
       >
         <ArrowLeft className="w-3.5 h-3.5" aria-hidden />
-        Remove from Rail
+        {t('rail.removeFromRail')}
       </Button>
     )
   }
@@ -822,7 +830,7 @@ function RailAssignmentButton({ ticket, rails, onMoveToRail, onRemoveFromRail }:
           setAnchor(buttonRef.current.getBoundingClientRect())
         }}
       >
-        Move to Rail
+        {t('rail.moveToRail')}
         <ArrowRight className="w-3.5 h-3.5" aria-hidden />
       </Button>
       {anchor && (
@@ -871,6 +879,7 @@ interface DescriptionRenderProps {
 }
 
 function DescriptionRender({ description, onEdit }: DescriptionRenderProps) {
+  const { t } = useTranslation('tickets')
   const { user, contract } = splitDescriptionAtContractLayer(description)
   const userPart = user || description
   return (
@@ -894,9 +903,9 @@ function DescriptionRender({ description, onEdit }: DescriptionRenderProps) {
           onClick={(e) => e.stopPropagation()}
         >
           <summary className="cursor-pointer text-[10px] font-medium text-foreground/80 select-none flex items-center gap-2">
-            Contract Layer
+            {t('contractLayer.title')}
             <span className="rounded-full bg-muted/40 px-1.5 text-[9px] text-foreground/60">
-              {countContractSubsections(contract)}/5 populated
+              {t('contractLayer.populated', { n: countContractSubsections(contract) })}
             </span>
           </summary>
           <div className="mt-2 prose prose-invert prose-xs max-w-none prose-p:my-1 prose-headings:mt-2 prose-headings:mb-1 prose-headings:text-sm prose-headings:font-semibold prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-code:text-cyan-300 prose-code:text-[10px] prose-code:bg-muted/40 prose-code:px-1 prose-code:py-0.5 prose-code:rounded text-foreground/80 text-xs">

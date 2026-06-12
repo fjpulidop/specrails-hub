@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useLayoutEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSharedWebSocket } from './useSharedWebSocket'
+import i18n from '../lib/i18n'
 
 interface WsJob {
   id: string
@@ -108,9 +109,11 @@ export function useOsNotifications({
     if (prefs.filter === 'failed' && job.status !== 'failed') return
 
     function show(): void {
-      const title = job.status === 'completed' ? 'Job completed' : 'Job failed'
+      const title = job.status === 'completed'
+        ? i18n.t('commands:notifications.jobCompleted')
+        : i18n.t('commands:notifications.jobFailed')
       const projectName = projectId ? (projectsByIdRef.current?.get(projectId) ?? '') : ''
-      const commandSnippet = job.command ? job.command.slice(0, 80) : 'Unknown command'
+      const commandSnippet = job.command ? job.command.slice(0, 80) : i18n.t('commands:notifications.unknownCommand')
       const body = projectName ? `[${projectName}] ${commandSnippet}` : commandSnippet
 
       const notification = new Notification(title, {

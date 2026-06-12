@@ -1,0 +1,55 @@
+{
+  "shell": {
+    "backAriaLabel": "Indietro (Esc)",
+    "apply": "Applica",
+    "somethingWentWrong": "Qualcosa è andato storto",
+    "quickPrompts": "Prompt rapidi",
+    "workingOnRefinement": "Sto lavorando alla tua rifinitura…",
+    "history": "Cronologia",
+    "viewCurrentContent": "Visualizza contenuto corrente",
+    "conversation": "Conversazione",
+    "applied": "Applicato.",
+    "you": "Tu",
+    "autoTestResult": "Risultato auto-test",
+    "ai": "AI",
+    "refinementReady": "Rifinitura pronta — rivedi il diff a destra.",
+    "diffPreview": "Anteprima diff",
+    "proposedChanges": "Modifiche proposte",
+    "wordLevelDiff": "diff a livello di parola",
+    "forceApply": "Forza applicazione",
+    "conflict": {
+      "diskChanged": "Il file è cambiato su disco durante la modifica. L'applicazione è stata bloccata.",
+      "nameChanged": "L'AI ha cambiato il nome dell'agente. La rinomina è un'azione esplicita separata — correggi la bozza o rinomina in Studio."
+    },
+    "discardDialog": {
+      "ariaLabel": "Scartare le modifiche?",
+      "title": "Scartare la rifinitura?",
+      "body": "La bozza corrente verrà annullata e non applicata.",
+      "keepEditing": "Continua a modificare"
+    },
+    "composer": {
+      "sendAriaLabel": "Invia (⌘⏎)",
+      "kbdSubmit": "invia",
+      "kbdCancel": "annulla"
+    }
+  },
+  "composer": {
+    "title": "AI Edit",
+    "placeholder": "Descrivi le modifiche che vuoi…",
+    "submit": "Invia",
+    "unsupportedFileType": "Tipo di file non supportato: {{name}}",
+    "uploadFailed": "Caricamento non riuscito per {{name}}: {{message}}"
+  },
+  "diffView": {
+    "inserted": "inserito",
+    "removed": "rimosso"
+  },
+  "refine": {
+    "serverError": "Errore del server ({{status}})",
+    "connectionFailed": "Connessione non riuscita: {{message}}",
+    "applyFailed": "Applicazione non riuscita ({{status}})",
+    "loadAgentFailed": "Impossibile caricare l'agente ({{status}})",
+    "loadSessionFailed": "Impossibile caricare la sessione ({{status}})",
+    "rehydrateFailed": "Impossibile ripristinare la sessione: {{message}}"
+  }
+}

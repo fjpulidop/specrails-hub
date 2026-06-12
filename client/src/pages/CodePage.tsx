@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ExternalLink, FileMinus2, FilePlus2, FileText, Filter, RotateCw, X } from 'lucide-react'
 import { FileTree } from '../components/code-explorer/FileTree'
 import { FileViewer, type CopyPathAction, type SummaryAction } from '../components/code-explorer/FileViewer'
@@ -48,6 +49,7 @@ function clampTreeWidth(width: number, containerWidth: number): number {
 }
 
 export default function CodePage() {
+  const { t } = useTranslation('code')
   const { activeProjectId } = useHub()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -171,11 +173,11 @@ export default function CodePage() {
       <div
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize file tree"
+        aria-label={t('page.resizeFileTree')}
         onPointerDown={beginTreeResize}
         onDoubleClick={resetTreeWidth}
         className="relative w-1.5 shrink-0 cursor-col-resize select-none touch-none border-x border-border/40 hover:bg-accent-primary/20 focus-visible:outline-none focus-visible:bg-accent-primary/30"
-        title="Drag to resize. Double-click to reset."
+        title={t('resizer.hint')}
         data-testid="code-tree-resizer"
       />
       <main className="flex-1 overflow-hidden flex flex-col">
@@ -205,7 +207,7 @@ export default function CodePage() {
           />
         ) : (
           <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-            Select a file to preview.
+            {t('page.selectFile')}
           </div>
         )}
       </main>
@@ -232,6 +234,7 @@ function CodeProvenanceToolbar({
   summaryAction: SummaryAction | null
   copyPathAction: CopyPathAction | null
 }) {
+  const { t } = useTranslation('code')
   const activeMode = ticketId ? 'spec' : jobId ? 'job-context' : 'all'
 
   return (
@@ -239,7 +242,7 @@ function CodeProvenanceToolbar({
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
           <Filter className="h-3.5 w-3.5" />
-          Scope
+          {t('toolbar.scope')}
         </span>
         <button
           type="button"
@@ -249,7 +252,7 @@ function CodeProvenanceToolbar({
             ? 'rounded-md bg-accent-primary/20 px-2 py-1 text-xs text-accent-primary'
             : 'rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground'}
         >
-          All AI
+          {t('toolbar.allAi')}
         </button>
         <div className="flex items-center gap-1 rounded-md border border-border/70 bg-card/40 px-1 py-1">
           <button
@@ -260,13 +263,13 @@ function CodeProvenanceToolbar({
               ? 'rounded bg-accent-success/20 px-2 py-0.5 text-xs text-accent-success'
               : 'rounded px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground'}
           >
-            Spec
+            {t('toolbar.spec')}
           </button>
           <input
             value={ticketInput}
             onChange={(e) => onTicketInputChange(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') onApplyTicket(ticketInput) }}
-            placeholder="id"
+            placeholder={t('toolbar.ticketIdPlaceholder')}
             inputMode="numeric"
             className="h-6 w-20 bg-transparent px-1 font-mono text-xs outline-none placeholder:text-muted-foreground/60"
           />
@@ -278,7 +281,7 @@ function CodeProvenanceToolbar({
             onClick={copyPathAction.onClick}
             className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground"
           >
-            Copy file path
+            {t('toolbar.copyFilePath')}
           </button>
         )}
         {summaryAction && (
@@ -286,19 +289,19 @@ function CodeProvenanceToolbar({
             type="button"
             onClick={summaryAction.onClick}
             disabled={summaryAction.regenerating || !!summaryAction.disabledReason}
-            aria-label={summaryAction.hasSummary ? 'Regenerate summary' : 'Generate summary'}
+            aria-label={summaryAction.hasSummary ? t('toolbar.regenerateSummary') : t('toolbar.generateSummary')}
             className="inline-flex items-center gap-1.5 rounded-md bg-accent-primary/15 px-2.5 py-1 text-xs text-accent-primary hover:bg-accent-primary/25 disabled:opacity-50"
-            title={summaryAction.disabledReason ? `Summary unavailable: ${summaryAction.disabledReason}` : undefined}
+            title={summaryAction.disabledReason ? t('toolbar.summaryUnavailable', { reason: summaryAction.disabledReason }) : undefined}
           >
             <RotateCw className={summaryAction.regenerating ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
             {summaryAction.hasSummary
-              ? (summaryAction.regenerating ? 'Regenerating…' : 'Regenerate summary')
-              : (summaryAction.regenerating ? 'Generating…' : 'Generate summary')}
+              ? (summaryAction.regenerating ? t('toolbar.regenerating') : t('toolbar.regenerateSummary'))
+              : (summaryAction.regenerating ? t('toolbar.generating') : t('toolbar.generateSummary'))}
           </button>
         )}
         {activeMode === 'job-context' && (
           <span className="rounded-md bg-accent-info/15 px-2 py-1 text-xs text-accent-info">
-            Job context
+            {t('toolbar.jobContext')}
           </span>
         )}
         {(jobId || ticketId) && (
@@ -308,7 +311,7 @@ function CodeProvenanceToolbar({
             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
-            Clear
+            {t('toolbar.clear')}
           </button>
         )}
       </div>
@@ -325,6 +328,7 @@ function ProvenanceResultPanel({
   ticketId: number | null
   onOpenFile: (path: string) => void
 }) {
+  const { t } = useTranslation('code')
   const [rows, setRows] = useState<ProvenanceRow[] | null>(null)
 
   useEffect(() => {
@@ -351,7 +355,7 @@ function ProvenanceResultPanel({
   }, [rows])
 
   const total = rows?.length ?? 0
-  const title = jobId ? `Job ${jobId}` : `Spec #${ticketId}`
+  const title = jobId ? t('provenancePanel.jobTitle', { jobId }) : t('provenancePanel.specTitle', { ticketId })
 
   return (
     <section className="border-b border-border bg-card/35 px-4 py-3" data-testid="provenance-result-panel">
@@ -359,12 +363,12 @@ function ProvenanceResultPanel({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold truncate">{title}</h2>
-            <span className="text-[11px] text-muted-foreground">{total} touched {total === 1 ? 'file' : 'files'}</span>
+            <span className="text-[11px] text-muted-foreground">{t('provenancePanel.touchedFiles', { count: total })}</span>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
-            <ResultGroup label="added" rows={grouped.created} icon="created" onOpenFile={onOpenFile} />
-            <ResultGroup label="changed" rows={grouped.modified} icon="modified" onOpenFile={onOpenFile} />
-            <ResultGroup label="deleted" rows={grouped.deleted} icon="deleted" onOpenFile={onOpenFile} />
+            <ResultGroup label={t('action.added')} rows={grouped.created} icon="created" onOpenFile={onOpenFile} />
+            <ResultGroup label={t('action.changed')} rows={grouped.modified} icon="modified" onOpenFile={onOpenFile} />
+            <ResultGroup label={t('action.deleted')} rows={grouped.deleted} icon="deleted" onOpenFile={onOpenFile} />
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -374,7 +378,7 @@ function ProvenanceResultPanel({
               className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              Log
+              {t('provenancePanel.log')}
             </a>
           )}
         </div>

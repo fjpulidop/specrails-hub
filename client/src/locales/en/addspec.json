@@ -1,0 +1,190 @@
+{
+  "proposeModal": {
+    "title": "Add Spec",
+    "dialogDescription": "Create a new spec from a short idea, either immediately or through Explore mode.",
+    "engineAriaLabel": "AI engine for this spec",
+    "modeTablistLabel": "Spec creation mode",
+    "mode": {
+      "quick": "Quick",
+      "explore": "Explore",
+      "raw": "Raw",
+      "exploreHint": "interactive",
+      "rawHint": "no AI"
+    },
+    "modeDescription": {
+      "quick": "Describe the feature or change. Attach mockups, briefs, or data for more context.",
+      "explore": "Describe a rough idea. Claude will help you shape it through conversation — you decide when to commit.",
+      "raw": "Your prompt, as-is — saved as a spec ticket. No AI runs now; drag it to a rail to build it."
+    },
+    "editorPlaceholder": {
+      "quick": "e.g. Add a dark mode toggle to the settings page that persists the user's preference...",
+      "explore": "e.g. dark mode — not sure where the toggle should live or how to persist it…",
+      "raw": "Describe the feature, change, or idea. Markdown, images, and files supported…"
+    },
+    "ideaAriaLabel": "Spec idea",
+    "raw": {
+      "titleLabel": "Title",
+      "titlePlaceholder": "Auto-filled from your prompt…",
+      "priorityLabel": "Priority",
+      "labelsLabel": "Labels",
+      "removeLabel": "Remove label {{label}}",
+      "addLabelAria": "Add label",
+      "labelPlaceholder": "optional…",
+      "bodyAriaLabel": "Raw spec body"
+    },
+    "priority": {
+      "critical": "Critical",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "fromWebsite": "From a website",
+    "fromWebsiteTitle": "Open a real web page, select an area, and turn it into a spec",
+    "capture": {
+      "responsiveSizes_one": "Responsive · {{count}} size",
+      "responsiveSizes_other": "Responsive · {{count}} sizes"
+    },
+    "submit": {
+      "quick": "Generate Spec",
+      "explore": "Continue",
+      "raw": "Create",
+      "disabledTitle": "Write a prompt first"
+    },
+    "toast": {
+      "createFailed": "Failed to create spec",
+      "rawSavedWithId": "Saved as #{{id}} · Raw spec ready for rails",
+      "rawCreated": "Raw spec created",
+      "exploreNotWired": "Explore mode is not wired in this view",
+      "generating": "Generating...",
+      "failedToStart": "{{projectName}} · Failed to start",
+      "unsupportedFileType": "Unsupported file type: {{name}}",
+      "uploadFailed": "Upload failed for {{name}}: {{message}}"
+    }
+  },
+  "featureProposal": {
+    "title": "Propose a Feature",
+    "ideaIntro": "Describe your idea in plain language. Claude will read the codebase and structure it into a full proposal.",
+    "ideaAriaLabel": "Feature idea",
+    "ideaPlaceholder": "e.g. I want users to be able to set a budget alert so they get notified when API costs exceed a threshold...",
+    "cmdEnterToSubmit": "Cmd+Enter to submit",
+    "exploreIdea": "Explore Idea",
+    "exploringTitle": "Exploring your idea...",
+    "refiningTitle": "Refining proposal...",
+    "reviewTitle": "Review Proposal",
+    "readingCodebase_one": "Reading codebase... ({{count}} file explored)",
+    "readingCodebase_other": "Reading codebase... ({{count}} files explored)",
+    "refinementAriaLabel": "Refinement feedback",
+    "refinementPlaceholder": "Ask for changes, add constraints, refine scope...",
+    "sendRefinementTitle": "Send refinement (Cmd+Enter)",
+    "cmdEnterToSend": "Cmd+Enter to send",
+    "confirmCreateIssue": "Create a GitHub Issue from this proposal?",
+    "yesCreateIssue": "Yes, create issue",
+    "createGithubIssue": "Create GitHub Issue",
+    "startOver": "Start Over",
+    "creatingIssueTitle": "Creating GitHub Issue...",
+    "creatingIssueViaCli": "Creating issue via GitHub CLI...",
+    "issueCreated": "Issue Created",
+    "proposeAnother": "Propose Another",
+    "errorTitle": "Something went wrong",
+    "errorFallback": "An error occurred",
+    "tryAgain": "Try Again",
+    "cancelledTitle": "Cancelled",
+    "cancelledBody": "The proposal was cancelled."
+  },
+  "contextScope": {
+    "heading": "Context Awareness",
+    "custom": "Custom",
+    "customMix": "Custom mix — see Fine-tune below",
+    "estimateUnavailable": "{{tier}} · estimate unavailable",
+    "preset": {
+      "minimal": "Minimal",
+      "light": "Light",
+      "standard": "Standard",
+      "rich": "Rich",
+      "max": "Max",
+      "hub": "Hub"
+    },
+    "presetCost": {
+      "minimal": "1× cost · fastest first-token · no specs loaded",
+      "light": "1.3× cost · Specrails specs loaded",
+      "standard": "1.6× cost · Specrails + OpenSpec specs loaded",
+      "rich": "2× cost · full repo read access",
+      "max": "4× cost · full read + Contract Layer refinement",
+      "hub": "4–6× cost · all features + project & your approved MCPs"
+    },
+    "smashCapable": "SMASH-capable",
+    "smashHint": "Contract Layer is on, so this spec can later be decomposed into Sub-Specs.",
+    "fineTune": "Fine-tune",
+    "defaultLabel": "Context scope",
+    "summaryMinimal": "minimal",
+    "tags": {
+      "specrails": "specrails",
+      "openspec": "openspec",
+      "codebase": "codebase",
+      "mcp": "mcp",
+      "myMcp": "my-mcp",
+      "contract": "contract"
+    },
+    "checks": {
+      "specrailsLabel": "specrails tickets",
+      "openspecLabel": "openspec specs",
+      "fullLabel": "Full codebase",
+      "mcpLabel": "Project MCPs",
+      "mcpHint": ".mcp.json servers",
+      "userMcpLabel": "My approved MCPs",
+      "userMcpHint": "~/.claude · ~/.codex servers",
+      "userMcpTooltip": "Your locally-approved MCP servers (claude mcp add / codex mcp add)",
+      "exploreOnly": "Explore mode only",
+      "contractLabel": "Enrich with Contract Layer",
+      "contractHint": "post-commit refinement · enables SMASH"
+    }
+  },
+  "aiEngine": {
+    "label": "AI engine"
+  },
+  "modelSelector": {
+    "presetHeading": "Model preset",
+    "preset": {
+      "balanced": {
+        "label": "Balanced",
+        "description": "Sonnet for all agents (recommended)"
+      },
+      "budget": {
+        "label": "Budget",
+        "description": "Haiku for all agents — 3x cheaper, faster"
+      },
+      "max": {
+        "label": "Max",
+        "description": "Opus for architect + PM, Sonnet for rest"
+      }
+    },
+    "overridesHeading": "Per-agent model overrides",
+    "overriddenCount": "{{count}} overridden",
+    "customBadge": "custom",
+    "resetToDefault": "Reset to preset default"
+  },
+  "modelCombobox": {
+    "alias": "Claude Code alias: {{alias}}",
+    "tier": {
+      "balanced": "Balanced",
+      "mostCapable": "Most capable",
+      "fastest": "Fastest"
+    }
+  },
+  "costMeter": {
+    "heading": "Cost awareness",
+    "meterAriaLabel": "cost tier",
+    "estimateUnavailable": "tier-only — estimate unavailable"
+  },
+  "commandProposal": {
+    "heading": "Suggested command",
+    "run": "Run",
+    "dismiss": "Dismiss"
+  },
+  "errors": {
+    "serverError": "Server error ({{status}})",
+    "connectionFailed": "Connection failed: {{message}}",
+    "sendRefinementFailed": "Failed to send refinement",
+    "createIssueFailed": "Failed to create issue"
+  }
+}

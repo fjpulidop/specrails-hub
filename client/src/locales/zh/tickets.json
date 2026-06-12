@@ -1,0 +1,110 @@
+{
+  "priority": {
+    "critical": "紧急",
+    "high": "高",
+    "medium": "中",
+    "low": "低"
+  },
+  "ticketStatus": {
+    "todo": "待办",
+    "inProgress": "进行中",
+    "done": "完成",
+    "cancelled": "已取消"
+  },
+  "source": {
+    "manual": "手动创建",
+    "productBacklog": "来自产品 backlog",
+    "proposeSpec": "来自 spec 提案",
+    "getBacklogSpecs": "来自 backlog spec",
+    "freePrompt": "来自 Raw prompt"
+  },
+  "fields": {
+    "title": "标题",
+    "description": "描述",
+    "status": "状态",
+    "priority": "优先级",
+    "labels": "标签",
+    "markdownPlaceholder": "Markdown 描述…",
+    "supportsMarkdown": "支持 Markdown"
+  },
+  "meta": {
+    "createdAgo": "创建于 {{time}}",
+    "updatedAgo": "更新于 {{time}}"
+  },
+  "untitled": "未命名",
+  "deleteDialog": {
+    "title": "删除工单",
+    "body": "确定要删除 <strong>#{{id}} {{title}}</strong> 吗？此操作无法撤销。"
+  },
+  "detailModal": {
+    "toast": {
+      "updated": "工单已更新",
+      "updateFailed": "更新工单失败"
+    },
+    "compare": "对比",
+    "compareTooltip": "与另一个 spec 对比",
+    "doneEditing": "完成编辑",
+    "addDescription": "添加描述…",
+    "prerequisites": "前置条件",
+    "addLabel": "添加标签",
+    "addLabelPlaceholder": "添加标签…",
+    "effort": "工作量",
+    "assignee": "负责人",
+    "continueEditing": "继续编辑",
+    "ticketFallbackLabel": "工单 #{{id}}"
+  },
+  "contractLayer": {
+    "title": "Contract Layer",
+    "populated": "已填充 {{n}}/5"
+  },
+  "rail": {
+    "moveToRail": "放入 Rail",
+    "removeFromRail": "从 Rail 移除",
+    "currentlyOn": "当前位于 {{rail}}",
+    "popoverTitle": "放入 rail",
+    "noRails": "没有可用的 rail。"
+  },
+  "contextMenu": {
+    "ariaLabel": "工单操作",
+    "deleteTicket": "删除工单",
+    "changeStatus": "更改状态",
+    "statusOptions": "状态选项",
+    "setPriority": "设置优先级",
+    "priorityOptions": "优先级选项"
+  },
+  "viewMode": {
+    "list": "列表视图",
+    "grid": "网格视图（看板）",
+    "postit": "便签视图"
+  },
+  "createModal": {
+    "title": "创建工单",
+    "titlePlaceholder": "工单标题…",
+    "labelsPlaceholder": "输入以添加标签…",
+    "create": "创建",
+    "creating": "正在创建…",
+    "toast": {
+      "created": "工单已创建",
+      "createFailed": "创建工单失败"
+    }
+  },
+  "comparePicker": {
+    "title": "选择对比对象…",
+    "todoCount": "（{{n}} 个待办）",
+    "searchPlaceholder": "搜索待办 spec…",
+    "noMatches": "没有匹配的待办 spec",
+    "empty": "没有其他可对比的待办 spec"
+  },
+  "spendingLine": {
+    "ariaLabel": "在分析页查看此工单的支出",
+    "turns_one": "{{count}} 轮",
+    "turns_other": "{{count}} 轮",
+    "active": "活跃 {{duration}}",
+    "breakdownItem": "{{n}} {{label}}"
+  },
+  "toasts": {
+    "newTicket": "新工单：{{title}}",
+    "newTicketsAdded_one": "已从产品发现新增 {{count}} 个工单",
+    "newTicketsAdded_other": "已从产品发现新增 {{count}} 个工单"
+  }
+}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { RefreshCw } from 'lucide-react'
 import { getApiBase } from '../lib/api'
 import { useHub, projectProviders } from '../hooks/useHub'
@@ -18,21 +19,21 @@ import { CostScatter } from '../components/analytics/CostScatter'
 import { TopTicketsCrossSurface } from '../components/analytics/TopTicketsCrossSurface'
 import { InvocationsTable } from '../components/analytics/InvocationsTable'
 
-const PERIODS: { value: Period; label: string }[] = [
-  { value: '7d', label: '7d' },
-  { value: '30d', label: '30d' },
-  { value: '90d', label: '90d' },
-  { value: 'all', label: 'All' },
+const PERIODS: { value: Period; labelKey: string }[] = [
+  { value: '7d', labelKey: 'periods.d7' },
+  { value: '30d', labelKey: 'periods.d30' },
+  { value: '90d', labelKey: 'periods.d90' },
+  { value: 'all', labelKey: 'periods.all' },
 ]
 
-const SURFACE_CHIPS: { value: Surface | 'all'; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'job', label: 'Jobs' },
-  { value: 'explore-spec', label: 'Explore' },
-  { value: 'quick-spec', label: 'Quick' },
-  { value: 'ai-edit', label: 'Refine' },
-  { value: 'smash', label: 'SMASH' },
-  { value: 'file-summary', label: 'File summaries' },
+const SURFACE_CHIPS: { value: Surface | 'all'; labelKey: string }[] = [
+  { value: 'all', labelKey: 'page.all' },
+  { value: 'job', labelKey: 'surfaces.job' },
+  { value: 'explore-spec', labelKey: 'surfaces.exploreSpec' },
+  { value: 'quick-spec', labelKey: 'surfaces.quickSpec' },
+  { value: 'ai-edit', labelKey: 'surfaces.aiEdit' },
+  { value: 'smash', labelKey: 'surfaces.smash' },
+  { value: 'file-summary', labelKey: 'surfaces.fileSummary' },
 ]
 
 function buildQuery(filters: SpendingFilters): string {
@@ -50,6 +51,7 @@ function buildQuery(filters: SpendingFilters): string {
 }
 
 export default function AnalyticsPage() {
+  const { t } = useTranslation('analytics')
   const { activeProjectId, projects } = useHub()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -202,14 +204,14 @@ export default function AnalyticsPage() {
       <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border/40">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <h1 className="text-base font-semibold tracking-tight">Analytics</h1>
+            <h1 className="text-base font-semibold tracking-tight">{t('page.title')}</h1>
             {filters.ticketId && (
               <button
                 type="button"
                 onClick={() => setFilters((f) => ({ ...f, ticketId: undefined }))}
                 className="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[11px] font-medium bg-accent-highlight/15 text-accent-highlight ring-1 ring-accent-highlight/30 hover:bg-accent-highlight/25"
               >
-                ticket #{filters.ticketId} ·  ✕
+                {t('page.ticketChip', { id: filters.ticketId })}
               </button>
             )}
           </div>
@@ -223,7 +225,7 @@ export default function AnalyticsPage() {
                   className={`px-2.5 h-6 rounded text-[11px] font-medium transition-colors ${
                     filters.period === p.value ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'
                   }`}
-                >{p.label}</button>
+                >{t(p.labelKey)}</button>
               ))}
             </div>
             <ExportDropdown
@@ -235,7 +237,7 @@ export default function AnalyticsPage() {
               type="button"
               onClick={() => { cacheRef.current.clear(); fetchSpending(); fetchInvocations() }}
               className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-border/60 bg-card/50 text-muted-foreground hover:text-foreground hover:bg-accent/60"
-              title="Refresh"
+              title={t('common:actions.refresh')}
             ><RefreshCw className="w-3 h-3" /></button>
           </div>
         </div>
@@ -253,14 +255,14 @@ export default function AnalyticsPage() {
                     ? 'bg-foreground/10 text-foreground ring-1 ring-foreground/20'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/40'
                 }`}
-              >{c.label}</button>
+              >{t(c.labelKey)}</button>
             )
           })}
         </div>
         {/* Provider chips — only when the project has more than one engine */}
         {multiProvider && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="analytics-provider-chips">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70 mr-1">Engine</span>
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70 mr-1">{t('page.engine')}</span>
             <button
               type="button"
               onClick={() => toggleProvider('all')}
@@ -269,7 +271,7 @@ export default function AnalyticsPage() {
                   ? 'bg-foreground/10 text-foreground ring-1 ring-foreground/20'
                   : 'text-muted-foreground hover:text-foreground hover:bg-accent/40'
               }`}
-            >All</button>
+            >{t('page.all')}</button>
             {installedProviders.map((p) => {
               const active = providerFilter?.includes(p) ?? false
               return (
@@ -291,11 +293,11 @@ export default function AnalyticsPage() {
 
       {error && (
         <div className="rounded-lg border border-accent-warning/30 bg-accent-warning/10 p-4 flex items-center justify-between">
-          <p className="text-sm text-accent-warning">Failed to load: {error}</p>
+          <p className="text-sm text-accent-warning">{t('page.failedToLoad', { error })}</p>
           <button
             onClick={() => fetchSpending()}
             className="flex items-center gap-1.5 h-7 px-3 rounded-md text-xs text-accent-warning border border-accent-warning/30 hover:bg-accent-warning/10"
-          ><RefreshCw className="w-3 h-3" />Retry</button>
+          ><RefreshCw className="w-3 h-3" />{t('common:actions.retry')}</button>
         </div>
       )}
 

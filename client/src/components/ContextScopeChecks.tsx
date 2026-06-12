@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { tierFromScope, type ContextScope, type SpecMode } from '../types/context-scope'
 
@@ -61,21 +62,23 @@ export function ContextScopeChecks({
   mode,
   onChange,
   defaultOpen = false,
-  label = 'Context scope',
+  label,
   showSummary = true,
 }: Props) {
+  const { t } = useTranslation('addspec')
+  const effectiveLabel = label ?? t('contextScope.defaultLabel')
   const mcpDisabled = mode === 'quick'
   const userMcpDisabled = mode === 'quick'
   const [open, setOpen] = useState(defaultOpen)
   const activeScopes = [
-    scope.specrails && 'specrails',
-    scope.openspec && 'openspec',
-    scope.full && 'codebase',
-    scope.mcp && !mcpDisabled && 'mcp',
-    scope.userMcp && !userMcpDisabled && 'my-mcp',
-    scope.contractRefine && 'contract',
+    scope.specrails && t('contextScope.tags.specrails'),
+    scope.openspec && t('contextScope.tags.openspec'),
+    scope.full && t('contextScope.tags.codebase'),
+    scope.mcp && !mcpDisabled && t('contextScope.tags.mcp'),
+    scope.userMcp && !userMcpDisabled && t('contextScope.tags.myMcp'),
+    scope.contractRefine && t('contextScope.tags.contract'),
   ].filter(Boolean) as string[]
-  const summary = activeScopes.length === 0 ? 'minimal' : activeScopes.join(', ')
+  const summary = activeScopes.length === 0 ? t('contextScope.summaryMinimal') : activeScopes.join(', ')
   const tier = tierFromScope(scope)
   return (
     <div className="flex flex-col gap-2">
@@ -89,7 +92,7 @@ export function ContextScopeChecks({
       >
         <span className="flex items-center gap-1.5">
           {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          {label}
+          {effectiveLabel}
         </span>
         {!open && showSummary ? (
           <span className="text-[10px] normal-case tracking-normal text-muted-foreground/80">
@@ -101,47 +104,47 @@ export function ContextScopeChecks({
       <div id="ctx-scope-body" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <CheckRow
           id="ctx-specrails"
-          label="specrails tickets"
+          label={t('contextScope.checks.specrailsLabel')}
           hint=".specrails/local-tickets.json"
           checked={scope.specrails}
           onChange={(v) => onChange({ ...scope, specrails: v })}
         />
         <CheckRow
           id="ctx-openspec"
-          label="openspec specs"
+          label={t('contextScope.checks.openspecLabel')}
           hint="openspec/specs/*"
           checked={scope.openspec}
           onChange={(v) => onChange({ ...scope, openspec: v })}
         />
         <CheckRow
           id="ctx-full"
-          label="Full codebase"
+          label={t('contextScope.checks.fullLabel')}
           hint="Read · Grep · Glob"
           checked={scope.full}
           onChange={(v) => onChange({ ...scope, full: v })}
         />
         <CheckRow
           id="ctx-mcp"
-          label="Project MCPs"
-          hint=".mcp.json servers"
+          label={t('contextScope.checks.mcpLabel')}
+          hint={t('contextScope.checks.mcpHint')}
           checked={scope.mcp && !mcpDisabled}
           disabled={mcpDisabled}
-          tooltip={mcpDisabled ? 'Explore mode only' : undefined}
+          tooltip={mcpDisabled ? t('contextScope.checks.exploreOnly') : undefined}
           onChange={(v) => onChange({ ...scope, mcp: v })}
         />
         <CheckRow
           id="ctx-user-mcp"
-          label="My approved MCPs"
-          hint="~/.claude · ~/.codex servers"
+          label={t('contextScope.checks.userMcpLabel')}
+          hint={t('contextScope.checks.userMcpHint')}
           checked={!!scope.userMcp && !userMcpDisabled}
           disabled={userMcpDisabled}
-          tooltip={userMcpDisabled ? 'Explore mode only' : 'Your locally-approved MCP servers (claude mcp add / codex mcp add)'}
+          tooltip={userMcpDisabled ? t('contextScope.checks.exploreOnly') : t('contextScope.checks.userMcpTooltip')}
           onChange={(v) => onChange({ ...scope, userMcp: v })}
         />
         <CheckRow
           id="ctx-contract-refine"
-          label="Enrich with Contract Layer"
-          hint="post-commit refinement · enables SMASH"
+          label={t('contextScope.checks.contractLabel')}
+          hint={t('contextScope.checks.contractHint')}
           checked={scope.contractRefine}
           onChange={(v) => onChange({ ...scope, contractRefine: v })}
         />

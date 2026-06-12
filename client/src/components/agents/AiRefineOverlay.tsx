@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useHub } from '../../hooks/useHub'
 import { useAgentRefine, type AgentRefineState } from '../../hooks/useAgentRefine'
 import {
@@ -10,12 +11,12 @@ import {
   type AiEditUiPhase,
 } from '../ai-edit/AiEditShell'
 
-const SUGGESTION_CHIPS = [
-  'Tighten the tool list',
-  'Make the personality stricter',
-  'Add a Workflow protocol section',
-  'Shorten and sharpen the description',
-  'Match the sr-developer style',
+const SUGGESTION_CHIP_KEYS = [
+  'refine.chips.tightenTools',
+  'refine.chips.stricterPersonality',
+  'refine.chips.workflowSection',
+  'refine.chips.sharpenDescription',
+  'refine.chips.matchDeveloperStyle',
 ]
 
 interface Props {
@@ -44,6 +45,7 @@ export function AiRefineOverlay({
   onOpenInStudio,
   onApplied,
 }: Props) {
+  const { t } = useTranslation('agentstudio')
   const { activeProjectId } = useHub()
   const r = useAgentRefine(activeProjectId)
   const [input, setInput] = useState('')
@@ -123,13 +125,13 @@ export function AiRefineOverlay({
       uiPhase={uiPhase}
       errorMessage={r.state.errorMessage}
       applyConflict={r.state.applyConflict}
-      eyebrow="AI Edit"
+      eyebrow={t('refine.eyebrow')}
       targetLabel={agentId}
       targetLabelMono
-      headline="Refine your agent"
-      streamingHeadline="Refining your agent…"
+      headline={t('refine.headline')}
+      streamingHeadline={t('refine.streamingHeadline')}
       description={extractDescription(baseBody)}
-      chips={SUGGESTION_CHIPS}
+      chips={SUGGESTION_CHIP_KEYS.map((key) => t(key))}
       onChipSubmit={(text) => void submit(text)}
       composer={
         <PlainComposer
@@ -139,8 +141,8 @@ export function AiRefineOverlay({
           disabled={uiPhase === 'streaming' || uiPhase === 'applied'}
           placeholder={
             r.state.refineId
-              ? 'Send a follow-up refinement…'
-              : 'Describe how to refine this agent…'
+              ? t('refine.placeholderFollowUp')
+              : t('refine.placeholderInitial')
           }
           inputRef={inputRef}
         />
@@ -150,11 +152,11 @@ export function AiRefineOverlay({
       diff={diff}
       diffHeaderLabel={`.claude/agents/${agentId}.md`}
       baseBody={baseBody}
-      baseBodyDisclosureLabel="View current agent body"
+      baseBodyDisclosureLabel={t('refine.viewCurrentBody')}
       appliedNotice={
         r.state.appliedVersion !== null ? (
           <div className="rounded-md border border-green-500/40 bg-green-500/10 p-3 text-xs text-green-300">
-            Applied as version {r.state.appliedVersion}.
+            {t('refine.appliedAsVersion', { version: r.state.appliedVersion })}
           </div>
         ) : undefined
       }
@@ -173,7 +175,7 @@ export function AiRefineOverlay({
       secondaryAction={
         onOpenInStudio && r.state.draftBody && r.state.refineId
           ? {
-              label: 'Open draft in Studio for manual editing',
+              label: t('refine.openInStudio'),
               icon: <ExternalLink className="w-3 h-3" />,
               onClick: () => {
                 if (r.state.refineId && r.state.draftBody && onOpenInStudio) {

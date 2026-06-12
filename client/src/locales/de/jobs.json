@@ -1,0 +1,201 @@
+{
+  "statusLabel": {
+    "running": "läuft",
+    "completed": "abgeschlossen",
+    "done": "fertig",
+    "failed": "fehlgeschlagen",
+    "canceled": "abgebrochen",
+    "queued": "in Warteschlange",
+    "zombie": "Zombie",
+    "skipped": "übersprungen"
+  },
+  "statusTooltip": {
+    "running": "Job wird gerade ausgeführt",
+    "completed": "Job erfolgreich abgeschlossen",
+    "failed": "Job wurde mit einem Exit-Code ungleich null beendet",
+    "canceled": "Job wurde manuell abgebrochen",
+    "queued": "Job wartet in der Warteschlange",
+    "queuedToRun": "Job wartet auf Ausführung",
+    "zombie": "Job wurde nach längerer Inaktivität automatisch beendet",
+    "skipped": "Job wurde übersprungen, weil ein übergeordneter Job in der Pipeline fehlgeschlagen ist"
+  },
+  "statusName": {
+    "running": "läuft",
+    "completed": "abgeschlossen",
+    "failed": "fehlgeschlagen",
+    "canceled": "abgebrochen",
+    "zombie_terminated": "Zombie",
+    "queued": "in Warteschlange",
+    "skipped": "übersprungen"
+  },
+  "page": {
+    "title": "Jobs",
+    "exportJobs": "Jobs exportieren",
+    "proposalDeleted": "Vorschlag gelöscht",
+    "proposal": {
+      "title": "Vorschlag",
+      "noContent": "Noch kein Inhalt für den Vorschlag.",
+      "githubIssue": "GitHub-Issue:"
+    }
+  },
+  "detail": {
+    "breadcrumbDashboard": "Dashboard",
+    "breadcrumbJob": "Job #{{id}}",
+    "notFound": "Job nicht gefunden",
+    "notFoundDescription": "Die Job-ID „{{id}}“ existiert nicht",
+    "backToDashboard": "Zurück zum Dashboard",
+    "startedAgo": "Gestartet {{timeAgo}}",
+    "queuedWaiting": "In Warteschlange – wartet auf Start",
+    "exportDiagnostic": "Diagnose exportieren",
+    "exportDiagnosticAria": "Diagnose-Bundle exportieren",
+    "exportDiagnosticTooltip": "ZIP mit Telemetrie, Logs und Zusammenfassung für diesen Job herunterladen",
+    "reExecute": "Erneut ausführen",
+    "reExecuteTooltip": "Neuen Job mit demselben Befehl starten",
+    "cancelJob": "Job abbrechen",
+    "cancelJobTooltip": "SIGTERM an den laufenden Prozess senden. Der Job wird als abgebrochen markiert.",
+    "toast": {
+      "jobDeleted": "Job gelöscht",
+      "cancelSignalSent": "Abbruchsignal gesendet",
+      "cancelSignalSentDescription": "Der Job stoppt am nächsten sicheren Punkt",
+      "failed": "Fehlgeschlagen",
+      "networkError": "Netzwerkfehler",
+      "exportFailed": "Export fehlgeschlagen",
+      "exportFailedHttp": "Export fehlgeschlagen (HTTP {{status}})",
+      "jobRequeued": "Job erneut eingereiht",
+      "spawnFailed": "Job konnte nicht gestartet werden"
+    }
+  },
+  "statusPanel": {
+    "inProgress": "Job läuft",
+    "completed": "Job abgeschlossen",
+    "failed": "Job fehlgeschlagen",
+    "duration": "Dauer",
+    "cost": "Kosten",
+    "turns": "Turns",
+    "tokens": "Tokens",
+    "filesCount_one": "{{count}} Datei",
+    "filesCount_other": "{{count}} Dateien",
+    "pipelineTotal": "Pipeline gesamt ({{count}} Phasen)",
+    "totalCost": "Gesamtkosten",
+    "totalTokens": "Tokens gesamt",
+    "filesModified": "Geänderte Dateien"
+  },
+  "ticketHeader": {
+    "showMore": "+ {{count}} weitere",
+    "showLess": "Weniger anzeigen",
+    "deletedTicket": "#{{id}} (gelöscht)",
+    "deletedTooltip": "Ticket existiert nicht mehr"
+  },
+  "modal": {
+    "openInNewTab": "In neuem Tab öffnen",
+    "notFound": "Job nicht gefunden",
+    "cancelConfirmTitle": "Job abbrechen?",
+    "cancelConfirmDescription": "Der Job stoppt am nächsten sicheren Punkt. Diese Aktion kann nicht rückgängig gemacht werden.",
+    "keepRunning": "Weiterlaufen lassen",
+    "cancelJob": "Job abbrechen",
+    "toast": {
+      "cancelSignalSent": "Abbruchsignal gesendet",
+      "cancelSignalSentDescription": "Der Job stoppt am nächsten sicheren Punkt",
+      "cancelFailed": "Abbrechen fehlgeschlagen",
+      "networkError": "Netzwerkfehler"
+    }
+  },
+  "comparison": {
+    "title": "Job-Vergleich",
+    "jobN": "Job {{n}}",
+    "loadFailed": "Vergleich konnte nicht geladen werden: {{error}}",
+    "duration": "Dauer",
+    "cost": "Kosten",
+    "tokensOut": "Ausgabe-Tokens",
+    "tokensIn": "Eingabe-Tokens",
+    "cacheRead": "Cache-Read",
+    "model": "Modell",
+    "phasesDone": "Abgeschlossene Phasen",
+    "betterValueHint": "Grün hervorgehoben = besserer Wert"
+  },
+  "recent": {
+    "emptyTitle": "Noch keine Jobs",
+    "emptyDescription": "Führe oben einen Befehl aus, um hier deinen Job-Verlauf zu sehen",
+    "filterAll": "Alle ({{count}})",
+    "filterStatus": "{{status}} ({{count}})",
+    "fromDate": "Von",
+    "toDate": "Bis",
+    "clear": "Zurücksetzen",
+    "exitCompareMode": "Vergleichsmodus verlassen",
+    "compareTwoJobs": "2 Jobs vergleichen",
+    "clearJobs": "Jobs löschen",
+    "selectTwoToCompare": "Wähle 2 Jobs zum Vergleichen",
+    "selectOneMore": "Wähle 1 weiteren Job",
+    "readyToCompare": "Bereit – auf Vergleichen klicken",
+    "compareAction": "Vergleichen →",
+    "colStatus": "Status",
+    "colCommand": "Befehl",
+    "colDuration": "Dauer",
+    "colTokens": "Tokens",
+    "colCost": "Kosten",
+    "colStarted": "Gestartet",
+    "profileTooltip": "Profil: {{name}}",
+    "pipelinePart": "Teil einer Pipeline",
+    "pipelineDependsOn": "(hängt vom vorherigen Schritt ab)",
+    "deleteProposal": "Vorschlag löschen",
+    "loadMore": "Mehr laden ({{count}} verbleibend)",
+    "priority": {
+      "critical": "kritisch",
+      "high": "hoch",
+      "normal": "normal",
+      "low": "niedrig"
+    },
+    "clearModal": {
+      "title": "Jobs löschen",
+      "jobsInHistory_one": "{{count}} Job im Verlauf",
+      "jobsInHistory_other": "{{count}} Jobs im Verlauf",
+      "clearAll_one": "{{count}} Job löschen",
+      "clearAll_other": "Alle {{count}} Jobs löschen",
+      "orByRange": "Oder nach Datumsbereich löschen:",
+      "fromPlaceholder": "Von",
+      "toPlaceholder": "Bis",
+      "clearInRange_one": "{{count}} Job im Zeitraum löschen",
+      "clearInRange_other": "{{count}} Jobs im Zeitraum löschen",
+      "clearRange": "Zeitraum löschen"
+    },
+    "deleteProposalConfirm": {
+      "title": "Vorschlag löschen?",
+      "description": "Dadurch wird 1 Vorschlag dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "toast": {
+      "cleared_one": "{{count}} Job gelöscht",
+      "cleared_other": "{{count}} Jobs gelöscht",
+      "clearFailed": "Jobs konnten nicht gelöscht werden",
+      "networkError": "Netzwerkfehler"
+    }
+  },
+  "activeJob": {
+    "none": "Kein aktiver Job",
+    "noneHint": "Wähle unten einen Befehl, um einen Job zu starten",
+    "exitCode": "exit {{code}}",
+    "cancelTooltip": "SIGTERM an den laufenden claude-Prozess senden",
+    "viewLogs": "Logs anzeigen",
+    "toast": {
+      "cancelRequested": "Job-Abbruch angefordert",
+      "cancelRequestedDescription": "SIGTERM wird an den Prozess gesendet",
+      "cancelFailed": "Job konnte nicht abgebrochen werden",
+      "networkError": "Netzwerkfehler beim Abbrechen des Jobs"
+    }
+  },
+  "logViewer": {
+    "loading": "Logs werden geladen…",
+    "empty": "Noch keine Log-Ausgabe",
+    "filterPlaceholder": "Logs filtern…",
+    "copySuccess": "Log in die Zwischenablage kopiert",
+    "copyFailed": "Log konnte nicht kopiert werden",
+    "lineCount": "{{filtered}} / {{total}} Zeilen",
+    "jumpToBottom": "Zum Ende springen",
+    "phaseLines_one": "{{count}} Zeile",
+    "phaseLines_other": "{{count}} Zeilen",
+    "noMatchingLines": "Keine passenden Zeilen",
+    "noOutput": "Keine Ausgabe",
+    "completed": "Abgeschlossen",
+    "turns_one": "{{count}} Turn",
+    "turns_other": "{{count}} Turns"
+  }
+}

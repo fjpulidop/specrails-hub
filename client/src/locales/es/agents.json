@@ -1,0 +1,177 @@
+{
+  "page": {
+    "title": "Agentes",
+    "subtitle": "Gestiona los perfiles de agentes y el catálogo (upstream + personalizados) de este proyecto.",
+    "tabs": {
+      "profiles": "Perfiles",
+      "usage": "Uso",
+      "catalog": "Catálogo"
+    },
+    "banner": {
+      "title": "El pipeline con perfiles requiere specrails-core {{required}}+",
+      "body": "Este proyecto tiene <code>{{version}}</code>. Ejecuta <code>{{command}}</code> dentro del proyecto para activar el modo perfiles. Los perfiles que crees aquí se guardarán igualmente; simplemente no afectarán al pipeline hasta que actualices core.",
+      "unknownVersion": "desconocida"
+    }
+  },
+  "catalog": {
+    "loading": "Cargando catálogo…",
+    "aiEditChipLabel": "Edición IA · {{agentId}}",
+    "errors": {
+      "loadFailed": "Error al cargar el catálogo: {{status}}",
+      "bodyLoadFailed": "Error al cargar el cuerpo del agente: {{status}}",
+      "generateFailed": "Error al generar: {{status}}",
+      "agentLoadFailed": "Error al cargar: {{status}}"
+    },
+    "templates": {
+      "title": "Biblioteca de plantillas de agentes",
+      "countOf": "{{shown}} de {{total}}",
+      "description": "Empieza desde una plantilla seleccionada de ingeniería, producto, ciencia, salud, legal y más. Elige una y ábrela en el Studio para revisarla y editarla antes de guardar.",
+      "searchPlaceholder": "Buscar por nombre, descripción, etiqueta o categoría…",
+      "allCategories": "Todas",
+      "tagFilter": "Filtro de etiquetas:",
+      "noMatch": "Ninguna plantilla coincide con tus filtros.",
+      "clearFilters": "Limpiar filtros",
+      "openInStudio": "Abrir en el Studio →",
+      "tip": "Consejo: haz clic en una etiqueta de cualquier tarjeta para filtrar por ella."
+    },
+    "generate": {
+      "title": "Generar un agente personalizado",
+      "agentIdLabel": "Id del agente",
+      "agentIdHint": "Debe empezar por <code>custom-</code>.",
+      "descriptionLabel": "Describe qué debe hacer este agente",
+      "descriptionPlaceholder": "p. ej. Revisar cambios de Terraform/IaC y señalar errores de configuración de seguridad, permisos IAM excesivos y buckets S3 públicos antes del merge. Conservador y conciso.",
+      "note": "Claude redactará un cuerpo <code>.md</code> completo. Lo revisarás en el Studio y podrás editarlo antes de guardar. Esto lanza una invocación puntual de claude y puede tardar hasta 90 segundos.",
+      "generating": "Generando…",
+      "generateButton": "Generar"
+    },
+    "empty": {
+      "title": "No hay agentes instalados",
+      "body": "Ejecuta <code>{{command}}</code> en este proyecto para instalar los agentes upstream, o crea ahora un agente personalizado."
+    },
+    "actions": {
+      "template": "Plantilla",
+      "templateTitle": "Empezar desde una plantilla",
+      "generate": "Generar",
+      "generateWithClaude": "Generar con Claude",
+      "blank": "En blanco",
+      "blankTitle": "Empezar desde una plantilla en blanco"
+    },
+    "sidebar": {
+      "title": "Catálogo",
+      "createLabel": "Crear un agente personalizado:"
+    },
+    "sections": {
+      "upstream": "Upstream ({{count}})",
+      "upstreamDescription": "Incluidos con specrails-core; solo lectura.",
+      "custom": "Personalizados ({{count}})",
+      "customDescription": "Los archivos custom-*.md de tu proyecto. Usa Plantilla / Generar / En blanco arriba para crear uno.",
+      "noCustomAgents": "Aún no hay agentes personalizados."
+    },
+    "detail": {
+      "defaultModel": "modelo por defecto: {{model}}",
+      "aiEdit": "Edición IA",
+      "aiEditTitle": "Refina este agente iterativamente con IA",
+      "readOnly": "solo lectura",
+      "editableHint": "editable — usa Editar arriba"
+    },
+    "kind": {
+      "upstream": "upstream",
+      "custom": "personalizado"
+    }
+  },
+  "profiles": {
+    "loading": "Cargando perfiles…",
+    "selectPrompt": "Selecciona un perfil para editarlo",
+    "errors": {
+      "listFailed": "Error al listar: {{status}}",
+      "loadFailed": "Error al cargar: {{status}}",
+      "migrationFailed": "Error en la migración: {{status}}",
+      "createFailed": "Error al crear: {{status}}",
+      "duplicateFailed": "Error al duplicar: {{status}}",
+      "deleteFailed": "Error al eliminar: {{status}}",
+      "saveFailed": "Error al guardar: {{status}}"
+    },
+    "toasts": {
+      "migrated": "Perfil migrado",
+      "migratedDescription": "perfil default creado a partir de tus agentes actuales",
+      "migrationFailed": "Error en la migración",
+      "created": "Perfil creado",
+      "createFailed": "No se pudo crear el perfil",
+      "duplicated": "Perfil duplicado",
+      "duplicatedDescription": "{{from}} → {{to}}",
+      "duplicateFailed": "No se pudo duplicar el perfil",
+      "deleted": "Perfil eliminado",
+      "deleteFailed": "No se pudo eliminar el perfil",
+      "saved": "Perfil guardado",
+      "saveFailed": "No se pudo guardar el perfil",
+      "savedWithUntargeted": "Perfil guardado con agentes sin asignar",
+      "savedWithUntargetedDescription": "Ninguna regla de enrutado apunta a: {{agents}}. Añade una regla por etiquetas o reorienta la regla por defecto si quieres que se ejecuten."
+    },
+    "createDialog": {
+      "title": "Nuevo perfil",
+      "description": "Elige un nombre en minúsculas y kebab-case (letras, dígitos y guiones).",
+      "confirmLabel": "Crear",
+      "invalidHint": "Debe empezar por una letra o un dígito y contener solo letras minúsculas, dígitos y guiones."
+    },
+    "duplicateDialog": {
+      "title": "Duplicar «{{name}}»",
+      "description": "Nombre para el nuevo perfil.",
+      "invalidHint": "Solo minúsculas en kebab-case."
+    },
+    "deleteDialog": {
+      "title": "¿Eliminar el perfil «{{name}}»?",
+      "description": "Esta acción no se puede deshacer. Los jobs ya lanzados con este perfil conservan su snapshot; los próximos lanzamientos usarán el orden de resolución."
+    },
+    "empty": {
+      "title": "Aún no hay perfiles",
+      "body": "Los perfiles te permiten guardar combinaciones de orquestador + agentes + enrutado y elegir una por rail.",
+      "migrateButton": "Migrar desde los agentes actuales",
+      "blankButton": "Perfil en blanco",
+      "migrateExplainer": "«Migrar» lee los modelos del frontmatter de tu <code>.claude/agents/</code> actual y crea un perfil <code>default</code> que replica el comportamiento de hoy — sin pérdidas."
+    },
+    "sidebar": {
+      "title": "Perfiles",
+      "teamDefault": "(por defecto del equipo)"
+    },
+    "editorFooter": {
+      "fixValidationIssues": "Corrige los problemas de validación antes de guardar",
+      "issuesToResolve_one": "{{count}} problema por resolver",
+      "issuesToResolve_other": "{{count}} problemas por resolver"
+    }
+  },
+  "usage": {
+    "title": "Uso de perfiles",
+    "windowLabel": "{{days}}d",
+    "subtitleEmpty": "Jobs lanzados por perfil en la ventana seleccionada.",
+    "subtitle": "Jobs lanzados por perfil en los últimos {{count}} días.",
+    "empty": "Aún no hay jobs con perfil.",
+    "jobsTooltip": "jobs",
+    "jobsLabel_one": "job",
+    "jobsLabel_other": "jobs",
+    "successRateTooltip": "tasa de éxito",
+    "okSuffix": "ok",
+    "avgDurationTooltip": "duración media",
+    "avgTokensTooltip": "media de tokens",
+    "tokensSuffix": "tok"
+  },
+  "routingRule": {
+    "addTitle": "Añadir regla de enrutado",
+    "editTitle": "Editar regla de enrutado",
+    "addDescription": "Añade una regla de enrutado por etiquetas usando etiquetas en minúsculas y kebab-case.",
+    "editDescription": "Actualiza las etiquetas o el agente de destino de esta regla.",
+    "tagsLabel": "Etiquetas",
+    "tagsHint": "Separadas por comas. Usa minúsculas en kebab-case, como <code>frontend</code> o <code>api-design</code>.",
+    "invalidTags_one": "Etiqueta no válida: {{tags}}. Las etiquetas solo pueden contener letras minúsculas, dígitos y guiones.",
+    "invalidTags_other": "Etiquetas no válidas: {{tags}}. Las etiquetas solo pueden contener letras minúsculas, dígitos y guiones.",
+    "routeToLabel": "Enrutar a",
+    "routeToHint": "Solo los agentes de la cadena de este perfil pueden ser destinos de enrutado.",
+    "addRule": "Añadir regla",
+    "saveChanges": "Guardar cambios"
+  },
+  "railSelectors": {
+    "profileTitle": "Perfil de agentes para este rail",
+    "noProfile": "Sin perfil",
+    "modelTitle": "Modelo para este rail ultracode",
+    "engineTitle": "Motor de IA para este rail"
+  }
+}

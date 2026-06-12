@@ -1,0 +1,177 @@
+{
+  "page": {
+    "title": "Agents",
+    "subtitle": "Manage agent profiles and the catalog (upstream + custom) for this project.",
+    "tabs": {
+      "profiles": "Profiles",
+      "usage": "Usage",
+      "catalog": "Catalog"
+    },
+    "banner": {
+      "title": "Profile-aware pipeline requires specrails-core {{required}}+",
+      "body": "This project has <code>{{version}}</code>. Run <code>{{command}}</code> inside the project to unlock profile mode. Profiles you create here will still save; they just won't affect the pipeline until core is updated.",
+      "unknownVersion": "unknown"
+    }
+  },
+  "catalog": {
+    "loading": "Loading catalog…",
+    "aiEditChipLabel": "AI Edit · {{agentId}}",
+    "errors": {
+      "loadFailed": "Catalog load failed: {{status}}",
+      "bodyLoadFailed": "Agent body load failed: {{status}}",
+      "generateFailed": "Generate failed: {{status}}",
+      "agentLoadFailed": "Load failed: {{status}}"
+    },
+    "templates": {
+      "title": "Agent template library",
+      "countOf": "{{shown}} of {{total}}",
+      "description": "Start from a curated template across engineering, product, science, health, legal, and more. Pick one and open it in the Studio for review and editing before saving.",
+      "searchPlaceholder": "Search by name, description, tag, or category…",
+      "allCategories": "All",
+      "tagFilter": "Tag filter:",
+      "noMatch": "No templates match your filters.",
+      "clearFilters": "Clear filters",
+      "openInStudio": "Open in Studio →",
+      "tip": "Tip: click a tag pill on any card to filter by that tag."
+    },
+    "generate": {
+      "title": "Generate a custom agent",
+      "agentIdLabel": "Agent id",
+      "agentIdHint": "Must start with <code>custom-</code>.",
+      "descriptionLabel": "Describe what this agent should do",
+      "descriptionPlaceholder": "e.g. Review Terraform/IaC changes and flag security misconfigurations, excessive IAM permissions, and public S3 buckets before merging. Conservative and terse.",
+      "note": "Claude will draft a full <code>.md</code> body. You'll review it in the Studio and can edit before saving. This spawns a one-shot claude invocation and can take up to 90 seconds.",
+      "generating": "Generating…",
+      "generateButton": "Generate"
+    },
+    "empty": {
+      "title": "No agents installed",
+      "body": "Run <code>{{command}}</code> in this project to install the upstream agents, or create a custom agent now."
+    },
+    "actions": {
+      "template": "Template",
+      "templateTitle": "Start from a template",
+      "generate": "Generate",
+      "generateWithClaude": "Generate with Claude",
+      "blank": "Blank",
+      "blankTitle": "Start from a blank template"
+    },
+    "sidebar": {
+      "title": "Catalog",
+      "createLabel": "Create a custom agent:"
+    },
+    "sections": {
+      "upstream": "Upstream ({{count}})",
+      "upstreamDescription": "Shipped by specrails-core; read-only.",
+      "custom": "Custom ({{count}})",
+      "customDescription": "Your project's custom-*.md files. Use Template / Generate / Blank above to create one.",
+      "noCustomAgents": "No custom agents yet."
+    },
+    "detail": {
+      "defaultModel": "default model: {{model}}",
+      "aiEdit": "AI Edit",
+      "aiEditTitle": "Iteratively refine this agent with AI",
+      "readOnly": "read-only",
+      "editableHint": "editable — use Edit above"
+    },
+    "kind": {
+      "upstream": "upstream",
+      "custom": "custom"
+    }
+  },
+  "profiles": {
+    "loading": "Loading profiles…",
+    "selectPrompt": "Select a profile to edit",
+    "errors": {
+      "listFailed": "List failed: {{status}}",
+      "loadFailed": "Load failed: {{status}}",
+      "migrationFailed": "Migration failed: {{status}}",
+      "createFailed": "Create failed: {{status}}",
+      "duplicateFailed": "Duplicate failed: {{status}}",
+      "deleteFailed": "Delete failed: {{status}}",
+      "saveFailed": "Save failed: {{status}}"
+    },
+    "toasts": {
+      "migrated": "Profile migrated",
+      "migratedDescription": "default profile created from your current agents",
+      "migrationFailed": "Migration failed",
+      "created": "Profile created",
+      "createFailed": "Failed to create profile",
+      "duplicated": "Profile duplicated",
+      "duplicatedDescription": "{{from}} → {{to}}",
+      "duplicateFailed": "Failed to duplicate profile",
+      "deleted": "Profile deleted",
+      "deleteFailed": "Failed to delete profile",
+      "saved": "Profile saved",
+      "saveFailed": "Failed to save profile",
+      "savedWithUntargeted": "Profile saved with untargeted agents",
+      "savedWithUntargetedDescription": "No routing rule points to: {{agents}}. Add a tag rule or retarget the default rule if you want them to run."
+    },
+    "createDialog": {
+      "title": "New profile",
+      "description": "Pick a lowercase kebab-case name (letters, digits, and hyphens).",
+      "confirmLabel": "Create",
+      "invalidHint": "Must start with a letter or digit and contain only lowercase letters, digits, and hyphens."
+    },
+    "duplicateDialog": {
+      "title": "Duplicate \"{{name}}\"",
+      "description": "Name for the new profile.",
+      "invalidHint": "Lowercase kebab-case only."
+    },
+    "deleteDialog": {
+      "title": "Delete profile \"{{name}}\"?",
+      "description": "This cannot be undone. Jobs already launched with this profile keep their snapshot; future launches will fall back to the resolution order."
+    },
+    "empty": {
+      "title": "No profiles yet",
+      "body": "Profiles let you save orchestrator + agent + routing combinations and pick one per rail.",
+      "migrateButton": "Migrate from current agents",
+      "blankButton": "Blank profile",
+      "migrateExplainer": "\"Migrate\" reads your existing <code>.claude/agents/</code> frontmatter models and creates a <code>default</code> profile mirroring today's behavior — zero-loss."
+    },
+    "sidebar": {
+      "title": "Profiles",
+      "teamDefault": "(team default)"
+    },
+    "editorFooter": {
+      "fixValidationIssues": "Fix validation issues before saving",
+      "issuesToResolve_one": "{{count}} issue to resolve",
+      "issuesToResolve_other": "{{count}} issues to resolve"
+    }
+  },
+  "usage": {
+    "title": "Profile usage",
+    "windowLabel": "{{days}}d",
+    "subtitleEmpty": "Jobs launched per profile in the selected window.",
+    "subtitle": "Jobs launched per profile in the last {{count}} days.",
+    "empty": "No profile-scoped jobs yet.",
+    "jobsTooltip": "jobs",
+    "jobsLabel_one": "job",
+    "jobsLabel_other": "jobs",
+    "successRateTooltip": "success rate",
+    "okSuffix": "ok",
+    "avgDurationTooltip": "avg duration",
+    "avgTokensTooltip": "avg tokens",
+    "tokensSuffix": "tok"
+  },
+  "routingRule": {
+    "addTitle": "Add routing rule",
+    "editTitle": "Edit routing rule",
+    "addDescription": "Add a tag-matched routing rule using lowercase kebab-case tags.",
+    "editDescription": "Update the tags or target agent for this rule.",
+    "tagsLabel": "Tags",
+    "tagsHint": "Comma-separated. Use lowercase kebab-case like <code>frontend</code> or <code>api-design</code>.",
+    "invalidTags_one": "Invalid tag: {{tags}}. Tags must use lowercase letters, digits, and hyphens only.",
+    "invalidTags_other": "Invalid tags: {{tags}}. Tags must use lowercase letters, digits, and hyphens only.",
+    "routeToLabel": "Route to",
+    "routeToHint": "Only agents in this profile's chain can be routing targets.",
+    "addRule": "Add rule",
+    "saveChanges": "Save changes"
+  },
+  "railSelectors": {
+    "profileTitle": "Agent profile for this rail",
+    "noProfile": "No profile",
+    "modelTitle": "Model for this ultracode rail",
+    "engineTitle": "AI engine for this rail"
+  }
+}

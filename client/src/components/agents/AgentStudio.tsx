@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Save, Trash2, History, ArrowLeft, AlertCircle, FlaskConical, Loader2, Wand2 } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
@@ -40,29 +41,29 @@ interface Props {
 // that import AGENT_TEMPLATES from AgentStudio.
 export { AGENT_TEMPLATES, type AgentTemplate } from './agentTemplates'
 
-const SAMPLE_TASKS: Array<{ label: string; prompt: string }> = [
+const SAMPLE_TASKS: Array<{ labelKey: string; prompt: string }> = [
   {
-    label: '— pick a sample task —',
+    labelKey: 'studio.sampleTasks.pick',
     prompt: '',
   },
   {
-    label: 'Terraform: public S3 bucket',
+    labelKey: 'studio.sampleTasks.terraform',
     prompt: 'Review this Terraform diff:\n+ resource "aws_s3_bucket" "logs" {\n+   bucket = "app-logs"\n+   acl    = "public-read"\n+ }',
   },
   {
-    label: 'Code review: SQL injection',
+    labelKey: 'studio.sampleTasks.sqlInjection',
     prompt: 'Review this Node.js snippet for security issues:\n\n```js\napp.get("/user/:id", async (req, res) => {\n  const row = await db.query(`SELECT * FROM users WHERE id = ${req.params.id}`)\n  res.json(row)\n})\n```',
   },
   {
-    label: 'Frontend: accessibility',
+    labelKey: 'studio.sampleTasks.accessibility',
     prompt: 'Review this React component for accessibility issues:\n\n```tsx\nfunction ProductCard({ product, onAddToCart }) {\n  return (\n    <div onClick={onAddToCart} className="card">\n      <img src={product.image} />\n      <h3>{product.name}</h3>\n      <div className="price">${product.price}</div>\n    </div>\n  )\n}\n```',
   },
   {
-    label: 'Data: schema change',
+    labelKey: 'studio.sampleTasks.schemaChange',
     prompt: 'Evaluate this migration plan:\n- Add NOT NULL column `email_verified_at` (timestamp) to a 50M-row `users` table\n- Backfill with `NOW()` for existing rows\n- Deploy without downtime\n\nIs this safe? What would you change?',
   },
   {
-    label: 'Performance: slow query',
+    labelKey: 'studio.sampleTasks.slowQuery',
     prompt: 'Explain why this Postgres query is slow on a 10M-row `orders` table and propose an index:\n\n```sql\nSELECT * FROM orders\nWHERE customer_id = $1\n  AND status IN (\'pending\', \'paid\')\n  AND created_at > NOW() - INTERVAL \'30 days\'\nORDER BY created_at DESC\nLIMIT 50;\n```',
   },
 ]
@@ -104,6 +105,7 @@ export function AgentStudio({
   onSaved,
   onResumeRefine,
 }: Props) {
+  const { t } = useTranslation('agentstudio')
   const isCreate = !agentId
   const [id, setId] = useState(agentId ?? initialName ?? '')
   const [body, setBody] = useState(initialBody ?? BLANK_TEMPLATE)
@@ -130,7 +132,7 @@ export function AgentStudio({
       let cancelled = false
       fetch(`${getApiBase()}/profiles/catalog/${encodeURIComponent(agentId!)}/refine/${draftFromRefine}`)
         .then((r) => {
-          if (!r.ok) throw new Error(`Load draft failed: ${r.status}`)
+          if (!r.ok) throw new Error(t('studio.errors.loadDraftFailed', { status: r.status }))
           return r.json() as Promise<{ draftBody: string | null }>
         })
         .then((data) => {
@@ -152,7 +154,7 @@ export function AgentStudio({
     let cancelled = false
     fetch(`${getApiBase()}/profiles/catalog/${encodeURIComponent(agentId!)}`)
       .then((r) => {
-        if (!r.ok) throw new Error(`Load failed: ${r.status}`)
+        if (!r.ok) throw new Error(t('studio.errors.loadFailed', { status: r.status }))
         return r.json() as Promise<{ id: string; body: string }>
       })
       .then((data) => {
@@ -207,23 +209,23 @@ export function AgentStudio({
       }
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? `Save failed: ${res.status}`)
+        throw new Error(err.error ?? t('studio.errors.saveFailed', { status: res.status }))
       }
       setDirty(false)
-      toast.success(isCreate ? 'Agent created' : 'Agent saved', {
+      toast.success(isCreate ? t('studio.toasts.agentCreated') : t('studio.toasts.agentSaved'), {
         description: isCreate ? id : agentId,
       })
       if (onSaved) onSaved(isCreate ? id : agentId!)
     } catch (e) {
       const message = (e as Error).message
       setError(message)
-      toast.error(isCreate ? 'Failed to create agent' : 'Failed to save agent', {
+      toast.error(isCreate ? t('studio.toasts.createFailed') : t('studio.toasts.saveFailed'), {
         description: message,
       })
     } finally {
       setSaving(false)
     }
-  }, [agentId, body, id, isCreate, onSaved])
+  }, [agentId, body, id, isCreate, onSaved, t])
 
   const remove = useCallback(async () => {
     if (isCreate) return
@@ -236,19 +238,19 @@ export function AgentStudio({
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? `Delete failed: ${res.status}`)
+        throw new Error(err.error ?? t('studio.errors.deleteFailed', { status: res.status }))
       }
-      toast.success('Agent deleted', { description: agentId })
+      toast.success(t('studio.toasts.agentDeleted'), { description: agentId })
       if (onSaved) onSaved(agentId!)
       onClose()
     } catch (e) {
       const message = (e as Error).message
       setError(message)
-      toast.error('Failed to delete agent', { description: message })
+      toast.error(t('studio.toasts.deleteFailed'), { description: message })
     } finally {
       setSaving(false)
     }
-  }, [agentId, isCreate, onClose, onSaved])
+  }, [agentId, isCreate, onClose, onSaved, t])
 
   const restore = useCallback((v: AgentVersion) => {
     setBody(v.body)
@@ -272,7 +274,7 @@ export function AgentStudio({
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? `Test failed: ${res.status}`)
+        throw new Error(err.error ?? t('studio.errors.testFailed', { status: res.status }))
       }
       const data = (await res.json()) as { output: string; tokens: number; durationMs: number }
       setTestResult(data)
@@ -281,12 +283,12 @@ export function AgentStudio({
     } finally {
       setTesting(false)
     }
-  }, [agentId, body, id, isCreate, sampleTask])
+  }, [agentId, body, id, isCreate, sampleTask, t])
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-sm text-muted-foreground">Loading agent…</p>
+        <p className="text-sm text-muted-foreground">{t('studio.loadingAgent')}</p>
       </div>
     )
   }
@@ -296,9 +298,9 @@ export function AgentStudio({
       {!isCreate && (
         <ConfirmDialog
           open={confirmDelete}
-          title={`Delete agent "${agentId}"?`}
-          description="This removes the .md from disk. Version history stays in the DB — use a fresh custom agent if you want to recover the body later."
-          confirmLabel="Delete"
+          title={t('studio.deleteConfirm.title', { agentId })}
+          description={t('studio.deleteConfirm.description')}
+          confirmLabel={t('common:actions.delete')}
           destructive
           onConfirm={remove}
           onCancel={() => setConfirmDelete(false)}
@@ -310,13 +312,13 @@ export function AgentStudio({
           type="button"
           onClick={onClose}
           className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-          title="Back"
+          title={t('common:actions.back')}
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="flex-1 min-w-0">
           <div className="text-xs text-muted-foreground uppercase tracking-wide">
-            {isCreate ? 'New custom agent' : 'Edit custom agent'}
+            {isCreate ? t('studio.modeCreate') : t('studio.modeEdit')}
           </div>
           {isCreate ? (
             <Input
@@ -346,14 +348,14 @@ export function AgentStudio({
                     } catch { /* ignore */ }
                   }}
                   className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-accent-primary/40 bg-accent-primary/15 text-accent-primary hover:bg-accent-primary/25 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
-                  title="Hand this draft back to the AI Edit overlay"
+                  title={t('studio.resumeAiEditTitle')}
                 >
-                  <Wand2 className="w-3 h-3" /> Resume AI Edit
+                  <Wand2 className="w-3 h-3" /> {t('studio.resumeAiEdit')}
                 </button>
               )}
               {refineDraftLoading && (
                 <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                  <Loader2 className="w-3 h-3 animate-spin" /> loading AI draft…
+                  <Loader2 className="w-3 h-3 animate-spin" /> {t('studio.loadingAiDraft')}
                 </span>
               )}
             </div>
@@ -367,10 +369,10 @@ export function AgentStudio({
               setTestPaneOpen((v) => !v)
               if (!testPaneOpen) setShowVersions(false)
             }}
-            title="Test this agent against a sample task"
+            title={t('studio.testButtonTitle')}
           >
             <FlaskConical className="w-3.5 h-3.5 mr-1" />
-            Test
+            {t('studio.testButton')}
           </Button>
           {!isCreate && (
             <Button
@@ -380,10 +382,10 @@ export function AgentStudio({
                 setShowVersions((v) => !v)
                 if (!showVersions) setTestPaneOpen(false)
               }}
-              title="Version history"
+              title={t('studio.historyButtonTitle')}
             >
               <History className="w-3.5 h-3.5 mr-1" />
-              History
+              {t('studio.historyButton')}
             </Button>
           )}
           {!isCreate && (
@@ -395,12 +397,12 @@ export function AgentStudio({
               className="text-red-400 hover:text-red-300"
             >
               <Trash2 className="w-3.5 h-3.5 mr-1" />
-              Delete
+              {t('common:actions.delete')}
             </Button>
           )}
           <Button size="sm" onClick={save} disabled={!canSave || saving}>
             <Save className="w-3.5 h-3.5 mr-1" />
-            {saving ? 'Saving…' : isCreate ? 'Create' : 'Save'}
+            {saving ? t('common:states.saving') : isCreate ? t('studio.create') : t('common:actions.save')}
           </Button>
         </div>
       </div>
@@ -416,12 +418,12 @@ export function AgentStudio({
       {/* Validation hints */}
       {isCreate && id.length > 0 && !nameValid && (
         <div className="px-4 py-1.5 text-[11px] border-b border-yellow-500/30 bg-yellow-500/10 text-yellow-500">
-          Name must start with <code>custom-</code> and contain only lowercase letters, digits, and hyphens.
+          <Trans t={t} i18nKey="studio.validation.namePattern" components={{ code: <code /> }} />
         </div>
       )}
       {!hasFrontmatter && (
         <div className="px-4 py-1.5 text-[11px] border-b border-yellow-500/30 bg-yellow-500/10 text-yellow-500">
-          Missing YAML frontmatter (needs opening <code>---</code> on the first line).
+          <Trans t={t} i18nKey="studio.validation.missingFrontmatter" components={{ code: <code /> }} />
         </div>
       )}
 
@@ -430,7 +432,7 @@ export function AgentStudio({
         <div className="flex-1 flex flex-col min-h-0">
           <div className="px-4 py-1.5 border-b border-border text-[11px] font-mono text-muted-foreground flex items-center justify-between">
             <span>.claude/agents/{isCreate ? id || 'custom-…' : agentId}.md</span>
-            {dirty && <span className="text-yellow-500">● unsaved</span>}
+            {dirty && <span className="text-yellow-500">{t('studio.unsaved')}</span>}
           </div>
           <textarea
             value={body}
@@ -446,11 +448,11 @@ export function AgentStudio({
         {testPaneOpen && (
           <aside className="w-96 flex-shrink-0 border-l border-border flex flex-col min-h-0">
             <div className="px-3 py-2 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-              <FlaskConical className="w-3.5 h-3.5" /> Test agent
+              <FlaskConical className="w-3.5 h-3.5" /> {t('studio.testPane.header')}
             </div>
             <div className="p-3 border-b border-border">
               <div className="flex items-center justify-between mb-1">
-                <label className="text-[11px] text-muted-foreground">Sample task</label>
+                <label className="text-[11px] text-muted-foreground">{t('studio.testPane.sampleTaskLabel')}</label>
                 <select
                   className="h-6 text-[11px] rounded border border-border bg-background px-1"
                   value=""
@@ -461,14 +463,14 @@ export function AgentStudio({
                   disabled={testing}
                 >
                   {SAMPLE_TASKS.map((s, i) => (
-                    <option key={i} value={i}>{s.label}</option>
+                    <option key={i} value={i}>{t(s.labelKey)}</option>
                   ))}
                 </select>
               </div>
               <textarea
                 value={sampleTask}
                 onChange={(e) => setSampleTask(e.target.value)}
-                placeholder={'Describe what the agent should do, or pick a sample above.'}
+                placeholder={t('studio.testPane.placeholder')}
                 className="w-full text-xs p-2 rounded border border-border bg-background min-h-[80px] resize-y font-mono"
                 disabled={testing}
               />
@@ -480,16 +482,16 @@ export function AgentStudio({
                 >
                   {testing ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Running…
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> {t('studio.testPane.running')}
                     </>
                   ) : (
                     <>
-                      <FlaskConical className="w-3.5 h-3.5 mr-1.5" /> Run
+                      <FlaskConical className="w-3.5 h-3.5 mr-1.5" /> {t('studio.testPane.run')}
                     </>
                   )}
                 </Button>
                 <span className="text-[11px] text-muted-foreground">
-                  Sandboxed; no files written.
+                  {t('studio.testPane.sandboxNote')}
                 </span>
               </div>
             </div>
@@ -503,7 +505,12 @@ export function AgentStudio({
                 <>
                   <div className="flex items-center gap-3 text-[11px] text-muted-foreground mb-2">
                     <span>
-                      <span className="text-foreground font-mono">{testResult.tokens}</span> tokens
+                      <Trans
+                        t={t}
+                        i18nKey="studio.testPane.tokens"
+                        count={testResult.tokens}
+                        components={{ mono: <span className="text-foreground font-mono" /> }}
+                      />
                     </span>
                     <span>
                       <span className="text-foreground font-mono">
@@ -518,7 +525,7 @@ export function AgentStudio({
               )}
               {!testing && !testResult && !testError && (
                 <p className="text-[11px] text-muted-foreground italic">
-                  Run a sample task against the current draft. Output appears here.
+                  {t('studio.testPane.emptyHint')}
                 </p>
               )}
             </div>
@@ -527,12 +534,12 @@ export function AgentStudio({
         {showVersions && !isCreate && (
           <aside className="w-72 flex-shrink-0 border-l border-border flex flex-col">
             <div className="px-3 py-2 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Version history
+              {t('studio.versions.header')}
             </div>
             <div className="flex-1 overflow-auto p-2 space-y-1">
               {versions.length === 0 ? (
                 <div className="text-[11px] text-muted-foreground italic px-2 py-2">
-                  No prior versions recorded for this agent.
+                  {t('studio.versions.empty')}
                 </div>
               ) : (
                 versions.map((v) => (
@@ -551,7 +558,7 @@ export function AgentStudio({
               )}
             </div>
             <div className="px-3 py-2 border-t border-border text-[11px] text-muted-foreground">
-              Click a version to restore its body into the editor (you still need to Save).
+              {t('studio.versions.restoreHint')}
             </div>
           </aside>
         )}

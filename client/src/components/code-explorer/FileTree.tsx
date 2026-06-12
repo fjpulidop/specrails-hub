@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Folder, FolderOpen, File as FileIcon, ChevronRight, ChevronDown, GitCommitHorizontal } from 'lucide-react'
 import { cn } from '../../lib/utils'
@@ -71,6 +72,7 @@ function ancestorHidden(path: string, collapsed: Set<string>): boolean {
 }
 
 export function FileTree({ onOpenFile, selectedPath, filterJobId, filterTicketId }: FileTreeProps) {
+  const { t } = useTranslation('code')
   const { activeProjectId } = useHub()
   const { openTicketDetail } = useTicketDetailModal()
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
@@ -223,7 +225,7 @@ export function FileTree({ onOpenFile, selectedPath, filterJobId, filterTicketId
             )}
             aria-pressed={filter === 'touched-by-ai'}
           >
-            {filterJobId ? 'Job files' : filterTicketId ? 'Spec files' : 'Touched by AI'}
+            {filterJobId ? t('tree.jobFiles') : filterTicketId ? t('tree.specFiles') : t('tree.touchedByAi')}
           </button>
           <button
             type="button"
@@ -236,55 +238,55 @@ export function FileTree({ onOpenFile, selectedPath, filterJobId, filterTicketId
             )}
             aria-pressed={filter === 'all'}
           >
-            All files
+            {t('tree.allFiles')}
           </button>
           <div className="flex-1" />
           <button
             type="button"
             onClick={collapseAll}
-            title="Collapse all folders"
+            title={t('tree.collapseAll')}
             className="px-1.5 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            aria-label="Collapse all folders"
+            aria-label={t('tree.collapseAll')}
           >
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
             onClick={expandAll}
-            title="Expand all folders"
+            title={t('tree.expandAll')}
             className="px-1.5 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            aria-label="Expand all folders"
+            aria-label={t('tree.expandAll')}
           >
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
         </div>
         {filter === 'touched-by-ai' && touchedFileCount > 0 && (
           <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-            <span>{touchedFileCount} AI-touched {touchedFileCount === 1 ? 'file' : 'files'}</span>
+            <span>{t('tree.touchedCount', { count: touchedFileCount })}</span>
           </div>
         )}
       </div>
 
       {isEmpty && isFirstLoad ? (
         <div className="flex-1 flex items-center justify-center px-4 text-center" data-testid="file-tree-loading">
-          <p className="text-xs text-muted-foreground animate-pulse">Loading files…</p>
+          <p className="text-xs text-muted-foreground animate-pulse">{t('tree.loadingFiles')}</p>
         </div>
       ) : isEmpty && filter === 'touched-by-ai' ? (
         <div className="flex-1 flex flex-col items-center justify-center px-4 text-center gap-3">
           <p className="text-xs text-muted-foreground">
-            No AI-touched files yet. Run a job, or switch to All files.
+            {t('tree.emptyTouched')}
           </p>
           <button
             type="button"
             onClick={() => setFilter('all')}
             className="text-xs px-3 py-1.5 rounded-md bg-accent-primary/20 text-accent-primary hover:bg-accent-primary/30"
           >
-            Show all files
+            {t('tree.showAllFiles')}
           </button>
         </div>
       ) : isEmpty ? (
         <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground px-4 text-center">
-          No files.
+          {t('tree.noFiles')}
         </div>
       ) : (
         <div ref={parentRef} className="flex-1 overflow-auto" data-testid="file-tree-scroller">
@@ -349,7 +351,7 @@ export function FileTree({ onOpenFile, selectedPath, filterJobId, filterTicketId
                     {isFolder && folderTouchedCount > 0 && (
                       <span
                         className="text-[10px] px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground"
-                        title={`${folderTouchedCount} AI-touched files below this folder`}
+                        title={t('tree.folderTouched', { count: folderTouchedCount })}
                       >
                         {folderTouchedCount}
                       </span>
@@ -362,15 +364,21 @@ export function FileTree({ onOpenFile, selectedPath, filterJobId, filterTicketId
                           latest?.kind === 'modified' && 'bg-accent-info/15 text-accent-info',
                           latest?.kind === 'deleted' && 'bg-destructive/15 text-destructive',
                         )}
-                        title={`Latest AI job ${latestAction} this file`}
+                        title={
+                          latest?.kind === 'created'
+                            ? t('tree.latestTitleCreated')
+                            : latest?.kind === 'deleted'
+                              ? t('tree.latestTitleDeleted')
+                              : t('tree.latestTitleModified')
+                        }
                       >
-                        {latestAction}
+                        {t(`action.${latestAction}`)}
                       </span>
                     )}
                     {!isFolder && jobLabel && (
                       <span
                         className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground font-mono"
-                        title={`Job ${latest?.jobId ?? ''}`}
+                        title={t('tree.jobTitle', { jobId: latest?.jobId ?? '' })}
                       >
                         <GitCommitHorizontal className="h-3 w-3" />
                         {jobLabel}
@@ -382,7 +390,7 @@ export function FileTree({ onOpenFile, selectedPath, filterJobId, filterTicketId
                         onClick={(e) => { e.stopPropagation(); openTicketDetail(createdBy) }}
                         className="text-[10px] px-1.5 py-0.5 rounded bg-accent-success/20 text-accent-success"
                         data-testid={`provenance-chip-created-${createdBy}`}
-                        title={`Created while implementing spec #${createdBy}`}
+                        title={t('tree.createdBySpec', { id: createdBy })}
                       >
                         #{createdBy}
                       </button>
@@ -394,7 +402,7 @@ export function FileTree({ onOpenFile, selectedPath, filterJobId, filterTicketId
                         onClick={(e) => { e.stopPropagation(); openTicketDetail(tid) }}
                         className="text-[10px] px-1.5 py-0.5 rounded bg-accent-info/15 text-accent-info"
                         data-testid={`provenance-chip-modified-${tid}`}
-                        title={`Modified while implementing spec #${tid}`}
+                        title={t('tree.modifiedBySpec', { id: tid })}
                       >
                         #{tid}
                       </button>

@@ -1,0 +1,105 @@
+{
+  "modal": {
+    "dialogLabel": "Browser-Aufnahme",
+    "nav": {
+      "forward": "Vorwärts",
+      "reload": "Neu laden"
+    },
+    "address": {
+      "placeholder": "URL eingeben und „Los“ drücken…",
+      "label": "Adressleiste",
+      "go": "Los"
+    },
+    "viewport": {
+      "groupLabel": "Viewport-Größe",
+      "presetLabel": "Viewport {{preset}}",
+      "presetTitle": "Viewport: {{preset}}",
+      "fit": "Anpassen",
+      "desktop": "Desktop",
+      "tablet": "Tablet",
+      "mobile": "Mobil"
+    },
+    "network": {
+      "ariaLabel": "Netzwerk-Requests aufzeichnen",
+      "titleOn": "Netzwerk-Requests der Seite werden aufgezeichnet (zum Deaktivieren klicken)",
+      "titleOff": "Netzwerkaufzeichnung aus (zum Aktivieren klicken)",
+      "button": "Netzwerk"
+    },
+    "allSizes": {
+      "ariaLabel": "In allen Bildschirmgrößen aufnehmen",
+      "titleOn": "Dieses Element wird in Desktop, Tablet und Mobil aufgenommen (zum Deaktivieren klicken)",
+      "titleOff": "In allen Größen aufnehmen: Desktop, Tablet und Mobil",
+      "button": "Alle Größen"
+    },
+    "select": {
+      "active": "Element anklicken oder ziehen…",
+      "start": "Auswählen, um Spec zu erstellen",
+      "hint": "Klicke ein hervorgehobenes Element an, um es aufzunehmen, oder ziehe ein eigenes Rechteck. Nutze die Breadcrumb (oder ↑/↓) zum Verfeinern. Esc zum Abbrechen."
+    },
+    "closeBrowser": "Browser schließen",
+    "status": {
+      "connecting": "Browser wird verbunden…",
+      "unavailable": "Browser nicht verfügbar",
+      "opening": "Browser wird geöffnet…",
+      "capturing": "Aufnahme läuft…"
+    },
+    "error": {
+      "unavailable": "Der Browser ist nicht verfügbar.",
+      "devHint": "Führe in der Entwicklung einmal <cmd>npx playwright install chromium</cmd> aus. In der Desktop-App ist Chromium gebündelt."
+    },
+    "breadcrumb": {
+      "hint": "↑ Elternelement · ↓ Kindelement"
+    },
+    "toast": {
+      "captured": "Seitenauswahl aufgenommen",
+      "captureFailed": "Aufnahme fehlgeschlagen"
+    }
+  },
+  "editor": {
+    "tools": {
+      "arrow": "Pfeil (A)",
+      "box": "Rechteck (R)",
+      "text": "Text (T)",
+      "blur": "Weichzeichnen / Schwärzen (B)",
+      "step": "Schrittnummer (N)"
+    },
+    "notePrompt": "Notiztext:",
+    "colorLabel": "Farbe {{color}}",
+    "undo": "Rückgängig",
+    "undoTitle": "Rückgängig (⌘Z)",
+    "redo": "Wiederholen",
+    "redoTitle": "Wiederholen (⌘⇧Z)",
+    "capturedAlt": "Aufgenommene Auswahl",
+    "discardConfirm": "Anmerkungen verwerfen?",
+    "reselect": "Neu auswählen",
+    "createSpec": "Spec erstellen",
+    "skipContinue": "Überspringen & weiter"
+  },
+  "domPanel": {
+    "header": "Aufgenommene Seite · {{title}}",
+    "badge": {
+      "elements_one": "{{count}} Element",
+      "elements_other": "{{count}} Elemente",
+      "tokens": "Tokens",
+      "requests": "{{count}} Req.",
+      "truncated": "gekürzt"
+    },
+    "removeLabel": "Aufgenommenen Seitenkontext entfernen",
+    "noMarkup": "(kein Markup aufgenommen)",
+    "appliedCss": "Angewendetes CSS",
+    "appliedCssTruncated": "Angewendetes CSS (gekürzt)",
+    "designTokens": "Design-Tokens",
+    "fonts": "Schriften:",
+    "copyJson": "Als JSON kopieren",
+    "copied": "Kopiert!",
+    "network_one": "Netzwerk · {{count}} Request",
+    "network_other": "Netzwerk · {{count}} Requests"
+  },
+  "session": {
+    "connectionError": "Verbindungsfehler",
+    "lostConnection": "Verbindung zum Browser verloren. Schließe „Von einer Website“ und öffne es erneut.",
+    "tooManySessions": "Zu viele offene Browser-Sessions. Schließe eine und versuche es erneut.",
+    "launchFailed": "Der Browser konnte auf dem Server nicht gestartet werden.",
+    "openFailed": "Browser konnte nicht geöffnet werden."
+  }
+}

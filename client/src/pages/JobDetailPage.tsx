@@ -3,6 +3,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { getApiBase } from '../lib/api'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
+import { getDateFnsLocale } from '../lib/i18n'
 import { ChevronRight, Home, RotateCcw, Download } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -21,15 +23,16 @@ import { formatCommandForProvider } from '../lib/format-command'
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'running' | 'queued' | 'failed' | 'canceled'
 
-const STATUS_BADGE: Record<string, { variant: BadgeVariant; label: string; tooltip: string }> = {
-  running: { variant: 'running', label: 'running', tooltip: 'Job is actively executing' },
-  completed: { variant: 'success', label: 'completed', tooltip: 'Job completed successfully' },
-  failed: { variant: 'failed', label: 'failed', tooltip: 'Job exited with a non-zero code' },
-  canceled: { variant: 'canceled', label: 'canceled', tooltip: 'Job was manually canceled' },
-  queued: { variant: 'queued', label: 'queued', tooltip: 'Job is waiting in the queue' },
+const STATUS_BADGE: Record<string, { variant: BadgeVariant; labelKey: string; tooltipKey: string }> = {
+  running: { variant: 'running', labelKey: 'statusLabel.running', tooltipKey: 'statusTooltip.running' },
+  completed: { variant: 'success', labelKey: 'statusLabel.completed', tooltipKey: 'statusTooltip.completed' },
+  failed: { variant: 'failed', labelKey: 'statusLabel.failed', tooltipKey: 'statusTooltip.failed' },
+  canceled: { variant: 'canceled', labelKey: 'statusLabel.canceled', tooltipKey: 'statusTooltip.canceled' },
+  queued: { variant: 'queued', labelKey: 'statusLabel.queued', tooltipKey: 'statusTooltip.queued' },
 }
 
 export default function JobDetailPage() {
+  const { t } = useTranslation('jobs')
   const { id } = useParams<{ id: string }>()
   const { activeProjectId, projects } = useHub()
   const activeProvider = projects.find((p) => p.id === activeProjectId)?.provider
@@ -192,17 +195,17 @@ export default function JobDetailPage() {
       if (res.ok) {
         const data = await res.json() as { status?: string }
         if (data.status === 'deleted') {
-          toast.success('Job deleted')
+          toast.success(t('detail.toast.jobDeleted'))
           navigate('/jobs')
         } else {
-          toast.success('Cancel signal sent', { description: 'Job will stop at the next safe point' })
+          toast.success(t('detail.toast.cancelSignalSent'), { description: t('detail.toast.cancelSignalSentDescription') })
         }
       } else {
         const data = await res.json() as { error?: string }
-        toast.error('Failed', { description: data.error })
+        toast.error(t('detail.toast.failed'), { description: data.error })
       }
     } catch {
-      toast.error('Network error')
+      toast.error(t('detail.toast.networkError'))
     }
   }
 
@@ -214,7 +217,7 @@ export default function JobDetailPage() {
       const res = await fetch(`${getApiBase()}/jobs/${job.id}/diagnostic`)
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { error?: string }
-        throw new Error(data.error ?? `Export failed (HTTP ${res.status})`)
+        throw new Error(data.error ?? t('detail.toast.exportFailedHttp', { status: res.status }))
       }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
@@ -227,7 +230,7 @@ export default function JobDetailPage() {
       a.remove()
       URL.revokeObjectURL(url)
     } catch (err) {
-      toast.error('Export failed', { description: (err as Error).message })
+      toast.error(t('detail.toast.exportFailed'), { description: (err as Error).message })
     }
   }
 
@@ -240,8 +243,8 @@ export default function JobDetailPage() {
         body: JSON.stringify({ command: job.command }),
       })
       const data = await res.json() as { jobId?: string; error?: string }
-      if (!res.ok) throw new Error(data.error ?? 'Failed to spawn job')
-      toast.success('Job re-queued')
+      if (!res.ok) throw new Error(data.error ?? t('detail.toast.spawnFailed'))
+      toast.success(t('detail.toast.jobRequeued'))
       navigate(`/jobs/${data.jobId}`)
     } catch (err) {
       toast.error((err as Error).message)
@@ -263,12 +266,12 @@ export default function JobDetailPage() {
   if (notFound || !job) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-6 flex flex-col items-center gap-3 mt-12">
-        <p className="text-lg font-semibold">Job not found</p>
-        <p className="text-sm text-muted-foreground">The job ID "{id}" doesn't exist</p>
+        <p className="text-lg font-semibold">{t('detail.notFound')}</p>
+        <p className="text-sm text-muted-foreground">{t('detail.notFoundDescription', { id })}</p>
         <Button asChild variant="outline" size="sm">
           <Link to="/">
             <Home className="w-3.5 h-3.5 mr-1.5" />
-            Back to Dashboard
+            {t('detail.backToDashboard')}
           </Link>
         </Button>
       </div>
@@ -297,10 +300,10 @@ export default function JobDetailPage() {
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Link to="/" className="hover:text-foreground transition-colors flex items-center gap-1">
             <Home className="w-3 h-3" />
-            Dashboard
+            {t('detail.breadcrumbDashboard')}
           </Link>
           <ChevronRight className="w-3 h-3" />
-          <span className="text-foreground font-mono">Job #{id?.slice(0, 8)}</span>
+          <span className="text-foreground font-mono">{t('detail.breadcrumbJob', { id: id?.slice(0, 8) })}</span>
         </div>
 
         {/* Ticket identity card — premium header when the job references tickets */}
@@ -318,10 +321,10 @@ export default function JobDetailPage() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div>
-                    <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+                    <Badge variant={statusInfo.variant}>{t(statusInfo.labelKey)}</Badge>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent>{statusInfo.tooltip}</TooltipContent>
+                <TooltipContent>{t(statusInfo.tooltipKey)}</TooltipContent>
               </Tooltip>
               <code
                 className={cn(
@@ -335,8 +338,8 @@ export default function JobDetailPage() {
             <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
               <span>
                 {job.started_at
-                  ? `Started ${formatDistanceToNow(new Date(job.started_at), { addSuffix: true })}`
-                  : 'Queued — waiting to start'}
+                  ? t('detail.startedAgo', { timeAgo: formatDistanceToNow(new Date(job.started_at), { addSuffix: true, locale: getDateFnsLocale() }) })
+                  : t('detail.queuedWaiting')}
               </span>
               {job.model && <span className="text-muted-foreground/40">{job.model}</span>}
             </div>
@@ -352,14 +355,14 @@ export default function JobDetailPage() {
                     size="sm"
                     className="h-7"
                     onClick={handleExportDiagnostic}
-                    aria-label="Export diagnostic bundle"
+                    aria-label={t('detail.exportDiagnosticAria')}
                   >
                     <Download className="w-3.5 h-3.5 mr-1.5" />
-                    Export diagnostic
+                    {t('detail.exportDiagnostic')}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Download ZIP with telemetry, logs, and summary for this job
+                  {t('detail.exportDiagnosticTooltip')}
                 </TooltipContent>
               </Tooltip>
             )}
@@ -373,11 +376,11 @@ export default function JobDetailPage() {
                     className="h-7"
                   >
                     <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
-                    Re-execute
+                    {t('detail.reExecute')}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Spawn a new job with the same command
+                  {t('detail.reExecuteTooltip')}
                 </TooltipContent>
               </Tooltip>
             )}
@@ -390,11 +393,11 @@ export default function JobDetailPage() {
                     onClick={handleCancel}
                     className="h-7 border-destructive/30 text-destructive hover:bg-destructive/10"
                   >
-                    Cancel Job
+                    {t('detail.cancelJob')}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Send SIGTERM to the running process. The job will be marked as canceled.
+                  {t('detail.cancelJobTooltip')}
                 </TooltipContent>
               </Tooltip>
             )}

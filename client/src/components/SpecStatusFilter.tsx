@@ -1,4 +1,5 @@
 import { CheckCircle2, Circle, Layers } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   Select,
   SelectTrigger,
@@ -18,27 +19,29 @@ interface SpecStatusFilterProps {
   className?: string
 }
 
-const LABELS: Record<SpecStatusFilterValue, string> = {
-  all: 'All',
-  todo: 'ToDo',
-  done: 'Done',
+/** i18n keys (specs namespace) per filter value. */
+const LABEL_KEYS: Record<SpecStatusFilterValue, string> = {
+  all: 'statusFilter.all',
+  todo: 'statusFilter.todo',
+  done: 'statusFilter.done',
 }
 
 export function SpecStatusFilter({ value, onChange, counts, className }: SpecStatusFilterProps) {
+  const { t } = useTranslation('specs')
   const visibleCount = counts ? counts[value] : null
 
   return (
     <div className={cn('flex items-center shrink-0', className)}>
       <Select value={value} onValueChange={(v) => onChange(v as SpecStatusFilterValue)}>
         <SelectTrigger
-          aria-label="Filter by status"
+          aria-label={t('statusFilter.ariaLabel')}
           data-testid="spec-status-filter"
           className="h-7 w-auto gap-1.5 px-2 text-xs bg-accent-info/10 border-accent-info/30 hover:bg-accent-info/20"
         >
           <Layers className="w-3 h-3 text-muted-foreground" />
           <SelectValue>
             <span className="flex items-center gap-1.5">
-              <span>{LABELS[value]}</span>
+              <span>{t(LABEL_KEYS[value])}</span>
               {visibleCount !== null && (
                 <span className="text-[10px] text-muted-foreground/80">·&nbsp;{visibleCount}</span>
               )}
@@ -49,21 +52,21 @@ export function SpecStatusFilter({ value, onChange, counts, className }: SpecSta
           <SelectItem value="all">
             <span className="inline-flex items-center gap-2">
               <Layers className="w-3 h-3 text-muted-foreground" />
-              <span>All</span>
+              <span>{t('statusFilter.all')}</span>
               {counts && <span className="text-[10px] text-muted-foreground/70">{counts.all}</span>}
             </span>
           </SelectItem>
           <SelectItem value="todo">
             <span className="inline-flex items-center gap-2">
               <Circle className="w-3 h-3 text-muted-foreground" />
-              <span>ToDo</span>
+              <span>{t('statusFilter.todo')}</span>
               {counts && <span className="text-[10px] text-muted-foreground/70">{counts.todo}</span>}
             </span>
           </SelectItem>
           <SelectItem value="done">
             <span className="inline-flex items-center gap-2">
               <CheckCircle2 className="w-3 h-3 text-accent-success/80" />
-              <span>Done</span>
+              <span>{t('statusFilter.done')}</span>
               {counts && <span className="text-[10px] text-muted-foreground/70">{counts.done}</span>}
             </span>
           </SelectItem>

@@ -1,0 +1,62 @@
+{
+  "toasts": {
+    "railAdded": "Rail {{n}} added",
+    "railRemoved": "{{rail}} removed",
+    "railCompleted": "Rail {{n}} completed",
+    "railFailed": "Rail {{n}} failed — specs returned to Specs",
+    "railEnded": "Rail {{n}} {{status}} — specs returned to Specs",
+    "alreadyOnRail": "Already on {{rail}}",
+    "movedToRail": "Moved to {{rail}}",
+    "railRunningStopFirst": "{{rail}} is running — stop it before removing",
+    "removedFromRail": "Removed from {{rail}}",
+    "queuedOnRail": "Queued on {{rail}}",
+    "queuedOnRailDescription": "Rail is currently running",
+    "railStopped": "{{rail}} stopped",
+    "stopFailed": "Failed to stop rail",
+    "syncTicketsFailed": "Failed to sync rail tickets",
+    "launchFailed": "Failed to launch rail",
+    "launchNetworkError": "Network error launching rail",
+    "railLaunched": "{{rail}} launched",
+    "launchDescription_one": "{{mode}} with {{count}} spec",
+    "launchDescription_other": "{{mode}} with {{count}} specs"
+  },
+  "railsBoard": {
+    "title": "Rails",
+    "runningCount_one": "{{count}} running",
+    "runningCount_other": "{{count}} running"
+  },
+  "railControls": {
+    "viewJobLog": "View job log",
+    "log": "Log",
+    "implement": "Implement",
+    "batch": "Batch",
+    "ultra": "Ultra",
+    "ultraTitle": "Ultracode — Claude implements the spec autonomously, no pipeline",
+    "stop": "Stop",
+    "play": "Play",
+    "failedRetry": "Job failed — click to retry",
+    "addSpecsFirst": "Add specs to this rail first"
+  },
+  "railRow": {
+    "moveToSpecs": "Move to Specs",
+    "deleteRail": "Delete {{label}}",
+    "dropHere": "Drop here",
+    "dropOnThisRail": "Drop on this rail",
+    "dragSpecsHere": "Drag specs here"
+  },
+  "ultracodeDialog": {
+    "title": "Launch in Ultracode mode",
+    "context_one": "{{rail}} · {{count}} spec",
+    "context_other": "{{rail}} · {{count}} specs",
+    "noPipelineTitle": "No OpenSpec pipeline.",
+    "noPipelineBody": "The structured architect → developer → reviewer flow is skipped entirely.",
+    "autonomyTitle": "Native Claude autonomy.",
+    "autonomyBody": "Claude works on its own using native agents and dynamic workflows.",
+    "costTitle": "Variable cost.",
+    "costBody": "Spend depends on what Claude decides to do — it can be higher than expected.",
+    "continue": "Continue"
+  },
+  "useRails": {
+    "fetchFailed": "Failed to fetch rails: {{status}}"
+  }
+}

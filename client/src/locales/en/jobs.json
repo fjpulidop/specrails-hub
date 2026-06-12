@@ -1,0 +1,201 @@
+{
+  "statusLabel": {
+    "running": "running",
+    "completed": "completed",
+    "done": "done",
+    "failed": "failed",
+    "canceled": "canceled",
+    "queued": "queued",
+    "zombie": "zombie",
+    "skipped": "skipped"
+  },
+  "statusTooltip": {
+    "running": "Job is actively executing",
+    "completed": "Job completed successfully",
+    "failed": "Job exited with a non-zero exit code",
+    "canceled": "Job was manually canceled",
+    "queued": "Job is waiting in the queue",
+    "queuedToRun": "Job is waiting to run",
+    "zombie": "Job was auto-terminated after prolonged inactivity",
+    "skipped": "Job was skipped because a parent job in the pipeline failed"
+  },
+  "statusName": {
+    "running": "running",
+    "completed": "completed",
+    "failed": "failed",
+    "canceled": "canceled",
+    "zombie_terminated": "zombie",
+    "queued": "queued",
+    "skipped": "skipped"
+  },
+  "page": {
+    "title": "Jobs",
+    "exportJobs": "Export Jobs",
+    "proposalDeleted": "Proposal deleted",
+    "proposal": {
+      "title": "Proposal",
+      "noContent": "No proposal content yet.",
+      "githubIssue": "GitHub Issue:"
+    }
+  },
+  "detail": {
+    "breadcrumbDashboard": "Dashboard",
+    "breadcrumbJob": "Job #{{id}}",
+    "notFound": "Job not found",
+    "notFoundDescription": "The job ID \"{{id}}\" doesn't exist",
+    "backToDashboard": "Back to Dashboard",
+    "startedAgo": "Started {{timeAgo}}",
+    "queuedWaiting": "Queued — waiting to start",
+    "exportDiagnostic": "Export diagnostic",
+    "exportDiagnosticAria": "Export diagnostic bundle",
+    "exportDiagnosticTooltip": "Download ZIP with telemetry, logs, and summary for this job",
+    "reExecute": "Re-execute",
+    "reExecuteTooltip": "Spawn a new job with the same command",
+    "cancelJob": "Cancel Job",
+    "cancelJobTooltip": "Send SIGTERM to the running process. The job will be marked as canceled.",
+    "toast": {
+      "jobDeleted": "Job deleted",
+      "cancelSignalSent": "Cancel signal sent",
+      "cancelSignalSentDescription": "Job will stop at the next safe point",
+      "failed": "Failed",
+      "networkError": "Network error",
+      "exportFailed": "Export failed",
+      "exportFailedHttp": "Export failed (HTTP {{status}})",
+      "jobRequeued": "Job re-queued",
+      "spawnFailed": "Failed to spawn job"
+    }
+  },
+  "statusPanel": {
+    "inProgress": "Job in progress",
+    "completed": "Job completed",
+    "failed": "Job failed",
+    "duration": "Duration",
+    "cost": "Cost",
+    "turns": "Turns",
+    "tokens": "Tokens",
+    "filesCount_one": "{{count}} file",
+    "filesCount_other": "{{count}} files",
+    "pipelineTotal": "Pipeline total ({{count}} phases)",
+    "totalCost": "Total cost",
+    "totalTokens": "Total tokens",
+    "filesModified": "Files modified"
+  },
+  "ticketHeader": {
+    "showMore": "+ {{count}} more",
+    "showLess": "Show less",
+    "deletedTicket": "#{{id}} (deleted)",
+    "deletedTooltip": "Ticket no longer exists"
+  },
+  "modal": {
+    "openInNewTab": "Open in new tab",
+    "notFound": "Job not found",
+    "cancelConfirmTitle": "Cancel job?",
+    "cancelConfirmDescription": "The job will stop at the next safe point. This action cannot be undone.",
+    "keepRunning": "Keep running",
+    "cancelJob": "Cancel job",
+    "toast": {
+      "cancelSignalSent": "Cancel signal sent",
+      "cancelSignalSentDescription": "Job will stop at the next safe point",
+      "cancelFailed": "Failed to cancel",
+      "networkError": "Network error"
+    }
+  },
+  "comparison": {
+    "title": "Job Comparison",
+    "jobN": "Job {{n}}",
+    "loadFailed": "Failed to load comparison: {{error}}",
+    "duration": "Duration",
+    "cost": "Cost",
+    "tokensOut": "Tokens out",
+    "tokensIn": "Tokens in",
+    "cacheRead": "Cache read",
+    "model": "Model",
+    "phasesDone": "Phases done",
+    "betterValueHint": "Green highlights indicate better value"
+  },
+  "recent": {
+    "emptyTitle": "No jobs yet",
+    "emptyDescription": "Run a command above to see your job history here",
+    "filterAll": "All ({{count}})",
+    "filterStatus": "{{status}} ({{count}})",
+    "fromDate": "From date",
+    "toDate": "To date",
+    "clear": "Clear",
+    "exitCompareMode": "Exit compare mode",
+    "compareTwoJobs": "Compare 2 jobs",
+    "clearJobs": "Clear jobs",
+    "selectTwoToCompare": "Select 2 jobs to compare",
+    "selectOneMore": "Select 1 more job",
+    "readyToCompare": "Ready — click compare",
+    "compareAction": "Compare →",
+    "colStatus": "Status",
+    "colCommand": "Command",
+    "colDuration": "Duration",
+    "colTokens": "Tokens",
+    "colCost": "Cost",
+    "colStarted": "Started",
+    "profileTooltip": "Profile: {{name}}",
+    "pipelinePart": "Part of a pipeline",
+    "pipelineDependsOn": "(depends on previous step)",
+    "deleteProposal": "Delete proposal",
+    "loadMore": "Load more ({{count}} remaining)",
+    "priority": {
+      "critical": "critical",
+      "high": "high",
+      "normal": "normal",
+      "low": "low"
+    },
+    "clearModal": {
+      "title": "Clear Jobs",
+      "jobsInHistory_one": "{{count}} job in history",
+      "jobsInHistory_other": "{{count}} jobs in history",
+      "clearAll_one": "Clear all {{count}} job",
+      "clearAll_other": "Clear all {{count}} jobs",
+      "orByRange": "Or clear by date range:",
+      "fromPlaceholder": "From",
+      "toPlaceholder": "To",
+      "clearInRange_one": "Clear {{count}} job in range",
+      "clearInRange_other": "Clear {{count}} jobs in range",
+      "clearRange": "Clear range"
+    },
+    "deleteProposalConfirm": {
+      "title": "Delete proposal?",
+      "description": "This will permanently delete 1 proposal. This action cannot be undone."
+    },
+    "toast": {
+      "cleared_one": "Cleared {{count}} job",
+      "cleared_other": "Cleared {{count}} jobs",
+      "clearFailed": "Failed to clear jobs",
+      "networkError": "Network error"
+    }
+  },
+  "activeJob": {
+    "none": "No active job",
+    "noneHint": "Select a command below to start a job",
+    "exitCode": "exit {{code}}",
+    "cancelTooltip": "Send SIGTERM to the running claude process",
+    "viewLogs": "View Logs",
+    "toast": {
+      "cancelRequested": "Job cancellation requested",
+      "cancelRequestedDescription": "Sending SIGTERM to the process",
+      "cancelFailed": "Failed to cancel job",
+      "networkError": "Network error canceling job"
+    }
+  },
+  "logViewer": {
+    "loading": "Loading logs...",
+    "empty": "No log output yet",
+    "filterPlaceholder": "Filter logs...",
+    "copySuccess": "Log copied to clipboard",
+    "copyFailed": "Failed to copy log",
+    "lineCount": "{{filtered}} / {{total}} lines",
+    "jumpToBottom": "Jump to bottom",
+    "phaseLines_one": "{{count}} line",
+    "phaseLines_other": "{{count}} lines",
+    "noMatchingLines": "No matching lines",
+    "noOutput": "No output",
+    "completed": "Completed",
+    "turns_one": "{{count}} turn",
+    "turns_other": "{{count}} turns"
+  }
+}

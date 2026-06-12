@@ -81,7 +81,7 @@ describe('JobDetailModal', () => {
   it('shows loading text while fetching', () => {
     global.fetch = vi.fn().mockReturnValue(new Promise(() => {}))
     render(<JobDetailModal jobId="job-abc123" onClose={onClose} />)
-    expect(screen.getByText('Loading...')).toBeInTheDocument()
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
   })
 
   it('renders command after successful fetch', async () => {

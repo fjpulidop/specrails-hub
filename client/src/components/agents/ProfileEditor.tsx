@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react'
 import { Plus, GripVertical, X, ArrowUp, ArrowDown, Pin, Pencil } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import {
   DndContext,
   closestCenter,
@@ -55,6 +56,7 @@ export function ProfileEditor({
   // Baseline agents (architect / developer / reviewer / merge-resolver) are
   // required and pinned in every profile — default and custom alike — because
   // the pipeline relies on all four. Routing rules stay fully flexible.
+  const { t } = useTranslation('agentstudio')
   const [catalog, setCatalog] = useState<CatalogAgent[]>([])
   const [pickingAgent, setPickingAgent] = useState(false)
   const [addRoutingPrompt, setAddRoutingPrompt] = useState(false)
@@ -90,35 +92,38 @@ export function ProfileEditor({
     // Baseline is required on every profile — default and custom alike.
     for (const baseline of BASELINE_REQUIRED_AGENTS) {
       if (!profile.agents.some((a) => a.id === baseline)) {
-        issues.push(`Missing required baseline agent: ${baseline}`)
+        issues.push(t('profileEditor.validation.missingBaseline', { agent: baseline }))
       }
     }
     // Routing: at most one default rule, last if present.
     const defaults = profile.routing.filter((r) => 'default' in r && r.default === true)
     if (defaults.length > 1) {
-      issues.push(`Routing may have at most one default rule (found ${defaults.length})`)
+      issues.push(t('profileEditor.validation.multipleDefaultRules', { found: defaults.length }))
     }
     if (defaults.length === 1) {
       const last = profile.routing[profile.routing.length - 1]
       if (!('default' in last && last.default === true)) {
-        issues.push('The default routing rule must be the last entry')
+        issues.push(t('profileEditor.validation.defaultRuleNotLast'))
       }
     }
     for (const rule of profile.routing) {
       if (!profile.agents.some((a) => a.id === rule.agent)) {
-        issues.push(`Routing references agent not in the chain: ${rule.agent}`)
+        issues.push(t('profileEditor.validation.unknownRoutingAgent', { agent: rule.agent }))
       }
       if ('tags' in rule) {
         const invalidTags = rule.tags.filter((tag) => !ROUTING_TAG_PATTERN.test(tag))
         if (invalidTags.length > 0) {
           issues.push(
-            `Routing rule ${rule.agent} has invalid tags: ${invalidTags.join(', ')} (use lowercase kebab-case)`,
+            t('profileEditor.validation.invalidTags', {
+              agent: rule.agent,
+              tags: invalidTags.join(', '),
+            }),
           )
         }
       }
     }
     return issues
-  }, [profile])
+  }, [profile, t])
 
   // ── Soft warnings (non-blocking, surfaced at save-time) ─────────────────────
   // Only surface this when explicit routing exists. If routing is empty the
@@ -309,7 +314,7 @@ export function ProfileEditor({
       {/* Live validation summary */}
       {validationIssues.length > 0 && (
         <div className="px-3 py-2 text-xs rounded-md border border-yellow-500/30 bg-yellow-500/10 text-yellow-500">
-          <div className="font-medium mb-1">{validationIssues.length} validation {validationIssues.length === 1 ? 'issue' : 'issues'}</div>
+          <div className="font-medium mb-1">{t('profileEditor.validationSummary', { count: validationIssues.length })}</div>
           <ul className="list-disc list-inside space-y-0.5">
             {validationIssues.map((issue, i) => (
               <li key={i}>{issue}</li>
@@ -321,11 +326,11 @@ export function ProfileEditor({
       {/* Metadata */}
       <section className="space-y-3">
         <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">Name</label>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">{t('profileEditor.nameLabel')}</label>
           <Input value={profile.name} disabled className="text-sm" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">Description</label>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">{t('profileEditor.descriptionLabel')}</label>
           <Input
             value={profile.description ?? ''}
             onChange={(e) =>
@@ -334,7 +339,7 @@ export function ProfileEditor({
               })
             }
             className="text-sm"
-            placeholder="What is this profile for?"
+            placeholder={t('profileEditor.descriptionPlaceholder')}
           />
         </div>
       </section>
@@ -342,7 +347,7 @@ export function ProfileEditor({
       {/* Orchestrator */}
       <section>
         <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-          Orchestrator
+          {t('profileEditor.orchestrator.heading')}
         </h2>
         <div className="flex items-center gap-3 p-3 rounded-md border border-border">
           <div className="flex-1 min-w-0">
@@ -350,8 +355,7 @@ export function ProfileEditor({
               /specrails:implement · /specrails:batch-implement
             </div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
-              Top-level model for both commands. batch-implement delegates to implement
-              per feature, so every rail it spawns inherits this profile's agent chain.
+              {t('profileEditor.orchestrator.description')}
             </div>
           </div>
           <ModelSelect
@@ -369,16 +373,16 @@ export function ProfileEditor({
       <section>
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Agent chain ({profile.agents.length})
+            {t('profileEditor.agentChain.heading', { n: profile.agents.length })}
           </h2>
           <Button
             size="sm"
             variant="ghost"
             onClick={() => setPickingAgent((v) => !v)}
             disabled={availableToAdd.length === 0}
-            title={availableToAdd.length === 0 ? 'All catalog agents are already in the chain' : 'Add an agent from the catalog'}
+            title={availableToAdd.length === 0 ? t('profileEditor.agentChain.addDisabledTitle') : t('profileEditor.agentChain.addTitle')}
           >
-            <Plus className="w-3.5 h-3.5 mr-1" /> Add
+            <Plus className="w-3.5 h-3.5 mr-1" /> {t('common:actions.add')}
           </Button>
         </div>
 
@@ -386,20 +390,20 @@ export function ProfileEditor({
           <div className="mb-2 p-2 rounded-md border border-border bg-muted/30">
             <div className="flex items-center justify-between mb-1.5 px-1">
               <span className="text-[11px] text-muted-foreground">
-                Pick from catalog ({availableToAdd.length} available)
+                {t('profileEditor.agentChain.pickFromCatalog', { n: availableToAdd.length })}
               </span>
               <button
                 type="button"
                 className="p-1 hover:bg-accent rounded"
                 onClick={() => setPickingAgent(false)}
-                title="Close"
+                title={t('common:actions.close')}
               >
                 <X className="w-3 h-3" />
               </button>
             </div>
             {availableToAdd.length === 0 ? (
               <div className="px-2 py-3 text-xs text-muted-foreground text-center">
-                No more agents in the catalog. Add custom agents from the Agents Catalog tab.
+                {t('profileEditor.agentChain.emptyCatalog')}
               </div>
             ) : (
               <div className="space-y-0.5 max-h-64 overflow-auto">
@@ -419,7 +423,7 @@ export function ProfileEditor({
                           : 'bg-muted text-muted-foreground')
                       }
                     >
-                      {a.kind}
+                      {t(`profileEditor.agentChain.kind.${a.kind}`)}
                     </span>
                   </button>
                 ))}
@@ -449,7 +453,7 @@ export function ProfileEditor({
       <section>
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Routing ({profile.routing.length})
+            {t('profileEditor.routing.heading', { n: profile.routing.length })}
           </h2>
           <div className="flex items-center gap-1">
             {!hasDefaultRoutingRule && (
@@ -458,9 +462,9 @@ export function ProfileEditor({
                 variant="ghost"
                 onClick={addDefaultRoutingRule}
                 disabled={profile.agents.length === 0}
-                title={profile.agents.length === 0 ? 'Add at least one agent before creating routing rules' : undefined}
+                title={profile.agents.length === 0 ? t('profileEditor.routing.needAgentsTitle') : undefined}
               >
-                <Plus className="w-3.5 h-3.5 mr-1" /> Add default
+                <Plus className="w-3.5 h-3.5 mr-1" /> {t('profileEditor.routing.addDefault')}
               </Button>
             )}
             <Button
@@ -468,23 +472,25 @@ export function ProfileEditor({
               variant="ghost"
               onClick={() => setAddRoutingPrompt(true)}
               disabled={profile.agents.length === 0}
-              title={profile.agents.length === 0 ? 'Add at least one agent before creating routing rules' : undefined}
+              title={profile.agents.length === 0 ? t('profileEditor.routing.needAgentsTitle') : undefined}
             >
-              <Plus className="w-3.5 h-3.5 mr-1" /> Add rule
+              <Plus className="w-3.5 h-3.5 mr-1" /> {t('profileEditor.routing.addRule')}
             </Button>
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground mb-2">
-          First matching rule wins. Rules are editable and removable, and the default catch-all
-          stays last when present. If you leave routing empty, the pipeline falls back to the
-          first developer-shaped agent in the chain.
+          {t('profileEditor.routing.explainer')}
         </p>
         {agentsMissingRouting.length > 0 && (
           <div className="mb-2 px-3 py-2 text-xs rounded-md border border-yellow-500/30 bg-yellow-500/10 text-yellow-500">
-            <div className="font-medium mb-1">Untargeted agents in the chain</div>
+            <div className="font-medium mb-1">{t('profileEditor.routing.untargetedTitle')}</div>
             <div>
-              No routing rule points to: <span className="font-mono">{agentsMissingRouting.join(', ')}</span>.
-              Add a tag rule or retarget the default rule if you want them to run.
+              <Trans
+                t={t}
+                i18nKey="profileEditor.routing.untargetedDetail"
+                values={{ agents: agentsMissingRouting.join(', ') }}
+                components={{ mono: <span className="font-mono" /> }}
+              />
             </div>
           </div>
         )}
@@ -528,6 +534,7 @@ function AgentRow({
   onModel: (m: ModelAlias) => void
   onRemove: () => void
 }) {
+  const { t } = useTranslation('agentstudio')
   // Baseline is required + pinned on every profile. Architect first,
   // merge-resolver last.
   const isRequired = BASELINE_REQUIRED_AGENTS.has(agent.id)
@@ -555,8 +562,8 @@ function AgentRow({
       <button
         type="button"
         className="flex-shrink-0 p-0.5 rounded text-muted-foreground cursor-grab active:cursor-grabbing hover:text-foreground"
-        title="Drag to reorder"
-        aria-label="Drag handle"
+        title={t('profileEditor.agentRow.dragTitle')}
+        aria-label={t('profileEditor.agentRow.dragHandleAria')}
         {...attributes}
         {...listeners}
       >
@@ -566,22 +573,22 @@ function AgentRow({
       {pinnedFirst && (
         <span
           className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-accent-primary/15 text-accent-primary"
-          title="Pinned to first position — pipeline always starts with sr-architect"
+          title={t('profileEditor.agentRow.pinnedFirstTitle')}
         >
-          <Pin className="w-2.5 h-2.5 rotate-[135deg]" /> first
+          <Pin className="w-2.5 h-2.5 rotate-[135deg]" /> {t('profileEditor.agentRow.pinnedFirst')}
         </span>
       )}
       {pinnedLast && (
         <span
           className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-accent-primary/15 text-accent-primary"
-          title="Pinned to last position — merge phase always runs last"
+          title={t('profileEditor.agentRow.pinnedLastTitle')}
         >
-          <Pin className="w-2.5 h-2.5 rotate-45" /> last
+          <Pin className="w-2.5 h-2.5 rotate-45" /> {t('profileEditor.agentRow.pinnedLast')}
         </span>
       )}
       {isRequired && !pinnedFirst && !pinnedLast && (
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-          required
+          {t('profileEditor.agentRow.required')}
         </span>
       )}
       <ModelSelect value={agent.model ?? 'sonnet'} onChange={onModel} />
@@ -592,8 +599,8 @@ function AgentRow({
         disabled={!canRemove}
         title={
           canRemove
-            ? 'Remove'
-            : 'Required baseline agent — the pipeline depends on this row'
+            ? t('common:actions.remove')
+            : t('profileEditor.agentRow.requiredRemoveTitle')
         }
       >
         <X className="w-3 h-3" />
@@ -629,6 +636,7 @@ function RoutingRow({
   onDown: () => void
   onRemove: () => void
 }) {
+  const { t } = useTranslation('agentstudio')
   const isDefault = 'default' in rule && rule.default === true
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-border group hover:bg-accent/30 transition-colors">
@@ -636,7 +644,7 @@ function RoutingRow({
         {ordinal}.
       </span>
       {isDefault ? (
-        <span className="text-xs text-muted-foreground flex-1">everything else</span>
+        <span className="text-xs text-muted-foreground flex-1">{t('profileEditor.routingRow.everythingElse')}</span>
       ) : (
         <span className="text-xs flex-1 flex gap-1 flex-wrap items-center">
           {(rule as RoutingTagRule).tags.map((t) => (
@@ -650,8 +658,8 @@ function RoutingRow({
       {isDefault ? (
         <span
           className="h-7 max-w-[15rem] px-2 text-xs font-mono rounded border border-border bg-muted/40 text-muted-foreground inline-flex items-center"
-          aria-label="Default routing target (core, read-only)"
-          title="Core fallback — not editable"
+          aria-label={t('profileEditor.routingRow.defaultTargetAria')}
+          title={t('profileEditor.routingRow.defaultTargetTitle')}
         >
           {rule.agent}
         </span>
@@ -659,7 +667,7 @@ function RoutingRow({
         <select
           value={rule.agent}
           onChange={(e) => onAgentChange(e.target.value)}
-          aria-label={`Routing target for rule ${ordinal}`}
+          aria-label={t('profileEditor.routingRow.targetAria', { ordinal })}
           className="h-7 max-w-[15rem] px-2 text-xs font-mono rounded border border-border bg-background"
         >
           {chainAgents.map((agentId) => (
@@ -675,19 +683,19 @@ function RoutingRow({
             type="button"
             className="p-1 hover:bg-accent rounded"
             onClick={onEdit}
-            title="Edit rule"
-            aria-label={`Edit rule ${ordinal}`}
+            title={t('profileEditor.routingRow.editTitle')}
+            aria-label={t('profileEditor.routingRow.editAria', { ordinal })}
           >
             <Pencil className="w-3 h-3" />
           </button>
         )}
         {canMove && !isLast && (
-          <button type="button" className="p-1 hover:bg-accent rounded" onClick={onDown} title="Move down">
+          <button type="button" className="p-1 hover:bg-accent rounded" onClick={onDown} title={t('profileEditor.routingRow.moveDown')}>
             <ArrowDown className="w-3 h-3" />
           </button>
         )}
         {canMove && ordinal > 1 && (
-          <button type="button" className="p-1 hover:bg-accent rounded" onClick={onUp} title="Move up">
+          <button type="button" className="p-1 hover:bg-accent rounded" onClick={onUp} title={t('profileEditor.routingRow.moveUp')}>
             <ArrowUp className="w-3 h-3" />
           </button>
         )}
@@ -696,7 +704,7 @@ function RoutingRow({
             type="button"
             className="p-1 hover:bg-red-500/20 text-red-400 rounded"
             onClick={onRemove}
-            title="Remove"
+            title={t('common:actions.remove')}
           >
             <X className="w-3 h-3" />
           </button>
@@ -705,9 +713,9 @@ function RoutingRow({
       {isDefault && (
         <span
           className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
-          title="Core fallback — the pipeline's last-resort rule, pinned to sr-developer"
+          title={t('profileEditor.routingRow.coreDefaultTitle')}
         >
-          core · default
+          {t('profileEditor.routingRow.coreDefaultBadge')}
         </span>
       )}
     </div>

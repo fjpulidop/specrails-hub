@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { cn } from '../lib/utils'
 import { getApiBase } from '../lib/api'
@@ -16,6 +17,7 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ connectionStatus, rightSlot }: StatusBarProps) {
+  const { t } = useTranslation('nav')
   const [stats, setStats] = useState<Stats | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const prevStatusRef = useRef<'connecting' | 'connected' | 'disconnected'>('connecting')
@@ -25,10 +27,10 @@ export function StatusBar({ connectionStatus, rightSlot }: StatusBarProps) {
   useEffect(() => {
     const prev = prevStatusRef.current
     if (connectionStatus === 'connected' && !isFirstMount.current && prev !== 'connected') {
-      toast.success('Connection restored')
+      toast.success(t('statusBar.connectionRestored'))
       setIsSyncing(true)
-      const t = setTimeout(() => setIsSyncing(false), 2000)
-      return () => clearTimeout(t)
+      const timer = setTimeout(() => setIsSyncing(false), 2000)
+      return () => clearTimeout(timer)
     }
     if (isFirstMount.current && connectionStatus === 'connected') {
       isFirstMount.current = false
@@ -84,10 +86,10 @@ export function StatusBar({ connectionStatus, rightSlot }: StatusBarProps) {
             connectionStatus === 'disconnected' && 'text-destructive'
           )}
         >
-          {connectionStatus === 'connected' && !isSyncing && 'connected'}
-          {connectionStatus === 'connected' && isSyncing && 'syncing...'}
-          {connectionStatus === 'connecting' && 'reconnecting...'}
-          {connectionStatus === 'disconnected' && 'disconnected'}
+          {connectionStatus === 'connected' && !isSyncing && t('statusBar.connected')}
+          {connectionStatus === 'connected' && isSyncing && t('statusBar.syncing')}
+          {connectionStatus === 'connecting' && t('statusBar.reconnecting')}
+          {connectionStatus === 'disconnected' && t('statusBar.disconnected')}
         </span>
       </div>
 

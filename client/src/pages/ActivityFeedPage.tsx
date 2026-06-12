@@ -1,19 +1,21 @@
 import { useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { CheckCircle2, XCircle, Ban, Loader2, Activity, Zap } from 'lucide-react'
 import { useHub } from '../hooks/useHub'
 import { useActivity } from '../hooks/useActivity'
 import type { ActivityItem } from '../hooks/useActivity'
 
-function formatRelativeTime(isoTimestamp: string): string {
+function formatRelativeTime(isoTimestamp: string, t: TFunction): string {
   const diff = Date.now() - new Date(isoTimestamp).getTime()
   const seconds = Math.floor(diff / 1000)
-  if (seconds < 60) return `${seconds}s ago`
+  if (seconds < 60) return t('feed.relativeTime.seconds', { value: seconds })
   const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
+  if (minutes < 60) return t('feed.relativeTime.minutes', { value: minutes })
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
+  if (hours < 24) return t('feed.relativeTime.hours', { value: hours })
   const days = Math.floor(hours / 24)
-  return `${days}d ago`
+  return t('feed.relativeTime.days', { value: days })
 }
 
 function ActivityIcon({ type }: { type: ActivityItem['type'] }) {
@@ -29,12 +31,12 @@ function ActivityIcon({ type }: { type: ActivityItem['type'] }) {
   }
 }
 
-function typeLabel(type: ActivityItem['type']): string {
+function typeLabel(type: ActivityItem['type'], t: TFunction): string {
   switch (type) {
-    case 'job_completed': return 'Completed'
-    case 'job_failed': return 'Failed'
-    case 'job_canceled': return 'Canceled'
-    default: return 'Started'
+    case 'job_completed': return t('common:status.completed')
+    case 'job_failed': return t('common:status.failed')
+    case 'job_canceled': return t('common:status.canceled')
+    default: return t('feed.typeStarted')
   }
 }
 
@@ -48,6 +50,7 @@ function typeLabelClass(type: ActivityItem['type']): string {
 }
 
 export default function ActivityFeedPage() {
+  const { t } = useTranslation('activity')
   const { activeProjectId } = useHub()
   const { items, loading, hasMore, loadMore } = useActivity({ activeProjectId })
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -72,7 +75,7 @@ export default function ActivityFeedPage() {
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-background/50">
         <Activity className="w-4 h-4 text-muted-foreground" />
-        <h1 className="text-sm font-medium">Activity</h1>
+        <h1 className="text-sm font-medium">{t('feed.title')}</h1>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -83,8 +86,8 @@ export default function ActivityFeedPage() {
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 gap-2 text-muted-foreground">
             <Activity className="w-8 h-8 opacity-40" />
-            <p className="text-sm">No activity yet</p>
-            <p className="text-xs opacity-70">Job events will appear here when jobs run</p>
+            <p className="text-sm">{t('feed.emptyTitle')}</p>
+            <p className="text-xs opacity-70">{t('feed.emptyHint')}</p>
           </div>
         ) : (
           <ul className="divide-y divide-border/50">
@@ -97,7 +100,7 @@ export default function ActivityFeedPage() {
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className={`text-xs font-medium ${typeLabelClass(item.type)}`}>
-                      {typeLabel(item.type)}
+                      {typeLabel(item.type, t)}
                     </span>
                     {item.costUsd != null && (
                       <span className="text-xs text-muted-foreground">
@@ -107,7 +110,7 @@ export default function ActivityFeedPage() {
                   </div>
                 </div>
                 <span className="text-xs text-muted-foreground flex-shrink-0 tabular-nums">
-                  {formatRelativeTime(item.timestamp)}
+                  {formatRelativeTime(item.timestamp, t)}
                 </span>
               </li>
             ))}
@@ -125,7 +128,7 @@ export default function ActivityFeedPage() {
 
         {!hasMore && items.length > 0 && (
           <p className="text-center text-xs text-muted-foreground py-3">
-            All activity loaded
+            {t('feed.allLoaded')}
           </p>
         )}
       </div>

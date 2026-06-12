@@ -1,0 +1,55 @@
+{
+  "shell": {
+    "backAriaLabel": "Zurück (Esc)",
+    "apply": "Anwenden",
+    "somethingWentWrong": "Etwas ist schiefgelaufen",
+    "quickPrompts": "Schnell-Prompts",
+    "workingOnRefinement": "Arbeite an deiner Verfeinerung…",
+    "history": "Verlauf",
+    "viewCurrentContent": "Aktuellen Inhalt anzeigen",
+    "conversation": "Unterhaltung",
+    "applied": "Angewendet.",
+    "you": "Du",
+    "autoTestResult": "Auto-Test-Ergebnis",
+    "ai": "KI",
+    "refinementReady": "Verfeinerung bereit – prüfe den Diff rechts.",
+    "diffPreview": "Diff-Vorschau",
+    "proposedChanges": "Vorgeschlagene Änderungen",
+    "wordLevelDiff": "Diff auf Wortebene",
+    "forceApply": "Anwenden erzwingen",
+    "conflict": {
+      "diskChanged": "Die Datei wurde während der Bearbeitung auf dem Datenträger geändert. Anwenden wurde blockiert.",
+      "nameChanged": "Die KI hat den Agentennamen geändert. Umbenennen ist eine separate, explizite Aktion – passe den Entwurf an oder benenne im Studio um."
+    },
+    "discardDialog": {
+      "ariaLabel": "Änderungen verwerfen?",
+      "title": "Verfeinerung verwerfen?",
+      "body": "Der aktuelle Entwurf wird abgebrochen und nicht angewendet.",
+      "keepEditing": "Weiter bearbeiten"
+    },
+    "composer": {
+      "sendAriaLabel": "Senden (⌘⏎)",
+      "kbdSubmit": "senden",
+      "kbdCancel": "abbrechen"
+    }
+  },
+  "composer": {
+    "title": "AI Edit",
+    "placeholder": "Beschreibe die gewünschten Änderungen…",
+    "submit": "Absenden",
+    "unsupportedFileType": "Nicht unterstützter Dateityp: {{name}}",
+    "uploadFailed": "Upload fehlgeschlagen für {{name}}: {{message}}"
+  },
+  "diffView": {
+    "inserted": "eingefügt",
+    "removed": "entfernt"
+  },
+  "refine": {
+    "serverError": "Serverfehler ({{status}})",
+    "connectionFailed": "Verbindung fehlgeschlagen: {{message}}",
+    "applyFailed": "Anwenden fehlgeschlagen ({{status}})",
+    "loadAgentFailed": "Agent konnte nicht geladen werden ({{status}})",
+    "loadSessionFailed": "Session konnte nicht geladen werden ({{status}})",
+    "rehydrateFailed": "Session konnte nicht wiederhergestellt werden: {{message}}"
+  }
+}

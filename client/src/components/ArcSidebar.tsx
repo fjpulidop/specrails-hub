@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { PanelLeft, FolderOpen, Plus, BarChart2, BookOpen, Settings, X } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useHub } from '../hooks/useHub'
@@ -25,6 +26,7 @@ function ProjectItem({
   onSelect: () => void
   onRemove: () => void
 }) {
+  const { t } = useTranslation('nav')
   const [confirming, setConfirming] = useState(false)
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -90,9 +92,9 @@ function ProjectItem({
                 ? 'opacity-100 px-1 h-4 text-[10px] text-destructive bg-destructive/10 hover:bg-destructive/20'
                 : 'w-3.5 h-3.5'
             )}
-            aria-label={confirming ? `Confirm remove ${project.name}` : `Remove ${project.name}`}
+            aria-label={confirming ? t('projects.confirmRemove', { name: project.name }) : t('projects.remove', { name: project.name })}
           >
-            {confirming ? 'confirm?' : <X className="w-2.5 h-2.5" />}
+            {confirming ? t('projects.confirmShort') : <X className="w-2.5 h-2.5" />}
           </button>
         </>
       )}
@@ -100,10 +102,10 @@ function ProjectItem({
   )
 }
 
-const LEFT_PIN_LABEL: Record<'pinned-open' | 'pinned-collapsed' | 'unpinned', string> = {
-  'pinned-open': 'Collapse left sidebar (keep pinned)',
-  'pinned-collapsed': 'Unpin left sidebar',
-  'unpinned': 'Pin left sidebar open',
+const LEFT_PIN_LABEL_KEY: Record<'pinned-open' | 'pinned-collapsed' | 'unpinned', string> = {
+  'pinned-open': 'sidebarPin.left.pinnedOpen',
+  'pinned-collapsed': 'sidebarPin.left.pinnedCollapsed',
+  'unpinned': 'sidebarPin.left.unpinned',
 }
 
 export function ArcSidebar({
@@ -112,17 +114,18 @@ export function ArcSidebar({
   onOpenDocs,
   onOpenSettings,
 }: ArcSidebarProps) {
+  const { t } = useTranslation('nav')
   const { projects, activeProjectId, setActiveProjectId, removeProject } = useHub()
   const { leftMode, cycleLeftMode } = useSidebarPin()
   const [hovered, setHovered] = useState(false)
   const expanded = leftMode === 'pinned-open' || (leftMode === 'unpinned' && hovered)
   const lit = leftMode !== 'unpinned'
-  const pinLabel = LEFT_PIN_LABEL[leftMode]
+  const pinLabel = t(LEFT_PIN_LABEL_KEY[leftMode])
 
   const navItems = [
-    { label: 'Docs', icon: BookOpen, action: onOpenDocs },
-    { label: 'Analytics', icon: BarChart2, action: onOpenAnalytics },
-    { label: 'Settings', icon: Settings, action: onOpenSettings },
+    { label: t('arcSidebar.docs'), icon: BookOpen, action: onOpenDocs },
+    { label: t('arcSidebar.analytics'), icon: BarChart2, action: onOpenAnalytics },
+    { label: t('arcSidebar.settings'), icon: Settings, action: onOpenSettings },
   ]
 
   async function handleRemove(project: HubProject) {
@@ -152,7 +155,7 @@ export function ArcSidebar({
       >
         {expanded && (
           <span className="font-mono text-sm font-bold whitespace-nowrap overflow-hidden text-accent-primary">
-            Hub
+            {t('arcSidebar.hubTitle')}
           </span>
         )}
         <button
@@ -165,7 +168,7 @@ export function ArcSidebar({
               : 'text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50'
           )}
           aria-label={pinLabel}
-          title={`${pinLabel} (⌥⌘B)`}
+          title={t('sidebarPin.withShortcut', { label: pinLabel, shortcut: '⌥⌘B' })}
         >
           <PanelLeft className="w-4 h-4" />
         </button>
@@ -193,11 +196,11 @@ export function ArcSidebar({
             'text-muted-foreground hover:text-foreground hover:bg-muted/50',
             expanded ? 'px-2' : 'px-0 justify-center'
           )}
-          aria-label="Add project"
-          title={!expanded ? 'Add project' : undefined}
+          aria-label={t('projects.addProject')}
+          title={!expanded ? t('projects.addProject') : undefined}
         >
           <Plus className="w-4 h-4 flex-shrink-0" />
-          {expanded && <span className="text-xs whitespace-nowrap">Add project</span>}
+          {expanded && <span className="text-xs whitespace-nowrap">{t('projects.addProject')}</span>}
         </button>
       </div>
 

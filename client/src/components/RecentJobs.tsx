@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { getApiBase } from '../lib/api'
+import { getDateFnsLocale } from '../lib/i18n'
 import { formatDistanceToNow } from 'date-fns'
 import { Trash2, ClipboardList, GitCompareArrows, Link2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -15,23 +17,23 @@ import { formatCommandForProvider } from '../lib/format-command'
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'running' | 'queued' | 'failed' | 'canceled'
 
-const STATUS_BADGE: Record<JobStatus, { variant: BadgeVariant; label: string; tooltip: string }> = {
-  running: { variant: 'running', label: 'running', tooltip: 'Job is actively executing' },
-  completed: { variant: 'success', label: 'done', tooltip: 'Job completed successfully' },
-  failed: { variant: 'failed', label: 'failed', tooltip: 'Job exited with a non-zero exit code' },
-  canceled: { variant: 'canceled', label: 'canceled', tooltip: 'Job was manually canceled' },
-  queued: { variant: 'queued', label: 'queued', tooltip: 'Job is waiting to run' },
-  zombie_terminated: { variant: 'failed', label: 'zombie', tooltip: 'Job was auto-terminated after prolonged inactivity' },
-  skipped: { variant: 'warning', label: 'skipped', tooltip: 'Job was skipped because a parent job in the pipeline failed' },
+const STATUS_BADGE: Record<JobStatus, { variant: BadgeVariant; labelKey: string; tooltipKey: string }> = {
+  running: { variant: 'running', labelKey: 'statusLabel.running', tooltipKey: 'statusTooltip.running' },
+  completed: { variant: 'success', labelKey: 'statusLabel.done', tooltipKey: 'statusTooltip.completed' },
+  failed: { variant: 'failed', labelKey: 'statusLabel.failed', tooltipKey: 'statusTooltip.failed' },
+  canceled: { variant: 'canceled', labelKey: 'statusLabel.canceled', tooltipKey: 'statusTooltip.canceled' },
+  queued: { variant: 'queued', labelKey: 'statusLabel.queued', tooltipKey: 'statusTooltip.queuedToRun' },
+  zombie_terminated: { variant: 'failed', labelKey: 'statusLabel.zombie', tooltipKey: 'statusTooltip.zombie' },
+  skipped: { variant: 'warning', labelKey: 'statusLabel.skipped', tooltipKey: 'statusTooltip.skipped' },
 }
 
 const ALL_STATUSES: JobStatus[] = ['running', 'completed', 'failed', 'canceled', 'zombie_terminated', 'queued', 'skipped']
 
-const PRIORITY_STYLES: Record<JobPriority, { className: string; label: string }> = {
-  critical: { className: 'bg-red-500/15 text-red-400 border-red-500/30', label: 'critical' },
-  high: { className: 'bg-orange-500/15 text-orange-400 border-orange-500/30', label: 'high' },
-  normal: { className: '', label: 'normal' },
-  low: { className: 'bg-gray-500/15 text-gray-400 border-gray-500/30', label: 'low' },
+const PRIORITY_STYLES: Record<JobPriority, { className: string; labelKey: string }> = {
+  critical: { className: 'bg-red-500/15 text-red-400 border-red-500/30', labelKey: 'recent.priority.critical' },
+  high: { className: 'bg-orange-500/15 text-orange-400 border-orange-500/30', labelKey: 'recent.priority.high' },
+  normal: { className: '', labelKey: 'recent.priority.normal' },
+  low: { className: 'bg-gray-500/15 text-gray-400 border-gray-500/30', labelKey: 'recent.priority.low' },
 }
 
 function formatCost(cost: number | null | undefined): string | null {
@@ -63,7 +65,7 @@ function formatTokens(n: number | null | undefined): string | null {
 
 function formatRelTime(dateStr: string): string {
   try {
-    return formatDistanceToNow(new Date(dateStr), { addSuffix: true })
+    return formatDistanceToNow(new Date(dateStr), { addSuffix: true, locale: getDateFnsLocale() })
   } catch {
     return dateStr
   }
@@ -80,6 +82,7 @@ interface RecentJobsProps {
 const PAGE_SIZE = 10
 
 export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, onProposalDelete }: RecentJobsProps) {
+  const { t } = useTranslation('jobs')
   const navigate = useNavigate()
   const { activeProjectId, projects } = useHub()
   const activeProvider = projects.find((p) => p.id === activeProjectId)?.provider
@@ -144,16 +147,16 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
       })
       if (res.ok) {
         const data = await res.json() as { deleted: number }
-        toast.success(`Cleared ${data.deleted} job(s)`)
+        toast.success(t('recent.toast.cleared', { count: data.deleted }))
         setShowClearModal(false)
         setClearFrom('')
         setClearTo('')
         onJobsCleared?.()
       } else {
-        toast.error('Failed to clear jobs')
+        toast.error(t('recent.toast.clearFailed'))
       }
     } catch {
-      toast.error('Network error')
+      toast.error(t('recent.toast.networkError'))
     } finally {
       setIsClearing(false)
     }
@@ -173,9 +176,9 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
     return (
       <div className="rounded-lg border border-dashed border-border/40 bg-card/50 p-8 text-center space-y-2">
         <ClipboardList className="w-8 h-8 text-muted-foreground/30 mx-auto" />
-        <p className="text-sm font-medium text-muted-foreground">No jobs yet</p>
+        <p className="text-sm font-medium text-muted-foreground">{t('recent.emptyTitle')}</p>
         <p className="text-xs text-muted-foreground/60">
-          Run a command above to see your job history here
+          {t('recent.emptyDescription')}
         </p>
       </div>
     )
@@ -195,7 +198,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                 : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
             }`}
           >
-            All ({jobs.length})
+            {t('recent.filterAll', { count: jobs.length })}
           </button>
           {ALL_STATUSES.map((s) => {
             const count = jobs.filter((j) => j.status === s).length
@@ -211,7 +214,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                 }`}
               >
-                {s} ({count})
+                {t('recent.filterStatus', { status: t(`statusName.${s}`), count })}
               </button>
             )
           })}
@@ -223,14 +226,14 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
             className="h-6 rounded border border-border bg-input px-1.5 text-[10px] text-foreground"
-            title="From date"
+            title={t('recent.fromDate')}
           />
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
             className="h-6 rounded border border-border bg-input px-1.5 text-[10px] text-foreground"
-            title="To date"
+            title={t('recent.toDate')}
           />
           {(dateFrom || dateTo) && (
             <button
@@ -238,7 +241,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
               onClick={() => { setDateFrom(''); setDateTo('') }}
               className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
             >
-              Clear
+              {t('recent.clear')}
             </button>
           )}
           <Tooltip>
@@ -252,7 +255,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                 <GitCompareArrows className="w-3.5 h-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{compareMode ? 'Exit compare mode' : 'Compare 2 jobs'}</TooltipContent>
+            <TooltipContent>{compareMode ? t('recent.exitCompareMode') : t('recent.compareTwoJobs')}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -265,7 +268,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                 <Trash2 className="w-3.5 h-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Clear jobs</TooltipContent>
+            <TooltipContent>{t('recent.clearJobs')}</TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -274,9 +277,9 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
       {compareMode && (
         <div className="flex items-center justify-between rounded-md bg-accent/40 px-3 py-1.5 text-[10px] text-muted-foreground">
           <span>
-            {compareSelection.length === 0 && 'Select 2 jobs to compare'}
-            {compareSelection.length === 1 && 'Select 1 more job'}
-            {compareSelection.length === 2 && 'Ready — click compare'}
+            {compareSelection.length === 0 && t('recent.selectTwoToCompare')}
+            {compareSelection.length === 1 && t('recent.selectOneMore')}
+            {compareSelection.length === 2 && t('recent.readyToCompare')}
           </span>
           {compareSelection.length === 2 && (
             <button
@@ -284,7 +287,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
               className="text-[10px] font-medium text-foreground hover:underline"
               onClick={() => setCompareJobIds(compareSelection as [string, string])}
             >
-              Compare →
+              {t('recent.compareAction')}
             </button>
           )}
         </div>
@@ -292,13 +295,13 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
 
       {/* Column headers */}
       <div className="flex items-center gap-3 px-3 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-        <span className="w-14">Status</span>
-        <span className="flex-1 min-w-0">Command</span>
+        <span className="w-14">{t('recent.colStatus')}</span>
+        <span className="flex-1 min-w-0">{t('recent.colCommand')}</span>
         <div className="flex items-center gap-3 shrink-0">
-          <span className="w-14 text-right">Duration</span>
-          <span className="w-12 text-right">Tokens</span>
-          <span className="w-12 text-right">Cost</span>
-          <span className="w-20 text-right">Started</span>
+          <span className="w-14 text-right">{t('recent.colDuration')}</span>
+          <span className="w-12 text-right">{t('recent.colTokens')}</span>
+          <span className="w-12 text-right">{t('recent.colCost')}</span>
+          <span className="w-20 text-right">{t('recent.colStarted')}</span>
         </div>
       </div>
 
@@ -349,16 +352,16 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div>
-                    <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+                    <Badge variant={statusInfo.variant}>{t(statusInfo.labelKey)}</Badge>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent>{statusInfo.tooltip}</TooltipContent>
+                <TooltipContent>{t(statusInfo.tooltipKey)}</TooltipContent>
               </Tooltip>
 
               {/* Priority badge (only for non-normal) */}
               {job.priority && job.priority !== 'normal' && (
                 <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border ${PRIORITY_STYLES[job.priority].className}`}>
-                  {PRIORITY_STYLES[job.priority].label}
+                  {t(PRIORITY_STYLES[job.priority].labelKey)}
                 </span>
               )}
 
@@ -370,7 +373,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                       {job.profile_name}
                     </span>
                   </TooltipTrigger>
-                  <TooltipContent>Profile: {job.profile_name}</TooltipContent>
+                  <TooltipContent>{t('recent.profileTooltip', { name: job.profile_name })}</TooltipContent>
                 </Tooltip>
               )}
 
@@ -382,8 +385,8 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                       <Link2 className="w-3 h-3 text-accent-primary/60 shrink-0" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      Part of a pipeline
-                      {job.depends_on_job_id && ' (depends on previous step)'}
+                      {t('recent.pipelinePart')}
+                      {job.depends_on_job_id && ` ${t('recent.pipelineDependsOn')}`}
                       {job.skip_reason && ` — ${job.skip_reason}`}
                     </TooltipContent>
                   </Tooltip>
@@ -404,7 +407,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                     type="button"
                     className="w-4 h-4 md:opacity-0 md:group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
                     onClick={(e) => { e.stopPropagation(); setConfirmDeleteProposalId(proposalId) }}
-                    title="Delete proposal"
+                    title={t('recent.deleteProposal')}
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -423,7 +426,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
             onClick={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
             className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded hover:bg-accent/50"
           >
-            Load more ({filteredJobs.length - displayLimit} remaining)
+            {t('recent.loadMore', { count: filteredJobs.length - displayLimit })}
           </button>
         </div>
       )}
@@ -433,9 +436,9 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowClearModal(false)}>
           <div className="w-80 rounded-xl border border-border/30 bg-popover p-4 shadow-lg space-y-4" onClick={(e) => e.stopPropagation()}>
             <div>
-              <h3 className="text-sm font-semibold">Clear Jobs</h3>
+              <h3 className="text-sm font-semibold">{t('recent.clearModal.title')}</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {jobs.length} job{jobs.length !== 1 ? 's' : ''} in history
+                {t('recent.clearModal.jobsInHistory', { count: jobs.length })}
               </p>
             </div>
 
@@ -446,25 +449,25 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
               disabled={isClearing}
               onClick={() => handleClear('all')}
             >
-              Clear all {jobs.length} job{jobs.length !== 1 ? 's' : ''}
+              {t('recent.clearModal.clearAll', { count: jobs.length })}
             </Button>
 
             <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">Or clear by date range:</p>
+              <p className="text-xs text-muted-foreground">{t('recent.clearModal.orByRange')}</p>
               <div className="flex gap-2">
                 <input
                   type="date"
                   value={clearFrom}
                   onChange={(e) => setClearFrom(e.target.value)}
                   className="flex-1 h-7 rounded-md border border-border bg-input px-2 text-xs text-foreground"
-                  placeholder="From"
+                  placeholder={t('recent.clearModal.fromPlaceholder')}
                 />
                 <input
                   type="date"
                   value={clearTo}
                   onChange={(e) => setClearTo(e.target.value)}
                   className="flex-1 h-7 rounded-md border border-border bg-input px-2 text-xs text-foreground"
-                  placeholder="To"
+                  placeholder={t('recent.clearModal.toPlaceholder')}
                 />
               </div>
               <Button
@@ -474,7 +477,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                 disabled={isClearing || (!clearFrom && !clearTo)}
                 onClick={() => handleClear('range')}
               >
-                {(clearFrom || clearTo) ? `Clear ${clearRangeCount} job${clearRangeCount !== 1 ? 's' : ''} in range` : 'Clear range'}
+                {(clearFrom || clearTo) ? t('recent.clearModal.clearInRange', { count: clearRangeCount }) : t('recent.clearModal.clearRange')}
               </Button>
             </div>
 
@@ -484,7 +487,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
               className="w-full"
               onClick={() => setShowClearModal(false)}
             >
-              Cancel
+              {t('common:actions.cancel')}
             </Button>
           </div>
         </div>
@@ -494,14 +497,14 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
       <Dialog open={confirmDeleteProposalId !== null} onOpenChange={(o) => !o && setConfirmDeleteProposalId(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete proposal?</DialogTitle>
+            <DialogTitle>{t('recent.deleteProposalConfirm.title')}</DialogTitle>
             <DialogDescription>
-              This will permanently delete 1 proposal. This action cannot be undone.
+              {t('recent.deleteProposalConfirm.description')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteProposalId(null)}>
-              Cancel
+              {t('common:actions.cancel')}
             </Button>
             <Button
               variant="destructive"
@@ -511,7 +514,7 @@ export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, on
                 setConfirmDeleteProposalId(null)
               }}
             >
-              Delete
+              {t('common:actions.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

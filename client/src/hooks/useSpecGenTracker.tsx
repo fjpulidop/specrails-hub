@@ -21,6 +21,7 @@ import {
 } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import i18n from '../lib/i18n'
 import { useSharedWebSocket } from './useSharedWebSocket'
 import { useHub } from './useHub'
 import { API_ORIGIN } from '../lib/origin'
@@ -87,7 +88,7 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
     const id = setInterval(() => {
       toast.loading(`${spec.projectName} · ${spec.truncated}`, {
         id: spec.toastId,
-        description: `Generating... ${formatElapsed(Date.now() - spec.startTime)}`,
+        description: i18n.t('activity:specGen.generating', { elapsed: formatElapsed(Date.now() - spec.startTime) }),
       })
     }, 1000)
     spec.timerId = id
@@ -115,17 +116,17 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
   const successToast = useCallback((spec: TrackedSpec, ticket: LocalTicket) => {
     resolveSpec(spec)
     const elapsed = formatElapsed(Date.now() - spec.startTime)
-    toast.success(`${spec.projectName} · ${ticket.title || 'Spec created'}`, {
+    toast.success(`${spec.projectName} · ${ticket.title || i18n.t('activity:specGen.specCreated')}`, {
       id: spec.toastId,
       duration: 10_000,
-      description: `Generated in ${elapsed}`,
-      action: { label: 'View', onClick: () => openTicket(spec, ticket) },
+      description: i18n.t('activity:specGen.generatedIn', { elapsed }),
+      action: { label: i18n.t('activity:specGen.view'), onClick: () => openTicket(spec, ticket) },
     })
   }, [resolveSpec, openTicket])
 
-  const errorToast = useCallback((spec: TrackedSpec, message = 'Error generating spec') => {
+  const errorToast = useCallback((spec: TrackedSpec, message?: string) => {
     resolveSpec(spec)
-    toast.error(`${spec.projectName} · ${message}`, { id: spec.toastId })
+    toast.error(`${spec.projectName} · ${message ?? i18n.t('activity:specGen.errorGenerating')}`, { id: spec.toastId })
   }, [resolveSpec])
 
   // ── Explore mode: poll for new ticket ──────────────────────────────────────
@@ -149,7 +150,7 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
       if (attempts < 5) setTimeout(attempt, 1000)
       else {
         if (convId) exploreRef.current.delete(convId)
-        errorToast(spec, 'Could not find generated spec')
+        errorToast(spec, i18n.t('activity:specGen.couldNotFind'))
       }
     }
     attempt()
@@ -262,7 +263,7 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
       const updateToast = () => {
         toast.loading(`${p.projectName} · ${p.truncated}`, {
           id: toastId,
-          description: `Generating... ${formatElapsed(Date.now() - p.startTime)}`,
+          description: i18n.t('activity:specGen.generating', { elapsed: formatElapsed(Date.now() - p.startTime) }),
         })
       }
       updateToast()
@@ -293,11 +294,11 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
             removePendingSpec(p.id)
             unmarkSpecGenInFlight(p.projectId)
             const elapsed = formatElapsed(Date.now() - p.startTime)
-            toast.success(`${p.projectName} · ${newTicket.title || 'Spec created'}`, {
+            toast.success(`${p.projectName} · ${newTicket.title || i18n.t('activity:specGen.specCreated')}`, {
               id: toastId,
               duration: 10_000,
-              description: `Generated in ${elapsed}`,
-              action: { label: 'View', onClick: () => openTicket(restoredSpec, newTicket) },
+              description: i18n.t('activity:specGen.generatedIn', { elapsed }),
+              action: { label: i18n.t('activity:specGen.view'), onClick: () => openTicket(restoredSpec, newTicket) },
             })
             return
           }
@@ -308,7 +309,7 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
           clearInterval(timerId)
           removePendingSpec(p.id)
           unmarkSpecGenInFlight(p.projectId)
-          toast.error(`${p.projectName} · Could not confirm spec was created`, { id: toastId })
+          toast.error(`${p.projectName} · ${i18n.t('activity:specGen.couldNotConfirm')}`, { id: toastId })
         }
       }
       attempt()

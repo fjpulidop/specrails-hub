@@ -1,0 +1,412 @@
+{
+  "studio": {
+    "loadingAgent": "Loading agent…",
+    "modeCreate": "New custom agent",
+    "modeEdit": "Edit custom agent",
+    "create": "Create",
+    "unsaved": "● unsaved",
+    "resumeAiEdit": "Resume AI Edit",
+    "resumeAiEditTitle": "Hand this draft back to the AI Edit overlay",
+    "loadingAiDraft": "loading AI draft…",
+    "testButton": "Test",
+    "testButtonTitle": "Test this agent against a sample task",
+    "historyButton": "History",
+    "historyButtonTitle": "Version history",
+    "deleteConfirm": {
+      "title": "Delete agent \"{{agentId}}\"?",
+      "description": "This removes the .md from disk. Version history stays in the DB — use a fresh custom agent if you want to recover the body later."
+    },
+    "errors": {
+      "loadDraftFailed": "Load draft failed: {{status}}",
+      "loadFailed": "Load failed: {{status}}",
+      "saveFailed": "Save failed: {{status}}",
+      "deleteFailed": "Delete failed: {{status}}",
+      "testFailed": "Test failed: {{status}}"
+    },
+    "toasts": {
+      "agentCreated": "Agent created",
+      "agentSaved": "Agent saved",
+      "agentDeleted": "Agent deleted",
+      "createFailed": "Failed to create agent",
+      "saveFailed": "Failed to save agent",
+      "deleteFailed": "Failed to delete agent"
+    },
+    "validation": {
+      "namePattern": "Name must start with <code>custom-</code> and contain only lowercase letters, digits, and hyphens.",
+      "missingFrontmatter": "Missing YAML frontmatter (needs opening <code>---</code> on the first line)."
+    },
+    "sampleTasks": {
+      "pick": "— pick a sample task —",
+      "terraform": "Terraform: public S3 bucket",
+      "sqlInjection": "Code review: SQL injection",
+      "accessibility": "Frontend: accessibility",
+      "schemaChange": "Data: schema change",
+      "slowQuery": "Performance: slow query"
+    },
+    "testPane": {
+      "header": "Test agent",
+      "sampleTaskLabel": "Sample task",
+      "placeholder": "Describe what the agent should do, or pick a sample above.",
+      "run": "Run",
+      "running": "Running…",
+      "sandboxNote": "Sandboxed; no files written.",
+      "tokens_one": "<mono>{{count}}</mono> token",
+      "tokens_other": "<mono>{{count}}</mono> tokens",
+      "emptyHint": "Run a sample task against the current draft. Output appears here."
+    },
+    "versions": {
+      "header": "Version history",
+      "empty": "No prior versions recorded for this agent.",
+      "restoreHint": "Click a version to restore its body into the editor (you still need to Save)."
+    }
+  },
+  "refine": {
+    "eyebrow": "AI Edit",
+    "headline": "Refine your agent",
+    "streamingHeadline": "Refining your agent…",
+    "placeholderInitial": "Describe how to refine this agent…",
+    "placeholderFollowUp": "Send a follow-up refinement…",
+    "viewCurrentBody": "View current agent body",
+    "appliedAsVersion": "Applied as version {{version}}.",
+    "openInStudio": "Open draft in Studio for manual editing",
+    "chips": {
+      "tightenTools": "Tighten the tool list",
+      "stricterPersonality": "Make the personality stricter",
+      "workflowSection": "Add a Workflow protocol section",
+      "sharpenDescription": "Shorten and sharpen the description",
+      "matchDeveloperStyle": "Match the sr-developer style"
+    }
+  },
+  "profileEditor": {
+    "validation": {
+      "missingBaseline": "Missing required baseline agent: {{agent}}",
+      "multipleDefaultRules": "Routing may have at most one default rule (found {{found}})",
+      "defaultRuleNotLast": "The default routing rule must be the last entry",
+      "unknownRoutingAgent": "Routing references agent not in the chain: {{agent}}",
+      "invalidTags": "Routing rule {{agent}} has invalid tags: {{tags}} (use lowercase kebab-case)"
+    },
+    "validationSummary_one": "{{count}} validation issue",
+    "validationSummary_other": "{{count}} validation issues",
+    "nameLabel": "Name",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "What is this profile for?",
+    "orchestrator": {
+      "heading": "Orchestrator",
+      "description": "Top-level model for both commands. batch-implement delegates to implement per feature, so every rail it spawns inherits this profile's agent chain."
+    },
+    "agentChain": {
+      "heading": "Agent chain ({{n}})",
+      "addTitle": "Add an agent from the catalog",
+      "addDisabledTitle": "All catalog agents are already in the chain",
+      "pickFromCatalog": "Pick from catalog ({{n}} available)",
+      "emptyCatalog": "No more agents in the catalog. Add custom agents from the Agents Catalog tab.",
+      "kind": {
+        "upstream": "upstream",
+        "custom": "custom"
+      }
+    },
+    "routing": {
+      "heading": "Routing ({{n}})",
+      "addDefault": "Add default",
+      "addRule": "Add rule",
+      "needAgentsTitle": "Add at least one agent before creating routing rules",
+      "explainer": "First matching rule wins. Rules are editable and removable, and the default catch-all stays last when present. If you leave routing empty, the pipeline falls back to the first developer-shaped agent in the chain.",
+      "untargetedTitle": "Untargeted agents in the chain",
+      "untargetedDetail": "No routing rule points to: <mono>{{agents}}</mono>. Add a tag rule or retarget the default rule if you want them to run."
+    },
+    "agentRow": {
+      "dragTitle": "Drag to reorder",
+      "dragHandleAria": "Drag handle",
+      "pinnedFirst": "first",
+      "pinnedFirstTitle": "Pinned to first position — pipeline always starts with sr-architect",
+      "pinnedLast": "last",
+      "pinnedLastTitle": "Pinned to last position — merge phase always runs last",
+      "required": "required",
+      "requiredRemoveTitle": "Required baseline agent — the pipeline depends on this row"
+    },
+    "routingRow": {
+      "everythingElse": "everything else",
+      "defaultTargetAria": "Default routing target (core, read-only)",
+      "defaultTargetTitle": "Core fallback — not editable",
+      "targetAria": "Routing target for rule {{ordinal}}",
+      "editTitle": "Edit rule",
+      "editAria": "Edit rule {{ordinal}}",
+      "moveDown": "Move down",
+      "moveUp": "Move up",
+      "coreDefaultBadge": "core · default",
+      "coreDefaultTitle": "Core fallback — the pipeline's last-resort rule, pinned to sr-developer"
+    }
+  },
+  "agentSelector": {
+    "selectedCount": "{{selected}} / {{total}} agents selected",
+    "selectAll": "Select all",
+    "coreBadge": "core",
+    "categories": {
+      "architecture": "Architecture",
+      "development": "Development",
+      "review": "Review",
+      "product": "Product",
+      "utilities": "Utilities"
+    },
+    "agents": {
+      "sr-architect": {
+        "name": "Architect",
+        "description": "Architecture design, change specs, implementation planning"
+      },
+      "sr-developer": {
+        "name": "Developer",
+        "description": "Full-stack implementation across all layers"
+      },
+      "sr-frontend-developer": {
+        "name": "Frontend Dev",
+        "description": "Frontend implementation (React, Vue, Angular, etc.)"
+      },
+      "sr-backend-developer": {
+        "name": "Backend Dev",
+        "description": "Backend specialization (APIs, databases, services)"
+      },
+      "sr-reviewer": {
+        "name": "Reviewer",
+        "description": "General code review — the final quality gate"
+      },
+      "sr-frontend-reviewer": {
+        "name": "Frontend Reviewer",
+        "description": "Frontend review (UI, accessibility, performance)"
+      },
+      "sr-backend-reviewer": {
+        "name": "Backend Reviewer",
+        "description": "Backend review (APIs, security, scalability)"
+      },
+      "sr-security-reviewer": {
+        "name": "Security Reviewer",
+        "description": "Security analysis — OWASP, vulnerabilities, hardening"
+      },
+      "sr-performance-reviewer": {
+        "name": "Perf Reviewer",
+        "description": "Performance analysis — profiling, bottlenecks, optimization"
+      },
+      "sr-product-manager": {
+        "name": "Product Manager",
+        "description": "Product discovery, VPC personas, backlog management"
+      },
+      "sr-product-analyst": {
+        "name": "Product Analyst",
+        "description": "Backlog analysis, spec gap analysis, reporting"
+      },
+      "sr-test-writer": {
+        "name": "Test Writer",
+        "description": "Comprehensive test generation (unit, integration, E2E)"
+      },
+      "sr-doc-sync": {
+        "name": "Doc Sync",
+        "description": "Documentation sync — keeps docs aligned with code"
+      },
+      "sr-merge-resolver": {
+        "name": "Merge Resolver",
+        "description": "Merge conflict resolution with context awareness"
+      }
+    }
+  },
+  "templates": {
+    "security-reviewer": {
+      "label": "Security Reviewer",
+      "blurb": "Finds auth, injection, and data-exposure bugs in a diff before it ships."
+    },
+    "performance-profiler": {
+      "label": "Performance Profiler",
+      "blurb": "Finds hot paths, N+1 queries, unbounded loops, bundle bloat."
+    },
+    "data-engineer": {
+      "label": "Data Engineer",
+      "blurb": "Schema migrations, ETL pipelines, data transformations."
+    },
+    "ui-ux-polisher": {
+      "label": "UI / UX Polisher",
+      "blurb": "Accessibility, spacing, empty states, error handling."
+    },
+    "api-designer": {
+      "label": "API Designer",
+      "blurb": "Versioning, pagination, error shapes, backward compatibility."
+    },
+    "database-architect": {
+      "label": "Database Architect",
+      "blurb": "Indexes, normalization vs denormalization, query shapes."
+    },
+    "devops-sre": {
+      "label": "DevOps / SRE",
+      "blurb": "CI/CD, observability, incident-readiness, runbooks."
+    },
+    "mobile-engineer": {
+      "label": "Mobile Engineer",
+      "blurb": "iOS + Android patterns, offline-first, battery-aware."
+    },
+    "ml-engineer": {
+      "label": "ML Engineer",
+      "blurb": "Pipelines, eval, reproducibility, drift monitoring."
+    },
+    "accessibility-auditor": {
+      "label": "Accessibility Auditor",
+      "blurb": "WCAG 2.2 review: contrast, focus, ARIA, keyboard."
+    },
+    "qa-test-strategist": {
+      "label": "QA Test Strategist",
+      "blurb": "Test plans: unit / integration / E2E split, coverage gaps."
+    },
+    "load-tester": {
+      "label": "Load / Stress Tester",
+      "blurb": "Capacity planning, k6 / Locust scenarios, bottleneck hunting."
+    },
+    "integration-tester": {
+      "label": "Integration Tester",
+      "blurb": "Cross-service contracts, fixtures, flake reduction."
+    },
+    "regression-hunter": {
+      "label": "Regression Hunter",
+      "blurb": "Bisects, repros, writes the failing test first."
+    },
+    "data-analyst": {
+      "label": "Data Analyst",
+      "blurb": "Turns vague questions into queries + readable findings."
+    },
+    "etl-reviewer": {
+      "label": "ETL Pipeline Reviewer",
+      "blurb": "Idempotency, backfills, late-arriving data."
+    },
+    "dashboard-designer": {
+      "label": "Dashboard Designer",
+      "blurb": "One-glance dashboards, honest axes, action-per-chart."
+    },
+    "iac-reviewer": {
+      "label": "IaC / Cloud Reviewer",
+      "blurb": "Terraform / CloudFormation: IAM, public exposure, costs."
+    },
+    "compliance-reviewer": {
+      "label": "Compliance Reviewer",
+      "blurb": "GDPR / SOC2 / HIPAA-adjacent checks on data flows."
+    },
+    "threat-modeler": {
+      "label": "Threat Modeler",
+      "blurb": "STRIDE / LINDDUN over architecture diagrams."
+    },
+    "product-manager": {
+      "label": "Product Manager",
+      "blurb": "Problem framing, PRDs, prioritization."
+    },
+    "ux-researcher": {
+      "label": "UX Researcher",
+      "blurb": "Interview scripts, usability test plans, synthesis."
+    },
+    "technical-writer": {
+      "label": "Technical Writer",
+      "blurb": "Docs that are actually read — tutorials, references, changelogs."
+    },
+    "design-reviewer": {
+      "label": "Design System Reviewer",
+      "blurb": "Token drift, component misuse, consistency across flows."
+    },
+    "financial-analyst": {
+      "label": "Financial Analyst",
+      "blurb": "Unit economics, cohort models, scenario analysis."
+    },
+    "pricing-strategist": {
+      "label": "Pricing Strategist",
+      "blurb": "Tiering, packaging, willingness-to-pay studies."
+    },
+    "market-researcher": {
+      "label": "Market Researcher",
+      "blurb": "TAM/SAM/SOM, competitive maps, customer segments."
+    },
+    "ops-optimizer": {
+      "label": "Operations Optimizer",
+      "blurb": "Cycle-time, bottleneck-finding, automation candidates."
+    },
+    "seo-auditor": {
+      "label": "SEO Auditor",
+      "blurb": "Technical + content SEO: indexability, IA, intent match."
+    },
+    "growth-hacker": {
+      "label": "Growth Experimenter",
+      "blurb": "Funnel diagnosis, lift experiments, activation loops."
+    },
+    "social-strategist": {
+      "label": "Social Media Strategist",
+      "blurb": "Channel-fit content, editorial calendar, voice consistency."
+    },
+    "literature-reviewer": {
+      "label": "Literature Reviewer",
+      "blurb": "Systematic review summaries, citation graphs, conflicts."
+    },
+    "experiment-designer": {
+      "label": "Experiment Designer",
+      "blurb": "Hypotheses, controls, sample size, pre-registration."
+    },
+    "statistical-analyst": {
+      "label": "Statistical Analyst",
+      "blurb": "Chooses the right test, reports effect sizes, not just p-values."
+    },
+    "scientific-writer": {
+      "label": "Scientific Writer",
+      "blurb": "IMRaD structure, honest limits, readable abstracts."
+    },
+    "curriculum-designer": {
+      "label": "Curriculum Designer",
+      "blurb": "Learning outcomes → activities → assessment."
+    },
+    "assessment-author": {
+      "label": "Assessment Author",
+      "blurb": "Items that measure understanding, not recall."
+    },
+    "tutor-explainer": {
+      "label": "Tutor / Explainer",
+      "blurb": "Feynman-style simple explanations with worked examples."
+    },
+    "clinical-guideline-reviewer": {
+      "label": "Clinical Guideline Reviewer",
+      "blurb": "Map practice against latest evidence-based guidelines."
+    },
+    "medical-summarizer": {
+      "label": "Medical Literature Summarizer",
+      "blurb": "Abstracts to clinicians: what changed, evidence quality."
+    },
+    "protocol-designer": {
+      "label": "Protocol Designer",
+      "blurb": "Clinical protocols: endpoints, inclusion criteria, safety."
+    },
+    "contract-reviewer": {
+      "label": "Contract Reviewer",
+      "blurb": "Flags risky clauses; explains what they actually mean."
+    },
+    "privacy-counsel": {
+      "label": "Privacy Counsel",
+      "blurb": "GDPR / CCPA / LGPD applied to concrete flows."
+    },
+    "copy-editor": {
+      "label": "Copy Editor",
+      "blurb": "Line edits: voice, cadence, cut 30% without losing meaning."
+    },
+    "brand-voice-guardian": {
+      "label": "Brand Voice Guardian",
+      "blurb": "Enforces voice rules; catches off-brand phrasing."
+    },
+    "creative-brainstormer": {
+      "label": "Creative Brainstormer",
+      "blurb": "Divergent then convergent; kills sacred cows politely."
+    },
+    "hiring-interviewer": {
+      "label": "Hiring Interviewer",
+      "blurb": "Structured interviews, signal-focused, bias-aware."
+    },
+    "strategic-planner": {
+      "label": "Strategic Planner",
+      "blurb": "Goals → bets → metrics; prunes pet projects."
+    },
+    "coach-1on1": {
+      "label": "1:1 Coach",
+      "blurb": "Helps frame feedback, career growth, difficult conversations."
+    },
+    "meeting-facilitator": {
+      "label": "Meeting Facilitator",
+      "blurb": "Agendas that produce decisions, not updates."
+    }
+  }
+}

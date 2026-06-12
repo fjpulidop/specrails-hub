@@ -1,0 +1,190 @@
+{
+  "proposeModal": {
+    "title": "Añadir spec",
+    "dialogDescription": "Crea una nueva spec a partir de una idea breve, ya sea al instante o mediante el modo Explore.",
+    "engineAriaLabel": "Motor de IA para esta spec",
+    "modeTablistLabel": "Modo de creación de la spec",
+    "mode": {
+      "quick": "Quick",
+      "explore": "Explore",
+      "raw": "Raw",
+      "exploreHint": "interactivo",
+      "rawHint": "sin IA"
+    },
+    "modeDescription": {
+      "quick": "Describe la funcionalidad o el cambio. Adjunta mockups, briefs o datos para dar más contexto.",
+      "explore": "Describe una idea aproximada. Claude te ayudará a darle forma conversando — tú decides cuándo confirmarla.",
+      "raw": "Tu prompt, tal cual — guardado como ticket de spec. No se ejecuta IA ahora; arrástralo a un rail para construirlo."
+    },
+    "editorPlaceholder": {
+      "quick": "p. ej. Añade un interruptor de modo oscuro a la página de ajustes que recuerde la preferencia del usuario...",
+      "explore": "p. ej. modo oscuro — no tengo claro dónde colocar el interruptor ni cómo persistirlo…",
+      "raw": "Describe la funcionalidad, el cambio o la idea. Admite Markdown, imágenes y archivos…"
+    },
+    "ideaAriaLabel": "Idea de la spec",
+    "raw": {
+      "titleLabel": "Título",
+      "titlePlaceholder": "Se autocompleta a partir de tu prompt…",
+      "priorityLabel": "Prioridad",
+      "labelsLabel": "Etiquetas",
+      "removeLabel": "Quitar etiqueta {{label}}",
+      "addLabelAria": "Añadir etiqueta",
+      "labelPlaceholder": "opcional…",
+      "bodyAriaLabel": "Cuerpo de la spec Raw"
+    },
+    "priority": {
+      "critical": "Crítica",
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja"
+    },
+    "fromWebsite": "Desde una web",
+    "fromWebsiteTitle": "Abre una página web real, selecciona un área y conviértela en una spec",
+    "capture": {
+      "responsiveSizes_one": "Responsive · {{count}} tamaño",
+      "responsiveSizes_other": "Responsive · {{count}} tamaños"
+    },
+    "submit": {
+      "quick": "Generar spec",
+      "explore": "Continuar",
+      "raw": "Crear",
+      "disabledTitle": "Escribe primero un prompt"
+    },
+    "toast": {
+      "createFailed": "No se pudo crear la spec",
+      "rawSavedWithId": "Guardada como #{{id}} · Spec Raw lista para los rails",
+      "rawCreated": "Spec Raw creada",
+      "exploreNotWired": "El modo Explore no está disponible en esta vista",
+      "generating": "Generando...",
+      "failedToStart": "{{projectName}} · Error al iniciar",
+      "unsupportedFileType": "Tipo de archivo no compatible: {{name}}",
+      "uploadFailed": "Error al subir {{name}}: {{message}}"
+    }
+  },
+  "featureProposal": {
+    "title": "Proponer una funcionalidad",
+    "ideaIntro": "Describe tu idea en lenguaje natural. Claude leerá el código y la estructurará en una propuesta completa.",
+    "ideaAriaLabel": "Idea de funcionalidad",
+    "ideaPlaceholder": "p. ej. Quiero que los usuarios puedan configurar una alerta de presupuesto para recibir un aviso cuando los costes de la API superen un umbral...",
+    "cmdEnterToSubmit": "Cmd+Enter para enviar",
+    "exploreIdea": "Explorar idea",
+    "exploringTitle": "Explorando tu idea...",
+    "refiningTitle": "Refinando la propuesta...",
+    "reviewTitle": "Revisar propuesta",
+    "readingCodebase_one": "Leyendo el código... ({{count}} archivo explorado)",
+    "readingCodebase_other": "Leyendo el código... ({{count}} archivos explorados)",
+    "refinementAriaLabel": "Comentarios de refinamiento",
+    "refinementPlaceholder": "Pide cambios, añade restricciones, ajusta el alcance...",
+    "sendRefinementTitle": "Enviar refinamiento (Cmd+Enter)",
+    "cmdEnterToSend": "Cmd+Enter para enviar",
+    "confirmCreateIssue": "¿Crear un issue de GitHub a partir de esta propuesta?",
+    "yesCreateIssue": "Sí, crear issue",
+    "createGithubIssue": "Crear issue de GitHub",
+    "startOver": "Empezar de nuevo",
+    "creatingIssueTitle": "Creando issue de GitHub...",
+    "creatingIssueViaCli": "Creando el issue con la CLI de GitHub...",
+    "issueCreated": "Issue creado",
+    "proposeAnother": "Proponer otra",
+    "errorTitle": "Algo ha ido mal",
+    "errorFallback": "Se ha producido un error",
+    "tryAgain": "Reintentar",
+    "cancelledTitle": "Cancelado",
+    "cancelledBody": "La propuesta se ha cancelado."
+  },
+  "contextScope": {
+    "heading": "Conocimiento del contexto",
+    "custom": "Personalizado",
+    "customMix": "Combinación personalizada — ver Ajuste fino abajo",
+    "estimateUnavailable": "{{tier}} · estimación no disponible",
+    "preset": {
+      "minimal": "Mínimo",
+      "light": "Ligero",
+      "standard": "Estándar",
+      "rich": "Amplio",
+      "max": "Max",
+      "hub": "Hub"
+    },
+    "presetCost": {
+      "minimal": "Coste 1× · primer token más rápido · sin specs cargadas",
+      "light": "Coste 1,3× · specs de Specrails cargadas",
+      "standard": "Coste 1,6× · specs de Specrails + OpenSpec cargadas",
+      "rich": "Coste 2× · acceso de lectura a todo el repo",
+      "max": "Coste 4× · lectura completa + refinamiento de Contract Layer",
+      "hub": "Coste 4–6× · todas las funciones + MCP del proyecto y tus MCP aprobados"
+    },
+    "smashCapable": "Compatible con SMASH",
+    "smashHint": "La Contract Layer está activada, así que esta spec podrá descomponerse después en Sub-Specs.",
+    "fineTune": "Ajuste fino",
+    "defaultLabel": "Alcance del contexto",
+    "summaryMinimal": "mínimo",
+    "tags": {
+      "specrails": "specrails",
+      "openspec": "openspec",
+      "codebase": "codebase",
+      "mcp": "mcp",
+      "myMcp": "my-mcp",
+      "contract": "contract"
+    },
+    "checks": {
+      "specrailsLabel": "tickets de specrails",
+      "openspecLabel": "specs de openspec",
+      "fullLabel": "Código completo",
+      "mcpLabel": "MCP del proyecto",
+      "mcpHint": "servidores de .mcp.json",
+      "userMcpLabel": "Mis MCP aprobados",
+      "userMcpHint": "servidores de ~/.claude · ~/.codex",
+      "userMcpTooltip": "Tus servidores MCP aprobados en local (claude mcp add / codex mcp add)",
+      "exploreOnly": "Solo en modo Explore",
+      "contractLabel": "Enriquecer con Contract Layer",
+      "contractHint": "refinamiento post-commit · habilita SMASH"
+    }
+  },
+  "aiEngine": {
+    "label": "Motor de IA"
+  },
+  "modelSelector": {
+    "presetHeading": "Preset de modelo",
+    "preset": {
+      "balanced": {
+        "label": "Equilibrado",
+        "description": "Sonnet para todos los agentes (recomendado)"
+      },
+      "budget": {
+        "label": "Económico",
+        "description": "Haiku para todos los agentes — 3× más barato y rápido"
+      },
+      "max": {
+        "label": "Max",
+        "description": "Opus para arquitecto + PM, Sonnet para el resto"
+      }
+    },
+    "overridesHeading": "Modelo por agente",
+    "overriddenCount": "{{count}} modificados",
+    "customBadge": "personalizado",
+    "resetToDefault": "Restablecer al valor del preset"
+  },
+  "modelCombobox": {
+    "alias": "Alias en Claude Code: {{alias}}",
+    "tier": {
+      "balanced": "Equilibrado",
+      "mostCapable": "Más capaz",
+      "fastest": "Más rápido"
+    }
+  },
+  "costMeter": {
+    "heading": "Indicador de coste",
+    "meterAriaLabel": "nivel de coste",
+    "estimateUnavailable": "solo nivel — estimación no disponible"
+  },
+  "commandProposal": {
+    "heading": "Comando sugerido",
+    "run": "Ejecutar",
+    "dismiss": "Descartar"
+  },
+  "errors": {
+    "serverError": "Error del servidor ({{status}})",
+    "connectionFailed": "Error de conexión: {{message}}",
+    "sendRefinementFailed": "No se pudo enviar el refinamiento",
+    "createIssueFailed": "No se pudo crear el issue"
+  }
+}

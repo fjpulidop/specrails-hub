@@ -1,0 +1,113 @@
+{
+  "page": {
+    "resizeFileTree": "Ridimensiona l'albero dei file",
+    "selectFile": "Seleziona un file per l'anteprima."
+  },
+  "resizer": {
+    "hint": "Trascina per ridimensionare. Doppio clic per ripristinare."
+  },
+  "toolbar": {
+    "scope": "Ambito",
+    "allAi": "Tutta l'AI",
+    "spec": "Spec",
+    "ticketIdPlaceholder": "id",
+    "copyFilePath": "Copia percorso file",
+    "generateSummary": "Genera riepilogo",
+    "regenerateSummary": "Rigenera riepilogo",
+    "generating": "Generazione…",
+    "regenerating": "Rigenerazione…",
+    "summaryUnavailable": "Riepilogo non disponibile: {{reason}}",
+    "jobContext": "Contesto job",
+    "clear": "Cancella"
+  },
+  "provenancePanel": {
+    "jobTitle": "Job {{jobId}}",
+    "specTitle": "Spec #{{ticketId}}",
+    "touchedFiles_one": "{{count}} file toccato",
+    "touchedFiles_other": "{{count}} file toccati",
+    "log": "Log"
+  },
+  "kind": {
+    "created": "creato",
+    "modified": "modificato",
+    "deleted": "eliminato"
+  },
+  "action": {
+    "added": "aggiunto",
+    "changed": "modificato",
+    "deleted": "eliminato"
+  },
+  "viewer": {
+    "loadingFile": "Caricamento file…",
+    "showSummary": "Mostra riepilogo",
+    "markdownViewMode": "Modalità di visualizzazione Markdown",
+    "preview": "Anteprima",
+    "raw": "Raw",
+    "missingFile": "Questo file è stato toccato da un job AI ma non esiste più nel working tree.",
+    "binaryFile": "File binario.",
+    "tooLarge": "File troppo grande per l'anteprima ({{size}} MB).",
+    "noContent": "Nessun contenuto disponibile.",
+    "pathCopied": "Percorso copiato",
+    "copyPathFailed": "Impossibile copiare il percorso",
+    "budgetPrompt": "Ignorare il limite di budget?"
+  },
+  "summary": {
+    "generationFailed": "Generazione del riepilogo non riuscita",
+    "skipped": "Riepilogo saltato: {{reason}}",
+    "unavailable": "Riepilogo non disponibile: {{reason}}.",
+    "empty": "Ancora nessun riepilogo per questo file.",
+    "stale": "Obsoleto",
+    "hide": "Nascondi",
+    "reason": {
+      "missing": "file mancante",
+      "binary": "file binario",
+      "tooLarge": "file troppo grande"
+    }
+  },
+  "history": {
+    "resize": "Ridimensiona cronologia interventi AI",
+    "title_one": "Cronologia interventi AI · {{count}} modifica",
+    "title_other": "Cronologia interventi AI · {{count}} modifiche",
+    "show": "Mostra",
+    "hide": "Nascondi",
+    "unknownJob": "job sconosciuto",
+    "filterByJob": "Filtra Codice per job {{jobId}}",
+    "diff": "Diff",
+    "openSpec": "Apri spec #{{ticketId}}",
+    "specChip": "spec #{{ticketId}}",
+    "loadingDiff": "Caricamento diff...",
+    "diffUnavailable": "Diff non disponibile per questo intervento storico. I nuovi job salveranno le patch automaticamente.",
+    "diffTruncated": "[diff troncato]"
+  },
+  "tree": {
+    "jobFiles": "File del job",
+    "specFiles": "File della spec",
+    "touchedByAi": "Toccati dall'AI",
+    "allFiles": "Tutti i file",
+    "collapseAll": "Comprimi tutte le cartelle",
+    "expandAll": "Espandi tutte le cartelle",
+    "touchedCount_one": "{{count}} file toccato dall'AI",
+    "touchedCount_other": "{{count}} file toccati dall'AI",
+    "loadingFiles": "Caricamento file…",
+    "emptyTouched": "Ancora nessun file toccato dall'AI. Esegui un job o passa a Tutti i file.",
+    "showAllFiles": "Mostra tutti i file",
+    "noFiles": "Nessun file.",
+    "folderTouched_one": "{{count}} file toccato dall'AI in questa cartella",
+    "folderTouched_other": "{{count}} file toccati dall'AI in questa cartella",
+    "jobTitle": "Job {{jobId}}",
+    "createdBySpec": "Creato durante l'implementazione della spec #{{id}}",
+    "modifiedBySpec": "Modificato durante l'implementazione della spec #{{id}}",
+    "latestTitleCreated": "L'ultimo job AI ha aggiunto questo file",
+    "latestTitleModified": "L'ultimo job AI ha modificato questo file",
+    "latestTitleDeleted": "L'ultimo job AI ha eliminato questo file"
+  },
+  "monaco": {
+    "loadFailed": "Impossibile caricare il visualizzatore di codice.",
+    "reload": "Ricarica",
+    "loadingEditor": "Caricamento editor…"
+  },
+  "ticketFiles": {
+    "title": "File toccati da questo ticket",
+    "jobTitle": "Job {{jobId}}"
+  }
+}

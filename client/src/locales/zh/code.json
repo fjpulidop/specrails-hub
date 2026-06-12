@@ -1,0 +1,113 @@
+{
+  "page": {
+    "resizeFileTree": "调整文件树大小",
+    "selectFile": "选择一个文件进行预览。"
+  },
+  "resizer": {
+    "hint": "拖动以调整大小。双击重置。"
+  },
+  "toolbar": {
+    "scope": "范围",
+    "allAi": "全部 AI",
+    "spec": "Spec",
+    "ticketIdPlaceholder": "id",
+    "copyFilePath": "复制文件路径",
+    "generateSummary": "生成摘要",
+    "regenerateSummary": "重新生成摘要",
+    "generating": "生成中…",
+    "regenerating": "重新生成中…",
+    "summaryUnavailable": "摘要不可用：{{reason}}",
+    "jobContext": "任务上下文",
+    "clear": "清除"
+  },
+  "provenancePanel": {
+    "jobTitle": "任务 {{jobId}}",
+    "specTitle": "Spec #{{ticketId}}",
+    "touchedFiles_one": "{{count}} 个被改动的文件",
+    "touchedFiles_other": "{{count}} 个被改动的文件",
+    "log": "日志"
+  },
+  "kind": {
+    "created": "创建",
+    "modified": "修改",
+    "deleted": "删除"
+  },
+  "action": {
+    "added": "新增",
+    "changed": "更改",
+    "deleted": "删除"
+  },
+  "viewer": {
+    "loadingFile": "正在加载文件…",
+    "showSummary": "显示摘要",
+    "markdownViewMode": "Markdown 查看模式",
+    "preview": "预览",
+    "raw": "原始",
+    "missingFile": "此文件曾被 AI 任务改动，但已不存在于工作区中。",
+    "binaryFile": "二进制文件。",
+    "tooLarge": "文件过大，无法预览（{{size}} MB）。",
+    "noContent": "无可用内容。",
+    "pathCopied": "路径已复制",
+    "copyPathFailed": "无法复制路径",
+    "budgetPrompt": "要超出预算上限继续吗？"
+  },
+  "summary": {
+    "generationFailed": "摘要生成失败",
+    "skipped": "已跳过摘要：{{reason}}",
+    "unavailable": "摘要不可用：{{reason}}。",
+    "empty": "此文件还没有摘要。",
+    "stale": "已过期",
+    "hide": "隐藏",
+    "reason": {
+      "missing": "文件缺失",
+      "binary": "二进制文件",
+      "tooLarge": "文件过大"
+    }
+  },
+  "history": {
+    "resize": "调整 AI 改动历史大小",
+    "title_one": "AI 改动历史 · {{count}} 处更改",
+    "title_other": "AI 改动历史 · {{count}} 处更改",
+    "show": "显示",
+    "hide": "隐藏",
+    "unknownJob": "未知任务",
+    "filterByJob": "按任务 {{jobId}} 筛选 Code",
+    "diff": "Diff",
+    "openSpec": "打开 Spec #{{ticketId}}",
+    "specChip": "Spec #{{ticketId}}",
+    "loadingDiff": "正在加载 diff...",
+    "diffUnavailable": "此历史改动没有可用的 diff。新任务会自动保存补丁。",
+    "diffTruncated": "[diff 已截断]"
+  },
+  "tree": {
+    "jobFiles": "任务文件",
+    "specFiles": "Spec 文件",
+    "touchedByAi": "AI 改动过",
+    "allFiles": "全部文件",
+    "collapseAll": "折叠所有文件夹",
+    "expandAll": "展开所有文件夹",
+    "touchedCount_one": "{{count}} 个 AI 改动过的文件",
+    "touchedCount_other": "{{count}} 个 AI 改动过的文件",
+    "loadingFiles": "正在加载文件…",
+    "emptyTouched": "还没有 AI 改动过的文件。运行一个任务，或切换到“全部文件”。",
+    "showAllFiles": "显示全部文件",
+    "noFiles": "没有文件。",
+    "folderTouched_one": "此文件夹下有 {{count}} 个 AI 改动过的文件",
+    "folderTouched_other": "此文件夹下有 {{count}} 个 AI 改动过的文件",
+    "jobTitle": "任务 {{jobId}}",
+    "createdBySpec": "在实现 Spec #{{id}} 时创建",
+    "modifiedBySpec": "在实现 Spec #{{id}} 时修改",
+    "latestTitleCreated": "最近的 AI 任务添加了此文件",
+    "latestTitleModified": "最近的 AI 任务更改了此文件",
+    "latestTitleDeleted": "最近的 AI 任务删除了此文件"
+  },
+  "monaco": {
+    "loadFailed": "代码查看器加载失败。",
+    "reload": "重新加载",
+    "loadingEditor": "正在加载编辑器…"
+  },
+  "ticketFiles": {
+    "title": "此工单改动的文件",
+    "jobTitle": "任务 {{jobId}}"
+  }
+}

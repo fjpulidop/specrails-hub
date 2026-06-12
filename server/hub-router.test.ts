@@ -1230,4 +1230,75 @@ describe('hub-router', () => {
     })
   })
 
+  // ─── Language ──────────────────────────────────────────────────────────────
+
+  describe('GET /api/hub/language', () => {
+    it('returns null when the user never chose a language (OS detection stays client-side)', async () => {
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/language')
+      expect(res.status).toBe(200)
+      expect(res.body.language).toBeNull()
+    })
+
+    it('returns the persisted language', async () => {
+      setHubSetting(hubDb, 'ui_language', 'es')
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/language')
+      expect(res.status).toBe(200)
+      expect(res.body.language).toBe('es')
+    })
+
+    it('returns null when persisted value is outside the allow-list', async () => {
+      setHubSetting(hubDb, 'ui_language', 'klingon')
+      const { app } = createApp()
+      const res = await request(app).get('/api/hub/language')
+      expect(res.status).toBe(200)
+      expect(res.body.language).toBeNull()
+    })
+  })
+
+  describe('PATCH /api/hub/language', () => {
+    it.each(['en', 'es', 'fr', 'de', 'pt', 'it', 'zh', 'ja'])('persists %s', async (language) => {
+      const { app } = createApp()
+      const res = await request(app).patch('/api/hub/language').send({ language })
+      expect(res.status).toBe(200)
+      expect(res.body.language).toBe(language)
+      expect(getHubSetting(hubDb, 'ui_language')).toBe(language)
+    })
+
+    it('rejects unknown language with 400', async () => {
+      const { app } = createApp()
+      const res = await request(app).patch('/api/hub/language').send({ language: 'nl' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toBe('invalid_language')
+      expect(getHubSetting(hubDb, 'ui_language')).toBeUndefined()
+    })
+
+    it('rejects region-qualified tags with 400 (client sends base subtags only)', async () => {
+      const { app } = createApp()
+      const res = await request(app).patch('/api/hub/language').send({ language: 'es-ES' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toBe('invalid_language')
+    })
+
+    it('rejects non-string language with 400', async () => {
+      const { app } = createApp()
+      const res = await request(app).patch('/api/hub/language').send({ language: 42 })
+      expect(res.status).toBe(400)
+    })
+
+    it('rejects missing language field with 400', async () => {
+      const { app } = createApp()
+      const res = await request(app).patch('/api/hub/language').send({})
+      expect(res.status).toBe(400)
+    })
+
+    it('round-trip GET reflects PATCH', async () => {
+      const { app } = createApp()
+      await request(app).patch('/api/hub/language').send({ language: 'ja' })
+      const res = await request(app).get('/api/hub/language')
+      expect(res.body.language).toBe('ja')
+    })
+  })
+
 })

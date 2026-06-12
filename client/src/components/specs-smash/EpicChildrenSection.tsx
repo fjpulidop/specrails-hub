@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { ChevronRight, Split } from 'lucide-react'
 import type { LocalTicket, TicketPriority } from '../../types'
 
@@ -22,6 +23,7 @@ export interface EpicChildrenSectionProps {
  * the end.
  */
 export function EpicChildrenSection({ epicId, allTickets, onOpenChild }: EpicChildrenSectionProps) {
+  const { t } = useTranslation('activity')
   const children = allTickets
     .filter((t) => t.parent_epic_id === epicId)
     .sort((a, b) => {
@@ -37,7 +39,7 @@ export function EpicChildrenSection({ epicId, allTickets, onOpenChild }: EpicChi
         className="rounded-md border border-dashed border-border/40 bg-muted/10 px-3 py-2 text-xs text-foreground/60"
         data-testid="epic-children-empty"
       >
-        No Sub-Specs. This Epic was emptied — use Re-SMASH to regenerate.
+        {t('epicChildren.empty')}
       </div>
     )
   }
@@ -46,7 +48,7 @@ export function EpicChildrenSection({ epicId, allTickets, onOpenChild }: EpicChi
     <div className="rounded-md border border-accent-highlight/40 bg-accent-highlight/5 px-3 py-2" data-testid="epic-children-section">
       <div className="flex items-center gap-2 text-xs font-medium text-foreground mb-2">
         <Split className="w-3.5 h-3.5 text-accent-highlight" aria-hidden />
-        <span>Sub-Specs ({children.length})</span>
+        <span>{t('epicChildren.header', { count: children.length })}</span>
       </div>
       <ul className="flex flex-col gap-1.5">
         {children.map((child) => (
@@ -88,6 +90,7 @@ export interface EpicBreadcrumbProps {
 }
 
 export function EpicBreadcrumb({ epic, childExecutionOrder, totalChildren, onOpenEpic }: EpicBreadcrumbProps) {
+  const { t } = useTranslation('activity')
   return (
     <div
       className="flex items-center gap-2 rounded-md border border-accent-secondary/30 bg-accent-secondary/10 px-3 py-1.5 text-xs"
@@ -102,7 +105,7 @@ export function EpicBreadcrumb({ epic, childExecutionOrder, totalChildren, onOpe
       </button>
       {childExecutionOrder != null && totalChildren > 0 && (
         <span className="text-foreground/60">
-          · step {childExecutionOrder} of {totalChildren}
+          {t('epicChildren.step', { order: childExecutionOrder, total: totalChildren })}
         </span>
       )}
     </div>

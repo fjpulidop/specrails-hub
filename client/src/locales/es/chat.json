@@ -1,0 +1,57 @@
+{
+  "panel": {
+    "openChat": "Abrir chat",
+    "dragToResize": "Arrastra para redimensionar",
+    "tabTitle": "Chat {{n}}",
+    "startConversation": "Inicia una conversación sobre este proyecto",
+    "noConversations": "Aún no hay conversaciones",
+    "newConversation": "Nueva conversación",
+    "suggestions": {
+      "projectStatus": "¿Cuál es el estado del proyecto?",
+      "recentFailures": "Muestra los jobs fallidos recientes",
+      "commands": "¿Qué comandos debería ejecutar?",
+      "explainCodebase": "Explica la base de código"
+    }
+  },
+  "header": {
+    "fallbackTitle": "Chat",
+    "newConversation": "Nueva conversación",
+    "deleteConversation": "Eliminar conversación",
+    "restorePanel": "Restaurar panel de chat",
+    "maximizePanel": "Maximizar panel de chat",
+    "closeChat": "Cerrar chat"
+  },
+  "input": {
+    "placeholder": "Mensaje...",
+    "send": "Enviar",
+    "stop": "Detener",
+    "modelLocked": "No se puede cambiar el modelo durante una conversación activa"
+  },
+  "messageList": {
+    "contextLoaded": "Contexto cargado — listo para ayudar",
+    "noMessages": "Aún no hay mensajes",
+    "askAnything": "Pregunta a Claude lo que quieras sobre tu proyecto",
+    "suggestions": {
+      "currentStatus": "¿Cuál es el estado actual del proyecto?",
+      "recentFailures": "Muéstrame los jobs fallidos recientes",
+      "testsToRun": "¿Qué tests debería ejecutar?",
+      "mainArchitecture": "Explica la arquitectura principal"
+    }
+  },
+  "errors": {
+    "sendFailed": "No se pudo enviar el mensaje"
+  },
+  "dock": {
+    "minimizedSessions_one": "{{count}} sesión minimizada",
+    "minimizedSessions_other": "{{count}} sesiones minimizadas",
+    "minimizedCount": "{{count}} minimizadas",
+    "unknownProject": "Proyecto desconocido"
+  },
+  "chip": {
+    "restore": "Restaurar {{label}}",
+    "close": "Cerrar {{label}}",
+    "continueEditing": "Seguir editando · {{projectName}}",
+    "kindAiEdit": "AI Edit",
+    "kindExploreSpec": "Explore Spec"
+  }
+}

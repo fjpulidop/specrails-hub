@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Download } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -7,23 +8,23 @@ export interface ExportDropdownProps {
   baseUrl: string
   /** Page-level filter params to forward */
   params?: Record<string, string>
-  /** Label shown on button. Default: "Export" */
+  /** Label shown on button. Default: localized "Export" */
   label?: string
   /** Disable the button when there is no data to export */
   disabled?: boolean
 }
 
 type ExportEntry = {
-  label: string
+  labelKey: string
   format: 'csv' | 'json'
   mode: 'summary' | 'raw'
 }
 
 const ENTRIES: ExportEntry[] = [
-  { label: 'Summary CSV', format: 'csv', mode: 'summary' },
-  { label: 'Raw CSV',     format: 'csv', mode: 'raw' },
-  { label: 'Summary JSON', format: 'json', mode: 'summary' },
-  { label: 'Raw JSON',     format: 'json', mode: 'raw' },
+  { labelKey: 'export.summaryCsv', format: 'csv', mode: 'summary' },
+  { labelKey: 'export.rawCsv',     format: 'csv', mode: 'raw' },
+  { labelKey: 'export.summaryJson', format: 'json', mode: 'summary' },
+  { labelKey: 'export.rawJson',     format: 'json', mode: 'raw' },
 ]
 
 function filenameFromHeader(header: string | null): string | null {
@@ -32,7 +33,8 @@ function filenameFromHeader(header: string | null): string | null {
   return m ? m[1] : null
 }
 
-export function ExportDropdown({ baseUrl, params, label = 'Export', disabled }: ExportDropdownProps) {
+export function ExportDropdown({ baseUrl, params, label, disabled }: ExportDropdownProps) {
+  const { t } = useTranslation('analytics')
   const [open, setOpen] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -72,11 +74,11 @@ export function ExportDropdown({ baseUrl, params, label = 'Export', disabled }: 
       URL.revokeObjectURL(objectUrl)
     } catch (err) {
       console.warn('[ExportDropdown] download failed:', err)
-      toast.error('Export failed')
+      toast.error(t('export.failed'))
     } finally {
       setDownloading(false)
     }
-  }, [buildUrl])
+  }, [buildUrl, t])
 
   return (
     <div ref={containerRef} className="relative">
@@ -86,11 +88,11 @@ export function ExportDropdown({ baseUrl, params, label = 'Export', disabled }: 
         aria-expanded={open}
         disabled={downloading || disabled}
         onClick={() => setOpen((o) => !o)}
-        title={disabled ? 'No data for current filters' : undefined}
+        title={disabled ? t('export.noData') : undefined}
         className="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs font-medium border border-border/60 bg-card/50 text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors disabled:opacity-50 disabled:pointer-events-none"
       >
         <Download className="w-3 h-3" />
-        {downloading ? 'Downloading…' : label}
+        {downloading ? t('export.downloading') : (label ?? t('common:actions.export'))}
       </button>
 
       {open && (
@@ -107,7 +109,7 @@ export function ExportDropdown({ baseUrl, params, label = 'Export', disabled }: 
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-foreground hover:bg-accent/60 transition-colors"
             >
               <Download className="w-3 h-3 shrink-0" />
-              <span className="flex-1">{entry.label}</span>
+              <span className="flex-1">{t(entry.labelKey)}</span>
               {entry.mode === 'raw' && <span className="text-[9px] text-muted-foreground">≤10k</span>}
             </button>
           ))}

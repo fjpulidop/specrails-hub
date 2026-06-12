@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Link2, ArrowRight, Crown, Trash2, MessageSquare, AlertTriangle } from 'lucide-react'
@@ -60,6 +61,7 @@ export function TicketPostitCard({
   onLongPress,
   onDelete,
 }: TicketPostitCardProps) {
+  const { t } = useTranslation('specs')
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: ticket.id,
     disabled: jiggleMode,
@@ -136,7 +138,7 @@ export function TicketPostitCard({
     triggerResume({
       kind: 'explore-spec',
       projectId: activeProjectId,
-      label: ticket.title || `Ticket #${ticket.id}`,
+      label: ticket.title || t('card.ticketFallbackLabel', { id: ticket.id }),
       restoreRoute: '/',
       params: {
         initialIdea: '',
@@ -156,7 +158,7 @@ export function TicketPostitCard({
         },
       },
     })
-  }, [activeProjectId, ticket, triggerResume])
+  }, [activeProjectId, ticket, triggerResume, t])
 
   // Stable per-ticket jiggle phase offset (0..−399 ms over the 400 ms
   // animation) so each card wobbles out of phase with its neighbours
@@ -224,7 +226,7 @@ export function TicketPostitCard({
                   }
                 }}
                 disabled={!onOpenParentEpic}
-                title={`Open parent Epic #${ticket.parent_epic_id} · ${parentEpicTitle}`}
+                title={t('badges.openParentEpicTitle', { id: ticket.parent_epic_id, title: parentEpicTitle })}
                 data-testid={`postit-epic-child-pill-${ticket.id}`}
                 className="inline-flex items-center gap-1 rounded-md border border-accent-secondary/40 text-accent-secondary bg-accent-secondary/5 hover:bg-accent-secondary/15 hover:border-accent-secondary/60 disabled:hover:bg-accent-secondary/5 disabled:hover:border-accent-secondary/40 disabled:cursor-default px-1.5 py-0.5 text-[10px] font-medium max-w-[160px] truncate transition-colors"
               >
@@ -238,37 +240,39 @@ export function TicketPostitCard({
               <Badge
                 variant="outline"
                 className="h-4 gap-1 px-1.5 text-[9px] uppercase border-accent-warning/60 text-accent-warning bg-accent-warning/10"
-                title="This spec was marked done but its job ended in failure — review it"
+                title={t('badges.needsReviewTitle')}
                 data-testid={`needs-review-badge-${ticket.id}`}
               >
                 <AlertTriangle className="w-2.5 h-2.5" aria-hidden />
-                Review
+                {t('badges.review')}
               </Badge>
             )}
             {isEpic && (
               <Badge variant="outline" className="h-4 gap-1 px-1.5 text-[9px] border-accent-highlight/40 text-accent-highlight">
                 <Crown className="w-2.5 h-2.5" aria-hidden />
-                Epic{epicChildrenCount ? ` · ${epicChildrenCount}` : ''}
+                {epicChildrenCount
+                  ? t('badges.epicWithCount', { count: epicChildrenCount })
+                  : t('badges.epic')}
               </Badge>
             )}
             {ticket.source === 'free-prompt' && (
               <Badge
                 variant="outline"
                 className="h-4 px-1.5 text-[9px] uppercase border-accent-info/50 text-accent-info"
-                title="Raw spec — no AI generation at intake"
+                title={t('badges.rawTitle')}
                 data-testid={`raw-badge-${ticket.id}`}
               >
-                Raw
+                {t('badges.raw')}
               </Badge>
             )}
             {ticket.priority && !isDraft && (
               <Badge variant={PRIORITY_VARIANT[ticket.priority]} className="h-4 px-1.5 text-[9px] uppercase">
-                {ticket.priority}
+                {t(`priority.${ticket.priority}`)}
               </Badge>
             )}
             {isDraft && (
               <Badge variant="outline" className="h-4 px-1.5 text-[9px] uppercase border-accent-secondary/50 text-accent-secondary">
-                Draft
+                {t('common:status.draft')}
               </Badge>
             )}
           </div>
@@ -294,7 +298,7 @@ export function TicketPostitCard({
           <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground/70">
             <span className="inline-flex items-center gap-1">
               <Link2 className="w-2.5 h-2.5" aria-hidden />
-              Depends on {ticket.prerequisites!.length}
+              {t('card.dependsOn', { count: ticket.prerequisites!.length })}
             </span>
           </div>
         )}
@@ -311,11 +315,11 @@ export function TicketPostitCard({
                 onClick={handleContinueEditing}
                 onPointerDown={(e) => e.stopPropagation()}
                 data-testid="postit-continue-editing"
-                title="Continue editing this spec"
+                title={t('card.continueEditingTitle')}
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-accent-primary/90 hover:bg-accent-primary/10 hover:text-accent-primary transition-colors"
               >
                 <MessageSquare className="w-2.5 h-2.5" aria-hidden />
-                Continue Editing
+                {t('card.continueEditing')}
               </button>
             )}
             <button
@@ -325,7 +329,7 @@ export function TicketPostitCard({
               data-testid="move-to-rail-button"
               className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-accent-info/90 hover:bg-accent-info/10 hover:text-accent-info transition-colors"
             >
-              Move to Rail
+              {t('card.moveToRail')}
               <ArrowRight className="w-2.5 h-2.5" aria-hidden />
             </button>
           </div>
@@ -334,7 +338,7 @@ export function TicketPostitCard({
               type="button"
               onClick={(e) => { e.stopPropagation(); onDelete(ticket) }}
               className="p-1 rounded-md text-destructive/70 hover:bg-destructive/10 hover:text-destructive transition-colors"
-              aria-label={`Delete ticket #${ticket.id}`}
+              aria-label={t('card.deleteTicket', { id: ticket.id })}
             >
               <Trash2 className="w-3 h-3" />
             </button>

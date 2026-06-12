@@ -1,4 +1,5 @@
 import { Check, Lock } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 
 // ─── Agent definitions (mirrors specrails-core tui-installer.mjs) ────────────
@@ -44,14 +45,6 @@ export const DEFAULT_SELECTED = new Set([...CORE_AGENTS])
 
 export const AGENT_CATEGORIES = ['Architecture', 'Development', 'Review', 'Product', 'Utilities'] as const
 
-const CATEGORY_LABELS: Record<string, string> = {
-  Architecture: 'Architecture',
-  Development: 'Development',
-  Review: 'Review',
-  Product: 'Product',
-  Utilities: 'Utilities',
-}
-
 const CATEGORY_COLORS: Record<string, string> = {
   Architecture: 'text-accent-success',
   Development: 'text-accent-primary',
@@ -68,6 +61,7 @@ interface AgentSelectorProps {
 }
 
 export function AgentSelector({ selected, onChange }: AgentSelectorProps) {
+  const { t } = useTranslation('agentstudio')
   const selectedSet = new Set(selected)
 
   function toggle(agentId: string) {
@@ -107,21 +101,21 @@ export function AgentSelector({ selected, onChange }: AgentSelectorProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">
-          {selected.length} / {ALL_AGENTS.length} agents selected
+          {t('agentSelector.selectedCount', { selected: selected.length, total: ALL_AGENTS.length })}
         </span>
         <div className="flex gap-2">
           <button
             onClick={selectAll}
             className="text-[10px] text-accent-primary hover:underline"
           >
-            Select all
+            {t('agentSelector.selectAll')}
           </button>
           <span className="text-[10px] text-muted-foreground">·</span>
           <button
             onClick={selectNone}
             className="text-[10px] text-muted-foreground hover:underline"
           >
-            None
+            {t('common:states.none')}
           </button>
         </div>
       </div>
@@ -152,7 +146,7 @@ export function AgentSelector({ selected, onChange }: AgentSelectorProps) {
                   )}
                 </div>
                 <span className={cn('text-[10px] font-semibold uppercase tracking-wider', CATEGORY_COLORS[category])}>
-                  {CATEGORY_LABELS[category]}
+                  {t(`agentSelector.categories.${category.toLowerCase()}`)}
                 </span>
               </button>
 
@@ -186,7 +180,7 @@ export function AgentSelector({ selected, onChange }: AgentSelectorProps) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className={cn('text-xs font-medium', isSelected ? 'text-foreground' : 'text-foreground/80')}>
-                            {agent.name}
+                            {t(`agentSelector.agents.${agent.id}.name`, { defaultValue: agent.name })}
                           </span>
                           <span className="text-[9px] text-muted-foreground/60 font-mono truncate">
                             {agent.id}
@@ -194,12 +188,12 @@ export function AgentSelector({ selected, onChange }: AgentSelectorProps) {
                           {isCore && (
                             <span className="flex items-center gap-0.5 text-[9px] text-accent-warning/80">
                               <Lock className="w-2.5 h-2.5" />
-                              core
+                              {t('agentSelector.coreBadge')}
                             </span>
                           )}
                         </div>
                         <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                          {agent.description}
+                          {t(`agentSelector.agents.${agent.id}.description`, { defaultValue: agent.description })}
                         </p>
                       </div>
                     </button>

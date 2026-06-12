@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { CheckCircle2, AlertTriangle, RefreshCw, XCircle, Package } from 'lucide-react'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
@@ -11,23 +13,34 @@ interface Props {
   onMoreInfo?: () => void
 }
 
-function formatVersionLabel(item: SetupPrerequisite): string {
+function formatVersionLabel(item: SetupPrerequisite, t: TFunction): string {
   if (item.error === 'corrupted-bundle') {
-    return 'bundle corrupted — reinstall app'
+    return t('setup:prerequisites.corruptedBundle')
   }
-  if (!item.installed) return 'not installed'
+  if (!item.installed) return t('setup:prerequisites.notInstalled')
   if (item.executable === false) {
-    const where = item.resolvedPath ? ` at ${item.resolvedPath}` : ''
-    const why = item.executionError ? ` (${item.executionError})` : ''
-    return `found${where} but failed to execute${why}`
+    if (item.resolvedPath && item.executionError) {
+      return t('setup:prerequisites.failedToExecuteAtWithError', { path: item.resolvedPath, error: item.executionError })
+    }
+    if (item.resolvedPath) {
+      return t('setup:prerequisites.failedToExecuteAt', { path: item.resolvedPath })
+    }
+    if (item.executionError) {
+      return t('setup:prerequisites.failedToExecuteWithError', { error: item.executionError })
+    }
+    return t('setup:prerequisites.failedToExecute')
   }
   if (!item.meetsMinimum && item.minVersion) {
-    return `${item.version ?? 'unknown'} found — needs ${item.minVersion}+`
+    return t('setup:prerequisites.needsMinimum', {
+      version: item.version ?? t('setup:prerequisites.unknownVersion'),
+      minVersion: item.minVersion,
+    })
   }
-  return item.version ?? 'installed'
+  return item.version ?? t('setup:prerequisites.installedLabel')
 }
 
 export function PrerequisitesPanel({ status, isLoading, error, onRefresh, onMoreInfo }: Props) {
+  const { t } = useTranslation('setup')
   if (isLoading && !status) {
     return (
       <div
@@ -51,7 +64,7 @@ export function PrerequisitesPanel({ status, isLoading, error, onRefresh, onMore
         className="rounded-lg border border-border/40 bg-background/40 px-3 py-2"
       >
         <p className="text-[11px] text-muted-foreground">
-          Could not verify developer tools locally — install will validate.
+          {t('prerequisites.verifyError')}
         </p>
       </div>
     )
@@ -69,7 +82,7 @@ export function PrerequisitesPanel({ status, isLoading, error, onRefresh, onMore
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <CheckCircle2 className="w-4 h-4 text-accent-success flex-shrink-0" />
-            <p className="text-xs font-medium text-foreground">All required tools detected</p>
+            <p className="text-xs font-medium text-foreground">{t('prerequisites.allDetected')}</p>
           </div>
           {onRefresh && (
             <Button
@@ -81,7 +94,7 @@ export function PrerequisitesPanel({ status, isLoading, error, onRefresh, onMore
               className="h-7 px-2 gap-1.5 text-[11px] flex-shrink-0"
             >
               <RefreshCw className={cn('w-3 h-3', isLoading && 'animate-spin')} />
-              Refresh
+              {t('common:actions.refresh')}
             </Button>
           )}
         </div>
@@ -117,13 +130,13 @@ export function PrerequisitesPanel({ status, isLoading, error, onRefresh, onMore
           <div className="min-w-0">
             <p className="text-xs font-medium text-foreground">
               {allMissingAreCorrupted
-                ? 'App bundle corrupted'
-                : `${missingCount} developer tool${missingCount === 1 ? '' : 's'} required`}
+                ? t('prerequisites.bundleCorruptedTitle')
+                : t('prerequisites.toolsRequired', { count: missingCount })}
             </p>
             <p className="text-[11px] text-muted-foreground">
               {allMissingAreCorrupted
-                ? 'Reinstall the SpecRails Hub app to restore bundled tools.'
-                : 'Install the missing tools to continue.'}
+                ? t('prerequisites.reinstallHint')
+                : t('prerequisites.installMissingHint')}
             </p>
           </div>
         </div>
@@ -137,7 +150,7 @@ export function PrerequisitesPanel({ status, isLoading, error, onRefresh, onMore
               className="h-7 px-2 gap-1.5 text-[11px]"
               data-testid="prerequisites-more-info"
             >
-              More info
+              {t('prerequisites.moreInfo')}
             </Button>
           )}
           {onRefresh && (
@@ -150,7 +163,7 @@ export function PrerequisitesPanel({ status, isLoading, error, onRefresh, onMore
               className="h-7 px-2 gap-1.5 text-[11px]"
             >
               <RefreshCw className={cn('w-3 h-3', isLoading && 'animate-spin')} />
-              Refresh
+              {t('common:actions.refresh')}
             </Button>
           )}
         </div>
@@ -193,11 +206,11 @@ export function PrerequisitesPanel({ status, isLoading, error, onRefresh, onMore
                   className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium bg-accent-secondary/20 text-accent-secondary border border-accent-secondary/30"
                 >
                   <Package className="w-2.5 h-2.5" />
-                  bundled
+                  {t('prerequisites.bundledBadge')}
                 </span>
               )}
               <span className={cn('text-muted-foreground', isCorrupted && 'text-destructive/80')}>
-                — {formatVersionLabel(item)}
+                — {formatVersionLabel(item, t)}
               </span>
             </li>
           )

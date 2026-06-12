@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -37,6 +38,7 @@ export function RoutingRuleDialog({
   onConfirm,
   onCancel,
 }: Props) {
+  const { t } = useTranslation('agents')
   const [tags, setTags] = useState('')
   const [agent, setAgent] = useState(chainAgents[0] ?? '')
 
@@ -62,44 +64,46 @@ export function RoutingRuleDialog({
     <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel() }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{mode === 'edit' ? 'Edit routing rule' : 'Add routing rule'}</DialogTitle>
+          <DialogTitle>{mode === 'edit' ? t('routingRule.editTitle') : t('routingRule.addTitle')}</DialogTitle>
           <DialogDescription>
             {mode === 'edit'
-              ? 'Update the tags or target agent for this rule.'
-              : 'Add a tag-matched routing rule using lowercase kebab-case tags.'}
+              ? t('routingRule.editDescription')
+              : t('routingRule.addDescription')}
           </DialogDescription>
         </DialogHeader>
         <div className="py-2 space-y-3">
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">
-              Tags
+              {t('routingRule.tagsLabel')}
             </label>
             <Input
               autoFocus
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               placeholder="frontend, ui"
-              aria-label="Tags"
+              aria-label={t('routingRule.tagsLabel')}
               className="text-sm font-mono"
             />
             <p className="text-[11px] text-muted-foreground mt-1">
-              Comma-separated. Use lowercase kebab-case like <code>frontend</code> or <code>api-design</code>.
+              <Trans t={t} i18nKey="routingRule.tagsHint" components={{ code: <code /> }} />
             </p>
             {invalidTags.length > 0 && (
               <p className="text-[11px] text-red-400 mt-1">
-                Invalid tag{invalidTags.length === 1 ? '' : 's'}: {invalidTags.join(', ')}.
-                Tags must use lowercase letters, digits, and hyphens only.
+                {t('routingRule.invalidTags', {
+                  count: invalidTags.length,
+                  tags: invalidTags.join(', '),
+                })}
               </p>
             )}
           </div>
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">
-              Route to
+              {t('routingRule.routeToLabel')}
             </label>
             <select
               value={agent}
               onChange={(e) => setAgent(e.target.value)}
-              aria-label="Route to"
+              aria-label={t('routingRule.routeToLabel')}
               className="w-full h-9 px-2 text-sm rounded-md border border-border bg-background"
             >
               {chainAgents.map((a) => (
@@ -107,20 +111,20 @@ export function RoutingRuleDialog({
               ))}
             </select>
             <p className="text-[11px] text-muted-foreground mt-1">
-              Only agents in this profile's chain can be routing targets.
+              {t('routingRule.routeToHint')}
             </p>
           </div>
         </div>
         <DialogFooter>
           <Button variant="ghost" size="sm" onClick={onCancel}>
-            Cancel
+            {t('common:actions.cancel')}
           </Button>
           <Button
             size="sm"
             onClick={() => onConfirm(parsedTags, agent)}
             disabled={!canConfirm}
           >
-            {mode === 'edit' ? 'Save changes' : 'Add rule'}
+            {mode === 'edit' ? t('routingRule.saveChanges') : t('routingRule.addRule')}
           </Button>
         </DialogFooter>
       </DialogContent>

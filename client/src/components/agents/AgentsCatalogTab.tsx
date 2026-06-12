@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { Plus, Pencil, Copy, Sparkles, Loader2, FileText, Search, X, Tag, Wand2 } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import { Button } from '../ui/button'
@@ -28,6 +29,7 @@ type RefineMode =
   | { kind: 'open'; projectId: string; agentId: string; baseBody: string; resumeRefineId?: string }
 
 export function AgentsCatalogTab() {
+  const { t } = useTranslation('agents')
   const [agents, setAgents] = useState<CatalogAgent[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [body, setBody] = useState<string | null>(null)
@@ -61,7 +63,7 @@ export function AgentsCatalogTab() {
     minimize({
       kind: 'ai-edit',
       projectId: cur.projectId,
-      label: `AI Edit · ${cur.agentId}`,
+      label: t('catalog.aiEditChipLabel', { agentId: cur.agentId }),
       restoreRoute: '/agents',
       params: {
         agentId: cur.agentId,
@@ -69,7 +71,7 @@ export function AgentsCatalogTab() {
         resumeRefineId: liveRefineRef.current.refineId ?? cur.resumeRefineId,
       },
     })
-  }, [minimize])
+  }, [minimize, t])
 
   // Restore from a chip click → re-open the AI Refine overlay with the
   // previously parked refine session id. If a different refine is currently
@@ -92,7 +94,7 @@ export function AgentsCatalogTab() {
     setLoading(true)
     fetch(`${getApiBase()}/profiles/catalog`)
       .then((r) => {
-        if (!r.ok) throw new Error(`Catalog load failed: ${r.status}`)
+        if (!r.ok) throw new Error(t('catalog.errors.loadFailed', { status: r.status }))
         return r.json() as Promise<{ agents: CatalogAgent[] }>
       })
       .then((data) => {
@@ -122,7 +124,7 @@ export function AgentsCatalogTab() {
     setBody(null)
     fetch(`${getApiBase()}/profiles/catalog/${encodeURIComponent(id)}`)
       .then((r) => {
-        if (!r.ok) throw new Error(`Agent body load failed: ${r.status}`)
+        if (!r.ok) throw new Error(t('catalog.errors.bodyLoadFailed', { status: r.status }))
         return r.json() as Promise<{ id: string; body: string }>
       })
       .then((data) => {
@@ -148,7 +150,7 @@ export function AgentsCatalogTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-sm text-muted-foreground">Loading catalog…</p>
+        <p className="text-sm text-muted-foreground">{t('catalog.loading')}</p>
       </div>
     )
   }
@@ -207,7 +209,7 @@ export function AgentsCatalogTab() {
           minimize({
             kind: 'ai-edit',
             projectId,
-            label: `AI Edit · ${agentId}`,
+            label: t('catalog.aiEditChipLabel', { agentId }),
             restoreRoute: '/agents',
             params: {
               agentId,
@@ -263,14 +265,16 @@ export function AgentsCatalogTab() {
         <div className="flex-shrink-0 px-6 pt-5 pb-3 border-b border-border">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
-              <FileText className="w-4 h-4 text-accent-primary" /> Agent template library
+              <FileText className="w-4 h-4 text-accent-primary" /> {t('catalog.templates.title')}
               <span className="text-[11px] font-normal text-muted-foreground ml-1">
-                {templateResults.length} of {AGENT_TEMPLATES.length}
+                {t('catalog.templates.countOf', {
+                  shown: templateResults.length,
+                  total: AGENT_TEMPLATES.length,
+                })}
               </span>
             </DialogTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              Start from a curated template across engineering, product, science, health, legal,
-              and more. Pick one and open it in the Studio for review and editing before saving.
+              {t('catalog.templates.description')}
             </p>
           </DialogHeader>
 
@@ -280,7 +284,7 @@ export function AgentsCatalogTab() {
             <input
               value={templateSearch}
               onChange={(e) => setTemplateSearch(e.target.value)}
-              placeholder="Search by name, description, tag, or category…"
+              placeholder={t('catalog.templates.searchPlaceholder')}
               className="w-full h-9 pl-8 pr-8 text-sm rounded-md border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
               autoFocus
             />
@@ -298,7 +302,7 @@ export function AgentsCatalogTab() {
           {/* Category chips */}
           <div className="flex gap-1.5 overflow-x-auto mt-3 pb-1 scrollbar-thin">
             <CategoryChip
-              label="All"
+              label={t('catalog.templates.allCategories')}
               count={AGENT_TEMPLATES.length}
               active={templateCategory === 'all'}
               onClick={() => setTemplateCategory('all')}
@@ -317,7 +321,7 @@ export function AgentsCatalogTab() {
           {/* Active tag filter */}
           {templateTag && (
             <div className="flex items-center gap-2 mt-2">
-              <span className="text-[11px] text-muted-foreground">Tag filter:</span>
+              <span className="text-[11px] text-muted-foreground">{t('catalog.templates.tagFilter')}</span>
               <button
                 type="button"
                 onClick={() => setTemplateTag(null)}
@@ -335,7 +339,7 @@ export function AgentsCatalogTab() {
           {templateResults.length === 0 ? (
             <div className="h-full flex items-center justify-center text-center">
               <div className="max-w-sm">
-                <div className="text-sm text-muted-foreground">No templates match your filters.</div>
+                <div className="text-sm text-muted-foreground">{t('catalog.templates.noMatch')}</div>
                 <button
                   type="button"
                   onClick={() => {
@@ -345,36 +349,36 @@ export function AgentsCatalogTab() {
                   }}
                   className="text-xs text-accent-primary hover:underline mt-2"
                 >
-                  Clear filters
+                  {t('catalog.templates.clearFilters')}
                 </button>
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {templateResults.map((t) => (
+              {templateResults.map((tpl) => (
                 <button
-                  key={t.id}
+                  key={tpl.id}
                   type="button"
                   onClick={() => {
                     closeTemplates()
-                    setStudio({ kind: 'create', initialBody: t.body, initialName: t.nameHint })
+                    setStudio({ kind: 'create', initialBody: tpl.body, initialName: tpl.nameHint })
                   }}
                   className="group text-left p-4 rounded-lg border border-border bg-card/40 hover:border-accent-primary/50 hover:bg-accent/40 hover:shadow-sm transition-all"
                 >
                   <div className="flex items-start gap-3 mb-2">
-                    <span className="text-2xl leading-none mt-0.5">{t.emoji}</span>
+                    <span className="text-2xl leading-none mt-0.5">{tpl.emoji}</span>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold text-foreground group-hover:text-accent-primary truncate">
-                        {t.label}
+                        {tpl.label}
                       </div>
-                      <div className="text-[10px] text-muted-foreground mt-0.5">{t.category}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">{tpl.category}</div>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 min-h-[2lh]">
-                    {t.blurb}
+                    {tpl.blurb}
                   </p>
                   <div className="flex flex-wrap gap-1 mt-3">
-                    {t.tags.slice(0, 5).map((tag) => (
+                    {tpl.tags.slice(0, 5).map((tag) => (
                       <span
                         key={tag}
                         role="button"
@@ -401,10 +405,10 @@ export function AgentsCatalogTab() {
                   </div>
                   <div className="mt-3 pt-2 border-t border-border/40 flex items-center justify-between">
                     <code className="text-[10px] font-mono text-muted-foreground/70 truncate">
-                      {t.nameHint}
+                      {tpl.nameHint}
                     </code>
                     <span className="text-[10px] text-accent-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                      Open in Studio →
+                      {t('catalog.templates.openInStudio')}
                     </span>
                   </div>
                 </button>
@@ -416,10 +420,10 @@ export function AgentsCatalogTab() {
         {/* Footer */}
         <div className="flex-shrink-0 px-6 py-3 border-t border-border flex items-center justify-between">
           <span className="text-[11px] text-muted-foreground">
-            Tip: click a tag pill on any card to filter by that tag.
+            {t('catalog.templates.tip')}
           </span>
           <Button variant="ghost" size="sm" onClick={closeTemplates}>
-            Cancel
+            {t('common:actions.cancel')}
           </Button>
         </div>
       </DialogContent>
@@ -439,13 +443,13 @@ export function AgentsCatalogTab() {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-accent-primary" /> Generate a custom agent
+            <Sparkles className="w-4 h-4 text-accent-primary" /> {t('catalog.generate.title')}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3 py-2">
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">
-              Agent id
+              {t('catalog.generate.agentIdLabel')}
             </label>
             <Input
               value={genName}
@@ -455,17 +459,17 @@ export function AgentsCatalogTab() {
               disabled={generating}
             />
             <p className="text-[11px] text-muted-foreground mt-1">
-              Must start with <code>custom-</code>.
+              <Trans t={t} i18nKey="catalog.generate.agentIdHint" components={{ code: <code /> }} />
             </p>
           </div>
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">
-              Describe what this agent should do
+              {t('catalog.generate.descriptionLabel')}
             </label>
             <textarea
               value={genDescription}
               onChange={(e) => setGenDescription(e.target.value)}
-              placeholder="e.g. Review Terraform/IaC changes and flag security misconfigurations, excessive IAM permissions, and public S3 buckets before merging. Conservative and terse."
+              placeholder={t('catalog.generate.descriptionPlaceholder')}
               className="w-full text-sm p-2 rounded border border-border bg-background min-h-[120px] resize-y"
               disabled={generating}
             />
@@ -476,9 +480,7 @@ export function AgentsCatalogTab() {
             </div>
           )}
           <p className="text-[11px] text-muted-foreground">
-            Claude will draft a full <code>.md</code> body. You'll review it in the Studio and
-            can edit before saving. This spawns a one-shot claude invocation and can take up to
-            90 seconds.
+            <Trans t={t} i18nKey="catalog.generate.note" components={{ code: <code /> }} />
           </p>
         </div>
         <DialogFooter>
@@ -488,7 +490,7 @@ export function AgentsCatalogTab() {
             onClick={() => setGenerateOpen(false)}
             disabled={generating}
           >
-            Cancel
+            {t('common:actions.cancel')}
           </Button>
           <Button
             size="sm"
@@ -497,11 +499,11 @@ export function AgentsCatalogTab() {
           >
             {generating ? (
               <>
-                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Generating…
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> {t('catalog.generate.generating')}
               </>
             ) : (
               <>
-                <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Generate
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" /> {t('catalog.generate.generateButton')}
               </>
             )}
           </Button>
@@ -521,7 +523,7 @@ export function AgentsCatalogTab() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? `Generate failed: ${res.status}`)
+        throw new Error(err.error ?? t('catalog.errors.generateFailed', { status: res.status }))
       }
       const data = (await res.json()) as { draft: string }
       // Close modal, open Studio in create mode with the draft
@@ -538,7 +540,7 @@ export function AgentsCatalogTab() {
   const duplicate = async (fromId: string) => {
     try {
       const res = await fetch(`${getApiBase()}/profiles/catalog/${encodeURIComponent(fromId)}`)
-      if (!res.ok) throw new Error(`Load failed: ${res.status}`)
+      if (!res.ok) throw new Error(t('catalog.errors.agentLoadFailed', { status: res.status }))
       const data = (await res.json()) as { body: string }
       setStudio({ kind: 'duplicate', from: fromId, initialBody: data.body })
     } catch (e) {
@@ -551,20 +553,24 @@ export function AgentsCatalogTab() {
       <>
         <div className="flex items-center justify-center h-full">
           <div className="text-center max-w-sm">
-            <div className="text-sm font-medium text-foreground">No agents installed</div>
+            <div className="text-sm font-medium text-foreground">{t('catalog.empty.title')}</div>
             <div className="text-xs text-muted-foreground mt-1 mb-4">
-              Run <code className="text-foreground">npx specrails-core@latest update</code> in this
-              project to install the upstream agents, or create a custom agent now.
+              <Trans
+                t={t}
+                i18nKey="catalog.empty.body"
+                values={{ command: 'npx specrails-core@latest update' }}
+                components={{ code: <code className="text-foreground" /> }}
+              />
             </div>
             <div className="flex gap-2 justify-center flex-wrap">
               <Button size="sm" onClick={() => setGenerateOpen(true)}>
-                <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Generate with Claude
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" /> {t('catalog.actions.generateWithClaude')}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setTemplatesOpen(true)}>
-                <FileText className="w-3.5 h-3.5 mr-1.5" /> Template
+                <FileText className="w-3.5 h-3.5 mr-1.5" /> {t('catalog.actions.template')}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setStudio({ kind: 'create' })}>
-                <Plus className="w-3.5 h-3.5 mr-1.5" /> Blank
+                <Plus className="w-3.5 h-3.5 mr-1.5" /> {t('catalog.actions.blank')}
               </Button>
             </div>
           </div>
@@ -588,10 +594,10 @@ export function AgentsCatalogTab() {
       <aside className="w-72 flex-shrink-0 border-r border-border flex flex-col">
         <div className="px-3 py-2 border-b border-border">
           <div className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1.5">
-            Catalog
+            {t('catalog.sidebar.title')}
           </div>
           <div className="text-[10px] text-muted-foreground/70 mb-2">
-            Create a custom agent:
+            {t('catalog.sidebar.createLabel')}
           </div>
           <div className="flex gap-1">
             <Button
@@ -599,34 +605,34 @@ export function AgentsCatalogTab() {
               variant="ghost"
               className="flex-1 h-7 text-[11px] px-2"
               onClick={() => setTemplatesOpen(true)}
-              title="Start from a template"
+              title={t('catalog.actions.templateTitle')}
             >
-              <FileText className="w-3 h-3 mr-1" /> Template
+              <FileText className="w-3 h-3 mr-1" /> {t('catalog.actions.template')}
             </Button>
             <Button
               size="sm"
               variant="ghost"
               className="flex-1 h-7 text-[11px] px-2"
               onClick={() => setGenerateOpen(true)}
-              title="Generate with Claude"
+              title={t('catalog.actions.generateWithClaude')}
             >
-              <Sparkles className="w-3 h-3 mr-1" /> Generate
+              <Sparkles className="w-3 h-3 mr-1" /> {t('catalog.actions.generate')}
             </Button>
             <Button
               size="sm"
               variant="ghost"
               className="flex-1 h-7 text-[11px] px-2"
               onClick={() => setStudio({ kind: 'create' })}
-              title="Start from a blank template"
+              title={t('catalog.actions.blankTitle')}
             >
-              <Plus className="w-3 h-3 mr-1" /> Blank
+              <Plus className="w-3 h-3 mr-1" /> {t('catalog.actions.blank')}
             </Button>
           </div>
         </div>
         <div className="flex-1 overflow-auto p-2">
           <Section
-            title={`Upstream (${upstream.length})`}
-            description="Shipped by specrails-core; read-only."
+            title={t('catalog.sections.upstream', { count: upstream.length })}
+            description={t('catalog.sections.upstreamDescription')}
           >
             {upstream.map((a) => (
               <CatalogRow
@@ -638,12 +644,12 @@ export function AgentsCatalogTab() {
             ))}
           </Section>
           <Section
-            title={`Custom (${custom.length})`}
-            description="Your project's custom-*.md files. Use Template / Generate / Blank above to create one."
+            title={t('catalog.sections.custom', { count: custom.length })}
+            description={t('catalog.sections.customDescription')}
           >
             {custom.length === 0 ? (
               <div className="text-[11px] text-muted-foreground px-2 py-2 italic">
-                No custom agents yet.
+                {t('catalog.sections.noCustomAgents')}
               </div>
             ) : (
               custom.map((a) => (
@@ -675,7 +681,7 @@ export function AgentsCatalogTab() {
                   <KindBadge kind={selected.kind} />
                   {selected.model && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                      default model: {selected.model}
+                      {t('catalog.detail.defaultModel', { model: selected.model })}
                     </span>
                   )}
                 </div>
@@ -685,12 +691,12 @@ export function AgentsCatalogTab() {
               </div>
               <div className="flex gap-2 flex-shrink-0">
                 <Button size="sm" variant="ghost" onClick={() => void duplicate(selected.id)}>
-                  <Copy className="w-3.5 h-3.5 mr-1" /> Duplicate
+                  <Copy className="w-3.5 h-3.5 mr-1" /> {t('common:actions.duplicate')}
                 </Button>
                 {selected.kind === 'custom' && (
                   <>
                     <Button size="sm" variant="ghost" onClick={() => setStudio({ kind: 'edit', agentId: selected.id })}>
-                      <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+                      <Pencil className="w-3.5 h-3.5 mr-1" /> {t('common:actions.edit')}
                     </Button>
                     <Button
                       size="sm"
@@ -709,9 +715,9 @@ export function AgentsCatalogTab() {
                           setError((e as Error).message)
                         }
                       }}
-                      title="Iteratively refine this agent with AI"
+                      title={t('catalog.detail.aiEditTitle')}
                     >
-                      <Wand2 className="w-3.5 h-3.5 mr-1" /> AI Edit
+                      <Wand2 className="w-3.5 h-3.5 mr-1" /> {t('catalog.detail.aiEdit')}
                     </Button>
                   </>
                 )}
@@ -723,11 +729,13 @@ export function AgentsCatalogTab() {
                   .claude/agents/{selected.id}.md
                 </span>
                 <span className="text-[10px] text-muted-foreground flex-shrink-0 ml-2">
-                  {selected.kind === 'upstream' ? 'read-only' : 'editable — use Edit above'}
+                  {selected.kind === 'upstream'
+                    ? t('catalog.detail.readOnly')
+                    : t('catalog.detail.editableHint')}
                 </span>
               </div>
               <pre className="p-4 text-xs font-mono overflow-auto max-h-[60vh] whitespace-pre-wrap break-all">
-                {bodyLoading ? 'Loading…' : body ?? ''}
+                {bodyLoading ? t('common:states.loading') : body ?? ''}
               </pre>
             </div>
           </div>
@@ -824,6 +832,7 @@ function CatalogRow({
 }
 
 function KindBadge({ kind }: { kind: 'upstream' | 'custom' }) {
+  const { t } = useTranslation('agents')
   return (
     <span
       className={
@@ -833,7 +842,7 @@ function KindBadge({ kind }: { kind: 'upstream' | 'custom' }) {
           : 'bg-muted text-muted-foreground')
       }
     >
-      {kind}
+      {kind === 'custom' ? t('catalog.kind.custom') : t('catalog.kind.upstream')}
     </span>
   )
 }

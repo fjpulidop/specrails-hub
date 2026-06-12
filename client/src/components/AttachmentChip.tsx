@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { Attachment } from '../types'
 import { cn } from '../lib/utils'
 
@@ -27,6 +28,7 @@ function iconForMime(mime: string): string {
 }
 
 export function AttachmentChip({ attachment, uploading, onRemove, onClick, index = 0, className }: Props) {
+  const { t } = useTranslation('attachments')
   const [mounted, setMounted] = useState(false)
   const [leaving, setLeaving] = useState(false)
 
@@ -36,10 +38,10 @@ export function AttachmentChip({ attachment, uploading, onRemove, onClick, index
     return () => clearTimeout(t)
   }, [index])
 
-  const name = attachment?.filename ?? uploading?.name ?? 'file'
+  const name = attachment?.filename ?? uploading?.name ?? t('chip.genericFile')
   const mime = attachment?.mimeType ?? 'application/octet-stream'
   const subtitle = uploading
-    ? 'Uploading…'
+    ? t('chip.uploading')
     : attachment
       ? formatBytes(attachment.size)
       : ''
@@ -78,7 +80,7 @@ export function AttachmentChip({ attachment, uploading, onRemove, onClick, index
         <button
           type="button"
           onClick={handleRemove}
-          aria-label={`Remove ${name}`}
+          aria-label={t('removeFile', { name })}
           className="ml-0.5 w-5 h-5 inline-flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
         >
           ×

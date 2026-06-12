@@ -1,4 +1,5 @@
 import { useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Send, Sparkles, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { RichAttachmentEditor, type RichAttachmentEditorHandle } from './RichAttachmentEditor'
@@ -31,12 +32,16 @@ export function AiEditComposer({
   onCancel,
   disabled,
   busy,
-  placeholder = 'Describe the changes you want…',
-  submitLabel = 'Submit',
+  placeholder,
+  submitLabel,
   className,
-  title = 'AI Edit',
+  title,
   subtitle,
 }: Props) {
+  const { t } = useTranslation('aiedit')
+  const resolvedPlaceholder = placeholder ?? t('composer.placeholder')
+  const resolvedSubmitLabel = submitLabel ?? t('composer.submit')
+  const resolvedTitle = title ?? t('composer.title')
   const editorRef = useRef<RichAttachmentEditorHandle | null>(null)
 
   const handleSubmit = useCallback(() => {
@@ -56,7 +61,7 @@ export function AiEditComposer({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-primary/80" />
-          <span className="text-sm font-medium text-foreground">{title}</span>
+          <span className="text-sm font-medium text-foreground">{resolvedTitle}</span>
           {subtitle && <span className="text-[11px] text-muted-foreground">· {subtitle}</span>}
         </div>
         <Button
@@ -65,7 +70,7 @@ export function AiEditComposer({
           className="h-7 w-7 p-0"
           onClick={onCancel}
           disabled={busy}
-          aria-label="Close"
+          aria-label={t('common:actions.close')}
         >
           <X className="w-4 h-4" />
         </Button>
@@ -74,11 +79,11 @@ export function AiEditComposer({
       <RichAttachmentEditor
         ref={editorRef}
         ticketKey={ticketKey}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         minHeight={120}
         autoFocus
         disabled={disabled || busy}
-        ariaLabel={title}
+        ariaLabel={resolvedTitle}
         onAttachmentAdded={(a) => {
           onAttachmentAdded(a)
           onSessionIdsChange(Array.from(new Set([...sessionIds, a.id])))
@@ -86,18 +91,18 @@ export function AiEditComposer({
         onAttachmentRemoved={(a) => {
           onSessionIdsChange(sessionIds.filter((id) => id !== a.id))
         }}
-        onUnsupportedFile={(f) => toast.error(`Unsupported file type: ${f.name}`)}
-        onUploadError={(err, f) => toast.error(`Upload failed for ${f.name}: ${err.message}`)}
+        onUnsupportedFile={(f) => toast.error(t('composer.unsupportedFileType', { name: f.name }))}
+        onUploadError={(err, f) => toast.error(t('composer.uploadFailed', { name: f.name, message: err.message }))}
         onSubmit={handleSubmit}
       />
 
       <div className="flex items-center justify-end mt-3 gap-2">
         <Button variant="ghost" size="sm" onClick={onCancel} disabled={busy}>
-          Cancel
+          {t('common:actions.cancel')}
         </Button>
         <Button size="sm" onClick={handleSubmit} disabled={disabled || busy} className="gap-1.5">
           <Send className="w-3.5 h-3.5" />
-          {submitLabel}
+          {resolvedSubmitLabel}
         </Button>
       </div>
     </div>

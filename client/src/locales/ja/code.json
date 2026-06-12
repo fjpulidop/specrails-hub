@@ -1,0 +1,113 @@
+{
+  "page": {
+    "resizeFileTree": "ファイルツリーのサイズを変更",
+    "selectFile": "プレビューするファイルを選択してください。"
+  },
+  "resizer": {
+    "hint": "ドラッグでサイズ変更。ダブルクリックでリセット。"
+  },
+  "toolbar": {
+    "scope": "スコープ",
+    "allAi": "すべての AI",
+    "spec": "スペック",
+    "ticketIdPlaceholder": "id",
+    "copyFilePath": "ファイルパスをコピー",
+    "generateSummary": "要約を生成",
+    "regenerateSummary": "要約を再生成",
+    "generating": "生成中…",
+    "regenerating": "再生成中…",
+    "summaryUnavailable": "要約は利用できません: {{reason}}",
+    "jobContext": "ジョブコンテキスト",
+    "clear": "クリア"
+  },
+  "provenancePanel": {
+    "jobTitle": "ジョブ {{jobId}}",
+    "specTitle": "スペック #{{ticketId}}",
+    "touchedFiles_one": "変更ファイル {{count}} 件",
+    "touchedFiles_other": "変更ファイル {{count}} 件",
+    "log": "ログ"
+  },
+  "kind": {
+    "created": "作成",
+    "modified": "変更",
+    "deleted": "削除"
+  },
+  "action": {
+    "added": "追加",
+    "changed": "変更",
+    "deleted": "削除"
+  },
+  "viewer": {
+    "loadingFile": "ファイルを読み込み中…",
+    "showSummary": "要約を表示",
+    "markdownViewMode": "Markdown 表示モード",
+    "preview": "プレビュー",
+    "raw": "Raw",
+    "missingFile": "このファイルは AI ジョブによって変更されましたが、作業ツリーにはもう存在しません。",
+    "binaryFile": "バイナリファイルです。",
+    "tooLarge": "ファイルが大きすぎてプレビューできません ({{size}} MB)。",
+    "noContent": "表示できる内容がありません。",
+    "pathCopied": "パスをコピーしました",
+    "copyPathFailed": "パスをコピーできませんでした",
+    "budgetPrompt": "予算上限を超過して実行しますか？"
+  },
+  "summary": {
+    "generationFailed": "要約の生成に失敗しました",
+    "skipped": "要約をスキップしました: {{reason}}",
+    "unavailable": "要約は利用できません: {{reason}}。",
+    "empty": "このファイルの要約はまだありません。",
+    "stale": "古い",
+    "hide": "非表示",
+    "reason": {
+      "missing": "ファイルが存在しません",
+      "binary": "バイナリファイル",
+      "tooLarge": "ファイルが大きすぎます"
+    }
+  },
+  "history": {
+    "resize": "AI 変更履歴のサイズを変更",
+    "title_one": "AI 変更履歴 · {{count}} 件の変更",
+    "title_other": "AI 変更履歴 · {{count}} 件の変更",
+    "show": "表示",
+    "hide": "非表示",
+    "unknownJob": "不明なジョブ",
+    "filterByJob": "ジョブ {{jobId}} でコードを絞り込み",
+    "diff": "差分",
+    "openSpec": "スペック #{{ticketId}} を開く",
+    "specChip": "スペック #{{ticketId}}",
+    "loadingDiff": "差分を読み込み中...",
+    "diffUnavailable": "この過去の変更の差分は利用できません。新しいジョブからはパッチが自動的に保存されます。",
+    "diffTruncated": "[差分は切り捨てられました]"
+  },
+  "tree": {
+    "jobFiles": "ジョブのファイル",
+    "specFiles": "スペックのファイル",
+    "touchedByAi": "AI が変更",
+    "allFiles": "すべてのファイル",
+    "collapseAll": "すべてのフォルダを折りたたむ",
+    "expandAll": "すべてのフォルダを展開",
+    "touchedCount_one": "AI が変更したファイル {{count}} 件",
+    "touchedCount_other": "AI が変更したファイル {{count}} 件",
+    "loadingFiles": "ファイルを読み込み中…",
+    "emptyTouched": "AI が変更したファイルはまだありません。ジョブを実行するか、「すべてのファイル」に切り替えてください。",
+    "showAllFiles": "すべてのファイルを表示",
+    "noFiles": "ファイルがありません。",
+    "folderTouched_one": "このフォルダ以下に AI が変更したファイルが {{count}} 件あります",
+    "folderTouched_other": "このフォルダ以下に AI が変更したファイルが {{count}} 件あります",
+    "jobTitle": "ジョブ {{jobId}}",
+    "createdBySpec": "スペック #{{id}} の実装中に作成",
+    "modifiedBySpec": "スペック #{{id}} の実装中に変更",
+    "latestTitleCreated": "最新の AI ジョブがこのファイルを追加しました",
+    "latestTitleModified": "最新の AI ジョブがこのファイルを変更しました",
+    "latestTitleDeleted": "最新の AI ジョブがこのファイルを削除しました"
+  },
+  "monaco": {
+    "loadFailed": "コードビューアの読み込みに失敗しました。",
+    "reload": "再読み込み",
+    "loadingEditor": "エディタを読み込み中…"
+  },
+  "ticketFiles": {
+    "title": "このチケットが変更したファイル",
+    "jobTitle": "ジョブ {{jobId}}"
+  }
+}

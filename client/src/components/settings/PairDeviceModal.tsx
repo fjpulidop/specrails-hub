@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { toast } from 'sonner'
+import { useTranslation, Trans } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -37,6 +38,7 @@ function base64url(input: string): string {
 /** Renders the pairing QR + live claim/approve flow. Polls the loopback admin
  *  API (no WS needed for a short-lived modal). */
 export function PairDeviceModal({ open, onClose, onPaired }: { open: boolean; onClose: () => void; onPaired: () => void }) {
+  const { t } = useTranslation('settings')
   const [qr, setQr] = useState<QrPayload | null>(null)
   const [state, setState] = useState<PairState>({ status: 'none' })
   const [error, setError] = useState<string | null>(null)
@@ -93,11 +95,11 @@ export function PairDeviceModal({ open, onClose, onPaired }: { open: boolean; on
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setState({ status: 'approved' })
       stopPolling()
-      toast.success('Device paired')
+      toast.success(t('pairDevice.pairedToast'))
       onPaired()
       setTimeout(close, 1200)
     } catch (e) {
-      toast.error(`Approve failed: ${(e as Error).message}`)
+      toast.error(t('pairDevice.approveFailed', { message: (e as Error).message }))
     }
   }
 
@@ -112,40 +114,45 @@ export function PairDeviceModal({ open, onClose, onPaired }: { open: boolean; on
     <Dialog open={open} onOpenChange={(o) => { if (!o) close() }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Pair a device</DialogTitle>
+          <DialogTitle>{t('pairDevice.title')}</DialogTitle>
           <DialogDescription>
-            Open SpecRails Companion on your phone and scan this code. It only works while this dialog is open.
+            {t('pairDevice.description')}
           </DialogDescription>
         </DialogHeader>
 
-        {error && <p className="text-sm text-destructive">Could not start pairing: {error}</p>}
+        {error && <p className="text-sm text-destructive">{t('pairDevice.startFailed', { error })}</p>}
 
         {state.status === 'claimed' && state.device ? (
           <div className="flex flex-col items-center gap-4 py-4">
             <p className="text-sm text-center">
-              <span className="font-semibold">{state.device.name}</span> ({state.device.platform}) wants to pair.
+              <Trans
+                ns="settings"
+                i18nKey="pairDevice.wantsToPair"
+                values={{ name: state.device.name, platform: state.device.platform }}
+                components={{ b: <span className="font-semibold" /> }}
+              />
             </p>
             <div className="flex gap-3">
-              <Button variant="outline" onClick={deny}>Deny</Button>
-              <Button onClick={approve}>Approve</Button>
+              <Button variant="outline" onClick={deny}>{t('pairDevice.deny')}</Button>
+              <Button onClick={approve}>{t('pairDevice.approve')}</Button>
             </div>
           </div>
         ) : state.status === 'approved' ? (
-          <p className="py-6 text-center text-accent-success font-medium">✓ Paired</p>
+          <p className="py-6 text-center text-accent-success font-medium">{t('pairDevice.paired')}</p>
         ) : qr ? (
           <div className="flex flex-col items-center gap-3 py-2">
             <div className="bg-white p-3 rounded-lg">
               <QRCodeSVG value={deepLink} size={220} />
             </div>
             <p className="text-xs text-muted-foreground text-center">
-              Waiting for a device… (on {qr.addrs[0] ?? 'this hub'}:{qr.port})
+              {t('pairDevice.waiting', { host: qr.addrs[0] ?? t('pairDevice.thisHub'), port: qr.port })}
             </p>
             <button
               type="button"
               className="text-xs text-accent-info underline"
-              onClick={() => { void navigator.clipboard?.writeText(deepLink); toast.success('Pairing code copied') }}
+              onClick={() => { void navigator.clipboard?.writeText(deepLink); toast.success(t('pairDevice.codeCopied')) }}
             >
-              Copy code (for "Enter manually")
+              {t('pairDevice.copyCode')}
             </button>
           </div>
         ) : (

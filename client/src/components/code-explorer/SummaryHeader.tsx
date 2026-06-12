@@ -1,4 +1,5 @@
 import { ChevronUp } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 import { useTicketDetailModal } from '../../context/TicketDetailModalContext'
 
@@ -21,12 +22,12 @@ interface SummaryHeaderProps {
   onCollapse?: () => void
 }
 
-function humanise(iso: string | undefined): string | null {
+function humanise(iso: string | undefined, locale: string): string | null {
   if (!iso) return null
   const t = Date.parse(iso)
   if (Number.isNaN(t)) return null
   const deltaSec = Math.round((t - Date.now()) / 1000)
-  const fmt = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+  const fmt = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
   const abs = Math.abs(deltaSec)
   if (abs < 60) return fmt.format(deltaSec, 'second')
   if (abs < 3600) return fmt.format(Math.round(deltaSec / 60), 'minute')
@@ -35,6 +36,7 @@ function humanise(iso: string | undefined): string | null {
 }
 
 export function SummaryHeader({ path, summary, stale, regenerating, generateDisabledReason, onCollapse }: SummaryHeaderProps) {
+  const { t, i18n } = useTranslation('code')
   const { openTicketDetail } = useTicketDetailModal()
 
   if (!summary) {
@@ -44,7 +46,7 @@ export function SummaryHeader({ path, summary, stale, regenerating, generateDisa
         <div className="flex flex-col gap-0.5 min-w-0">
           <span className="text-xs text-muted-foreground truncate">{path}</span>
           <p className="text-sm text-muted-foreground">
-            {generateDisabledReason ? `Summary unavailable: ${generateDisabledReason}.` : 'No summary for this file yet.'}
+            {generateDisabledReason ? t('summary.unavailable', { reason: generateDisabledReason }) : t('summary.empty')}
           </p>
         </div>
           {onCollapse && (
@@ -54,7 +56,7 @@ export function SummaryHeader({ path, summary, stale, regenerating, generateDisa
               className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted/50 hover:text-foreground"
             >
               <ChevronUp className="h-3.5 w-3.5" />
-              Hide
+              {t('summary.hide')}
             </button>
           )}
         </div>
@@ -62,7 +64,7 @@ export function SummaryHeader({ path, summary, stale, regenerating, generateDisa
     )
   }
 
-  const ts = humanise(summary.generatedAt)
+  const ts = humanise(summary.generatedAt, i18n.language)
   const triggered = summary.triggeredBy?.ticketId
   const modified = summary.triggeredBy?.modifiedTicketIds ?? []
 
@@ -79,7 +81,7 @@ export function SummaryHeader({ path, summary, stale, regenerating, generateDisa
                 )}
                 data-testid="summary-stale-badge"
               >
-                Stale
+                {t('summary.stale')}
               </span>
             )}
             {regenerating && (
@@ -117,7 +119,7 @@ export function SummaryHeader({ path, summary, stale, regenerating, generateDisa
             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted/50 hover:text-foreground"
           >
             <ChevronUp className="h-3.5 w-3.5" />
-            Hide
+            {t('summary.hide')}
           </button>
         )}
       </div>

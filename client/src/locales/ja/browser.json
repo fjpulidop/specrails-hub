@@ -1,0 +1,105 @@
+{
+  "modal": {
+    "dialogLabel": "ブラウザキャプチャ",
+    "nav": {
+      "forward": "進む",
+      "reload": "再読み込み"
+    },
+    "address": {
+      "placeholder": "URL を入力して Go を押してください…",
+      "label": "アドレスバー",
+      "go": "Go"
+    },
+    "viewport": {
+      "groupLabel": "ビューポートサイズ",
+      "presetLabel": "ビューポート {{preset}}",
+      "presetTitle": "ビューポート: {{preset}}",
+      "fit": "フィット",
+      "desktop": "デスクトップ",
+      "tablet": "タブレット",
+      "mobile": "モバイル"
+    },
+    "network": {
+      "ariaLabel": "ネットワークリクエストをキャプチャ",
+      "titleOn": "ページのネットワークリクエストをキャプチャ中 (クリックで無効化)",
+      "titleOff": "ネットワークキャプチャはオフ (クリックで有効化)",
+      "button": "ネットワーク"
+    },
+    "allSizes": {
+      "ariaLabel": "すべての画面サイズでキャプチャ",
+      "titleOn": "この要素をデスクトップ・タブレット・モバイルでキャプチャします (クリックで無効化)",
+      "titleOff": "すべてのサイズでキャプチャ: デスクトップ・タブレット・モバイル",
+      "button": "全サイズ"
+    },
+    "select": {
+      "active": "要素をクリックするかドラッグ…",
+      "start": "選択してスペックを作成",
+      "hint": "ハイライトされた要素をクリックしてキャプチャするか、任意の矩形をドラッグしてください。パンくず (または ↑/↓) で調整できます。Esc でキャンセル。"
+    },
+    "closeBrowser": "ブラウザを閉じる",
+    "status": {
+      "connecting": "ブラウザに接続中…",
+      "unavailable": "ブラウザを利用できません",
+      "opening": "ブラウザを起動中…",
+      "capturing": "キャプチャ中…"
+    },
+    "error": {
+      "unavailable": "ブラウザを利用できません。",
+      "devHint": "開発環境では <cmd>npx playwright install chromium</cmd> を一度実行してください。デスクトップアプリには Chromium が同梱されています。"
+    },
+    "breadcrumb": {
+      "hint": "↑ 親 · ↓ 子"
+    },
+    "toast": {
+      "captured": "ページの選択範囲をキャプチャしました",
+      "captureFailed": "キャプチャに失敗しました"
+    }
+  },
+  "editor": {
+    "tools": {
+      "arrow": "矢印 (A)",
+      "box": "ボックス (R)",
+      "text": "テキスト (T)",
+      "blur": "ぼかし / 黒塗り (B)",
+      "step": "ステップ番号 (N)"
+    },
+    "notePrompt": "メモのテキスト:",
+    "colorLabel": "色 {{color}}",
+    "undo": "元に戻す",
+    "undoTitle": "元に戻す (⌘Z)",
+    "redo": "やり直す",
+    "redoTitle": "やり直す (⌘⇧Z)",
+    "capturedAlt": "キャプチャした選択範囲",
+    "discardConfirm": "注釈を破棄しますか？",
+    "reselect": "再選択",
+    "createSpec": "スペックを作成",
+    "skipContinue": "スキップして続行"
+  },
+  "domPanel": {
+    "header": "キャプチャしたページ · {{title}}",
+    "badge": {
+      "elements_one": "{{count}} 要素",
+      "elements_other": "{{count}} 要素",
+      "tokens": "トークン",
+      "requests": "{{count}} req",
+      "truncated": "切り捨て"
+    },
+    "removeLabel": "キャプチャしたページコンテキストを削除",
+    "noMarkup": "(マークアップは取得されていません)",
+    "appliedCss": "適用された CSS",
+    "appliedCssTruncated": "適用された CSS (切り捨て)",
+    "designTokens": "デザイントークン",
+    "fonts": "フォント:",
+    "copyJson": "JSON としてコピー",
+    "copied": "コピーしました！",
+    "network_one": "ネットワーク · {{count}} 件のリクエスト",
+    "network_other": "ネットワーク · {{count}} 件のリクエスト"
+  },
+  "session": {
+    "connectionError": "接続エラー",
+    "lostConnection": "ブラウザとの接続が切れました。「ウェブサイトから」を閉じて開き直してください。",
+    "tooManySessions": "開いているブラウザセッションが多すぎます。1 つ閉じてから再試行してください。",
+    "launchFailed": "サーバーでブラウザの起動に失敗しました。",
+    "openFailed": "ブラウザを開けませんでした。"
+  }
+}

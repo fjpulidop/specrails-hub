@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Split, ArrowUp } from 'lucide-react'
 import type { LocalTicket, TicketPriority } from '../../types'
 
@@ -43,6 +44,7 @@ export interface EpicFamilySidebarProps {
  * caller can render unconditionally without an empty wrapper.
  */
 export function EpicFamilySidebar({ ticket, allTickets, onOpenTicket }: EpicFamilySidebarProps) {
+  const { t } = useTranslation('activity')
   const isEpic = ticket.is_epic === true
   const isChild = ticket.parent_epic_id != null
 
@@ -53,11 +55,11 @@ export function EpicFamilySidebar({ ticket, allTickets, onOpenTicket }: EpicFami
     const children = sortChildren(allTickets.filter((t) => t.parent_epic_id === ticket.id))
     return (
       <FamilyList
-        header={`Sub-Specs (${children.length})`}
+        header={t('family.subSpecsHeader', { count: children.length })}
         rows={children}
         currentId={ticket.id}
         onOpenTicket={onOpenTicket}
-        emptyMessage="No Sub-Specs. Use Re-SMASH to regenerate."
+        emptyMessage={t('family.emptySubSpecs')}
       />
     )
   }
@@ -70,11 +72,11 @@ export function EpicFamilySidebar({ ticket, allTickets, onOpenTicket }: EpicFami
   const rows: LocalTicket[] = epic ? [epic, ...siblings] : siblings
   return (
     <FamilyList
-      header={`Family (${siblings.length} Sub-Spec${siblings.length === 1 ? '' : 's'})`}
+      header={t('family.familyHeader', { count: siblings.length })}
       rows={rows}
       currentId={ticket.id}
       onOpenTicket={onOpenTicket}
-      emptyMessage="No siblings."
+      emptyMessage={t('family.noSiblings')}
     />
   )
 }
@@ -88,6 +90,7 @@ interface FamilyListProps {
 }
 
 function FamilyList({ header, rows, currentId, onOpenTicket, emptyMessage }: FamilyListProps) {
+  const { t } = useTranslation('activity')
   return (
     <div data-testid="epic-family-sidebar">
       <div className="flex items-center gap-1.5 mb-1.5">
@@ -100,17 +103,17 @@ function FamilyList({ header, rows, currentId, onOpenTicket, emptyMessage }: Fam
         <p className="text-[10px] text-foreground/50 italic">{emptyMessage}</p>
       ) : (
         <ul className="flex flex-col gap-0.5">
-          {rows.map((t) => {
-            const isCurrent = t.id === currentId
-            const isEpicRow = t.is_epic === true
+          {rows.map((row) => {
+            const isCurrent = row.id === currentId
+            const isEpicRow = row.is_epic === true
             const ariaLabel = isEpicRow
-              ? `Open parent Epic ${t.title}`
-              : `Open Sub-Spec ${t.title}`
+              ? t('family.openParentEpic', { title: row.title })
+              : t('family.openSubSpec', { title: row.title })
             return (
-              <li key={t.id}>
+              <li key={row.id}>
                 <button
                   type="button"
-                  onClick={() => { if (!isCurrent) onOpenTicket(t.id) }}
+                  onClick={() => { if (!isCurrent) onOpenTicket(row.id) }}
                   disabled={isCurrent}
                   aria-label={ariaLabel}
                   aria-current={isCurrent ? 'page' : undefined}
@@ -120,26 +123,26 @@ function FamilyList({ header, rows, currentId, onOpenTicket, emptyMessage }: Fam
                       ? 'bg-accent-highlight/15 cursor-default'
                       : 'hover:bg-muted/30 cursor-pointer',
                   ].join(' ')}
-                  data-testid={`epic-family-row-${t.id}`}
+                  data-testid={`epic-family-row-${row.id}`}
                 >
                   {isEpicRow ? (
                     <ArrowUp className="w-3 h-3 text-accent-highlight flex-shrink-0" aria-hidden />
                   ) : (
                     <span className="text-[9px] tabular-nums text-foreground/40 w-3 text-center flex-shrink-0">
-                      {t.execution_order ?? '–'}
+                      {row.execution_order ?? '–'}
                     </span>
                   )}
                   <span
-                    className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${priorityDotClass(t.priority)}`}
+                    className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${priorityDotClass(row.priority)}`}
                     aria-hidden
                   />
                   <span
                     className={`text-[11px] truncate ${
                       isCurrent ? 'text-foreground font-medium' : 'text-foreground/80'
                     }`}
-                    title={t.title}
+                    title={row.title}
                   >
-                    {t.title}
+                    {row.title}
                   </span>
                 </button>
               </li>

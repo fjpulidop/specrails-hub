@@ -1,0 +1,75 @@
+{
+  "topBar": {
+    "title": "Terminal",
+    "openCliMulti": "Ouvrir une CLI IA dans un nouveau terminal",
+    "openCli": "Ouvrir {{cli}} dans un nouveau terminal",
+    "maxTerminals": "Max {{max}} terminaux par projet",
+    "openInBrowser": "Ouvrir dans le navigateur",
+    "pasteScript": "Coller le script rapide dans le terminal actif",
+    "pasteScriptNoActive": "Aucun terminal actif où coller",
+    "newTerminal": "Nouveau terminal",
+    "killActive": "Tuer le terminal actif",
+    "restorePanel": "Restaurer le panneau",
+    "maximizePanel": "Agrandir le panneau"
+  },
+  "panelChevron": {
+    "collapse": "Replier le panneau du terminal",
+    "expand": "Déplier le panneau du terminal"
+  },
+  "dragHandle": {
+    "resize": "Redimensionner le panneau du terminal"
+  },
+  "sidebar": {
+    "rename": "Renommer {{name}}",
+    "close": "Fermer {{name}}"
+  },
+  "emptyState": {
+    "noTerminals": "Aucun terminal pour ce projet pour l'instant.",
+    "newTerminal": "Nouveau terminal"
+  },
+  "search": {
+    "placeholder": "Rechercher",
+    "previous": "Précédent (Maj+Entrée)",
+    "next": "Suivant (Entrée)",
+    "matchCase": "Respecter la casse",
+    "regex": "Regex",
+    "wholeWord": "Mot entier",
+    "close": "Fermer (Échap)"
+  },
+  "contextMenu": {
+    "paste": "Coller",
+    "selectAll": "Tout sélectionner",
+    "clear": "Effacer",
+    "search": "Rechercher…",
+    "saveScrollback": "Enregistrer l'historique dans un fichier…",
+    "openPath": "Ouvrir {{path}}"
+  },
+  "cliMenu": {
+    "open": "Ouvrir {{name}}"
+  },
+  "shortcutMenu": {
+    "configureBrowserUrl": "Configurer l'URL du navigateur dans les paramètres…",
+    "editQuickScript": "Modifier le script rapide dans les paramètres…"
+  },
+  "errors": {
+    "limitReached": "Limite de terminaux atteinte (max {{max}}).",
+    "spawnFailed": "Le shell n'a pas pu démarrer — le hub manque peut-être de descripteurs de fichiers. Essayez de redémarrer le hub.",
+    "invalidName": "Nom de terminal invalide.",
+    "openFailed": "Échec de l'ouverture du terminal.",
+    "serverUnreachable": "Impossible de joindre le serveur pour ouvrir un terminal.",
+    "exitedImmediately": "Le terminal s'est fermé immédiatement — le shell n'a peut-être pas pu démarrer. Si cela se reproduit, redémarrez le hub."
+  },
+  "session": {
+    "processExited": "[processus terminé]",
+    "processExitedWithCode": "[processus terminé (code {{code}})]"
+  },
+  "notifications": {
+    "commandFinished": "Commande terminée",
+    "commandFinishedNamed": "{{command}} terminée",
+    "finishedBody": "exit {{code}} en {{elapsed}}"
+  },
+  "duration": {
+    "seconds": "{{seconds}}s",
+    "minutesSeconds": "{{minutes}}m {{seconds}}s"
+  }
+}

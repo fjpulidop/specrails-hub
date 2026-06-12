@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getApiBase } from '../../lib/api'
 
 interface AnalyticsRow {
@@ -16,13 +17,14 @@ interface AnalyticsResponse {
   rows: AnalyticsRow[]
 }
 
-const WINDOW_OPTIONS: Array<{ label: string; days: number }> = [
-  { label: '7d', days: 7 },
-  { label: '30d', days: 30 },
-  { label: '90d', days: 90 },
+const WINDOW_OPTIONS: Array<{ days: number }> = [
+  { days: 7 },
+  { days: 30 },
+  { days: 90 },
 ]
 
 export function ProfileAnalyticsCard() {
+  const { t } = useTranslation('agents')
   const [data, setData] = useState<AnalyticsResponse | null>(null)
   const [windowDays, setWindowDays] = useState(30)
   const [loading, setLoading] = useState(true)
@@ -52,9 +54,9 @@ export function ProfileAnalyticsCard() {
       <div className="mx-6 my-4 rounded-md border border-border bg-muted/20">
         <div className="flex items-center justify-between px-4 py-2 border-b border-border">
           <div>
-            <div className="text-xs font-medium text-foreground">Profile usage</div>
+            <div className="text-xs font-medium text-foreground">{t('usage.title')}</div>
             <div className="text-[11px] text-muted-foreground">
-              Jobs launched per profile in the selected window.
+              {t('usage.subtitleEmpty')}
             </div>
           </div>
           <div className="flex gap-0.5">
@@ -70,13 +72,13 @@ export function ProfileAnalyticsCard() {
                     : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground')
                 }
               >
-                {opt.label}
+                {t('usage.windowLabel', { days: opt.days })}
               </button>
             ))}
           </div>
         </div>
         <div className="px-4 py-8 text-xs text-muted-foreground">
-          No profile-scoped jobs yet.
+          {t('usage.empty')}
         </div>
       </div>
     )
@@ -88,9 +90,9 @@ export function ProfileAnalyticsCard() {
     <div className="mx-6 my-4 rounded-md border border-border bg-muted/20">
       <div className="flex items-center justify-between px-4 py-2 border-b border-border">
         <div>
-          <div className="text-xs font-medium text-foreground">Profile usage</div>
+          <div className="text-xs font-medium text-foreground">{t('usage.title')}</div>
           <div className="text-[11px] text-muted-foreground">
-            Jobs launched per profile in the last {data.windowDays} days.
+            {t('usage.subtitle', { count: data.windowDays })}
           </div>
         </div>
         <div className="flex gap-0.5">
@@ -106,7 +108,7 @@ export function ProfileAnalyticsCard() {
                   : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground')
               }
             >
-              {opt.label}
+              {t('usage.windowLabel', { days: opt.days })}
             </button>
           ))}
         </div>
@@ -122,28 +124,29 @@ export function ProfileAnalyticsCard() {
               />
             </div>
             <div className="flex gap-4 text-[11px] text-muted-foreground min-w-0 flex-shrink-0">
-              <span title="jobs">
-                <span className="text-foreground font-mono">{row.jobs}</span> jobs
+              <span title={t('usage.jobsTooltip')}>
+                <span className="text-foreground font-mono">{row.jobs}</span>{' '}
+                {t('usage.jobsLabel', { count: row.jobs })}
               </span>
-              <span title="success rate">
+              <span title={t('usage.successRateTooltip')}>
                 <span className="text-foreground font-mono">
                   {Math.round(row.successRate * 100)}%
                 </span>{' '}
-                ok
+                {t('usage.okSuffix')}
               </span>
               {row.avgDurationMs != null && (
-                <span title="avg duration">
+                <span title={t('usage.avgDurationTooltip')}>
                   <span className="text-foreground font-mono">
                     {formatDuration(row.avgDurationMs)}
                   </span>
                 </span>
               )}
               {row.avgTokens != null && (
-                <span title="avg tokens">
+                <span title={t('usage.avgTokensTooltip')}>
                   <span className="text-foreground font-mono">
                     {formatTokens(row.avgTokens)}
                   </span>{' '}
-                  tok
+                  {t('usage.tokensSuffix')}
                 </span>
               )}
             </div>

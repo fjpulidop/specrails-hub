@@ -1,0 +1,186 @@
+{
+  "palette": {
+    "label": "Befehlspalette",
+    "searchPlaceholder": "Projekte, Befehle, Jobs durchsuchen...",
+    "noResults": "Keine Ergebnisse gefunden.",
+    "activeBadge": "aktiv",
+    "groups": {
+      "projects": "Projekte",
+      "spec": "Spec",
+      "jobs": "Jobs",
+      "navigation": "Navigation"
+    },
+    "nav": {
+      "dashboard": "Dashboard",
+      "hubAnalytics": "Hub-Analytics",
+      "projectAnalytics": "Projekt-Analytics",
+      "activityFeed": "Aktivitäts-Feed",
+      "hubSettings": "Hub-Einstellungen",
+      "docs": "Doku"
+    },
+    "sidebar": {
+      "collapseLeftKeepPinned": "Linke Seitenleiste einklappen (angepinnt lassen)",
+      "unpinLeft": "Linke Seitenleiste lösen",
+      "pinLeftOpen": "Linke Seitenleiste offen anpinnen",
+      "collapseRightKeepPinned": "Rechte Seitenleiste einklappen (angepinnt lassen)",
+      "unpinRight": "Rechte Seitenleiste lösen",
+      "pinRightOpen": "Rechte Seitenleiste offen anpinnen"
+    },
+    "footer": {
+      "navigate": "navigieren",
+      "select": "auswählen",
+      "close": "schließen"
+    }
+  },
+  "toasts": {
+    "queued": "{{name}} eingereiht",
+    "queuing": "{{name}} wird eingereiht..."
+  },
+  "errors": {
+    "spawnFailed": "Befehl konnte nicht gestartet werden"
+  },
+  "grid": {
+    "sections": {
+      "discovery": "Discovery",
+      "discoverySubtitle": "Produkt erkunden & definieren",
+      "delivery": "Delivery",
+      "deliverySubtitle": "Features bauen & ausliefern",
+      "others": "Sonstige"
+    },
+    "displayNames": {
+      "proposeSpec": "Custom-Propose",
+      "updateBacklog": "Auto-propose",
+      "productBacklog": "Auto-Select Specs"
+    },
+    "emptyState": {
+      "title": "Keine Befehle installiert",
+      "hint": "Führe <1>/setup</1> in Claude Code aus, um die specrails-Befehle zu installieren"
+    },
+    "runs_one": "{{count}} Lauf",
+    "runs_other": "{{count}} Läufe",
+    "tooltip": {
+      "opensWizard": "Öffnet einen geführten Assistenten"
+    }
+  },
+  "shortcuts": {
+    "title": "Tastaturkürzel",
+    "subtitle": "Drücke an beliebiger Stelle <1>?</1>, um dieses Panel umzuschalten",
+    "categories": {
+      "general": "Allgemein",
+      "navigation": "Navigation",
+      "actions": "Aktionen"
+    },
+    "items": {
+      "showCheatsheet": "Tastaturkürzel anzeigen",
+      "closeModal": "Modal / Seitenleiste schließen",
+      "toggleRightSidebar": "Rechte Seitenleiste umschalten",
+      "toggleLeftSidebar": "Linke Seitenleiste umschalten",
+      "toggleTerminal": "Terminal-Panel umschalten",
+      "navigateProjectPageWithAgents": "Zu Projektseite navigieren (Dashboard/Jobs/Analytics/Agenten/Einstellungen)",
+      "navigateProjectPage": "Zu Projektseite navigieren (Dashboard/Jobs/Analytics/Einstellungen)",
+      "switchProject": "Projekt nach Position wechseln",
+      "goDashboard": "Zum Dashboard",
+      "goActivity": "Zu Aktivität / Jobs",
+      "goAnalytics": "Zu Analytics",
+      "goSettings": "Zu den Einstellungen",
+      "nextItem": "Nächstes Listenelement",
+      "prevItem": "Vorheriges Listenelement"
+    }
+  },
+  "update": {
+    "title": {
+      "available": "Update verfügbar",
+      "downloading": "Update wird heruntergeladen",
+      "installing": "Update wird installiert",
+      "ready": "Update bereit",
+      "error": "Update fehlgeschlagen"
+    },
+    "desc": {
+      "available": "Eine neue Version von SpecRails Hub ist bereit zur Installation.",
+      "fetching": "Lade {{size}}…",
+      "progress": "{{percent}} % · {{downloaded}} von {{total}}",
+      "installing": "Signatur wird geprüft und abgeschlossen…",
+      "ready": "Neu starten, um Version {{version}} zu starten.",
+      "errorFallback": "Update konnte nicht abgeschlossen werden. Bitte erneut versuchen."
+    },
+    "pill": {
+      "downloading": "Wird heruntergeladen",
+      "installing": "Wird installiert",
+      "ready": "Bereit"
+    },
+    "actions": {
+      "restart": "Neu starten",
+      "later": "Später",
+      "update": "Aktualisieren",
+      "installing": "Wird installiert…",
+      "tryAgain": "Erneut versuchen",
+      "dismiss": "Schließen"
+    },
+    "mockReady": "Mock-Update bereit – Neustart übersprungen",
+    "errors": {
+      "installFailed": "Update konnte nicht installiert werden"
+    },
+    "units": {
+      "kb": "{{value}} KB",
+      "mb": "{{value}} MB"
+    }
+  },
+  "notifications": {
+    "jobCompleted": "Job abgeschlossen",
+    "jobFailed": "Job fehlgeschlagen",
+    "unknownCommand": "Unbekannter Befehl"
+  },
+  "templates": {
+    "emptyState": {
+      "title": "Noch keine Vorlagen.",
+      "hint": "Speichere Befehlssequenzen, um sie mit einem Klick auszuführen."
+    },
+    "createButton": "Vorlage erstellen",
+    "newButton": "Neue Vorlage",
+    "steps_one": "{{count}} Schritt",
+    "steps_other": "{{count}} Schritte",
+    "moreCommands_one": "+{{count}} weiterer",
+    "moreCommands_other": "+{{count}} weitere",
+    "run": "Ausführen",
+    "queuing": "Wird eingereiht…",
+    "aria": {
+      "edit": "Vorlage bearbeiten",
+      "delete": "Vorlage löschen"
+    },
+    "confirmDelete": "Vorlage „{{name}}“ löschen?",
+    "toasts": {
+      "queuedJobs_one": "{{count}} Job aus „{{name}}“ eingereiht",
+      "queuedJobs_other": "{{count}} Jobs aus „{{name}}“ eingereiht",
+      "deleted": "Vorlage „{{name}}“ gelöscht"
+    },
+    "errors": {
+      "runFailed": "Vorlage konnte nicht ausgeführt werden",
+      "deleteFailed": "Vorlage konnte nicht gelöscht werden"
+    }
+  },
+  "templateDialog": {
+    "editTitle": "Vorlage bearbeiten",
+    "newTitle": "Neue Vorlage",
+    "nameLabel": "Name",
+    "namePlaceholder": "z. B. Komplette Pipeline",
+    "descriptionLabel": "Beschreibung (optional)",
+    "descriptionPlaceholder": "Was macht dieses Rail?",
+    "stepsLabel": "Schritte (Befehle oder freie Prompts)",
+    "stepPlaceholder": "Befehl auswählen oder freien Prompt eingeben...",
+    "aria": {
+      "moveUp": "Nach oben verschieben",
+      "removeStep": "Schritt entfernen"
+    },
+    "update": "Aktualisieren",
+    "create": "Erstellen",
+    "errors": {
+      "nameRequired": "Name ist erforderlich",
+      "stepRequired": "Mindestens ein Schritt ist erforderlich",
+      "saveFailed": "Vorlage konnte nicht gespeichert werden"
+    },
+    "toasts": {
+      "updated": "Vorlage aktualisiert",
+      "created": "Vorlage erstellt"
+    }
+  }
+}

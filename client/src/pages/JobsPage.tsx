@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 import { usePipeline } from '../hooks/usePipeline'
 import { useProjectCache } from '../hooks/useProjectCache'
 import { RecentJobs } from '../components/RecentJobs'
@@ -14,6 +15,7 @@ import { getApiBase } from '../lib/api'
 import { useHub } from '../hooks/useHub'
 
 export default function JobsPage() {
+  const { t } = useTranslation('jobs')
   const { activeProjectId } = useHub()
   const { recentJobs } = usePipeline(activeProjectId)
 
@@ -81,19 +83,19 @@ export default function JobsPage() {
     try {
       const res = await fetch(`${getApiBase()}/propose/${proposalId}`, { method: 'DELETE' })
       if (res.ok) {
-        toast.success('Proposal deleted')
+        toast.success(t('page.proposalDeleted'))
         refreshJobs()
       }
     } catch { /* ignore */ }
-  }, [refreshJobs])
+  }, [refreshJobs, t])
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-sm font-semibold">Jobs</h1>
+        <h1 className="text-sm font-semibold">{t('page.title')}</h1>
         <ExportDropdown
           baseUrl={`${getApiBase()}/jobs/export`}
-          label="Export Jobs"
+          label={t('page.exportJobs')}
         />
       </div>
 
@@ -111,7 +113,7 @@ export default function JobsPage() {
             <>
               <DialogHeader>
                 <div className="flex items-center gap-2">
-                  <DialogTitle className="flex-1 min-w-0">Proposal</DialogTitle>
+                  <DialogTitle className="flex-1 min-w-0">{t('page.proposal.title')}</DialogTitle>
                   <Badge variant={detailProposal.status === 'created' ? 'success' : detailProposal.status === 'cancelled' ? 'destructive' : 'secondary'}>
                     {detailProposal.status}
                   </Badge>
@@ -127,11 +129,11 @@ export default function JobsPage() {
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground py-4 text-center">No proposal content yet.</p>
+                <p className="text-xs text-muted-foreground py-4 text-center">{t('page.proposal.noContent')}</p>
               )}
               {detailProposal.issue_url && (
                 <div className="text-xs">
-                  GitHub Issue:{' '}
+                  {t('page.proposal.githubIssue')}{' '}
                   <a href={detailProposal.issue_url} target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:underline">
                     {detailProposal.issue_url}
                   </a>
@@ -143,9 +145,9 @@ export default function JobsPage() {
                   size="sm"
                   onClick={() => { handleProposalDelete(detailProposal.id); setDetailProposal(null) }}
                 >
-                  Delete
+                  {t('common:actions.delete')}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setDetailProposal(null)}>Close</Button>
+                <Button variant="ghost" size="sm" onClick={() => setDetailProposal(null)}>{t('common:actions.close')}</Button>
               </DialogFooter>
             </>
           )}

@@ -1,0 +1,41 @@
+{
+  "removeFile": "Retirer {{name}}",
+  "errors": {
+    "uploadFailed": "Échec de l'envoi ({{status}})",
+    "uploadFailedFile": "Échec de l'envoi : {{name}}",
+    "deleteFailed": "Échec de la suppression ({{status}})",
+    "bulkDeleteFailed": "Échec de la suppression groupée ({{status}})",
+    "listFailed": "Échec du listage ({{status}})",
+    "fetchFailed": "Échec de la récupération ({{status}})",
+    "removeFailed": "Échec du retrait de la pièce jointe",
+    "loadFailed": "Échec du chargement de la pièce jointe"
+  },
+  "chip": {
+    "uploading": "Envoi…",
+    "genericFile": "fichier"
+  },
+  "editor": {
+    "attachFiles": "Joindre des fichiers",
+    "uploadingFiles_one": "Envoi de {{count}} fichier…",
+    "uploadingFiles_other": "Envoi de {{count}} fichiers…",
+    "dropToAddContext": "Déposez pour ajouter du contexte"
+  },
+  "section": {
+    "ariaLabel": "Pièces jointes",
+    "title": "Ressources",
+    "fileCount_one": "{{count}} fichier",
+    "fileCount_other": "{{count}} fichiers"
+  },
+  "lightbox": {
+    "preview": "Aperçu de {{name}}",
+    "backToHub": "Retour au hub",
+    "download": "Télécharger",
+    "downloadFile": "Télécharger {{name}}",
+    "loading": "Chargement de la pièce jointe...",
+    "loadError": "Impossible de charger la pièce jointe : {{error}}",
+    "previewUnavailable": "Aperçu non disponible pour ce type de fichier."
+  },
+  "sessionBar": {
+    "empty": "Aucune ressource épinglée — déposez des fichiers ou cliquez sur Ajouter"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "removeFile": "Remove {{name}}",
+  "errors": {
+    "uploadFailed": "Upload failed ({{status}})",
+    "uploadFailedFile": "Upload failed: {{name}}",
+    "deleteFailed": "Delete failed ({{status}})",
+    "bulkDeleteFailed": "Bulk delete failed ({{status}})",
+    "listFailed": "List failed ({{status}})",
+    "fetchFailed": "Fetch failed ({{status}})",
+    "removeFailed": "Failed to remove attachment",
+    "loadFailed": "Failed to load attachment"
+  },
+  "chip": {
+    "uploading": "Uploading…",
+    "genericFile": "file"
+  },
+  "editor": {
+    "attachFiles": "Attach files",
+    "uploadingFiles_one": "Uploading {{count}} file…",
+    "uploadingFiles_other": "Uploading {{count}} files…",
+    "dropToAddContext": "Drop to add context"
+  },
+  "section": {
+    "ariaLabel": "Attachments",
+    "title": "Resources",
+    "fileCount_one": "{{count}} file",
+    "fileCount_other": "{{count}} files"
+  },
+  "lightbox": {
+    "preview": "Preview {{name}}",
+    "backToHub": "Back to hub",
+    "download": "Download",
+    "downloadFile": "Download {{name}}",
+    "loading": "Loading attachment...",
+    "loadError": "Could not load attachment: {{error}}",
+    "previewUnavailable": "Preview not available for this file type."
+  },
+  "sessionBar": {
+    "empty": "No pinned resources — drop files or click Add"
+  }
+}

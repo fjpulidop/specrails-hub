@@ -1,0 +1,108 @@
+{
+  "feed": {
+    "title": "Atividade",
+    "emptyTitle": "Ainda não há atividade",
+    "emptyHint": "Os eventos de jobs aparecerão aqui quando houver jobs em execução",
+    "allLoaded": "Toda a atividade carregada",
+    "typeStarted": "Iniciado",
+    "phaseCommand": "Fase: {{phase}} → {{state}}",
+    "relativeTime": {
+      "seconds": "há {{value}}s",
+      "minutes": "há {{value}}m",
+      "hours": "há {{value}}h",
+      "days": "há {{value}}d"
+    }
+  },
+  "specGen": {
+    "generating": "A gerar... {{elapsed}}",
+    "generatedIn": "Gerado em {{elapsed}}",
+    "specCreated": "Spec criada",
+    "view": "Ver",
+    "errorGenerating": "Erro ao gerar a spec",
+    "couldNotFind": "Não foi possível encontrar a spec gerada",
+    "couldNotConfirm": "Não foi possível confirmar a criação da spec"
+  },
+  "contractRefine": {
+    "refining": "A refinar contrato…",
+    "retryRejected": "Repetição rejeitada",
+    "retryRejectedWithError": "Repetição rejeitada: {{error}}",
+    "retryFailed": "Falha ao repetir: {{message}}",
+    "skipped": "Contract layer ignorada — ticket guardado sem ela",
+    "reason": "Motivo: {{reason}}",
+    "added": "Contract layer adicionada · {{title}}"
+  },
+  "smash": {
+    "stage": {
+      "analyzing": "A analisar a spec…",
+      "identifying": "A identificar subtarefas…",
+      "ordering": "A ordenar a execução…"
+    },
+    "onTitled": "SMASH em “{{title}}”",
+    "onThisSpec": "SMASH nesta spec",
+    "split_one": "Spec dividida em {{count}} Sub-Spec",
+    "split_other": "Spec dividida em {{count}} Sub-Specs",
+    "undoAction": "Anular",
+    "undone": "SMASH anulado",
+    "undoFailed": "Falha ao anular",
+    "undoFailedWithReason": "Falha ao anular: {{reason}}",
+    "retrying": "A repetir o SMASH…",
+    "couldNotRetry": "Não foi possível repetir",
+    "couldNotRetryWithReason": "Não foi possível repetir: {{reason}}",
+    "retryFailed": "Falha ao repetir: {{message}}",
+    "couldNotComplete": "O SMASH não foi concluído",
+    "failReason": {
+      "invalidOutput": "O agente devolveu um resultado inválido",
+      "timeout": "O agente demorou demasiado tempo",
+      "modelError": "O modelo devolveu um erro",
+      "crashed": "O processo do agente falhou",
+      "generic": "Motivo: {{reason}}"
+    },
+    "couldNotStart": "Não foi possível iniciar o SMASH",
+    "couldNotStartWithReason": "Não foi possível iniciar o SMASH: {{reason}}",
+    "smashFailed": "O SMASH falhou: {{message}}",
+    "couldNotDeleteChildren": "Não foi possível eliminar as Sub-Specs atuais",
+    "deleteFailed": "Falha ao eliminar: {{message}}",
+    "smashButton": "SMASH: dividir Spec em Sub-Specs",
+    "reSmashButton": "Re-SMASH"
+  },
+  "smashModal": {
+    "title": "SMASH: dividir Spec em Sub-Specs",
+    "modePickerLabel": "Modo de decomposição",
+    "reSmashWarning_one": "⚠️ Isto vai eliminar a <strong>{{count}}</strong> Sub-Spec atual e criar novas.",
+    "reSmashWarning_other": "⚠️ Isto vai eliminar as <strong>{{count}}</strong> Sub-Specs atuais e criar novas.",
+    "modes": {
+      "simple": {
+        "title": "Simples",
+        "eta": "~10-30s",
+        "bullet1": "Decomposição one-shot baseada apenas no título e na descrição da spec.",
+        "bullet2": "Sem acesso à codebase — rápido e determinista.",
+        "bullet3": "Ideal para specs limpas com uma Contract Layer sólida."
+      },
+      "full": {
+        "title": "Completo",
+        "eta": "~3-10 min",
+        "bullet1": "Decomposição profunda multi-turno com acesso de leitura à codebase — lê de forma agressiva.",
+        "bullet2": "Cada Sub-Spec é uma super-spec: Contexto, Plano, Ficheiros, Casos Limite, Fora de Âmbito, Testes.",
+        "bullet3": "4-10 critérios de aceitação por Sub-Spec, baseados em caminhos de ficheiros reais.",
+        "bullet4": "Os tokens são gastos sem restrições — qualidade acima de velocidade."
+      }
+    },
+    "starting": "A iniciar…",
+    "confirmReSmash": "Confirmar Re-SMASH",
+    "smash": "SMASH"
+  },
+  "family": {
+    "subSpecsHeader": "Sub-Specs ({{count}})",
+    "emptySubSpecs": "Sem Sub-Specs. Use o Re-SMASH para regenerar.",
+    "familyHeader_one": "Família ({{count}} Sub-Spec)",
+    "familyHeader_other": "Família ({{count}} Sub-Specs)",
+    "noSiblings": "Sem irmãs.",
+    "openParentEpic": "Abrir Epic pai {{title}}",
+    "openSubSpec": "Abrir Sub-Spec {{title}}"
+  },
+  "epicChildren": {
+    "header": "Sub-Specs ({{count}})",
+    "empty": "Sem Sub-Specs. Este Epic ficou vazio — use o Re-SMASH para regenerar.",
+    "step": "· passo {{order}} de {{total}}"
+  }
+}

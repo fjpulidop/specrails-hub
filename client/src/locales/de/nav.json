@@ -1,0 +1,104 @@
+{
+  "sidebarPin": {
+    "withShortcut": "{{label}} ({{shortcut}})",
+    "left": {
+      "pinnedOpen": "Linke Seitenleiste einklappen (angepinnt lassen)",
+      "pinnedCollapsed": "Linke Seitenleiste lösen",
+      "unpinned": "Linke Seitenleiste offen anpinnen"
+    },
+    "right": {
+      "pinnedOpen": "Rechte Seitenleiste einklappen (angepinnt lassen)",
+      "pinnedCollapsed": "Rechte Seitenleiste lösen",
+      "unpinned": "Rechte Seitenleiste offen anpinnen"
+    }
+  },
+  "projects": {
+    "addProject": "Projekt hinzufügen",
+    "remove": "{{name}} entfernen",
+    "confirmRemove": "Entfernen von {{name}} bestätigen",
+    "confirmShort": "bestätigen?",
+    "added": "Projekt hinzugefügt: {{name}}",
+    "removed": "Projekt entfernt"
+  },
+  "arcSidebar": {
+    "hubTitle": "Hub",
+    "docs": "Doku",
+    "analytics": "Analytics",
+    "settings": "Einstellungen"
+  },
+  "rightSidebar": {
+    "projectTitle": "Projekt",
+    "dashboard": "Dashboard",
+    "jobs": "Jobs",
+    "analytics": "Analytics",
+    "agents": "Agenten",
+    "code": "Code",
+    "integrations": "Integrationen",
+    "settings": "Einstellungen"
+  },
+  "navbar": {
+    "home": "Start",
+    "analytics": "Analytics",
+    "docs": "Doku",
+    "settings": "Einstellungen",
+    "noCli": "Keine AI-CLI",
+    "noCliTooltip": "Keine AI-CLI gefunden. Installiere Claude Code oder Codex CLI.",
+    "activeCli": "Aktive CLI: {{label}}"
+  },
+  "statusBar": {
+    "connected": "verbunden",
+    "syncing": "synchronisiere...",
+    "reconnecting": "verbinde neu...",
+    "disconnected": "getrennt",
+    "connectionRestored": "Verbindung wiederhergestellt"
+  },
+  "titleBar": {
+    "searchShortcut": "Suchen (⌘K)",
+    "searchPlaceholder": "Suchen…",
+    "minimizeWindow": "Fenster minimieren",
+    "maximizeWindow": "Fenster maximieren",
+    "closeWindow": "Fenster schließen"
+  },
+  "costAlerts": {
+    "costAlertTitle": "Kostenwarnung",
+    "costAlertDescription": "Job-Kosten ${{cost}} – Schwellenwert ist ${{threshold}}",
+    "dailyBudgetTitle": "Tagesbudget überschritten",
+    "dailyBudgetDescription": "Heute ${{spent}} von ${{budget}} ausgegeben. Warteschlange pausiert.",
+    "hubBudgetTitle": "Hub-Tagesbudget überschritten",
+    "hubBudgetDescription": "Gesamtausgaben des Hubs ${{spent}} von ${{budget}}. Warteschlange pausiert.",
+    "bannerMessage": "Tagesbudget überschritten – ${{spent}} von ${{budget}} ausgegeben. Warteschlange ist pausiert.",
+    "dismiss": "Schließen"
+  },
+  "errorBoundary": {
+    "title": "Etwas ist schiefgelaufen",
+    "occurredIn": "In <strong>{{name}}</strong> ist ein Fehler aufgetreten"
+  },
+  "healthWidget": {
+    "healthLabel": "Health",
+    "notAvailable": "n. v.",
+    "factorCoverageAvailable": "Coverage verfügbar",
+    "factorCoverageGood": "Coverage ≥ 70 %",
+    "factorPipelineGreen": "Letzte Pipeline grün",
+    "factorActiveWeek": "Diese Woche aktiv",
+    "noJobsYet": "Noch keine Jobs",
+    "recurringFailures": "Wiederkehrende Fehler erkannt",
+    "failurePattern": "<cmd>{{command}}</cmd> ist diese Woche <times>{{count}}×</times> fehlgeschlagen – mögliches Projektproblem.",
+    "coverage": "Coverage",
+    "lines": "Zeilen",
+    "functions": "Funktionen",
+    "branches": "Branches",
+    "lastPipeline": "Letzte Pipeline",
+    "recentCommits": "Letzte Commits",
+    "noGitHistory": "Keine Git-Historie gefunden",
+    "minutesAgo": "vor {{count}}m",
+    "hoursAgo": "vor {{count}}h",
+    "daysAgo": "vor {{count}}d"
+  },
+  "collapsibleSection": {
+    "dragToReorder": "Zum Neuanordnen ziehen",
+    "unpinAria": "Abschnitt lösen (wird standardmäßig eingeklappt)",
+    "pinAria": "Abschnitt anpinnen (bleibt ausgeklappt)",
+    "unpinTooltip": "Lösen (standardmäßig einklappen)",
+    "pinTooltip": "Offen anpinnen (bleibt ausgeklappt)"
+  }
+}

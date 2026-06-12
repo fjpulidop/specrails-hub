@@ -1,0 +1,62 @@
+{
+  "toasts": {
+    "railAdded": "已添加 Rail {{n}}",
+    "railRemoved": "已移除 {{rail}}",
+    "railCompleted": "Rail {{n}} 已完成",
+    "railFailed": "Rail {{n}} 失败 — Spec 已退回 Specs",
+    "railEnded": "Rail {{n}} {{status}} — Spec 已退回 Specs",
+    "alreadyOnRail": "已在 {{rail}} 上",
+    "movedToRail": "已移至 {{rail}}",
+    "railRunningStopFirst": "{{rail}} 正在运行 — 请先停止再移除",
+    "removedFromRail": "已从 {{rail}} 移除",
+    "queuedOnRail": "已在 {{rail}} 排队",
+    "queuedOnRailDescription": "Rail 正在运行",
+    "railStopped": "{{rail}} 已停止",
+    "stopFailed": "停止 Rail 失败",
+    "syncTicketsFailed": "同步 Rail 工单失败",
+    "launchFailed": "启动 Rail 失败",
+    "launchNetworkError": "启动 Rail 时网络错误",
+    "railLaunched": "{{rail}} 已启动",
+    "launchDescription_one": "{{mode}}，共 {{count}} 个 Spec",
+    "launchDescription_other": "{{mode}}，共 {{count}} 个 Spec"
+  },
+  "railsBoard": {
+    "title": "Rails",
+    "runningCount_one": "{{count}} 个运行中",
+    "runningCount_other": "{{count}} 个运行中"
+  },
+  "railControls": {
+    "viewJobLog": "查看任务日志",
+    "log": "日志",
+    "implement": "实现",
+    "batch": "批量",
+    "ultra": "Ultra",
+    "ultraTitle": "Ultracode — Claude 自主实现该 Spec，不走流水线",
+    "stop": "停止",
+    "play": "运行",
+    "failedRetry": "任务失败 — 点击重试",
+    "addSpecsFirst": "请先向此 Rail 添加 Spec"
+  },
+  "railRow": {
+    "moveToSpecs": "移至 Specs",
+    "deleteRail": "删除 {{label}}",
+    "dropHere": "拖放到此处",
+    "dropOnThisRail": "拖放到此 Rail",
+    "dragSpecsHere": "将 Spec 拖到此处"
+  },
+  "ultracodeDialog": {
+    "title": "以 Ultracode 模式启动",
+    "context_one": "{{rail}} · {{count}} 个 Spec",
+    "context_other": "{{rail}} · {{count}} 个 Spec",
+    "noPipelineTitle": "无 OpenSpec 流水线。",
+    "noPipelineBody": "完全跳过架构师 → 开发者 → 审查者的结构化流程。",
+    "autonomyTitle": "Claude 原生自主模式。",
+    "autonomyBody": "Claude 使用原生 Agent 和动态工作流自主工作。",
+    "costTitle": "成本不固定。",
+    "costBody": "花费取决于 Claude 的决策 — 可能高于预期。",
+    "continue": "继续"
+  },
+  "useRails": {
+    "fetchFailed": "获取 Rails 失败：{{status}}"
+  }
+}

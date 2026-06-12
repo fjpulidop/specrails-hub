@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect, useId } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { getApiBase } from '../lib/api'
 import { useSharedWebSocket } from './useSharedWebSocket'
@@ -25,6 +26,7 @@ const CONTRACT_LAYER_MARKER = '\n\n---\n\n## Contract Layer\n\n'
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useTickets() {
+  const { t } = useTranslation('tickets')
   const { activeProjectId } = useHub()
   const [tickets, setTickets] = useState<LocalTicket[]>([])
   const [loading, setLoading] = useState(false)
@@ -79,7 +81,7 @@ export function useTickets() {
 
         if (newIds.size > 0 && oldIds.size > 0) {
           setNewTicketIds(newIds)
-          toast.success(`${newIds.size} new ticket${newIds.size > 1 ? 's' : ''} added from product discovery`)
+          toast.success(t('toasts.newTicketsAdded', { count: newIds.size }))
           setTimeout(() => setNewTicketIds(new Set()), GLOW_DURATION_MS)
         }
       })
@@ -88,7 +90,7 @@ export function useTickets() {
         setError((err as Error).message)
       })
       .finally(() => setLoading(false))
-  }, [fetchTickets])
+  }, [fetchTickets, t])
 
   useEffect(() => {
     if (!activeProjectId) {
@@ -149,7 +151,7 @@ export function useTickets() {
         knownIdsRef.current.add(ticket.id)
         setNewTicketIds((prev) => new Set([...prev, ticket.id]))
         if (!isSpecGenInFlight(currentProjectId)) {
-          toast.success(`New ticket: ${ticket.title}`)
+          toast.success(t('toasts.newTicket', { title: ticket.title }))
         }
         setTimeout(() => {
           setNewTicketIds((prev) => {
@@ -208,7 +210,7 @@ export function useTickets() {
         break
       }
     }
-  }, [refetch])
+  }, [refetch, t])
 
   useLayoutEffect(() => {
     registerHandler(`tickets-${handlerId}`, handleMessage)

@@ -1,0 +1,281 @@
+{
+  "wizard": {
+    "configureAgents": "Configurar agentes de {{provider}}",
+    "configureSubtitle": "Escolha que agentes instalar e como executá-los.",
+    "tabs": {
+      "agents": "Agentes",
+      "models": "Modelos"
+    },
+    "skipForNow": "Saltar por agora",
+    "install": "Instalar",
+    "nextProvider": "Seguinte: {{provider}}",
+    "installingProvider": "A instalar {{provider}}…",
+    "installingSpecrails": "A instalar o specrails...",
+    "installingFromTemplates": "A instalar agentes a partir de templates",
+    "waitingForOutput": "A aguardar output...",
+    "checkpoints": {
+      "baseInstall": "Instalação base",
+      "agentSelection": "Seleção de agentes",
+      "agentGeneration": "Geração de agentes"
+    },
+    "steps": {
+      "configure": "Configurar"
+    },
+    "summary": {
+      "agents": "Agentes",
+      "agentSkills": "Skills de agentes",
+      "skills": "Skills",
+      "openspecSkills": "Skills OpenSpec",
+      "legacyRemoved_one": "Removido {{count}} comando legado <code>/specrails:*</code>",
+      "legacyRemoved_other": "Removidos {{count}} comandos legados <code>/specrails:*</code>"
+    },
+    "complete": {
+      "welcome": "Bem-vindo ao <spec>spec</spec><rails>rails</rails>",
+      "configured": "<strong>{{projectName}}</strong> está agora configurado com fluxos de desenvolvimento assistidos por IA. Os seus agentes e comandos especializados estão prontos a usar.",
+      "installedForEngines_one": "Instalado para {{count}} motor",
+      "installedForEngines_other": "Instalado para {{count}} motores",
+      "learnMore": "Saiba como tirar o máximo partido do specrails:",
+      "continueToProject": "Continuar para o projeto"
+    },
+    "error": {
+      "title": "Falha na configuração",
+      "skipSetup": "Saltar configuração",
+      "prereqMissing": "A configuração do SpecRails precisa de Node.js, npm, npx e Git disponíveis no PATH antes de poder instalar este projeto.",
+      "prereqRetryHint": "Instale as ferramentas em falta, reinicie o SpecRails Hub e tente a configuração novamente."
+    }
+  },
+  "addProject": {
+    "title": "Adicionar projeto",
+    "description": "Registe um diretório de projeto para o gerir a partir do hub.",
+    "noProviderDetected": "Nenhuma CLI de IA detetada. Instale primeiro o Claude Code ou a Codex CLI.",
+    "pathLabel": "Caminho do projeto",
+    "pathPlaceholder": "/Users/eu/o-meu-projeto",
+    "pathHint": "Caminho absoluto para a raiz do projeto",
+    "browseForFolder": "Procurar pasta",
+    "selectProjectFolder": "Selecionar a pasta do projeto",
+    "nameLabel": "Nome a apresentar",
+    "optional": "(opcional)",
+    "namePlaceholder": "O Meu Projeto",
+    "nameHint": "Por omissão, o nome do diretório",
+    "providersLabel": "Fornecedores de IA",
+    "notFound": "não encontrado",
+    "multiProviderHint": "Ambos os motores serão configurados. O primeiro é o predefinido do projeto. Não pode ser alterado após a criação.",
+    "singleProviderHint": "Não pode ser alterado depois de o projeto ser criado.",
+    "adding": "A adicionar...",
+    "submit": "Adicionar projeto",
+    "toolsRequired_one": "{{tools}} é necessário para adicionar um projeto",
+    "toolsRequired_other": "{{tools}} são necessários para adicionar um projeto",
+    "errors": {
+      "pathRequired": "O caminho do projeto é obrigatório",
+      "selectProvider": "Selecione pelo menos um fornecedor de IA",
+      "addFailed": "Falha ao adicionar o projeto"
+    },
+    "toasts": {
+      "registered": "Projeto \"{{name}}\" registado"
+    }
+  },
+  "prerequisites": {
+    "corruptedBundle": "bundle corrompido — reinstale a app",
+    "notInstalled": "não instalado",
+    "failedToExecute": "encontrado mas falhou ao executar",
+    "failedToExecuteAt": "encontrado em {{path}} mas falhou ao executar",
+    "failedToExecuteWithError": "encontrado mas falhou ao executar ({{error}})",
+    "failedToExecuteAtWithError": "encontrado em {{path}} mas falhou ao executar ({{error}})",
+    "needsMinimum": "{{version}} encontrado — requer {{minVersion}}+",
+    "unknownVersion": "desconhecida",
+    "installedLabel": "instalado",
+    "verifyError": "Não foi possível verificar as ferramentas de desenvolvimento localmente — a instalação validará.",
+    "allDetected": "Todas as ferramentas necessárias detetadas",
+    "bundleCorruptedTitle": "Bundle da app corrompido",
+    "toolsRequired_one": "{{count}} ferramenta de desenvolvimento necessária",
+    "toolsRequired_other": "{{count}} ferramentas de desenvolvimento necessárias",
+    "reinstallHint": "Reinstale a app SpecRails Hub para restaurar as ferramentas incluídas.",
+    "installMissingHint": "Instale as ferramentas em falta para continuar.",
+    "moreInfo": "Mais informações",
+    "bundledBadge": "incluído"
+  },
+  "instructions": {
+    "title": "Instalar ferramentas de desenvolvimento",
+    "description": "O SpecRails precisa de Node.js, npm, npx e Git no PATH. Escolha o snippet para o seu SO, execute-o e clique em \"Já instalei, verificar novamente\".",
+    "darwin": {
+      "intro": "O Homebrew instala ambas as ferramentas numa só linha. Se não tiver o brew, use os downloads oficiais.",
+      "installNodeGit": "Instalar Node.js e Git via Homebrew"
+    },
+    "win32": {
+      "intro": "O winget vem incluído no Windows 11 e nas versões recentes do Windows 10. Abra o PowerShell ou o Terminal e execute:",
+      "installNode": "Instalar Node.js LTS",
+      "installGit": "Instalar Git",
+      "note": "Após a instalação, reinicie o SpecRails Hub para que o Windows atualize o PATH."
+    },
+    "linux": {
+      "intro": "Use o gestor de pacotes da sua distribuição:",
+      "debian": "Debian / Ubuntu",
+      "fedora": "Fedora / RHEL"
+    },
+    "links": {
+      "nodeOfficial": "Node.js (oficial)",
+      "gitOfficial": "Git (oficial)",
+      "gitWindows": "Git para Windows (oficial)"
+    },
+    "showOtherPlatforms": "Mostrar outras plataformas",
+    "hideOtherPlatforms": "Ocultar outras plataformas",
+    "recheck": "Já instalei, verificar novamente",
+    "diagnostics": {
+      "copy": "Copiar diagnóstico",
+      "copied": "Diagnóstico copiado",
+      "failed": "Falha ao copiar"
+    },
+    "corrupted": {
+      "title": "Bundle da app corrompido",
+      "description": "Não foi possível verificar uma ou mais ferramentas incluídas (Node.js, Git).",
+      "body": "Esta ferramenta é distribuída com a app SpecRails Hub e não pode ser instalada separadamente. Se vir esta mensagem, o bundle da app pode estar corrompido. Reinstale o SpecRails Hub."
+    }
+  },
+  "checkpoints": {
+    "title": "Progresso da configuração",
+    "progress": "{{done}} de {{total}} concluídos",
+    "rawLog_one": "Log em bruto ({{count}} linha)",
+    "rawLog_other": "Log em bruto ({{count}} linhas)"
+  },
+  "setupChat": {
+    "title": "Assistente de configuração",
+    "subtitle": "Responda às perguntas para configurar o seu projeto",
+    "settingUp": "A configurar o seu projeto...",
+    "placeholder": "Escreva uma resposta...",
+    "keyboardHint": "Enter para enviar, Shift+Enter para nova linha"
+  },
+  "welcome": {
+    "title": "Bem-vindo ao <spec>spec</spec><rails>rails</rails> hub",
+    "description": "O hub gere vários projetos a partir de uma única interface. Adicione o seu primeiro projeto para começar.",
+    "addFirstProject": "Adicione o seu primeiro projeto"
+  },
+  "onboarding": {
+    "productTour": "Tour do produto",
+    "stepCount": "Passo {{current}} de {{total}}",
+    "goToStep": "Ir para o passo {{step}}: {{label}}",
+    "stepLabel": "Passo {{step}}",
+    "dontShowAgain": "Não mostrar novamente",
+    "skipTour": "Saltar tour",
+    "getStarted": "Começar",
+    "flow": {
+      "addSpec": "Adicionar Spec",
+      "dropInRail": "Largar num Rail",
+      "hitPlay": "Carregar em Play",
+      "ship": "Ship",
+      "architect": "Arquiteto",
+      "developer": "Developer",
+      "reviewer": "Revisor"
+    },
+    "welcome": {
+      "nav": "Boas-vindas",
+      "title": "Bem-vindo ao specrails-hub",
+      "subtitle": "O seu cockpit local para entregar software com agentes de IA",
+      "intro": "O specrails-hub transforma uma ideia em código entregue — e permite-lhe <b>ver, orientar e confiar</b> em cada passo. Esboce uma spec a conversar com uma IA, largue-a num rail de execução e carregue em Play. O pipeline trata da arquitetura, implementação, revisão e do pull request, transmitindo o seu trabalho em direto durante todo o processo.",
+      "coreLoopLabel": "O ciclo central",
+      "flowCaption": "Cada spec flui automaticamente por <b>Arquiteto → Developer → Revisor → Ship</b>.",
+      "localNote": "<b>100% local · um único utilizador · sem contas.</b> Tudo corre na sua máquina. O seu código nunca sai do portátil a menos que <i>você</i> lance um agente sobre ele.",
+      "tourNote": "Este tour rápido percorre tudo o que o hub consegue fazer — cerca de um minuto."
+    },
+    "authorSpecs": {
+      "nav": "Criar specs",
+      "title": "Transforme ideias em specs",
+      "subtitle": "Seis formas de capturar exatamente o que quer construir",
+      "intro": "Uma <b>spec</b> é uma descrição do trabalho que quer ver feito. Crie-a como for mais conveniente no momento — de uma linha rápida a uma conversa completa com a IA.",
+      "exploreLabel": "Explore — conversar",
+      "exploreBody": "Descreva o que quer num chat; um rascunho em direto é reconstruído a cada turno. Um slider de presets ajusta quanto contexto do projeto a IA vê — desde apenas a sua mensagem até à base de código completa mais os seus servidores MCP.",
+      "quickLabel": "Quick — num só passo",
+      "quickBody": "Já sabe o que quer? Gere uma spec completa num único turno. Opcionalmente, enriqueça-a com uma Contract Layer: nomes exatos, formatos de dados, invariantes e uma lista de ficheiros a tocar, para que os agentes não reinventem nada.",
+      "websiteLabel": "A partir de um website",
+      "websiteBody": "Abre um browser embutido. Selecione um elemento com o cursor ou desenhe um retângulo, e a captura de ecrã, o DOM e o CSS aplicado tornam-se anexos. A versão desktop inclui o seu próprio Chromium, por isso funciona offline.",
+      "smashLabel": "Faça SMASH a um épico grande",
+      "smashBody": "Exploda uma spec grande numa família de sub-specs mais pequenas com um clique — cada filha leva um resumo curto no seu cartão.",
+      "draftsLabel": "Rascunhos e Continuar a Editar",
+      "draftsBody": "Estacione uma exploração em curso como ticket de rascunho e retome-a mais tarde; reabra qualquer spec no Explore para continuar a refiná-la.",
+      "compareLabel": "Comparar lado a lado",
+      "compareBody": "Arraste uma spec até à borda do ecrã e desliza um seletor com as suas outras specs — reveja duas em conjunto, ao estilo tablet."
+    },
+    "rails": {
+      "nav": "Executar em rails",
+      "title": "Execute o pipeline em rails",
+      "subtitle": "Organize specs em faixas e depois lance os agentes",
+      "intro": "O lado direito do Dashboard são os seus <b>Rails</b> — faixas de execução. Arraste um cartão de spec para um rail e prima <play>▶ Play</play> para lançar um job de implementação.",
+      "jobLabel": "O que cada job executa",
+      "flowCaption": "Cada fase transmite os seus logs em direto enquanto trabalha.",
+      "modeLabel": "Escolha como um rail corre",
+      "modeBody": "Cada rail escolhe um modo: <b>Implement</b> (o pipeline estruturado completo), <b>Batch</b> (várias specs em sequência) ou <b>Ultracode</b> (o Claude trabalha de forma autónoma, sem pipeline fixo).",
+      "profilesLabel": "Perfis de agentes",
+      "profilesBody": "Um catálogo declarativo por projeto que decide quais agentes correm e que modelo cada um usa — escolhido por rail e congelado por job para que o trabalho concorrente fique isolado.",
+      "jobDetailLabel": "Detalhe do job em direto",
+      "jobDetailBody": "Cada job mostra um cabeçalho com a identidade do ticket, um contador de duração em direto e contagens de turnos/tokens em execução, com o custo definitivo resolvido no fim.",
+      "isolationLabel": "Muitos projetos, isolados",
+      "isolationBody": "Cada projeto tem a sua própria base de dados e fila de jobs. Execute projetos diferentes ao mesmo tempo e alterne entre eles na barra lateral esquerda — a sua posição é memorizada por projeto."
+    },
+    "providers": {
+      "nav": "O seu agente",
+      "title": "Traga o seu próprio agente",
+      "subtitle": "Claude Code e Codex, como motores de primeira classe",
+      "intro": "O hub trata o <b>Claude Code</b> e a <b>Codex CLI</b> como motores intercambiáveis por trás de um único contrato. Um projeto pode instalar um ou ambos — a escolha é feita na instalação.",
+      "table": {
+        "capability": "Capacidade",
+        "streamingResume": "Streaming e retoma de sessão",
+        "native": "Nativo",
+        "costReporting": "Reporte de custos",
+        "providerBilled": "Faturado pelo fornecedor",
+        "estimated": "Estimado (~)",
+        "telemetry": "Telemetria (OTEL)",
+        "synthesized": "Sintetizada",
+        "agentProfiles": "Perfis de agentes"
+      },
+      "calloutLabel": "Quando ambos estão instalados",
+      "calloutBody": "Escolha o motor <b>por spec, por rail ou por lançamento de terminal</b>. O hub memoriza a sua última escolha por projeto. O custo do Codex é estimado a partir de uma tabela de preços local e sempre sinalizado com um <mono>~</mono>."
+    },
+    "cost": {
+      "nav": "Acompanhar custos",
+      "title": "Acompanhe cada cêntimo",
+      "subtitle": "Cada invocação faturável, registada e visualizada",
+      "intro": "Cada invocação de IA — em rails, Quick, Explore, edições de IA, SMASH e resumos de ficheiros — é registada para <b>Claude e Codex</b>. Acabou-se adivinhar quanto custam os agentes.",
+      "analyticsLabel": "Página de Analytics",
+      "analyticsBody": "Um hero de burn-rate, cronologia diária, top tickets, divisão por modelo e um scatter de custo vs. turnos. Filtre por período (7d / 30d / 90d / Tudo) e por superfície.",
+      "perTicketLabel": "Gastos por ticket",
+      "perTicketBody": "O detalhe de cada spec mostra quanto custou e quantos turnos demorou, com deep link para Analytics filtrado para esse ticket.",
+      "honestLabel": "Números honestos",
+      "honestBody": "O custo do Claude é o valor faturado pelo fornecedor; o do Codex é estimado e sinalizado com <mono>~</mono>. Os totais de tokens incluem os níveis de cache, por isso os valores batem mesmo certo.",
+      "budgetsLabel": "Orçamentos e alertas",
+      "budgetsBody": "Defina um orçamento diário e um alerta de custo por job; o hub pausa automaticamente a fila quando ultrapassa o limite. Exporte tudo para CSV ou JSON."
+    },
+    "workspace": {
+      "nav": "Espaço de trabalho",
+      "title": "Faça dele o seu espaço de trabalho",
+      "subtitle": "Tudo o que precisa sem sair da janela",
+      "terminalLabel": "Painel de terminal",
+      "terminalBody": "Um terminal a sério ao estilo do VS Code na parte inferior (<mod></mod> <j></j>) — renderização WebGL, pesquisa, imagens inline, arrastar e largar caminhos e integração com a shell. Até 10 sessões por projeto.",
+      "codeLabel": "Explorador de código",
+      "codeBody": "Uma árvore de ficheiros só de leitura e um visualizador Monaco com resumos de IA em linguagem simples e chips de proveniência “tocado por IA”, para que qualquer pessoa acompanhe o que mudou e porquê.",
+      "integrationsLabel": "Integrações",
+      "integrationsBody": "Um marketplace por projeto de integrações MCP — a navegação semântica de código Serena vem incluída. As instalações são aditivas: adicionar uma nunca perturba outra.",
+      "themesLabel": "Temas",
+      "themesBody": "Cinco temas incorporados — specrails (predefinido), dracula, aurora-light, obsidian-dark e matrix — aplicados antes de a UI desenhar, por isso não há flash. Mude-os em Definições → Aspeto.",
+      "chatsLabel": "Chats minimizáveis",
+      "chatsBody": "Estacione uma sessão de Explore ou AI Edit num chip da dock e retome-a mais tarde — nunca se perde entre refreshes ou trocas de projeto.",
+      "desktopLabel": "Desktop ou browser",
+      "desktopBody": "Use o hub no browser, ou descarregue a app desktop assinada (macOS e Windows) que inclui o seu próprio servidor e runtimes."
+    },
+    "moveFast": {
+      "nav": "Avançar depressa",
+      "title": "Avance à velocidade do pensamento",
+      "subtitle": "Primeiro o teclado, em todo o lado",
+      "paletteLabel": "Paleta de comandos",
+      "paletteShortcut": "<f>Prima</f> <mod></mod> <m>+</m> <k></k> <m>em qualquer lado</m>",
+      "paletteBody": "Mude de projeto, execute comandos de spec, salte para qualquer página e encontre jobs recentes — tudo com pesquisa difusa.",
+      "terminalLabel": "Painel de terminal",
+      "terminalBody": "Alterne com <mod></mod> <j></j>.",
+      "shortcutsLabel": "Todos os atalhos",
+      "shortcutsBody": "Prima <q></q> para ver a folha de consulta completa.",
+      "chatLabel": "Barra lateral de chat",
+      "chatBody": "Alterne a barra lateral direita com <mod></mod> <bkey></bkey>.",
+      "projectsLabel": "Barra lateral de projetos",
+      "projectsBody": "Alterne a barra lateral Arc esquerda com <alt></alt> <mod></mod> <bkey></bkey>.",
+      "outro": "<b>E o tour fica por aqui.</b> Adicione um projeto na barra lateral esquerda e entregue a sua primeira spec. Pode reabrir esta apresentação a qualquer momento nas Definições."
+    }
+  }
+}

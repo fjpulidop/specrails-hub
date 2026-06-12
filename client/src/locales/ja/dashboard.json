@@ -1,0 +1,62 @@
+{
+  "toasts": {
+    "railAdded": "レール {{n}} を追加しました",
+    "railRemoved": "{{rail}} を削除しました",
+    "railCompleted": "レール {{n}} が完了しました",
+    "railFailed": "レール {{n}} が失敗しました — スペックは Specs に戻されました",
+    "railEnded": "レール {{n}}: {{status}} — スペックは Specs に戻されました",
+    "alreadyOnRail": "すでに {{rail}} にあります",
+    "movedToRail": "{{rail}} に移動しました",
+    "railRunningStopFirst": "{{rail}} は実行中です — 削除する前に停止してください",
+    "removedFromRail": "{{rail}} から削除しました",
+    "queuedOnRail": "{{rail}} のキューに追加しました",
+    "queuedOnRailDescription": "レールは現在実行中です",
+    "railStopped": "{{rail}} を停止しました",
+    "stopFailed": "レールの停止に失敗しました",
+    "syncTicketsFailed": "レールのチケット同期に失敗しました",
+    "launchFailed": "レールの起動に失敗しました",
+    "launchNetworkError": "レール起動中にネットワークエラーが発生しました",
+    "railLaunched": "{{rail}} を起動しました",
+    "launchDescription_one": "{{mode}} · スペック {{count}} 件",
+    "launchDescription_other": "{{mode}} · スペック {{count}} 件"
+  },
+  "railsBoard": {
+    "title": "レール",
+    "runningCount_one": "{{count}} 件実行中",
+    "runningCount_other": "{{count}} 件実行中"
+  },
+  "railControls": {
+    "viewJobLog": "ジョブログを表示",
+    "log": "ログ",
+    "implement": "実装",
+    "batch": "バッチ",
+    "ultra": "Ultra",
+    "ultraTitle": "Ultracode — Claude がパイプラインなしでスペックを自律的に実装します",
+    "stop": "停止",
+    "play": "実行",
+    "failedRetry": "ジョブが失敗しました — クリックして再試行",
+    "addSpecsFirst": "先にこのレールにスペックを追加してください"
+  },
+  "railRow": {
+    "moveToSpecs": "Specs に移動",
+    "deleteRail": "{{label}} を削除",
+    "dropHere": "ここにドロップ",
+    "dropOnThisRail": "このレールにドロップ",
+    "dragSpecsHere": "ここにスペックをドラッグ"
+  },
+  "ultracodeDialog": {
+    "title": "Ultracode モードで起動",
+    "context_one": "{{rail}} · スペック {{count}} 件",
+    "context_other": "{{rail}} · スペック {{count}} 件",
+    "noPipelineTitle": "OpenSpec パイプラインなし。",
+    "noPipelineBody": "アーキテクト → 開発者 → レビュアーの構造化フローは完全にスキップされます。",
+    "autonomyTitle": "Claude ネイティブの自律性。",
+    "autonomyBody": "Claude はネイティブエージェントと動的ワークフローを使って自律的に作業します。",
+    "costTitle": "コストは変動します。",
+    "costBody": "支出は Claude の判断に依存し、想定より高くなることがあります。",
+    "continue": "続行"
+  },
+  "useRails": {
+    "fetchFailed": "レールの取得に失敗しました: {{status}}"
+  }
+}

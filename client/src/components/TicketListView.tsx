@@ -1,25 +1,28 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { formatDistanceToNow } from 'date-fns'
 import { Ticket, Search, AlertTriangle, Plus } from 'lucide-react'
 import { TicketContextMenu } from './TicketContextMenu'
 import { TicketStatusDot, TicketStatusRow } from './TicketStatusIndicator'
+import { getDateFnsLocale } from '../lib/i18n'
 import type { LocalTicket, TicketStatus, TicketPriority } from '../types'
 
-const PRIORITY_STYLES: Record<TicketPriority, { className: string; label: string }> = {
-  critical: { className: 'bg-red-500/15 text-red-400 border-red-500/30', label: 'critical' },
-  high: { className: 'bg-orange-500/15 text-orange-400 border-orange-500/30', label: 'high' },
-  medium: { className: '', label: '' },
-  low: { className: 'bg-gray-500/15 text-gray-400 border-gray-500/30', label: 'low' },
+const PRIORITY_STYLES: Record<TicketPriority, { className: string }> = {
+  critical: { className: 'bg-red-500/15 text-red-400 border-red-500/30' },
+  high: { className: 'bg-orange-500/15 text-orange-400 border-orange-500/30' },
+  medium: { className: '' },
+  low: { className: 'bg-gray-500/15 text-gray-400 border-gray-500/30' },
 }
 
 const ALL_STATUSES: TicketStatus[] = ['draft', 'todo', 'in_progress', 'done', 'cancelled']
 
-const STATUS_LABEL: Record<TicketStatus, string> = {
-  draft: 'draft',
-  todo: 'todo',
-  in_progress: 'in progress',
-  done: 'done',
-  cancelled: 'cancelled',
+/** i18n keys (specs namespace) for the lowercase status labels of this view. */
+const STATUS_LABEL_KEY: Record<TicketStatus, string> = {
+  draft: 'listView.status.draft',
+  todo: 'listView.status.todo',
+  in_progress: 'listView.status.inProgress',
+  done: 'listView.status.done',
+  cancelled: 'listView.status.cancelled',
 }
 
 type SortField = 'status' | 'priority' | 'updated_at'
@@ -30,7 +33,7 @@ const PRIORITY_ORDER: Record<TicketPriority, number> = { critical: 0, high: 1, m
 
 function formatRelTime(dateStr: string): string {
   try {
-    return formatDistanceToNow(new Date(dateStr), { addSuffix: true })
+    return formatDistanceToNow(new Date(dateStr), { addSuffix: true, locale: getDateFnsLocale() })
   } catch {
     return dateStr
   }
@@ -59,6 +62,7 @@ export function TicketListView({
   onPriorityChange,
   onCreateClick,
 }: TicketListViewProps) {
+  const { t } = useTranslation('specs')
   const [statusFilter, setStatusFilter] = useState<TicketStatus | null>(null)
   const [labelFilter, setLabelFilter] = useState<string | null>(null)
   // Separate input value (immediate) from filter value (debounced 300ms)
@@ -173,7 +177,7 @@ export function TicketListView({
     return (
       <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center space-y-1.5">
         <AlertTriangle className="w-6 h-6 text-red-400 mx-auto" />
-        <p className="text-sm font-medium text-red-400">Failed to load tickets</p>
+        <p className="text-sm font-medium text-red-400">{t('errors.loadFailed')}</p>
         <p className="text-xs text-red-400/70">{error}</p>
       </div>
     )
@@ -184,9 +188,9 @@ export function TicketListView({
       <div className="rounded-lg border border-dashed border-border/40 bg-card/50 p-8 text-center space-y-3">
         <Ticket className="w-8 h-8 text-muted-foreground/30 mx-auto" />
         <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">No tickets yet</p>
+          <p className="text-sm font-medium text-muted-foreground">{t('emptyState.noTickets')}</p>
           <p className="text-xs text-muted-foreground/60">
-            Create your first ticket or run a product backlog command to populate tickets
+            {t('emptyState.noTicketsHint')}
           </p>
         </div>
         {onCreateClick && (
@@ -196,7 +200,7 @@ export function TicketListView({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-accent/60 text-foreground hover:bg-accent transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            Create your first ticket
+            {t('emptyState.createFirst')}
           </button>
         )}
       </div>
@@ -217,7 +221,7 @@ export function TicketListView({
                 : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
             }`}
           >
-            All ({tickets.length})
+            {t('listView.filterAll', { count: tickets.length })}
           </button>
           {ALL_STATUSES.map((s) => {
             const count = tickets.filter((t) => t.status === s).length
@@ -233,7 +237,7 @@ export function TicketListView({
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                 }`}
               >
-                {STATUS_LABEL[s]} ({count})
+                {t('listView.statusWithCount', { status: t(STATUS_LABEL_KEY[s]), count })}
               </button>
             )
           })}
@@ -246,7 +250,7 @@ export function TicketListView({
               onChange={(e) => setLabelFilter(e.target.value || null)}
               className="h-6 rounded border border-border bg-input px-1.5 text-[10px] text-foreground"
             >
-              <option value="">All labels</option>
+              <option value="">{t('listView.allLabels')}</option>
               {allLabels.map((l) => (
                 <option key={l} value={l}>{l}</option>
               ))}
@@ -258,7 +262,7 @@ export function TicketListView({
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search..."
+              placeholder={t('listView.searchPlaceholder')}
               className="h-6 w-32 rounded border border-border bg-input pl-5 pr-1.5 text-[10px] text-foreground placeholder:text-muted-foreground"
             />
           </div>
@@ -268,28 +272,28 @@ export function TicketListView({
       {/* Column headers */}
       <div className="flex items-center gap-3 px-3 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
         <button type="button" onClick={() => toggleSort('status')} className="w-20 text-left hover:text-foreground transition-colors">
-          Status{sortIndicator('status')}
+          {t('listView.columns.status')}{sortIndicator('status')}
         </button>
-        <span className="flex-1 min-w-0">Title</span>
+        <span className="flex-1 min-w-0">{t('listView.columns.title')}</span>
         <button type="button" onClick={() => toggleSort('priority')} className="w-14 text-right hover:text-foreground transition-colors">
-          Priority{sortIndicator('priority')}
+          {t('listView.columns.priority')}{sortIndicator('priority')}
         </button>
-        <span className="w-24 text-right hidden sm:block">Labels</span>
+        <span className="w-24 text-right hidden sm:block">{t('listView.columns.labels')}</span>
         <button type="button" onClick={() => toggleSort('updated_at')} className="w-20 text-right hover:text-foreground transition-colors">
-          Updated{sortIndicator('updated_at')}
+          {t('listView.columns.updated')}{sortIndicator('updated_at')}
         </button>
       </div>
 
       {/* Filtered empty state */}
       {filteredAndSorted.length === 0 ? (
         <div className="py-6 text-center space-y-1.5">
-          <p className="text-xs text-muted-foreground">No tickets match your filters</p>
+          <p className="text-xs text-muted-foreground">{t('listView.noMatch')}</p>
           <button
             type="button"
             onClick={clearFilters}
             className="text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors underline underline-offset-2"
           >
-            Clear filters
+            {t('listView.clearFilters')}
           </button>
         </div>
       ) : (
@@ -327,7 +331,7 @@ export function TicketListView({
                     <div className="w-20 flex items-center gap-1.5 shrink-0">
                       <TicketStatusDot status={ticket.status} />
                       <span className={`text-[10px] ${isCancelled ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
-                        {STATUS_LABEL[ticket.status]}
+                        {t(STATUS_LABEL_KEY[ticket.status])}
                       </span>
                     </div>
 
@@ -347,7 +351,7 @@ export function TicketListView({
                           className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border border-accent-highlight/60 text-accent-highlight bg-accent-highlight/10 shrink-0"
                           data-testid={`epic-badge-list-${ticket.id}`}
                         >
-                          Epic
+                          {t('badges.epic')}
                         </span>
                       )}
                       {ticket.parent_epic_id != null && (
@@ -355,7 +359,7 @@ export function TicketListView({
                           className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border border-accent-secondary/40 text-accent-secondary shrink-0"
                           data-testid={`epic-child-pill-list-${ticket.id}`}
                         >
-                          ↑ Sub-Spec
+                          {t('badges.subSpec')}
                         </span>
                       )}
                     </div>
@@ -364,11 +368,11 @@ export function TicketListView({
                     <div className="w-14 text-right shrink-0">
                       {isDraft ? (
                         <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border border-accent-secondary/60 text-accent-secondary bg-accent-secondary/10">
-                          Draft
+                          {t('common:status.draft')}
                         </span>
-                      ) : priorityInfo && ticket.priority !== 'medium' && priorityInfo.label && (
+                      ) : priorityInfo && ticket.priority && ticket.priority !== 'medium' && (
                         <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium border ${priorityInfo.className}`}>
-                          {priorityInfo.label}
+                          {t(`priority.${ticket.priority}`)}
                         </span>
                       )}
                     </div>
@@ -406,7 +410,7 @@ export function TicketListView({
                 onClick={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
                 className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded hover:bg-accent/50"
               >
-                Load more ({filteredAndSorted.length - displayLimit} remaining)
+                {t('listView.loadMore', { count: filteredAndSorted.length - displayLimit })}
               </button>
             </div>
           )}

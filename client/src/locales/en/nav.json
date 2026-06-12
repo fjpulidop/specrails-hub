@@ -1,0 +1,104 @@
+{
+  "sidebarPin": {
+    "withShortcut": "{{label}} ({{shortcut}})",
+    "left": {
+      "pinnedOpen": "Collapse left sidebar (keep pinned)",
+      "pinnedCollapsed": "Unpin left sidebar",
+      "unpinned": "Pin left sidebar open"
+    },
+    "right": {
+      "pinnedOpen": "Collapse right sidebar (keep pinned)",
+      "pinnedCollapsed": "Unpin right sidebar",
+      "unpinned": "Pin right sidebar open"
+    }
+  },
+  "projects": {
+    "addProject": "Add project",
+    "remove": "Remove {{name}}",
+    "confirmRemove": "Confirm remove {{name}}",
+    "confirmShort": "confirm?",
+    "added": "Project added: {{name}}",
+    "removed": "Project removed"
+  },
+  "arcSidebar": {
+    "hubTitle": "Hub",
+    "docs": "Docs",
+    "analytics": "Analytics",
+    "settings": "Settings"
+  },
+  "rightSidebar": {
+    "projectTitle": "Project",
+    "dashboard": "Dashboard",
+    "jobs": "Jobs",
+    "analytics": "Analytics",
+    "agents": "Agents",
+    "code": "Code",
+    "integrations": "Integrations",
+    "settings": "Settings"
+  },
+  "navbar": {
+    "home": "Home",
+    "analytics": "Analytics",
+    "docs": "Docs",
+    "settings": "Settings",
+    "noCli": "No AI CLI",
+    "noCliTooltip": "No AI CLI detected. Install Claude Code or Codex CLI.",
+    "activeCli": "Active CLI: {{label}}"
+  },
+  "statusBar": {
+    "connected": "connected",
+    "syncing": "syncing...",
+    "reconnecting": "reconnecting...",
+    "disconnected": "disconnected",
+    "connectionRestored": "Connection restored"
+  },
+  "titleBar": {
+    "searchShortcut": "Search (⌘K)",
+    "searchPlaceholder": "Search…",
+    "minimizeWindow": "Minimize window",
+    "maximizeWindow": "Maximize window",
+    "closeWindow": "Close window"
+  },
+  "costAlerts": {
+    "costAlertTitle": "Cost alert",
+    "costAlertDescription": "Job cost ${{cost}} — threshold is ${{threshold}}",
+    "dailyBudgetTitle": "Daily budget exceeded",
+    "dailyBudgetDescription": "Spent ${{spent}} of ${{budget}} today. Queue paused.",
+    "hubBudgetTitle": "Hub daily budget exceeded",
+    "hubBudgetDescription": "Total hub spend ${{spent}} of ${{budget}}. Queue paused.",
+    "bannerMessage": "Daily budget exceeded — spent ${{spent}} of ${{budget}}. Queue is paused.",
+    "dismiss": "Dismiss"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "occurredIn": "An error occurred in <strong>{{name}}</strong>"
+  },
+  "healthWidget": {
+    "healthLabel": "health",
+    "notAvailable": "n/a",
+    "factorCoverageAvailable": "Coverage available",
+    "factorCoverageGood": "Coverage ≥ 70%",
+    "factorPipelineGreen": "Last pipeline green",
+    "factorActiveWeek": "Active this week",
+    "noJobsYet": "No jobs yet",
+    "recurringFailures": "Recurring failures detected",
+    "failurePattern": "<cmd>{{command}}</cmd> has failed <times>{{count}}×</times> this week — possible project issue.",
+    "coverage": "Coverage",
+    "lines": "Lines",
+    "functions": "Functions",
+    "branches": "Branches",
+    "lastPipeline": "Last pipeline",
+    "recentCommits": "Recent commits",
+    "noGitHistory": "No git history found",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago"
+  },
+  "collapsibleSection": {
+    "dragToReorder": "Drag to reorder",
+    "unpinAria": "Unpin section (will collapse by default)",
+    "pinAria": "Pin section (will stay expanded)",
+    "unpinTooltip": "Unpin (collapse by default)",
+    "pinTooltip": "Pin open (stay expanded)"
+  }
+}

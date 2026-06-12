@@ -1,0 +1,114 @@
+{
+  "board": {
+    "title": "Spec",
+    "dropHere": "Rilascia qui",
+    "emptyNoSpecs": "Ancora nessuna spec",
+    "emptyNoLabelMatch": "Nessuna spec corrisponde alle etichette attive",
+    "emptyNoActiveSpecs": "Nessuna spec attiva",
+    "emptyHint": "Clicca \"+ Aggiungi\" per iniziare",
+    "dropToMarkDone": "Rilascia per contrassegnare come completata",
+    "emptyNoDoneLabelMatch": "Nessuna spec completata corrisponde alle etichette attive",
+    "emptyNoCompleted": "Ancora nessuna spec completata",
+    "untitledSpec": "Spec senza titolo"
+  },
+  "status": {
+    "todo": "Da fare",
+    "inProgress": "In corso",
+    "done": "Completato",
+    "cancelled": "Annullato"
+  },
+  "priority": {
+    "critical": "critica",
+    "high": "alta",
+    "medium": "media",
+    "low": "bassa"
+  },
+  "badges": {
+    "epic": "Epic",
+    "epicWithCount": "Epic · {{count}}",
+    "subSpec": "↑ Sub-Spec",
+    "review": "Revisione",
+    "needsReviewTitle": "Questa spec è stata contrassegnata come completata ma il suo job è terminato con un errore — rivedila",
+    "raw": "Raw",
+    "rawTitle": "Spec Raw — nessuna generazione AI alla creazione",
+    "contract": "Contract",
+    "openParentEpicTitle": "Apri l'Epic padre #{{id}} · {{title}}"
+  },
+  "card": {
+    "deleteSpec": "Elimina spec #{{id}}",
+    "deleteTicket": "Elimina ticket #{{id}}",
+    "ticketFallbackLabel": "Ticket #{{id}}",
+    "dependsOn": "Dipende da {{count}}",
+    "continueEditing": "Continua a modificare",
+    "continueEditingTitle": "Continua a modificare questa spec",
+    "moveToRail": "Sposta su un rail"
+  },
+  "emptyState": {
+    "noTickets": "Ancora nessun ticket",
+    "noTicketsHint": "Crea il tuo primo ticket o esegui un comando di product backlog per popolare i ticket",
+    "createFirst": "Crea il tuo primo ticket"
+  },
+  "errors": {
+    "loadFailed": "Impossibile caricare i ticket"
+  },
+  "listView": {
+    "status": {
+      "draft": "bozza",
+      "todo": "da fare",
+      "inProgress": "in corso",
+      "done": "completato",
+      "cancelled": "annullato"
+    },
+    "filterAll": "Tutti ({{count}})",
+    "statusWithCount": "{{status}} ({{count}})",
+    "allLabels": "Tutte le etichette",
+    "searchPlaceholder": "Cerca...",
+    "columns": {
+      "status": "Stato",
+      "title": "Titolo",
+      "priority": "Priorità",
+      "labels": "Etichette",
+      "updated": "Aggiornato"
+    },
+    "noMatch": "Nessun ticket corrisponde ai filtri",
+    "clearFilters": "Cancella filtri",
+    "loadMore": "Carica altri ({{count}} rimanenti)"
+  },
+  "gridView": {
+    "emptyTodo": "Nessun ticket da fare",
+    "emptyInProgress": "Niente in corso",
+    "emptyDone": "Nessun ticket completato",
+    "cancelledSection": "Annullati ({{count}})"
+  },
+  "statusFilter": {
+    "ariaLabel": "Filtra per stato",
+    "all": "Tutti",
+    "todo": "Da fare",
+    "done": "Completati"
+  },
+  "sortControl": {
+    "modeAriaLabel": "Modalità di ordinamento",
+    "tooltip": "Ordina: {{mode}}",
+    "toggleDirAriaLabel": "Inverti direzione di ordinamento",
+    "ascending": "Crescente",
+    "descending": "Decrescente",
+    "modes": {
+      "default": "Predefinito",
+      "ticketId": "Ticket #",
+      "priority": "Priorità"
+    }
+  },
+  "viewTier": {
+    "ariaLabel": "Vista delle spec",
+    "listView": "Vista elenco",
+    "postitView": "Vista post-it"
+  },
+  "labelFilter": {
+    "ariaLabel": "Filtra per etichette",
+    "all": "Tutte",
+    "empty": "Nessuna etichetta in questo progetto.",
+    "selected_one": "{{count}} etichetta",
+    "selected_other": "{{count}} etichette",
+    "clear": "cancella"
+  }
+}

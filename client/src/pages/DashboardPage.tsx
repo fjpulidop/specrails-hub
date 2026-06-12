@@ -16,6 +16,7 @@ import {
 } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 import { useTickets } from '../hooks/useTickets'
 import { SpecsBoard } from '../components/SpecsBoard'
 import { RailsBoard, type RailState, applyRailJobOutcome, isRailSortId, extractRailId } from '../components/RailsBoard'
@@ -99,6 +100,7 @@ function saveRails(projectId: string | null, rails: RailState[]) {
 }
 
 export default function DashboardPage() {
+  const { t } = useTranslation('dashboard')
   const { activeProjectId, projects } = useHub()
   const railProviders = (() => {
     const p = projects.find((pr) => pr.id === activeProjectId)
@@ -283,8 +285,8 @@ export default function DashboardPage() {
       status: 'idle',
     }
     updateRails((prev) => [...prev, newRail])
-    toast.success(`Rail ${nextNum} added`)
-  }, [rails, updateRails])
+    toast.success(t('toasts.railAdded', { n: nextNum }))
+  }, [rails, updateRails, t])
 
   const handleDeleteRail = useCallback((railId: string) => {
     const rail = rails.find((r) => r.id === railId)
@@ -297,8 +299,8 @@ export default function DashboardPage() {
       })
     }
     updateRails((prev) => prev.filter((r) => r.id !== railId))
-    toast.info(`${rail.label} removed`)
-  }, [rails, updateRails, updateSpecOrder])
+    toast.info(t('toasts.railRemoved', { rail: rail.label }))
+  }, [rails, updateRails, updateSpecOrder, t])
 
   const handleRenameRail = useCallback((railId: string, newLabel: string) => {
     updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, label: `Rail ${newLabel}` } : r)))
@@ -351,14 +353,14 @@ export default function DashboardPage() {
       updateRails((prev) => applyRailJobOutcome(prev, targetIndex, m.ticketIds ?? []))
 
       if (m.status === 'completed') {
-        toast.info(`Rail ${targetIndex + 1} completed`)
+        toast.info(t('toasts.railCompleted', { n: targetIndex + 1 }))
       } else if (m.status === 'failed' || m.status === 'zombie_terminated') {
-        toast.error(`Rail ${targetIndex + 1} failed — specs returned to Specs`)
+        toast.error(t('toasts.railFailed', { n: targetIndex + 1 }))
       } else {
-        toast.info(`Rail ${targetIndex + 1} ${m.status ?? 'finished'} — specs returned to Specs`)
+        toast.info(t('toasts.railEnded', { n: targetIndex + 1, status: m.status ?? 'finished' }))
       }
     }
-  }, [updateRails])
+  }, [updateRails, t])
 
   useEffect(() => {
     registerHandler('dashboard-rails', handleRailWsMessage)
@@ -458,7 +460,7 @@ export default function DashboardPage() {
     const targetRail = rails.find((r) => r.id === railId)
     if (!targetRail) return
     if (targetRail.ticketIds.includes(ticketId)) {
-      toast.info(`Already on ${targetRail.label}`)
+      toast.info(t('toasts.alreadyOnRail', { rail: targetRail.label }))
       return
     }
     updateSpecOrder((prev) => (prev ?? specTickets.map((t) => t.id)).filter((id) => id !== ticketId))
@@ -471,8 +473,8 @@ export default function DashboardPage() {
       }
       return r
     }))
-    toast.success(`Moved to ${targetRail.label}`)
-  }, [rails, specTickets, updateRails, updateSpecOrder])
+    toast.success(t('toasts.movedToRail', { rail: targetRail.label }))
+  }, [rails, specTickets, updateRails, updateSpecOrder, t])
 
   // Reverse of `handleMoveTicketToRail`: remove a ticket from whatever rail
   // currently owns it and push it back to the spec list (appended to the
@@ -481,7 +483,7 @@ export default function DashboardPage() {
     const sourceRail = rails.find((r) => r.ticketIds.includes(ticketId))
     if (!sourceRail) return
     if (sourceRail.status === 'running') {
-      toast.error(`${sourceRail.label} is running — stop it before removing`)
+      toast.error(t('toasts.railRunningStopFirst', { rail: sourceRail.label }))
       return
     }
     updateRails((prev) => prev.map((r) =>
@@ -491,8 +493,8 @@ export default function DashboardPage() {
       const current = prev ?? specTickets.map((t) => t.id)
       return current.includes(ticketId) ? current : [...current, ticketId]
     })
-    toast.success(`Removed from ${sourceRail.label}`)
-  }, [rails, specTickets, updateRails, updateSpecOrder])
+    toast.success(t('toasts.removedFromRail', { rail: sourceRail.label }))
+  }, [rails, specTickets, updateRails, updateSpecOrder, t])
 
   // ── DnD helpers ──────────────────────────────────────────────────────────────
   const findContainer = useCallback(
@@ -608,9 +610,9 @@ export default function DashboardPage() {
         )
         if (targetRail) {
           if (targetRail.status === 'running') {
-            toast.info(`Queued on ${targetRail.label}`, { description: 'Rail is currently running' })
+            toast.info(t('toasts.queuedOnRail', { rail: targetRail.label }), { description: t('toasts.queuedOnRailDescription') })
           } else {
-            toast.success(`Moved to ${targetRail.label}`)
+            toast.success(t('toasts.movedToRail', { rail: targetRail.label }))
           }
         }
       }
@@ -618,7 +620,7 @@ export default function DashboardPage() {
       else if (destContainer === 'specs') {
         const sourceRail = rails.find((r) => r.id === sourceContainer)
         if (sourceRail?.status === 'running') {
-          toast.error(`${sourceRail.label} is running — stop it before removing`)
+          toast.error(t('toasts.railRunningStopFirst', { rail: sourceRail.label }))
           return
         }
         updateRails((prev) =>
@@ -631,7 +633,7 @@ export default function DashboardPage() {
           const current = prev ?? specTickets.map((t) => t.id)
           return insertAt(current, draggedId, overId)
         })
-        if (sourceRail) toast.success(`Removed from ${sourceRail.label}`)
+        if (sourceRail) toast.success(t('toasts.removedFromRail', { rail: sourceRail.label }))
       }
       // Done → Rail (revert to todo then add to rail)
       else if (sourceContainer === 'done-specs') {
@@ -728,9 +730,9 @@ export default function DashboardPage() {
       try {
         await fetch(`${getApiBase()}/rails/${railIndex}/stop`, { method: 'POST' })
         updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'idle', activeJobId: undefined } : r)))
-        toast.info(`${rail.label} stopped`)
+        toast.info(t('toasts.railStopped', { rail: rail.label }))
       } catch {
-        toast.error('Failed to stop rail')
+        toast.error(t('toasts.stopFailed'))
       }
       return
     }
@@ -768,7 +770,7 @@ export default function DashboardPage() {
         body: JSON.stringify({ ticketIds: rail.ticketIds }),
       })
     } catch {
-      toast.error('Failed to sync rail tickets')
+      toast.error(t('toasts.syncTicketsFailed'))
       return
     }
 
@@ -790,17 +792,17 @@ export default function DashboardPage() {
         }),
       })
       if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: 'Failed to launch' }))
-        toast.error(data.error || 'Failed to launch rail')
+        const data = await res.json().catch(() => ({ error: '' }))
+        toast.error(data.error || t('toasts.launchFailed'))
         return
       }
       const { jobId } = await res.json() as { jobId: string }
       updateRails((prev) => prev.map((r) => (r.id === railId ? { ...r, status: 'running', activeJobId: jobId } : r)))
-      toast.success(`${rail.label} launched`, {
-        description: `${rail.mode} with ${rail.ticketIds.length} spec${rail.ticketIds.length > 1 ? 's' : ''}`,
+      toast.success(t('toasts.railLaunched', { rail: rail.label }), {
+        description: t('toasts.launchDescription', { mode: rail.mode, count: rail.ticketIds.length }),
       })
     } catch {
-      toast.error('Network error launching rail')
+      toast.error(t('toasts.launchNetworkError'))
     }
   }
 

@@ -176,7 +176,7 @@ describe('RecentJobs - extended coverage', () => {
         )
       })
       await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith('Cleared 5 job(s)')
+        expect(toast.success).toHaveBeenCalledWith('Cleared 5 jobs')
       })
     })
 
