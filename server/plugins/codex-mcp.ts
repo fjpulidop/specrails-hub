@@ -1,8 +1,8 @@
 // Codex MCP registration helpers. Plugins on codex projects don't write
-// `<project>/.mcp.json`; instead, the hub invokes `codex mcp add` against
+// `<project>/.mcp.json`; instead, the app invokes `codex mcp add` against
 // a per-project `CODEX_HOME` so the resulting MCP registration is scoped
 // to that project alone, never leaking into the user's terminal codex
-// state or another hub project.
+// state or another managed project.
 //
 // Spec: openspec/changes/add-multi-provider-support/specs/plugin-system/spec.md
 //   - "Plugin install path is provider-aware" / "Per-provider home directory

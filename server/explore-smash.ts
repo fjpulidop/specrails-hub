@@ -19,7 +19,7 @@ export const SMASH_MAX_CHILDREN = 8
 // ─── Kill switch ─────────────────────────────────────────────────────────────
 
 /**
- * Returns `true` when the hub-wide kill switch is active and SMASH spawns
+ * Returns `true` when the app-wide kill switch is active and SMASH spawns
  * MUST be skipped regardless of per-project state.
  *
  * The env var `SPECRAILS_SMASH` controls the feature:
@@ -159,7 +159,7 @@ function buildSmashSimpleSystemPrompt(): string {
     '  conservatively from the parent ticket if unsure.',
     '- `rationale` MUST be ≤ 200 chars and explain why this child exists as a',
     '  separate ticket (e.g. dependency anchor, scope isolation, parallelisable).',
-    '- DO NOT include a Contract Layer in any child description. The hub will run',
+    '- DO NOT include a Contract Layer in any child description. The app will run',
     '  Contract Refine per child separately if the user requests it.',
     '- `shortSummary` is OPTIONAL: when included, a single plain-text sentence',
     '  ≤ 120 chars summarising the child for a dashboard postit. No markdown,',

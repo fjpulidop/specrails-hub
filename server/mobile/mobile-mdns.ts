@@ -34,6 +34,7 @@ export async function advertiseMdns(opts: MdnsOptions): Promise<boolean> {
     responder = getResponder()
     service = responder.createService({
       name: opts.name,
+      // mobile-app v1 wire compat — mDNS service type is frozen, do not rename.
       type: 'specrailshub',
       port: opts.port,
       txt: { id: opts.instanceId, fp: opts.fingerprint },

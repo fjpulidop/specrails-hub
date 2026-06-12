@@ -12,7 +12,7 @@ import type { Request, Response, NextFunction } from 'express'
 import { WebSocketServer, WebSocket } from 'ws'
 import type { WsMessage } from './types'
 import { ProjectRegistry } from './project-registry'
-import { createHubRouter } from './hub-router'
+import { createDesktopRouter } from './desktop-router'
 import { createProjectRouter } from './project-router'
 import { createDocsRouter } from './docs-router'
 import { requireAuth, requireLoopback, hostValidationMiddleware, safeEqual, loadOrGenerateToken, tokenFromUpgradeRequest } from './auth'
@@ -142,7 +142,7 @@ function corsMiddleware(req: Request, res: Response, next: NextFunction): void {
     }
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Hub-Token')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Desktop-Token')
   res.setHeader('Access-Control-Max-Age', '600')
 
   if (req.method === 'OPTIONS') {
@@ -167,11 +167,11 @@ const wsServerOptions = {
   // a single malicious frame can force the sidecar to buffer.
   maxPayload: 1024 * 1024,
   handleProtocols: (protocols: Set<string>) => {
-    if (protocols.has('specrails-hub')) return 'specrails-hub'
+    if (protocols.has('specrails-desktop')) return 'specrails-desktop'
 
     // Backward compatibility for clients that only offer the auth carrier.
     for (const protocol of protocols) {
-      if (protocol.startsWith('hub-token.')) return protocol
+      if (protocol.startsWith('desktop-token.')) return protocol
     }
     return false
   },
@@ -188,7 +188,7 @@ const browserWss = new WebSocketServer(wsServerOptions)
 // `{ type: 'subscribe', projectId }` control frame; `broadcast` then routes a
 // project-scoped message only to connections subscribed to that project (plus
 // connections that have NOT declared a subscription — back-compat, they get
-// everything exactly like before). Hub-level messages (no projectId) always go
+// everything exactly like before). App-level messages (no projectId) always go
 // to everyone. The current web client does not send `subscribe`, so it keeps
 // receiving everything and the existing client-side filter stays as a redundant
 // second layer. The Mobile Gateway will subscribe per device, turning this into
@@ -226,7 +226,7 @@ function authorizeUpgrade(request: http.IncomingMessage): 'ok' | 'forbidden' | '
 
 function broadcast(msg: WsMessage): void {
   const data = JSON.stringify(msg)
-  // Project-scoped messages carry a projectId; hub-level messages do not.
+  // Project-scoped messages carry a projectId; app-level messages do not.
   const msgProjectId = (msg as { projectId?: string }).projectId
   for (const [client, state] of clients) {
     if (client.readyState !== WebSocket.OPEN) continue
@@ -241,10 +241,10 @@ function broadcast(msg: WsMessage): void {
   getMobileEventBus().publish(msg)
 }
 
-// ─── Health endpoint state (populated by hub bootstrap below) ────────────────
+// ─── Health endpoint state (populated by the Super-mode bootstrap below) ─────
 
 let _getProjectCount: () => number = () => 0
-/** Captured by the hub bootstrap block so graceful shutdown can tear down every
+/** Captured by the Super-mode bootstrap block so graceful shutdown can tear down every
  *  project's spawners (rail/chat children) instead of orphaning them. */
 let _registry: ProjectRegistry | null = null
 /** The mobile companion gateway (off by default); torn down on shutdown. */
@@ -380,7 +380,7 @@ server.on('upgrade', (request, socket, head) => {
 // the network the day the bind changes.
 app.use('/api/docs', requireLoopback, createDocsRouter())
 
-// ─── Auth — protect all /api/* except /api/health and /api/hub/token ─────────
+// ─── Auth — protect all /api/* except /api/health and /api/token ─────────────
 // (CRIT-01) Token is served publicly so the local client can bootstrap itself.
 
 app.get('/api/health', (_req, res) => {
@@ -389,7 +389,7 @@ app.get('/api/health', (_req, res) => {
     version: PKG_VERSION,
     uptime: Math.floor(process.uptime()),
     projects: _getProjectCount(),
-    mode: 'hub',
+    mode: 'super',
   })
 })
 
@@ -400,7 +400,7 @@ app.get('/api/health', (_req, res) => {
 // from 127.0.0.1), and the Host-header guard above rejects DNS-rebinding (where
 // the peer IS loopback — the victim's own browser — but the Host is the
 // attacker's domain). Neither alone is sufficient; together they close both.
-app.get('/api/hub/token', requireLoopback, (_req, res) => {
+app.get('/api/token', requireLoopback, (_req, res) => {
   res.json({ token: loadOrGenerateToken() })
 })
 
@@ -434,7 +434,7 @@ function applyWsRateLimiting(ws: WebSocket): void {
   })
 }
 
-// ─── Hub bootstrap ────────────────────────────────────────────────────────────
+// ─── Super-mode bootstrap ─────────────────────────────────────────────────────
 
 {
   const registry = new ProjectRegistry(broadcast, undefined, port)
@@ -459,28 +459,32 @@ function applyWsRateLimiting(ws: WebSocket): void {
   // ─── Mobile companion gateway (off by default; boot if previously enabled) ──
   // Second HTTPS+WSS listener in THIS process; the main server stays loopback.
   // The control plane is desktop-only: loopback + (via /api below) requireAuth.
-  // Mounted before /api/hub so its sub-path is unambiguous.
-  const mobileGateway = new MobileGateway({ hubDb: registry.hubDb, hubPort: port, broadcast })
+  // Mounted before the /api desktop router so its sub-path is unambiguous.
+  const mobileGateway = new MobileGateway({ desktopDb: registry.desktopDb, desktopPort: port, broadcast })
   _mobileGateway = mobileGateway
-  app.use('/api/hub/mobile', requireLoopback, createMobileAdminRouter({
+  app.use('/api/mobile', requireLoopback, createMobileAdminRouter({
     gateway: mobileGateway,
-    hubDb: registry.hubDb,
+    desktopDb: registry.desktopDb,
     broadcast,
   }))
   if (mobileGateway.isEnabledSetting()) {
     mobileGateway.start().catch((err) => console.error('[mobile-gateway] boot start failed:', err))
   }
 
-  // Hub-level routes
-  app.use('/api/hub', createHubRouter(registry, broadcast))
+  // App-level routes. CRITICAL mount order: the desktop router is mounted at
+  // '/api' BEFORE the project router below so its exact routes (e.g.
+  // GET /api/projects, DELETE /api/projects/:id) are handled here, while
+  // everything else under /api/projects/:projectId/* falls through to the
+  // project router.
+  app.use('/api', createDesktopRouter(registry, broadcast))
 
   // Per-project routes under /api/projects/:projectId/*
   app.use('/api/projects', createProjectRouter(registry))
 
-  // Return 410 Gone for old per-project hook endpoint in hub mode
+  // Return 410 Gone for the old per-project hook endpoint in Super mode
   app.post('/hooks/events', (_req, res) => {
     res.status(410).json({
-      error: 'In hub mode, use /api/projects/:projectId/hooks/events',
+      error: 'In Super mode, use /api/projects/:projectId/hooks/events',
     })
   })
 
@@ -498,10 +502,10 @@ function applyWsRateLimiting(ws: WebSocket): void {
       if (frame.subscribe) state.subscribedProjectId = frame.projectId
     })
 
-    // Send hub state init
+    // Send app state init
     const projects = registry.listContexts().map((ctx) => ctx.project)
     ws.send(JSON.stringify({
-      type: 'hub.projects',
+      type: 'desktop.projects',
       projects,
       timestamp: new Date().toISOString(),
     }))
@@ -539,7 +543,7 @@ if (fs.existsSync(clientDist)) {
 server.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`[error] Port ${port} is already in use. Is another manager instance running?`)
-    console.error(`[error] Try stopping it first: specrails-hub stop`)
+    console.error(`[error] Try stopping it first: specrails-desktop stop`)
     process.exit(1)
   }
   throw err

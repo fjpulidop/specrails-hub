@@ -48,7 +48,7 @@ Each pill SHALL be colored using one of the six theme accent tokens (`accent-pri
 
 #### Scenario: Live theme switch updates pill colors
 
-- **WHEN** the user changes the hub theme from `dracula` to `aurora-light`
+- **WHEN** the user changes the app theme from `dracula` to `aurora-light`
 - **THEN** every pill remains in the same accent-token bucket but its rendered color reflects the new theme's resolved value for that token
 
 #### Scenario: No forbidden tokens used

@@ -6,8 +6,8 @@ import {
   DEFAULT_SPEC_SORT_DIR,
 } from '../types/spec-sort'
 
-const MODE_KEY = (projectId: string) => `specrails-hub:spec-sort-mode:${projectId}`
-const DIR_KEY = (projectId: string) => `specrails-hub:spec-sort-dir:${projectId}`
+const MODE_KEY = (projectId: string) => `specrails-desktop:spec-sort-mode:${projectId}`
+const DIR_KEY = (projectId: string) => `specrails-desktop:spec-sort-dir:${projectId}`
 
 function isMode(v: unknown): v is SpecSortMode {
   return v === 'default' || v === 'ticket-id' || v === 'priority'

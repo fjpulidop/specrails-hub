@@ -1,25 +1,25 @@
 ## ADDED Requirements
 
-### Requirement: CLI binary is named specrails-hub
-The npm package SHALL expose a binary named `specrails-hub` (not `srm`). All user-facing documentation, UI text, and error messages SHALL use `specrails-hub` as the command name.
+### Requirement: CLI binary is named specrails-desktop
+The npm package SHALL expose a binary named `specrails-desktop` (not `srm`). All user-facing documentation, UI text, and error messages SHALL use `specrails-desktop` as the command name.
 
 #### Scenario: Binary available after global install
-- **WHEN** the package is installed globally via `npm install -g specrails-hub`
-- **THEN** `specrails-hub` is available as a shell command
+- **WHEN** the package is installed globally via `npm install -g specrails-desktop`
+- **THEN** `specrails-desktop` is available as a shell command
 
 #### Scenario: Old srm command is not exposed
 - **WHEN** the package is installed
 - **THEN** no binary named `srm` is registered
 
-#### Scenario: Help text uses specrails-hub
-- **WHEN** the user runs `specrails-hub --help`
-- **THEN** the output references `specrails-hub` (not `srm`) in usage examples
+#### Scenario: Help text uses specrails-desktop
+- **WHEN** the user runs `specrails-desktop --help`
+- **THEN** the output references `specrails-desktop` (not `srm`) in usage examples
 
 ### Requirement: CLI locates the compiled server binary correctly
-The CLI SHALL resolve the Express server path relative to its own compiled location so that `specrails-hub start` can spawn the server process when installed via npm.
+The CLI SHALL resolve the Express server path relative to its own compiled location so that `specrails-desktop start` can spawn the server process when installed via npm.
 
 #### Scenario: CLI finds server in npm-installed package
-- **WHEN** the CLI is run from an npm global install (CLI at `cli/dist/specrails-hub.js`)
+- **WHEN** the CLI is run from an npm global install (CLI at `cli/dist/specrails-desktop.js`)
 - **THEN** it resolves the server at `<package-root>/server/dist/index.js`
 
 #### Scenario: CLI falls back to tsx in dev mode

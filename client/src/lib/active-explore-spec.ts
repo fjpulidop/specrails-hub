@@ -6,7 +6,7 @@
 // two stores are mutually exclusive: minimizing clears this entry, the chip
 // persistence takes over.
 
-const STORAGE_KEY = 'specrails-hub:active-explore-spec'
+const STORAGE_KEY = 'specrails-desktop:active-explore-spec'
 
 export interface ActiveExploreSpec {
   projectId: string

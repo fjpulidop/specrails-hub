@@ -59,36 +59,36 @@ vi.mock('../components/RootLayout', () => ({
   RootLayout: () => <div data-testid="root-layout">RootLayout</div>,
 }))
 
-// The HubProvider makes REST calls to /api/hub/projects.
+// The DesktopProvider makes REST calls to /api/projects.
 // We need to mock that too.
-vi.mock('../hooks/useHub', async () => {
-  const actual = await vi.importActual<typeof import('../hooks/useHub')>('../hooks/useHub')
+vi.mock('../hooks/useDesktop', async () => {
+  const actual = await vi.importActual<typeof import('../hooks/useDesktop')>('../hooks/useDesktop')
   return {
     ...actual,
-    HubProvider: ({ children }: { children: React.ReactNode }) => (
-      <div data-testid="hub-provider">{children}</div>
+    DesktopProvider: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="desktop-provider">{children}</div>
     ),
   }
 })
 
-describe('App — hub bootstrap', () => {
+describe('App — desktop bootstrap', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('mounts HubProvider unconditionally', async () => {
+  it('mounts DesktopProvider unconditionally', async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ projects: [] }) })
     render(<App />)
     await waitFor(() => {
-      expect(screen.getByTestId('hub-provider')).toBeInTheDocument()
+      expect(screen.getByTestId('desktop-provider')).toBeInTheDocument()
     })
   })
 
-  it('does not probe /api/hub/state for mode detection', () => {
+  it('does not probe /api/state for mode detection', () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ projects: [] }) })
     global.fetch = fetchMock
     render(<App />)
-    const hubStateCalls = fetchMock.mock.calls.filter(([url]) => typeof url === 'string' && url.includes('/api/hub/state'))
-    expect(hubStateCalls).toHaveLength(0)
+    const desktopStateCalls = fetchMock.mock.calls.filter(([url]) => typeof url === 'string' && url.includes('/api/state'))
+    expect(desktopStateCalls).toHaveLength(0)
   })
 })

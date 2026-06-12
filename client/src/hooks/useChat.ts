@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useLayoutEffect, useRef, createContex
 import { useSharedWebSocket } from './useSharedWebSocket'
 import type { ChatConversationSummary, ChatMessage } from '../types'
 import { getApiBase } from '../lib/api'
-import { useHub } from './useHub'
+import { useDesktop } from './useDesktop'
 import { toast } from 'sonner'
 import i18n from '../lib/i18n'
 
@@ -51,7 +51,7 @@ export function useChatContext(): UseChatReturn | null {
 }
 
 export function useChat(): UseChatReturn {
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const [conversations, setConversations] = useState<ChatConversation[]>([])
   const [activeTabIndex, setActiveTabIndex] = useState(0)
   const [isPanelOpen, setIsPanelOpen] = useState<boolean>(() => {
@@ -137,7 +137,7 @@ export function useChat(): UseChatReturn {
     const msg = raw as Record<string, unknown>
     if (typeof msg.type !== 'string') return
 
-    // In hub mode, filter messages to the active project only
+    // In Super mode, filter messages to the active project only
     const apiBase = getApiBase()
     const activeProjectId = apiBase.startsWith('/api/projects/')
       ? apiBase.split('/api/projects/')[1]

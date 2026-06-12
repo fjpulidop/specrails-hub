@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { getApiBase } from '../lib/api'
 import { useSharedWebSocket } from './useSharedWebSocket'
-import { useHub } from './useHub'
+import { useDesktop } from './useDesktop'
 import { isSpecGenInFlight } from '../lib/spec-gen-suppression'
 import type { LocalTicket } from '../types'
 
@@ -27,7 +27,7 @@ const CONTRACT_LAYER_MARKER = '\n\n---\n\n## Contract Layer\n\n'
 
 export function useTickets() {
   const { t } = useTranslation('tickets')
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const [tickets, setTickets] = useState<LocalTicket[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

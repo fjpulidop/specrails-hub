@@ -26,7 +26,7 @@ describe('useDashboardSplit', () => {
 
   it('ignores any persisted width at mount and uses the canonical default', () => {
     // Persistence is in-session only — first paint always matches dblclick.
-    localStorage.setItem('specrails-hub:dashboard-split:proj-1', '950')
+    localStorage.setItem('specrails-desktop:dashboard-split:proj-1', '950')
     const { result } = renderHook(() => useDashboardSplit('proj-1'))
     expect(result.current.leftWidth).toBe(840)
   })
@@ -50,7 +50,7 @@ describe('useDashboardSplit', () => {
     expect(result.current.leftWidth).toBe(840)
     act(() => result.current.resetToDefault())
     expect(result.current.leftWidth).toBe(840)
-    expect(localStorage.getItem('specrails-hub:dashboard-split:proj-1')).toBe('840')
+    expect(localStorage.getItem('specrails-desktop:dashboard-split:proj-1')).toBe('840')
   })
 
   it('falls back to the wide-left + compact-rails preset when no stored value existed at mount', () => {
@@ -59,14 +59,14 @@ describe('useDashboardSplit', () => {
     expect(result.current.leftWidth).toBe(840)
     act(() => result.current.resetToDefault())
     expect(result.current.leftWidth).toBe(840)
-    expect(localStorage.getItem('specrails-hub:dashboard-split:proj-1')).toBe('840')
+    expect(localStorage.getItem('specrails-desktop:dashboard-split:proj-1')).toBe('840')
   })
 
   it('switching projects resets to the canonical default', () => {
     // Pre-existing stored values are ignored — the splitter always opens at
     // the canonical default for whichever project becomes active.
-    localStorage.setItem('specrails-hub:dashboard-split:proj-A', '800')
-    localStorage.setItem('specrails-hub:dashboard-split:proj-B', '500')
+    localStorage.setItem('specrails-desktop:dashboard-split:proj-A', '800')
+    localStorage.setItem('specrails-desktop:dashboard-split:proj-B', '500')
     const { result, rerender } = renderHook(({ id }) => useDashboardSplit(id), {
       initialProps: { id: 'proj-A' as string | null },
     })

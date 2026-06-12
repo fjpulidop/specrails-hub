@@ -7,8 +7,8 @@ import { toast } from 'sonner'
 import { DownloadCloud, Cog, Check, AlertTriangle } from 'lucide-react'
 import i18n from '../lib/i18n'
 
-const DISMISSED_UPDATE_KEY = 'specrails-hub:dismissedDesktopUpdateVersion'
-const UPDATE_TOAST_ID = 'specrails-hub-desktop-update'
+const DISMISSED_UPDATE_KEY = 'specrails-desktop:dismissedDesktopUpdateVersion'
+const UPDATE_TOAST_ID = 'specrails-desktop-desktop-update'
 const RECHECK_INTERVAL_MS = 6 * 60 * 60 * 1000 // 6h — surface releases published mid-session
 
 type UpdateToastState = 'available' | 'downloading' | 'installing' | 'ready' | 'error'

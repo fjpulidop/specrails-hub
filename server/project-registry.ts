@@ -22,20 +22,20 @@ import { resolveTicketStoragePath, mutateStore, applyJobOutcomeToTickets, type J
 import type { WsMessage, TicketUpdatedMessage, RailUpdatedMessage } from './types'
 import { getRails, setRailTickets } from './rails-store'
 import {
-  initHubDb,
-  getHubDbPath,
+  initDesktopDb,
+  getDesktopDbPath,
   listProjects,
-  addProject as addProjectToHub,
-  removeProject as removeProjectFromHub,
+  addProject as addProjectToDesktopDb,
+  removeProject as removeProjectFromDesktopDb,
   getProject,
   getProjectByPath,
   touchProject,
   setProjectSetupSession,
   clearProjectSetupSession,
   clearAgentJob,
-  getHubSetting,
+  getDesktopSetting,
   type ProjectRow,
-} from './hub-db'
+} from './desktop-db'
 import { getConfig } from './config'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -60,37 +60,37 @@ export interface ProjectContext {
 // ─── ProjectRegistry ──────────────────────────────────────────────────────────
 
 export class ProjectRegistry {
-  private _hubDb: DbInstance
+  private _desktopDb: DbInstance
   private _contexts: Map<string, ProjectContext>
   private _broadcast: (msg: WsMessage) => void
   private _webhookManager: WebhookManager
-  private _hubPort: number
+  private _desktopPort: number
   // M9: projects whose per-project DB failed to load at startup (corrupt, locked,
   // or migration-stuck). They stay registered but have no live context.
   private _failedProjects: Map<string, { project: ProjectRow; error: string }>
 
-  constructor(broadcast: (msg: WsMessage) => void, hubDbPath?: string, hubPort?: number) {
+  constructor(broadcast: (msg: WsMessage) => void, desktopDbPath?: string, desktopPort?: number) {
     this._broadcast = broadcast
-    this._hubDb = initHubDb(hubDbPath ?? getHubDbPath())
+    this._desktopDb = initDesktopDb(desktopDbPath ?? getDesktopDbPath())
     this._contexts = new Map()
-    this._webhookManager = new WebhookManager(this._hubDb)
-    this._hubPort = hubPort ?? 4200
+    this._webhookManager = new WebhookManager(this._desktopDb)
+    this._desktopPort = desktopPort ?? 4200
     this._failedProjects = new Map()
   }
 
-  get hubDb(): DbInstance {
-    return this._hubDb
+  get desktopDb(): DbInstance {
+    return this._desktopDb
   }
 
   loadAll(): void {
-    const projects = listProjects(this._hubDb)
+    const projects = listProjects(this._desktopDb)
     for (const project of projects) {
       try {
         this._loadProjectContext(project)
         this._failedProjects.delete(project.id)
       } catch (err) {
         // M9: a single corrupt / locked / migration-stuck per-project jobs.sqlite
-        // must NOT crash the whole hub at startup (previously it did, killing
+        // must NOT crash the whole app at startup (previously it did, killing
         // every other project + the UI in a restart loop). Log it, record it as
         // failed-to-load, and keep loading the rest.
         const msg = err instanceof Error ? err.message : String(err)
@@ -113,7 +113,7 @@ export class ProjectRegistry {
     provider?: 'claude' | 'codex'
     providers?: ('claude' | 'codex')[]
   }): ProjectContext {
-    const row = addProjectToHub(this._hubDb, opts)
+    const row = addProjectToDesktopDb(this._desktopDb, opts)
     return this._loadProjectContext(row)
   }
 
@@ -122,7 +122,7 @@ export class ProjectRegistry {
     if (ctx) {
       // Tear down spawners BEFORE closing the DB. QueueManager.shutdown() drops
       // its DB handle so a late child 'close' can't run prepared statements on
-      // the closed connection (which would crash the hub) and terminates any
+      // the closed connection (which would crash the app) and terminates any
       // orphaned rail child + dangling zombie timer. ChatManager.shutdown()
       // kills in-flight chat/Explore children and clears their idle timers.
       // SetupManager.abort() stops the 3s install poll and kills install/enrich
@@ -133,7 +133,7 @@ export class ProjectRegistry {
       // M12: these three also spawn children that outlive removeProject. Proposal
       // and AgentRefine write to the per-project DB in their close handlers — if
       // not disposed before db.close() they throw on the closed connection and
-      // (no uncaughtException handler) crash the entire hub. SpecLauncher has no
+      // (no uncaughtException handler) crash the entire app. SpecLauncher has no
       // DB but its --dangerously-skip-permissions child keeps burning spend.
       try { ctx.proposalManager.shutdown() } catch { /* ignore */ }
       try { ctx.agentRefineManager.shutdown() } catch { /* ignore */ }
@@ -148,11 +148,11 @@ export class ProjectRegistry {
       // provider child, rejects queued work, and detaches the watcher — BEFORE
       // db.close() so a completing generation can't write to the closed handle.
       try { ctx.fileSummaryManager.dispose() } catch { /* ignore */ }
-      // Drop the hub-managed Explore Spec cwd (CLAUDE.md + symlink to project)
+      // Drop the app-managed Explore Spec cwd (CLAUDE.md + symlink to project)
       try { removeExploreCwd(ctx.project.slug) } catch { /* ignore — non-fatal */ }
       // Close the DB connection BEFORE removing the project's data dir below.
       try { ctx.db.close() } catch { /* ignore */ }
-      // B54: remove the ENTIRE hub-managed data dir for this project, not just
+      // B54: remove the ENTIRE app-managed data dir for this project, not just
       // the telemetry subdir. It also holds user-mcp.json (a copy of the user's
       // MCP config that can contain API keys), profile snapshots, codex-home, and
       // terminal shim dirs — all secret-bearing residue that previously survived
@@ -169,7 +169,7 @@ export class ProjectRegistry {
       } catch { /* ignore — non-fatal */ }
       this._contexts.delete(id)
     }
-    removeProjectFromHub(this._hubDb, id)
+    removeProjectFromDesktopDb(this._desktopDb, id)
   }
 
   getContext(id: string): ProjectContext | undefined {
@@ -177,7 +177,7 @@ export class ProjectRegistry {
   }
 
   getContextByPath(projectPath: string): ProjectContext | undefined {
-    const row = getProjectByPath(this._hubDb, projectPath)
+    const row = getProjectByPath(this._desktopDb, projectPath)
     if (!row) return undefined
     return this._contexts.get(row.id)
   }
@@ -209,11 +209,11 @@ export class ProjectRegistry {
   }
 
   touchProject(id: string): void {
-    touchProject(this._hubDb, id)
+    touchProject(this._desktopDb, id)
   }
 
   getProjectRow(id: string): ProjectRow | undefined {
-    return getProject(this._hubDb, id)
+    return getProject(this._desktopDb, id)
   }
 
   private _loadProjectContext(project: ProjectRow): ProjectContext {
@@ -233,7 +233,7 @@ export class ProjectRegistry {
       if (msg.type === 'queue') {
         for (const job of msg.jobs) {
           if (TERMINAL_JOB_STATUSES.has(job.status)) {
-            clearAgentJob(this._hubDb, job.id)
+            clearAgentJob(this._desktopDb, job.id)
           }
         }
       }
@@ -256,13 +256,13 @@ export class ProjectRegistry {
       provider: project.provider ?? 'claude',
       projectId: project.id,
       projectSlug: project.slug,
-      hubPort: this._hubPort,
+      desktopPort: this._desktopPort,
       getCostAlertThreshold: () => {
-        const val = getHubSetting(this._hubDb, 'cost_alert_threshold_usd')
+        const val = getDesktopSetting(this._desktopDb, 'cost_alert_threshold_usd')
         return val != null ? parseFloat(val) : null
       },
-      getHubDailyBudget: () => {
-        const val = getHubSetting(this._hubDb, 'hub_daily_budget_usd')
+      getDesktopDailyBudget: () => {
+        const val = getDesktopSetting(this._desktopDb, 'desktop_daily_budget_usd')
         const budget = val != null ? parseFloat(val) : null
         let totalSpend = 0
         for (const c of this.listContexts()) {
@@ -380,8 +380,8 @@ export class ProjectRegistry {
     const chatManager = new ChatManager(boundBroadcast, db, project.path, project.name, project.provider ?? 'claude', project.id, project.slug)
     const setupManager = new SetupManager(
       boundBroadcast,
-      (pid, sid) => setProjectSetupSession(this._hubDb, pid, sid),
-      (pid) => clearProjectSetupSession(this._hubDb, pid)
+      (pid, sid) => setProjectSetupSession(this._desktopDb, pid, sid),
+      (pid) => clearProjectSetupSession(this._desktopDb, pid)
     )
     const proposalManager = new ProposalManager(boundBroadcast, db, project.path)
     const agentRefineManager = new AgentRefineManager(boundBroadcast, db, project.path, project.id, project.provider ?? 'claude')
@@ -410,12 +410,12 @@ export class ProjectRegistry {
         return row?.total ?? 0
       },
       monthlyBudgetUsd: () => {
-        const raw = getHubSetting(this._hubDb, 'summary_monthly_budget_usd')
+        const raw = getDesktopSetting(this._desktopDb, 'summary_monthly_budget_usd')
         const n = parseFloat(raw ?? '5.00')
         return isNaN(n) ? 5.0 : n
       },
       language: () => {
-        const raw = getHubSetting(this._hubDb, 'summary_language')
+        const raw = getDesktopSetting(this._desktopDb, 'summary_language')
         return raw === 'es' ? 'es' : 'en'
       },
       providerId: () => fileSummaryAdapter.id,

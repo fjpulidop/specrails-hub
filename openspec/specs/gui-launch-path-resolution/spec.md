@@ -1,13 +1,13 @@
 # gui-launch-path-resolution Specification
 
 ## Purpose
-Resolve the inherited launchd PATH at server startup so the embedded hub finds Homebrew/Volta/nvm-installed `node`, `npx`, and `git` even when launched from Finder/Dock instead of a terminal, and surface diagnostics so users can troubleshoot broken installs.
+Resolve the inherited launchd PATH at server startup so the embedded server finds Homebrew/Volta/nvm-installed `node`, `npx`, and `git` even when launched from Finder/Dock instead of a terminal, and surface diagnostics so users can troubleshoot broken installs.
 
 ## Requirements
 
 ### Requirement: Server augments PATH at startup with well-known package-manager directories
 
-When the hub server process starts on macOS or Linux, it SHALL prepend missing well-known package-manager bin directories to `process.env.PATH` before any router, manager, or prerequisites check runs. The augmentation SHALL be a no-op on Windows (`process.platform === 'win32'`).
+When the app server process starts on macOS or Linux, it SHALL prepend missing well-known package-manager bin directories to `process.env.PATH` before any router, manager, or prerequisites check runs. The augmentation SHALL be a no-op on Windows (`process.platform === 'win32'`).
 
 The well-known directories SHALL be, in priority order:
 
@@ -32,7 +32,7 @@ A directory SHALL only be prepended if it is not already present in the inherite
 
 ### Requirement: Server merges login-shell PATH asynchronously after listening
 
-After the HTTP server begins listening, the hub SHALL spawn the user's login shell once to recover any PATH segments contributed by shell rc files (Volta, nvm, fnm, asdf shims, custom additions). The merge SHALL run asynchronously and MUST NOT delay the listening socket.
+After the HTTP server begins listening, the app SHALL spawn the user's login shell once to recover any PATH segments contributed by shell rc files (Volta, nvm, fnm, asdf shims, custom additions). The merge SHALL run asynchronously and MUST NOT delay the listening socket.
 
 The login-shell command SHALL be `$SHELL -lic 'printf "__SRH_PATH_BEGIN__%s__SRH_PATH_END__" "$PATH"'`. If `$SHELL` is unset, the implementation SHALL fall back to `/bin/sh`.
 
@@ -86,7 +86,7 @@ The `meetsMinimum` field SHALL only be `true` when both `installed` AND `executa
 
 ### Requirement: Diagnostic mode exposes PATH resolution sources
 
-The endpoint `GET /api/hub/setup-prerequisites?diagnostic=1` SHALL return the standard prerequisites payload extended with a `diagnostic` object containing:
+The endpoint `GET /api/setup-prerequisites?diagnostic=1` SHALL return the standard prerequisites payload extended with a `diagnostic` object containing:
 
 - `pathSegments`: the ordered list of `process.env.PATH` entries.
 - `pathSources`: a parallel array labelling each entry as one of `'inherited'`, `'fast-path'`, `'login-shell'`.
@@ -98,11 +98,11 @@ The endpoint `GET /api/hub/setup-prerequisites?diagnostic=1` SHALL return the st
 The base endpoint (without `?diagnostic=1`) SHALL NOT include the `diagnostic` field.
 
 #### Scenario: Default endpoint omits diagnostic
-- **WHEN** the client sends `GET /api/hub/setup-prerequisites`
+- **WHEN** the client sends `GET /api/setup-prerequisites`
 - **THEN** the response body SHALL NOT contain a `diagnostic` field
 
 #### Scenario: Diagnostic endpoint includes path sources
-- **WHEN** the client sends `GET /api/hub/setup-prerequisites?diagnostic=1`
+- **WHEN** the client sends `GET /api/setup-prerequisites?diagnostic=1`
 - **AND** `process.env.PATH` was assembled from inherited entries plus `/opt/homebrew/bin` from fast-path
 - **THEN** the response `diagnostic.pathSegments` SHALL list every PATH entry in order
 - **AND** the corresponding `diagnostic.pathSources` entry for `/opt/homebrew/bin` SHALL be `'fast-path'`

@@ -3,7 +3,7 @@
  * scripts/check-core-compat.ts
  *
  * Validates that the integration contract from specrails-core matches the
- * hardcoded constants in specrails-hub (CHECKPOINTS + KNOWN_VERBS).
+ * hardcoded constants in specrails-desktop (CHECKPOINTS + KNOWN_VERBS).
  *
  * Exit 0 — compatible, or contract not found (treated as a no-op)
  * Exit 1 — contract found but mismatch detected
@@ -24,32 +24,32 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `[check-core-compat] specrails-core@${result.coreVersion} vs specrails-hub@${result.hubVersion}`
+    `[check-core-compat] specrails-core@${result.coreVersion} vs specrails-desktop@${result.desktopVersion}`
   )
 
   let hasErrors = false
 
   if (result.missingCheckpoints.length > 0) {
     console.error(
-      `  ✗ Checkpoints in Core but missing in Hub: ${result.missingCheckpoints.join(', ')}`
+      `  ✗ Checkpoints in Core but missing in Desktop: ${result.missingCheckpoints.join(', ')}`
     )
     hasErrors = true
   }
   if (result.extraCheckpoints.length > 0) {
     console.error(
-      `  ✗ Checkpoints in Hub but not in Core: ${result.extraCheckpoints.join(', ')}`
+      `  ✗ Checkpoints in Desktop but not in Core: ${result.extraCheckpoints.join(', ')}`
     )
     hasErrors = true
   }
   if (result.missingCommands.length > 0) {
     console.error(
-      `  ✗ Commands in Core but missing in Hub (KNOWN_VERBS): ${result.missingCommands.join(', ')}`
+      `  ✗ Commands in Core but missing in Desktop (KNOWN_VERBS): ${result.missingCommands.join(', ')}`
     )
     hasErrors = true
   }
   if (result.extraCommands.length > 0) {
     console.error(
-      `  ✗ Commands in Hub (KNOWN_VERBS) but not in Core: ${result.extraCommands.join(', ')}`
+      `  ✗ Commands in Desktop (KNOWN_VERBS) but not in Core: ${result.extraCommands.join(', ')}`
     )
     hasErrors = true
   }
@@ -57,7 +57,7 @@ async function main(): Promise<void> {
   if (hasErrors) {
     // Contracts at schemaVersion >= 3 introduced a checkpoint-key rename across
     // the entire installer flow. Detecting drift remains useful, but a hard
-    // failure blocks every test run until the hub is aligned by hand — that
+    // failure blocks every test run until the app is aligned by hand — that
     // alignment is tracked as a separate piece of work. Degrade to a warning
     // when the contract is on the new schema; v1/v2 contracts still hard-fail
     // so we catch silent drift on the older shape.
@@ -65,12 +65,12 @@ async function main(): Promise<void> {
     if (Number.isFinite(schemaMajor) && schemaMajor >= 3) {
       console.warn(
         '[check-core-compat] ⚠ Contract mismatch on schemaVersion '
-          + `${result.contractSchemaVersion ?? '?'} — treated as a warning. Update hub constants to match specrails-core.`
+          + `${result.contractSchemaVersion ?? '?'} — treated as a warning. Update desktop constants to match specrails-core.`
       )
       process.exit(0)
     }
     console.error(
-      '[check-core-compat] ✗ Contract mismatch — update hub constants to match specrails-core'
+      '[check-core-compat] ✗ Contract mismatch — update desktop constants to match specrails-core'
     )
     process.exit(1)
   }

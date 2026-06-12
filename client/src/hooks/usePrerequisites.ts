@@ -72,7 +72,7 @@ async function fetchPrerequisites(signal?: AbortSignal): Promise<SetupPrerequisi
   if (cache.inFlight) return cache.inFlight
 
   const promise = (async () => {
-    const res = await fetch(`${API_ORIGIN}/api/hub/setup-prerequisites`, { signal })
+    const res = await fetch(`${API_ORIGIN}/api/setup-prerequisites`, { signal })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json() as Partial<SetupPrerequisitesStatus>
     if (typeof data?.ok !== 'boolean' || !Array.isArray(data?.prerequisites) || !Array.isArray(data?.missingRequired)) {

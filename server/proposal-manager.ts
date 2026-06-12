@@ -35,7 +35,7 @@ export class ProposalManager {
   /**
    * Tear down before the project's DB is closed (M12). Disposes so in-flight
    * close/error handlers skip their updateProposal DB writes (which would throw
-   * on the closed connection and crash the hub), and SIGTERMs orphaned children.
+   * on the closed connection and crash the app), and SIGTERMs orphaned children.
    */
   shutdown(): void {
     this._disposed = true
@@ -278,7 +278,7 @@ export class ProposalManager {
     return new Promise<void>((resolve) => {
       // Without this handler an ENOENT on spawn (e.g. `claude` not on
       // PATH) propagates as an unhandled 'error' event and crashes the
-      // entire hub process. Surface to the user instead.
+      // entire app process. Surface to the user instead.
       /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
       child.on('error', (err) => {
         console.error(`[ProposalManager] spawn failed for ${proposalId}: ${err.message}`)

@@ -10,7 +10,7 @@ export function broadcastTicketCreated(
   ticket: LocalTicket,
   newRevision: number,
 ): void {
-  ctx.ticketWatcher.notifyHubWrite(newRevision)
+  ctx.ticketWatcher.notifyDesktopWrite(newRevision)
   const msg: TicketCreatedMessage = {
     type: 'ticket_created',
     projectId: ctx.project.id,
@@ -29,7 +29,7 @@ export function broadcastTicketUpdated(
   ticket: LocalTicket,
   newRevision: number,
 ): void {
-  ctx.ticketWatcher.notifyHubWrite(newRevision)
+  ctx.ticketWatcher.notifyDesktopWrite(newRevision)
   const msg: TicketUpdatedMessage = {
     type: 'ticket_updated',
     projectId: ctx.project.id,
@@ -48,7 +48,7 @@ export function broadcastTicketDeleted(
   ticketId: number,
   newRevision: number,
 ): void {
-  ctx.ticketWatcher.notifyHubWrite(newRevision)
+  ctx.ticketWatcher.notifyDesktopWrite(newRevision)
   const msg: TicketDeletedMessage = {
     type: 'ticket_deleted',
     projectId: ctx.project.id,

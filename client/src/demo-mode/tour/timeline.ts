@@ -1,7 +1,7 @@
 /**
- * The canonical 15-beat timeline for the scripted hub-demo tour.
+ * The canonical 15-beat timeline for the scripted desktop-demo tour.
  *
- * openspec: hub-demo-scripted-tour (design.md §Decision 2)
+ * openspec: desktop-demo-scripted-tour (design.md §Decision 2)
  */
 
 import type { TourSelectorKey } from './selectors'

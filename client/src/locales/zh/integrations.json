@@ -5,7 +5,7 @@
     "selectProject": "选择一个项目以管理集成。",
     "deprecated": "已弃用",
     "loadError": "加载插件失败。",
-    "empty": "此 Hub 构建未捆绑任何插件。"
+    "empty": "此构建未捆绑任何插件。"
   },
   "card": {
     "statusActive": "已启用",
@@ -53,7 +53,7 @@
   },
   "docs": {
     "title": "文档",
-    "dialogDescription": "浏览捆绑的 specrails-hub 文档。使用侧边栏在指南间切换。",
+    "dialogDescription": "浏览捆绑的 Specrails 文档。使用侧边栏在指南间切换。",
     "sidebarEmpty": "暂无文档",
     "indexEmpty": "没有可用文档。捆绑文档位于仓库的 docs/ 目录下 — 将 Markdown 文件放在那里或 ~/.specrails/docs/ 下即可扩展。",
     "categoryEmpty": "此分类下暂无文档。",

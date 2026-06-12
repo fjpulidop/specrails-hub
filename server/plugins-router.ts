@@ -116,20 +116,20 @@ export function createPluginsRouter(): Router {
     try {
       const result = await installPrerequisite(prereq, project.id, broadcast)
       // After a successful install, the new binary lives in `~/.local/bin`
-      // (POSIX) or `%USERPROFILE%\.local\bin` (Windows). Refresh the hub's
+      // (POSIX) or `%USERPROFILE%\.local\bin` (Windows). Refresh the app's
       // PATH from a login shell so the next verify spawn finds it without a
-      // hub restart. On Windows this is a no-op — surface the hint as part
+      // app restart. On Windows this is a no-op — surface the hint as part
       // of the reason field instead.
       let hint: string | undefined
       if (result.ok) {
         if (process.platform === 'win32') {
-          hint = 'Installed. If verify still fails, restart SpecRails Hub so Windows refreshes PATH.'
+          hint = 'Installed. If verify still fails, restart Specrails so Windows refreshes PATH.'
         } else {
           try {
             await augmentPathFromLoginShell({ timeoutMs: 3000 })
             hint = 'Installed. PATH refreshed.'
           } catch {
-            hint = 'Installed. If verify still fails, restart SpecRails Hub.'
+            hint = 'Installed. If verify still fails, restart Specrails.'
           }
         }
       }
@@ -155,7 +155,7 @@ export function createPluginsRouter(): Router {
 
   // POST /api/projects/:projectId/plugins/_marketplace/disable
   // Body: { key: "<plugin-name>@<source>" } — sets enabledPlugins[key]=false
-  // in `~/.claude/settings.json`. The only place the hub mutates Claude's
+  // in `~/.claude/settings.json`. The only place the app mutates Claude's
   // per-user config; surfaced via an explicit user action.
   router.post('/_marketplace/disable', async (req, res) => {
     const { project, broadcast } = ctx(req)

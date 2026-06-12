@@ -2,7 +2,7 @@
  * Async beat runner. Iterates the canonical timeline, mutates tourStore, and
  * loops forever unless prefers-reduced-motion is set.
  *
- * openspec: hub-demo-scripted-tour (design.md §Decision 8)
+ * openspec: desktop-demo-scripted-tour (design.md §Decision 8)
  */
 
 import { tourStore } from './tour-store'
@@ -120,7 +120,7 @@ async function runAction(name: string, durationMs: number) {
       // instead of stacking.
       try {
         const sonner = await import('sonner')
-        sonner.toast.loading('specrails-hub · Add JWT auth with refresh…', {
+        sonner.toast.loading('specrails-desktop · Add JWT auth with refresh…', {
           id: TOUR_TOAST_ID,
           description: 'Generating spec...',
           duration: 2800,
@@ -140,7 +140,7 @@ async function runAction(name: string, durationMs: number) {
       // id so it doesn't pile up across loops. Auto-dismisses shortly after.
       try {
         const sonner = await import('sonner')
-        sonner.toast.success('specrails-hub · Spec created', {
+        sonner.toast.success('specrails-desktop · Spec created', {
           id: TOUR_TOAST_ID,
           description: 'Add JWT auth with refresh tokens',
           duration: 2200,
@@ -233,7 +233,7 @@ async function runAction(name: string, durationMs: number) {
 
 /** Best-effort coordinates when the target element is not in the DOM yet. */
 function fallbackCoord(key: TourSelectorKey): { x: number; y: number } {
-  // Rough anchors tuned for the default hub-demo layout. Used only on the
+  // Rough anchors tuned for the default desktop-demo layout. Used only on the
   // first frames before the real DOM has rendered. Once the element exists,
   // `targetCoords` takes over.
   const w = window.innerWidth

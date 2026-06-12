@@ -12,10 +12,10 @@
     },
     "nav": {
       "dashboard": "仪表盘",
-      "hubAnalytics": "Hub 分析",
+      "desktopAnalytics": "Desktop 分析",
       "projectAnalytics": "项目分析",
       "activityFeed": "活动流",
-      "hubSettings": "Hub 设置",
+      "desktopSettings": "Desktop 设置",
       "docs": "文档"
     },
     "sidebar": {
@@ -96,7 +96,7 @@
       "error": "更新失败"
     },
     "desc": {
-      "available": "SpecRails Hub 新版本已可安装。",
+      "available": "Specrails 新版本已可安装。",
       "fetching": "正在获取 {{size}}…",
       "progress": "{{percent}}% · {{downloaded}} / {{total}}",
       "installing": "正在验证签名并完成…",

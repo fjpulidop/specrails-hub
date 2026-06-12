@@ -8,7 +8,7 @@ TBD - created by promoting delta spec from change `add-specs-smash`. Defines the
 
 ### Requirement: SMASH action visibility gate
 
-The system SHALL render the SMASH action affordance in `TicketDetailModal` only when ALL of the following are true: (a) the ticket's `status` is not `'draft'`, (b) the ticket's `description` contains a `## Contract Layer` block (matching the separator used by the contract-refine feature), (c) the ticket has `parent_epic_id === null` (children cannot themselves be SMASHed), and (d) the hub-wide kill switch `SPECRAILS_SMASH` is not disabled.
+The system SHALL render the SMASH action affordance in `TicketDetailModal` only when ALL of the following are true: (a) the ticket's `status` is not `'draft'`, (b) the ticket's `description` contains a `## Contract Layer` block (matching the separator used by the contract-refine feature), (c) the ticket has `parent_epic_id === null` (children cannot themselves be SMASHed), and (d) the app-wide kill switch `SPECRAILS_SMASH` is not disabled.
 
 When any of (a)–(d) is false, the SMASH button MUST be hidden entirely (not rendered greyed-out). When the button would be hidden specifically because of (b) (no Contract Layer), the UI MAY surface an inert tooltip or helper text guiding the user to generate a Contract Layer first.
 
@@ -50,7 +50,7 @@ The SMASH action MUST present an inline confirmation step before any spawn fires
 
 ### Requirement: SMASH endpoint contract
 
-The server SHALL expose `POST /api/projects/:projectId/tickets/:id/smash` that orchestrates a single fresh `claude` spawn (no `--resume`, max 1 turn) whose system prompt is the byte-stable `buildSmashSystemPrompt()` and whose user prompt is the épica's `title` and `description` concatenated. The spawn SHALL be invoked from a hub-managed working directory that does not load the project's `CLAUDE.md` or `.mcp.json`. The endpoint MUST be idempotent at the run level (the client guards against double-fire while a SMASH is in flight) and MUST reject re-SMASH attempts against an épica that still has children.
+The server SHALL expose `POST /api/projects/:projectId/tickets/:id/smash` that orchestrates a single fresh `claude` spawn (no `--resume`, max 1 turn) whose system prompt is the byte-stable `buildSmashSystemPrompt()` and whose user prompt is the épica's `title` and `description` concatenated. The spawn SHALL be invoked from an app-managed working directory that does not load the project's `CLAUDE.md` or `.mcp.json`. The endpoint MUST be idempotent at the run level (the client guards against double-fire while a SMASH is in flight) and MUST reject re-SMASH attempts against an épica that still has children.
 
 #### Scenario: Successful SMASH
 - **WHEN** the endpoint is invoked for a valid épica candidate, the spawn succeeds, and the output parses to 3–8 valid children
@@ -258,7 +258,7 @@ Every SMASH spawn (success, failure, undo, retry) MUST record one row in `ai_inv
 
 ### Requirement: Kill switch behaviour
 
-The hub-wide environment variable `SPECRAILS_SMASH` MUST be honoured at three layers: (a) `POST /tickets/:id/smash` returns `409 { reason: 'disabled' }`, (b) the per-project config response includes `featureFlags.smash: false` so the client hides the button, and (c) Re-SMASH and Deshacer endpoints reject with the same `disabled` reason. The kill switch SHALL accept the case-insensitive values `0`, `false`, and `off` to mean disabled; any other value (including unset) means enabled.
+The app-wide environment variable `SPECRAILS_SMASH` MUST be honoured at three layers: (a) `POST /tickets/:id/smash` returns `409 { reason: 'disabled' }`, (b) the per-project config response includes `featureFlags.smash: false` so the client hides the button, and (c) Re-SMASH and Deshacer endpoints reject with the same `disabled` reason. The kill switch SHALL accept the case-insensitive values `0`, `false`, and `off` to mean disabled; any other value (including unset) means enabled.
 
 #### Scenario: Kill switch off (default)
 - **WHEN** the server starts without `SPECRAILS_SMASH` set

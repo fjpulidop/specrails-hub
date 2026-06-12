@@ -10,12 +10,12 @@ describe('WelcomeScreen', () => {
     expect(screen.getByText(/welcome to/i)).toBeInTheDocument()
   })
 
-  it('renders hub branding text', () => {
+  it('renders branding text', () => {
     render(<WelcomeScreen onAddProject={vi.fn()} />)
     expect(screen.getByText('spec')).toBeInTheDocument()
     expect(screen.getByText('rails')).toBeInTheDocument()
-    // The h2 contains "Welcome to specrails hub"
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/specrails.*hub/i)
+    // The h2 contains "Welcome to specrails"
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/specrails/i)
   })
 
   it('shows description text about adding a project', () => {
@@ -39,6 +39,6 @@ describe('WelcomeScreen', () => {
 
   it('does not show the CLI terminal command hint (UI-first: web / Mac app only)', () => {
     render(<WelcomeScreen onAddProject={vi.fn()} />)
-    expect(screen.queryByText(/specrails-hub add/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/specrails-desktop add/i)).not.toBeInTheDocument()
   })
 })

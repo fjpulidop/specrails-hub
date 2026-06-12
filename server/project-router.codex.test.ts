@@ -22,7 +22,7 @@ vi.mock('uuid', () => ({
 import { spawn as mockSpawn } from 'child_process'
 import { createProjectRouter } from './project-router'
 import { initDb } from './db'
-import { initHubDb } from './hub-db'
+import { initDesktopDb } from './desktop-db'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import type { DbInstance } from './db'
 
@@ -90,15 +90,15 @@ function makeMinimalContext(db: DbInstance, provider: 'claude' | 'codex' = 'code
       launch: vi.fn(async () => {}),
       cancel: vi.fn(),
     } as any,
-    ticketWatcher: { notifyHubWrite: vi.fn(), start: vi.fn(), close: vi.fn() } as any,
+    ticketWatcher: { notifyDesktopWrite: vi.fn(), start: vi.fn(), close: vi.fn() } as any,
     broadcast: vi.fn(),
   }
 }
 
 function makeRegistry(ctx: ProjectContext): ProjectRegistry {
-  const hubDb = initHubDb(':memory:')
+  const desktopDb = initDesktopDb(':memory:')
   return {
-    hubDb,
+    desktopDb,
     getContext: vi.fn((id: string) => (id === ctx.project.id ? ctx : undefined)),
     getContextByPath: vi.fn(() => undefined),
     addProject: vi.fn() as any,

@@ -1,14 +1,14 @@
 // Shared types for the Mobile Gateway (server/mobile/*).
 //
 // The gateway is a second HTTPS+WSS listener in the SAME Node process as the
-// hub, default port 4202, OFF by default. It pairs phones/tablets by QR +
+// main server, default port 4202, OFF by default. It pairs phones/tablets by QR +
 // desktop-approval and exposes a deny-by-default allow-list of the existing API,
-// redacted, over a per-device token. The hub server at 127.0.0.1:4200 is never
-// itself exposed. See docs/mobile.md (and ~/Desktop/specrails-hub-mobile-plan.md).
+// redacted, over a per-device token. The main server at 127.0.0.1:4200 is never
+// itself exposed. See docs/mobile.md.
 
 export type MobilePlatform = 'ios' | 'android'
 
-/** A paired device, as stored in hub.sqlite `mobile_devices` (migration 12). */
+/** A paired device, as stored in desktop.sqlite `mobile_devices` (migration 12). */
 export interface MobileDeviceRow {
   id: string
   name: string
@@ -40,8 +40,8 @@ export interface MobileDevicePublic {
  *  high-entropy single-use secret with a short TTL. */
 export interface QrPayload {
   v: 1
-  hub: string          // hubInstanceId (stable UUID)
-  name: string         // user-visible hub name
+  hub: string          // stable instance UUID — mobile-app v1 wire compat: field name frozen, do not rename
+  name: string         // user-visible instance name
   addrs: string[]      // candidate LAN IPv4 addresses
   port: number
   fp: string           // sha256 hex of the gateway cert DER (pin target)
@@ -68,6 +68,6 @@ export interface PairApprovedResult {
   approved: true
   deviceToken: string
   deviceId: string
-  hubName: string
-  hubInstanceId: string
+  hubName: string       // mobile-app v1 wire compat — field name frozen, do not rename
+  hubInstanceId: string // mobile-app v1 wire compat — field name frozen, do not rename
 }

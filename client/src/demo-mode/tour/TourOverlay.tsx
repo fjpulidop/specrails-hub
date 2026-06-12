@@ -7,7 +7,7 @@
  *
  * None of these interact with production state. All read from tourStore.
  *
- * openspec: hub-demo-scripted-tour
+ * openspec: desktop-demo-scripted-tour
  */
 
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
@@ -678,7 +678,7 @@ function TourSummaryCard({ done, progress }: { done: boolean; progress: number }
   const title = done ? 'Job completed' : 'Job running...'
 
   // Progressive stats. At progress=0 everything is at the "just started"
-  // baseline; at progress=1 they match the final SHIPPED values. Real hub
+  // baseline; at progress=1 they match the final SHIPPED values. Real app
   // JobDetailPage shows 0 / $0 / 0 / 0 while a fresh job is running and
   // ticks up from the event stream — this mirrors that rhythm.
   const totalSec = 24 * 60 + 21 // 1461 s

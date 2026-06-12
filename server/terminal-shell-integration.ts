@@ -97,7 +97,7 @@ export function composeShellIntegrationSpawn(
     const bundled = locateBundledShim('zsh-shim.zsh')
     if (!bundled) return NO_SHELL_INTEGRATION
     const userZdotdirZshrc = path.join(shimDir, '.zshrc')
-    const shimContent = `# SpecRails Hub auto-generated zsh entry — do not edit\nsource '${bundled.replace(/'/g, `'\\''`)}'\n`
+    const shimContent = `# Specrails auto-generated zsh entry — do not edit\nsource '${bundled.replace(/'/g, `'\\''`)}'\n`
     writeFile(userZdotdirZshrc, shimContent)
     return {
       args: [],
@@ -114,7 +114,7 @@ export function composeShellIntegrationSpawn(
     const bundled = locateBundledShim('bash-shim.bash')
     if (!bundled) return NO_SHELL_INTEGRATION
     const shimPath = path.join(shimDir, 'shim.bash')
-    const shimContent = `# SpecRails Hub auto-generated bash rcfile — do not edit\nsource '${bundled.replace(/'/g, `'\\''`)}'\n`
+    const shimContent = `# Specrails auto-generated bash rcfile — do not edit\nsource '${bundled.replace(/'/g, `'\\''`)}'\n`
     writeFile(shimPath, shimContent)
     return {
       args: ['--rcfile', shimPath],
@@ -145,7 +145,7 @@ export function composeShellIntegrationSpawn(
     const bundled = locateBundledShim('powershell-shim.ps1')
     if (!bundled) return NO_SHELL_INTEGRATION
     const shimPath = path.join(shimDir, 'profile.ps1')
-    const shimContent = `# SpecRails Hub auto-generated PowerShell profile — do not edit\n. '${bundled.replace(/'/g, "''")}'\n`
+    const shimContent = `# Specrails auto-generated PowerShell profile — do not edit\n. '${bundled.replace(/'/g, "''")}'\n`
     writeFile(shimPath, shimContent)
     return {
       args: ['-NoLogo', '-NoExit', '-File', shimPath],

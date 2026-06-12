@@ -4,14 +4,14 @@
 TBD - created by archiving change add-agents-profiles. Update Purpose after archive.
 ## Requirements
 ### Requirement: Sidebar entry
-The project sidebar SHALL contain a new entry labeled "Agents" placed between the existing pipeline-related entries and Settings. The entry SHALL be visible in hub mode only.
+The project sidebar SHALL contain a new entry labeled "Agents" placed between the existing pipeline-related entries and Settings. The entry SHALL be visible in Super mode only.
 
-#### Scenario: Entry visible in hub mode
+#### Scenario: Entry visible in Super mode
 - **WHEN** `activeProjectId` is non-null
 - **THEN** the sidebar shows an "Agents" link between the pipeline entries and Settings
 
 #### Scenario: Entry hidden in legacy mode
-- **WHEN** the hub runs in legacy single-project mode
+- **WHEN** the app runs in legacy single-project mode
 - **THEN** the "Agents" sidebar entry is not rendered
 
 ### Requirement: Three-tab shell
@@ -23,7 +23,7 @@ The Agents section SHALL render a tab strip with three tabs: `Profiles`, `Agents
 
 #### Scenario: Tab persistence
 - **WHEN** the user selects the Agents tab and navigates away and back
-- **THEN** the hub restores the Agents tab as active for that project (per-project memory)
+- **THEN** the app restores the Agents tab as active for that project (per-project memory)
 
 ### Requirement: Profiles tab
 The Profiles tab SHALL display a list/grid of the project's profiles, a "New profile" action, and an editing surface for the currently-selected profile that shows orchestrator model, agent chain (ordered, per-agent model dropdown), and routing rules (ordered, drag-to-reorder, first-match-wins semantics visible).
@@ -81,7 +81,7 @@ The Agents section SHALL display a banner when the linked project's specrails-co
 - **THEN** no banner is displayed
 
 ### Requirement: Per-project memory of active tab and selection
-The hub SHALL persist per-project the last-visited Agents sub-tab and the last-selected profile name for that project. These SHALL be restored when returning to the project.
+The app SHALL persist per-project the last-visited Agents sub-tab and the last-selected profile name for that project. These SHALL be restored when returning to the project.
 
 #### Scenario: Tab restored on project switch
 - **WHEN** the user is on the Agents tab with Profiles sub-tab open for project A, switches to project B, and returns to A

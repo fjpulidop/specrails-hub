@@ -10,8 +10,9 @@ import type { MobilePlatform } from './mobile-types'
 // The LAN-facing REST surface. Two parts:
 //   /pair/*  — unauthenticated, locked-down pairing handshake.
 //   /v1/*    — authenticated allow-list. Each route forwards, in-process, via a
-//              REAL loopback HTTP request to http://127.0.0.1:<hubPort> with the
-//              master hub token injected server-side (it never leaves the box).
+//              REAL loopback HTTP request to http://127.0.0.1:<desktopPort> with
+//              the master token injected server-side as `x-desktop-token` (it
+//              never leaves the box).
 //
 // Forwarding is PARAMETERISED: the internal path is rebuilt from Express route
 // params (each a single URL segment — `..`/`/` can't appear), never from the raw
@@ -25,14 +26,14 @@ const CONV_ID_RE = /^[A-Za-z0-9-]{1,64}$/
 
 export interface MobileRouterDeps {
   db: DbInstance
-  hubPort: number
+  desktopPort: number
   currentFingerprint: () => string
   pairing: PairingManager
 }
 
 export function createMobileRouter(deps: MobileRouterDeps): Router {
   const router = Router()
-  const internalBase = `http://127.0.0.1:${deps.hubPort}`
+  const internalBase = `http://127.0.0.1:${deps.desktopPort}`
   // Express 5 types a route param as `string | string[]`; coerce to a single
   // segment (an array — which path-to-regexp never produces here — collapses to
   // '' and fails the validators below).
@@ -75,8 +76,8 @@ export function createMobileRouter(deps: MobileRouterDeps): Router {
   const v1 = Router()
   v1.use(createMobileAuthMiddleware({ db: deps.db, currentFingerprint: deps.currentFingerprint }))
 
-  /** Forward to the internal hub API with the master token injected; redact the
-   *  JSON response. `internalPath` is built from validated params only. */
+  /** Forward to the internal desktop API with the master token injected; redact
+   *  the JSON response. `internalPath` is built from validated params only. */
   async function forward(
     res: Response,
     method: string,
@@ -89,7 +90,7 @@ export function createMobileRouter(deps: MobileRouterDeps): Router {
       const init: RequestInit = {
         method,
         headers: {
-          Authorization: `Bearer ${loadOrGenerateToken()}`,
+          'x-desktop-token': loadOrGenerateToken(),
           ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         },
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
@@ -107,7 +108,7 @@ export function createMobileRouter(deps: MobileRouterDeps): Router {
       }
       res.status(upstream.status).json(redact(json))
     } catch {
-      res.status(502).json({ error: 'Hub unreachable' })
+      res.status(502).json({ error: 'Server unreachable' })
     }
   }
 
@@ -129,7 +130,8 @@ export function createMobileRouter(deps: MobileRouterDeps): Router {
 
   // —— Reads ——
   v1.get('/projects', (req, res) => {
-    void forward(res, 'GET', '/api/hub/projects', '')
+    // Exact GET /api/projects is served by the desktop router (mounted at /api).
+    void forward(res, 'GET', '/api/projects', '')
   })
 
   const projectReads: Array<[string, string]> = [
@@ -253,12 +255,12 @@ export function createMobileRouter(deps: MobileRouterDeps): Router {
     if (!validate(res, [pid, PID_RE])) return
     const b = (req.body ?? {}) as Record<string, unknown>
     const narrowed: Record<string, unknown> = {}
-    // The hub's generate-spec expects `idea` — the app sends `prompt`.
+    // The server's generate-spec expects `idea` — the app sends `prompt`.
     if (typeof b.prompt === 'string') narrowed.idea = b.prompt
     if (typeof b.model === 'string') narrowed.model = b.model
     if (typeof b.aiEngine === 'string') narrowed.aiEngine = b.aiEngine
     if (typeof b.contractRefine === 'boolean') narrowed.contractRefine = b.contractRefine
-    // Forward the context scope so the hub injects .specrails/local-tickets.json
+    // Forward the context scope so the server injects .specrails/local-tickets.json
     // (specrails:true) and dedups against existing specs — without this the AI has
     // no context and re-creates specs that already exist.
     const scope = narrowScope(b.contextScope)
@@ -271,7 +273,7 @@ export function createMobileRouter(deps: MobileRouterDeps): Router {
     if (!validate(res, [pid, PID_RE])) return
     const b = (req.body ?? {}) as Record<string, unknown>
     const narrowed: Record<string, unknown> = {}
-    // The hub's from-prompt expects `description` — the app sends `prompt`.
+    // The server's from-prompt expects `description` — the app sends `prompt`.
     if (typeof b.prompt === 'string') narrowed.description = b.prompt
     if (typeof b.title === 'string') narrowed.title = b.title
     void forward(res, 'POST', `/api/projects/${encodeURIComponent(pid)}/tickets/from-prompt`, '', narrowed)

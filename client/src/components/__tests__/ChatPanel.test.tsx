@@ -3,7 +3,7 @@ import { screen, fireEvent } from '@testing-library/react'
 import { render } from '../../test-utils'
 import { ChatPanel } from '../ChatPanel'
 import type { UseChatReturn } from '../../hooks/useChat'
-import type { HubProject } from '../../hooks/useHub'
+import type { DesktopProject } from '../../hooks/useDesktop'
 
 function makeChat(overrides: Partial<UseChatReturn> = {}): UseChatReturn {
   return {
@@ -23,7 +23,7 @@ function makeChat(overrides: Partial<UseChatReturn> = {}): UseChatReturn {
   }
 }
 
-const mockProject: HubProject = {
+const mockProject: DesktopProject = {
   id: 'proj-1',
   slug: 'test-project',
   name: 'Test Project',

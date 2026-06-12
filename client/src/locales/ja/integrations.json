@@ -5,7 +5,7 @@
     "selectProject": "インテグレーションを管理するプロジェクトを選択してください。",
     "deprecated": "非推奨",
     "loadError": "プラグインの読み込みに失敗しました。",
-    "empty": "このハブビルドにはプラグインが同梱されていません。"
+    "empty": "このビルドにはプラグインが同梱されていません。"
   },
   "card": {
     "statusActive": "有効",
@@ -53,7 +53,7 @@
   },
   "docs": {
     "title": "ドキュメント",
-    "dialogDescription": "同梱の specrails-hub ドキュメントを閲覧できます。サイドバーでガイドを切り替えてください。",
+    "dialogDescription": "同梱の Specrails ドキュメントを閲覧できます。サイドバーでガイドを切り替えてください。",
     "sidebarEmpty": "ドキュメントはまだありません",
     "indexEmpty": "利用可能なドキュメントがありません。同梱ドキュメントはリポジトリの docs/ 以下にあります — Markdown ファイルをそこか ~/.specrails/docs/ 以下に置くと拡張できます。",
     "categoryEmpty": "このカテゴリにはまだドキュメントがありません。",

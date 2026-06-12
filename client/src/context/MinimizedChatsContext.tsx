@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import { isSpecDraftUpdate } from '../lib/spec-draft'
 import { MinimizedChatsDock } from '../components/minimized-chats/MinimizedChatsDock'
@@ -122,11 +122,11 @@ const MinimizedChatsContext = createContext<MinimizedChatsContextValue | null>(
 
 // ─── Persistence ──────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'specrails-hub:minimized-chats'
+const STORAGE_KEY = 'specrails-desktop:minimized-chats'
 // Pending restores are persisted too, so a refresh that lands BETWEEN a chip
 // click and the trigger consuming it never loses the session — on next mount
 // any leftover pending entry is folded back into the dock.
-const PENDING_STORAGE_KEY = 'specrails-hub:minimized-chats-pending'
+const PENDING_STORAGE_KEY = 'specrails-desktop:minimized-chats-pending'
 const MAX_PERSISTED = 50
 // If a queued restore is not consumed within this window (e.g. the trigger
 // surface never mounts), the chip is moved back into the dock so the session
@@ -222,7 +222,7 @@ function sameSession(a: MinimizedChat, b: MinimizedChat): boolean {
 // ─── Provider ─────────────────────────────────────────────────────────────
 
 export function MinimizedChatsProvider({ children }: { children: ReactNode }) {
-  const { projects, activeProjectId, setActiveProjectId, setupProjectIds } = useHub()
+  const { projects, activeProjectId, setActiveProjectId, setupProjectIds } = useDesktop()
   const navigate = useNavigate()
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
 

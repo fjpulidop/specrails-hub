@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, act, fireEvent } from '@testing-library/react'
 import { render } from '../../test-utils'
 import { ProjectLayout } from '../ProjectLayout'
-import type { HubProject } from '../../hooks/useHub'
+import type { DesktopProject } from '../../hooks/useDesktop'
 
 // ─── Hoisted capture points shared with vi.mock factories ────────────────────
 const h = vi.hoisted(() => ({
@@ -94,7 +94,7 @@ vi.mock('../../context/TerminalsContext', () => ({
   }),
 }))
 
-const mockProject: HubProject = {
+const mockProject: DesktopProject = {
   id: 'proj-1',
   slug: 'my-project',
   name: 'My Project',
@@ -164,20 +164,20 @@ describe('ProjectLayout (extended: cost alerts + terminal panel)', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('shows the hub-level error toast on hub_daily_budget_exceeded (defaults applied)', () => {
+  it('shows the app-level error toast on desktop_daily_budget_exceeded (defaults applied)', () => {
     render(<ProjectLayout project={mockProject} />)
     act(() => {
-      // No projectId → hub-level message reaches all projects; missing amounts default to 0
-      h.wsHandler!({ type: 'hub_daily_budget_exceeded' })
+      // No projectId → app-level message reaches all projects; missing amounts default to 0
+      h.wsHandler!({ type: 'desktop_daily_budget_exceeded' })
     })
     expect(h.toastError).toHaveBeenCalledWith(
-      'Hub daily budget exceeded',
+      'Desktop daily budget exceeded',
       expect.objectContaining({
-        description: 'Total hub spend $0.00 of $0.00. Queue paused.',
+        description: 'Total Desktop spend $0.00 of $0.00. Queue paused.',
         duration: Infinity,
       }),
     )
-    // Hub message does NOT raise the per-project banner
+    // Desktop message does NOT raise the per-project banner
     expect(screen.queryByText(/Queue is paused/)).not.toBeInTheDocument()
   })
 

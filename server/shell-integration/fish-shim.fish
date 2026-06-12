@@ -1,4 +1,4 @@
-# SpecRails Hub — fish shell-integration shim
+# Specrails — fish shell-integration shim
 # Sourced via `fish -C "source <this-file>"`, which runs after the user's
 # config.fish / conf.d, so the user's real fish config is preserved.
 

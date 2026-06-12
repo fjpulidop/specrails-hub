@@ -2,13 +2,13 @@
 
 ## Purpose
 
-AI-generated plain-language summaries of files in a project, hash-gated against re-generation and budgeted against monthly hub-wide spend. Powers the Code section's file viewer header.
+AI-generated plain-language summaries of files in a project, hash-gated against re-generation and budgeted against monthly app-wide spend. Powers the Code section's file viewer header.
 
 ## Requirements
 
 ### Requirement: Summary persistence layout
 
-The hub SHALL persist per-file AI summaries as JSON files under `<project>/.specrails/file-summaries/<sha256-of-relative-path>.json`, each conforming to a versioned schema with fields `schemaVersion`, `path`, `fileHash`, `summary`, `language`, `generatedAt`, `generatedBy`, and `triggeredBy`.
+The app SHALL persist per-file AI summaries as JSON files under `<project>/.specrails/file-summaries/<sha256-of-relative-path>.json`, each conforming to a versioned schema with fields `schemaVersion`, `path`, `fileHash`, `summary`, `language`, `generatedAt`, `generatedBy`, and `triggeredBy`.
 
 #### Scenario: Summary written after successful generation
 
@@ -57,7 +57,7 @@ The hub SHALL persist per-file AI summaries as JSON files under `<project>/.spec
 
 ### Requirement: Concurrency and per-job caps
 
-`FileSummaryManager` SHALL cap concurrency at 2 in-flight generations per project and 8 hub-wide, and SHALL refuse to enqueue more than 50 regenerations triggered by a single job.
+`FileSummaryManager` SHALL cap concurrency at 2 in-flight generations per project and 8 app-wide, and SHALL refuse to enqueue more than 50 regenerations triggered by a single job.
 
 #### Scenario: Third in-flight per project queues
 
@@ -75,7 +75,7 @@ The hub SHALL persist per-file AI summaries as JSON files under `<project>/.spec
 
 ### Requirement: Monthly budget cap
 
-`FileSummaryManager` SHALL refuse non-user-initiated regenerations when the current month's `ai_invocations` spend with `surface='file-summary'` for the project meets or exceeds the hub-wide `summary_monthly_budget_usd` setting.
+`FileSummaryManager` SHALL refuse non-user-initiated regenerations when the current month's `ai_invocations` spend with `surface='file-summary'` for the project meets or exceeds the app-wide `summary_monthly_budget_usd` setting.
 
 #### Scenario: Spend below budget proceeds normally
 
@@ -207,7 +207,7 @@ The server SHALL expose `GET /api/projects/:projectId/code/summary?path=…` and
 
 ### Requirement: Orphan summary sweep
 
-On every Code section open, the hub SHALL run an idle sweep that removes summary JSON files whose `path` no longer exists on disk, capped at 200 deletions per sweep.
+On every Code section open, the app SHALL run an idle sweep that removes summary JSON files whose `path` no longer exists on disk, capped at 200 deletions per sweep.
 
 #### Scenario: Orphan files are removed
 

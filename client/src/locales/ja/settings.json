@@ -1,7 +1,7 @@
 {
   "language": {
     "title": "言語",
-    "description": "ハブ全体の UI 言語。即座に適用され、再起動は不要です。",
+    "description": "Desktop 全体の UI 言語。即座に適用され、再起動は不要です。",
     "selectLabel": "インターフェース言語",
     "updateFailed": "言語設定を保存できませんでした"
   },
@@ -59,23 +59,23 @@
     "saveBudgetFailed": "予算の保存に失敗しました",
     "saveThresholdFailed": "しきい値の保存に失敗しました"
   },
-  "hub": {
-    "title": "ハブ設定",
-    "description": "登録済みプロジェクトの管理とハブ情報の表示。",
+  "desktop": {
+    "title": "Desktop 設定",
+    "description": "登録済みプロジェクトの管理と Desktop 情報の表示。",
     "registeredProjects": "登録済みプロジェクト",
     "noProjects": "登録されたプロジェクトはまだありません",
     "techUrlDescription": "specrails-tech API のベース URL（デフォルト: http://localhost:3000）",
     "techUrlSaved": "specrails-tech の URL を保存しました",
     "techUrlSaveFailed": "URL の保存に失敗しました",
     "budgetAlertsHeading": "予算とアラート",
-    "dailyBudgetLabel": "ハブ日次予算（USD）",
+    "dailyBudgetLabel": "Desktop 日次予算（USD）",
     "dailyBudgetHelper": "全プロジェクト共通のグローバルな日次支出上限。超過するとキューは自動で一時停止します。",
     "dailyBudgetPlaceholder": "例: 10.00",
     "perJobHelper": "単一ジョブがこの金額を超えたときにアラートします。無効にするには空欄のままにします。",
     "costAlertsDisabled": "コストアラートを無効にしました",
-    "dailyBudgetRemoved": "ハブの日次予算を削除しました",
-    "dailyBudgetSet": "ハブの日次予算を ${{amount}} に設定しました",
-    "dailyBudgetSaveFailed": "ハブの日次予算の保存に失敗しました",
+    "dailyBudgetRemoved": "Desktop の日次予算を削除しました",
+    "dailyBudgetSet": "Desktop の日次予算を ${{amount}} に設定しました",
+    "dailyBudgetSaveFailed": "Desktop の日次予算の保存に失敗しました",
     "projectRemoved": "プロジェクトを削除しました",
     "projectRemoveFailed": "プロジェクトの削除に失敗しました",
     "onboardingHeading": "オンボーディング",
@@ -83,10 +83,10 @@
     "platformTourDescription": "ウェルカムウィザードを再生して主要機能を確認します。",
     "replayTour": "ツアーを再生",
     "terminalPanelHeading": "ターミナルパネル",
-    "infoHeading": "ハブ情報",
+    "infoHeading": "Desktop 情報",
     "infoPort": "ポート",
     "infoProjects": "プロジェクト",
-    "infoDb": "ハブ DB"
+    "infoDb": "Desktop DB"
   },
   "notifications": {
     "heading": "OS 通知",
@@ -101,7 +101,7 @@
   },
   "webhooks": {
     "heading": "アウトバウンド Webhook",
-    "description": "ハブのイベントを外部ツール（Slack、Zapier、CI/CD）に通知します。シークレットが設定されている場合、リクエストは <code>X-Specrails-Signature</code> で署名されます。",
+    "description": "Desktop のイベントを外部ツール（Slack、Zapier、CI/CD）に通知します。シークレットが設定されている場合、リクエストは <code>X-Specrails-Signature</code> で署名されます。",
     "eventJobCompleted": "ジョブ完了",
     "eventJobFailed": "ジョブ失敗",
     "eventDailyBudgetExceeded": "日次予算超過",
@@ -125,8 +125,8 @@
   },
   "terminal": {
     "title": "ターミナルパネル",
-    "hubDescription": "プロジェクト別のオーバーライドがない限り、すべてのプロジェクトに適用されるハブ全体のデフォルトです。",
-    "projectDescription": "ターミナルパネルのプロジェクト別オーバーライド。ハブのデフォルトを継承するには、フィールドを変更しないでください。",
+    "desktopDescription": "プロジェクト別のオーバーライドがない限り、すべてのプロジェクトに適用される Desktop 全体のデフォルトです。",
+    "projectDescription": "ターミナルパネルのプロジェクト別オーバーライド。Desktop のデフォルトを継承するには、フィールドを変更しないでください。",
     "fontFamily": "フォントファミリー",
     "fontSize": "フォントサイズ（{{min}}–{{max}}）",
     "renderMode": "レンダリングモード",
@@ -141,7 +141,7 @@
     "unsavedChanges": "未保存の変更",
     "clearOverride": "オーバーライドをクリア",
     "clear": "クリア",
-    "inheritingDefault": "ハブのデフォルトを継承中",
+    "inheritingDefault": "Desktop のデフォルトを継承中",
     "nothingToSave": "保存する変更はありません",
     "saved": "ターミナル設定を保存しました"
   },
@@ -159,7 +159,7 @@
   },
   "mobile": {
     "heading": "モバイルコンパニオン",
-    "description": "スマートフォンの SpecRails Companion アプリからこのハブを操作します。通信は 100% ローカルネットワーク経由です。デフォルトはオフです。",
+    "description": "スマートフォンの SpecRails Companion アプリから Specrails を操作します。通信は 100% ローカルネットワーク経由です。デフォルトはオフです。",
     "accessOn": "モバイルアクセス オン",
     "accessOff": "モバイルアクセス オフ",
     "listeningOnPort": "ポート {{port}} で待機中",
@@ -186,7 +186,7 @@
     "approve": "承認",
     "paired": "✓ ペアリング済み",
     "waiting": "デバイスを待機中…（{{host}}:{{port}}）",
-    "thisHub": "このハブ",
+    "thisDesktop": "このコンピューター",
     "copyCode": "コードをコピー（「手動で入力」用）",
     "pairedToast": "デバイスをペアリングしました",
     "approveFailed": "承認に失敗しました: {{message}}",

@@ -61,11 +61,11 @@ describe('TicketWatcher', () => {
     await watcher.close() // second close should not throw
   })
 
-  it('notifyHubWrite updates internal revision', async () => {
+  it('notifyDesktopWrite updates internal revision', async () => {
     makeTicketFile(tmpDir, 1)
     const watcher = new TicketWatcher(tmpDir, 'proj-1', broadcast)
     watcher.start()
-    watcher.notifyHubWrite(5)
+    watcher.notifyDesktopWrite(5)
     await watcher.close()
   })
 
@@ -101,17 +101,17 @@ describe('TicketWatcher', () => {
     expect((msg as any).projectId).toBe('proj-1')
   })
 
-  it('suppresses echo when notifyHubWrite matches revision', async () => {
+  it('suppresses echo when notifyDesktopWrite matches revision', async () => {
     const filePath = makeTicketFile(tmpDir, 1)
     const watcher = new TicketWatcher(tmpDir, 'proj-1', broadcast)
     watcher.start()
 
     await new Promise((r) => setTimeout(r, 300))
 
-    // Hub writes and notifies the watcher
+    // App writes and notifies the watcher
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
     data.revision = 2
-    watcher.notifyHubWrite(2)
+    watcher.notifyDesktopWrite(2)
     fs.writeFileSync(filePath, JSON.stringify(data), 'utf-8')
 
     await new Promise((r) => setTimeout(r, 1200))
@@ -135,7 +135,7 @@ describe('ticket-broadcast helpers', () => {
     const { broadcastTicketCreated } = await import('./ticket-broadcast')
     const mockCtx = {
       project: { id: 'proj-1' },
-      ticketWatcher: { notifyHubWrite: vi.fn() },
+      ticketWatcher: { notifyDesktopWrite: vi.fn() },
       broadcast: broadcastFn,
     } as any
 
@@ -157,7 +157,7 @@ describe('ticket-broadcast helpers', () => {
 
     broadcastTicketCreated(mockCtx, ticket, 2)
 
-    expect(mockCtx.ticketWatcher.notifyHubWrite).toHaveBeenCalledWith(2)
+    expect(mockCtx.ticketWatcher.notifyDesktopWrite).toHaveBeenCalledWith(2)
     expect(broadcastFn).toHaveBeenCalledOnce()
     const msg = broadcastFn.mock.calls[0][0]
     expect(msg.type).toBe('ticket_created')
@@ -170,7 +170,7 @@ describe('ticket-broadcast helpers', () => {
     const { broadcastTicketUpdated } = await import('./ticket-broadcast')
     const mockCtx = {
       project: { id: 'proj-2' },
-      ticketWatcher: { notifyHubWrite: vi.fn() },
+      ticketWatcher: { notifyDesktopWrite: vi.fn() },
       broadcast: broadcastFn,
     } as any
 
@@ -202,13 +202,13 @@ describe('ticket-broadcast helpers', () => {
     const { broadcastTicketDeleted } = await import('./ticket-broadcast')
     const mockCtx = {
       project: { id: 'proj-3' },
-      ticketWatcher: { notifyHubWrite: vi.fn() },
+      ticketWatcher: { notifyDesktopWrite: vi.fn() },
       broadcast: broadcastFn,
     } as any
 
     broadcastTicketDeleted(mockCtx, 7, 10)
 
-    expect(mockCtx.ticketWatcher.notifyHubWrite).toHaveBeenCalledWith(10)
+    expect(mockCtx.ticketWatcher.notifyDesktopWrite).toHaveBeenCalledWith(10)
     expect(broadcastFn).toHaveBeenCalledOnce()
     const msg = broadcastFn.mock.calls[0][0]
     expect(msg.type).toBe('ticket_deleted')

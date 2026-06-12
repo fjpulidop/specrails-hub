@@ -2,11 +2,11 @@ import { readFileSync, existsSync } from 'fs'
 import { join, resolve } from 'path'
 
 /**
- * Locate the hub repository root (the directory containing .claude/commands/).
- * Works in both dev mode (tsx: __dirname = <hub>/server/) and
- * compiled mode (tsc: __dirname = <hub>/server/dist/).
+ * Locate the app repository root (the directory containing .claude/commands/).
+ * Works in both dev mode (tsx: __dirname = <repo>/server/) and
+ * compiled mode (tsc: __dirname = <repo>/server/dist/).
  */
-function findHubRoot(): string | null {
+function findDesktopRoot(): string | null {
   let dir = resolve(__dirname, '..')
   if (existsSync(join(dir, '.claude', 'commands'))) return dir
   dir = resolve(__dirname, '../..')
@@ -14,14 +14,14 @@ function findHubRoot(): string | null {
   return null
 }
 
-const HUB_ROOT = findHubRoot()
+const DESKTOP_ROOT = findDesktopRoot()
 
 function builtInCommand(commandPath: string, commandArgs: string): string | null {
   if (commandPath !== 'specrails:explore-spec') return null
 
-  return `You are a senior product engineer helping the user shape one backlog spec inside specrails-hub's Explore Spec experience.
+  return `You are a senior product engineer helping the user shape one backlog spec inside Specrails' Explore Spec experience.
 
-Do not use any local skill, slash-command workflow, or repository-change workflow. Stay inside this chat and shape the draft ticket only. Do not inspect active change folders unless the user explicitly asks about them, and do not create or modify files. The hub commits the final ticket only when the user clicks Create Spec.
+Do not use any local skill, slash-command workflow, or repository-change workflow. Stay inside this chat and shape the draft ticket only. Do not inspect active change folders unless the user explicitly asks about them, and do not create or modify files. The app commits the final ticket only when the user clicks Create Spec.
 
 Your job is to maintain a live draft. After every assistant turn that changes draft state, end your message with a fenced \`spec-draft\` JSON block. The visible prose should match the user's language. Draft fields must be written in English.
 
@@ -69,8 +69,8 @@ function findCommandFile(baseDir: string, parts: string[]): string | null {
  * Reads the command file from .claude/commands/ or .claude/skills/,
  * strips YAML frontmatter, and substitutes $ARGUMENTS.
  *
- * Searches the project directory first, then falls back to the hub's
- * own .claude/commands/ directory (for hub-namespaced commands like
+ * Searches the project directory first, then falls back to the app's
+ * own .claude/commands/ directory (for app-namespaced commands like
  * /specrails:implement that aren't installed in the target project).
  *
  * Falls back to returning the command string as-is if the file is not found.
@@ -89,9 +89,9 @@ export function resolveCommand(command: string, cwd: string): string {
   // 1. Check the project directory
   let resolvedPath = findCommandFile(cwd, parts)
 
-  // 2. Fallback: check the hub's own directory
-  if (!resolvedPath && HUB_ROOT && resolve(cwd) !== resolve(HUB_ROOT)) {
-    resolvedPath = findCommandFile(HUB_ROOT, parts)
+  // 2. Fallback: check the app's own directory
+  if (!resolvedPath && DESKTOP_ROOT && resolve(cwd) !== resolve(DESKTOP_ROOT)) {
+    resolvedPath = findCommandFile(DESKTOP_ROOT, parts)
   }
 
   if (!resolvedPath) return command

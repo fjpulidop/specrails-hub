@@ -48,7 +48,7 @@ function instructionsFilenameFor(providerId?: string): string {
 }
 
 /** Provider-aware instructions-file contributor. Same block format
- *  (`<!-- specrails-hub-managed:<plugin>:start/end -->`); destination
+ *  (`<!-- specrails-desktop-managed:<plugin>:start/end -->`); destination
  *  filename is the adapter's `instructionsFilename`. */
 const instructionsMdContributor: SharedFileContributor = {
   id: 'instructions-md',

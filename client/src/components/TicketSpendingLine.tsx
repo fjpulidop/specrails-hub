@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getApiBase } from '../lib/api'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { useTicketDetailModal } from '../context/TicketDetailModalContext'
 import type { TicketSpendingSummary, Surface } from '../types/spending'
 import { SURFACE_LABEL } from '../types/spending'
@@ -28,7 +28,7 @@ export function TicketSpendingLine({ ticketId }: Props) {
   const { t } = useTranslation('tickets')
   const [summary, setSummary] = useState<TicketSpendingSummary | null>(null)
   const navigate = useNavigate()
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const { closeTicketDetail } = useTicketDetailModal()
 
   useEffect(() => {

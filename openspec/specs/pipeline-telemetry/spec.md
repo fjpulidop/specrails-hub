@@ -7,12 +7,12 @@ TBD - created by archiving change pipeline-telemetry. Update Purpose after archi
 The system SHALL expose a per-project setting `pipelineTelemetryEnabled` in the project `SettingsPage`, persisted in the per-project SQLite database. The default value SHALL be `false`. The setting SHALL NOT be exposed in legacy (single-project) mode.
 
 #### Scenario: Default state for a new project
-- **WHEN** a user adds a new project to the hub
+- **WHEN** a user adds a new project to the app
 - **THEN** `pipelineTelemetryEnabled` is `false` and the toggle in `SettingsPage` reflects OFF
 
 #### Scenario: Persisting the toggle
 - **WHEN** a user toggles `pipelineTelemetryEnabled` to ON in `SettingsPage` and navigates away
-- **THEN** the value persists in the per-project SQLite and remains ON on subsequent hub restarts
+- **THEN** the value persists in the per-project SQLite and remains ON on subsequent app restarts
 
 #### Scenario: Setting is scoped per project
 - **WHEN** a user toggles the setting ON in project A
@@ -22,7 +22,7 @@ The system SHALL expose a per-project setting `pipelineTelemetryEnabled` in the 
 The system SHALL, when `pipelineTelemetryEnabled` is `true` for a project, inject the following environment variables into every `claude` child process spawned by that project's `QueueManager`:
 
 - `CLAUDE_CODE_ENABLE_TELEMETRY=1`
-- `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:<hubPort>/otlp`
+- `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:<desktopPort>/otlp`
 - `OTEL_EXPORTER_OTLP_PROTOCOL=http/json`
 - `OTEL_METRICS_EXPORTER=otlp`
 - `OTEL_LOGS_EXPORTER=otlp`
@@ -117,7 +117,7 @@ When invoked, the server SHALL produce a zip file named `specrails-diagnostic-<j
 
 - `job-metadata.json`: job record (id, status, phase list, timestamps, cost).
 - `telemetry.ndjson`: the decompressed raw NDJSON if `state="active"`; an empty file with a single header line if `state="compacted"`.
-- `logs.txt`: the existing job log content already persisted by the hub.
+- `logs.txt`: the existing job log content already persisted by the app.
 - `summary.md`: human-readable summary derived from either raw blob (if active) or `telemetry_summaries` rows (if compacted). Includes `truncated: true` note if the 10 MB cap was hit during the run.
 
 The client SHALL trigger a browser download when the action is invoked.

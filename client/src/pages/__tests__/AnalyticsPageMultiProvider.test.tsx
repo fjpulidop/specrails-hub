@@ -7,8 +7,8 @@ import AnalyticsPage from '../AnalyticsPage'
 vi.mock('../../lib/api', () => ({ getApiBase: () => '/api' }))
 
 // Multi-provider project so the engine filter chips render.
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({
     activeProjectId: 'proj-1',
     projects: [{ id: 'proj-1', slug: 'p', name: 'P', path: '/p', db_path: ':memory:', provider: 'claude', providers: ['claude', 'codex'], added_at: '', last_seen_at: '' }],
     isLoading: false,

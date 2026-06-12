@@ -13,8 +13,8 @@ beforeEach(() => {
 
 // ─── Shared mocks ─────────────────────────────────────────────────────────────
 
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({
     activeProjectId: 'proj-1',
     projects: [
       {
@@ -117,11 +117,11 @@ describe('GlobalSettingsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     ;(global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-      if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
+      if (typeof url === 'string' && url.includes('/api/webhooks')) {
         return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
       }
-      if (typeof url === 'string' && url.includes('/api/hub/budget')) {
-        return Promise.resolve({ ok: true, json: async () => ({ hubDailyBudgetUsd: null }) })
+      if (typeof url === 'string' && url.includes('/api/budget')) {
+        return Promise.resolve({ ok: true, json: async () => ({ desktopDailyBudgetUsd: null }) })
       }
       return Promise.resolve({
         ok: true,
@@ -130,19 +130,19 @@ describe('GlobalSettingsPage', () => {
     })
   })
 
-  it('renders Hub Settings dialog when open=true', async () => {
+  it('renders Desktop Settings dialog when open=true', async () => {
     const GlobalSettingsPage = (await import('../GlobalSettingsPage')).default
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
 
     await waitFor(() => {
-      expect(screen.getByText('Hub Settings')).toBeInTheDocument()
+      expect(screen.getByText('Desktop Settings')).toBeInTheDocument()
     })
   })
 
   it('does not render dialog content when open=false', async () => {
     const GlobalSettingsPage = (await import('../GlobalSettingsPage')).default
     render(<GlobalSettingsPage open={false} onClose={vi.fn()} />)
-    expect(screen.queryByText('Hub Settings')).toBeNull()
+    expect(screen.queryByText('Desktop Settings')).toBeNull()
   })
 
   it('renders registered projects section when open=true', async () => {
@@ -163,12 +163,12 @@ describe('GlobalSettingsPage', () => {
     })
   })
 
-  it('renders hub information section', async () => {
+  it('renders desktop information section', async () => {
     const GlobalSettingsPage = (await import('../GlobalSettingsPage')).default
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
 
     await waitFor(() => {
-      expect(screen.getByText('Hub Information')).toBeInTheDocument()
+      expect(screen.getByText('Desktop Information')).toBeInTheDocument()
     })
   })
 })

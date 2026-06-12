@@ -5,6 +5,7 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
 import { PairDeviceModal } from '../PairDeviceModal'
 
+// QR payload field `hub` is mobile-app v1 wire compat — do not rename
 const QR = {
   v: 1, hub: 'h', name: 'Mac', addrs: ['192.168.1.5'], port: 4202,
   fp: 'a'.repeat(64), secret: 'sec', claimId: 'cid', exp: 9999999999,

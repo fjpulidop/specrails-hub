@@ -3,7 +3,7 @@
  * state via useSyncExternalStore; glides between coordinates using a CSS
  * `transform` transition.
  *
- * openspec: hub-demo-scripted-tour (design.md §Decision 3)
+ * openspec: desktop-demo-scripted-tour (design.md §Decision 3)
  */
 
 import { useSyncExternalStore } from 'react'

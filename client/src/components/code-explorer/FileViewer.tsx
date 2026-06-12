@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ChevronDown, ChevronUp, FileMinus2, FilePlus2, FileText, GitCommitHorizontal } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
-import { useHub } from '../../hooks/useHub'
+import { useDesktop } from '../../hooks/useDesktop'
 import { useSharedWebSocket } from '../../hooks/useSharedWebSocket'
 import { useTicketDetailModal } from '../../context/TicketDetailModalContext'
 import { CodeViewerMonaco } from './CodeViewerMonaco'
@@ -61,15 +61,15 @@ const MIN_HISTORY_HEIGHT = 120
 const MIN_VIEWER_BODY_HEIGHT = 240
 
 function summaryCollapsedKey(projectId: string | null): string | null {
-  return projectId ? `specrails-hub:code-summary-collapsed:${projectId}` : null
+  return projectId ? `specrails-desktop:code-summary-collapsed:${projectId}` : null
 }
 
 function historyHeightKey(projectId: string | null): string | null {
-  return projectId ? `specrails-hub:code-history-height:${projectId}` : null
+  return projectId ? `specrails-desktop:code-history-height:${projectId}` : null
 }
 
 function historyCollapsedKey(projectId: string | null): string | null {
-  return projectId ? `specrails-hub:code-history-collapsed:${projectId}` : null
+  return projectId ? `specrails-desktop:code-history-collapsed:${projectId}` : null
 }
 
 function loadHistoryHeight(projectId: string | null): number {
@@ -121,7 +121,7 @@ function clampHistoryHeight(height: number, containerHeight: number): number {
 
 export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopyPathActionChange }: FileViewerProps) {
   const { t } = useTranslation('code')
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const { openTicketDetail } = useTicketDetailModal()
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
   const viewerRef = useRef<HTMLDivElement | null>(null)

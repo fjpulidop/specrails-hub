@@ -1,5 +1,5 @@
 /**
- * Extended tests for JobsPage (formerly in DashboardPage before the hub redesign
+ * Extended tests for JobsPage (formerly in DashboardPage before the multi-project redesign
  * extracted jobs/proposals into a dedicated page — SPEA-723).
  */
 import React from 'react'
@@ -24,8 +24,8 @@ vi.mock('react-markdown', () => ({
 }))
 vi.mock('remark-gfm', () => ({ default: () => {} }))
 
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({
     activeProjectId: 'proj-1',
     projects: [{ id: 'proj-1', name: 'Test Project', path: '/test', slug: 'test', db_path: '/test/.db', added_at: '', last_seen_at: '' }],
     setActiveProjectId: vi.fn(),

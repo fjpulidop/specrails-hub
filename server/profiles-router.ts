@@ -385,7 +385,7 @@ export function createProfilesRouter(): Router {
       const { project, db, broadcast } = ctx(req)
       const agentId = req.params.agentId
       if (!/^custom-[a-z0-9][a-z0-9-]*$/.test(agentId)) {
-        res.status(403).json({ error: 'only custom-* agents can be edited from the hub' })
+        res.status(403).json({ error: 'only custom-* agents can be edited from the app' })
         return
       }
       const body = (req.body?.body ?? '').toString()

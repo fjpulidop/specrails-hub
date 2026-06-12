@@ -9,7 +9,7 @@ import { AgentStudio } from './AgentStudio'
 import { AiRefineOverlay } from './AiRefineOverlay'
 import { AGENT_TEMPLATES, ALL_TEMPLATE_CATEGORIES, type AgentTemplateCategory } from './agentTemplates'
 import { useMinimizedChats, usePendingRestore } from '../../context/MinimizedChatsContext'
-import { useHub } from '../../hooks/useHub'
+import { useDesktop } from '../../hooks/useDesktop'
 
 interface CatalogAgent {
   id: string
@@ -48,7 +48,7 @@ export function AgentsCatalogTab() {
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
 
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const { minimize } = useMinimizedChats()
 
   // Snapshot of the live AiEdit shell so we can auto-minimize the current

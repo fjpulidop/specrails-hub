@@ -38,8 +38,8 @@ const mockStartSetupWizard = vi.fn()
 const mockSetActiveProjectId = vi.fn()
 const mockAddProject = vi.fn()
 
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({
     startSetupWizard: mockStartSetupWizard,
     setActiveProjectId: mockSetActiveProjectId,
     projects: [],
@@ -64,8 +64,8 @@ function mockFetchSequence(opts?: {
 
   global.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString()
-    if (url.includes('/api/hub/available-providers')) return providersResponse
-    if (url.includes('/api/hub/setup-prerequisites')) {
+    if (url.includes('/api/available-providers')) return providersResponse
+    if (url.includes('/api/setup-prerequisites')) {
       return prereqOk
         ? { ok: true, json: async () => prereqStatus }
         : { ok: false, status: 500, json: async () => ({}) }
@@ -263,8 +263,8 @@ describe('AddProjectDialog', () => {
     const user = userEvent.setup()
     global.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.includes('/api/hub/available-providers')) return { ok: true, json: async () => ({ claude: true, codex: true }) }
-      if (url.includes('/api/hub/setup-prerequisites')) return { ok: true, json: async () => goodPrereqsStatus }
+      if (url.includes('/api/available-providers')) return { ok: true, json: async () => ({ claude: true, codex: true }) }
+      if (url.includes('/api/setup-prerequisites')) return { ok: true, json: async () => goodPrereqsStatus }
       return { ok: true, json: async () => ({}) }
     })
     render(<AddProjectDialog open={true} onClose={vi.fn()} />)

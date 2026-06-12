@@ -77,7 +77,7 @@ function spawnCoreInit(args: string[], cwd: string): ChildProcess {
 // H19: hard cap on the runtime probe. `npx --yes --prefer-online
 // <CORE_PACKAGE_SPEC> version` does a network round-trip to the npm
 // registry, and spawnSync blocks the single event loop — without a timeout a
-// hung network froze the WHOLE hub indefinitely during Add Project. On
+// hung network froze the WHOLE app indefinitely during Add Project. On
 // timeout the probe degrades to ok:false, which the install paths surface as
 // a setup_error instead of hanging.
 const CORE_PROBE_TIMEOUT_MS = 60_000
@@ -121,7 +121,7 @@ function probeCoreRuntimeVersion(cwd: string): { ok: boolean; bin: string; versi
 
 function writeSpawnInstallConfig(projectId: string, yamlText: string): string {
   const tmpDir = tmpdir()
-  const tempPath = join(tmpDir, `specrails-hub-install-config-${projectId}-${Date.now()}.yaml`)
+  const tempPath = join(tmpDir, `specrails-desktop-install-config-${projectId}-${Date.now()}.yaml`)
   writeFileSync(tempPath, yamlText, 'utf-8')
   return tempPath
 }
@@ -582,8 +582,8 @@ async function validateCoreContract(): Promise<void> {
   const contractPath = await findCoreContract()
   if (!contractPath) {
     // specrails-core does not yet ship integration-contract.json (planned in RFC-003).
-    // Fall back silently to runtime defaults — Hub works fine without the contract.
-    console.debug('[Hub] integration-contract.json not found — using runtime defaults')
+    // Fall back silently to runtime defaults — Specrails works fine without the contract.
+    console.debug('[Specrails] integration-contract.json not found — using runtime defaults')
     return
   }
 
@@ -592,7 +592,7 @@ async function validateCoreContract(): Promise<void> {
     const raw = require('fs').readFileSync(contractPath, 'utf-8') as string
     contract = JSON.parse(raw) as { checkpoints?: string[]; commands?: string[] }
   } catch {
-    console.debug('[Hub] integration-contract.json failed to parse — using runtime defaults')
+    console.debug('[Specrails] integration-contract.json failed to parse — using runtime defaults')
     return
   }
 
@@ -605,11 +605,11 @@ async function validateCoreContract(): Promise<void> {
       .map((cp) => cp.key)
 
     if (missingCheckpoints.length > 0 || extraCheckpoints.length > 0) {
-      console.warn('[Hub] ⚠️  specrails-core contract checkpoint mismatch:')
+      console.warn('[Specrails] ⚠️  specrails-core contract checkpoint mismatch:')
       if (missingCheckpoints.length > 0)
-        console.warn(`  Checkpoints in Core but not in Hub: ${missingCheckpoints.join(', ')}`)
+        console.warn(`  Checkpoints in Core but not in the app: ${missingCheckpoints.join(', ')}`)
       if (extraCheckpoints.length > 0)
-        console.warn(`  Checkpoints in Hub but not in Core: ${extraCheckpoints.join(', ')}`)
+        console.warn(`  Checkpoints in the app but not in Core: ${extraCheckpoints.join(', ')}`)
     }
   }
 }
@@ -755,7 +755,7 @@ export class SetupManager {
 
     // spawnCoreInit uses shell:false on POSIX, so a spawn failure emits 'error'
     // (and NOT 'close') — without this handler the temp config file leaks and
-    // the unhandled 'error' event would crash the hub.
+    // the unhandled 'error' event would crash the app.
     /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
     child.on('error', (err) => {
       console.error(`[SetupManager] core spawn failed for ${projectId}: ${err.message}`)

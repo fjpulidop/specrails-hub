@@ -12,7 +12,7 @@ The server SHALL maintain a global `TerminalManager` that holds all active PTY s
 - **THEN** the server responds with HTTP 403 and closes the socket
 
 #### Scenario: Project removal kills its terminals
-- **WHEN** a project is removed from the hub via `DELETE /api/hub/projects/:id`
+- **WHEN** a project is removed from the app via `DELETE /api/projects/:id`
 - **THEN** all terminal sessions whose `projectId` equals the removed project are killed (SIGTERM then SIGKILL after 2s grace) and removed from the registry
 
 ### Requirement: Shell selection and environment
@@ -85,7 +85,7 @@ Client-to-server binary frames SHALL be forwarded unmodified to `pty.write()`. T
 - **THEN** the shell receives them unchanged (verifiable by shell history recall behavior)
 
 ### Requirement: Rename operation
-Clients SHALL rename a session via `PATCH /api/projects/:projectId/terminals/:id` with body `{ name: string }`. The server MUST update the session's `name` and broadcast a control message `{"type":"renamed","id":"...","name":"..."}` to all attached WebSocket clients and on the hub-level WebSocket so other project tabs see the update on return.
+Clients SHALL rename a session via `PATCH /api/projects/:projectId/terminals/:id` with body `{ name: string }`. The server MUST update the session's `name` and broadcast a control message `{"type":"renamed","id":"...","name":"..."}` to all attached WebSocket clients and on the app-level WebSocket so other project tabs see the update on return.
 
 #### Scenario: Rename persists in session metadata
 - **WHEN** a client PATCHes a session with `{"name":"build watcher"}`

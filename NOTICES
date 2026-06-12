@@ -1,11 +1,11 @@
 NOTICES — Third-Party Software Attributions
 ===========================================
 
-This product (specrails-hub) is licensed under the MIT License.
+This product (specrails-desktop) is licensed under the MIT License.
 See LICENSE for full terms.
 
 This file contains required attribution notices for third-party software
-components used in specrails-hub. These notices are required by the respective
+components used in specrails-desktop. These notices are required by the respective
 licenses of each component.
 
 For the full Software Bill of Materials (SBOM), see the specrails-tech repo at:
@@ -16,7 +16,7 @@ docs/compliance/sbom.json
 ## 1. highlight.js
 
 **License:** BSD-3-Clause
-**Used in:** specrails-hub/client (runtime bundle)
+**Used in:** specrails-desktop/client (runtime bundle)
 **Version:** ^11.11.1
 
 Copyright (c) 2006, Ivan Sagalaev
@@ -52,7 +52,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ## 2. qs
 
 **License:** BSD-3-Clause
-**Used in:** specrails-hub server (runtime — transitive via express)
+**Used in:** specrails-desktop server (runtime — transitive via express)
 **Version:** ^6.14.2
 
 Copyright (c) 2014 Nathan LaFreniere and other contributors
@@ -65,7 +65,7 @@ All rights reserved.
 ## 3. ieee754
 
 **License:** BSD-3-Clause
-**Used in:** specrails-hub server (runtime — transitive)
+**Used in:** specrails-desktop server (runtime — transitive)
 **Version:** ^1.2.1
 
 Copyright (c) 2008, Fair Oaks Labs, Inc.
@@ -78,7 +78,7 @@ All rights reserved.
 ## 4. react-transition-group
 
 **License:** BSD-3-Clause
-**Used in:** specrails-hub/client (runtime — transitive via recharts)
+**Used in:** specrails-desktop/client (runtime — transitive via recharts)
 **Version:** ^4.4.5
 
 Copyright (c) 2018, React Community
@@ -91,7 +91,7 @@ Portions Copyright (c) 2013-present, Facebook, Inc.
 ## 5. d3-ease
 
 **License:** BSD-3-Clause
-**Used in:** specrails-hub/client (runtime — transitive via recharts)
+**Used in:** specrails-desktop/client (runtime — transitive via recharts)
 **Version:** ^3.0.1
 
 Copyright 2010-2021 Mike Bostock
@@ -103,7 +103,7 @@ Copyright 2010-2021 Mike Bostock
 ## 6. class-variance-authority
 
 **License:** Apache-2.0
-**Used in:** specrails-hub/client (runtime)
+**Used in:** specrails-desktop/client (runtime)
 **Version:** ^0.7.1
 
 Copyright (c) 2022 Joe Bell

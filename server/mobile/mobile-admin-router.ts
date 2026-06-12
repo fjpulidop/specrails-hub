@@ -5,13 +5,13 @@ import type { WsMessage } from '../types'
 import type { MobileGateway } from './mobile-gateway'
 import { listDevices, revokeDevice } from './mobile-devices'
 
-// Loopback-only control plane for the desktop UI, mounted on the MAIN hub server
-// at /api/hub/mobile (behind requireAuth + requireLoopback). The phone never
+// Loopback-only control plane for the desktop UI, mounted on the MAIN server
+// at /api/mobile (behind requireAuth + requireLoopback). The phone never
 // touches these routes — they manage the gateway and pairing from the desktop.
 
 export interface MobileAdminDeps {
   gateway: MobileGateway
-  hubDb: DbInstance
+  desktopDb: DbInstance
   broadcast: (msg: WsMessage) => void
 }
 
@@ -19,7 +19,7 @@ const DEVICE_ID_RE = /^[A-Za-z0-9-]{1,64}$/
 
 export function createMobileAdminRouter(deps: MobileAdminDeps): Router {
   const router = Router()
-  const { gateway, hubDb } = deps
+  const { gateway, desktopDb } = deps
 
   router.get('/status', (_req: Request, res: Response) => {
     res.json(gateway.status())
@@ -82,7 +82,7 @@ export function createMobileAdminRouter(deps: MobileAdminDeps): Router {
 
   // —— Devices ——
   router.get('/devices', (_req: Request, res: Response) => {
-    res.json({ devices: listDevices(hubDb) })
+    res.json({ devices: listDevices(desktopDb) })
   })
 
   router.delete('/devices/:id', (req: Request, res: Response) => {
@@ -91,7 +91,7 @@ export function createMobileAdminRouter(deps: MobileAdminDeps): Router {
       res.status(400).json({ error: 'Invalid device id' })
       return
     }
-    const changed = revokeDevice(hubDb, id)
+    const changed = revokeDevice(desktopDb, id)
     if (changed) {
       gateway.bridge?.closeForDevice(id)
       deps.broadcast({ type: 'mobile.device_revoked', deviceId: id, timestamp: new Date().toISOString() })

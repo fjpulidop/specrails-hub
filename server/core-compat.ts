@@ -6,8 +6,8 @@ import { CHECKPOINTS } from './setup-manager'
 // Windows has no `which`; probe PATH via `where` instead.
 const WHICH_CMD = process.platform === 'win32' ? 'where' : 'which'
 
-// These must mirror KNOWN_VERBS in cli/specrails-hub.ts
-const HUB_KNOWN_COMMANDS = new Set([
+// These must mirror KNOWN_VERBS in cli/specrails-desktop.ts
+const DESKTOP_KNOWN_COMMANDS = new Set([
   'implement',
   'batch-implement',
   'why',
@@ -22,10 +22,12 @@ const HUB_KNOWN_COMMANDS = new Set([
 // v1.0: cli.initArgs / cli.updateArgs (flat); checkpoints/commands as string[]
 // v2.0: cli.claude / cli.codex (per-provider objects) + specrailsDir
 // v3.0: providers/modelPresets/legacyCompat top-level; checkpoints is now an
-//       object (key → description); `commands` field dropped from the contract
+//       object (key â description); `commands` field dropped from the contract
 interface IntegrationContract {
   schemaVersion: string
   coreVersion?: string
+  // Legacy field name frozen in the external specrails-core contract file —
+  // do not rename (specrails-core wire compat).
   minimumHubVersion?: string
   provider?: string
   cli?: {
@@ -43,7 +45,7 @@ interface IntegrationContract {
   }
   // v1/v2: string[]; v3: { [key: string]: string }
   checkpoints: string[] | Record<string, string>
-  // v1/v2 only — absent in v3
+  // v1/v2 only â absent in v3
   commands?: string[]
   ticketProvider?: {
     type: string
@@ -55,7 +57,7 @@ interface IntegrationContract {
 export interface CoreCompatResult {
   compatible: boolean
   coreVersion: string | null
-  hubVersion: string
+  desktopVersion: string
   missingCheckpoints: string[]
   extraCheckpoints: string[]
   missingCommands: string[]
@@ -84,7 +86,7 @@ export async function findCoreContract(): Promise<string | null> {
   return null
 }
 
-// ─── CLI detection ────────────────────────────────────────────────────────────
+// âââ CLI detection ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 // Importing the providers barrel registers every bundled adapter so the
 // detection helpers below walk the registry instead of hardcoding provider
@@ -112,7 +114,7 @@ export function detectCLISync(): CLIProvider | null {
 
 /**
  * Check which AI CLIs are available in the user's PATH. Returns a map of
- * provider id → available flag, one entry per registered adapter.
+ * provider id â available flag, one entry per registered adapter.
  */
 export function detectAvailableCLIs(): Record<string, boolean> {
   const out: Record<string, boolean> = {}
@@ -158,7 +160,7 @@ export function getCLIStatus(): CLIStatus {
       stdio: ['pipe', 'pipe', 'ignore'],
       timeout: 3000,
     }).trim()
-    // Extract semver-like token from output (e.g. "Claude Code 1.2.3" → "1.2.3")
+    // Extract semver-like token from output (e.g. "Claude Code 1.2.3" â "1.2.3")
     const match = raw.match(/\d+\.\d+\.\d+[\w.-]*/)
     return { provider, version: match ? match[0] : raw }
   } catch {
@@ -166,7 +168,7 @@ export function getCLIStatus(): CLIStatus {
   }
 }
 
-function readHubVersion(): string {
+function readDesktopVersion(): string {
   // __dirname is server/ in dev (tsx) or server/dist/ when compiled
   const candidates = [
     path.join(__dirname, '..', 'package.json'),       // from server/ (dev)
@@ -175,21 +177,21 @@ function readHubVersion(): string {
   for (const p of candidates) {
     try {
       const pkg = JSON.parse(fs.readFileSync(p, 'utf-8')) as { name?: string; version?: string }
-      if (pkg.name === 'specrails-hub' && pkg.version) return pkg.version
+      if (pkg.name === 'specrails-desktop' && pkg.version) return pkg.version
     } catch { /* skip */ }
   }
   return 'unknown'
 }
 
 export async function checkCoreCompat(): Promise<CoreCompatResult> {
-  const hubVersion = readHubVersion()
+  const desktopVersion = readDesktopVersion()
   const contractPath = await findCoreContract()
 
   if (!contractPath) {
     return {
       compatible: true,
       coreVersion: null,
-      hubVersion,
+      desktopVersion,
       missingCheckpoints: [],
       extraCheckpoints: [],
       missingCommands: [],
@@ -200,7 +202,7 @@ export async function checkCoreCompat(): Promise<CoreCompatResult> {
 
   const contract: IntegrationContract = JSON.parse(fs.readFileSync(contractPath, 'utf-8'))
 
-  const hubCheckpointKeys = CHECKPOINTS.map((cp) => cp.key)
+  const desktopCheckpointKeys = CHECKPOINTS.map((cp) => cp.key)
   // v1/v2 store checkpoints as a string[]; v3+ stores them as a description map.
   const contractCheckpoints: string[] = Array.isArray(contract.checkpoints)
     ? contract.checkpoints
@@ -208,16 +210,16 @@ export async function checkCoreCompat(): Promise<CoreCompatResult> {
         ? Object.keys(contract.checkpoints)
         : [])
 
-  const missingCheckpoints = contractCheckpoints.filter((c) => !hubCheckpointKeys.includes(c))
-  const extraCheckpoints = hubCheckpointKeys.filter((k) => !contractCheckpoints.includes(k))
+  const missingCheckpoints = contractCheckpoints.filter((c) => !desktopCheckpointKeys.includes(c))
+  const extraCheckpoints = desktopCheckpointKeys.filter((k) => !contractCheckpoints.includes(k))
 
-  // v3 dropped the `commands` field from the contract — when absent, the
+  // v3 dropped the `commands` field from the contract â when absent, the
   // command-set check is a no-op (cannot prove drift either way).
   const contractCommands: string[] = Array.isArray(contract.commands) ? contract.commands : []
-  const missingCommands = contractCommands.filter((c) => !HUB_KNOWN_COMMANDS.has(c))
+  const missingCommands = contractCommands.filter((c) => !DESKTOP_KNOWN_COMMANDS.has(c))
   const extraCommands = contract.commands === undefined
     ? []
-    : [...HUB_KNOWN_COMMANDS].filter((c) => !contractCommands.includes(c))
+    : [...DESKTOP_KNOWN_COMMANDS].filter((c) => !contractCommands.includes(c))
 
   const compatible =
     missingCheckpoints.length === 0 &&
@@ -228,7 +230,7 @@ export async function checkCoreCompat(): Promise<CoreCompatResult> {
   return {
     compatible,
     coreVersion: contract.coreVersion ?? readCoreVersionNear(contractPath),
-    hubVersion,
+    desktopVersion,
     missingCheckpoints,
     extraCheckpoints,
     missingCommands,
@@ -238,7 +240,7 @@ export async function checkCoreCompat(): Promise<CoreCompatResult> {
   }
 }
 
-// v3 contracts no longer include `coreVersion` at the top level — fall back
+// v3 contracts no longer include `coreVersion` at the top level â fall back
 // to reading it from the package.json next to the contract file.
 function readCoreVersionNear(contractPath: string): string | null {
   try {

@@ -4,7 +4,7 @@ import { Sparkles, Send, Zap, MessagesSquare, Globe, Ratio, PenLine } from 'luci
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { useSpecGenTracker } from '../hooks/useSpecGenTracker'
 import { API_ORIGIN } from '../lib/origin'
 import { deleteAllAttachments } from '../lib/attachments'
@@ -89,7 +89,7 @@ function genPendingId(): string {
 
 export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: ProposeSpecModalProps) {
   const { t } = useTranslation('addspec')
-  const { activeProjectId, projects } = useHub()
+  const { activeProjectId, projects } = useDesktop()
   const tracker = useSpecGenTracker()
   const [mode, setMode] = useState<SpecMode>('quick')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -434,7 +434,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                   budget={budget}
                   budgetError={budgetError}
                   model={model ?? 'sonnet'}
-                  maxPresetId={mode === 'quick' ? 'max' : 'hub'}
+                  maxPresetId={mode === 'quick' ? 'max' : 'desktop'}
                   smashCapable={smashCapable}
                 />
                 <ContextScopeChecks scope={scope} mode={mode} onChange={handleScopeChange} label={t('contextScope.fineTune')} showSummary={false} />

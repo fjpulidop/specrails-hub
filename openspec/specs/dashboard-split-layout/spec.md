@@ -36,7 +36,7 @@ The splitter position SHALL persist in `localStorage` under a per-project key, a
 
 #### Scenario: Position persisted after drag
 - **WHEN** the user finishes dragging the splitter
-- **THEN** the resulting left-panel width in pixels is written to `localStorage['specrails-hub:dashboard-split:<projectId>']`
+- **THEN** the resulting left-panel width in pixels is written to `localStorage['specrails-desktop:dashboard-split:<projectId>']`
 
 #### Scenario: Position restored on mount
 - **WHEN** the dashboard mounts and a persisted value exists for the active project

@@ -5,24 +5,33 @@ import fs from 'fs'
 import net from 'net'
 import type { WsMessage } from './types'
 import type { ProjectRegistry } from './project-registry'
-import { getHubSetting, setHubSetting, listProjects, listAgents, getAgent, addAgent, updateAgent, listWebhooks, getWebhook, addWebhook, updateWebhook, removeWebhook, getProjectSetupSession } from './hub-db'
-import type { WebhookEvent } from './hub-db'
+import { getDesktopSetting, setDesktopSetting, listProjects, listAgents, getAgent, addAgent, updateAgent, listWebhooks, getWebhook, addWebhook, updateWebhook, removeWebhook, getProjectSetupSession } from './desktop-db'
+import type { WebhookEvent } from './desktop-db'
 import { WebhookManager } from './webhook-manager'
 import { createSpecrailsTechClient } from './specrails-tech-client'
 import { checkCoreCompat, getCLIStatus, detectAvailableCLIs } from './core-compat'
 import { hasAdapter, listAdapters } from './providers'
-import { getHubAnalytics, getHubTodayStats, getHubRecentJobs } from './hub-analytics'
+import { getDesktopAnalytics, getDesktopTodayStats, getDesktopRecentJobs } from './desktop-analytics'
 import { getSetupPrerequisitesStatus } from './setup-prerequisites'
 import { getPathDiagnostic } from './path-resolver'
 import {
-  getHubTerminalSettings,
-  patchHubTerminalSettings,
+  getDesktopTerminalSettings,
+  patchDesktopTerminalSettings,
   TerminalSettingsValidationError,
 } from './terminal-settings'
 import type { AnalyticsOpts, AnalyticsPeriod } from './types'
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+// Emergency rollback for the codex provider: SPECRAILS_CODEX_BETA=0 forces
+// codex back to "unavailable" without redeploying. The pre-rebrand
+// SPECRAILS_HUB_CODEX_BETA name is read as a legacy fallback when the new
+// var is unset (legacy fallback — do not remove while old installs exist).
+function isCodexBetaDisabled(): boolean {
+  const v = process.env.SPECRAILS_CODEX_BETA ?? process.env.SPECRAILS_HUB_CODEX_BETA
+  return v === '0'
 }
 
 // Theme allow-list. Mirror of THEME_IDS in `client/src/lib/themes.ts` —
@@ -114,15 +123,15 @@ function publicWebhook(row: ReturnType<typeof getWebhook>) {
   return { ...rest, hasSecret: row.secret.length > 0 }
 }
 
-export function createHubRouter(
+export function createDesktopRouter(
   registry: ProjectRegistry,
   broadcast: (msg: WsMessage) => void
 ): Router {
   const router = Router()
 
-  // GET /api/hub/projects — list all registered projects
+  // GET /api/projects — list all registered projects
   router.get('/projects', (_req, res) => {
-    const projects = listProjects(registry.hubDb)
+    const projects = listProjects(registry.desktopDb)
     // Detect projects that are currently in the setup wizard so the client
     // can restore the wizard after a page refresh.
     const setupProjectIds: string[] = []
@@ -131,7 +140,7 @@ export function createHubRouter(
       if (!ctx) continue
       const installing = ctx.setupManager.isInstalling(p.id)
       const settingUp = ctx.setupManager.isSettingUp(p.id)
-      const hasSession = !!getProjectSetupSession(registry.hubDb, p.id)
+      const hasSession = !!getProjectSetupSession(registry.desktopDb, p.id)
       const specrailsInstalled = hasSpecrails(p.path)
       if (installing || settingUp || (hasSession && !specrailsInstalled)) {
         setupProjectIds.push(p.id)
@@ -140,18 +149,18 @@ export function createHubRouter(
     res.json({ projects, setupProjectIds })
   })
 
-  // GET /api/hub/available-providers — which AI CLIs are installed, plus supported install tiers
+  // GET /api/available-providers — which AI CLIs are installed, plus supported install tiers
   //
   // Codex (OpenAI) is supported as a first-class provider as of Stage C of
-  // the multi-provider work. The legacy `SPECRAILS_HUB_CODEX_BETA=0` env var
-  // is honoured as an emergency rollback (forces codex back to "unavailable"
-  // in the UI without redeploying) — unset or `1` reports the real detection.
+  // the multi-provider work. The `SPECRAILS_CODEX_BETA=0` env var is honoured
+  // as an emergency rollback (forces codex back to "unavailable" in the UI
+  // without redeploying) — unset or `1` reports the real detection.
   router.get('/available-providers', (_req, res) => {
     const providers = detectAvailableCLIs()
-    // tiers: quick install is always available (Hub-driven config); full requires an AI CLI
+    // tiers: quick install is always available (app-driven config); full requires an AI CLI
     const tiers: ('quick' | 'full')[] = ['quick']
     if (providers.claude || providers.codex) tiers.push('full')
-    const codexBetaOff = process.env.SPECRAILS_HUB_CODEX_BETA === '0'
+    const codexBetaOff = isCodexBetaDisabled()
     res.json({
       claude: providers.claude,
       codex: codexBetaOff ? false : providers.codex,
@@ -183,7 +192,7 @@ export function createHubRouter(
     res.json(status)
   })
 
-  // POST /api/hub/projects — register a new project by path
+  // POST /api/projects — register a new project by path
   router.post('/projects', (req, res) => {
     const { path: projectPath, name, provider, providers: providersRaw } = req.body ?? {}
     if (!projectPath || typeof projectPath !== 'string') {
@@ -217,9 +226,9 @@ export function createHubRouter(
     }
     // Beta-gate parity: if codex beta is forced off via env, refuse codex
     // selections too (consistency with /available-providers).
-    if (providers.includes('codex') && process.env.SPECRAILS_HUB_CODEX_BETA === '0') {
+    if (providers.includes('codex') && isCodexBetaDisabled()) {
       res.status(400).json({
-        error: 'Codex provider is currently disabled (SPECRAILS_HUB_CODEX_BETA=0). Unset or set to 1 to enable.',
+        error: 'Codex provider is currently disabled (SPECRAILS_CODEX_BETA=0). Unset or set to 1 to enable.',
       })
       return
     }
@@ -257,7 +266,7 @@ export function createHubRouter(
         providers: providers as ('claude' | 'codex')[],
       })
       broadcast({
-        type: 'hub.project_added',
+        type: 'desktop.project_added',
         project: ctx.project,
         timestamp: new Date().toISOString(),
       })
@@ -268,13 +277,13 @@ export function createHubRouter(
       if (message.includes('UNIQUE')) {
         res.status(409).json({ error: 'A project with this path is already registered' })
       } else {
-        console.error('[hub] add project error:', err)
+        console.error('[desktop] add project error:', err)
         res.status(500).json({ error: 'Failed to register project' })
       }
     }
   })
 
-  // DELETE /api/hub/projects/:id — unregister a project
+  // DELETE /api/projects/:id — unregister a project
   router.delete('/projects/:id', (req, res) => {
     const { id } = req.params
     const ctx = registry.getContext(id)
@@ -285,17 +294,17 @@ export function createHubRouter(
 
     registry.removeProject(id)
     broadcast({
-      type: 'hub.project_removed',
+      type: 'desktop.project_removed',
       projectId: id,
       timestamp: new Date().toISOString(),
     })
     res.json({ ok: true })
   })
 
-  // GET /api/hub/state — hub-level state summary
+  // GET /api/state — app-level state summary
   router.get('/state', (_req, res) => {
-    const projects = listProjects(registry.hubDb)
-    const todayStats = getHubTodayStats(registry)
+    const projects = listProjects(registry.desktopDb)
+    const todayStats = getDesktopTodayStats(registry)
     res.json({
       projects,
       projectCount: projects.length,
@@ -303,24 +312,24 @@ export function createHubRouter(
     })
   })
 
-  // GET /api/hub/analytics?period= — cross-project aggregated analytics
+  // GET /api/analytics?period= — cross-project aggregated analytics
   router.get('/analytics', (req, res) => {
     const period = (req.query.period as AnalyticsPeriod | undefined) ?? '7d'
     const from = req.query.from as string | undefined
     const to = req.query.to as string | undefined
     const opts: AnalyticsOpts = { period, from, to }
-    const result = getHubAnalytics(registry, opts)
+    const result = getDesktopAnalytics(registry, opts)
     res.json(result)
   })
 
-  // GET /api/hub/recent-jobs?limit= — last N jobs across all projects
+  // GET /api/recent-jobs?limit= — last N jobs across all projects
   router.get('/recent-jobs', (req, res) => {
     const limit = Math.min(Math.max(parseInt((req.query.limit as string) ?? '10', 10) || 10, 1), 50)
-    const jobs = getHubRecentJobs(registry, limit)
+    const jobs = getDesktopRecentJobs(registry, limit)
     res.json({ jobs })
   })
 
-  // GET /api/hub/resolve?path=<cwd> — resolve a project from a filesystem path
+  // GET /api/resolve?path=<cwd> — resolve a project from a filesystem path
   router.get('/resolve', (req, res) => {
     const queryPath = req.query.path as string | undefined
     if (!queryPath) {
@@ -339,19 +348,19 @@ export function createHubRouter(
     res.json({ project: ctx.project })
   })
 
-  // GET /api/hub/settings — get hub-level settings
+  // GET /api/settings — get app-level settings
   router.get('/settings', (_req, res) => {
-    const port = getHubSetting(registry.hubDb, 'port') ?? '4200'
+    const port = getDesktopSetting(registry.desktopDb, 'port') ?? '4200'
     const specrailsTechUrl =
-      getHubSetting(registry.hubDb, 'specrails_tech_url') ??
+      getDesktopSetting(registry.desktopDb, 'specrails_tech_url') ??
       process.env.SPECRAILS_TECH_URL ??
       'http://localhost:3000'
-    const costAlertThresholdRaw = getHubSetting(registry.hubDb, 'cost_alert_threshold_usd')
+    const costAlertThresholdRaw = getDesktopSetting(registry.desktopDb, 'cost_alert_threshold_usd')
     const costAlertThresholdUsd = costAlertThresholdRaw != null ? parseFloat(costAlertThresholdRaw) : null
     res.json({ port: parseInt(port, 10), specrailsTechUrl, costAlertThresholdUsd })
   })
 
-  // PUT /api/hub/settings — update hub-level settings
+  // PUT /api/settings — update app-level settings
   router.put('/settings', (req, res) => {
     const { port, specrailsTechUrl, costAlertThresholdUsd } = req.body ?? {}
     if (port !== undefined) {
@@ -360,7 +369,7 @@ export function createHubRouter(
         res.status(400).json({ error: 'port must be an integer between 1 and 65535' })
         return
       }
-      setHubSetting(registry.hubDb, 'port', String(n))
+      setDesktopSetting(registry.desktopDb, 'port', String(n))
     }
     if (specrailsTechUrl !== undefined && typeof specrailsTechUrl === 'string') {
       const normalized = validateHttpUrl(specrailsTechUrl.trim(), {
@@ -371,13 +380,13 @@ export function createHubRouter(
         res.status(400).json({ error: 'specrailsTechUrl must be a valid http(s) URL' })
         return
       }
-      setHubSetting(registry.hubDb, 'specrails_tech_url', normalized)
+      setDesktopSetting(registry.desktopDb, 'specrails_tech_url', normalized)
     }
     if (costAlertThresholdUsd !== undefined) {
       if (costAlertThresholdUsd === null) {
-        registry.hubDb.prepare('DELETE FROM hub_settings WHERE key = ?').run('cost_alert_threshold_usd')
+        registry.desktopDb.prepare('DELETE FROM desktop_settings WHERE key = ?').run('cost_alert_threshold_usd')
       } else if (typeof costAlertThresholdUsd === 'number' && costAlertThresholdUsd > 0) {
-        setHubSetting(registry.hubDb, 'cost_alert_threshold_usd', String(costAlertThresholdUsd))
+        setDesktopSetting(registry.desktopDb, 'cost_alert_threshold_usd', String(costAlertThresholdUsd))
       }
     }
     res.json({ ok: true })
@@ -385,34 +394,34 @@ export function createHubRouter(
 
   // ─── Budget routes ────────────────────────────────────────────────────────────
 
-  // GET /api/hub/budget — get hub-level budget status
+  // GET /api/budget — get app-level budget status
   router.get('/budget', (_req, res) => {
-    const hubDailyBudgetRaw = getHubSetting(registry.hubDb, 'hub_daily_budget_usd')
-    const hubDailyBudgetUsd = hubDailyBudgetRaw != null ? parseFloat(hubDailyBudgetRaw) : null
-    const costAlertRaw = getHubSetting(registry.hubDb, 'cost_alert_threshold_usd')
+    const desktopDailyBudgetRaw = getDesktopSetting(registry.desktopDb, 'desktop_daily_budget_usd')
+    const desktopDailyBudgetUsd = desktopDailyBudgetRaw != null ? parseFloat(desktopDailyBudgetRaw) : null
+    const costAlertRaw = getDesktopSetting(registry.desktopDb, 'cost_alert_threshold_usd')
     const costAlertThresholdUsd = costAlertRaw != null ? parseFloat(costAlertRaw) : null
-    const { costToday } = getHubTodayStats(registry)
-    const budgetUtilizationPct = hubDailyBudgetUsd != null && hubDailyBudgetUsd > 0
-      ? (costToday / hubDailyBudgetUsd) * 100
+    const { costToday } = getDesktopTodayStats(registry)
+    const budgetUtilizationPct = desktopDailyBudgetUsd != null && desktopDailyBudgetUsd > 0
+      ? (costToday / desktopDailyBudgetUsd) * 100
       : null
-    res.json({ hubDailyBudgetUsd, costAlertThresholdUsd, costToday, budgetUtilizationPct })
+    res.json({ desktopDailyBudgetUsd, costAlertThresholdUsd, costToday, budgetUtilizationPct })
   })
 
-  // PATCH /api/hub/budget — update hub-level budget settings
+  // PATCH /api/budget — update app-level budget settings
   router.patch('/budget', (req, res) => {
-    const { hubDailyBudgetUsd, costAlertThresholdUsd } = req.body ?? {}
-    if (hubDailyBudgetUsd !== undefined) {
-      if (hubDailyBudgetUsd === null) {
-        registry.hubDb.prepare('DELETE FROM hub_settings WHERE key = ?').run('hub_daily_budget_usd')
-      } else if (typeof hubDailyBudgetUsd === 'number' && hubDailyBudgetUsd > 0) {
-        setHubSetting(registry.hubDb, 'hub_daily_budget_usd', String(hubDailyBudgetUsd))
+    const { desktopDailyBudgetUsd, costAlertThresholdUsd } = req.body ?? {}
+    if (desktopDailyBudgetUsd !== undefined) {
+      if (desktopDailyBudgetUsd === null) {
+        registry.desktopDb.prepare('DELETE FROM desktop_settings WHERE key = ?').run('desktop_daily_budget_usd')
+      } else if (typeof desktopDailyBudgetUsd === 'number' && desktopDailyBudgetUsd > 0) {
+        setDesktopSetting(registry.desktopDb, 'desktop_daily_budget_usd', String(desktopDailyBudgetUsd))
       }
     }
     if (costAlertThresholdUsd !== undefined) {
       if (costAlertThresholdUsd === null) {
-        registry.hubDb.prepare('DELETE FROM hub_settings WHERE key = ?').run('cost_alert_threshold_usd')
+        registry.desktopDb.prepare('DELETE FROM desktop_settings WHERE key = ?').run('cost_alert_threshold_usd')
       } else if (typeof costAlertThresholdUsd === 'number' && costAlertThresholdUsd > 0) {
-        setHubSetting(registry.hubDb, 'cost_alert_threshold_usd', String(costAlertThresholdUsd))
+        setDesktopSetting(registry.desktopDb, 'cost_alert_threshold_usd', String(costAlertThresholdUsd))
       }
     }
     res.json({ ok: true })
@@ -420,14 +429,14 @@ export function createHubRouter(
 
   // ─── Agent routes ────────────────────────────────────────────────────────────
 
-  // GET /api/hub/agents — list all registered agents
+  // GET /api/agents — list all registered agents
   router.get('/agents', (_req, res) => {
-    res.json({ agents: listAgents(registry.hubDb) })
+    res.json({ agents: listAgents(registry.desktopDb) })
   })
 
-  // GET /api/hub/agents/:id — get agent by ID
+  // GET /api/agents/:id — get agent by ID
   router.get('/agents/:id', (req, res) => {
-    const agent = getAgent(registry.hubDb, req.params.id)
+    const agent = getAgent(registry.desktopDb, req.params.id)
     if (!agent) {
       res.status(404).json({ error: 'Agent not found' })
       return
@@ -435,7 +444,7 @@ export function createHubRouter(
     res.json({ agent })
   })
 
-  // POST /api/hub/agents — register a new agent
+  // POST /api/agents — register a new agent
   router.post('/agents', (req, res) => {
     const { slug, name, role, config } = req.body ?? {}
     if (!slug || typeof slug !== 'string') {
@@ -448,22 +457,22 @@ export function createHubRouter(
     }
     const id = randomUUID()
     try {
-      const agent = addAgent(registry.hubDb, { id, slug, name, role, config })
+      const agent = addAgent(registry.desktopDb, { id, slug, name, role, config })
       res.status(201).json({ agent })
     } catch (err) {
       const message = (err as Error).message ?? ''
       if (message.includes('UNIQUE')) {
         res.status(409).json({ error: 'An agent with this slug already exists' })
       } else {
-        console.error('[hub] add agent error:', err)
+        console.error('[desktop] add agent error:', err)
         res.status(500).json({ error: 'Failed to register agent' })
       }
     }
   })
 
-  // PATCH /api/hub/agents/:id — update agent fields
+  // PATCH /api/agents/:id — update agent fields
   router.patch('/agents/:id', (req, res) => {
-    const agent = getAgent(registry.hubDb, req.params.id)
+    const agent = getAgent(registry.desktopDb, req.params.id)
     if (!agent) {
       res.status(404).json({ error: 'Agent not found' })
       return
@@ -476,17 +485,17 @@ export function createHubRouter(
     if (current_job_id !== undefined) updates.current_job_id = current_job_id
     if (last_heartbeat_at !== undefined) updates.last_heartbeat_at = last_heartbeat_at
     if (config !== undefined) updates.config = config
-    const updated = updateAgent(registry.hubDb, req.params.id, updates)
+    const updated = updateAgent(registry.desktopDb, req.params.id, updates)
     res.json({ agent: updated })
   })
 
-  // GET /api/hub/core-compat — compatibility status between hub and specrails-core
+  // GET /api/core-compat — compatibility status between the app and specrails-core
   router.get('/core-compat', async (_req, res) => {
     const result = await checkCoreCompat()
     res.json(result)
   })
 
-  // GET /api/hub/cli-status — detected AI CLI provider and version
+  // GET /api/cli-status — detected AI CLI provider and version
   router.get('/cli-status', (_req, res) => {
     res.json(getCLIStatus())
   })
@@ -496,13 +505,13 @@ export function createHubRouter(
 
   function getSpecrailsTechClient() {
     const url =
-      getHubSetting(registry.hubDb, 'specrails_tech_url') ??
+      getDesktopSetting(registry.desktopDb, 'specrails_tech_url') ??
       process.env.SPECRAILS_TECH_URL ??
       'http://localhost:3000'
     return createSpecrailsTechClient(url)
   }
 
-  // GET /api/hub/specrails-tech/status — health + connected flag
+  // GET /api/specrails-tech/status — health + connected flag
   router.get('/specrails-tech/status', async (_req, res) => {
     const client = getSpecrailsTechClient()
     const result = await client.health()
@@ -513,7 +522,7 @@ export function createHubRouter(
     res.json({ connected: true, data: result.data })
   })
 
-  // GET /api/hub/specrails-tech/agents — list agents
+  // GET /api/specrails-tech/agents — list agents
   router.get('/specrails-tech/agents', async (_req, res) => {
     const client = getSpecrailsTechClient()
     const result = await client.listAgents()
@@ -524,7 +533,7 @@ export function createHubRouter(
     res.json({ connected: true, data: result.data })
   })
 
-  // GET /api/hub/specrails-tech/agents/:slug — agent detail
+  // GET /api/specrails-tech/agents/:slug — agent detail
   router.get('/specrails-tech/agents/:slug', async (req, res) => {
     const client = getSpecrailsTechClient()
     const result = await client.getAgent(req.params.slug)
@@ -535,7 +544,7 @@ export function createHubRouter(
     res.json({ connected: true, data: result.data })
   })
 
-  // GET /api/hub/specrails-tech/docs — list docs
+  // GET /api/specrails-tech/docs — list docs
   router.get('/specrails-tech/docs', async (_req, res) => {
     const client = getSpecrailsTechClient()
     const result = await client.listDocs()
@@ -546,7 +555,7 @@ export function createHubRouter(
     res.json({ connected: true, data: result.data })
   })
 
-  // GET /api/hub/specrails-tech/docs/:page — doc page detail
+  // GET /api/specrails-tech/docs/:page — doc page detail
   router.get('/specrails-tech/docs/:page', async (req, res) => {
     const client = getSpecrailsTechClient()
     const result = await client.getDoc(req.params.page)
@@ -559,14 +568,14 @@ export function createHubRouter(
 
   // ─── Webhook routes ──────────────────────────────────────────────────────────
 
-  const webhookManager = new WebhookManager(registry.hubDb)
+  const webhookManager = new WebhookManager(registry.desktopDb)
 
-  // GET /api/hub/webhooks — list all webhooks
+  // GET /api/webhooks — list all webhooks
   router.get('/webhooks', (_req, res) => {
-    res.json({ webhooks: listWebhooks(registry.hubDb).map(publicWebhook) })
+    res.json({ webhooks: listWebhooks(registry.desktopDb).map(publicWebhook) })
   })
 
-  // POST /api/hub/webhooks — create a webhook
+  // POST /api/webhooks — create a webhook
   router.post('/webhooks', (req, res) => {
     const { url, secret, events, projectId } = req.body ?? {}
     if (!url || typeof url !== 'string') {
@@ -574,7 +583,7 @@ export function createHubRouter(
       return
     }
 
-    const validEvents: WebhookEvent[] = ['job.completed', 'job.failed', 'job.canceled', 'daily_budget_exceeded', 'hub_daily_budget_exceeded']
+    const validEvents: WebhookEvent[] = ['job.completed', 'job.failed', 'job.canceled', 'daily_budget_exceeded', 'desktop_daily_budget_exceeded']
     const parsedEvents: WebhookEvent[] = Array.isArray(events)
       ? (events as string[]).filter((e): e is WebhookEvent => validEvents.includes(e as WebhookEvent))
       : ['job.completed', 'job.failed', 'job.canceled']
@@ -601,7 +610,7 @@ export function createHubRouter(
       return
     }
 
-    const webhook = addWebhook(registry.hubDb, {
+    const webhook = addWebhook(registry.desktopDb, {
       id: randomUUID(),
       projectId: projectId ?? null,
       url: normalizedUrl,
@@ -611,16 +620,16 @@ export function createHubRouter(
     res.status(201).json({ webhook: publicWebhook(webhook) })
   })
 
-  // PATCH /api/hub/webhooks/:id — update a webhook
+  // PATCH /api/webhooks/:id — update a webhook
   router.patch('/webhooks/:id', (req, res) => {
-    const existing = getWebhook(registry.hubDb, req.params.id)
+    const existing = getWebhook(registry.desktopDb, req.params.id)
     if (!existing) {
       res.status(404).json({ error: 'Webhook not found' })
       return
     }
 
     const { url, secret, events, enabled } = req.body ?? {}
-    const validEvents: WebhookEvent[] = ['job.completed', 'job.failed', 'job.canceled', 'daily_budget_exceeded', 'hub_daily_budget_exceeded']
+    const validEvents: WebhookEvent[] = ['job.completed', 'job.failed', 'job.canceled', 'daily_budget_exceeded', 'desktop_daily_budget_exceeded']
     const parsedEvents: WebhookEvent[] | undefined = Array.isArray(events)
       ? (events as string[]).filter((e): e is WebhookEvent => validEvents.includes(e as WebhookEvent))
       : undefined
@@ -638,7 +647,7 @@ export function createHubRouter(
       normalizedUrl = candidate
     }
 
-    const updated = updateWebhook(registry.hubDb, req.params.id, {
+    const updated = updateWebhook(registry.desktopDb, req.params.id, {
       url: normalizedUrl,
       secret: typeof secret === 'string' ? secret.trim() : undefined,
       events: parsedEvents,
@@ -647,20 +656,20 @@ export function createHubRouter(
     res.json({ webhook: publicWebhook(updated) })
   })
 
-  // DELETE /api/hub/webhooks/:id — delete a webhook
+  // DELETE /api/webhooks/:id — delete a webhook
   router.delete('/webhooks/:id', (req, res) => {
-    const existing = getWebhook(registry.hubDb, req.params.id)
+    const existing = getWebhook(registry.desktopDb, req.params.id)
     if (!existing) {
       res.status(404).json({ error: 'Webhook not found' })
       return
     }
-    removeWebhook(registry.hubDb, req.params.id)
+    removeWebhook(registry.desktopDb, req.params.id)
     res.json({ ok: true })
   })
 
-  // POST /api/hub/webhooks/:id/test — send a test ping
+  // POST /api/webhooks/:id/test — send a test ping
   router.post('/webhooks/:id/test', (req, res) => {
-    const webhook = getWebhook(registry.hubDb, req.params.id)
+    const webhook = getWebhook(registry.desktopDb, req.params.id)
     if (!webhook) {
       res.status(404).json({ error: 'Webhook not found' })
       return
@@ -669,19 +678,19 @@ export function createHubRouter(
     res.json({ ok: true, message: 'Test ping queued' })
   })
 
-  // GET /api/hub/terminal-settings — hub-wide terminal defaults
+  // GET /api/terminal-settings — Desktop-wide terminal defaults
   router.get('/terminal-settings', (_req, res) => {
-    res.json(getHubTerminalSettings(registry.hubDb))
+    res.json(getDesktopTerminalSettings(registry.desktopDb))
   })
 
-  // PATCH /api/hub/terminal-settings — partial update of hub defaults
+  // PATCH /api/terminal-settings — partial update of Desktop-wide defaults
   router.patch('/terminal-settings', (req, res) => {
     if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
       res.status(400).json({ error: 'invalid body' })
       return
     }
     try {
-      const updated = patchHubTerminalSettings(registry.hubDb, req.body as Record<string, unknown>)
+      const updated = patchDesktopTerminalSettings(registry.desktopDb, req.body as Record<string, unknown>)
       res.json(updated)
     } catch (err) {
       if (err instanceof TerminalSettingsValidationError) {
@@ -692,11 +701,11 @@ export function createHubRouter(
     }
   })
 
-  // ─── Theme (hub-wide UI theme) ────────────────────────────────────────────
+  // ─── Theme (app-wide UI theme) ────────────────────────────────────────────
   // Allow-list synchronized with `client/src/lib/themes.ts THEME_IDS`.
-  // Persisted under hub_settings key `ui_theme`. Default seeded by migration 8.
+  // Persisted under desktop_settings key `ui_theme`. Default seeded by migration 8.
   router.get('/theme', (_req, res) => {
-    const stored = getHubSetting(registry.hubDb, 'ui_theme')
+    const stored = getDesktopSetting(registry.desktopDb, 'ui_theme')
     const theme = stored && THEME_ID_ALLOWLIST.has(stored) ? stored : 'specrails'
     res.json({ theme })
   })
@@ -710,17 +719,17 @@ export function createHubRouter(
       })
       return
     }
-    setHubSetting(registry.hubDb, 'ui_theme', next)
+    setDesktopSetting(registry.desktopDb, 'ui_theme', next)
     res.json({ theme: next })
   })
 
-  // ─── Language (hub-wide UI language) ──────────────────────────────────────
+  // ─── Language (app-wide UI language) ──────────────────────────────────────
   // Allow-list synchronized with `client/src/lib/i18n.ts LANGUAGE_IDS`.
-  // Persisted under hub_settings key `ui_language`. No default is seeded:
+  // Persisted under desktop_settings key `ui_language`. No default is seeded:
   // `language: null` means "user never chose" and the client keeps following
   // the OS/browser language until an explicit choice is PATCHed.
   router.get('/language', (_req, res) => {
-    const stored = getHubSetting(registry.hubDb, 'ui_language')
+    const stored = getDesktopSetting(registry.desktopDb, 'ui_language')
     const language = stored && LANGUAGE_ID_ALLOWLIST.has(stored) ? stored : null
     res.json({ language })
   })
@@ -734,15 +743,15 @@ export function createHubRouter(
       })
       return
     }
-    setHubSetting(registry.hubDb, 'ui_language', next)
+    setDesktopSetting(registry.desktopDb, 'ui_language', next)
     res.json({ language: next })
   })
 
   // ─── Code Explorer settings (summary language + monthly budget) ───────────
   router.get('/code-explorer-settings', (_req, res) => {
-    const langRaw = getHubSetting(registry.hubDb, 'summary_language')
+    const langRaw = getDesktopSetting(registry.desktopDb, 'summary_language')
     const language = langRaw === 'es' ? 'es' : 'en'
-    const budgetRaw = getHubSetting(registry.hubDb, 'summary_monthly_budget_usd')
+    const budgetRaw = getDesktopSetting(registry.desktopDb, 'summary_monthly_budget_usd')
     const parsed = budgetRaw !== undefined ? Number(budgetRaw) : NaN
     const monthlyBudgetUsd = Number.isFinite(parsed) && parsed >= 0 ? parsed : 5.0
     res.json({ language, monthlyBudgetUsd })
@@ -769,14 +778,14 @@ export function createHubRouter(
       }
     }
     if (body.language !== undefined) {
-      setHubSetting(registry.hubDb, 'summary_language', body.language as string)
+      setDesktopSetting(registry.desktopDb, 'summary_language', body.language as string)
     }
     if (body.monthlyBudgetUsd !== undefined) {
-      setHubSetting(registry.hubDb, 'summary_monthly_budget_usd', String(body.monthlyBudgetUsd))
+      setDesktopSetting(registry.desktopDb, 'summary_monthly_budget_usd', String(body.monthlyBudgetUsd))
     }
-    const langRaw = getHubSetting(registry.hubDb, 'summary_language')
+    const langRaw = getDesktopSetting(registry.desktopDb, 'summary_language')
     const language = langRaw === 'es' ? 'es' : 'en'
-    const budgetRaw = getHubSetting(registry.hubDb, 'summary_monthly_budget_usd')
+    const budgetRaw = getDesktopSetting(registry.desktopDb, 'summary_monthly_budget_usd')
     const parsed = budgetRaw !== undefined ? Number(budgetRaw) : NaN
     const monthlyBudgetUsd = Number.isFinite(parsed) && parsed >= 0 ? parsed : 5.0
     res.json({ language, monthlyBudgetUsd })

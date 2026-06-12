@@ -1,7 +1,7 @@
 /**
  * Canonical spec payload produced by the tour during Beat 08 (spawnNewSpecCard).
  *
- * openspec: hub-demo-scripted-tour (tasks §4.2)
+ * openspec: desktop-demo-scripted-tour (tasks §4.2)
  */
 
 import type { LocalTicket } from '../../types'

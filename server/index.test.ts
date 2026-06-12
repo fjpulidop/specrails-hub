@@ -239,7 +239,7 @@ function createTestApp() {
       version: '0.0.0-test',
       uptime: Math.floor(process.uptime()),
       projects: 1,
-      mode: 'hub',
+      mode: 'super',
     })
   })
 
@@ -560,7 +560,7 @@ describe('API endpoints', () => {
       expect(res.body.uptime).toBeGreaterThanOrEqual(0)
       expect(typeof res.body.projects).toBe('number')
       expect(res.body.projects).toBeGreaterThanOrEqual(0)
-      expect(res.body.mode).toBe('hub')
+      expect(res.body.mode).toBe('super')
     })
   })
 })

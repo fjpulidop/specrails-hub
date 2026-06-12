@@ -102,7 +102,7 @@
       "standard": "Standard",
       "rich": "Umfangreich",
       "max": "Max",
-      "hub": "Hub"
+      "desktop": "Desktop"
     },
     "presetCost": {
       "minimal": "1× Kosten · schnellstes erstes Token · keine Specs geladen",
@@ -110,7 +110,7 @@
       "standard": "1,6× Kosten · Specrails- + OpenSpec-Specs geladen",
       "rich": "2× Kosten · voller Lesezugriff aufs Repo",
       "max": "4× Kosten · voller Lesezugriff + Contract-Layer-Verfeinerung",
-      "hub": "4–6× Kosten · alle Features + Projekt-MCPs & deine freigegebenen MCPs"
+      "desktop": "4–6× Kosten · alle Features + Projekt-MCPs & deine freigegebenen MCPs"
     },
     "smashCapable": "SMASH-fähig",
     "smashHint": "Contract Layer ist aktiv, daher kann diese Spec später in Sub-Specs zerlegt werden.",

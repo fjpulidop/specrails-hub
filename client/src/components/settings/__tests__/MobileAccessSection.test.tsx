@@ -20,8 +20,8 @@ function mockApi(handlers: Handler[]) {
   }) as never
 }
 
-const OFF = { enabled: false, running: false, port: 4202, certFingerprint: null, lanAddresses: [], mdnsEnabled: true, hubName: 'Mac' }
-const ON = { enabled: true, running: true, port: 4202, certFingerprint: 'a'.repeat(64), lanAddresses: ['192.168.1.5'], mdnsEnabled: true, hubName: 'Mac' }
+const OFF = { enabled: false, running: false, port: 4202, certFingerprint: null, lanAddresses: [], mdnsEnabled: true, desktopName: 'Mac' }
+const ON = { enabled: true, running: true, port: 4202, certFingerprint: 'a'.repeat(64), lanAddresses: ['192.168.1.5'], mdnsEnabled: true, desktopName: 'Mac' }
 
 beforeEach(() => { vi.clearAllMocks() })
 

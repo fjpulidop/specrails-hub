@@ -53,11 +53,11 @@
   },
   "errors": {
     "limitReached": "Limite de terminaux atteinte (max {{max}}).",
-    "spawnFailed": "Le shell n'a pas pu démarrer — le hub manque peut-être de descripteurs de fichiers. Essayez de redémarrer le hub.",
+    "spawnFailed": "Le shell n'a pas pu démarrer — l'application manque peut-être de descripteurs de fichiers. Essayez de redémarrer l'application.",
     "invalidName": "Nom de terminal invalide.",
     "openFailed": "Échec de l'ouverture du terminal.",
     "serverUnreachable": "Impossible de joindre le serveur pour ouvrir un terminal.",
-    "exitedImmediately": "Le terminal s'est fermé immédiatement — le shell n'a peut-être pas pu démarrer. Si cela se reproduit, redémarrez le hub."
+    "exitedImmediately": "Le terminal s'est fermé immédiatement — le shell n'a peut-être pas pu démarrer. Si cela se reproduit, redémarrez l'application."
   },
   "session": {
     "processExited": "[processus terminé]",

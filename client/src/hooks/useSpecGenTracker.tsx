@@ -1,7 +1,7 @@
 /**
  * Cross-project spec generation tracker.
  *
- * Lives at HubApp level — never unmounts during a session. Owns the WebSocket
+ * Lives at DesktopApp level — never unmounts during a session. Owns the WebSocket
  * handlers and in-flight Maps so they survive project switches (which unmount
  * DashboardPage and ProposeSpecModal).
  *
@@ -23,7 +23,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import i18n from '../lib/i18n'
 import { useSharedWebSocket } from './useSharedWebSocket'
-import { useHub } from './useHub'
+import { useDesktop } from './useDesktop'
 import { API_ORIGIN } from '../lib/origin'
 import { forceProjectRoute } from '../lib/route-memory'
 import { formatElapsed, readPendingSpecs, savePendingSpec, removePendingSpec } from '../lib/pending-specs'
@@ -69,7 +69,7 @@ const RESTORE_POLL_MS = 3000
 
 export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
-  const { setActiveProjectId } = useHub()
+  const { setActiveProjectId } = useDesktop()
   const navigate = useNavigate()
   const [specToOpen, setSpecToOpen] = useState<SpecToOpen | null>(null)
 
@@ -79,7 +79,7 @@ export function SpecGenTrackerProvider({ children }: { children: ReactNode }) {
   const exploreRef = useRef<Map<string, TrackedSpec>>(new Map())
 
   const activeProjectIdRef = useRef<string | null>(null)
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
 
   // ── Internal helpers ────────────────────────────────────────────────────────
@@ -339,7 +339,7 @@ const NOOP_TRACKER: SpecGenTrackerValue = {
   clearSpecToOpen: () => {},
 }
 
-/** Returns the tracker, or a no-op fallback in legacy (non-hub) mode. */
+/** Returns the tracker, or a no-op fallback in legacy (non-Super) mode. */
 export function useSpecGenTracker(): SpecGenTrackerValue {
   return useContext(SpecGenTrackerContext) ?? NOOP_TRACKER
 }

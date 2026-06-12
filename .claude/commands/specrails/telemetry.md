@@ -5,7 +5,7 @@ category: Workflow
 tags: [workflow, telemetry, cost, metrics, analytics, agents]
 ---
 
-Analyze **specrails-hub** agent execution telemetry — token usage, API cost estimates, run throughput, and performance trends across all `sr-*` agents.
+Analyze **specrails-desktop** agent execution telemetry — token usage, API cost estimates, run throughput, and performance trends across all `sr-*` agents.
 
 **Input:** `$ARGUMENTS` — optional flags:
 
@@ -326,7 +326,7 @@ Render output according to `FORMAT`.
 ### FORMAT = "markdown"
 
 ```
-## Agent Telemetry Dashboard — specrails-hub
+## Agent Telemetry Dashboard — specrails-desktop
 Period: <today | last 7 days | all time>  |  As of: <ISO date>  |  Data source: <logs + memory | memory only>
 
 ---
@@ -476,7 +476,7 @@ Emit a single JSON object to stdout:
 ```json
 {
   "schema_version": "1",
-  "project": "specrails-hub",
+  "project": "specrails-desktop",
   "period": "<today|week|all>",
   "period_start": "<ISO datetime or null>",
   "generated_at": "<ISO datetime>",

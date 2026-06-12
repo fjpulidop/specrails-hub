@@ -604,7 +604,7 @@ describe('ChatManager', () => {
       expect(args).toContain('--json')
       expect(args).toContain('--sandbox')
       expect(args).toContain('workspace-write')
-      // chat-turn must NOT fold the hub system prompt — AGENTS.md in
+      // chat-turn must NOT fold the app system prompt — AGENTS.md in
       // explore-cwd carries the framing; argv stays user-text-only so codex
       // doesn't mistake the system prompt for the user request.
       const promptArg = args.find((a) => a.includes('Hello codex')) as string
@@ -864,7 +864,7 @@ describe('ChatManager', () => {
       delete process.env.SPECRAILS_EXPLORE_LEGACY_CWD
     })
 
-    it('uses the hub-managed explore-cwd for kind=explore by default', async () => {
+    it('uses the app-managed explore-cwd for kind=explore by default', async () => {
       const cmExplore = new ChatManager(
         broadcast, db, projectPath, 'P', 'claude', 'proj-x', 'slug-x',
       )

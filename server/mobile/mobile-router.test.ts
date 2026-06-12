@@ -2,14 +2,14 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import express from 'express'
 import http from 'http'
 import request from 'supertest'
-import { initHubDb } from '../hub-db'
+import { initDesktopDb } from '../desktop-db'
 import type { DbInstance } from '../db'
 import { createDevice, hashToken } from './mobile-devices'
 import { createMobileRouter } from './mobile-router'
 import { PairingManager } from './mobile-pairing'
 
-// A stand-in "internal hub" the gateway forwards to. Captures the last body so we
-// can assert narrowing, and echoes auth so we can assert the master token is
+// A stand-in "internal server" the gateway forwards to. Captures the last body so
+// we can assert narrowing, and echoes auth so we can assert the master token is
 // injected.
 let internal: http.Server
 let internalPort = 0
@@ -19,8 +19,9 @@ let lastAuth: string | undefined
 beforeAll(async () => {
   const app = express()
   app.use(express.json())
-  app.get('/api/hub/projects', (req, res) => {
-    lastAuth = req.headers['authorization']
+  // Exact GET /api/projects is served by the desktop router (mounted at /api).
+  app.get('/api/projects', (req, res) => {
+    lastAuth = req.headers['x-desktop-token'] as string | undefined
     res.json({ projects: [{ id: 'p1', name: 'P', slug: 's', path: '/Users/x/secret', db_path: '/d' }] })
   })
   app.get('/api/projects/:id/tickets', (_req, res) => res.json({ tickets: [{ id: 1, title: 'T' }] }))
@@ -40,12 +41,12 @@ afterAll(async () => {
 
 function buildApp(db: DbInstance): express.Express {
   const pairing = new PairingManager({
-    certFingerprint: () => 'fp', hubInstanceId: () => 'h', hubName: () => 'Mac',
+    certFingerprint: () => 'fp', desktopInstanceId: () => 'd', desktopName: () => 'Mac',
     port: () => 4202, lanAddresses: () => ['10.0.0.1'], createDevice: () => 'd1',
   })
   const app = express()
   app.use(express.json())
-  app.use(createMobileRouter({ db, hubPort: internalPort, currentFingerprint: () => 'fp', pairing }))
+  app.use(createMobileRouter({ db, desktopPort: internalPort, currentFingerprint: () => 'fp', pairing }))
   return app
 }
 
@@ -53,7 +54,7 @@ describe('mobile-router', () => {
   let db: DbInstance
   let app: express.Express
   beforeEach(() => {
-    db = initHubDb(':memory:')
+    db = initDesktopDb(':memory:')
     createDevice(db, { name: 'A', platform: 'ios', tokenHash: hashToken('tok'), certFingerprint: 'fp' })
     app = buildApp(db)
     lastPatchBody = null
@@ -65,7 +66,9 @@ describe('mobile-router', () => {
     expect(res.body.projects[0].path).toBeUndefined()
     expect(res.body.projects[0].db_path).toBeUndefined()
     expect(res.body.projects[0].id).toBe('p1')
-    expect(lastAuth).toMatch(/^Bearer .+/)
+    // Master token injected via the x-desktop-token header (matches server/auth.ts).
+    expect(lastAuth).toBeTruthy()
+    expect(lastAuth!.length).toBeGreaterThan(0)
   })
 
   it('401 without a device token', async () => {
@@ -168,10 +171,10 @@ describe('mobile-router', () => {
 
   it('generate-spec and from-prompt narrow their bodies', async () => {
     const gs = await request(app).post('/v1/projects/p1/tickets/generate-spec').set('Authorization', 'Bearer tok').send({ prompt: 'do x', evil: 1, contractRefine: true, contextScope: { specrails: true, full: false, bogus: 1 } })
-    // prompt → idea, and the context scope is forwarded so the hub injects specs + dedups.
+    // prompt → idea, and the context scope is forwarded so the server injects specs + dedups.
     expect(gs.body.body).toEqual({ idea: 'do x', contractRefine: true, contextScope: { specrails: true, full: false } })
     const fp = await request(app).post('/v1/projects/p1/tickets/from-prompt').set('Authorization', 'Bearer tok').send({ prompt: 'p', title: 't', evil: 1 })
-    expect(fp.body.body).toEqual({ description: 'p', title: 't' }) // prompt → description (hub contract)
+    expect(fp.body.body).toEqual({ description: 'p', title: 't' }) // prompt → description (server contract)
   })
 
   it('reads: jobs/:jid, tickets/:tid, spending-summary, state, activity, stats', async () => {
@@ -191,15 +194,15 @@ describe('mobile-router', () => {
     }
   })
 
-  it('502 when the internal hub is unreachable', async () => {
+  it('502 when the internal server is unreachable', async () => {
     const pairing = new PairingManager({
-      certFingerprint: () => 'fp', hubInstanceId: () => 'h', hubName: () => 'Mac',
+      certFingerprint: () => 'fp', desktopInstanceId: () => 'd', desktopName: () => 'Mac',
       port: () => 4202, lanAddresses: () => [], createDevice: () => 'd1',
     })
     const a = express()
     a.use(express.json())
     // Point at a port nothing is listening on.
-    a.use(createMobileRouter({ db, hubPort: 9, currentFingerprint: () => 'fp', pairing }))
+    a.use(createMobileRouter({ db, desktopPort: 9, currentFingerprint: () => 'fp', pairing }))
     const res = await request(a).get('/v1/projects').set('Authorization', 'Bearer tok')
     expect(res.status).toBe(502)
   })
@@ -207,12 +210,12 @@ describe('mobile-router', () => {
   it('pairing claim + status are reachable without auth', async () => {
     // Fresh app with a real pairing session.
     const pairing = new PairingManager({
-      certFingerprint: () => 'fp', hubInstanceId: () => 'h', hubName: () => 'Mac',
+      certFingerprint: () => 'fp', desktopInstanceId: () => 'd', desktopName: () => 'Mac',
       port: () => 4202, lanAddresses: () => ['10.0.0.1'], createDevice: () => 'd1',
     })
     const a = express()
     a.use(express.json())
-    a.use(createMobileRouter({ db, hubPort: internalPort, currentFingerprint: () => 'fp', pairing }))
+    a.use(createMobileRouter({ db, desktopPort: internalPort, currentFingerprint: () => 'fp', pairing }))
     const qr = pairing.createSession()
 
     const claim = await request(a).post('/pair/claim').send({ secret: qr.secret, deviceName: 'iPhone', platform: 'ios' })

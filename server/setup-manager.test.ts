@@ -229,7 +229,7 @@ describe('SetupManager', () => {
       )
       const fromConfigIdx = (spawnArgs as string[]).indexOf('--from-config')
       expect(fromConfigIdx).toBeGreaterThanOrEqual(0)
-      expect((spawnArgs as string[])[fromConfigIdx + 1]).toContain('specrails-hub-install-config-p1-')
+      expect((spawnArgs as string[])[fromConfigIdx + 1]).toContain('specrails-desktop-install-config-p1-')
       expect(spawnOpts).toEqual(expect.objectContaining({ cwd: '/path/to/project' }))
     })
 
@@ -325,7 +325,7 @@ describe('SetupManager', () => {
     it('fails before spawn when Git is missing from PATH', async () => {
       const prereqs = await import('./setup-prerequisites')
       vi.mocked(prereqs.formatMissingSetupPrerequisites).mockReturnValueOnce(
-        '- Git (git) is not on PATH. Install Git and restart SpecRails Hub.',
+        '- Git (git) is not on PATH. Install Git and restart Specrails.',
       )
 
       sm.startInstall('p1', '/path/to/project')
@@ -1075,7 +1075,7 @@ describe('SetupManager', () => {
   })
 
   // ─── getSummary / computeSummary ────────────────────────────────────────────
-  // Regression tests for: "Hub shows 0 Agents, 0 Personas, 0 Specs after install"
+  // Regression tests for: "App shows 0 Agents, 0 Personas, 0 Specs after install"
   // Root cause: three places in SetupWizard.tsx hardcoded { agents:0, personas:0, commands:0 }
   // Fix: computeSummary() now called in setup_install_done broadcasts; getSummary() is public.
 

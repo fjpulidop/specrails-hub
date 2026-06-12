@@ -6,7 +6,7 @@ import { Link2, ArrowRight, Crown, Trash2, MessageSquare, AlertTriangle } from '
 import { Badge } from './ui/badge'
 import { MoveToRailPopover } from './MoveToRailPopover'
 import { useMinimizedChats } from '../context/MinimizedChatsContext'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { parseAcceptanceCriteria } from './explore-spec/acceptance-criteria'
 import type { LocalTicket, TicketPriority } from '../types'
 import type { RailState } from './RailsBoard'
@@ -128,7 +128,7 @@ export function TicketPostitCard({
   // affordance is hidden for non-editable statuses (done, cancelled, etc.)
   // to keep the postit clean.
   const { triggerResume } = useMinimizedChats()
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const canContinueEditing = POSTIT_EDITABLE_STATUSES.has(ticket.status) && Boolean(activeProjectId)
 
   const handleContinueEditing = useCallback((e: React.MouseEvent) => {

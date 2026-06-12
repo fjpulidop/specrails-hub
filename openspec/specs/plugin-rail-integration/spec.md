@@ -59,7 +59,7 @@ When a rail job spawns with at least one plugin in `active`, `QueueManager` MUST
 #### Scenario: Chat session inherits MCP config from cwd
 - **GIVEN** Serena is installed and present in `.mcp.json`
 - **WHEN** a chat session spawns
-- **THEN** the Claude CLI loads `serena` from `.mcp.json` via the spawn `cwd` without any hub-side plugin code path running
+- **THEN** the Claude CLI loads `serena` from `.mcp.json` via the spawn `cwd` without any app-side plugin code path running
 
 ### Requirement: SetupManager ignores plugins
 `SetupManager` MUST NOT read plugin state, run healthchecks, or inject plugin env vars during the project setup wizard. The wizard remains entirely independent of the plugin system.
@@ -82,15 +82,15 @@ When a rail job spawns with at least one plugin in `active`, `QueueManager` MUST
 - **THEN** the ZIP archive does not contain `plugins.json` and `summary.md` does not reference any plugin
 
 ### Requirement: WebSocket events for plugin lifecycle
-The hub SHALL broadcast project-scoped WebSocket events on plugin lifecycle transitions: `plugin.installed`, `plugin.uninstalled`, `plugin.health_changed`, and `plugin.degraded`. Every event MUST include `projectId` and the plugin `name`. `plugin.degraded` MUST additionally include `reason` and, when emitted from a rail spawn path, the related `jobId`.
+The app SHALL broadcast project-scoped WebSocket events on plugin lifecycle transitions: `plugin.installed`, `plugin.uninstalled`, `plugin.health_changed`, and `plugin.degraded`. Every event MUST include `projectId` and the plugin `name`. `plugin.degraded` MUST additionally include `reason` and, when emitted from a rail spawn path, the related `jobId`.
 
 #### Scenario: install emits plugin.installed
 - **WHEN** a plugin install completes successfully
-- **THEN** the hub broadcasts `{ type: "plugin.installed", projectId, name, version }`
+- **THEN** the app broadcasts `{ type: "plugin.installed", projectId, name, version }`
 
 #### Scenario: degraded during rail spawn carries jobId
 - **WHEN** a plugin is degraded during a rail's pre-spawn healthcheck
-- **THEN** the hub broadcasts `{ type: "plugin.degraded", projectId, name, reason, jobId }`
+- **THEN** the app broadcasts `{ type: "plugin.degraded", projectId, name, reason, jobId }`
 
 ### Requirement: Snapshot atomicity vs concurrent install
 A user-driven plugin install or uninstall MUST NOT corrupt an in-flight rail's behavior. The rail's snapshot, taken before spawn, MUST be the source of truth for that job; subsequent state changes MUST NOT be reflected back into already-running jobs.

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
  * (`RailsBoard`) panels of the dashboard.
  *
  * - The left-panel width in pixels is persisted per-project in `localStorage`
- *   under `specrails-hub:dashboard-split:<projectId>`.
+ *   under `specrails-desktop:dashboard-split:<projectId>`.
  * - The splitter is disabled on viewports below `DISABLE_BELOW_VIEWPORT_PX`
  *   wide; in that case the left panel takes 100% and `enabled` is `false`.
  * - The persisted value is clamped to `[MIN_LEFT_PX, viewport - MIN_RIGHT_PX]`
@@ -26,7 +26,7 @@ export const DISABLE_BELOW_VIEWPORT_PX = 900
 export const DEFAULT_SNAP_TOLERANCE_PX = 48
 
 function storageKey(projectId: string | null): string | null {
-  return projectId ? `specrails-hub:dashboard-split:${projectId}` : null
+  return projectId ? `specrails-desktop:dashboard-split:${projectId}` : null
 }
 
 function loadStored(projectId: string | null): number | null {

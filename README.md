@@ -1,12 +1,12 @@
 <div align="center">
 
-# 🚄 specrails-hub
+# 🚄 specrails-desktop
 
 ### The local cockpit for shipping software with AI agents
 
 **Draft specs by talking to Claude or Codex → drag them onto execution rails → watch the pipeline ship — all from one window, on your laptop, with every dollar tracked.**
 
-[![npm version](https://img.shields.io/npm/v/specrails-hub?color=4f46e5&label=npm&logo=npm&logoColor=white&style=flat-square)](https://www.npmjs.com/package/specrails-hub)
+[![npm version](https://img.shields.io/npm/v/specrails-desktop?color=4f46e5&label=npm&logo=npm&logoColor=white&style=flat-square)](https://www.npmjs.com/package/specrails-desktop)
 [![license](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-339933?logo=node.js&logoColor=white&style=flat-square)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white&style=flat-square)](https://www.typescriptlang.org/)
@@ -22,7 +22,7 @@
 
 ## 🌟 What is this?
 
-**specrails-hub** turns *"I'll just let the AI do it"* into a workflow you can **see, steer, and trust**. It's a local-first dashboard and CLI that sits on top of [**specrails-core**](https://github.com/fjpulidop/specrails-core) and gives you **one window for all your projects**:
+**Specrails Desktop** (`specrails-desktop`) turns *"I'll just let the AI do it"* into a workflow you can **see, steer, and trust**. It's the desktop app for specrails — a local-first dashboard and CLI that sits on top of [**specrails-core**](https://github.com/fjpulidop/specrails-core) and gives you **one window for all your projects**:
 
 - 💬 Shape a spec in conversation with an AI, or generate one in a single shot.
 - 🛤️ Drag specs onto **execution rails** and run them — one job at a time per project, in parallel across projects.
@@ -77,14 +77,14 @@
 
 ## 🤖 Bring your own agent
 
-specrails-hub treats **Claude Code** and **Codex CLI** as first-class, interchangeable providers through a single `ProviderAdapter` contract — no manager ever branches on `provider === 'X'`.
+specrails-desktop treats **Claude Code** and **Codex CLI** as first-class, interchangeable providers through a single `ProviderAdapter` contract — no manager ever branches on `provider === 'X'`.
 
 | | 🟣 Claude Code | 🟢 Codex CLI |
 |---|:---:|:---:|
 | Native streaming | ✅ | ✅ |
 | Native session resume | ✅ | ✅ |
 | Native cost reporting | ✅ | ⚠️ estimated via rate-card |
-| Native OTEL telemetry | ✅ | 🔧 synthesized by the hub |
+| Native OTEL telemetry | ✅ | 🔧 synthesized by the app |
 | Agent profiles | ✅ | — |
 
 A project can install **one or both**. When both are present, the UI lets you pick the engine per spec, per rail, or per terminal launch. Adding a third provider is *one file + one registry entry* — see [`docs/internals/`](docs/internals/).
@@ -117,13 +117,13 @@ A project can install **one or both**. When both are present, the UI lets you pi
 
 ```bash
 # 1️⃣  Install
-npm install -g specrails-hub
+npm install -g specrails-desktop
 
-# 2️⃣  Start the hub
-specrails-hub start
+# 2️⃣  Start the app
+specrails-desktop start
 
 # 3️⃣  Add a project from the CLI…
-specrails-hub add /path/to/your/project
+specrails-desktop add /path/to/your/project
 
 # …or click “➕ Add project” in the dashboard sidebar at
 #   http://127.0.0.1:4200
@@ -133,18 +133,18 @@ If a project doesn't have specrails-core yet, a **3-step setup wizard** (Configu
 
 > 💡 **Prefer a desktop app?** Grab a signed macOS or Windows build — see [Desktop app](#%EF%B8%8F-desktop-app). It bundles the server, so there's no separate `start`.
 
-### 🧑‍💻 The `specrails-hub` CLI
+### 🧑‍💻 The `specrails-desktop` CLI
 
 ```bash
-specrails-hub start | stop | add | remove | list   # manage the hub
-specrails-hub implement #42                         # run a specrails verb
-specrails-hub --status                              # manager status
-specrails-hub --jobs                                # recent job history
-specrails-hub --project <name|path>                 # target a project
-specrails-hub --help                                # full reference
+specrails-desktop start | stop | add | remove | list   # manage the app
+specrails-desktop implement #42                         # run a specrails verb
+specrails-desktop --status                              # manager status
+specrails-desktop --jobs                                # recent job history
+specrails-desktop --project <name|path>                 # target a project
+specrails-desktop --help                                # full reference
 ```
 
-When the hub is running, the CLI talks to it over HTTP + WebSocket; when it isn't, it spawns the agent directly. Either way you get streamed logs.
+When the app is running, the CLI talks to it over HTTP + WebSocket; when it isn't, it spawns the agent directly. Either way you get streamed logs.
 
 ---
 
@@ -164,17 +164,17 @@ The provider is chosen **per project at install time** and is immutable afterwar
 
 ## 🏗️ How it's built
 
-A clean **three-layer TypeScript monorepo** — one Express process runs in *hub mode* and manages every project.
+A clean **three-layer TypeScript monorepo** — one Express process runs in *Super mode* and manages every project.
 
 ```
 🗄️  server/   Express 5 + WebSocket + SQLite (better-sqlite3)   · the brain
 🎨  client/   React 19 + Vite + Tailwind v4                      · the dashboard
-⌨️  cli/      specrails-hub command bridge                       · the terminal door
+⌨️  cli/      specrails-desktop command bridge                   · the terminal door
 ```
 
 ```
 ~/.specrails/
-├── hub.sqlite                       # project registry
+├── desktop.sqlite                   # project registry
 ├── manager.pid                      # running server PID
 └── projects/<slug>/
     ├── jobs.sqlite                  # per-project DB (jobs, analytics, chats)
@@ -196,8 +196,8 @@ A clean **three-layer TypeScript monorepo** — one Express process runs in *hub
 ## 🛠️ Development
 
 ```bash
-git clone https://github.com/fjpulidop/specrails-hub.git
-cd specrails-hub
+git clone https://github.com/fjpulidop/specrails-desktop.git
+cd specrails-desktop
 npm install                        # root deps (server + CLI)
 cd client && npm install && cd ..  # client deps (separate tree)
 npm run dev                        # 🚀 server :4200 + client :4201, hot reload
@@ -224,7 +224,7 @@ npm run dev                        # 🚀 server :4200 + client :4201, hot reloa
 
 Desktop builds for **macOS (Apple Silicon)**, **Windows (x64)**, and **Windows (arm64)** are published at:
 
-> 📥 `https://specrails.dev/downloads/specrails-hub/latest/`
+> 📥 `https://specrails.dev/downloads/specrails-desktop/latest/`
 
 The macOS build is **signed + notarized**. The Windows installers are **unsigned in v1** — SmartScreen flags them, so click **More info → Run anyway**. (Authenticode signing is a planned follow-up.)
 
@@ -246,7 +246,7 @@ BUNDLE_CHROMIUM=true npm run build:desktop:local
 ## 🔒 Security model
 
 - 🏠 Binds to `127.0.0.1` only — **do not expose to a network**.
-- 🔑 A hub token is **auto-generated on first run** and persisted to `~/.specrails/hub.token` (mode `0600`). Every `/api/*` route requires it (except `/api/health` and `/api/hub/token`), and WebSocket upgrades carry it as a subprotocol. The browser client fetches it same-origin — there's nothing to configure.
+- 🔑 An app token is **auto-generated on first run** and persisted to `~/.specrails/desktop.token` (mode `0600`). Every `/api/*` route requires it (except `/api/health` and `/api/token`), and WebSocket upgrades carry it as a subprotocol. The browser client fetches it same-origin — there's nothing to configure.
 - 🧷 Parameterised SQL everywhere — never string-interpolated.
 - 🧬 Reserved files in your project (`.mcp.json`, `.specrails/plugins/state.json`, `.specrails/profiles/.user-preferred.json`) are mutated **surgically** — read → modify only owned keys → atomic temp+rename — so adding plugin N+1 never disturbs plugin N.
 
@@ -262,7 +262,7 @@ BUNDLE_CHROMIUM=true npm run build:desktop:local
 | 📝 [Creating specs](docs/creating-specs.md) | Quick vs Explore, drafts, SMASH, Compare, Continue Editing |
 | 🚀 [Running pipelines](docs/running-pipelines.md) | Rails, jobs, agent profiles, plugins |
 | 💰 [Tracking cost](docs/tracking-cost.md) | Analytics, exports, per-ticket spending |
-| 🎨 [Customising the hub](docs/customizing.md) | Themes, settings, telemetry, kill switches |
+| 🎨 [Customising the app](docs/customizing.md) | Themes, settings, telemetry, kill switches |
 | ⌨️ [Terminal panel](docs/terminal.md) | Shortcuts, shell integration, drag-and-drop |
 | 🧑‍💻 [CLI reference](docs/cli.md) | Every command grouped by task |
 | 🟢 [Codex notes](docs/codex.md) | Auth, sandbox, estimated-cost caveats, rollback |
@@ -275,7 +275,7 @@ BUNDLE_CHROMIUM=true npm run build:desktop:local
 
 ## ☕ Support
 
-If specrails-hub saves you time, you can buy me a coffee on **Ko-fi** — it funds the open-source ecosystem. 💜
+If specrails-desktop saves you time, you can buy me a coffee on **Ko-fi** — it funds the open-source ecosystem. 💜
 
 [![Donate on Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-FF5E5B?logo=kofi&logoColor=white&style=flat-square)](https://ko-fi.com/D1D81Y002C)
 

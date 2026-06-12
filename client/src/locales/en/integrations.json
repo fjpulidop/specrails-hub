@@ -5,7 +5,7 @@
     "selectProject": "Select a project to manage integrations.",
     "deprecated": "Deprecated",
     "loadError": "Failed to load plugins.",
-    "empty": "No plugins are bundled with this hub build."
+    "empty": "No plugins are bundled with this build."
   },
   "card": {
     "statusActive": "Active",
@@ -53,7 +53,7 @@
   },
   "docs": {
     "title": "Documentation",
-    "dialogDescription": "Browse the bundled specrails-hub documentation. Use the sidebar to switch between guides.",
+    "dialogDescription": "Browse the bundled Specrails documentation. Use the sidebar to switch between guides.",
     "sidebarEmpty": "No docs yet",
     "indexEmpty": "No documents available. The bundled docs ship under docs/ in the repo — drop Markdown files there or under ~/.specrails/docs/ to extend them.",
     "categoryEmpty": "No documents in this category yet.",

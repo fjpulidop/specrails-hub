@@ -28,7 +28,7 @@ import {
   summaryFilePath,
   summariesDir,
   sweepOrphans,
-  __resetHubSummaryStateForTests,
+  __resetDesktopSummaryStateForTests,
   type FileSummaryDeps,
   type GenerateInput,
   type GenerateOutput,
@@ -78,7 +78,7 @@ let db: DbInstance
 beforeEach(() => {
   projectPath = mkTmpProject()
   db = initDb(':memory:')
-  __resetHubSummaryStateForTests()
+  __resetDesktopSummaryStateForTests()
 })
 
 afterEach(() => {
@@ -245,7 +245,7 @@ describe('FileSummaryManager.enqueue', () => {
 
   it('per-job cap: 51st enqueue with same jobId returns skipped:per-job-cap', async () => {
     const { deps, generate, broadcasts } = makeDeps(db)
-    const mgr = new FileSummaryManager(deps, { perJobCap: 2, perProjectConcurrency: 8, hubConcurrency: 8 })
+    const mgr = new FileSummaryManager(deps, { perJobCap: 2, perProjectConcurrency: 8, desktopConcurrency: 8 })
     for (let i = 0; i < 4; i++) {
       const rel = `src/f${i}.ts`
       writeFile(projectPath, rel, `// file ${i}\n`)
@@ -295,7 +295,7 @@ describe('FileSummaryManager.enqueue', () => {
         }
       }),
     })
-    const mgr = new FileSummaryManager(deps, { perProjectConcurrency: 2, hubConcurrency: 8 })
+    const mgr = new FileSummaryManager(deps, { perProjectConcurrency: 2, desktopConcurrency: 8 })
     for (let i = 0; i < 5; i++) {
       writeFile(projectPath, `f${i}.ts`, `// ${i}\n`)
     }
@@ -369,7 +369,7 @@ describe('FileSummaryManager.enqueue', () => {
     ).toBe(true)
   })
 
-  it('regenerates when the hub language changed even if the content hash matches', async () => {
+  it('regenerates when the app language changed even if the content hash matches', async () => {
     writeFile(projectPath, 'src/foo.ts', 'console.log("hi")\n')
     const hash = await computeFileHash(path.join(projectPath, 'src/foo.ts'))
     writeSummary(projectPath, 'src/foo.ts', {
@@ -462,7 +462,7 @@ describe('FileSummaryManager.enqueue', () => {
     writeFile(projectPath, 'a.ts', '// a\n')
     writeFile(projectPath, 'b.ts', '// b\n')
     const { deps, generate } = makeDeps(db)
-    const mgr = new FileSummaryManager(deps, { maxJobCounters: 1, perProjectConcurrency: 8, hubConcurrency: 8 })
+    const mgr = new FileSummaryManager(deps, { maxJobCounters: 1, perProjectConcurrency: 8, desktopConcurrency: 8 })
     const r1 = await mgr.enqueue({
       projectPath, projectId: 'p1', projectSlug: 'p1', relPath: 'a.ts',
       triggeredBy: { kind: 'job', id: 'jA', ticketId: null }, jobId: 'jA',

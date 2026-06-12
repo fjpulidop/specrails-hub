@@ -15,8 +15,8 @@ vi.mock('../../hooks/useSharedWebSocket', () => ({
 vi.mock('../../hooks/useSpecGenTracker', () => ({
   useSpecGenTracker: () => ({ specToOpen: null, clearSpecToOpen: vi.fn() }),
 }))
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({
     activeProjectId: 'p-test',
     projects: [],
     setActiveProjectId: vi.fn(),
@@ -144,8 +144,8 @@ describe('DashboardPage sort wiring', () => {
   it('persists sort selection to localStorage and restores on remount', () => {
     const { unmount } = render(<DashboardPage />)
     fireEvent.click(screen.getByTestId('set-priority-desc'))
-    expect(localStorage.getItem('specrails-hub:spec-sort-mode:p-test')).toBe('priority')
-    expect(localStorage.getItem('specrails-hub:spec-sort-dir:p-test')).toBe('desc')
+    expect(localStorage.getItem('specrails-desktop:spec-sort-mode:p-test')).toBe('priority')
+    expect(localStorage.getItem('specrails-desktop:spec-sort-dir:p-test')).toBe('desc')
     unmount()
 
     render(<DashboardPage />)
@@ -170,7 +170,7 @@ describe('DashboardPage sort wiring', () => {
     act(() => {
       invokeSortChange?.('default', 'asc')
     })
-    expect(localStorage.getItem('specrails-hub:spec-sort-dir:p-test')).toBe('asc')
+    expect(localStorage.getItem('specrails-desktop:spec-sort-dir:p-test')).toBe('asc')
     act(() => {
       invokeSortChange?.('priority', 'asc')
     })

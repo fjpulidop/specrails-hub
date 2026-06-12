@@ -40,7 +40,7 @@ export interface JobResult {
   total_cost_usd?: number
   /** 1/true when total_cost_usd is a pricing-table estimate (codex) rather
    *  than a provider-billed figure (claude). Persisted to
-   *  jobs.total_cost_usd_estimated so hub surfaces can badge it. */
+   *  jobs.total_cost_usd_estimated so app surfaces can badge it. */
   total_cost_usd_estimated?: boolean
   num_turns?: number
   model?: string
@@ -338,7 +338,7 @@ const MIGRATIONS: Migration[] = [
   },
 
   // Migration 14: terminal_settings_override — per-project key/value override
-  // for hub-wide terminal settings. Absence of a row means "inherit hub default".
+  // for app-wide terminal settings. Absence of a row means "inherit app default".
   (db) => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS terminal_settings_override (
@@ -566,7 +566,7 @@ const MIGRATIONS: Migration[] = [
   // Migration 27: jobs.total_cost_usd_estimated — 1 when jobs.total_cost_usd
   // came from server/pricing.ts (estimated fallback for non-native-cost
   // providers like codex); 0 when authoritative from the provider's terminal
-  // event. Mirrors the ai_invocations column (migration 20) so the hub
+  // event. Mirrors the ai_invocations column (migration 20) so the app
   // dashboard, budget enforcement, and webhook can distinguish a rate-card
   // estimate from a provider-billed figure. Additive + idempotent.
   (db) => {
@@ -621,7 +621,7 @@ function applyMigrations(db: DbInstance): void {
       // COLUMN` on next startup and bricked it forever with 'duplicate column
       // name'. With this, a failed migration leaves nothing applied and re-runs
       // cleanly. (Pre-existing half-applied DBs are contained by the per-project
-      // load isolation in project-registry.ts — one bad DB no longer kills the hub.)
+      // load isolation in project-registry.ts — one bad DB no longer kills the app.)
       const tx = db.transaction(() => {
         MIGRATIONS[i](db)
         db.prepare('INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)').run(version)

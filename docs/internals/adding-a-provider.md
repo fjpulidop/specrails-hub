@@ -1,6 +1,6 @@
-# Adding a new AI provider to SpecRails Hub
+# Adding a new AI provider to Specrails
 
-The hub is provider-agnostic by design. Every manager that spawns an AI
+The app is provider-agnostic by design. Every manager that spawns an AI
 CLI consumes a `ProviderAdapter` rather than branching on a hardcoded
 `if (provider === 'claude')`. Adding a new provider is mostly one adapter
 file plus one entry in the registry — but the codebase still carries a
@@ -41,7 +41,7 @@ export const exampleAdapter: ProviderAdapter = {
     nativeResume: true,
     nativeStreamJson: true,
     nativeCostUsd: false,    // if false, add the provider:model entries to server/pricing.ts
-    nativeOtelEnv: false,    // if false, the hub will synthesise OTEL via the bridge
+    nativeOtelEnv: false,    // if false, the app will synthesise OTEL via the bridge
     profileEnvSupport: true,
     systemPromptArg: false,
   },
@@ -90,7 +90,7 @@ provider with zero edits):
 
 - `getAdapter` / `listAdapters` / `hasAdapter` (`server/providers/registry.ts`).
 - `detectAvailableCLIs` (`server/core-compat.ts`).
-- `POST /api/hub/projects` provider validation (`server/hub-router.ts`,
+- `POST /api/projects` provider validation (`server/desktop-router.ts`,
   via `hasAdapter` / `listAdapters`).
 - `setup-prerequisites` provider rows (`server/setup-prerequisites.ts`,
   iterates `listAdapters()`).
@@ -100,7 +100,7 @@ provider with zero edits):
 **Manual wiring still required** (these hardcode `claude` / `codex`
 today and will NOT surface a 4th provider until edited):
 
-- `GET /api/hub/available-providers` (`server/hub-router.ts`) returns a
+- `GET /api/available-providers` (`server/desktop-router.ts`) returns a
   literal `{ claude, codex }` shape — add your key.
 - `AddProjectDialog` (`client/src/components/AddProjectDialog.tsx`)
   hardcodes `PROVIDER_ORDER = ['claude', 'codex']` and reads
@@ -116,7 +116,7 @@ A 4th provider is a **compile-time blocker** until you widen the
 `'claude' | 'codex'` unions still scattered across the server. The build
 fails until they're widened (or migrated to a shared `ProviderId`):
 
-- `CliProvider` (`server/hub-db.ts`) — the canonical project-row provider type.
+- `CliProvider` (`server/desktop-db.ts`) — the canonical project-row provider type.
 - `SpecProvider` (`server/spec-models.ts`).
 - The inline `'claude' | 'codex'` unions in `server/queue-manager.ts`
   (`EnqueueOptions.provider`, `_jobProviderSelection`),
@@ -162,7 +162,7 @@ Mirror that file for a new `<provider>-mcp.ts` if your provider has a
 similar `<binary> mcp add/remove/list` subcommand. Then update
 `server/plugins/serena/install.ts`, which routes to the CLI-add helper
 whenever `getAdapter(providerId).mcpRegistration === 'cli-add'`. The
-hub-level `PluginManager` already threads `providerId` through every
+app-level `PluginManager` already threads `providerId` through every
 relevant method.
 
 For `mcpRegistration === 'project-json'` providers, the existing

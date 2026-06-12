@@ -4,7 +4,7 @@ import type { DbInstance } from './db'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface HubProjectStats {
+export interface DesktopProjectStats {
   projectId: string
   projectName: string
   totalCostUsd: number
@@ -13,7 +13,7 @@ export interface HubProjectStats {
   avgDurationMs: number | null
 }
 
-export interface HubAnalyticsResponse {
+export interface DesktopAnalyticsResponse {
   period: {
     label: string
     from: string | null
@@ -26,7 +26,7 @@ export interface HubAnalyticsResponse {
     costToday: number
     jobsToday: number
   }
-  projectBreakdown: HubProjectStats[]
+  projectBreakdown: DesktopProjectStats[]
   costTimeline: Array<{ date: string; costUsd: number }>
 }
 
@@ -116,10 +116,10 @@ function queryProjectTimeline(db: DbInstance, clause: string, params: unknown[])
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-export function getHubAnalytics(
+export function getDesktopAnalytics(
   registry: ProjectRegistry,
   opts: AnalyticsOpts
-): HubAnalyticsResponse {
+): DesktopAnalyticsResponse {
   const { current, label } = resolveBounds(opts)
   const { clause, params } = buildWhere(current)
 
@@ -136,7 +136,7 @@ export function getHubAnalytics(
   let costToday = 0
   let jobsToday = 0
 
-  const projectBreakdown: HubProjectStats[] = []
+  const projectBreakdown: DesktopProjectStats[] = []
   const timelineMap = new Map<string, number>()
 
   // Iterate sequentially to avoid SQLite contention
@@ -189,7 +189,7 @@ export function getHubAnalytics(
 
 // ─── Recent jobs across all projects ─────────────────────────────────────────
 
-interface HubRecentJob {
+interface DesktopRecentJob {
   id: string
   command: string
   started_at: string
@@ -200,8 +200,8 @@ interface HubRecentJob {
   projectName: string
 }
 
-export function getHubRecentJobs(registry: ProjectRegistry, limit = 10): HubRecentJob[] {
-  const all: HubRecentJob[] = []
+export function getDesktopRecentJobs(registry: ProjectRegistry, limit = 10): DesktopRecentJob[] {
+  const all: DesktopRecentJob[] = []
 
   for (const ctx of registry.listContexts()) {
     const rows = ctx.db.prepare(`
@@ -228,14 +228,14 @@ export function getHubRecentJobs(registry: ProjectRegistry, limit = 10): HubRece
     .slice(0, limit)
 }
 
-// ─── Quick today stats (for /api/hub/state) ────────────────────────────────────
+// ─── Quick today stats (for /api/state) ────────────────────────────────────
 
-export interface HubTodayStats {
+export interface DesktopTodayStats {
   costToday: number
   jobsToday: number
 }
 
-export function getHubTodayStats(registry: ProjectRegistry): HubTodayStats {
+export function getDesktopTodayStats(registry: ProjectRegistry): DesktopTodayStats {
   const today = new Date().toISOString().slice(0, 10)
   const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
   const clause = 'WHERE started_at >= ? AND started_at < ?'

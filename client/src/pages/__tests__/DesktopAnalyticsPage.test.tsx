@@ -49,7 +49,7 @@ const mockAnalyticsData = {
   ],
 }
 
-describe('HubAnalyticsPage', () => {
+describe('DesktopAnalyticsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -58,10 +58,10 @@ describe('HubAnalyticsPage', () => {
     })
   })
 
-  it('renders Hub Analytics heading', async () => {
-    const HubAnalyticsPage = (await import('../HubAnalyticsPage')).default
-    render(<HubAnalyticsPage />)
-    expect(screen.getByText('Hub Analytics')).toBeInTheDocument()
+  it('renders Desktop Analytics heading', async () => {
+    const DesktopAnalyticsPage = (await import('../DesktopAnalyticsPage')).default
+    render(<DesktopAnalyticsPage />)
+    expect(screen.getByText('Desktop Analytics')).toBeInTheDocument()
   })
 
   it('renders loading skeleton initially', async () => {
@@ -69,16 +69,16 @@ describe('HubAnalyticsPage', () => {
       () => new Promise(() => {}) // never resolves
     )
 
-    const HubAnalyticsPage = (await import('../HubAnalyticsPage')).default
-    render(<HubAnalyticsPage />)
+    const DesktopAnalyticsPage = (await import('../DesktopAnalyticsPage')).default
+    render(<DesktopAnalyticsPage />)
     // Loading skeleton uses animate-pulse
     const skeletons = document.querySelectorAll('.animate-pulse')
     expect(skeletons.length).toBeGreaterThan(0)
   })
 
   it('renders KPI cards after loading', async () => {
-    const HubAnalyticsPage = (await import('../HubAnalyticsPage')).default
-    render(<HubAnalyticsPage />)
+    const DesktopAnalyticsPage = (await import('../DesktopAnalyticsPage')).default
+    render(<DesktopAnalyticsPage />)
 
     await waitFor(() => {
       expect(screen.getByText('Total Cost')).toBeInTheDocument()
@@ -88,8 +88,8 @@ describe('HubAnalyticsPage', () => {
   })
 
   it('renders project comparison section', async () => {
-    const HubAnalyticsPage = (await import('../HubAnalyticsPage')).default
-    render(<HubAnalyticsPage />)
+    const DesktopAnalyticsPage = (await import('../DesktopAnalyticsPage')).default
+    render(<DesktopAnalyticsPage />)
 
     await waitFor(() => {
       expect(screen.getByText('Project Comparison')).toBeInTheDocument()
@@ -103,8 +103,8 @@ describe('HubAnalyticsPage', () => {
       status: 500,
     })
 
-    const HubAnalyticsPage = (await import('../HubAnalyticsPage')).default
-    render(<HubAnalyticsPage />)
+    const DesktopAnalyticsPage = (await import('../DesktopAnalyticsPage')).default
+    render(<DesktopAnalyticsPage />)
 
     await waitFor(() => {
       expect(screen.getByText(/failed to load analytics/i)).toBeInTheDocument()
@@ -112,8 +112,8 @@ describe('HubAnalyticsPage', () => {
   })
 
   it('renders period selector buttons', async () => {
-    const HubAnalyticsPage = (await import('../HubAnalyticsPage')).default
-    render(<HubAnalyticsPage />)
+    const DesktopAnalyticsPage = (await import('../DesktopAnalyticsPage')).default
+    render(<DesktopAnalyticsPage />)
 
     await waitFor(() => {
       expect(screen.getByText('7d')).toBeInTheDocument()
@@ -122,8 +122,8 @@ describe('HubAnalyticsPage', () => {
   })
 
   it('renders refresh button', async () => {
-    const HubAnalyticsPage = (await import('../HubAnalyticsPage')).default
-    render(<HubAnalyticsPage />)
+    const DesktopAnalyticsPage = (await import('../DesktopAnalyticsPage')).default
+    render(<DesktopAnalyticsPage />)
 
     await waitFor(() => {
       expect(screen.getByLabelText('Refresh analytics')).toBeInTheDocument()
@@ -131,8 +131,8 @@ describe('HubAnalyticsPage', () => {
   })
 
   it('changes period when a preset button is clicked', async () => {
-    const HubAnalyticsPage = (await import('../HubAnalyticsPage')).default
-    render(<HubAnalyticsPage />)
+    const DesktopAnalyticsPage = (await import('../DesktopAnalyticsPage')).default
+    render(<DesktopAnalyticsPage />)
 
     await waitFor(() => {
       expect(screen.getByText('30d')).toBeInTheDocument()
@@ -149,8 +149,8 @@ describe('HubAnalyticsPage', () => {
   })
 
   it('renders cost data values in KPI cards', async () => {
-    const HubAnalyticsPage = (await import('../HubAnalyticsPage')).default
-    render(<HubAnalyticsPage />)
+    const DesktopAnalyticsPage = (await import('../DesktopAnalyticsPage')).default
+    render(<DesktopAnalyticsPage />)
 
     await waitFor(() => {
       expect(screen.getByText('$2.5000')).toBeInTheDocument()
@@ -163,8 +163,8 @@ describe('HubAnalyticsPage', () => {
       json: async () => ({ ...mockAnalyticsData, projectBreakdown: [] }),
     })
 
-    const HubAnalyticsPage = (await import('../HubAnalyticsPage')).default
-    render(<HubAnalyticsPage />)
+    const DesktopAnalyticsPage = (await import('../DesktopAnalyticsPage')).default
+    render(<DesktopAnalyticsPage />)
 
     await waitFor(() => {
       expect(screen.getByText('No projects registered.')).toBeInTheDocument()

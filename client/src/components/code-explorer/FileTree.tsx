@@ -6,7 +6,7 @@ import { cn } from '../../lib/utils'
 import { getApiBase } from '../../lib/api'
 import { useProjectCache } from '../../hooks/useProjectCache'
 import { useTicketDetailModal } from '../../context/TicketDetailModalContext'
-import { useHub } from '../../hooks/useHub'
+import { useDesktop } from '../../hooks/useDesktop'
 import { useSharedWebSocket } from '../../hooks/useSharedWebSocket'
 
 type FilterMode = 'touched-by-ai' | 'all'
@@ -38,8 +38,8 @@ interface FileTreeProps {
   filterTicketId?: number | null
 }
 
-const FILTER_LS_KEY = (projectId: string) => `specrails-hub:code-tree-filter:${projectId}`
-const COLLAPSED_LS_KEY = (projectId: string) => `specrails-hub:code-tree-collapsed:${projectId}`
+const FILTER_LS_KEY = (projectId: string) => `specrails-desktop:code-tree-filter:${projectId}`
+const COLLAPSED_LS_KEY = (projectId: string) => `specrails-desktop:code-tree-collapsed:${projectId}`
 
 function depthOf(path: string): number {
   return path.split('/').length - 1
@@ -73,7 +73,7 @@ function ancestorHidden(path: string, collapsed: Set<string>): boolean {
 
 export function FileTree({ onOpenFile, selectedPath, filterJobId, filterTicketId }: FileTreeProps) {
   const { t } = useTranslation('code')
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const { openTicketDetail } = useTicketDetailModal()
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
 

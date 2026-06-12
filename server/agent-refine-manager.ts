@@ -88,7 +88,7 @@ export class AgentRefineManager {
    * Tear down before the project's DB is closed (M12). Marks the manager disposed
    * so in-flight close/error handlers short-circuit instead of writing to a
    * closed connection (which throws synchronously inside the EventEmitter and,
-   * with no uncaughtException handler, crashes the whole hub), and SIGTERMs any
+   * with no uncaughtException handler, crashes the whole app), and SIGTERMs any
    * orphaned refine child. Idempotent.
    */
   shutdown(): void {

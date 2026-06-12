@@ -287,7 +287,7 @@ function DocsDialogImpl({ open, onClose }: DocsDialogProps) {
   }, [open])
 
   // Stabilise these handlers so `DocView`'s useEffect deps don't change every
-  // parent re-render — otherwise every HubApp render (job streaming, WS
+  // parent re-render — otherwise every DesktopApp render (job streaming, WS
   // events, etc.) triggers a refetch storm that flickers the panel.
   const handleSelect = useCallback((category: string, slug: string) => {
     setActiveCategory(category)
@@ -348,7 +348,7 @@ function DocsDialogImpl({ open, onClose }: DocsDialogProps) {
   )
 }
 
-// Memoise the whole dialog so HubApp re-renders (job streaming, WS events,
+// Memoise the whole dialog so DesktopApp re-renders (job streaming, WS events,
 // theme provider, etc.) don't cascade into a markdown re-parse.
 const DocsDialog = memo(DocsDialogImpl)
 export default DocsDialog

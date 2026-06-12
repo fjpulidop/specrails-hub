@@ -26,7 +26,7 @@ export class SpecLauncherManager {
 
   /**
    * Tear down before the project is removed (M12). This manager holds no DB
-   * handle (its close handler only broadcasts), so it cannot crash the hub — but
+   * handle (its close handler only broadcasts), so it cannot crash the app — but
    * an orphaned `/opsx:ff` child runs with --dangerously-skip-permissions against
    * a removed project and keeps burning spend, so SIGTERM it. Idempotent.
    */
@@ -64,7 +64,7 @@ export class SpecLauncherManager {
     this._activeProcesses.set(launchId, child)
     this._buffers.set(launchId, '')
 
-    // Surface ENOENT (e.g. claude not on PATH) instead of crashing the hub.
+    // Surface ENOENT (e.g. claude not on PATH) instead of crashing the app.
     /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
     child.on('error', (err) => {
       console.error(`[SpecLauncherManager] spawn failed for ${launchId}: ${err.message}`)

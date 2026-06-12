@@ -70,7 +70,7 @@ describe('SpecrailsTechClient', () => {
   describe('listAgents()', () => {
     it('returns unwrapped agent array on success', async () => {
       const agents = [
-        { slug: 'hub-engineer', name: 'Hub Engineer', title: null, status: 'active', status_source: 'AGENTS.md', agents_md_path: 'agents/hub-engineer/AGENTS.md' },
+        { slug: 'desktop-engineer', name: 'Desktop Engineer', title: null, status: 'active', status_source: 'AGENTS.md', agents_md_path: 'agents/desktop-engineer/AGENTS.md' },
       ]
       vi.stubGlobal('fetch', mockFetch(200, { data: agents }))
       const client = new SpecrailsTechClient('http://localhost:3000')
@@ -78,7 +78,7 @@ describe('SpecrailsTechClient', () => {
       expect(result.connected).toBe(true)
       if (result.connected) {
         expect(result.data).toHaveLength(1)
-        expect(result.data[0].slug).toBe('hub-engineer')
+        expect(result.data[0].slug).toBe('desktop-engineer')
       }
     })
 
@@ -108,17 +108,17 @@ describe('SpecrailsTechClient', () => {
 
   describe('getAgent()', () => {
     it('encodes slug in URL and returns agent', async () => {
-      const agent = { slug: 'hub-engineer', name: 'Hub Engineer', title: null, status: 'active', status_source: 'AGENTS.md', agents_md_path: 'agents/hub-engineer/AGENTS.md' }
+      const agent = { slug: 'desktop-engineer', name: 'Desktop Engineer', title: null, status: 'active', status_source: 'AGENTS.md', agents_md_path: 'agents/desktop-engineer/AGENTS.md' }
       const fetchMock = mockFetch(200, { data: agent })
       vi.stubGlobal('fetch', fetchMock)
       const client = new SpecrailsTechClient('http://localhost:3000')
-      const result = await client.getAgent('hub-engineer')
+      const result = await client.getAgent('desktop-engineer')
       expect(result.connected).toBe(true)
       if (result.connected) {
-        expect(result.data.name).toBe('Hub Engineer')
+        expect(result.data.name).toBe('Desktop Engineer')
       }
       const calledUrl = (fetchMock.mock.calls[0] as [string])[0]
-      expect(calledUrl).toContain('/api/v1/agents/hub-engineer')
+      expect(calledUrl).toContain('/api/v1/agents/desktop-engineer')
     })
   })
 

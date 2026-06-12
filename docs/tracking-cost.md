@@ -1,6 +1,6 @@
 # Tracking cost
 
-specrails-hub records every AI CLI invocation it spawns — both Claude and Codex — and surfaces the totals on one Analytics page per project. This guide walks through what's tracked, what's not, and how to read the dashboard.
+specrails-desktop records every AI CLI invocation it spawns — both Claude and Codex — and surfaces the totals on one Analytics page per project. This guide walks through what's tracked, what's not, and how to read the dashboard.
 
 ## What gets tracked
 
@@ -23,11 +23,11 @@ Each invocation row carries: provider (Claude or Codex), model, status, started/
 
 Claude cost is **provider-billed and authoritative** — the figure comes straight from the CLI.
 
-Codex has no native cost field, so the hub **estimates** its cost from a local rate-card (`server/pricing.ts`). Estimated rows are flagged: they render with a `~` tilde in the raw table and feed an "includes ~$X estimated" footnote in the Hero. On multi-provider projects, a **Provider breakdown** card splits spend by engine so you can see authoritative vs estimated at a glance.
+Codex has no native cost field, so the app **estimates** its cost from a local rate-card (`server/pricing.ts`). Estimated rows are flagged: they render with a `~` tilde in the raw table and feed an "includes ~$X estimated" footnote in the Hero. On multi-provider projects, a **Provider breakdown** card splits spend by engine so you can see authoritative vs estimated at a glance.
 
 ## What's NOT tracked (intentionally)
 
-- **Sidebar chat** — the general-purpose chat panel in the right sidebar. It spawns an AI process but isn't pipeline work, so the hub excludes it from analytics by design.
+- **Sidebar chat** — the general-purpose chat panel in the right sidebar. It spawns an AI process but isn't pipeline work, so the app excludes it from analytics by design.
 - **Setup wizard** — the install/enrich flow when you add a project. It *does* spawn an AI CLI (a genuine model invocation), but it's an interactive one-time wizard rather than a repeatable pipeline job, so it's deliberately left uninstrumented.
 
 If you want the absolute total of what an engine has cost you, your provider's own console (e.g. the Anthropic console for Claude) is the source of truth.
@@ -38,7 +38,7 @@ Open **Analytics** from the project right sidebar.
 
 ### Sticky filter header
 
-- **Period** — `7d`, `30d`, `90d`, or `All`. (There's no 24-hour or custom-range option here — the custom calendar range lives on Hub Analytics, below.)
+- **Period** — `7d`, `30d`, `90d`, or `All`. (There's no 24-hour or custom-range option here — the custom calendar range lives on Desktop Analytics, below.)
 - **Surface** — chips for `All` plus each of the six surfaces (Jobs, Explore, Quick, Refine, SMASH, File summaries). All are included by default; toggle chips to narrow the view.
 - **Engine** — provider chips (Claude / Codex) that appear **only on multi-provider projects**, letting you filter by engine.
 
@@ -135,21 +135,21 @@ Exports use the standard `fetch → Blob → URL.createObjectURL → anchor.clic
 
 Open **Settings** from the project right sidebar → the **Budget** card:
 
-- **Daily budget (USD)** — the hub auto-pauses the queue when the day's spend (the sum of completed-job cost since midnight) exceeds this. New rail launches queue rather than start; in-flight jobs aren't killed.
+- **Daily budget (USD)** — the app auto-pauses the queue when the day's spend (the sum of completed-job cost since midnight) exceeds this. New rail launches queue rather than start; in-flight jobs aren't killed.
 - **Per-job cost alert (USD)** — emits an alert when a single job exceeds this amount.
 
 Leave either field blank to disable that limit.
 
 When the daily budget is hit, a dismissible banner appears across the project pages ("Daily budget exceeded — … Queue is paused.") and the queue stays paused server-side. Resume by raising the budget, clearing it, or waiting for the counter to reset at midnight (it counts completed-job cost since the start of the current calendar day, not a rolling 24-hour window).
 
-See [Customising the hub](customizing.md#budget) for the full setup.
+See [Customising the app](customizing.md#budget) for the full setup.
 
-## Hub-wide analytics
+## App-wide analytics
 
-For the cross-project view, open **Analytics** from the Arc sidebar on the left. Hub Analytics is a separate page with its own blocks — KPI cards, a cost timeline, and per-project breakdowns — rolled up across all your registered projects. It also offers a custom calendar date range that the per-project page doesn't.
+For the cross-project view, open **Analytics** from the Arc sidebar on the left. Desktop Analytics is a separate page with its own blocks — KPI cards, a cost timeline, and per-project breakdowns — rolled up across all your registered projects. It also offers a custom calendar date range that the per-project page doesn't.
 
 ## Where to go next
 
-- [Customising the hub](customizing.md) — set the budget, configure notifications.
+- [Customising the app](customizing.md) — set the budget, configure notifications.
 - [Creating specs](creating-specs.md) — every spec you create adds rows to your analytics.
 - [Using Codex](codex.md) — how cost works when you run a project on Codex.

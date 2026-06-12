@@ -34,8 +34,8 @@ vi.mock('../RichAttachmentEditor', () => ({
 const mockStartWithMessage = vi.fn().mockResolvedValue('conv-1')
 const mockAbortStream = vi.fn()
 
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({ activeProjectId: 'proj-1', projects: [{ id: 'proj-1', name: 'Test Project' }] }),
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({ activeProjectId: 'proj-1', projects: [{ id: 'proj-1', name: 'Test Project' }] }),
 }))
 
 const mockRegisterExploreSpec = vi.fn()
@@ -169,14 +169,14 @@ describe('ProposeSpecModal', () => {
     })
     expect(screen.getByTestId('context-scope-toggle')).toHaveTextContent(/fine-tune/i)
     expect(screen.getByTestId('scope-stop-max')).toBeInTheDocument()
-    expect(screen.queryByTestId('scope-stop-hub')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('scope-stop-desktop')).not.toBeInTheDocument()
 
     const exploreTab = screen.getAllByRole('tab').find((t) => t.textContent?.toLowerCase().includes('explore'))!
     fireEvent.click(exploreTab)
 
     expect(screen.getByTestId('context-scope-slider')).toBeInTheDocument()
     expect(screen.getByTestId('context-scope-toggle')).toHaveTextContent(/fine-tune/i)
-    expect(screen.getByTestId('scope-stop-hub')).toBeInTheDocument()
+    expect(screen.getByTestId('scope-stop-desktop')).toBeInTheDocument()
   })
 
   it('sends contractRefine in the Quick generate-spec body', async () => {
@@ -377,7 +377,7 @@ describe('ProposeSpecModal', () => {
     })
   })
 
-  it('hides scope-smash-hint for a codex project at Max and Hub presets', async () => {
+  it('hides scope-smash-hint for a codex project at Max and Desktop presets', async () => {
     // Override the fetch mock so the default-spec-model endpoint returns provider='codex'
     ;(global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       if (typeof url === 'string' && url.includes('/default-spec-model')) {
@@ -400,11 +400,11 @@ describe('ProposeSpecModal', () => {
     fireEvent.click(screen.getByTestId('scope-stop-max'))
     expect(screen.queryByTestId('scope-smash-hint')).not.toBeInTheDocument()
 
-    // Switch to Explore mode — Hub preset (also contractRefine=true) still no hint
+    // Switch to Explore mode — Desktop preset (also contractRefine=true) still no hint
     const exploreTab = screen.getAllByRole('tab').find((t) => t.textContent?.toLowerCase().includes('explore'))!
     fireEvent.click(exploreTab)
-    await waitFor(() => expect(screen.getByTestId('scope-stop-hub')).toBeInTheDocument())
-    fireEvent.click(screen.getByTestId('scope-stop-hub'))
+    await waitFor(() => expect(screen.getByTestId('scope-stop-desktop')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('scope-stop-desktop'))
     expect(screen.queryByTestId('scope-smash-hint')).not.toBeInTheDocument()
   })
 

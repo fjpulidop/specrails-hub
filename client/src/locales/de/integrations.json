@@ -5,7 +5,7 @@
     "selectProject": "Wähle ein Projekt, um Integrationen zu verwalten.",
     "deprecated": "Veraltet",
     "loadError": "Plugins konnten nicht geladen werden.",
-    "empty": "In diesem Hub-Build sind keine Plugins gebündelt."
+    "empty": "In diesem Build sind keine Plugins gebündelt."
   },
   "card": {
     "statusActive": "Aktiv",
@@ -53,7 +53,7 @@
   },
   "docs": {
     "title": "Dokumentation",
-    "dialogDescription": "Durchstöbere die mitgelieferte specrails-hub-Dokumentation. Wechsle über die Seitenleiste zwischen den Guides.",
+    "dialogDescription": "Durchstöbere die mitgelieferte Specrails-Dokumentation. Wechsle über die Seitenleiste zwischen den Guides.",
     "sidebarEmpty": "Noch keine Doku",
     "indexEmpty": "Keine Dokumente verfügbar. Die mitgelieferte Doku liegt im Repo unter docs/ – lege dort oder unter ~/.specrails/docs/ Markdown-Dateien ab, um sie zu erweitern.",
     "categoryEmpty": "Noch keine Dokumente in dieser Kategorie.",

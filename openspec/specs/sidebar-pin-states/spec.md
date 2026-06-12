@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the tri-state pin model that governs the left (`ArcSidebar`) and right (`ProjectRightSidebar`) project sidebars in the hub UI. Each sidebar has three modes — `pinned-open`, `pinned-collapsed`, `unpinned` — that determine its width, whether hover-reveal is active, and how the pin button is styled. A single user-facing action (pin button click or keyboard shortcut) cycles the three modes deterministically and persists the choice per-sidebar in `localStorage`.
+Defines the tri-state pin model that governs the left (`ArcSidebar`) and right (`ProjectRightSidebar`) project sidebars in the app UI. Each sidebar has three modes — `pinned-open`, `pinned-collapsed`, `unpinned` — that determine its width, whether hover-reveal is active, and how the pin button is styled. A single user-facing action (pin button click or keyboard shortcut) cycles the three modes deterministically and persists the choice per-sidebar in `localStorage`.
 
 ## Requirements
 
@@ -11,15 +11,15 @@ Defines the tri-state pin model that governs the left (`ArcSidebar`) and right (
 Each project sidebar (left `ArcSidebar`, right `ProjectRightSidebar`) SHALL have a `mode` taking exactly one of three values: `pinned-open`, `pinned-collapsed`, `unpinned`. Left and right modes are independent.
 
 #### Scenario: Default mode on first run
-- **WHEN** the user opens the hub with no persisted sidebar mode in `localStorage`
+- **WHEN** the user opens the app with no persisted sidebar mode in `localStorage`
 - **THEN** both `leftMode` and `rightMode` are `unpinned`
 
 #### Scenario: Persisted mode restored on reload
-- **WHEN** `localStorage['specrails-hub:sidebar-mode:left']` is `pinned-collapsed` and the page loads
+- **WHEN** `localStorage['specrails-desktop:sidebar-mode:left']` is `pinned-collapsed` and the page loads
 - **THEN** the left sidebar mounts with `leftMode === 'pinned-collapsed'`
 
 #### Scenario: Invalid persisted value falls back to default
-- **WHEN** `localStorage['specrails-hub:sidebar-mode:right']` contains an unrecognised string (e.g., `"foo"`)
+- **WHEN** `localStorage['specrails-desktop:sidebar-mode:right']` contains an unrecognised string (e.g., `"foo"`)
 - **THEN** the right sidebar mounts with `rightMode === 'unpinned'` and the invalid value is overwritten on the next mode change
 
 ### Requirement: Pin button cycles the three modes
@@ -100,11 +100,11 @@ The pin button's `aria-label` and `title` SHALL describe the action that the nex
 
 ### Requirement: Mode persistence to localStorage
 
-Whenever a sidebar's mode changes, the new value SHALL be written to `localStorage['specrails-hub:sidebar-mode:left']` or `:right`. Persistence failures (e.g., quota exceeded, private mode) MUST NOT crash or block the UI.
+Whenever a sidebar's mode changes, the new value SHALL be written to `localStorage['specrails-desktop:sidebar-mode:left']` or `:right`. Persistence failures (e.g., quota exceeded, private mode) MUST NOT crash or block the UI.
 
 #### Scenario: Successful write
 - **WHEN** the user cycles `leftMode` from `unpinned` to `pinned-open`
-- **THEN** `localStorage['specrails-hub:sidebar-mode:left']` equals `"pinned-open"`
+- **THEN** `localStorage['specrails-desktop:sidebar-mode:left']` equals `"pinned-open"`
 
 #### Scenario: Write failure is swallowed
 - **WHEN** `localStorage.setItem` throws (e.g., the browser denies writes)

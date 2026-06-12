@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from '../../test-utils'
 import userEvent from '@testing-library/user-event'
 import { ChatPanel } from '../ChatPanel'
 import type { UseChatReturn } from '../../hooks/useChat'
-import type { HubProject } from '../../hooks/useHub'
+import type { DesktopProject } from '../../hooks/useDesktop'
 
 vi.mock('react-markdown', () => ({
   default: ({ children }: { children: string }) => <span>{children}</span>,
@@ -29,7 +29,7 @@ function makeChat(overrides: Partial<UseChatReturn> = {}): UseChatReturn {
   }
 }
 
-const mockProject: HubProject = {
+const mockProject: DesktopProject = {
   id: 'proj-1',
   slug: 'test-project',
   name: 'Test Project',

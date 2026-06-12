@@ -53,19 +53,19 @@ describe('SidebarPinContext', () => {
   it('persists left mode to localStorage', () => {
     render(<SidebarPinProvider><Harness /></SidebarPinProvider>)
     fireEvent.click(screen.getByText('cycle-left'))
-    expect(window.localStorage.getItem('specrails-hub:sidebar-mode:left')).toBe('pinned-open')
+    expect(window.localStorage.getItem('specrails-desktop:sidebar-mode:left')).toBe('pinned-open')
   })
 
   it('restores persisted mode on mount', () => {
-    window.localStorage.setItem('specrails-hub:sidebar-mode:left', 'pinned-collapsed')
-    window.localStorage.setItem('specrails-hub:sidebar-mode:right', 'pinned-open')
+    window.localStorage.setItem('specrails-desktop:sidebar-mode:left', 'pinned-collapsed')
+    window.localStorage.setItem('specrails-desktop:sidebar-mode:right', 'pinned-open')
     render(<SidebarPinProvider><Harness /></SidebarPinProvider>)
     expect(screen.getByTestId('left').textContent).toBe('pinned-collapsed')
     expect(screen.getByTestId('right').textContent).toBe('pinned-open')
   })
 
   it('falls back to unpinned on invalid persisted value', () => {
-    window.localStorage.setItem('specrails-hub:sidebar-mode:left', 'wat')
+    window.localStorage.setItem('specrails-desktop:sidebar-mode:left', 'wat')
     render(<SidebarPinProvider><Harness /></SidebarPinProvider>)
     expect(screen.getByTestId('left').textContent).toBe('unpinned')
   })

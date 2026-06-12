@@ -1,13 +1,13 @@
-# hub-demo-scripted-tour Specification
+# desktop-demo-scripted-tour Specification
 
 ## Purpose
-TBD - created by archiving change hub-demo-scripted-tour. Update Purpose after archive.
+TBD - created by archiving change desktop-demo-scripted-tour. Update Purpose after archive.
 ## Requirements
-### Requirement: Tour auto-plays on hub-demo boot
-When the hub-demo build is loaded in a browser, the tour SHALL start automatically after the DOM has stabilised and SHALL require no user input to begin.
+### Requirement: Tour auto-plays on desktop-demo boot
+When the desktop-demo build is loaded in a browser, the tour SHALL start automatically after the DOM has stabilised and SHALL require no user input to begin.
 
 #### Scenario: Tour starts without interaction
-- **WHEN** `/hub-demo/index.html` is loaded in a browser
+- **WHEN** `/desktop-demo/index.html` is loaded in a browser
 - **THEN** within 2 seconds of the page's `load` event, the synthetic cursor is visible and Beat 02 (moveTo `+ Propose Spec` button) has started
 
 #### Scenario: Tour does not start in production client
@@ -44,7 +44,7 @@ The tour SHALL execute beats in the following order and SHALL produce the corres
 - **THEN** the elapsed wall-clock time is between 17 and 19 seconds inclusive
 
 ### Requirement: Tour loops indefinitely
-The tour SHALL loop continuously for as long as the hub-demo document is visible. The tour SHALL NOT require any user input to restart.
+The tour SHALL loop continuously for as long as the desktop-demo document is visible. The tour SHALL NOT require any user input to restart.
 
 #### Scenario: Loop continues past one iteration
 - **WHEN** the tour has completed Beat 15
@@ -62,7 +62,7 @@ The tour SHALL render a synthetic cursor as a single SVG element that is indepen
 - **THEN** the synthetic cursor's centre ends within 2 CSS pixels of S's bounding rect centre (plus the configured per-beat offset) by the time Beat N+1 starts
 
 ### Requirement: Selector resolution is verified by CI
-Every selector consumed by the tour SHALL resolve to exactly one DOM node in the hub-demo build. The project SHALL include an automated test that fails the build if any tour selector is missing or ambiguous.
+Every selector consumed by the tour SHALL resolve to exactly one DOM node in the desktop-demo build. The project SHALL include an automated test that fails the build if any tour selector is missing or ambiguous.
 
 #### Scenario: Missing selector fails CI
 - **WHEN** a component used by the tour is renamed or removed such that one of its `data-testid` / aria selectors no longer resolves
@@ -109,8 +109,8 @@ During Beat 14, the log viewer SHALL render the canonical tour log lines from `c
 When the user's system or browser advertises `prefers-reduced-motion: reduce`, the tour SHALL NOT animate.
 
 #### Scenario: Reduced motion at boot renders idle state only
-- **WHEN** `prefers-reduced-motion: reduce` is set and `/hub-demo/index.html` is loaded
-- **THEN** the tour does not render the synthetic cursor, does not begin the timeline, and the hub-demo displays a static idle state (Beat 01 visuals only)
+- **WHEN** `prefers-reduced-motion: reduce` is set and `/desktop-demo/index.html` is loaded
+- **THEN** the tour does not render the synthetic cursor, does not begin the timeline, and the desktop-demo displays a static idle state (Beat 01 visuals only)
 
 ### Requirement: Tour ships only in the demo build
 The tour orchestrator module, synthetic cursor, and programmatic-mode tour sources SHALL NOT be included in the production client bundle.

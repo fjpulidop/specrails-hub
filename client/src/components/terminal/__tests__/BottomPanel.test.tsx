@@ -228,7 +228,7 @@ describe('BottomPanel', () => {
       <BottomPanel projectId="p" state={makeState({ sessions: [s], activeId: 's1' })} viewportHeight={800} statusBarHeight={28} />,
     )
     fireEvent.click(getByLabelText(/maximize panel/i))
-    let stored = JSON.parse(localStorage.getItem('specrails-hub:terminal-panel:p')!) as { visibility: string }
+    let stored = JSON.parse(localStorage.getItem('specrails-desktop:terminal-panel:p')!) as { visibility: string }
     expect(stored.visibility).toBe('maximized')
     rerender(
       <MemoryRouter>
@@ -238,7 +238,7 @@ describe('BottomPanel', () => {
       </MemoryRouter>,
     )
     fireEvent.click(getByLabelText(/restore panel/i))
-    stored = JSON.parse(localStorage.getItem('specrails-hub:terminal-panel:p')!) as { visibility: string }
+    stored = JSON.parse(localStorage.getItem('specrails-desktop:terminal-panel:p')!) as { visibility: string }
     expect(stored.visibility).toBe('restored')
   })
 

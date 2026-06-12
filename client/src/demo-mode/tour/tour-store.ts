@@ -2,7 +2,7 @@
  * Lightweight external store for tour state. Consumed by TourOverlay via
  * useSyncExternalStore. No external deps.
  *
- * openspec: hub-demo-scripted-tour
+ * openspec: desktop-demo-scripted-tour
  */
 
 import { TOUR_LOG_LINES, type TourLogLine } from '../fixtures/tour-log'

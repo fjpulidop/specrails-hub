@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { RefreshCw } from 'lucide-react'
 import { getApiBase } from '../lib/api'
-import { useHub, projectProviders } from '../hooks/useHub'
+import { useDesktop, projectProviders } from '../hooks/useDesktop'
 import { providerLabel } from '../lib/provider-capabilities'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import type {
@@ -52,7 +52,7 @@ function buildQuery(filters: SpendingFilters): string {
 
 export default function AnalyticsPage() {
   const { t } = useTranslation('analytics')
-  const { activeProjectId, projects } = useHub()
+  const { activeProjectId, projects } = useDesktop()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const activeProject = projects.find((p) => p.id === activeProjectId)

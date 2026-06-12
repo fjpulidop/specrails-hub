@@ -9,11 +9,11 @@ vi.mock('child_process', () => ({ execSync: vi.fn() }))
 import { checkCoreCompat, findCoreContract, detectCLI, detectCLISync, getCLIStatus } from './core-compat'
 import { execSync } from 'child_process'
 
-// Minimal valid contract matching hub constants
+// Minimal valid contract matching app constants
 const COMPATIBLE_CONTRACT = {
   schemaVersion: '1',
   coreVersion: '1.0.0',
-  minimumHubVersion: '1.0.0',
+  minimumHubVersion: '1.0.0', // legacy field name frozen in the specrails-core contract
   cli: { initArgs: [], updateArgs: [] },
   checkpoints: [
     'base_install',
@@ -74,7 +74,7 @@ describe('checkCoreCompat', () => {
     expect(result.missingCommands).toEqual([])
   })
 
-  it('returns compatible=true when contract exactly matches hub constants', async () => {
+  it('returns compatible=true when contract exactly matches app constants', async () => {
     setupContractInTmpDir(COMPATIBLE_CONTRACT, tmpDir)
 
     const result = await checkCoreCompat()
@@ -104,7 +104,7 @@ describe('checkCoreCompat', () => {
     expect(result.missingCommands).toEqual([])
   })
 
-  it('detects drift when hub has a checkpoint that core dropped', async () => {
+  it('detects drift when the app has a checkpoint that core dropped', async () => {
     const driftedContract = {
       ...COMPATIBLE_CONTRACT,
       checkpoints: COMPATIBLE_CONTRACT.checkpoints.filter((c) => c !== 'final_verification'),
@@ -132,7 +132,7 @@ describe('checkCoreCompat', () => {
     expect(result.extraCommands).toEqual([])
   })
 
-  it('detects drift when hub has a command that core dropped', async () => {
+  it('detects drift when the app has a command that core dropped', async () => {
     const driftedContract = {
       ...COMPATIBLE_CONTRACT,
       commands: COMPATIBLE_CONTRACT.commands.filter((c) => c !== 'health-check'),
@@ -146,12 +146,12 @@ describe('checkCoreCompat', () => {
     expect(result.missingCommands).toEqual([])
   })
 
-  it('reports hubVersion from package.json', async () => {
+  it('reports desktopVersion from package.json', async () => {
     vi.mocked(execSync).mockImplementation(() => { throw new Error('not found') })
 
     const result = await checkCoreCompat()
 
-    expect(result.hubVersion).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(result.desktopVersion).toMatch(/^\d+\.\d+\.\d+$/)
   })
 })
 

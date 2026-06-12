@@ -5,7 +5,7 @@ import { ExternalLink, FileMinus2, FilePlus2, FileText, Filter, RotateCw, X } fr
 import { FileTree } from '../components/code-explorer/FileTree'
 import { FileViewer, type CopyPathAction, type SummaryAction } from '../components/code-explorer/FileViewer'
 import { getApiBase } from '../lib/api'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 
 type ProvenanceKind = 'created' | 'modified' | 'deleted'
 
@@ -22,7 +22,7 @@ const MIN_TREE_WIDTH = 240
 const MIN_MAIN_WIDTH = 520
 
 function treeWidthKey(projectId: string | null): string | null {
-  return projectId ? `specrails-hub:code-tree-width:${projectId}` : null
+  return projectId ? `specrails-desktop:code-tree-width:${projectId}` : null
 }
 
 function loadTreeWidth(projectId: string | null): number {
@@ -50,7 +50,7 @@ function clampTreeWidth(width: number, containerWidth: number): number {
 
 export default function CodePage() {
   const { t } = useTranslation('code')
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const containerRef = useRef<HTMLDivElement | null>(null)

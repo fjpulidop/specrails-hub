@@ -19,11 +19,11 @@ vi.mock('../../hooks/useSharedWebSocket', () => ({
 }))
 
 import { SetupWizard } from '../SetupWizard'
-import type { HubProject } from '../../hooks/useHub'
+import type { DesktopProject } from '../../hooks/useDesktop'
 
 // Use a counter to ensure unique project IDs — avoids wizardCache cross-test contamination
 let projectIdCounter = 0
-function makeProject(overrides: Partial<HubProject> = {}): HubProject {
+function makeProject(overrides: Partial<DesktopProject> = {}): DesktopProject {
   const id = `proj-setup-${++projectIdCounter}`
   return {
     id,

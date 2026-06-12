@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   minimize: vi.fn(),
   toggleMaximize: vi.fn(),
   close: vi.fn(),
-  useHub: vi.fn(),
+  useDesktop: vi.fn(),
 }))
 
 vi.mock('@tauri-apps/api/window', () => ({
@@ -18,14 +18,14 @@ vi.mock('@tauri-apps/api/window', () => ({
   }),
 }))
 
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => mocks.useHub(),
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => mocks.useDesktop(),
 }))
 
 describe('TitleBar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.useHub.mockReturnValue({
+    mocks.useDesktop.mockReturnValue({
       projects: [{ id: 'p1', name: 'Project One' }],
       activeProjectId: 'p1',
     })

@@ -19,7 +19,7 @@ The desktop update toast (mounted by `useDesktopUpdateNotifier`) SHALL render it
 
 ### Requirement: Update toast lifecycle and persistence are unchanged
 
-The update toast SHALL be mounted only when the runtime is Tauri (or the `VITE_MOCK_DESKTOP_UPDATE` mock flag is set), SHALL use the toast id `specrails-hub-desktop-update`, SHALL have `duration: Infinity`, SHALL be non-dismissible by Sonner's default UX (`dismissible: false`), and SHALL persist a "dismissed for this version" marker to `localStorage` under the key `specrails-hub:dismissedDesktopUpdateVersion` when the user clicks Dismiss.
+The update toast SHALL be mounted only when the runtime is Tauri (or the `VITE_MOCK_DESKTOP_UPDATE` mock flag is set), SHALL use the toast id `specrails-desktop-desktop-update`, SHALL have `duration: Infinity`, SHALL be non-dismissible by Sonner's default UX (`dismissible: false`), and SHALL persist a "dismissed for this version" marker to `localStorage` under the key `specrails-desktop:dismissedDesktopUpdateVersion` when the user clicks Dismiss.
 
 #### Scenario: Toast suppressed for already-dismissed version
 
@@ -29,7 +29,7 @@ The update toast SHALL be mounted only when the runtime is Tauri (or the `VITE_M
 #### Scenario: Dismiss writes the version to localStorage
 
 - **WHEN** the user clicks the Dismiss button on the update toast
-- **THEN** `localStorage['specrails-hub:dismissedDesktopUpdateVersion']` equals the offered version and the toast is removed from the screen
+- **THEN** `localStorage['specrails-desktop:dismissedDesktopUpdateVersion']` equals the offered version and the toast is removed from the screen
 
 ### Requirement: Update toast surfaces install progress and ready state
 

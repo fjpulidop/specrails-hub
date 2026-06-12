@@ -19,7 +19,7 @@ describe('specs-view-tier', () => {
   })
 
   it('returns default when stored value is invalid', () => {
-    localStorage.setItem('specrails-hub:specs-view-tier:p1', 'garbage')
+    localStorage.setItem('specrails-desktop:specs-view-tier:p1', 'garbage')
     expect(loadSpecsViewTier('p1')).toBe(DEFAULT_SPECS_VIEW_TIER)
   })
 

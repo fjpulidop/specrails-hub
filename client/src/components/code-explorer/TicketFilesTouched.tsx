@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { FileText, FilePlus2, FileMinus2, GitCommitHorizontal } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
-import { useHub } from '../../hooks/useHub'
+import { useDesktop } from '../../hooks/useDesktop'
 import { FEATURE_CODE_EXPLORER } from '../../lib/feature-flags'
 
 interface ProvenanceRow {
@@ -23,7 +23,7 @@ export function TicketFilesTouched({ ticketId, onClose }: Props) {
   // any early return (Rules of Hooks). The feature gate is applied below.
   const { t } = useTranslation('code')
   const navigate = useNavigate()
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const [rows, setRows] = useState<ProvenanceRow[] | null>(null)
 
   useEffect(() => {

@@ -4,8 +4,8 @@ import { render, screen, waitFor } from '../../test-utils'
 import ActivityFeedPage from '../ActivityFeedPage'
 import type { ActivityItem } from '../../hooks/useActivity'
 
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({
     activeProjectId: 'proj-1',
     projects: [],
     isLoading: false,

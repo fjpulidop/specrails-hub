@@ -1,27 +1,27 @@
-# SpecRails Hub on macOS
+# Specrails on macOS
 
 ## Supported configurations
 
-- **macOS on Apple Silicon (arm64)** — the only architecture the shipped desktop build targets. The official `.dmg` is built on Apple-Silicon CI and named `specrails-hub-<version>-aarch64.dmg`.
+- **macOS on Apple Silicon (arm64)** — the only architecture the shipped desktop build targets. The official `.dmg` is built on Apple-Silicon CI and named `specrails-desktop-<version>-aarch64.dmg`.
 - Intel Macs are supported only via Rosetta / forward-compat. There is no native x86_64 macOS build today.
 
 ## Installation
 
 Signed, notarized builds are published on every release under:
 
-> 📥 `https://specrails.dev/downloads/specrails-hub/latest/`
+> 📥 `https://specrails.dev/downloads/specrails-desktop/latest/`
 
-- `specrails-hub-<version>-aarch64.dmg` — the Apple Silicon installer.
+- `specrails-desktop-<version>-aarch64.dmg` — the Apple Silicon installer.
 
-Versioned copies live at `downloads/specrails-hub/v<version>/` for archival and deep-linking. A machine-readable `manifest.json` in `latest/` describes the current release (version, sha256, size) so you can verify a download:
+Versioned copies live at `downloads/specrails-desktop/v<version>/` for archival and deep-linking. A machine-readable `manifest.json` in `latest/` describes the current release (version, sha256, size) so you can verify a download:
 
 ```bash
-shasum -a 256 specrails-hub-<version>-aarch64.dmg
+shasum -a 256 specrails-desktop-<version>-aarch64.dmg
 ```
 
-Compare the output against `platforms["darwin-arm64"].sha256` in `https://specrails.dev/downloads/specrails-hub/latest/manifest.json`.
+Compare the output against `platforms["darwin-arm64"].sha256` in `https://specrails.dev/downloads/specrails-desktop/latest/manifest.json`.
 
-To install: open the `.dmg` and drag **SpecRails Hub** into `Applications/`.
+To install: open the `.dmg` and drag **Specrails** into `Applications/`.
 
 ## Gatekeeper / first launch
 
@@ -33,14 +33,14 @@ Official installers from the release pipeline are **code-signed and notarized**,
 - Clear the quarantine attribute from a terminal:
 
   ```bash
-  xattr -dr com.apple.quarantine "/Applications/SpecRails Hub.app"
+  xattr -dr com.apple.quarantine "/Applications/Specrails.app"
   ```
 
 You only need this once per build. It does not apply to the notarized installers above.
 
 ## Prerequisites
 
-When you add a project, the hub checks for the tools it needs and surfaces them in a **prerequisites panel** (in the `Add Project` dialog and the setup wizard). It checks:
+When you add a project, the app checks for the tools it needs and surfaces them in a **prerequisites panel** (in the `Add Project` dialog and the setup wizard). It checks:
 
 - **Bundled tools** — `node`, `npm`, `npx`, `git`.
 - **Provider CLIs** — **Claude Code** and **Codex**. These are always probed via your system `PATH` (never bundled). **At least one provider must be installed and working** before Add Project is enabled — if neither is usable the panel blocks the dialog.
@@ -49,7 +49,7 @@ When everything is in order, the panel collapses to a single line: **All require
 
 ## PATH resolution
 
-GUI apps on macOS inherit a minimal `PATH` from launchd when launched from Finder, Dock, or Spotlight. On Apple Silicon this typically omits `/opt/homebrew/bin` and any tool-version-manager shims. The hub resolves this differently depending on whether it is running as the shipped desktop app or as a plain server.
+GUI apps on macOS inherit a minimal `PATH` from launchd when launched from Finder, Dock, or Spotlight. On Apple Silicon this typically omits `/opt/homebrew/bin` and any tool-version-manager shims. The app resolves this differently depending on whether it is running as the shipped desktop app or as a plain server.
 
 ### Desktop app (the default for `.dmg` users)
 
@@ -63,7 +63,7 @@ If a build ships **without** the bundled runtimes (or has a partial/botched extr
 
 ### Server / non-bundled fallback
 
-When the app runs without an active bundle (a runtimes-less build, or `npm run dev:server`), the hub reconstructs `PATH` in two steps:
+When the app runs without an active bundle (a runtimes-less build, or `npm run dev:server`), the app reconstructs `PATH` in two steps:
 
 1. **Fast path (sync)** — `resolveStartupPath()` prepends any missing well-known package-manager directories to `process.env.PATH`:
    - `/opt/homebrew/bin`, `/opt/homebrew/sbin` (Apple Silicon Homebrew prefix)
@@ -88,7 +88,7 @@ This points you at the actual fix (remove the stale link) instead of sending you
 
 ## Diagnostic endpoint
 
-`GET /api/hub/setup-prerequisites?diagnostic=1` returns the standard payload plus a `diagnostic` block. Example (illustrative — real payloads also carry `pathSources: "bundled"` segments in desktop mode):
+`GET /api/setup-prerequisites?diagnostic=1` returns the standard payload plus a `diagnostic` block. Example (illustrative — real payloads also carry `pathSources: "bundled"` segments in desktop mode):
 
 ```jsonc
 {
@@ -118,7 +118,7 @@ The install-instructions modal exposes a **Copy diagnostics** button that fetche
 
 After installing or reinstalling Node (or a provider CLI):
 
-1. Quit SpecRails Hub completely (**Cmd-Q**, not just close the window).
+1. Quit Specrails completely (**Cmd-Q**, not just close the window).
 2. Relaunch from `Applications/`.
 3. Open the `Add Project` dialog.
 4. The panel should collapse to **All required tools detected**. If something is still flagged, the per-tool list expands — find the red row, click **More info → Copy diagnostics**, and inspect its `whichResults` entry and `pathSegments` to see whether the resolver found the binary you expect.
@@ -126,5 +126,5 @@ After installing or reinstalling Node (or a provider CLI):
 ## Known limitations
 
 - **Provider requirement**: at least one of Claude Code or Codex must be installed and on `PATH`; otherwise Add Project stays disabled.
-- **Port 4200** must be free on launch. The hub binds `127.0.0.1:4200` for its API + WebSocket; if another process holds the port, the server cannot start.
+- **Port 4200** must be free on launch. The app binds `127.0.0.1:4200` for its API + WebSocket; if another process holds the port, the server cannot start.
 - **Terminal panel**: the bottom terminal panel spawns `$SHELL -l -i`, so your `.zshrc` / `.bashrc` loads as it would in a normal login shell. Per-session shell selection is not yet exposed in the UI — set `SHELL` to override the default.

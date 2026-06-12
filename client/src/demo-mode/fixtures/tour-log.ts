@@ -8,7 +8,7 @@
  *   trailing numbers/counts → accent-info
  *   SHIPPED / PASS → accent-success, bold
  *
- * openspec: hub-demo-scripted-tour (design.md §Decision 5)
+ * openspec: desktop-demo-scripted-tour (design.md §Decision 5)
  */
 
 export interface TourLogLine {

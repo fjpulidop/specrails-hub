@@ -9,7 +9,7 @@ paths:
 
 - React 18 + TypeScript + Vite + Tailwind v4
 - ESM modules (`client/tsconfig.json` — separate from root `tsconfig.json`)
-- File naming: PascalCase for components (e.g., `HubApp.tsx`, `SetupWizard.tsx`), kebab-case for utilities
+- File naming: PascalCase for components (e.g., `DesktopApp.tsx`, `SetupWizard.tsx`), kebab-case for utilities
 - Run `cd client && npm install` separately — client has its own `package.json`
 
 ## API calls
@@ -17,8 +17,8 @@ paths:
 - **ALWAYS use `getApiBase()`** from `lib/api.ts` as the prefix for all API calls
   - Wrong: `fetch('/api/projects/123/jobs')`
   - Right: `fetch(\`${getApiBase()}/jobs\`)`
-- `getApiBase()` returns `/api/projects/<id>` in hub mode, `/api` in legacy mode
-- `HubProvider` updates this when the active project changes — never cache the base URL
+- `getApiBase()` returns `/api/projects/<id>` for the active project (throws when no project is set)
+- `DesktopProvider` updates this when the active project changes — never cache the base URL
 
 ## State management
 
@@ -35,12 +35,12 @@ paths:
   // In WS handler:
   if (msg.projectId !== activeProjectIdRef.current) return;
   ```
-- Hub-level WS messages have no `projectId` — they reach all handlers (e.g., `hub.project_added`)
+- App-level WS messages have no `projectId` — they reach all handlers (e.g., `desktop.project_added`)
 
-## Hub mode
+## Super mode
 
-- `App.tsx` detects hub mode via `GET /api/hub/state` and renders `HubApp` or legacy `RootLayout`
-- `useHub.tsx` — `HubProvider` context: project list, active project, setup wizard state
+- `App.tsx` mounts `DesktopProvider` and `DesktopApp` unconditionally (Super mode is the only mode; `GET /api/state` reports `mode: 'super'`)
+- `useDesktop.tsx` — `DesktopProvider` context: project list, active project, setup wizard state
 - `useProjectRouteMemory` — saves/restores URL route per project on tab switch
 - On project switch: show cached data immediately, fetch fresh data in background — never reset to empty state
 

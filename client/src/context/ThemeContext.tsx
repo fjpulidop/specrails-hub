@@ -8,19 +8,19 @@ import {
   type ThemeDescriptor,
 } from '../lib/themes'
 import { getActiveTheme } from '../lib/theme-palette'
-import { getHubToken } from '../lib/auth'
+import { getDesktopToken } from '../lib/auth'
 
 /**
- * Build headers including the hub auth token. Defense-in-depth: the global
- * fetch interceptor in `lib/auth.ts` also attaches X-Hub-Token to /api/*
+ * Build headers including the app auth token. Defense-in-depth: the global
+ * fetch interceptor in `lib/auth.ts` also attaches X-Desktop-Token to /api/*
  * requests, but explicit attachment here means theme switches work even if
  * the interceptor has not yet been installed (e.g. very early in boot, or
  * in test environments that bypass `installFetchInterceptor`).
  */
 function authedHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const headers: Record<string, string> = { ...extra }
-  const token = getHubToken()
-  if (token) headers['X-Hub-Token'] = token
+  const token = getDesktopToken()
+  if (token) headers['X-Desktop-Token'] = token
   return headers
 }
 
@@ -63,12 +63,12 @@ function persistThemeToLocalStorage(id: ThemeId): void {
 interface ThemeProviderProps {
   children: ReactNode
   /**
-   * Test seam: override fetch/PATCH targets. Defaults to real `/api/hub/theme`.
+   * Test seam: override fetch/PATCH targets. Defaults to real `/api/theme`.
    */
   endpoint?: string
 }
 
-export function ThemeProvider({ children, endpoint = '/api/hub/theme' }: ThemeProviderProps) {
+export function ThemeProvider({ children, endpoint = '/api/theme' }: ThemeProviderProps) {
   const [themeId, setThemeIdState] = useState<ThemeId>(() => readBootTheme())
   const [isUpdating, setIsUpdating] = useState(false)
   const reconciledOnMount = useRef(false)

@@ -4,8 +4,8 @@ import type { ReactNode } from 'react'
 export type SidebarMode = 'pinned-open' | 'pinned-collapsed' | 'unpinned'
 
 const VALID_MODES: readonly SidebarMode[] = ['pinned-open', 'pinned-collapsed', 'unpinned']
-const STORAGE_KEY_LEFT = 'specrails-hub:sidebar-mode:left'
-const STORAGE_KEY_RIGHT = 'specrails-hub:sidebar-mode:right'
+const STORAGE_KEY_LEFT = 'specrails-desktop:sidebar-mode:left'
+const STORAGE_KEY_RIGHT = 'specrails-desktop:sidebar-mode:right'
 
 function isSidebarMode(value: unknown): value is SidebarMode {
   return typeof value === 'string' && (VALID_MODES as readonly string[]).includes(value)

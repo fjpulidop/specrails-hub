@@ -39,7 +39,7 @@ export function setOsNotificationPrefs(prefs: OsNotificationPrefs): void {
 }
 
 interface UseOsNotificationsOpts {
-  /** Called on notification click to switch to the job's project (hub mode) */
+  /** Called on notification click to switch to the job's project (Super mode) */
   setActiveProjectId?: (id: string) => void
   /** projectId → projectName map for notification body text */
   projectsById?: Map<string, string>

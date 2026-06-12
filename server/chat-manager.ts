@@ -295,7 +295,7 @@ export class ChatManager {
 
   /**
    * Resolve the spawn cwd for a chat turn. Explore conversations spawn from
-   * a hub-managed directory by default to skip auto-loading the project's
+   * an app-managed directory by default to skip auto-loading the project's
    * `CLAUDE.md` (the dominant first-token cost); when the per-project MCP
    * toggle is on, fall back to the project path so `.mcp.json` is honoured.
    * Non-Explore conversations always use the project path.
@@ -310,7 +310,7 @@ export class ChatManager {
     if (kind !== 'explore') return this._cwd
     if (!this._projectSlug || !this._cwd || !this._projectName) return this._cwd
     // Per-conversation scope.mcp is the only source of truth. Legacy null
-    // scope is treated as mcp=false (spawn from hub-managed cwd).
+    // scope is treated as mcp=false (spawn from app-managed cwd).
     const mcpEnabled = scope ? !!scope.mcp : false
     if (mcpEnabled) return this._cwd
     try {
@@ -370,7 +370,7 @@ export class ChatManager {
       `You are a project assistant for the "${name}" specrails project with full access to this repository via Claude Code. ` +
       `You can help answer questions about the codebase, explain SpecRails concepts, and suggest commands to run.` +
       `\n\nIMPORTANT: You have explicit permission to read and write .specrails/local-tickets.json — ` +
-      `this is the project's local ticket store managed by specrails-hub. It is NOT sensitive. ` +
+      `this is the project's local ticket store managed by Specrails. It is NOT sensitive. ` +
       `When creating or updating tickets, write directly to this JSON file.` +
       `\n\nUser messages may begin with a "## Current Dashboard Context" section. It is injected by the dashboard, ` +
       `not typed by the user — treat it as live, authoritative project state (active job, recent jobs, stats, costs) ` +
@@ -447,7 +447,7 @@ export class ChatManager {
     const base =
       `You are a fast, focused assistant for the "${name}" specrails project. ` +
       `You have explicit permission to read and write .specrails/local-tickets.json — ` +
-      `this is the project's local ticket store managed by specrails-hub. It is NOT sensitive. ` +
+      `this is the project's local ticket store managed by Specrails. It is NOT sensitive. ` +
       `When creating or updating tickets, write directly to this JSON file.\n\n` +
       `IMPORTANT: Be efficient. Minimize tool calls. Only read files that are directly relevant. ` +
       `Do not explore broadly — focus on the specific task.`
@@ -641,7 +641,7 @@ export class ChatManager {
     this._emittedProposals.set(conversationId, new Set())
     this._streamFilters.set(conversationId, { inBlock: false, pendingTail: '' })
 
-    // Surface ENOENT (e.g. claude not on PATH) instead of crashing the hub.
+    // Surface ENOENT (e.g. claude not on PATH) instead of crashing the app.
     /* c8 ignore start -- spawn-failure path; exercised manually, not in CI */
     child.on('error', (err) => {
       console.error(`[chat-manager] spawn failed for ${conversationId}: ${err.message}`)
@@ -795,7 +795,7 @@ export class ChatManager {
               // the original child's 'error' listener. Without one, an async
               // spawn 'error' (ENOENT/EAGAIN — the very class of failure that
               // can recur right after a crash) would be an unhandled 'error'
-              // event and crash the entire hub. Mirror the original handler.
+              // event and crash the entire app. Mirror the original handler.
               /* c8 ignore start -- respawn spawn-failure path; exercised manually, not in CI */
               newChild.on('error', (err) => {
                 console.error(`[chat-manager] explore crash-respawn spawn failed for ${conversationId}: ${err.message}`)
@@ -993,7 +993,7 @@ export class ChatManager {
    * active chat child (SIGTERM), cancel all Explore idle timers and queued
    * waiter timeouts, and clear all per-conversation tracking. Without this,
    * in-flight claude/codex children are orphaned (reparented to init) when the
-   * hub exits and keep consuming API quota/CPU. Idempotent.
+   * app exits and keep consuming API quota/CPU. Idempotent.
    */
   shutdown(): void {
     for (const child of this._activeProcesses.values()) {

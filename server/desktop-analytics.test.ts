@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getHubAnalytics, getHubTodayStats, getHubRecentJobs } from './hub-analytics'
+import { getDesktopAnalytics, getDesktopTodayStats, getDesktopRecentJobs } from './desktop-analytics'
 import { initDb } from './db'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import type { DbInstance } from './db'
@@ -41,7 +41,7 @@ function makeRegistry(contexts: Array<{ id: string; name: string; db: DbInstance
   )
 
   return {
-    hubDb: {} as any,
+    desktopDb: {} as any,
     getContext: (id) => ctxMap.get(id),
     getContextByPath: () => undefined,
     addProject: vi.fn() as any,
@@ -53,10 +53,10 @@ function makeRegistry(contexts: Array<{ id: string; name: string; db: DbInstance
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe('getHubAnalytics', () => {
+describe('getDesktopAnalytics', () => {
   it('returns zero KPIs when no projects are registered', () => {
     const registry = makeRegistry([])
-    const result = getHubAnalytics(registry, { period: '7d' })
+    const result = getDesktopAnalytics(registry, { period: '7d' })
 
     expect(result.kpi.totalJobs).toBe(0)
     expect(result.kpi.totalCostUsd).toBe(0)
@@ -78,7 +78,7 @@ describe('getHubAnalytics', () => {
       { id: 'p2', name: 'Project Two', db: db2 },
     ])
 
-    const result = getHubAnalytics(registry, { period: '7d' })
+    const result = getDesktopAnalytics(registry, { period: '7d' })
 
     expect(result.kpi.totalJobs).toBe(3)
     expect(result.kpi.totalCostUsd).toBeCloseTo(0.06, 5)
@@ -93,7 +93,7 @@ describe('getHubAnalytics', () => {
       { id: 'p2', name: 'Beta', db: db2 },
     ])
 
-    const result = getHubAnalytics(registry, { period: '7d' })
+    const result = getDesktopAnalytics(registry, { period: '7d' })
 
     expect(result.projectBreakdown).toHaveLength(2)
     // Sorted by cost descending
@@ -110,7 +110,7 @@ describe('getHubAnalytics', () => {
       { id: 'p2', name: 'Beta', db: db2 },
     ])
 
-    const result = getHubAnalytics(registry, { period: '7d' })
+    const result = getDesktopAnalytics(registry, { period: '7d' })
 
     // Both jobs on same date — timeline should have one entry for today with sum
     const todayEntry = result.costTimeline.find((e) => e.date === today)
@@ -120,16 +120,16 @@ describe('getHubAnalytics', () => {
 
   it('includes period label in response', () => {
     const registry = makeRegistry([])
-    const result = getHubAnalytics(registry, { period: '30d' })
+    const result = getDesktopAnalytics(registry, { period: '30d' })
     expect(result.period.label).toBe('Last 30 days')
   })
 
   it('B42: period=custom with malformed dates does not throw (RangeError guard)', () => {
     const registry = makeRegistry([{ id: 'p1', name: 'A', db: makeProjectDb([{ costUsd: 0.01, status: 'completed' }]) }])
     // Garbage from/to — previously flowed into new Date(...).toISOString() → 500.
-    expect(() => getHubAnalytics(registry, { period: 'custom', from: 'not-a-date', to: 'xx' })).not.toThrow()
+    expect(() => getDesktopAnalytics(registry, { period: 'custom', from: 'not-a-date', to: 'xx' })).not.toThrow()
     // A valid single bound is honored without throwing either.
-    expect(() => getHubAnalytics(registry, { period: 'custom', from: '2026-01-01', to: 'garbage' })).not.toThrow()
+    expect(() => getDesktopAnalytics(registry, { period: 'custom', from: '2026-01-01', to: 'garbage' })).not.toThrow()
   })
 
   it('jobsToday and costToday reflect only today\'s data', () => {
@@ -142,17 +142,17 @@ describe('getHubAnalytics', () => {
     ])
     const registry = makeRegistry([{ id: 'p1', name: 'Project', db }])
 
-    const result = getHubAnalytics(registry, { period: '7d' })
+    const result = getDesktopAnalytics(registry, { period: '7d' })
 
     expect(result.kpi.jobsToday).toBe(1)
     expect(result.kpi.costToday).toBeCloseTo(0.10, 5)
   })
 })
 
-describe('getHubTodayStats', () => {
+describe('getDesktopTodayStats', () => {
   it('returns zeros when no projects', () => {
     const registry = makeRegistry([])
-    const stats = getHubTodayStats(registry)
+    const stats = getDesktopTodayStats(registry)
     expect(stats.costToday).toBe(0)
     expect(stats.jobsToday).toBe(0)
   })
@@ -166,18 +166,18 @@ describe('getHubTodayStats', () => {
       { id: 'p2', name: 'B', db: db2 },
     ])
 
-    const stats = getHubTodayStats(registry)
+    const stats = getDesktopTodayStats(registry)
     expect(stats.jobsToday).toBe(2)
     expect(stats.costToday).toBeCloseTo(0.12, 5)
   })
 })
 
-// ─── getHubRecentJobs ─────────────────────────────────────────────────────────
+// ─── getDesktopRecentJobs ─────────────────────────────────────────────────────────
 
-describe('getHubRecentJobs', () => {
+describe('getDesktopRecentJobs', () => {
   it('returns empty list when no projects', () => {
     const registry = makeRegistry([])
-    expect(getHubRecentJobs(registry)).toEqual([])
+    expect(getDesktopRecentJobs(registry)).toEqual([])
   })
 
   it('returns jobs sorted by started_at descending', () => {
@@ -187,7 +187,7 @@ describe('getHubRecentJobs', () => {
       { costUsd: 0.02, status: 'completed', startedAt: `${today}T10:00:00.000Z` },
     ])
     const registry = makeRegistry([{ id: 'p1', name: 'Proj', db }])
-    const jobs = getHubRecentJobs(registry)
+    const jobs = getDesktopRecentJobs(registry)
     expect(jobs[0].started_at > jobs[1].started_at).toBe(true)
   })
 
@@ -204,7 +204,7 @@ describe('getHubRecentJobs', () => {
       { id: 'p1', name: 'Alpha', db: db1 },
       { id: 'p2', name: 'Beta', db: db2 },
     ])
-    const jobs = getHubRecentJobs(registry, 2)
+    const jobs = getDesktopRecentJobs(registry, 2)
     expect(jobs).toHaveLength(2)
     expect(jobs[0].started_at >= jobs[1].started_at).toBe(true)
   })
@@ -212,20 +212,20 @@ describe('getHubRecentJobs', () => {
   it('includes projectId and projectName on each job', () => {
     const db = makeProjectDb([{ costUsd: 0.01, status: 'completed' }])
     const registry = makeRegistry([{ id: 'proj-1', name: 'MyProject', db }])
-    const jobs = getHubRecentJobs(registry)
+    const jobs = getDesktopRecentJobs(registry)
     expect(jobs[0].projectId).toBe('proj-1')
     expect(jobs[0].projectName).toBe('MyProject')
   })
 })
 
-// ─── getHubAnalytics — buildWhere edge cases ──────────────────────────────────
+// ─── getDesktopAnalytics — buildWhere edge cases ──────────────────────────────────
 
-describe('getHubAnalytics — custom period edge cases', () => {
+describe('getDesktopAnalytics — custom period edge cases', () => {
   it('handles custom period with only from date', () => {
     const db = makeProjectDb([{ costUsd: 0.05, status: 'completed' }])
     const registry = makeRegistry([{ id: 'p1', name: 'Proj', db }])
     const today = new Date().toISOString().slice(0, 10)
-    const result = getHubAnalytics(registry, { period: 'custom', from: today })
+    const result = getDesktopAnalytics(registry, { period: 'custom', from: today })
     expect(result.kpi.totalJobs).toBeGreaterThanOrEqual(0)
   })
 
@@ -233,7 +233,7 @@ describe('getHubAnalytics — custom period edge cases', () => {
     const db = makeProjectDb([{ costUsd: 0.05, status: 'completed' }])
     const registry = makeRegistry([{ id: 'p1', name: 'Proj', db }])
     const today = new Date().toISOString().slice(0, 10)
-    const result = getHubAnalytics(registry, { period: 'custom', to: today })
+    const result = getDesktopAnalytics(registry, { period: 'custom', to: today })
     expect(result.kpi.totalJobs).toBeGreaterThanOrEqual(0)
   })
 })

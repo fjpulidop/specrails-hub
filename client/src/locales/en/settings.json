@@ -1,7 +1,7 @@
 {
   "language": {
     "title": "Language",
-    "description": "Hub-wide UI language. Applies instantly — no restart needed.",
+    "description": "Desktop-wide UI language. Applies instantly — no restart needed.",
     "selectLabel": "Interface language",
     "updateFailed": "Could not save the language preference"
   },
@@ -59,23 +59,23 @@
     "saveBudgetFailed": "Failed to save budget",
     "saveThresholdFailed": "Failed to save threshold"
   },
-  "hub": {
-    "title": "Hub Settings",
-    "description": "Manage registered projects and view hub information.",
+  "desktop": {
+    "title": "Desktop Settings",
+    "description": "Manage registered projects and view Desktop information.",
     "registeredProjects": "Registered Projects",
     "noProjects": "No projects registered yet",
     "techUrlDescription": "Base URL for the specrails-tech API (default: http://localhost:3000)",
     "techUrlSaved": "specrails-tech URL saved",
     "techUrlSaveFailed": "Failed to save URL",
     "budgetAlertsHeading": "Budget & Alerts",
-    "dailyBudgetLabel": "Hub daily budget (USD)",
+    "dailyBudgetLabel": "Desktop daily budget (USD)",
     "dailyBudgetHelper": "Global daily spend limit across all projects. Queues auto-pause when exceeded.",
     "dailyBudgetPlaceholder": "e.g. 10.00",
     "perJobHelper": "Alert when a single job exceeds this amount. Leave blank to disable.",
     "costAlertsDisabled": "Cost alerts disabled",
-    "dailyBudgetRemoved": "Hub daily budget removed",
-    "dailyBudgetSet": "Hub daily budget set to ${{amount}}",
-    "dailyBudgetSaveFailed": "Failed to save hub daily budget",
+    "dailyBudgetRemoved": "Desktop daily budget removed",
+    "dailyBudgetSet": "Desktop daily budget set to ${{amount}}",
+    "dailyBudgetSaveFailed": "Failed to save Desktop daily budget",
     "projectRemoved": "Project removed",
     "projectRemoveFailed": "Failed to remove project",
     "onboardingHeading": "Onboarding",
@@ -83,10 +83,10 @@
     "platformTourDescription": "Replay the welcome wizard to review key features.",
     "replayTour": "Replay Tour",
     "terminalPanelHeading": "Terminal Panel",
-    "infoHeading": "Hub Information",
+    "infoHeading": "Desktop Information",
     "infoPort": "Port",
     "infoProjects": "Projects",
-    "infoDb": "Hub DB"
+    "infoDb": "Desktop DB"
   },
   "notifications": {
     "heading": "OS Notifications",
@@ -101,7 +101,7 @@
   },
   "webhooks": {
     "heading": "Outbound Webhooks",
-    "description": "Notify external tools (Slack, Zapier, CI/CD) on hub events. Requests are signed via <code>X-Specrails-Signature</code> when a secret is set.",
+    "description": "Notify external tools (Slack, Zapier, CI/CD) on Desktop events. Requests are signed via <code>X-Specrails-Signature</code> when a secret is set.",
     "eventJobCompleted": "Job completed",
     "eventJobFailed": "Job failed",
     "eventDailyBudgetExceeded": "Daily budget exceeded",
@@ -125,8 +125,8 @@
   },
   "terminal": {
     "title": "Terminal panel",
-    "hubDescription": "Hub-wide defaults applied to every project unless a per-project override is set.",
-    "projectDescription": "Per-project overrides for the terminal panel. Leave a field unchanged to inherit the hub default.",
+    "desktopDescription": "Desktop-wide defaults applied to every project unless a per-project override is set.",
+    "projectDescription": "Per-project overrides for the terminal panel. Leave a field unchanged to inherit the Desktop default.",
     "fontFamily": "Font family",
     "fontSize": "Font size ({{min}}–{{max}})",
     "renderMode": "Render mode",
@@ -141,7 +141,7 @@
     "unsavedChanges": "Unsaved changes",
     "clearOverride": "Clear override",
     "clear": "Clear",
-    "inheritingDefault": "Inheriting hub default",
+    "inheritingDefault": "Inheriting Desktop default",
     "nothingToSave": "Nothing to save",
     "saved": "Terminal settings saved"
   },
@@ -159,7 +159,7 @@
   },
   "mobile": {
     "heading": "Mobile companion",
-    "description": "Control this hub from the SpecRails Companion app on your phone, 100% over your local network. Off by default.",
+    "description": "Control Specrails from the SpecRails Companion app on your phone, 100% over your local network. Off by default.",
     "accessOn": "Mobile access on",
     "accessOff": "Mobile access off",
     "listeningOnPort": "Listening on port {{port}}",
@@ -186,7 +186,7 @@
     "approve": "Approve",
     "paired": "✓ Paired",
     "waiting": "Waiting for a device… (on {{host}}:{{port}})",
-    "thisHub": "this hub",
+    "thisDesktop": "this computer",
     "copyCode": "Copy code (for \"Enter manually\")",
     "pairedToast": "Device paired",
     "approveFailed": "Approve failed: {{message}}",

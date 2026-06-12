@@ -53,7 +53,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM4QjFFMTZCNDdENkE0M0IKUldRN3BOWkhhK0d4eUo5TFY4ZVJPUEZUTk5VdFh0ZTROWkVKcnp3ckdDSmFKakN6UVNVRUdSVm8K",
       "endpoints": [
-        "https://github.com/fjpulidop/specrails-hub/releases/latest/download/latest.json"
+        "https://github.com/fjpulidop/specrails-desktop/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

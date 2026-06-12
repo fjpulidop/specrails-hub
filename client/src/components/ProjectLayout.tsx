@@ -8,7 +8,7 @@ import { ChatPanel } from './ChatPanel'
 import { usePipeline } from '../hooks/usePipeline'
 import { useChat, ChatContext } from '../hooks/useChat'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
-import { type HubProject, projectProviders } from '../hooks/useHub'
+import { type DesktopProject, projectProviders } from '../hooks/useDesktop'
 import { FEATURE_CHAT_ENABLED, FEATURE_TERMINAL_PANEL } from '../lib/feature-flags'
 import { BottomPanel } from './terminal/BottomPanel'
 import { PanelChevronButton } from './terminal/PanelChevronButton'
@@ -17,7 +17,7 @@ import { useTerminals, useProjectTerminals } from '../context/TerminalsContext'
 const STATUSBAR_HEIGHT_PX = 28
 
 interface ProjectLayoutProps {
-  project: HubProject
+  project: DesktopProject
 }
 
 export function ProjectLayout({ project }: ProjectLayoutProps) {
@@ -32,7 +32,7 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
   useEffect(() => {
     const id = `cost-alerts-${project.id}`
     registerHandler(id, (raw) => {
-      const msg = raw as { type: string; projectId?: string; jobId?: string; cost?: number; threshold?: number; dailySpend?: number; budget?: number; queuePaused?: boolean; hubDailySpend?: number; hubBudget?: number }
+      const msg = raw as { type: string; projectId?: string; jobId?: string; cost?: number; threshold?: number; dailySpend?: number; budget?: number; queuePaused?: boolean; desktopDailySpend?: number; desktopBudget?: number }
       if (msg.projectId !== undefined && msg.projectId !== '' && msg.projectId !== projectIdRef.current) return
       if (msg.type === 'cost_alert') {
         toast.warning(t('costAlerts.costAlertTitle'), {
@@ -50,11 +50,11 @@ export function ProjectLayout({ project }: ProjectLayoutProps) {
           duration: Infinity,
         })
         setBudgetExceeded({ dailySpend: msg.dailySpend ?? 0, budget: msg.budget ?? 0 })
-      } else if (msg.type === 'hub_daily_budget_exceeded') {
-        toast.error(t('costAlerts.hubBudgetTitle'), {
-          description: t('costAlerts.hubBudgetDescription', {
-            spent: (msg.hubDailySpend ?? 0).toFixed(2),
-            budget: (msg.hubBudget ?? 0).toFixed(2),
+      } else if (msg.type === 'desktop_daily_budget_exceeded') {
+        toast.error(t('costAlerts.desktopBudgetTitle'), {
+          description: t('costAlerts.desktopBudgetDescription', {
+            spent: (msg.desktopDailySpend ?? 0).toFixed(2),
+            budget: (msg.desktopBudget ?? 0).toFixed(2),
           }),
           duration: Infinity,
         })

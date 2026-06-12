@@ -3,7 +3,7 @@
  *
  * Listens for the server-side `explore.contract_refine_failed` event and
  * `ticket_updated` events that carry a Contract Layer, surfacing them as
- * sonner toasts. Mounted at HubApp level so toasts work regardless of which
+ * sonner toasts. Mounted at DesktopApp level so toasts work regardless of which
  * page the user is on.
  *
  * Minimal v1: error toast with a Retry action that POSTs the refine

@@ -2,7 +2,7 @@ export type SpecsViewTier = 'row' | 'postit'
 
 export const DEFAULT_SPECS_VIEW_TIER: SpecsViewTier = 'postit'
 
-const KEY = (projectId: string) => `specrails-hub:specs-view-tier:${projectId}`
+const KEY = (projectId: string) => `specrails-desktop:specs-view-tier:${projectId}`
 
 function isTier(v: unknown): v is SpecsViewTier {
   return v === 'row' || v === 'postit'

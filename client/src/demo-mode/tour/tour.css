@@ -2,7 +2,7 @@
  * Tour-specific CSS keyframes. Loaded only from demo-entry.tsx so the
  * production client bundle does not include them.
  *
- * openspec: hub-demo-scripted-tour
+ * openspec: desktop-demo-scripted-tour
  */
 
 @keyframes tour-click-ring {
@@ -97,7 +97,7 @@ footer[class*="h-7"][class*="border-t"] {
 }
 
 /*
- * Hub-mode chrome we don't want in the demo: the custom tauri TitleBar,
+ * Super-mode chrome we don't want in the demo: the custom tauri TitleBar,
  * the left ArcSidebar (project switcher), and the right
  * ProjectRightSidebar. The tour is meant to showcase the Specs + Rails
  * workflow, so peripheral chrome only distracts.
@@ -106,7 +106,7 @@ footer[class*="h-7"][class*="border-t"] {
   display: none !important;
 }
 
-/* ArcSidebar: narrow left column inside HubApp (w-11 … flex-shrink-0) */
+/* ArcSidebar: narrow left column inside DesktopApp (w-11 … flex-shrink-0) */
 div[class*="w-11"][class*="flex-shrink-0"][class*="border-r"] {
   display: none !important;
 }

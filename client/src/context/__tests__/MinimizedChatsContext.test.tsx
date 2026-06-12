@@ -18,12 +18,12 @@ const fakeWs = {
   connectionStatus: 'connected' as const,
 }
 
-const STORAGE_KEY = 'specrails-hub:minimized-chats'
-const PENDING_KEY = 'specrails-hub:minimized-chats-pending'
+const STORAGE_KEY = 'specrails-desktop:minimized-chats'
+const PENDING_KEY = 'specrails-desktop:minimized-chats-pending'
 
-// ─── Hub mock ────────────────────────────────────────────────────────────
+// ─── Desktop mock ────────────────────────────────────────────────────────────
 
-const hubState = {
+const desktopState = {
   projects: [
     { id: 'p1', name: 'Alpha' },
     { id: 'p2', name: 'Beta' },
@@ -32,15 +32,15 @@ const hubState = {
   setupProjectIds: new Set<string>(),
 }
 const setActiveProjectIdSpy = vi.fn((id: string | null) => {
-  hubState.activeProjectId = id
+  desktopState.activeProjectId = id
 })
 
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({
-    projects: hubState.projects,
-    activeProjectId: hubState.activeProjectId,
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({
+    projects: desktopState.projects,
+    activeProjectId: desktopState.activeProjectId,
     setActiveProjectId: setActiveProjectIdSpy,
-    setupProjectIds: hubState.setupProjectIds,
+    setupProjectIds: desktopState.setupProjectIds,
   }),
 }))
 
@@ -142,12 +142,12 @@ function dockLabels(): string[] {
 describe('MinimizedChatsContext', () => {
   beforeEach(() => {
     localStorage.clear()
-    hubState.projects = [
+    desktopState.projects = [
       { id: 'p1', name: 'Alpha' },
       { id: 'p2', name: 'Beta' },
     ]
-    hubState.activeProjectId = 'p1'
-    hubState.setupProjectIds = new Set()
+    desktopState.activeProjectId = 'p1'
+    desktopState.setupProjectIds = new Set()
     setActiveProjectIdSpy.mockClear()
     spyRestoreCallback.mockClear()
   })
@@ -216,7 +216,7 @@ describe('MinimizedChatsContext', () => {
     await user.click(screen.getByTestId('do-minimize'))
     expect(screen.getByText('Test spec')).toBeTruthy()
 
-    hubState.projects = [{ id: 'p1', name: 'Alpha' }]
+    desktopState.projects = [{ id: 'p1', name: 'Alpha' }]
     rerender(
       <SharedWebSocketContext.Provider value={fakeWs}>
         <MemoryRouter initialEntries={['/']}>
@@ -443,7 +443,7 @@ describe('MinimizedChatsContext', () => {
     expect(screen.getByTestId('minimized-chats-dock')).toBeTruthy()
 
     // Active project enters setup → dock hidden (chat preserved in storage).
-    hubState.setupProjectIds = new Set(['p1'])
+    desktopState.setupProjectIds = new Set(['p1'])
     rerender(
       <SharedWebSocketContext.Provider value={fakeWs}>
         <MemoryRouter initialEntries={['/']}>
@@ -466,8 +466,8 @@ describe('MinimizedChatsContext', () => {
     await user.click(screen.getByTestId('do-minimize'))
     expect(screen.getByText(/Alpha/)).toBeTruthy()
 
-    // Project renamed in the hub — dock reads projects reactively.
-    hubState.projects = [
+    // Project renamed in the app — dock reads projects reactively.
+    desktopState.projects = [
       { id: 'p1', name: 'Alpha Renamed' },
       { id: 'p2', name: 'Beta' },
     ]

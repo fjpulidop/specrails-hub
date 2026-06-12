@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { shouldDeliverToSubscriber, parseSubscribeFrame } from './ws-routing'
 
 describe('shouldDeliverToSubscriber (H-09 project isolation)', () => {
-  it('delivers hub-level messages (no projectId) to everyone', () => {
+  it('delivers app-level messages (no projectId) to everyone', () => {
     expect(shouldDeliverToSubscriber(undefined, null)).toBe(true)
     expect(shouldDeliverToSubscriber(undefined, 'proj-a')).toBe(true)
   })

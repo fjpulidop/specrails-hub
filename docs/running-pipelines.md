@@ -111,7 +111,7 @@ Below: the full streaming log with auto-scroll, search, and copy.
 
 ### Cancelling a job
 
-Click **Stop** on the rail header. The hub sends `SIGTERM` to the subprocess, waits **5 s**, then `SIGKILL`.
+Click **Stop** on the rail header. The app sends `SIGTERM` to the subprocess, waits **5 s**, then `SIGKILL`.
 
 ### Diagnostic export
 
@@ -170,7 +170,7 @@ Click **Test** in the Studio to run the current draft against a sample task in a
 
 ### Requirements
 
-Profiles require `specrails-core ≥ 4.1.0` in the project. Without it, you can still create and edit profiles in the hub, but the pipeline runs in legacy mode (no env injection). A yellow banner on the Agents page tells you when to upgrade.
+Profiles require `specrails-core ≥ 4.1.0` in the project. Without it, you can still create and edit profiles in the app, but the pipeline runs in legacy mode (no env injection). A yellow banner on the Agents page tells you when to upgrade.
 
 For deeper internals (resolution order, snapshotting, file format), see [internals/profiles.md](internals/profiles.md).
 
@@ -180,7 +180,7 @@ Per-project bundled integrations. Click **Integrations** in the project's right 
 
 ### Bundled today
 
-- **Serena** — semantic code navigation via LSP + MCP. Requires `uv` on PATH (the hub auto-detects).
+- **Serena** — semantic code navigation via LSP + MCP. Requires `uv` on PATH (the app auto-detects).
 
 ### Installing a plugin
 
@@ -194,7 +194,7 @@ Each plugin tile has:
 
 ### How plugins affect your pipeline
 
-Before each rail spawn, the hub:
+Before each rail spawn, the app:
 
 1. Resolves the project's installed plugins (parallel verify, per-plugin 2 s timeout).
 2. Classifies them into `active` and `degraded`.
@@ -205,7 +205,7 @@ Degraded plugins are **non-blocking** — the rail spawns anyway, but a `plugin.
 
 ### Reserved paths
 
-The hub never wholesale rewrites these files:
+The app never wholesale rewrites these files:
 
 - `<project>/.mcp.json` — surgical merge per plugin.
 - `<project>/.specrails/plugins/state.json` — install registry.
@@ -229,12 +229,12 @@ The rail launches one `/specrails:batch-implement` job that works through every 
 If something looks wrong:
 
 - **One rail** — click **Stop** on the rail header.
-- **Auto-pause on budget** — if you set a daily budget (project or hub-wide), the queue automatically pauses once that day's spend hits the cap. Configure it under [Budget](customizing.md#budget).
-- **Everything** — quit the desktop app, or run `specrails-hub stop`.
+- **Auto-pause on budget** — if you set a daily budget (project or app-wide), the queue automatically pauses once that day's spend hits the cap. Configure it under [Budget](customizing.md#budget).
+- **Everything** — quit the desktop app, or run `specrails-desktop stop`.
 
 ## Where to go next
 
 - [Tracking cost](tracking-cost.md) — see what each rail run is costing you.
-- [Customising the hub](customizing.md) — daily budget, per-job alerts, telemetry.
+- [Customising the app](customizing.md) — daily budget, per-job alerts, telemetry.
 - [Using Codex](codex.md) — run rails on the Codex CLI.
 - [Agent profile internals](internals/profiles.md) — for power users.

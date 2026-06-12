@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '../../test-utils'
 import { MessageList } from '../MessageList'
 import type { ChatMessage } from '../../types'
-import type { HubProject } from '../../hooks/useHub'
+import type { DesktopProject } from '../../hooks/useDesktop'
 
 vi.mock('react-markdown', () => ({
   default: ({ children }: { children: string }) => <span>{children}</span>,
@@ -12,7 +12,7 @@ vi.mock('remark-gfm', () => ({ default: () => {} }))
 
 const noOp = vi.fn()
 
-const mockProject: HubProject = {
+const mockProject: DesktopProject = {
   id: 'proj-1',
   slug: 'test-project',
   name: 'Test Project',

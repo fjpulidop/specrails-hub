@@ -5,12 +5,12 @@
 /**
  * Decide whether a broadcast message should be delivered to a given connection.
  *
- * - Hub-level messages (no projectId) go to everyone.
+ * - App-level messages (no projectId) go to everyone.
  * - A connection that has NOT declared a subscription (`subscribedProjectId`
  *   null) receives everything — back-compat with the current web client, whose
  *   own client-side filter remains as a redundant second layer.
  * - A connection subscribed to project P receives only P's project-scoped
- *   messages (plus all hub-level ones).
+ *   messages (plus all app-level ones).
  *
  * The Mobile Gateway turns this into a hard authorization boundary by always
  * subscribing each device connection to exactly the project(s) it may see.

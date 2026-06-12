@@ -1,5 +1,5 @@
-# SpecRails Hub — zsh shell-integration shim
-# Loaded via ZDOTDIR override when the user spawns a terminal in the hub.
+# Specrails — zsh shell-integration shim
+# Loaded via ZDOTDIR override when the user spawns a terminal in the app.
 # Sources the user's real login files, then layers OSC 133 / OSC 1337 hooks on top.
 
 # Sentinel so the server can detect bootstrap success.

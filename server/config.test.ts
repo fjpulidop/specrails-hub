@@ -161,7 +161,7 @@ describe('getConfig', () => {
     expect(config.issueTracker.active).toBe('github')
   })
 
-  it('uses hub mode when .claude directory exists at cwd', () => {
+  it('uses Super mode when .claude directory exists at cwd', () => {
     existsSyncSpy.mockImplementation((p: unknown) => String(p).endsWith('.claude'))
     readdirSyncSpy.mockReturnValue([])
 

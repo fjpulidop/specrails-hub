@@ -1,10 +1,10 @@
 /**
  * Returns the base URL prefix for project-scoped API calls.
  *
- * The hub server is the only supported runtime; this helper always returns
+ * The Super-mode server is the only supported runtime; this helper always returns
  * `${API_ORIGIN}/api/projects/<activeProjectId>`. Callers must set the active
  * project via `setActiveProjectId` before using the helper. Endpoints that are
- * not project-scoped (e.g. `/api/hub/*`, `/api/health`) should reference
+ * not project-scoped (e.g. `/api/*`, `/api/health`) should reference
  * `API_ORIGIN` directly instead of going through `getApiBase`.
  */
 

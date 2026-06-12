@@ -67,7 +67,7 @@ describe('useDesktopUpdateNotifier', () => {
 
     const [, options] = customMock.mock.calls[0]
     expect(options).toMatchObject({
-      id: 'specrails-hub-desktop-update',
+      id: 'specrails-desktop-desktop-update',
       duration: Infinity,
       dismissible: false,
       unstyled: true,
@@ -76,7 +76,7 @@ describe('useDesktopUpdateNotifier', () => {
   })
 
   it('does not surface a toast for a previously-dismissed version', async () => {
-    localStorage.setItem('specrails-hub:dismissedDesktopUpdateVersion', '99.0.0-test')
+    localStorage.setItem('specrails-desktop:dismissedDesktopUpdateVersion', '99.0.0-test')
     renderHook(() => useDesktopUpdateNotifier())
 
     await new Promise((resolve) => setTimeout(resolve, 30))
@@ -220,7 +220,7 @@ describe('DesktopUpdateToast', () => {
     const restart = await screen.findByRole('button', { name: 'Restart' })
     fireEvent.click(restart)
     expect(successMock).toHaveBeenCalled()
-    expect(dismissMock).toHaveBeenCalledWith('specrails-hub-desktop-update')
+    expect(dismissMock).toHaveBeenCalledWith('specrails-desktop-desktop-update')
     expect(invokeMock).not.toHaveBeenCalled()
   })
 
@@ -245,8 +245,8 @@ describe('DesktopUpdateToast', () => {
     render(<DesktopUpdateToast update={createTauriUpdate()} onClose={onClose} />)
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
 
-    expect(localStorage.getItem('specrails-hub:dismissedDesktopUpdateVersion')).toBe('99.0.0-test')
-    expect(dismissMock).toHaveBeenCalledWith('specrails-hub-desktop-update')
+    expect(localStorage.getItem('specrails-desktop:dismissedDesktopUpdateVersion')).toBe('99.0.0-test')
+    expect(dismissMock).toHaveBeenCalledWith('specrails-desktop-desktop-update')
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -263,8 +263,8 @@ describe('DesktopUpdateToast', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Update' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Later' }))
 
-    expect(dismissMock).toHaveBeenCalledWith('specrails-hub-desktop-update')
-    expect(localStorage.getItem('specrails-hub:dismissedDesktopUpdateVersion')).toBeNull()
+    expect(dismissMock).toHaveBeenCalledWith('specrails-desktop-desktop-update')
+    expect(localStorage.getItem('specrails-desktop:dismissedDesktopUpdateVersion')).toBeNull()
     expect(onClose).toHaveBeenCalled()
   })
 })

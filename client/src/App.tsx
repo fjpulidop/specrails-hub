@@ -20,7 +20,7 @@ const ActivityFeedPage = lazy(() => import('./pages/ActivityFeedPage'))
 const AgentsPage = lazy(() => import('./pages/AgentsPage'))
 const CodePage = lazy(() => import('./pages/CodePage'))
 const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage'))
-const HubAnalyticsPage = lazy(() => import('./pages/HubAnalyticsPage'))
+const DesktopAnalyticsPage = lazy(() => import('./pages/DesktopAnalyticsPage'))
 const DocsPage = lazy(() => import('./pages/DocsPage'))
 const DocsDialog = lazy(() => import('./components/DocsDialog'))
 import { ProjectLayout } from './components/ProjectLayout'
@@ -34,7 +34,7 @@ import { AddProjectDialog } from './components/AddProjectDialog'
 import { SidebarPinProvider, useSidebarPin } from './context/SidebarPinContext'
 import { CommandPalette } from './components/CommandPalette'
 import { SharedWebSocketProvider } from './hooks/useSharedWebSocket'
-import { HubProvider, useHub } from './hooks/useHub'
+import { DesktopProvider, useDesktop } from './hooks/useDesktop'
 import { SpecGenTrackerProvider } from './hooks/useSpecGenTracker'
 import { ContractRefineTrackerProvider } from './hooks/useContractRefineTracker'
 import { SmashTrackerProvider } from './context/SmashTrackerContext'
@@ -57,7 +57,7 @@ const ROUTE_MEMORY_EXCLUDE = new Set<string>(['/settings'])
 
 // One-time cleanup of legacy persisted route memory so users upgrading from a
 // version that wrote to localStorage don't keep their stale "last visited" routes.
-const LEGACY_ROUTE_MEMORY_KEY = 'specrails-hub:routeMemory'
+const LEGACY_ROUTE_MEMORY_KEY = 'specrails-desktop:routeMemory'
 try { localStorage.removeItem(LEGACY_ROUTE_MEMORY_KEY) } catch { /* ignore */ }
 
 function useProjectRouteMemory(activeProjectId: string | null) {
@@ -119,11 +119,11 @@ function useProjectRouteMemory(activeProjectId: string | null) {
   }, [activeProjectId, location.pathname])
 }
 
-// ─── Hub app shell ────────────────────────────────────────────────────────────
+// ─── Desktop app shell ────────────────────────────────────────────────────────────
 
-function HubApp() {
+function DesktopApp() {
   const { t } = useTranslation('common')
-  const { projects, activeProjectId, isLoading, isSwitchingProject, setupProjectIds, completeSetupWizard, setActiveProjectId } = useHub()
+  const { projects, activeProjectId, isLoading, isSwitchingProject, setupProjectIds, completeSetupWizard, setActiveProjectId } = useDesktop()
   const { cycleLeftMode, cycleRightMode } = useSidebarPin()
   const navigate = useNavigate()
   const terminals = useTerminals()
@@ -134,7 +134,7 @@ function HubApp() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [analyticsOpen, setAnalyticsOpen] = useState(false)
   const [docsOpen, setDocsOpen] = useState(false)
-  // Stable onClose so memoised DocsDialog doesn't re-render every HubApp render.
+  // Stable onClose so memoised DocsDialog doesn't re-render every DesktopApp render.
   const closeDocs = useCallback(() => setDocsOpen(false), [])
   const [onboardingOpen, setOnboardingOpen] = useState(() => !hasSeenOnboarding())
 
@@ -272,7 +272,7 @@ function HubApp() {
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
           <div className="flex-1 overflow-auto">
             <Suspense fallback={<div className="flex items-center justify-center h-40"><p className="text-sm text-muted-foreground">{t('states.loading')}</p></div>}>
-              <HubAnalyticsPage />
+              <DesktopAnalyticsPage />
             </Suspense>
           </div>
         </DialogContent>
@@ -293,10 +293,10 @@ function HubApp() {
   )
 }
 
-// ─── Terminals provider wrapper (reads active project from useHub) ───────────
+// ─── Terminals provider wrapper (reads active project from useDesktop) ───────────
 
-function TerminalsProviderWithHub({ children }: { children: React.ReactNode }) {
-  const { activeProjectId } = useHub()
+function TerminalsProviderWithDesktop({ children }: { children: React.ReactNode }) {
+  const { activeProjectId } = useDesktop()
   return <TerminalsProvider activeProjectId={activeProjectId}>{children}</TerminalsProvider>
 }
 
@@ -392,26 +392,26 @@ export default function App() {
                 renders the matching effect or nothing. See
                 `components/theme-effects/ThemeEffectLayer.tsx`. */}
             <ThemeEffectLayer />
-            <HubProvider>
-              {/* Custom frameless titlebar inside HubProvider so it can read active project */}
+            <DesktopProvider>
+              {/* Custom frameless titlebar inside DesktopProvider so it can read active project */}
               <TitleBar />
               <SpecGenTrackerProvider>
                 <ContractRefineTrackerProvider>
                 <SmashTrackerProvider>
                 <SidebarPinProvider>
-                  <TerminalsProviderWithHub>
+                  <TerminalsProviderWithDesktop>
                     <MinimizedChatsProvider>
                       <TicketDetailModalProvider>
-                        <HubApp />
+                        <DesktopApp />
                         <ThemedToaster />
                       </TicketDetailModalProvider>
                     </MinimizedChatsProvider>
-                  </TerminalsProviderWithHub>
+                  </TerminalsProviderWithDesktop>
                 </SidebarPinProvider>
                 </SmashTrackerProvider>
                 </ContractRefineTrackerProvider>
               </SpecGenTrackerProvider>
-            </HubProvider>
+            </DesktopProvider>
             </LanguageProvider>
           </ThemeProvider>
         </SharedWebSocketProvider>

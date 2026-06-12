@@ -19,7 +19,7 @@ export type ThemeId = (typeof THEME_IDS)[number]
  * Type guard usable client + server side. Server validates incoming PATCH
  * payloads against the same allow-list; we keep the source-of-truth list in
  * this client module and import a synchronized server-side copy in
- * `server/hub-router.ts`.
+ * `server/desktop-router.ts`.
  */
 export function isThemeId(v: unknown): v is ThemeId {
   return typeof v === 'string' && (THEME_IDS as readonly string[]).includes(v)
@@ -402,4 +402,4 @@ export function getTheme(id: ThemeId): ThemeDescriptor {
 }
 
 /** localStorage key used by the anti-FOUC boot script and ThemeContext mirror. */
-export const THEME_LOCAL_STORAGE_KEY = 'specrails-hub:ui-theme'
+export const THEME_LOCAL_STORAGE_KEY = 'specrails-desktop:ui-theme'

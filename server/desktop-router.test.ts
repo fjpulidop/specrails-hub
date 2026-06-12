@@ -26,18 +26,18 @@ vi.mock('./specrails-tech-client', () => ({
   createSpecrailsTechClient: vi.fn(() => mockSpecrailsTechClient),
 }))
 
-import { createHubRouter } from './hub-router'
-import { initHubDb, addProject, removeProject as removeProjectFromHub, getHubSetting, setHubSetting, addAgent, getAgent, addWebhook } from './hub-db'
+import { createDesktopRouter } from './desktop-router'
+import { initDesktopDb, addProject, removeProject as removeProjectFromDesktopDb, getDesktopSetting, setDesktopSetting, addAgent, getAgent, addWebhook } from './desktop-db'
 import { initDb } from './db'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import type { WsMessage } from './types'
 import type { DbInstance } from './db'
 
-function createMockRegistry(hubDb: DbInstance) {
+function createMockRegistry(desktopDb: DbInstance) {
   const contexts = new Map<string, any>()
 
   const registry = {
-    hubDb,
+    desktopDb,
     getContext: vi.fn((id: string) => contexts.get(id)),
     getContextByPath: vi.fn((projectPath: string) => {
       for (const ctx of contexts.values()) {
@@ -46,7 +46,7 @@ function createMockRegistry(hubDb: DbInstance) {
       return undefined
     }),
     addProject: vi.fn((opts: { id: string; slug: string; name: string; path: string }) => {
-      const row = addProject(hubDb, opts)
+      const row = addProject(desktopDb, opts)
       const ctx = {
         project: row,
         db: {} as any,
@@ -61,7 +61,7 @@ function createMockRegistry(hubDb: DbInstance) {
     }),
     removeProject: vi.fn((id: string) => {
       contexts.delete(id)
-      removeProjectFromHub(hubDb, id)
+      removeProjectFromDesktopDb(desktopDb, id)
     }),
     touchProject: vi.fn(),
     listContexts: vi.fn(() => Array.from(contexts.values())),
@@ -70,44 +70,44 @@ function createMockRegistry(hubDb: DbInstance) {
   return { registry, contexts }
 }
 
-describe('hub-router', () => {
-  let hubDb: DbInstance
+describe('desktop-router', () => {
+  let desktopDb: DbInstance
   let existsSyncSpy: any
   let realpathSyncSpy: any
 
   beforeEach(() => {
     vi.restoreAllMocks()
-    hubDb = initHubDb(':memory:')
+    desktopDb = initDesktopDb(':memory:')
     // Spy on fs.existsSync so the router's `fs.existsSync(resolvedPath)` is intercepted
     existsSyncSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(true)
     realpathSyncSpy = vi.spyOn(fs, 'realpathSync').mockImplementation((p: fs.PathLike) => String(p))
   })
 
   function createApp() {
-    const { registry, contexts } = createMockRegistry(hubDb)
+    const { registry, contexts } = createMockRegistry(desktopDb)
     const broadcast = vi.fn()
-    const router = createHubRouter(registry, broadcast)
+    const router = createDesktopRouter(registry, broadcast)
     const app = express()
     app.use(express.json())
-    app.use('/api/hub', router)
+    app.use('/api', router)
     return { app, registry, broadcast, contexts }
   }
 
   // ─── GET /projects ──────────────────────────────────────────────────────────
 
-  describe('GET /api/hub/projects', () => {
+  describe('GET /api/projects', () => {
     it('returns empty projects list', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/projects')
+      const res = await request(app).get('/api/projects')
       expect(res.status).toBe(200)
       expect(res.body.projects).toEqual([])
       expect(res.body.setupProjectIds).toEqual([])
     })
 
     it('returns registered projects', async () => {
-      addProject(hubDb, { id: 'p1', slug: 'proj-1', name: 'Project 1', path: '/path/1' })
+      addProject(desktopDb, { id: 'p1', slug: 'proj-1', name: 'Project 1', path: '/path/1' })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/projects')
+      const res = await request(app).get('/api/projects')
       expect(res.status).toBe(200)
       expect(res.body.projects).toHaveLength(1)
       expect(res.body.projects[0].slug).toBe('proj-1')
@@ -116,31 +116,31 @@ describe('hub-router', () => {
 
   // ─── POST /projects ────────────────────────────────────────────────────────
 
-  describe('POST /api/hub/projects', () => {
+  describe('POST /api/projects', () => {
     it('returns 400 when path is missing', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({})
+      const res = await request(app).post('/api/projects').send({})
       expect(res.status).toBe(400)
       expect(res.body.error).toContain('path is required')
     })
 
     it('returns 400 when path is not a string', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({ path: 123 })
+      const res = await request(app).post('/api/projects').send({ path: 123 })
       expect(res.status).toBe(400)
     })
 
     it('returns 400 when path does not exist on filesystem', async () => {
       existsSyncSpy.mockReturnValue(false)
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({ path: '/nonexistent' })
+      const res = await request(app).post('/api/projects').send({ path: '/nonexistent' })
       expect(res.status).toBe(400)
       expect(res.body.error).toContain('does not exist')
     })
 
     it('creates project with derived name from path', async () => {
       const { app, broadcast } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({ path: '/home/user/my-project' })
+      const res = await request(app).post('/api/projects').send({ path: '/home/user/my-project' })
       expect(res.status).toBe(201)
       expect(res.body.project).toBeDefined()
       expect(res.body.project.name).toBe('my-project')
@@ -149,7 +149,7 @@ describe('hub-router', () => {
 
     it('creates project with custom name', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({
+      const res = await request(app).post('/api/projects').send({
         path: '/home/user/my-project',
         name: 'Custom Name',
       })
@@ -159,25 +159,25 @@ describe('hub-router', () => {
 
     it('returns 409 when path is already registered', async () => {
       const { app } = createApp()
-      await request(app).post('/api/hub/projects').send({ path: '/home/user/my-project' })
-      const res = await request(app).post('/api/hub/projects').send({ path: '/home/user/my-project' })
+      await request(app).post('/api/projects').send({ path: '/home/user/my-project' })
+      const res = await request(app).post('/api/projects').send({ path: '/home/user/my-project' })
       expect(res.status).toBe(409)
     })
 
     it('includes has_specrails in response', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({ path: '/home/user/proj' })
+      const res = await request(app).post('/api/projects').send({ path: '/home/user/proj' })
       expect(res.status).toBe(201)
       expect(res.body.has_specrails).toBeDefined()
     })
 
-    it('broadcasts hub.project_added on success', async () => {
+    it('broadcasts desktop.project_added on success', async () => {
       const { app, broadcast } = createApp()
-      await request(app).post('/api/hub/projects').send({ path: '/home/user/proj' })
+      await request(app).post('/api/projects').send({ path: '/home/user/proj' })
 
       const addMsgs = broadcast.mock.calls
         .map((c: any) => c[0])
-        .filter((m: any) => m.type === 'hub.project_added')
+        .filter((m: any) => m.type === 'desktop.project_added')
       expect(addMsgs).toHaveLength(1)
       expect(addMsgs[0].project).toBeDefined()
     })
@@ -185,14 +185,14 @@ describe('hub-router', () => {
     it('stores canonical project path when realpath differs', async () => {
       realpathSyncSpy.mockReturnValue('/private/tmp/test-wizard')
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({ path: '/tmp/test-wizard' })
+      const res = await request(app).post('/api/projects').send({ path: '/tmp/test-wizard' })
       expect(res.status).toBe(201)
       expect(res.body.project.path).toBe('/private/tmp/test-wizard')
     })
 
     it('defaults to providers=["claude"] when no provider is sent', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({ path: '/home/user/single' })
+      const res = await request(app).post('/api/projects').send({ path: '/home/user/single' })
       expect(res.status).toBe(201)
       expect(res.body.project.provider).toBe('claude')
       expect(res.body.project.providers).toEqual(['claude'])
@@ -200,7 +200,7 @@ describe('hub-router', () => {
 
     it('accepts a providers array and sets the first as primary', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({ path: '/home/user/multi', providers: ['claude', 'codex'] })
+      const res = await request(app).post('/api/projects').send({ path: '/home/user/multi', providers: ['claude', 'codex'] })
       expect(res.status).toBe(201)
       expect(res.body.project.provider).toBe('claude')
       expect(res.body.project.providers).toEqual(['claude', 'codex'])
@@ -208,7 +208,7 @@ describe('hub-router', () => {
 
     it('honours a legacy single provider field', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({ path: '/home/user/legacy', provider: 'codex' })
+      const res = await request(app).post('/api/projects').send({ path: '/home/user/legacy', provider: 'codex' })
       expect(res.status).toBe(201)
       expect(res.body.project.provider).toBe('codex')
       expect(res.body.project.providers).toEqual(['codex'])
@@ -216,14 +216,14 @@ describe('hub-router', () => {
 
     it('de-duplicates repeated providers', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({ path: '/home/user/dup', providers: ['claude', 'claude', 'codex'] })
+      const res = await request(app).post('/api/projects').send({ path: '/home/user/dup', providers: ['claude', 'claude', 'codex'] })
       expect(res.status).toBe(201)
       expect(res.body.project.providers).toEqual(['claude', 'codex'])
     })
 
     it('rejects an unknown provider in the array', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({ path: '/home/user/bad', providers: ['claude', 'turbofake'] })
+      const res = await request(app).post('/api/projects').send({ path: '/home/user/bad', providers: ['claude', 'turbofake'] })
       expect(res.status).toBe(400)
       expect(res.body.error).toMatch(/provider must be one of/i)
     })
@@ -231,25 +231,25 @@ describe('hub-router', () => {
 
   // ─── DELETE /projects/:id ──────────────────────────────────────────────────
 
-  describe('DELETE /api/hub/projects/:id', () => {
+  describe('DELETE /api/projects/:id', () => {
     it('returns 404 for non-existent project', async () => {
       const { app } = createApp()
-      const res = await request(app).delete('/api/hub/projects/nonexistent')
+      const res = await request(app).delete('/api/projects/nonexistent')
       expect(res.status).toBe(404)
     })
 
-    it('removes project and broadcasts hub.project_removed', async () => {
+    it('removes project and broadcasts desktop.project_removed', async () => {
       const { app, broadcast } = createApp()
-      const createRes = await request(app).post('/api/hub/projects').send({ path: '/home/user/proj' })
+      const createRes = await request(app).post('/api/projects').send({ path: '/home/user/proj' })
       const id = createRes.body.project.id
 
-      const res = await request(app).delete(`/api/hub/projects/${id}`)
+      const res = await request(app).delete(`/api/projects/${id}`)
       expect(res.status).toBe(200)
       expect(res.body.ok).toBe(true)
 
       const removeMsgs = broadcast.mock.calls
         .map((c: any) => c[0])
-        .filter((m: any) => m.type === 'hub.project_removed')
+        .filter((m: any) => m.type === 'desktop.project_removed')
       expect(removeMsgs).toHaveLength(1)
       expect(removeMsgs[0].projectId).toBe(id)
     })
@@ -257,11 +257,11 @@ describe('hub-router', () => {
 
   // ─── GET /state ─────────────────────────────────────────────────────────────
 
-  describe('GET /api/hub/state', () => {
+  describe('GET /api/state', () => {
     it('returns state with project count', async () => {
-      addProject(hubDb, { id: 'p1', slug: 'proj-1', name: 'Project 1', path: '/path/1' })
+      addProject(desktopDb, { id: 'p1', slug: 'proj-1', name: 'Project 1', path: '/path/1' })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/state')
+      const res = await request(app).get('/api/state')
       expect(res.status).toBe(200)
       expect(res.body.projectCount).toBe(1)
       expect(res.body.projects).toHaveLength(1)
@@ -270,16 +270,16 @@ describe('hub-router', () => {
 
   // ─── GET /resolve ──────────────────────────────────────────────────────────
 
-  describe('GET /api/hub/resolve', () => {
+  describe('GET /api/resolve', () => {
     it('returns 400 when path query is missing', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/resolve')
+      const res = await request(app).get('/api/resolve')
       expect(res.status).toBe(400)
     })
 
     it('returns 404 for unregistered path', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/resolve?path=/unknown')
+      const res = await request(app).get('/api/resolve?path=/unknown')
       expect(res.status).toBe(404)
     })
 
@@ -290,9 +290,9 @@ describe('hub-router', () => {
       })
       const { app, registry } = createApp()
       // Create a project first
-      await request(app).post('/api/hub/projects').send({ path: '/tmp/test-wizard' })
+      await request(app).post('/api/projects').send({ path: '/tmp/test-wizard' })
 
-      const res = await request(app).get('/api/hub/resolve?path=/tmp/test-wizard')
+      const res = await request(app).get('/api/resolve?path=/tmp/test-wizard')
       expect(res.status).toBe(200)
       expect(res.body.project).toBeDefined()
       expect(registry.touchProject).toHaveBeenCalled()
@@ -301,18 +301,18 @@ describe('hub-router', () => {
 
   // ─── GET /agents ────────────────────────────────────────────────────────────
 
-  describe('GET /api/hub/agents', () => {
+  describe('GET /api/agents', () => {
     it('returns empty agents list', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/agents')
+      const res = await request(app).get('/api/agents')
       expect(res.status).toBe(200)
       expect(res.body.agents).toEqual([])
     })
 
     it('returns registered agents', async () => {
-      addAgent(hubDb, { id: 'a1', slug: 'my-agent', name: 'My Agent' })
+      addAgent(desktopDb, { id: 'a1', slug: 'my-agent', name: 'My Agent' })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/agents')
+      const res = await request(app).get('/api/agents')
       expect(res.status).toBe(200)
       expect(res.body.agents).toHaveLength(1)
       expect(res.body.agents[0].slug).toBe('my-agent')
@@ -321,17 +321,17 @@ describe('hub-router', () => {
 
   // ─── GET /agents/:id ────────────────────────────────────────────────────────
 
-  describe('GET /api/hub/agents/:id', () => {
+  describe('GET /api/agents/:id', () => {
     it('returns 404 for non-existent agent', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/agents/nonexistent')
+      const res = await request(app).get('/api/agents/nonexistent')
       expect(res.status).toBe(404)
     })
 
     it('returns agent by ID', async () => {
-      addAgent(hubDb, { id: 'a1', slug: 'my-agent', name: 'My Agent' })
+      addAgent(desktopDb, { id: 'a1', slug: 'my-agent', name: 'My Agent' })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/agents/a1')
+      const res = await request(app).get('/api/agents/a1')
       expect(res.status).toBe(200)
       expect(res.body.agent.id).toBe('a1')
       expect(res.body.agent.status).toBe('idle')
@@ -340,24 +340,24 @@ describe('hub-router', () => {
 
   // ─── POST /agents ────────────────────────────────────────────────────────────
 
-  describe('POST /api/hub/agents', () => {
+  describe('POST /api/agents', () => {
     it('returns 400 when slug is missing', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/agents').send({ name: 'Foo' })
+      const res = await request(app).post('/api/agents').send({ name: 'Foo' })
       expect(res.status).toBe(400)
       expect(res.body.error).toContain('slug is required')
     })
 
     it('returns 400 when name is missing', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/agents').send({ slug: 'foo' })
+      const res = await request(app).post('/api/agents').send({ slug: 'foo' })
       expect(res.status).toBe(400)
       expect(res.body.error).toContain('name is required')
     })
 
     it('creates agent with required fields', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/agents').send({ slug: 'my-agent', name: 'My Agent' })
+      const res = await request(app).post('/api/agents').send({ slug: 'my-agent', name: 'My Agent' })
       expect(res.status).toBe(201)
       expect(res.body.agent.slug).toBe('my-agent')
       expect(res.body.agent.name).toBe('My Agent')
@@ -366,7 +366,7 @@ describe('hub-router', () => {
 
     it('creates agent with optional role and config', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/agents').send({
+      const res = await request(app).post('/api/agents').send({
         slug: 'dev-agent',
         name: 'Dev Agent',
         role: 'developer',
@@ -377,27 +377,27 @@ describe('hub-router', () => {
     })
 
     it('returns 409 when slug is already registered', async () => {
-      addAgent(hubDb, { id: 'a1', slug: 'my-agent', name: 'My Agent' })
+      addAgent(desktopDb, { id: 'a1', slug: 'my-agent', name: 'My Agent' })
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/agents').send({ slug: 'my-agent', name: 'Other' })
+      const res = await request(app).post('/api/agents').send({ slug: 'my-agent', name: 'Other' })
       expect(res.status).toBe(409)
     })
   })
 
   // ─── PATCH /agents/:id ──────────────────────────────────────────────────────
 
-  describe('PATCH /api/hub/agents/:id', () => {
+  describe('PATCH /api/agents/:id', () => {
     it('returns 404 for non-existent agent', async () => {
       const { app } = createApp()
-      const res = await request(app).patch('/api/hub/agents/missing').send({ status: 'busy' })
+      const res = await request(app).patch('/api/agents/missing').send({ status: 'busy' })
       expect(res.status).toBe(404)
     })
 
     it('updates agent status and current_job_id', async () => {
-      addAgent(hubDb, { id: 'a1', slug: 'my-agent', name: 'My Agent' })
+      addAgent(desktopDb, { id: 'a1', slug: 'my-agent', name: 'My Agent' })
       const { app } = createApp()
       const res = await request(app)
-        .patch('/api/hub/agents/a1')
+        .patch('/api/agents/a1')
         .send({ status: 'busy', current_job_id: 'job-xyz' })
       expect(res.status).toBe(200)
       expect(res.body.agent.status).toBe('busy')
@@ -405,17 +405,17 @@ describe('hub-router', () => {
     })
 
     it('persists updates to the DB', async () => {
-      addAgent(hubDb, { id: 'a1', slug: 'my-agent', name: 'My Agent' })
+      addAgent(desktopDb, { id: 'a1', slug: 'my-agent', name: 'My Agent' })
       const { app } = createApp()
-      await request(app).patch('/api/hub/agents/a1').send({ name: 'Renamed' })
-      const row = getAgent(hubDb, 'a1')
+      await request(app).patch('/api/agents/a1').send({ name: 'Renamed' })
+      const row = getAgent(desktopDb, 'a1')
       expect(row?.name).toBe('Renamed')
     })
 
     it('returns updated agent with no body changes', async () => {
-      addAgent(hubDb, { id: 'a1', slug: 'my-agent', name: 'My Agent' })
+      addAgent(desktopDb, { id: 'a1', slug: 'my-agent', name: 'My Agent' })
       const { app } = createApp()
-      const res = await request(app).patch('/api/hub/agents/a1').send({})
+      const res = await request(app).patch('/api/agents/a1').send({})
       expect(res.status).toBe(200)
       expect(res.body.agent.id).toBe('a1')
     })
@@ -423,18 +423,18 @@ describe('hub-router', () => {
 
   // ─── GET /settings ─────────────────────────────────────────────────────────
 
-  describe('GET /api/hub/settings', () => {
+  describe('GET /api/settings', () => {
     it('returns default port 4200', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/settings')
+      const res = await request(app).get('/api/settings')
       expect(res.status).toBe(200)
       expect(res.body.port).toBe(4200)
     })
 
     it('returns persisted port setting', async () => {
-      setHubSetting(hubDb, 'port', '8080')
+      setDesktopSetting(desktopDb, 'port', '8080')
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/settings')
+      const res = await request(app).get('/api/settings')
       expect(res.status).toBe(200)
       expect(res.body.port).toBe(8080)
     })
@@ -442,44 +442,44 @@ describe('hub-router', () => {
 
   // ─── PUT /settings ─────────────────────────────────────────────────────────
 
-  describe('PUT /api/hub/settings', () => {
+  describe('PUT /api/settings', () => {
     it('updates port setting', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .put('/api/hub/settings')
+        .put('/api/settings')
         .send({ port: 9090 })
       expect(res.status).toBe(200)
       expect(res.body.ok).toBe(true)
-      expect(getHubSetting(hubDb, 'port')).toBe('9090')
+      expect(getDesktopSetting(desktopDb, 'port')).toBe('9090')
     })
 
     it('returns ok even with empty body', async () => {
       const { app } = createApp()
-      const res = await request(app).put('/api/hub/settings').send({})
+      const res = await request(app).put('/api/settings').send({})
       expect(res.status).toBe(200)
       expect(res.body.ok).toBe(true)
     })
 
     it('rejects a non-numeric port with 400 and does not persist garbage', async () => {
       const { app } = createApp()
-      const res = await request(app).put('/api/hub/settings').send({ port: 'abc' })
+      const res = await request(app).put('/api/settings').send({ port: 'abc' })
       expect(res.status).toBe(400)
-      expect(getHubSetting(hubDb, 'port')).toBeUndefined()
+      expect(getDesktopSetting(desktopDb, 'port')).toBeUndefined()
     })
 
     it('rejects an out-of-range port with 400', async () => {
       const { app } = createApp()
-      const res = await request(app).put('/api/hub/settings').send({ port: 70000 })
+      const res = await request(app).put('/api/settings').send({ port: 70000 })
       expect(res.status).toBe(400)
     })
   })
 
   // ─── GET /recent-jobs ───────────────────────────────────────────────────────
 
-  describe('GET /api/hub/recent-jobs', () => {
+  describe('GET /api/recent-jobs', () => {
     it('returns empty list when no projects have jobs', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/recent-jobs')
+      const res = await request(app).get('/api/recent-jobs')
       expect(res.status).toBe(200)
       expect(res.body.jobs).toEqual([])
     })
@@ -503,7 +503,7 @@ describe('hub-router', () => {
         broadcast: vi.fn(),
       })
 
-      const res = await request(app).get('/api/hub/recent-jobs')
+      const res = await request(app).get('/api/recent-jobs')
       expect(res.status).toBe(200)
       expect(res.body.jobs).toHaveLength(1)
       expect(res.body.jobs[0].projectId).toBe('p1')
@@ -526,31 +526,31 @@ describe('hub-router', () => {
         queueManager: {} as any, chatManager: {} as any, setupManager: {} as any, proposalManager: {} as any, broadcast: vi.fn(),
       })
 
-      const res = await request(app).get('/api/hub/recent-jobs?limit=3')
+      const res = await request(app).get('/api/recent-jobs?limit=3')
       expect(res.status).toBe(200)
       expect(res.body.jobs).toHaveLength(3)
     })
   })
 
-  // ─── GET /api/hub/cli-status ────────────────────────────────────────────────
+  // ─── GET /api/cli-status ────────────────────────────────────────────────
 
-  describe('GET /api/hub/cli-status', () => {
+  describe('GET /api/cli-status', () => {
     it('returns provider and version from getCLIStatus', async () => {
       const { app } = createApp()
 
-      const res = await request(app).get('/api/hub/cli-status')
+      const res = await request(app).get('/api/cli-status')
       expect(res.status).toBe(200)
       expect(res.body.provider).toBe('claude')
       expect(res.body.version).toBe('1.2.3')
     })
   })
 
-  // ─── GET /api/hub/available-providers ───────────────────────────────────────
+  // ─── GET /api/available-providers ───────────────────────────────────────
 
-  describe('GET /api/hub/available-providers', () => {
+  describe('GET /api/available-providers', () => {
     it('returns available CLI providers (codex forced to false — coming soon)', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/available-providers')
+      const res = await request(app).get('/api/available-providers')
       expect(res.status).toBe(200)
       expect(res.body).toHaveProperty('claude')
       expect(res.body).toHaveProperty('codex')
@@ -560,10 +560,10 @@ describe('hub-router', () => {
 
   // ─── POST /projects — provider validation ───────────────────────────────────
 
-  describe('POST /api/hub/projects — provider field', () => {
+  describe('POST /api/projects — provider field', () => {
     it('returns 400 for invalid provider value', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({
+      const res = await request(app).post('/api/projects').send({
         path: '/home/user/proj',
         provider: 'gemini',
       })
@@ -577,7 +577,7 @@ describe('hub-router', () => {
       // dir under tmp so the registry validation passes.
       const projectPath = fs.mkdtempSync(path.join(require('os').tmpdir(), 'codex-project-'))
       try {
-        const res = await request(app).post('/api/hub/projects').send({
+        const res = await request(app).post('/api/projects').send({
           path: projectPath,
           provider: 'codex',
         })
@@ -590,7 +590,7 @@ describe('hub-router', () => {
 
     it('rejects unknown provider id with a clear allow-list error', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({
+      const res = await request(app).post('/api/projects').send({
         path: '/tmp/whatever',
         provider: 'turbofake',
       })
@@ -598,119 +598,144 @@ describe('hub-router', () => {
       expect(res.body.error).toMatch(/provider must be one of:.*claude.*codex/)
     })
 
-    it('SPECRAILS_HUB_CODEX_BETA=0 env var disables codex acceptance', async () => {
-      const prev = process.env.SPECRAILS_HUB_CODEX_BETA
-      process.env.SPECRAILS_HUB_CODEX_BETA = '0'
+    it('SPECRAILS_CODEX_BETA=0 env var disables codex acceptance', async () => {
+      const prev = process.env.SPECRAILS_CODEX_BETA
+      process.env.SPECRAILS_CODEX_BETA = '0'
       const projectPath = fs.mkdtempSync(path.join(require('os').tmpdir(), 'codex-blocked-'))
       try {
         const { app } = createApp()
-        const res = await request(app).post('/api/hub/projects').send({
+        const res = await request(app).post('/api/projects').send({
           path: projectPath,
           provider: 'codex',
         })
         expect(res.status).toBe(400)
-        expect(res.body.error).toMatch(/disabled|SPECRAILS_HUB_CODEX_BETA/)
+        expect(res.body.error).toMatch(/disabled|SPECRAILS_CODEX_BETA/)
       } finally {
         fs.rmSync(projectPath, { recursive: true, force: true })
-        if (prev === undefined) delete process.env.SPECRAILS_HUB_CODEX_BETA
-        else process.env.SPECRAILS_HUB_CODEX_BETA = prev
+        if (prev === undefined) delete process.env.SPECRAILS_CODEX_BETA
+        else process.env.SPECRAILS_CODEX_BETA = prev
+      }
+    })
+
+    it('legacy SPECRAILS_HUB_CODEX_BETA=0 env var still disables codex (legacy fallback)', async () => {
+      // Pre-rebrand installs may still set the old var name — it must keep
+      // working when the new one is unset. Legacy name allowed here only.
+      const prevNew = process.env.SPECRAILS_CODEX_BETA
+      const prevLegacy = process.env.SPECRAILS_HUB_CODEX_BETA
+      delete process.env.SPECRAILS_CODEX_BETA
+      process.env.SPECRAILS_HUB_CODEX_BETA = '0'
+      const projectPath = fs.mkdtempSync(path.join(require('os').tmpdir(), 'codex-legacy-blocked-'))
+      try {
+        const { app } = createApp()
+        const res = await request(app).post('/api/projects').send({
+          path: projectPath,
+          provider: 'codex',
+        })
+        expect(res.status).toBe(400)
+        expect(res.body.error).toMatch(/disabled|SPECRAILS_CODEX_BETA/)
+      } finally {
+        fs.rmSync(projectPath, { recursive: true, force: true })
+        if (prevNew === undefined) delete process.env.SPECRAILS_CODEX_BETA
+        else process.env.SPECRAILS_CODEX_BETA = prevNew
+        if (prevLegacy === undefined) delete process.env.SPECRAILS_HUB_CODEX_BETA
+        else process.env.SPECRAILS_HUB_CODEX_BETA = prevLegacy
       }
     })
 
     it('returns 400 when path is a system-critical directory', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/projects').send({ path: '/etc' })
+      const res = await request(app).post('/api/projects').send({ path: '/etc' })
       expect(res.status).toBe(400)
       expect(res.body.error).toContain('system')
     })
   })
 
-  // ─── GET /api/hub/analytics ──────────────────────────────────────────────────
+  // ─── GET /api/analytics ──────────────────────────────────────────────────
 
-  describe('GET /api/hub/analytics', () => {
+  describe('GET /api/analytics', () => {
     it('returns analytics data with default period', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/analytics')
+      const res = await request(app).get('/api/analytics')
       expect(res.status).toBe(200)
     })
 
     it('accepts period query param', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/analytics?period=30d')
+      const res = await request(app).get('/api/analytics?period=30d')
       expect(res.status).toBe(200)
     })
 
     it('accepts from and to query params', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/analytics?period=custom&from=2026-01-01&to=2026-03-01')
+      const res = await request(app).get('/api/analytics?period=custom&from=2026-01-01&to=2026-03-01')
       expect(res.status).toBe(200)
     })
   })
 
-  // ─── GET /api/hub/core-compat ───────────────────────────────────────────────
+  // ─── GET /api/core-compat ───────────────────────────────────────────────
 
-  describe('GET /api/hub/core-compat', () => {
+  describe('GET /api/core-compat', () => {
     it('returns compatibility result', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/core-compat')
+      const res = await request(app).get('/api/core-compat')
       expect(res.status).toBe(200)
       expect(res.body.compatible).toBe(true)
     })
   })
 
-  // ─── PUT /api/hub/settings — additional fields ──────────────────────────────
+  // ─── PUT /api/settings — additional fields ──────────────────────────────
 
-  describe('PUT /api/hub/settings — extended fields', () => {
+  describe('PUT /api/settings — extended fields', () => {
     it('updates specrailsTechUrl', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .put('/api/hub/settings')
+        .put('/api/settings')
         .send({ specrailsTechUrl: 'http://my-specrails.internal' })
       expect(res.status).toBe(200)
       expect(res.body.ok).toBe(true)
-      expect(getHubSetting(hubDb, 'specrails_tech_url')).toBe('http://my-specrails.internal')
+      expect(getDesktopSetting(desktopDb, 'specrails_tech_url')).toBe('http://my-specrails.internal')
     })
 
     it('ignores non-string specrailsTechUrl', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .put('/api/hub/settings')
+        .put('/api/settings')
         .send({ specrailsTechUrl: 42 })
       expect(res.status).toBe(200)
       // Should not have been saved
-      expect(getHubSetting(hubDb, 'specrails_tech_url')).toBeUndefined()
+      expect(getDesktopSetting(desktopDb, 'specrails_tech_url')).toBeUndefined()
     })
 
     it('sets costAlertThresholdUsd', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .put('/api/hub/settings')
+        .put('/api/settings')
         .send({ costAlertThresholdUsd: 5.0 })
       expect(res.status).toBe(200)
-      expect(getHubSetting(hubDb, 'cost_alert_threshold_usd')).toBe('5')
+      expect(getDesktopSetting(desktopDb, 'cost_alert_threshold_usd')).toBe('5')
     })
 
     it('clears costAlertThresholdUsd when null', async () => {
-      setHubSetting(hubDb, 'cost_alert_threshold_usd', '5')
+      setDesktopSetting(desktopDb, 'cost_alert_threshold_usd', '5')
       const { app } = createApp()
       const res = await request(app)
-        .put('/api/hub/settings')
+        .put('/api/settings')
         .send({ costAlertThresholdUsd: null })
       expect(res.status).toBe(200)
-      expect(getHubSetting(hubDb, 'cost_alert_threshold_usd')).toBeUndefined()
+      expect(getDesktopSetting(desktopDb, 'cost_alert_threshold_usd')).toBeUndefined()
     })
 
     it('returns costAlertThresholdUsd from GET /settings', async () => {
-      setHubSetting(hubDb, 'cost_alert_threshold_usd', '10.5')
+      setDesktopSetting(desktopDb, 'cost_alert_threshold_usd', '10.5')
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/settings')
+      const res = await request(app).get('/api/settings')
       expect(res.status).toBe(200)
       expect(res.body.costAlertThresholdUsd).toBe(10.5)
     })
 
     it('returns null costAlertThresholdUsd when not set', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/settings')
+      const res = await request(app).get('/api/settings')
       expect(res.status).toBe(200)
       expect(res.body.costAlertThresholdUsd).toBeNull()
     })
@@ -718,11 +743,11 @@ describe('hub-router', () => {
 
   // ─── specrails-tech proxy routes ────────────────────────────────────────────
 
-  describe('GET /api/hub/specrails-tech/status', () => {
+  describe('GET /api/specrails-tech/status', () => {
     it('returns connected:true when service is reachable', async () => {
       mockSpecrailsTechClient.health.mockResolvedValue({ connected: true, data: { status: 'ok' } })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/specrails-tech/status')
+      const res = await request(app).get('/api/specrails-tech/status')
       expect(res.status).toBe(200)
       expect(res.body.connected).toBe(true)
       expect(res.body.data.status).toBe('ok')
@@ -731,18 +756,18 @@ describe('hub-router', () => {
     it('returns connected:false when service is unreachable', async () => {
       mockSpecrailsTechClient.health.mockResolvedValue({ connected: false, error: 'ECONNREFUSED' })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/specrails-tech/status')
+      const res = await request(app).get('/api/specrails-tech/status')
       expect(res.status).toBe(200)
       expect(res.body.connected).toBe(false)
       expect(res.body.error).toBeDefined()
     })
   })
 
-  describe('GET /api/hub/specrails-tech/agents', () => {
+  describe('GET /api/specrails-tech/agents', () => {
     it('returns agents list when connected', async () => {
       mockSpecrailsTechClient.listAgents.mockResolvedValue({ connected: true, data: [{ slug: 'cto' }] })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/specrails-tech/agents')
+      const res = await request(app).get('/api/specrails-tech/agents')
       expect(res.status).toBe(200)
       expect(res.body.connected).toBe(true)
       expect(res.body.data).toHaveLength(1)
@@ -751,18 +776,18 @@ describe('hub-router', () => {
     it('returns empty data when disconnected', async () => {
       mockSpecrailsTechClient.listAgents.mockResolvedValue({ connected: false, error: 'offline' })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/specrails-tech/agents')
+      const res = await request(app).get('/api/specrails-tech/agents')
       expect(res.status).toBe(200)
       expect(res.body.connected).toBe(false)
       expect(res.body.data).toEqual([])
     })
   })
 
-  describe('GET /api/hub/specrails-tech/agents/:slug', () => {
+  describe('GET /api/specrails-tech/agents/:slug', () => {
     it('returns agent detail when connected', async () => {
       mockSpecrailsTechClient.getAgent.mockResolvedValue({ connected: true, data: { slug: 'cto', name: 'CTO' } })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/specrails-tech/agents/cto')
+      const res = await request(app).get('/api/specrails-tech/agents/cto')
       expect(res.status).toBe(200)
       expect(res.body.connected).toBe(true)
       expect(res.body.data.slug).toBe('cto')
@@ -771,17 +796,17 @@ describe('hub-router', () => {
     it('returns 503 when disconnected', async () => {
       mockSpecrailsTechClient.getAgent.mockResolvedValue({ connected: false, error: 'offline' })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/specrails-tech/agents/cto')
+      const res = await request(app).get('/api/specrails-tech/agents/cto')
       expect(res.status).toBe(503)
       expect(res.body.connected).toBe(false)
     })
   })
 
-  describe('GET /api/hub/specrails-tech/docs', () => {
+  describe('GET /api/specrails-tech/docs', () => {
     it('returns docs list when connected', async () => {
       mockSpecrailsTechClient.listDocs.mockResolvedValue({ connected: true, data: [{ page: 'intro' }] })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/specrails-tech/docs')
+      const res = await request(app).get('/api/specrails-tech/docs')
       expect(res.status).toBe(200)
       expect(res.body.connected).toBe(true)
       expect(res.body.data).toHaveLength(1)
@@ -790,17 +815,17 @@ describe('hub-router', () => {
     it('returns empty data when disconnected', async () => {
       mockSpecrailsTechClient.listDocs.mockResolvedValue({ connected: false, error: 'offline' })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/specrails-tech/docs')
+      const res = await request(app).get('/api/specrails-tech/docs')
       expect(res.status).toBe(200)
       expect(res.body.data).toEqual([])
     })
   })
 
-  describe('GET /api/hub/specrails-tech/docs/:page', () => {
+  describe('GET /api/specrails-tech/docs/:page', () => {
     it('returns doc detail when connected', async () => {
       mockSpecrailsTechClient.getDoc.mockResolvedValue({ connected: true, data: { page: 'intro', content: '...' } })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/specrails-tech/docs/intro')
+      const res = await request(app).get('/api/specrails-tech/docs/intro')
       expect(res.status).toBe(200)
       expect(res.body.connected).toBe(true)
       expect(res.body.data.page).toBe('intro')
@@ -809,20 +834,20 @@ describe('hub-router', () => {
     it('returns 503 when disconnected', async () => {
       mockSpecrailsTechClient.getDoc.mockResolvedValue({ connected: false, error: 'offline' })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/specrails-tech/docs/intro')
+      const res = await request(app).get('/api/specrails-tech/docs/intro')
       expect(res.status).toBe(503)
     })
   })
 
   // ─── PATCH /agents/:id — extended fields ────────────────────────────────────
 
-  describe('PATCH /api/hub/agents/:id — extended fields', () => {
+  describe('PATCH /api/agents/:id — extended fields', () => {
     it('updates last_heartbeat_at and config', async () => {
-      addAgent(hubDb, { id: 'a2', slug: 'extended-agent', name: 'Extended' })
+      addAgent(desktopDb, { id: 'a2', slug: 'extended-agent', name: 'Extended' })
       const { app } = createApp()
       const heartbeat = new Date().toISOString()
       const res = await request(app)
-        .patch('/api/hub/agents/a2')
+        .patch('/api/agents/a2')
         .send({ last_heartbeat_at: heartbeat, config: '{"model":"claude"}' })
       expect(res.status).toBe(200)
       expect(res.body.agent.last_heartbeat_at).toBe(heartbeat)
@@ -831,16 +856,16 @@ describe('hub-router', () => {
 
   // ─── Webhook routes ──────────────────────────────────────────────────────────
 
-  describe('GET /api/hub/webhooks', () => {
+  describe('GET /api/webhooks', () => {
     it('returns empty list when no webhooks exist', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/webhooks')
+      const res = await request(app).get('/api/webhooks')
       expect(res.status).toBe(200)
       expect(res.body.webhooks).toEqual([])
     })
 
     it('returns list of webhooks', async () => {
-      addWebhook(hubDb, {
+      addWebhook(desktopDb, {
         id: 'wh-1',
         projectId: null,
         url: 'https://example.com/hook',
@@ -848,7 +873,7 @@ describe('hub-router', () => {
         secret: 'stored-secret',
       })
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/webhooks')
+      const res = await request(app).get('/api/webhooks')
       expect(res.status).toBe(200)
       expect(res.body.webhooks).toHaveLength(1)
       expect(res.body.webhooks[0].url).toBe('https://example.com/hook')
@@ -857,24 +882,24 @@ describe('hub-router', () => {
     })
   })
 
-  describe('POST /api/hub/webhooks', () => {
+  describe('POST /api/webhooks', () => {
     it('returns 400 when url is missing', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/webhooks').send({ events: ['job.completed'] })
+      const res = await request(app).post('/api/webhooks').send({ events: ['job.completed'] })
       expect(res.status).toBe(400)
       expect(res.body.error).toContain('url is required')
     })
 
     it('returns 400 when url is not a string', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/webhooks').send({ url: 123 })
+      const res = await request(app).post('/api/webhooks').send({ url: 123 })
       expect(res.status).toBe(400)
     })
 
     it('returns 400 when all provided events are invalid', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .post('/api/hub/webhooks')
+        .post('/api/webhooks')
         .send({ url: 'https://example.com/hook', events: ['invalid.event'] })
       expect(res.status).toBe(400)
       expect(res.body.error).toContain('valid event')
@@ -883,7 +908,7 @@ describe('hub-router', () => {
     it('creates webhook with default events when events not provided', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .post('/api/hub/webhooks')
+        .post('/api/webhooks')
         .send({ url: 'https://example.com/hook' })
       expect(res.status).toBe(201)
       expect(res.body.webhook.url).toBe('https://example.com/hook')
@@ -895,7 +920,7 @@ describe('hub-router', () => {
     it('creates webhook with custom events', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .post('/api/hub/webhooks')
+        .post('/api/webhooks')
         .send({ url: 'https://example.com/hook', events: ['job.completed', 'daily_budget_exceeded'] })
       expect(res.status).toBe(201)
       const events = JSON.parse(res.body.webhook.events)
@@ -906,7 +931,7 @@ describe('hub-router', () => {
     it('creates webhook with secret', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .post('/api/hub/webhooks')
+        .post('/api/webhooks')
         .send({ url: 'https://example.com/hook', secret: 'mysecret' })
       expect(res.status).toBe(201)
       expect(res.body.webhook.secret).toBeUndefined()
@@ -916,7 +941,7 @@ describe('hub-router', () => {
     it('rejects non-https webhook urls', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .post('/api/hub/webhooks')
+        .post('/api/webhooks')
         .send({ url: 'http://example.com/hook' })
       expect(res.status).toBe(400)
       expect(res.body.error).toContain('webhook url must be https')
@@ -925,7 +950,7 @@ describe('hub-router', () => {
     it('rejects localhost webhook urls', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .post('/api/hub/webhooks')
+        .post('/api/webhooks')
         .send({ url: 'https://localhost/hook' })
       expect(res.status).toBe(400)
       expect(res.body.error).toContain('webhook url must be https')
@@ -934,7 +959,7 @@ describe('hub-router', () => {
     it('returns 400 when projectId does not match a registered project', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .post('/api/hub/webhooks')
+        .post('/api/webhooks')
         .send({ url: 'https://example.com/hook', projectId: 'nonexistent-project' })
       expect(res.status).toBe(400)
       expect(res.body.error).toContain('project not found')
@@ -942,48 +967,48 @@ describe('hub-router', () => {
 
     it('creates project-scoped webhook when projectId is valid', async () => {
       const { app } = createApp()
-      const createRes = await request(app).post('/api/hub/projects').send({ path: '/home/user/myproj' })
+      const createRes = await request(app).post('/api/projects').send({ path: '/home/user/myproj' })
       const projectId = createRes.body.project.id
 
       const res = await request(app)
-        .post('/api/hub/webhooks')
+        .post('/api/webhooks')
         .send({ url: 'https://example.com/hook', projectId })
       expect(res.status).toBe(201)
       expect(res.body.webhook.project_id).toBe(projectId)
     })
   })
 
-  describe('PATCH /api/hub/webhooks/:id', () => {
+  describe('PATCH /api/webhooks/:id', () => {
     it('returns 404 for non-existent webhook', async () => {
       const { app } = createApp()
-      const res = await request(app).patch('/api/hub/webhooks/nonexistent').send({ enabled: false })
+      const res = await request(app).patch('/api/webhooks/nonexistent').send({ enabled: false })
       expect(res.status).toBe(404)
       expect(res.body.error).toContain('Webhook not found')
     })
 
     it('updates webhook url', async () => {
-      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://old.example.com/hook', events: ['job.completed'] })
+      addWebhook(desktopDb, { id: 'wh-1', projectId: null, url: 'https://old.example.com/hook', events: ['job.completed'] })
       const { app } = createApp()
       const res = await request(app)
-        .patch('/api/hub/webhooks/wh-1')
+        .patch('/api/webhooks/wh-1')
         .send({ url: 'https://new.example.com/hook' })
       expect(res.status).toBe(200)
       expect(res.body.webhook.url).toBe('https://new.example.com/hook')
     })
 
     it('updates webhook enabled flag', async () => {
-      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
+      addWebhook(desktopDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
       const { app } = createApp()
-      const res = await request(app).patch('/api/hub/webhooks/wh-1').send({ enabled: false })
+      const res = await request(app).patch('/api/webhooks/wh-1').send({ enabled: false })
       expect(res.status).toBe(200)
       expect(res.body.webhook.enabled).toBe(0)
     })
 
     it('updates webhook events', async () => {
-      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
+      addWebhook(desktopDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
       const { app } = createApp()
       const res = await request(app)
-        .patch('/api/hub/webhooks/wh-1')
+        .patch('/api/webhooks/wh-1')
         .send({ events: ['job.failed', 'daily_budget_exceeded'] })
       expect(res.status).toBe(200)
       const events = JSON.parse(res.body.webhook.events)
@@ -991,49 +1016,49 @@ describe('hub-router', () => {
     })
 
     it('updates webhook secret', async () => {
-      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
+      addWebhook(desktopDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
       const { app } = createApp()
-      const res = await request(app).patch('/api/hub/webhooks/wh-1').send({ secret: 'new-secret' })
+      const res = await request(app).patch('/api/webhooks/wh-1').send({ secret: 'new-secret' })
       expect(res.status).toBe(200)
       expect(res.body.webhook.secret).toBeUndefined()
       expect(res.body.webhook.hasSecret).toBe(true)
     })
 
     it('rejects updated webhook urls that target private IPs', async () => {
-      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
+      addWebhook(desktopDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
       const { app } = createApp()
       const res = await request(app)
-        .patch('/api/hub/webhooks/wh-1')
+        .patch('/api/webhooks/wh-1')
         .send({ url: 'https://127.0.0.1/hook' })
       expect(res.status).toBe(400)
       expect(res.body.error).toContain('webhook url must be https')
     })
   })
 
-  describe('DELETE /api/hub/webhooks/:id', () => {
+  describe('DELETE /api/webhooks/:id', () => {
     it('returns 404 for non-existent webhook', async () => {
       const { app } = createApp()
-      const res = await request(app).delete('/api/hub/webhooks/nonexistent')
+      const res = await request(app).delete('/api/webhooks/nonexistent')
       expect(res.status).toBe(404)
       expect(res.body.error).toContain('Webhook not found')
     })
 
     it('deletes existing webhook', async () => {
-      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
+      addWebhook(desktopDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
       const { app } = createApp()
-      const deleteRes = await request(app).delete('/api/hub/webhooks/wh-1')
+      const deleteRes = await request(app).delete('/api/webhooks/wh-1')
       expect(deleteRes.status).toBe(200)
       expect(deleteRes.body.ok).toBe(true)
 
-      const listRes = await request(app).get('/api/hub/webhooks')
+      const listRes = await request(app).get('/api/webhooks')
       expect(listRes.body.webhooks).toHaveLength(0)
     })
   })
 
-  describe('POST /api/hub/webhooks/:id/test', () => {
+  describe('POST /api/webhooks/:id/test', () => {
     it('returns 404 for non-existent webhook', async () => {
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/webhooks/nonexistent/test')
+      const res = await request(app).post('/api/webhooks/nonexistent/test')
       expect(res.status).toBe(404)
       expect(res.body.error).toContain('Webhook not found')
     })
@@ -1042,9 +1067,9 @@ describe('hub-router', () => {
       const fetchMock = vi.fn().mockResolvedValue({ ok: true })
       vi.stubGlobal('fetch', fetchMock)
 
-      addWebhook(hubDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
+      addWebhook(desktopDb, { id: 'wh-1', projectId: null, url: 'https://example.com/hook', events: ['job.completed'] })
       const { app } = createApp()
-      const res = await request(app).post('/api/hub/webhooks/wh-1/test')
+      const res = await request(app).post('/api/webhooks/wh-1/test')
       expect(res.status).toBe(200)
       expect(res.body.ok).toBe(true)
       expect(res.body.message).toContain('queued')
@@ -1053,10 +1078,10 @@ describe('hub-router', () => {
     })
   })
 
-  describe('GET /api/hub/setup-prerequisites', () => {
+  describe('GET /api/setup-prerequisites', () => {
     it('omits diagnostic field on default request', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/setup-prerequisites')
+      const res = await request(app).get('/api/setup-prerequisites')
       expect(res.status).toBe(200)
       expect(res.body).toHaveProperty('prerequisites')
       expect(res.body).not.toHaveProperty('diagnostic')
@@ -1064,7 +1089,7 @@ describe('hub-router', () => {
 
     it('includes diagnostic field when ?diagnostic=1', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/setup-prerequisites?diagnostic=1')
+      const res = await request(app).get('/api/setup-prerequisites?diagnostic=1')
       expect(res.status).toBe(200)
       expect(res.body).toHaveProperty('diagnostic')
       expect(res.body.diagnostic).toHaveProperty('pathSegments')
@@ -1076,10 +1101,10 @@ describe('hub-router', () => {
     })
   })
 
-  describe('GET /api/hub/terminal-settings', () => {
+  describe('GET /api/terminal-settings', () => {
     it('returns documented defaults seeded by migration', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/terminal-settings')
+      const res = await request(app).get('/api/terminal-settings')
       expect(res.status).toBe(200)
       expect(res.body.fontSize).toBe(12)
       expect(res.body.renderMode).toBe('auto')
@@ -1089,11 +1114,11 @@ describe('hub-router', () => {
     })
   })
 
-  describe('PATCH /api/hub/terminal-settings', () => {
+  describe('PATCH /api/terminal-settings', () => {
     it('updates valid fields and returns the merged settings', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .patch('/api/hub/terminal-settings')
+        .patch('/api/terminal-settings')
         .send({ fontSize: 16, renderMode: 'canvas', copyOnSelect: true })
       expect(res.status).toBe(200)
       expect(res.body.fontSize).toBe(16)
@@ -1106,7 +1131,7 @@ describe('hub-router', () => {
     it('rejects out-of-range fontSize with 400', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .patch('/api/hub/terminal-settings')
+        .patch('/api/terminal-settings')
         .send({ fontSize: 4 })
       expect(res.status).toBe(400)
       expect(res.body.error).toBe('validation_failed')
@@ -1116,7 +1141,7 @@ describe('hub-router', () => {
     it('rejects unknown setting key with 400', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .patch('/api/hub/terminal-settings')
+        .patch('/api/terminal-settings')
         .send({ fontWeight: 700 })
       expect(res.status).toBe(400)
       expect(res.body.field).toBe('fontWeight')
@@ -1125,7 +1150,7 @@ describe('hub-router', () => {
     it('rejects non-object body with 400', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .patch('/api/hub/terminal-settings')
+        .patch('/api/terminal-settings')
         .send([1, 2])
       expect(res.status).toBe(400)
     })
@@ -1133,76 +1158,76 @@ describe('hub-router', () => {
 
   // ─── Theme ──────────────────────────────────────────────────────────────────
 
-  describe('GET /api/hub/theme', () => {
+  describe('GET /api/theme', () => {
     it('returns specrails by default (seeded by migration)', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/theme')
+      const res = await request(app).get('/api/theme')
       expect(res.status).toBe(200)
       expect(res.body.theme).toBe('specrails')
     })
 
     it('returns the persisted theme', async () => {
-      setHubSetting(hubDb, 'ui_theme', 'aurora-light')
+      setDesktopSetting(desktopDb, 'ui_theme', 'aurora-light')
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/theme')
+      const res = await request(app).get('/api/theme')
       expect(res.status).toBe(200)
       expect(res.body.theme).toBe('aurora-light')
     })
 
     it('falls back to specrails when persisted value is outside the allow-list', async () => {
-      setHubSetting(hubDb, 'ui_theme', 'totally-bogus-theme')
+      setDesktopSetting(desktopDb, 'ui_theme', 'totally-bogus-theme')
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/theme')
+      const res = await request(app).get('/api/theme')
       expect(res.status).toBe(200)
       expect(res.body.theme).toBe('specrails')
     })
   })
 
-  describe('PATCH /api/hub/theme', () => {
+  describe('PATCH /api/theme', () => {
     it('persists a valid theme', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .patch('/api/hub/theme')
+        .patch('/api/theme')
         .send({ theme: 'obsidian-dark' })
       expect(res.status).toBe(200)
       expect(res.body.theme).toBe('obsidian-dark')
-      expect(getHubSetting(hubDb, 'ui_theme')).toBe('obsidian-dark')
+      expect(getDesktopSetting(desktopDb, 'ui_theme')).toBe('obsidian-dark')
     })
 
     it('persists the matrix theme', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .patch('/api/hub/theme')
+        .patch('/api/theme')
         .send({ theme: 'matrix' })
       expect(res.status).toBe(200)
       expect(res.body.theme).toBe('matrix')
-      expect(getHubSetting(hubDb, 'ui_theme')).toBe('matrix')
+      expect(getDesktopSetting(desktopDb, 'ui_theme')).toBe('matrix')
     })
 
     it('rejects a near-miss matrix typo with 400', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .patch('/api/hub/theme')
+        .patch('/api/theme')
         .send({ theme: 'matricks' })
       expect(res.status).toBe(400)
       expect(res.body.error).toBe('invalid_theme')
-      expect(getHubSetting(hubDb, 'ui_theme')).toBe('specrails')
+      expect(getDesktopSetting(desktopDb, 'ui_theme')).toBe('specrails')
     })
 
     it('rejects unknown theme with 400', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .patch('/api/hub/theme')
+        .patch('/api/theme')
         .send({ theme: 'midnight-blue' })
       expect(res.status).toBe(400)
       expect(res.body.error).toBe('invalid_theme')
-      expect(getHubSetting(hubDb, 'ui_theme')).toBe('specrails')
+      expect(getDesktopSetting(desktopDb, 'ui_theme')).toBe('specrails')
     })
 
     it('rejects non-string theme with 400', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .patch('/api/hub/theme')
+        .patch('/api/theme')
         .send({ theme: 123 })
       expect(res.status).toBe(400)
     })
@@ -1210,21 +1235,21 @@ describe('hub-router', () => {
     it('rejects missing theme field with 400', async () => {
       const { app } = createApp()
       const res = await request(app)
-        .patch('/api/hub/theme')
+        .patch('/api/theme')
         .send({})
       expect(res.status).toBe(400)
     })
 
     it('round-trip GET reflects PATCH', async () => {
       const { app } = createApp()
-      await request(app).patch('/api/hub/theme').send({ theme: 'aurora-light' })
-      const res = await request(app).get('/api/hub/theme')
+      await request(app).patch('/api/theme').send({ theme: 'aurora-light' })
+      const res = await request(app).get('/api/theme')
       expect(res.body.theme).toBe('aurora-light')
     })
 
     it.each(['dracula', 'aurora-light', 'obsidian-dark'])('accepts %s', async (theme) => {
       const { app } = createApp()
-      const res = await request(app).patch('/api/hub/theme').send({ theme })
+      const res = await request(app).patch('/api/theme').send({ theme })
       expect(res.status).toBe(200)
       expect(res.body.theme).toBe(theme)
     })
@@ -1232,71 +1257,71 @@ describe('hub-router', () => {
 
   // ─── Language ──────────────────────────────────────────────────────────────
 
-  describe('GET /api/hub/language', () => {
+  describe('GET /api/language', () => {
     it('returns null when the user never chose a language (OS detection stays client-side)', async () => {
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/language')
+      const res = await request(app).get('/api/language')
       expect(res.status).toBe(200)
       expect(res.body.language).toBeNull()
     })
 
     it('returns the persisted language', async () => {
-      setHubSetting(hubDb, 'ui_language', 'es')
+      setDesktopSetting(desktopDb, 'ui_language', 'es')
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/language')
+      const res = await request(app).get('/api/language')
       expect(res.status).toBe(200)
       expect(res.body.language).toBe('es')
     })
 
     it('returns null when persisted value is outside the allow-list', async () => {
-      setHubSetting(hubDb, 'ui_language', 'klingon')
+      setDesktopSetting(desktopDb, 'ui_language', 'klingon')
       const { app } = createApp()
-      const res = await request(app).get('/api/hub/language')
+      const res = await request(app).get('/api/language')
       expect(res.status).toBe(200)
       expect(res.body.language).toBeNull()
     })
   })
 
-  describe('PATCH /api/hub/language', () => {
+  describe('PATCH /api/language', () => {
     it.each(['en', 'es', 'fr', 'de', 'pt', 'it', 'zh', 'ja'])('persists %s', async (language) => {
       const { app } = createApp()
-      const res = await request(app).patch('/api/hub/language').send({ language })
+      const res = await request(app).patch('/api/language').send({ language })
       expect(res.status).toBe(200)
       expect(res.body.language).toBe(language)
-      expect(getHubSetting(hubDb, 'ui_language')).toBe(language)
+      expect(getDesktopSetting(desktopDb, 'ui_language')).toBe(language)
     })
 
     it('rejects unknown language with 400', async () => {
       const { app } = createApp()
-      const res = await request(app).patch('/api/hub/language').send({ language: 'nl' })
+      const res = await request(app).patch('/api/language').send({ language: 'nl' })
       expect(res.status).toBe(400)
       expect(res.body.error).toBe('invalid_language')
-      expect(getHubSetting(hubDb, 'ui_language')).toBeUndefined()
+      expect(getDesktopSetting(desktopDb, 'ui_language')).toBeUndefined()
     })
 
     it('rejects region-qualified tags with 400 (client sends base subtags only)', async () => {
       const { app } = createApp()
-      const res = await request(app).patch('/api/hub/language').send({ language: 'es-ES' })
+      const res = await request(app).patch('/api/language').send({ language: 'es-ES' })
       expect(res.status).toBe(400)
       expect(res.body.error).toBe('invalid_language')
     })
 
     it('rejects non-string language with 400', async () => {
       const { app } = createApp()
-      const res = await request(app).patch('/api/hub/language').send({ language: 42 })
+      const res = await request(app).patch('/api/language').send({ language: 42 })
       expect(res.status).toBe(400)
     })
 
     it('rejects missing language field with 400', async () => {
       const { app } = createApp()
-      const res = await request(app).patch('/api/hub/language').send({})
+      const res = await request(app).patch('/api/language').send({})
       expect(res.status).toBe(400)
     })
 
     it('round-trip GET reflects PATCH', async () => {
       const { app } = createApp()
-      await request(app).patch('/api/hub/language').send({ language: 'ja' })
-      const res = await request(app).get('/api/hub/language')
+      await request(app).patch('/api/language').send({ language: 'ja' })
+      const res = await request(app).get('/api/language')
       expect(res.body.language).toBe('ja')
     })
   })

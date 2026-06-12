@@ -14,7 +14,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from './ui/dialog'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { usePrerequisites } from '../hooks/usePrerequisites'
 import { PrerequisitesPanel } from './PrerequisitesPanel'
 import { InstallInstructionsModal } from './InstallInstructionsModal'
@@ -42,7 +42,7 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
   const [installModalOpen, setInstallModalOpen] = useState(false)
 
   const { t } = useTranslation('setup')
-  const { addProject, startSetupWizard, setActiveProjectId } = useHub()
+  const { addProject, startSetupWizard, setActiveProjectId } = useDesktop()
   const { status: prereqStatus, isLoading: prereqLoading, error: prereqError, recheck: prereqRecheck } = usePrerequisites()
 
   const missingToolsLabel = useMemo(() => {
@@ -58,11 +58,11 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
 
   useEffect(() => {
     if (!open) return
-    fetch('/api/hub/available-providers')
+    fetch('/api/available-providers')
       .then((r) => r.json())
       .then((data) => {
         // Honour the server's real availability. The emergency-rollback env
-        // var `SPECRAILS_HUB_CODEX_BETA=0` on the server reports codex:false
+        // var `SPECRAILS_CODEX_BETA=0` on the server reports codex:false
         // even if the binary is installed.
         const claude = Boolean(data.claude)
         const codex = Boolean(data.codex)

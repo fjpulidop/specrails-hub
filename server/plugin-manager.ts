@@ -163,7 +163,7 @@ export class PluginManager {
         status = 'degraded'
       } else {
         // Plugin install lives in two files:
-        //   (a) state.json — the hub's record that the plugin is installed
+        //   (a) state.json — the app's record that the plugin is installed
         //   (b) .mcp.json  — the actual contract with Claude (loaded blindly)
         // Active = both present. Deactivated = (a) without the (b) keys
         // (user toggled off; install survives). For codex projects the
@@ -299,7 +299,7 @@ export class PluginManager {
       out.push({
         path: rel,
         op: exists ? 'modify' : 'create',
-        summary: `+ <!-- specrails-hub-managed:${m.name} --> block`,
+        summary: `+ <!-- specrails-desktop-managed:${m.name} --> block`,
       })
     }
 

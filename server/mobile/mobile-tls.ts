@@ -41,7 +41,9 @@ export function fingerprintOf(certPem: string): string {
 }
 
 async function generatePair(): Promise<{ certPem: string; keyPem: string }> {
-  const attrs = [{ name: 'commonName', value: 'specrails-hub-mobile' }]
+  // The phone pins sha256(cert DER), never the CN, so renaming the CN only
+  // affects freshly generated certs (which always require a fresh QR pairing).
+  const attrs = [{ name: 'commonName', value: 'specrails-desktop-mobile' }]
   const notAfter = new Date()
   notAfter.setFullYear(notAfter.getFullYear() + 10)
   const pems = await selfsignedGenerate(attrs, {

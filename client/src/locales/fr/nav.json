@@ -21,7 +21,7 @@
     "removed": "Projet supprimé"
   },
   "arcSidebar": {
-    "hubTitle": "Hub",
+    "desktopTitle": "Desktop",
     "docs": "Docs",
     "analytics": "Analytics",
     "settings": "Paramètres"
@@ -64,8 +64,8 @@
     "costAlertDescription": "Coût du job : {{cost}} $ — le seuil est de {{threshold}} $",
     "dailyBudgetTitle": "Budget quotidien dépassé",
     "dailyBudgetDescription": "{{spent}} $ dépensés sur {{budget}} $ aujourd'hui. File d'attente en pause.",
-    "hubBudgetTitle": "Budget quotidien du hub dépassé",
-    "hubBudgetDescription": "Dépense totale du hub : {{spent}} $ sur {{budget}} $. File d'attente en pause.",
+    "desktopBudgetTitle": "Budget quotidien de Desktop dépassé",
+    "desktopBudgetDescription": "Dépense totale de Desktop : {{spent}} $ sur {{budget}} $. File d'attente en pause.",
     "bannerMessage": "Budget quotidien dépassé — {{spent}} $ dépensés sur {{budget}} $. La file d'attente est en pause.",
     "dismiss": "Ignorer"
   },

@@ -171,14 +171,14 @@ describe('explore-cwd-manager', () => {
     expect(renderExploreClaudeMd('SnapshotProject')).toMatchInlineSnapshot(`
       "# Explore Spec assistant for "SnapshotProject"
 
-      You are running inside the **Explore Spec** experience of specrails-hub. The
+      You are running inside the **Explore Spec** experience of Specrails. The
       user has opened a thinking-partner conversation to shape a single backlog
-      ticket. The hub commits the final ticket — you never write to disk and never
+      ticket. The app commits the final ticket — you never write to disk and never
       invoke ticket-creation slash commands.
 
       ## Where you are
 
-      - The current working directory is a hub-managed scratch directory; it does
+      - The current working directory is an app-managed scratch directory; it does
         NOT contain the user's source code.
       - The user's repo is mounted at \`./project\`. Read it ONLY when the spec
         actually requires evidence (e.g. the user names a concrete file or feature).
@@ -193,7 +193,7 @@ describe('explore-cwd-manager', () => {
         just enough, ask only the questions you need, surface trade-offs, propose a
         concrete shape.
       - Maintain the structured live draft via fenced \`spec-draft\` JSON blocks at
-        the end of every turn that updates draft state. The hub parses these blocks
+        the end of every turn that updates draft state. The app parses these blocks
         and updates the user's draft pane; the block itself is stripped from the
         visible chat output.
       - Set \`ready: true\` in the draft block only when the draft has a title, a
@@ -204,7 +204,7 @@ describe('explore-cwd-manager', () => {
 
       - Do NOT create or modify any files in this cwd or in \`./project\`.
       - Do NOT call \`/specrails:propose-spec\`, \`/specrails:implement\`, or any
-        slash command that produces side effects in the project. The hub owns the
+        slash command that produces side effects in the project. The app owns the
         commit via \`POST /tickets/from-draft\` when the user clicks Create Spec.
       - Do NOT modify, rewrite, or reference the user's own \`./project/CLAUDE.md\`
         in your output. It exists for other purposes.

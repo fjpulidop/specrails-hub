@@ -11,9 +11,9 @@ import { atomicWriteFileSync, withFileLock } from './json-mutation'
  * delimited by HTML-comment markers; multiple plugins coexist without
  * stomping each other.
  *
- *   <!-- specrails-hub-managed:<plugin>:start -->
+ *   <!-- specrails-desktop-managed:<plugin>:start -->
  *   ...content...
- *   <!-- specrails-hub-managed:<plugin>:end -->
+ *   <!-- specrails-desktop-managed:<plugin>:end -->
  *
  * Operations are surgical, atomic (temp+rename), and serialized via the
  * shared in-process file mutex.
@@ -25,9 +25,20 @@ import { atomicWriteFileSync, withFileLock } from './json-mutation'
  */
 
 function startMarker(pluginName: string): string {
-  return `<!-- specrails-hub-managed:${pluginName}:start -->`
+  return `<!-- specrails-desktop-managed:${pluginName}:start -->`
 }
 function endMarker(pluginName: string): string {
+  return `<!-- specrails-desktop-managed:${pluginName}:end -->`
+}
+
+// Legacy marker compat — blocks written by pre-rebrand "Specrails Hub"
+// installs used the `specrails-hub-managed` namespace. We still locate (and
+// therefore replace/remove) those blocks so existing user files never end up
+// with orphaned managed sections. New writes always use the new markers.
+function legacyStartMarker(pluginName: string): string {
+  return `<!-- specrails-hub-managed:${pluginName}:start -->`
+}
+function legacyEndMarker(pluginName: string): string {
   return `<!-- specrails-hub-managed:${pluginName}:end -->`
 }
 
@@ -48,9 +59,7 @@ interface BlockMatch {
   content: string
 }
 
-function locateBlock(text: string, pluginName: string): BlockMatch | null {
-  const start = startMarker(pluginName)
-  const end = endMarker(pluginName)
+function locateBlockWithMarkers(text: string, start: string, end: string): BlockMatch | null {
   const sIdx = text.indexOf(start)
   if (sIdx < 0) return null
   const eIdx = text.indexOf(end, sIdx + start.length)
@@ -62,6 +71,14 @@ function locateBlock(text: string, pluginName: string): BlockMatch | null {
     end: eIdx + end.length,
     content: text.slice(innerStart, innerEnd).replace(/^\n+|\n+$/g, ''),
   }
+}
+
+function locateBlock(text: string, pluginName: string): BlockMatch | null {
+  return (
+    locateBlockWithMarkers(text, startMarker(pluginName), endMarker(pluginName)) ??
+    // Fall back to the legacy pre-rebrand markers (see legacyStartMarker).
+    locateBlockWithMarkers(text, legacyStartMarker(pluginName), legacyEndMarker(pluginName))
+  )
 }
 
 /** Returns the current managed-block content for `pluginName`, or null if absent. */

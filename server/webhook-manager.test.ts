@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { WebhookManager } from './webhook-manager'
-import { initHubDb, addWebhook, addProject } from './hub-db'
+import { initDesktopDb, addWebhook, addProject } from './desktop-db'
 import type { DbInstance } from './db'
 
 // Flush setImmediate and pending microtasks so fire-and-forget callbacks execute
@@ -12,13 +12,13 @@ async function flushAsync(passes = 4): Promise<void> {
 }
 
 describe('WebhookManager', () => {
-  let hubDb: DbInstance
+  let desktopDb: DbInstance
   let manager: WebhookManager
   let fetchMock: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
-    hubDb = initHubDb(':memory:')
-    manager = new WebhookManager(hubDb)
+    desktopDb = initDesktopDb(':memory:')
+    manager = new WebhookManager(desktopDb)
     fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
   })
@@ -33,7 +33,7 @@ describe('WebhookManager', () => {
   describe('deliverTest', () => {
     it('sends a test ping payload to the webhook URL', async () => {
       fetchMock.mockResolvedValue({ ok: true })
-      const webhook = addWebhook(hubDb, {
+      const webhook = addWebhook(desktopDb, {
         id: 'wh-1',
         projectId: null,
         url: 'https://example.com/hook',
@@ -56,7 +56,7 @@ describe('WebhookManager', () => {
 
     it('adds HMAC-SHA256 signature header when secret is set', async () => {
       fetchMock.mockResolvedValue({ ok: true })
-      const webhook = addWebhook(hubDb, {
+      const webhook = addWebhook(desktopDb, {
         id: 'wh-2',
         projectId: null,
         url: 'https://example.com/hook',
@@ -74,7 +74,7 @@ describe('WebhookManager', () => {
 
     it('does not add signature header when secret is empty', async () => {
       fetchMock.mockResolvedValue({ ok: true })
-      const webhook = addWebhook(hubDb, {
+      const webhook = addWebhook(desktopDb, {
         id: 'wh-3',
         projectId: null,
         url: 'https://example.com/hook',
@@ -91,7 +91,7 @@ describe('WebhookManager', () => {
 
     it('uses wildcard projectId when webhook.project_id is null', async () => {
       fetchMock.mockResolvedValue({ ok: true })
-      const webhook = addWebhook(hubDb, {
+      const webhook = addWebhook(desktopDb, {
         id: 'wh-4',
         projectId: null,
         url: 'https://example.com/hook',
@@ -107,8 +107,8 @@ describe('WebhookManager', () => {
 
     it('uses actual projectId when webhook.project_id is set', async () => {
       fetchMock.mockResolvedValue({ ok: true })
-      addProject(hubDb, { id: 'proj-123', slug: 'proj-123', name: 'Test Project', path: '/tmp/test' })
-      const webhook = addWebhook(hubDb, {
+      addProject(desktopDb, { id: 'proj-123', slug: 'proj-123', name: 'Test Project', path: '/tmp/test' })
+      const webhook = addWebhook(desktopDb, {
         id: 'wh-5',
         projectId: 'proj-123',
         url: 'https://example.com/hook',
@@ -124,7 +124,7 @@ describe('WebhookManager', () => {
 
     it('includes Content-Type and User-Agent headers', async () => {
       fetchMock.mockResolvedValue({ ok: true })
-      const webhook = addWebhook(hubDb, {
+      const webhook = addWebhook(desktopDb, {
         id: 'wh-6',
         projectId: null,
         url: 'https://example.com/hook',
@@ -136,7 +136,7 @@ describe('WebhookManager', () => {
 
       const [, opts] = fetchMock.mock.calls[0] as [string, RequestInit & { headers: Record<string, string> }]
       expect(opts.headers['Content-Type']).toBe('application/json')
-      expect(opts.headers['User-Agent']).toBe('specrails-hub')
+      expect(opts.headers['User-Agent']).toBe('specrails-desktop')
     })
   })
 
@@ -145,7 +145,7 @@ describe('WebhookManager', () => {
   describe('deliver', () => {
     it('sends payload to all enabled webhooks matching the event', async () => {
       fetchMock.mockResolvedValue({ ok: true })
-      addWebhook(hubDb, {
+      addWebhook(desktopDb, {
         id: 'wh-1',
         projectId: null,
         url: 'https://example.com/hook',
@@ -164,7 +164,7 @@ describe('WebhookManager', () => {
 
     it('does not send to webhooks not matching the event', async () => {
       fetchMock.mockResolvedValue({ ok: true })
-      addWebhook(hubDb, {
+      addWebhook(desktopDb, {
         id: 'wh-1',
         projectId: null,
         url: 'https://example.com/hook',
@@ -179,7 +179,7 @@ describe('WebhookManager', () => {
 
     it('sends to global webhooks (project_id IS NULL) for any project', async () => {
       fetchMock.mockResolvedValue({ ok: true })
-      addWebhook(hubDb, {
+      addWebhook(desktopDb, {
         id: 'wh-global',
         projectId: null,
         url: 'https://example.com/global',
@@ -195,7 +195,7 @@ describe('WebhookManager', () => {
     it('handles webhooks with malformed events JSON gracefully', async () => {
       fetchMock.mockResolvedValue({ ok: true })
       // Insert a webhook with invalid JSON events directly
-      hubDb.prepare(
+      desktopDb.prepare(
         `INSERT INTO webhooks (id, project_id, url, secret, events, enabled) VALUES (?, NULL, ?, '', ?, 1)`
       ).run('wh-bad', 'https://example.com/hook', 'not-valid-json')
 
@@ -208,7 +208,7 @@ describe('WebhookManager', () => {
     it('delivers to multiple matching webhooks', async () => {
       fetchMock.mockResolvedValue({ ok: true })
       for (let i = 1; i <= 3; i++) {
-        addWebhook(hubDb, {
+        addWebhook(desktopDb, {
           id: `wh-${i}`,
           projectId: null,
           url: `https://example.com/hook${i}`,
@@ -224,7 +224,7 @@ describe('WebhookManager', () => {
 
     it('includes a timestamp in the payload', async () => {
       fetchMock.mockResolvedValue({ ok: true })
-      addWebhook(hubDb, {
+      addWebhook(desktopDb, {
         id: 'wh-1',
         projectId: null,
         url: 'https://example.com/hook',
@@ -246,7 +246,7 @@ describe('WebhookManager', () => {
       vi.useFakeTimers()
       fetchMock.mockResolvedValue({ ok: false })
 
-      addWebhook(hubDb, {
+      addWebhook(desktopDb, {
         id: 'wh-1',
         projectId: null,
         url: 'https://example.com/hook',
@@ -263,7 +263,7 @@ describe('WebhookManager', () => {
       vi.useFakeTimers()
       fetchMock.mockRejectedValue(new Error('Network error'))
 
-      addWebhook(hubDb, {
+      addWebhook(desktopDb, {
         id: 'wh-1',
         projectId: null,
         url: 'https://example.com/hook',
@@ -279,7 +279,7 @@ describe('WebhookManager', () => {
     it('does not retry after a successful response', async () => {
       fetchMock.mockResolvedValue({ ok: true })
 
-      addWebhook(hubDb, {
+      addWebhook(desktopDb, {
         id: 'wh-1',
         projectId: null,
         url: 'https://example.com/hook',

@@ -20,7 +20,7 @@ The Profile Editor SHALL allow editing the tag set of any non-default routing ru
 - **THEN** the rule remains at index N in the profile's routing array
 
 ### Requirement: Default routing rule is immutable and pinned to sr-developer
-Every profile's `default: true` routing rule SHALL have `agent === 'sr-developer'`. The hub SHALL NOT permit clients to retarget, reorder, or delete this rule. The UI SHALL hide the agent selector, delete, and reorder controls for this rule and render a "core" indicator. The server SHALL reject profile create/update requests whose default rule targets any agent other than `sr-developer`.
+Every profile's `default: true` routing rule SHALL have `agent === 'sr-developer'`. The app SHALL NOT permit clients to retarget, reorder, or delete this rule. The UI SHALL hide the agent selector, delete, and reorder controls for this rule and render a "core" indicator. The server SHALL reject profile create/update requests whose default rule targets any agent other than `sr-developer`.
 
 #### Scenario: Default rule UI is read-only
 - **WHEN** the Profile Editor renders a routing list that contains a `default: true` rule

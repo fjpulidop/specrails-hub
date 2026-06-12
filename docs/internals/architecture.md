@@ -1,16 +1,16 @@
 # Architecture
 
-This document describes the technical architecture of specrails-hub (v1.63.1): its layers, data layout, request flow, authentication, and the subsystems that make up the hub. It is the entry point to the other internals docs — see the [See also](#see-also) block at the bottom.
+This document describes the technical architecture of specrails-desktop (v1.63.1): its layers, data layout, request flow, authentication, and the subsystems that make up the app. It is the entry point to the other internals docs — see the [See also](#see-also) block at the bottom.
 
 ---
 
 ## Three-layer monorepo
 
 ```
-specrails-hub/
+specrails-desktop/
 ├── server/       → Express 5 + WebSocket + SQLite (TypeScript, CommonJS)
 ├── client/       → React 19 + Vite + Tailwind v4 (TypeScript, ESM)
-├── cli/          → specrails-hub CLI bridge (TypeScript, CommonJS)
+├── cli/          → specrails-desktop CLI bridge (TypeScript, CommonJS)
 └── src-tauri/    → Tauri v2 desktop shell (Rust + bundled server sidecar)
 ```
 
@@ -37,27 +37,29 @@ Tests use vitest with `:memory:` SQLite databases.
 
 ```
 ~/.specrails/
-  hub.sqlite              # project registry (id, name, path, slug, provider…)
-  hub.token               # auth token, mode 0600 (auto-generated on first run)
+  desktop.sqlite          # project registry (id, name, path, slug, provider…)
+  desktop.token           # auth token, mode 0600 (auto-generated on first run)
   manager.pid             # server PID for clean shutdown
   projects/
     <slug>/
       jobs.sqlite         # per-project: jobs, rails, tickets, invocations, …
       jobs/<jobId>/       # per-job snapshots (profile.json, plugins.json, …)
       telemetry/          # OTEL blobs (compacted after 7 days)
-      explore-cwd/        # hub-managed Explore spawn cwd (CLAUDE.md + ./project link)
+      explore-cwd/        # app-managed Explore spawn cwd (CLAUDE.md + ./project link)
       terminals/          # per-session shell-integration shims
 ```
 
-The hub SQLite (`hub.sqlite`) stores only project metadata. All per-project data lives in an isolated `jobs.sqlite` under the project's slug directory — not just jobs and chat, but rails, tickets, agent profiles/versions, AI invocations (cost analytics), telemetry pointers, file provenance, terminal settings/marks, and more (see the `MIGRATIONS` array in `server/db.ts`). Projects can be removed and re-added without losing history, and the registry can be wiped without touching project data.
+The app SQLite (`desktop.sqlite`) stores only project metadata. All per-project data lives in an isolated `jobs.sqlite` under the project's slug directory — not just jobs and chat, but rails, tickets, agent profiles/versions, AI invocations (cost analytics), telemetry pointers, file provenance, terminal settings/marks, and more (see the `MIGRATIONS` array in `server/db.ts`). Projects can be removed and re-added without losing history, and the registry can be wiped without touching project data.
 
 > The data root is hardcoded to `os.homedir()/.specrails`. There is no environment override for the data directory.
+>
+> **Rebrand migration:** installs upgraded from the Specrails Hub era are migrated automatically — on startup the server renames a legacy `hub.sqlite` (plus its `-wal`/`-shm` sidecars) to `desktop.sqlite` and a legacy `hub.token` to `desktop.token` before opening them, so no data or token is lost.
 
 ---
 
-## Hub architecture
+## Super-mode architecture
 
-Hub is the **only** supported mode — a single Express process manages every registered project. There is no legacy/non-hub runtime, and no mode detection.
+Super mode is the **only** supported mode — a single Express process manages every registered project. There is no legacy single-project runtime, and no mode detection.
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -69,7 +71,7 @@ Hub is the **only** supported mode — a single Express process manages every re
 │  └── Project C → …                                  │
 │                                                     │
 │  Routes:                                            │
-│  /api/hub/*              → hub-level operations     │
+│  /api/*                  → app-level operations    │
 │  /api/projects/:id/*     → project-scoped actions   │
 │  /otlp/v1/*              → OTLP telemetry receiver   │
 └─────────────────────────────────────────────────────┘
@@ -97,9 +99,9 @@ The `boundBroadcast` closure injects `projectId` into all WebSocket messages, so
 |--------|---------------|
 | `index.ts` | Entry point: PATH resolution, auth bootstrap, port binding, router mounts, WS server |
 | `auth.ts` | Token bootstrap + `requireAuth` middleware + WS upgrade token check |
-| `hub-db.ts` | Hub-level SQLite: project registry CRUD, hub settings |
+| `desktop-db.ts` | App-level SQLite: project registry CRUD, app settings |
 | `project-registry.ts` | `ProjectRegistry` class: load/unload per-project `ProjectContext` |
-| `hub-router.ts` | `/api/hub/*` routes: projects, settings, themes, specrails-tech proxy, hub analytics |
+| `desktop-router.ts` | `/api/*` routes: projects, settings, themes, specrails-tech proxy, cross-project analytics |
 | `project-router.ts` | `/api/projects/:id/*` routes: all project-scoped operations |
 | `db.ts` | Per-project SQLite: schema (`MIGRATIONS`) + queries |
 | `queue-manager.ts` | Job queue: spawn provider CLI processes serially per project |
@@ -112,7 +114,7 @@ The `boundBroadcast` closure injects `projectId` into all WebSocket messages, so
 | `pricing.ts` | Rate-card cost fallback for providers without native billing |
 | `result-event.ts` | `finaliseInvocationResult` — combines adapter result + pricing |
 | `telemetry-receiver.ts` | OTLP/JSON receiver mounted at `/otlp` |
-| `hub-analytics.ts` | Hub-level analytics aggregated across all projects |
+| `desktop-analytics.ts` | App-level analytics aggregated across all projects |
 | `metrics.ts` | Per-project health metrics |
 | `docs-router.ts` | Serve the embedded docs portal (`/api/docs`) |
 | `path-resolver.ts` | Resolve a usable PATH for GUI-launched desktop spawns |
@@ -126,7 +128,7 @@ Provider, terminal, profile, plugin, code-explorer, and explore subsystems each 
 
 ```
 client/src/
-├── App.tsx                     # Mounts HubProvider + HubApp unconditionally
+├── App.tsx                     # Mounts DesktopProvider + DesktopApp unconditionally
 ├── components/
 │   ├── TabBar.tsx              # Project tab switcher
 │   ├── ProjectLayout.tsx       # Per-project three-panel wrapper
@@ -141,7 +143,7 @@ client/src/
 │   ├── WelcomeScreen.tsx       # Zero-state landing
 │   └── SetupWizard.tsx         # Configure / Install / Done onboarding wizard
 ├── hooks/
-│   ├── useHub.tsx              # HubProvider context: project list, active project
+│   ├── useDesktop.tsx          # DesktopProvider context: project list, active project
 │   ├── useProjectCache.ts      # Stale-while-revalidate per-project cache
 │   ├── useSpecGenTracker.tsx   # Quick-spec generation state (localStorage)
 │   ├── usePipeline.ts          # Pipeline phase state
@@ -149,11 +151,11 @@ client/src/
 ├── pages/
 │   ├── DashboardPage.tsx       # Specs board + Rails board + pipeline state
 │   ├── AnalyticsPage.tsx       # Per-project cost analytics
-│   ├── HubAnalyticsPage.tsx    # Cross-project spending roll-up
+│   ├── DesktopAnalyticsPage.tsx # Cross-project spending roll-up
 │   ├── AgentsPage.tsx          # Agent profiles + catalog
 │   ├── CodePage.tsx            # Read-only code explorer (flag-gated)
 │   ├── SettingsPage.tsx        # Per-project settings
-│   ├── GlobalSettingsPage.tsx  # Hub settings
+│   ├── GlobalSettingsPage.tsx  # App settings
 │   └── JobDetailPage.tsx       # Full log viewer for a single job
 └── lib/
     ├── api.ts                  # getApiBase(): dynamic API prefix per active project
@@ -163,16 +165,16 @@ client/src/
 
 ### App bootstrap
 
-`App.tsx` mounts `HubProvider` and `<HubApp />` **unconditionally** — there is no mode detection and no fallback layout. The client fetches its auth token same-origin from `/api/hub/token` and then loads the project registry.
+`App.tsx` mounts `DesktopProvider` and `<DesktopApp />` **unconditionally** — there is no mode detection and no fallback layout. The client fetches its auth token same-origin from `/api/token` and then loads the project registry.
 
 ### API base routing
 
-`getApiBase()` (from `lib/api.ts`) always returns `${API_ORIGIN}/api/projects/<activeProjectId>` and **throws** when no active project is set — it never returns a bare `/api`. `HubProvider` updates the active project (via `setActiveProjectId`) on project switch; all API calls must go through `getApiBase()` rather than hardcoding `/api/projects/...`.
+`getApiBase()` (from `lib/api.ts`) always returns `${API_ORIGIN}/api/projects/<activeProjectId>` and **throws** when no active project is set — it never returns a bare `/api`. `DesktopProvider` updates the active project (via `setActiveProjectId`) on project switch; all API calls must go through `getApiBase()` rather than hardcoding `/api/projects/...`.
 
 ### Per-project tab switch pattern
 
 On project switch:
-1. `useHub` updates `activeProjectId`.
+1. `useDesktop` updates `activeProjectId`.
 2. `useProjectCache` returns cached data immediately (no flicker).
 3. A background fetch refreshes the cache for the new project.
 4. Never reset to empty state — always show the last-known data while loading.
@@ -183,14 +185,14 @@ State-bearing hooks key off `activeProjectId` as a `useEffect` dependency. `useS
 
 ## Authentication
 
-The hub is local-first but **always authenticated** — auth is mandatory, not optional.
+The app is local-first but **always authenticated** — auth is mandatory, not optional.
 
-- On first run the server generates a token (two concatenated `randomUUID()`s) and persists it to `~/.specrails/hub.token` with mode `0600` (`server/auth.ts`).
-- `app.use('/api', requireAuth)` protects every `/api/*` route. The exceptions are `GET /api/health` and `GET /api/hub/token` (both mounted before the middleware), plus `/api/docs` (the docs portal handlers respond before the auth fallthrough).
-- `requireAuth` accepts the token as an `Authorization: Bearer <token>` header **or** an `X-Hub-Token: <token>` header.
-- WebSocket upgrades are authorized by `authorizeUpgrade`: the browser client sends the token as a subprotocol `hub-token.<token>`; the CLI can pass it as a `Bearer` header.
+- On first run the server generates a token (two concatenated `randomUUID()`s) and persists it to `~/.specrails/desktop.token` with mode `0600` (`server/auth.ts`).
+- `app.use('/api', requireAuth)` protects every `/api/*` route. The exceptions are `GET /api/health` and `GET /api/token` (both mounted before the middleware), plus `/api/docs` (the docs portal handlers respond before the auth fallthrough).
+- `requireAuth` accepts the token as an `Authorization: Bearer <token>` header **or** an `X-Desktop-Token: <token>` header.
+- WebSocket upgrades are authorized by `authorizeUpgrade`: the browser client sends the token as a subprotocol `desktop-token.<token>`; the CLI can pass it as a `Bearer` header.
 
-There is no UI to set or clear the token and it is not a hub setting. The browser client fetches it same-origin from `/api/hub/token`, which is why that one route is public.
+There is no UI to set or clear the token and it is not an app setting. The browser client fetches it same-origin from `/api/token`, which is why that one route is public.
 
 ---
 
@@ -198,7 +200,7 @@ There is no UI to set or clear the token and it is not a hub setting. The browse
 
 A single WebSocket connection at `ws://127.0.0.1:4200/ws` multiplexes all application messages. Terminal PTY output flows over a dedicated `/ws/terminal/:id` socket so high-throughput terminal data cannot starve the event stream.
 
-Every project-scoped message includes a `projectId` field; hub-level messages (`hub.project_added`, `hub.project_removed`, `hub.projects`) have none.
+Every project-scoped message includes a `projectId` field; app-level messages (`desktop.project_added`, `desktop.project_removed`, `desktop.projects`) have none.
 
 ### Representative message types
 
@@ -211,9 +213,9 @@ Canonical shapes live in `server/types.ts`. The core dashboard messages:
 | `log` | project | `{ source: 'stdout'\|'stderr', line, timestamp, processId, projectId }` |
 | `phase` | project | `{ phase, state, timestamp, projectId }` |
 | `exit` | project | `{ code, signal, early }` — process exit replay on the WS upgrade |
-| `hub.project_added` | hub | `{ project }` |
-| `hub.project_removed` | hub | `{ projectId }` |
-| `hub.projects` | hub | `{ projects }` |
+| `desktop.project_added` | app | `{ project }` |
+| `desktop.project_removed` | app | `{ projectId }` |
+| `desktop.projects` | app | `{ projects }` |
 
 Job lifecycle is reported by the message types `job_started`, `job_completed`, `job_failed`, and `job_canceled`. Feature subsystems add many more (`spending.invalidated`, `plugin.*`, `file.*`, `rail.job_started/completed/stopped`, `explore.contract_refine_failed`, chat/refine/SMASH/proposal streams). See [`api-reference.md`](api-reference.md) for the full outbound-event catalogue.
 
@@ -229,7 +231,7 @@ useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProject
 if (msg.projectId && msg.projectId !== activeProjectIdRef.current) return
 ```
 
-Hub-level messages (no `projectId`) are processed by all handlers.
+App-level messages (no `projectId`) are processed by all handlers.
 
 ---
 
@@ -247,7 +249,7 @@ Hub-level messages (no `projectId`) are processed by all handlers.
 
 ## Feature subsystems
 
-The hub is more than the job pipeline. Each subsystem owns its modules; this is a map, not a duplication of [`CLAUDE.md`](../../CLAUDE.md).
+The app is more than the job pipeline. Each subsystem owns its modules; this is a map, not a duplication of [`CLAUDE.md`](../../CLAUDE.md).
 
 | Subsystem | Server modules | Notes |
 |-----------|---------------|-------|
@@ -258,9 +260,9 @@ The hub is more than the job pipeline. Each subsystem owns its modules; this is 
 | **Terminal panel** | `server/terminal-manager.ts` | `node-pty` sessions over the dedicated `/ws/terminal/:id` socket, OSC shell-integration marks. See [`../terminal.md`](../terminal.md). |
 | **Code explorer** | `server/code-explorer-router.ts`, `server/file-provenance.ts`, `server/file-summary-manager.ts` | Read-only file tree + Monaco viewer + AI summaries; provenance per ticket/job. |
 | **Pipeline telemetry** | `server/telemetry-receiver.ts` + QueueManager OTEL injection | Opt-in OTLP/JSON signals to `POST /otlp/v1/{traces,metrics,logs}`; blobs compacted after 7 days; diagnostic ZIP export. |
-| **Explore acceleration + Contract Refine** | `server/explore-cwd-manager.ts`, `server/contract-refine-runner.ts` | Hub-managed Explore spawn cwd for fast first-token; optional post-commit Contract Layer enrichment. Kill switches: `SPECRAILS_EXPLORE_CONTRACT_REFINE`, `SPECRAILS_EXPLORE_LEGACY_CWD`. |
+| **Explore acceleration + Contract Refine** | `server/explore-cwd-manager.ts`, `server/contract-refine-runner.ts` | App-managed Explore spawn cwd for fast first-token; optional post-commit Contract Layer enrichment. Kill switches: `SPECRAILS_EXPLORE_CONTRACT_REFINE`, `SPECRAILS_EXPLORE_LEGACY_CWD`. |
 | **Tickets / drafts** | `server/ticket-store.ts` | Spec tickets (incl. `draft` status) backing the Specs board and Save-as-Draft flow. |
-| **Theme system** | `server/hub-router.ts` (`GET/PATCH /api/hub/theme`) | Five built-in themes (`dracula`, `aurora-light`, `obsidian-dark`, `matrix`, `specrails`), default `specrails`, persisted hub-wide with an anti-FOUC inline script. |
+| **Theme system** | `server/desktop-router.ts` (`GET/PATCH /api/theme`) | Five built-in themes (`dracula`, `aurora-light`, `obsidian-dark`, `matrix`, `specrails`), default `specrails`, persisted app-wide with an anti-FOUC inline script. |
 
 Most client feature sections are gated by VITE flags, and they share one polarity: `VITE_FEATURE_TERMINAL_PANEL`, `VITE_FEATURE_AGENTS_SECTION`, `VITE_FEATURE_EXPLORE_PREMIUM_UX`, and `VITE_FEATURE_CODE_EXPLORER` are all **opt-out** — default ON, set the flag to `false` to hide that section. See [`configuration.md`](configuration.md) for the full flag and settings reference.
 
@@ -271,10 +273,10 @@ Most client feature sections are gated by VITE flags, and they share one polarit
 When a project is added without specrails-core, the setup wizard runs. The client renders a **3-step** indicator: **Configure → Install → Done**.
 
 1. **Configure** — confirm path and pick provider(s) and model presets. (Multi-provider projects get one Configure step per provider.)
-2. **Install** — the hub writes `.specrails/install-config.yaml` and runs `npx --yes --prefer-online specrails-core@latest init --yes --from-config <tempPath>`, streaming the log. For multi-provider projects each provider's install runs sequentially.
+2. **Install** — the app writes `.specrails/install-config.yaml` and runs `npx --yes --prefer-online specrails-core@latest init --yes --from-config <tempPath>`, streaming the log. For multi-provider projects each provider's install runs sequentially.
 3. **Done** — per-provider completion summary.
 
-`SetupManager` (server) owns wizard state; `HubProvider` (client) tracks which projects are in setup via `setupProjectIds`. The wizard does spawn a real AI CLI for the `/setup` chat, but that spawn is deliberately left uninstrumented (it writes no `ai_invocations` row).
+`SetupManager` (server) owns wizard state; `DesktopProvider` (client) tracks which projects are in setup via `setupProjectIds`. The wizard does spawn a real AI CLI for the `/setup` chat, but that spawn is deliberately left uninstrumented (it writes no `ai_invocations` row).
 
 ---
 
@@ -313,7 +315,7 @@ macOS desktop builds are signed + notarized. Windows builds (x64 and arm64) ship
 ## Security model
 
 - **Loopback-only bind** — the server listens on `127.0.0.1` and is not exposed to a network.
-- **Mandatory token auth** — every `/api/*` route and every WebSocket upgrade requires the hub token (see [Authentication](#authentication)). The token lives in `~/.specrails/hub.token` (mode `0600`).
+- **Mandatory token auth** — every `/api/*` route and every WebSocket upgrade requires the app token (see [Authentication](#authentication)). The token lives in `~/.specrails/desktop.token` (mode `0600`).
 - **Origin check** — a CORS middleware rejects cross-origin (non-localhost `Origin`) requests with `403`.
 - **Parameterized SQL** — all SQLite operations use parameterized queries; user input is never string-interpolated into SQL.
 - **Path validation** — project paths are validated as existing directories on registration.
@@ -323,8 +325,8 @@ macOS desktop builds are signed + notarized. Windows builds (x64 and arm64) ship
 ## See also
 
 - [API reference](api-reference.md) — REST routes and the full WebSocket event catalogue
-- [Configuration](configuration.md) — env vars, feature flags, hub/project settings
+- [Configuration](configuration.md) — env vars, feature flags, app/project settings
 - [Agent profiles](profiles.md) — profile schema, resolution order, snapshot-per-job
 - [Adding a provider](adding-a-provider.md) — the `ProviderAdapter` contract
 - [OpenSpec workflow](openspec-workflow.md) — the spec-driven change lifecycle
-- [Operations runbook](operations-runbook.md) — running, upgrading, and recovering the hub
+- [Operations runbook](operations-runbook.md) — running, upgrading, and recovering the app

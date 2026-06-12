@@ -116,7 +116,7 @@ describe('PluginManager.listAvailable', () => {
     await m.install(tmpDir, 'pid', 'serena', broadcast)
     const md = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8')
     expect(md).toContain('## serena hint')
-    expect(md).toContain('specrails-hub-managed:serena')
+    expect(md).toContain('specrails-desktop-managed:serena')
   })
 
   it('uninstall removes CLAUDE.md block but preserves user content', async () => {
@@ -129,7 +129,7 @@ describe('PluginManager.listAvailable', () => {
     const md = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8')
     expect(md).toContain('My notes.')
     expect(md).not.toContain('serena hint')
-    expect(md).not.toContain('specrails-hub-managed:serena')
+    expect(md).not.toContain('specrails-desktop-managed:serena')
   })
 
   it('setActive(false) removes CLAUDE.md block; setActive(true) restores it', async () => {

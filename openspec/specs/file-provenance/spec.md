@@ -8,7 +8,7 @@ Per-project ledger linking files in the working tree to the tickets and jobs tha
 
 ### Requirement: Provenance table schema and persistence
 
-The hub SHALL persist file⇄ticket provenance in a per-project SQLite table `file_provenance` with columns `(id, file_path, ticket_id, job_id, kind, at)`, indexed on `(file_path)`, `(ticket_id)`, and `(at DESC)`. The `kind` column SHALL be constrained to one of `'created'`, `'modified'`, `'deleted'`.
+The app SHALL persist file⇄ticket provenance in a per-project SQLite table `file_provenance` with columns `(id, file_path, ticket_id, job_id, kind, at)`, indexed on `(file_path)`, `(ticket_id)`, and `(at DESC)`. The `kind` column SHALL be constrained to one of `'created'`, `'modified'`, `'deleted'`.
 
 #### Scenario: Schema migration runs idempotently
 
@@ -95,7 +95,7 @@ The server SHALL expose `GET /api/projects/:projectId/code/provenance?ticketId=�
 
 ### Requirement: WebSocket broadcast on provenance changes
 
-The hub SHALL broadcast a `file.provenance_updated` WebSocket event scoped by `projectId` for every inserted or removed provenance row, with payload `{ projectId, path, kind, ticketId, jobId, at }`.
+The app SHALL broadcast a `file.provenance_updated` WebSocket event scoped by `projectId` for every inserted or removed provenance row, with payload `{ projectId, path, kind, ticketId, jobId, at }`.
 
 #### Scenario: Insert triggers a broadcast
 

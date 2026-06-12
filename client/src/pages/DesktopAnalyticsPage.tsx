@@ -4,35 +4,35 @@ import { RefreshCw, TrendingUp } from 'lucide-react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from 'recharts'
 import { format } from 'date-fns'
 import { getDateFnsLocale } from '../lib/i18n'
-import type { HubAnalyticsResponse, AnalyticsPeriod } from '../types'
+import type { DesktopAnalyticsResponse, AnalyticsPeriod } from '../types'
 import { PeriodSelector } from '../components/analytics/PeriodSelector'
 import { useActiveTheme } from '../context/ThemeContext'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 
 // ─── KPI Cards ────────────────────────────────────────────────────────────────
 
-function HubKpiCards({ kpi }: { kpi: HubAnalyticsResponse['kpi'] }) {
+function DesktopKpiCards({ kpi }: { kpi: DesktopAnalyticsResponse['kpi'] }) {
   const { t } = useTranslation('analytics')
   const cards = [
     {
-      label: t('hub.totalCost'),
+      label: t('desktop.totalCost'),
       value: `$${kpi.totalCostUsd.toFixed(4)}`,
-      sub: t('hub.costToday', { value: `$${kpi.costToday.toFixed(4)}` }),
+      sub: t('desktop.costToday', { value: `$${kpi.costToday.toFixed(4)}` }),
     },
     {
-      label: t('hub.totalJobs'),
+      label: t('desktop.totalJobs'),
       value: kpi.totalJobs.toLocaleString(),
-      sub: t('hub.jobsToday', { n: kpi.jobsToday }),
+      sub: t('desktop.jobsToday', { n: kpi.jobsToday }),
     },
     {
-      label: t('hub.successRate'),
+      label: t('desktop.successRate'),
       value: `${(kpi.successRate * 100).toFixed(1)}%`,
-      sub: t('hub.acrossAllProjects'),
+      sub: t('desktop.acrossAllProjects'),
     },
     {
-      label: t('hub.avgCostPerJob'),
+      label: t('desktop.avgCostPerJob'),
       value: kpi.totalJobs > 0 ? `$${(kpi.totalCostUsd / kpi.totalJobs).toFixed(5)}` : '—',
-      sub: t('hub.periodAverage'),
+      sub: t('desktop.periodAverage'),
     },
   ]
 
@@ -51,7 +51,7 @@ function HubKpiCards({ kpi }: { kpi: HubAnalyticsResponse['kpi'] }) {
 
 // ─── Cost Timeline ────────────────────────────────────────────────────────────
 
-function HubCostTimeline({ data }: { data: HubAnalyticsResponse['costTimeline'] }) {
+function DesktopCostTimeline({ data }: { data: DesktopAnalyticsResponse['costTimeline'] }) {
   const { t } = useTranslation('analytics')
   const theme = useActiveTheme()
   const hasData = data.length > 0 && data.some((d) => d.costUsd > 0)
@@ -60,10 +60,10 @@ function HubCostTimeline({ data }: { data: HubAnalyticsResponse['costTimeline'] 
 
   return (
     <div className="rounded-lg border border-border/40 bg-card/50 p-4">
-      <h3 className="text-sm font-medium mb-3">{t('hub.costOverTime')}</h3>
+      <h3 className="text-sm font-medium mb-3">{t('desktop.costOverTime')}</h3>
       {!hasData ? (
         <div className="h-[200px] flex items-center justify-center text-xs text-muted-foreground">
-          {t('hub.noCostData')}
+          {t('desktop.noCostData')}
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={200}>
@@ -111,14 +111,14 @@ function HubCostTimeline({ data }: { data: HubAnalyticsResponse['costTimeline'] 
 
 // ─── Project Breakdown Table ──────────────────────────────────────────────────
 
-function ProjectBreakdown({ projects }: { projects: HubAnalyticsResponse['projectBreakdown'] }) {
+function ProjectBreakdown({ projects }: { projects: DesktopAnalyticsResponse['projectBreakdown'] }) {
   const { t } = useTranslation('analytics')
   const theme = useActiveTheme()
   if (projects.length === 0) {
     return (
       <div className="rounded-lg border border-border/40 bg-card/50 p-4">
-        <h3 className="text-sm font-medium mb-3">{t('hub.projectComparison')}</h3>
-        <p className="text-xs text-muted-foreground">{t('hub.noProjects')}</p>
+        <h3 className="text-sm font-medium mb-3">{t('desktop.projectComparison')}</h3>
+        <p className="text-xs text-muted-foreground">{t('desktop.noProjects')}</p>
       </div>
     )
   }
@@ -127,7 +127,7 @@ function ProjectBreakdown({ projects }: { projects: HubAnalyticsResponse['projec
 
   return (
     <div className="rounded-lg border border-border/40 bg-card/50 p-4">
-      <h3 className="text-sm font-medium mb-4">{t('hub.projectComparison')}</h3>
+      <h3 className="text-sm font-medium mb-4">{t('desktop.projectComparison')}</h3>
       <div className="space-y-3">
         {projects.map((p, idx) => (
           <div key={p.projectId} className="space-y-1">
@@ -136,8 +136,8 @@ function ProjectBreakdown({ projects }: { projects: HubAnalyticsResponse['projec
                 {p.projectName}
               </span>
               <div className="flex items-center gap-4 text-muted-foreground">
-                <span>{t('hub.jobsCount', { count: p.totalJobs })}</span>
-                <span>{t('hub.successPct', { pct: (p.successRate * 100).toFixed(0) })}</span>
+                <span>{t('desktop.jobsCount', { count: p.totalJobs })}</span>
+                <span>{t('desktop.successPct', { pct: (p.successRate * 100).toFixed(0) })}</span>
                 <span className="font-mono text-foreground">${p.totalCostUsd.toFixed(4)}</span>
               </div>
             </div>
@@ -159,7 +159,7 @@ function ProjectBreakdown({ projects }: { projects: HubAnalyticsResponse['projec
 
 // ─── Per-Project Bar Chart ────────────────────────────────────────────────────
 
-function ProjectCostBar({ projects }: { projects: HubAnalyticsResponse['projectBreakdown'] }) {
+function ProjectCostBar({ projects }: { projects: DesktopAnalyticsResponse['projectBreakdown'] }) {
   const { t } = useTranslation('analytics')
   const theme = useActiveTheme()
   if (projects.length === 0) return null
@@ -167,7 +167,7 @@ function ProjectCostBar({ projects }: { projects: HubAnalyticsResponse['projectB
 
   return (
     <div className="rounded-lg border border-border/40 bg-card/50 p-4">
-      <h3 className="text-sm font-medium mb-3">{t('hub.costByProject')}</h3>
+      <h3 className="text-sm font-medium mb-3">{t('desktop.costByProject')}</h3>
       <ResponsiveContainer width="100%" height={180}>
         <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -203,12 +203,12 @@ function ProjectCostBar({ projects }: { projects: HubAnalyticsResponse['projectB
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function HubAnalyticsPage() {
+export default function DesktopAnalyticsPage() {
   const { t } = useTranslation('analytics')
   const [period, setPeriod] = useState<AnalyticsPeriod>('7d')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const [data, setData] = useState<HubAnalyticsResponse | null>(null)
+  const [data, setData] = useState<DesktopAnalyticsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -222,8 +222,8 @@ export default function HubAnalyticsPage() {
   }, [period, from, to]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    registerHandler('hub-analytics', handleWsMessage)
-    return () => unregisterHandler('hub-analytics')
+    registerHandler('desktop-analytics', handleWsMessage)
+    return () => unregisterHandler('desktop-analytics')
   }, [handleWsMessage, registerHandler, unregisterHandler])
 
   async function load(p: AnalyticsPeriod, f?: string, t?: string) {
@@ -232,9 +232,9 @@ export default function HubAnalyticsPage() {
     try {
       const params = new URLSearchParams({ period: p })
       if (p === 'custom' && f && t) { params.set('from', f); params.set('to', t) }
-      const res = await fetch(`/api/hub/analytics?${params}`)
+      const res = await fetch(`/api/analytics?${params}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json() as HubAnalyticsResponse
+      const json = await res.json() as DesktopAnalyticsResponse
       setData(json)
     } catch (err) {
       setError((err as Error).message)
@@ -260,7 +260,7 @@ export default function HubAnalyticsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-muted-foreground" />
-            <h1 className="text-sm font-semibold">{t('hub.title')}</h1>
+            <h1 className="text-sm font-semibold">{t('desktop.title')}</h1>
             {data && (
               <span className="text-xs text-muted-foreground">{data.period.label}</span>
             )}
@@ -276,7 +276,7 @@ export default function HubAnalyticsPage() {
               onClick={() => load(period, from, to)}
               disabled={loading}
               className="flex items-center gap-1.5 h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
-              aria-label={t('hub.refreshAria')}
+              aria-label={t('desktop.refreshAria')}
             >
               <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -286,7 +286,7 @@ export default function HubAnalyticsPage() {
         {/* Error */}
         {error && (
           <div className="rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-xs text-red-400">
-            {t('hub.failedToLoad', { error })}
+            {t('desktop.failedToLoad', { error })}
           </div>
         )}
 
@@ -309,10 +309,10 @@ export default function HubAnalyticsPage() {
         {/* Content */}
         {data && (
           <div className="space-y-3">
-            <HubKpiCards kpi={data.kpi} />
+            <DesktopKpiCards kpi={data.kpi} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <HubCostTimeline data={data.costTimeline} />
+              <DesktopCostTimeline data={data.costTimeline} />
               <ProjectCostBar projects={data.projectBreakdown} />
             </div>
 

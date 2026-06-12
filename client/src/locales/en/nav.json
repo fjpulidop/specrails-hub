@@ -21,7 +21,7 @@
     "removed": "Project removed"
   },
   "arcSidebar": {
-    "hubTitle": "Hub",
+    "desktopTitle": "Desktop",
     "docs": "Docs",
     "analytics": "Analytics",
     "settings": "Settings"
@@ -64,8 +64,8 @@
     "costAlertDescription": "Job cost ${{cost}} — threshold is ${{threshold}}",
     "dailyBudgetTitle": "Daily budget exceeded",
     "dailyBudgetDescription": "Spent ${{spent}} of ${{budget}} today. Queue paused.",
-    "hubBudgetTitle": "Hub daily budget exceeded",
-    "hubBudgetDescription": "Total hub spend ${{spent}} of ${{budget}}. Queue paused.",
+    "desktopBudgetTitle": "Desktop daily budget exceeded",
+    "desktopBudgetDescription": "Total Desktop spend ${{spent}} of ${{budget}}. Queue paused.",
     "bannerMessage": "Daily budget exceeded — spent ${{spent}} of ${{budget}}. Queue is paused.",
     "dismiss": "Dismiss"
   },

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useHub } from '../../hooks/useHub'
+import { useDesktop } from '../../hooks/useDesktop'
 import { useAgentRefine, type AgentRefineState } from '../../hooks/useAgentRefine'
 import {
   AiEditShell,
@@ -46,7 +46,7 @@ export function AiRefineOverlay({
   onApplied,
 }: Props) {
   const { t } = useTranslation('agentstudio')
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const r = useAgentRefine(activeProjectId)
   const [input, setInput] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)

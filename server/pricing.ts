@@ -1,5 +1,5 @@
 // Local pricing table for providers whose CLI does NOT report `total_cost_usd`
-// natively. The hub uses this to populate `ai_invocations.total_cost_usd` from
+// natively. The app uses this to populate `ai_invocations.total_cost_usd` from
 // captured token usage so the Spending dashboard, daily-budget enforcement, and
 // cost alerts continue to function uniformly across providers.
 //

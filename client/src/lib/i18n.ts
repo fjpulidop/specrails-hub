@@ -1,12 +1,12 @@
 /**
- * i18n registry — single source of truth for the hub-wide UI language.
+ * i18n registry — single source of truth for the app-wide UI language.
  *
  * Architecture mirrors the theme system (`lib/themes.ts` + ThemeContext):
  *  - `LANGUAGE_IDS` is the allow-list, duplicated server-side in
- *    `server/hub-router.ts` (LANGUAGE_ID_ALLOWLIST) to avoid pulling client
+ *    `server/desktop-router.ts` (LANGUAGE_ID_ALLOWLIST) to avoid pulling client
  *    code into the server bundle.
- *  - Persisted hub-wide as `hub_settings.ui_language`, mirrored to
- *    `localStorage['specrails-hub:ui-language']` so boot picks the right
+ *  - Persisted app-wide as `desktop_settings.ui_language`, mirrored to
+ *    `localStorage['specrails-desktop:ui-language']` so boot picks the right
  *    language before the server round-trip.
  *
  * Resource loading:
@@ -20,7 +20,7 @@
  *  1. Add the id to `LANGUAGE_IDS` and a descriptor to `LANGUAGES`.
  *  2. Create `client/src/locales/<id>/` with the same JSON namespaces as
  *     `locales/en/` (key parity enforced by `lib/__tests__` parity test).
- *  3. Extend `LANGUAGE_ID_ALLOWLIST` in `server/hub-router.ts`.
+ *  3. Extend `LANGUAGE_ID_ALLOWLIST` in `server/desktop-router.ts`.
  *  4. Map a date-fns locale in `DATE_FNS_LOCALES` below.
  * No component code changes required (OCP).
  */
@@ -53,8 +53,8 @@ export const LANGUAGES: Record<LanguageId, LanguageDescriptor> = {
 
 export const DEFAULT_LANGUAGE: LanguageId = 'en'
 
-/** localStorage key mirroring the server-persisted `hub_settings.ui_language`. */
-export const LANGUAGE_LOCAL_STORAGE_KEY = 'specrails-hub:ui-language'
+/** localStorage key mirroring the server-persisted `desktop_settings.ui_language`. */
+export const LANGUAGE_LOCAL_STORAGE_KEY = 'specrails-desktop:ui-language'
 
 /** Type guard usable client + server side (server keeps a synchronized copy). */
 export function isLanguageId(v: unknown): v is LanguageId {

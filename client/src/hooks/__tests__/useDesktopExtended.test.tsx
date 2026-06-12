@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import React from 'react'
-import { HubProvider, useHub } from '../useHub'
+import { DesktopProvider, useDesktop } from '../useDesktop'
 import { SharedWebSocketProvider } from '../useSharedWebSocket'
 
 vi.mock('../../lib/api', () => ({
@@ -35,7 +35,7 @@ function makeWrapper() {
     return React.createElement(
       SharedWebSocketProvider,
       { url: 'ws://localhost:4200' },
-      React.createElement(HubProvider, null, children)
+      React.createElement(DesktopProvider, null, children)
     )
   }
 }
@@ -52,7 +52,7 @@ function makeProject(overrides: Partial<{ id: string; name: string }> = {}) {
   }
 }
 
-describe('useHub - error paths', () => {
+describe('useDesktop - error paths', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     MockWebSocket.instances = []
@@ -72,7 +72,7 @@ describe('useHub - error paths', () => {
         json: () => Promise.resolve({ error: 'Project already exists' }),
       })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     await expect(
@@ -91,7 +91,7 @@ describe('useHub - error paths', () => {
         json: () => Promise.resolve({}),
       })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     await expect(
@@ -107,7 +107,7 @@ describe('useHub - error paths', () => {
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ projects: [] }) })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ project: newProject, has_specrails: true }) })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     await act(async () => {
@@ -131,7 +131,7 @@ describe('useHub - error paths', () => {
         json: () => Promise.resolve({ error: 'Project not found' }),
       })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     await expect(
@@ -150,7 +150,7 @@ describe('useHub - error paths', () => {
         json: () => Promise.resolve({}),
       })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     await expect(
@@ -163,19 +163,19 @@ describe('useHub - error paths', () => {
   it('fetch non-ok on initial load: isLoading becomes false, projects stays empty', async () => {
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     expect(result.current.projects).toHaveLength(0)
   })
 
-  it('WS hub.project_added: does not add duplicate project', async () => {
+  it('WS desktop.project_added: does not add duplicate project', async () => {
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ projects: [makeProject({ id: 'dup-proj' })] }),
     })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     await waitFor(() => MockWebSocket.instances.length > 0)
@@ -185,7 +185,7 @@ describe('useHub - error paths', () => {
     // Simulate adding the same project again
     act(() => {
       ws.simulateMessage({
-        type: 'hub.project_added',
+        type: 'desktop.project_added',
         project: makeProject({ id: 'dup-proj', name: 'Duplicate Project' }),
       })
     })
@@ -194,7 +194,7 @@ describe('useHub - error paths', () => {
     expect(result.current.projects).toHaveLength(1)
   })
 
-  it('WS hub.project_removed: does not deactivate if different project is active', async () => {
+  it('WS desktop.project_removed: does not deactivate if different project is active', async () => {
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({
@@ -205,7 +205,7 @@ describe('useHub - error paths', () => {
       }),
     })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     // Set active to proj-keep
@@ -217,7 +217,7 @@ describe('useHub - error paths', () => {
     await act(async () => { ws.onopen?.() })
 
     act(() => {
-      ws.simulateMessage({ type: 'hub.project_removed', projectId: 'proj-remove' })
+      ws.simulateMessage({ type: 'desktop.project_removed', projectId: 'proj-remove' })
     })
 
     // Active project should remain proj-keep since we removed proj-remove
@@ -231,7 +231,7 @@ describe('useHub - error paths', () => {
       json: () => Promise.resolve({ projects: [makeProject()] }),
     })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     await waitFor(() => MockWebSocket.instances.length > 0)
@@ -248,13 +248,13 @@ describe('useHub - error paths', () => {
     expect(result.current.projects.length).toBe(before)
   })
 
-  it('WS hub.projects: keeps active project if it exists in new list', async () => {
+  it('WS desktop.projects: keeps active project if it exists in new list', async () => {
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ projects: [makeProject({ id: 'existing' })] }),
     })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     await waitFor(() => MockWebSocket.instances.length > 0)
@@ -263,14 +263,14 @@ describe('useHub - error paths', () => {
 
     // Set active project via WS (REST load no longer auto-selects)
     act(() => {
-      ws.simulateMessage({ type: 'hub.projects', projects: [makeProject({ id: 'existing' })] })
+      ws.simulateMessage({ type: 'desktop.projects', projects: [makeProject({ id: 'existing' })] })
     })
     await waitFor(() => expect(result.current.activeProjectId).toBe('existing'))
 
     // Send updated list — active project should stay 'existing'
     act(() => {
       ws.simulateMessage({
-        type: 'hub.projects',
+        type: 'desktop.projects',
         projects: [
           makeProject({ id: 'existing' }),
           makeProject({ id: 'new-one' }),
@@ -288,7 +288,7 @@ describe('useHub - error paths', () => {
         ok: true,
         json: () => Promise.resolve({ projects: [makeProject({ id: 'p1' }), makeProject({ id: 'p2' })] }),
       })
-      const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+      const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
       await waitFor(() => expect(result.current.isLoading).toBe(false))
       expect(result.current.isSwitchingProject).toBe(false)
     })
@@ -298,7 +298,7 @@ describe('useHub - error paths', () => {
         ok: true,
         json: () => Promise.resolve({ projects: [makeProject({ id: 'p1' }), makeProject({ id: 'p2' })] }),
       })
-      const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+      const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
       await waitFor(() => expect(result.current.isLoading).toBe(false))
 
       await waitFor(() => MockWebSocket.instances.length > 0)
@@ -308,7 +308,7 @@ describe('useHub - error paths', () => {
       // Set active project to p1 via WS (REST no longer auto-selects)
       act(() => {
         ws.simulateMessage({
-          type: 'hub.projects',
+          type: 'desktop.projects',
           projects: [makeProject({ id: 'p1' }), makeProject({ id: 'p2' })],
         })
       })
@@ -323,7 +323,7 @@ describe('useHub - error paths', () => {
         ok: true,
         json: () => Promise.resolve({ projects: [makeProject({ id: 'p1' }), makeProject({ id: 'p2' })] }),
       })
-      const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+      const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
       await waitFor(() => expect(result.current.isLoading).toBe(false))
 
       act(() => { result.current.setActiveProjectId('p2') })
@@ -335,7 +335,7 @@ describe('useHub - error paths', () => {
         ok: true,
         json: () => Promise.resolve({ projects: [makeProject({ id: 'p1' })] }),
       })
-      const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+      const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
       await waitFor(() => expect(result.current.isLoading).toBe(false))
 
       act(() => { result.current.setActiveProjectId('p1') })

@@ -4,7 +4,7 @@ import { render } from '../../test-utils'
 import { OnboardingWizard, hasSeenOnboarding, resetOnboarding } from '../OnboardingWizard'
 
 const STEP_TITLES = [
-  'Welcome to specrails-hub',
+  'Welcome to Specrails',
   'Turn ideas into specs',
   'Run the pipeline on rails',
   'Bring your own agent',
@@ -117,12 +117,12 @@ describe('hasSeenOnboarding / resetOnboarding', () => {
   })
 
   it('returns true after onboarding is dismissed', () => {
-    localStorage.setItem('specrails-hub:onboarding-dismissed', 'true')
+    localStorage.setItem('specrails-desktop:onboarding-dismissed', 'true')
     expect(hasSeenOnboarding()).toBe(true)
   })
 
   it('resets the onboarding state', () => {
-    localStorage.setItem('specrails-hub:onboarding-dismissed', 'true')
+    localStorage.setItem('specrails-desktop:onboarding-dismissed', 'true')
     resetOnboarding()
     expect(hasSeenOnboarding()).toBe(false)
   })

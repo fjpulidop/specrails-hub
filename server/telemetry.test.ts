@@ -27,7 +27,7 @@ describe('buildTelemetryEnv', () => {
     expect(env.OTEL_RESOURCE_ATTRIBUTES).toBe('specrails.job_id=job-1,specrails.project_id=proj-1')
   })
 
-  it('uses the provided hub port in the endpoint URL', () => {
+  it('uses the provided server port in the endpoint URL', () => {
     const env = buildTelemetryEnv('job-abc', 'proj-xyz', 9999)
     expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe('http://127.0.0.1:9999/otlp')
   })

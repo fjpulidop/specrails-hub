@@ -8,7 +8,7 @@ import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog'
 import { useChatContext, type ChatConversation } from '../../hooks/useChat'
 import { useSpecDraftStream } from '../../hooks/useSpecDraftStream'
-import { useHub } from '../../hooks/useHub'
+import { useDesktop } from '../../hooks/useDesktop'
 import { getApiBase } from '../../lib/api'
 import { API_ORIGIN } from '../../lib/origin'
 import { markSpecGenInFlight, unmarkSpecGenInFlight } from '../../lib/spec-gen-suppression'
@@ -134,7 +134,7 @@ export function ExploreSpecShell({
 }: ExploreSpecShellProps) {
   const { t } = useTranslation('explore')
   const chat = useChatContext()
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const [conversationId, setConversationId] = useState<string | null>(
     resumeConversationId ?? null,
   )

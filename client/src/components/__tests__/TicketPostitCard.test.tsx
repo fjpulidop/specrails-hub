@@ -17,7 +17,7 @@ function makeTicket(overrides: Partial<LocalTicket> = {}): LocalTicket {
     assignee: null,
     prerequisites: [],
     metadata: {},
-    short_summary: 'Lets users switch theme persisted hub-wide.',
+    short_summary: 'Lets users switch theme persisted app-wide.',
     is_epic: false,
     parent_epic_id: null,
     execution_order: null,
@@ -73,7 +73,7 @@ describe('TicketPostitCard', () => {
     expect(screen.getByText('#42')).toBeInTheDocument()
     expect(screen.getByText('Add dark mode toggle')).toBeInTheDocument()
     expect(screen.getByText(/high/i)).toBeInTheDocument()
-    expect(screen.getByTestId('postit-short-summary')).toHaveTextContent('Lets users switch theme persisted hub-wide.')
+    expect(screen.getByTestId('postit-short-summary')).toHaveTextContent('Lets users switch theme persisted app-wide.')
   })
 
   it('hides the summary region when short_summary is null', () => {

@@ -19,7 +19,7 @@ import type { SpecSortMode, SpecSortDir } from '../types/spec-sort'
 import { ProposeSpecModal, type ExploreLaunchPayload } from './ProposeSpecModal'
 import { ExploreSpecShell } from './explore-spec/ExploreSpecShell'
 import { useMinimizedChats, usePendingRestore } from '../context/MinimizedChatsContext'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import i18n from '../lib/i18n'
 import { deleteAllAttachments } from '../lib/attachments'
 import {
@@ -113,9 +113,9 @@ interface ExploreState {
   contextScope?: import('../types/context-scope').ContextScope
 }
 
-const DONE_SORT_MODE_KEY = (projectId: string) => `specrails-hub:done-spec-sort-mode:${projectId}`
-const DONE_SORT_DIR_KEY = (projectId: string) => `specrails-hub:done-spec-sort-dir:${projectId}`
-const DONE_VIEW_TIER_KEY = (projectId: string) => `specrails-hub:done-spec-view-tier:${projectId}`
+const DONE_SORT_MODE_KEY = (projectId: string) => `specrails-desktop:done-spec-sort-mode:${projectId}`
+const DONE_SORT_DIR_KEY = (projectId: string) => `specrails-desktop:done-spec-sort-dir:${projectId}`
+const DONE_VIEW_TIER_KEY = (projectId: string) => `specrails-desktop:done-spec-view-tier:${projectId}`
 
 function isSpecSortMode(value: unknown): value is SpecSortMode {
   return value === 'default' || value === 'ticket-id' || value === 'priority'
@@ -237,7 +237,7 @@ export function SpecsBoard({
   const [explore, setExplore] = useState<ExploreState | null>(null)
   const [activeLabels, setActiveLabels] = useState<Set<string>>(new Set())
   const [statusFilter, setStatusFilter] = useState<SpecStatusFilterValue>('all')
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const [doneSort, setDoneSort] = useState(() => loadDoneSort(activeProjectId))
   const [doneViewTier, setDoneViewTier] = useState<SpecsViewTier>(() => loadDoneViewTier(activeProjectId))
   const { minimize } = useMinimizedChats()

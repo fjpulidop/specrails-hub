@@ -175,7 +175,7 @@ export function usePipeline(activeProjectId?: string | null) {
         if (msg.recentJobs) setRecentJobs(msg.recentJobs)
         if (msg.queue) setQueueState(msg.queue)
       } catch {
-        // ignore — state endpoint may not exist in hub mode
+        // ignore — state endpoint may not exist in Super mode
       }
     }
     fetchState()

@@ -17,7 +17,7 @@ export function CodeSectionSettings() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/hub/code-explorer-settings')
+    fetch('/api/code-explorer-settings')
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((data) => { if (!cancelled) setSettings(data as CodeExplorerSettings) })
       .catch(() => { if (!cancelled) setSettings({ language: 'en', monthlyBudgetUsd: 5.0 }) })
@@ -30,7 +30,7 @@ export function CodeSectionSettings() {
     setSettings(optimistic)
     setSaving(true)
     try {
-      const res = await fetch('/api/hub/code-explorer-settings', {
+      const res = await fetch('/api/code-explorer-settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(next),

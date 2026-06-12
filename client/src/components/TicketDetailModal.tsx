@@ -14,7 +14,7 @@ import { TicketSpendingLine } from './TicketSpendingLine'
 import { useMinimizedChats } from '../context/MinimizedChatsContext'
 import { useTicketDetailModal } from '../context/TicketDetailModalContext'
 import { parseAcceptanceCriteria } from './explore-spec/acceptance-criteria'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { SmashActions } from './specs-smash/SmashActions'
 import { EpicBreadcrumb } from './specs-smash/EpicChildrenSection'
 import { EpicFamilySidebar } from './specs-smash/EpicFamilySidebar'
@@ -84,7 +84,7 @@ export function TicketDetailModal({
   embedded = false,
 }: TicketDetailModalProps) {
   const { t } = useTranslation('tickets')
-  const { activeProjectId, projects } = useHub()
+  const { activeProjectId, projects } = useDesktop()
   const { enterSplit, state: splitState } = useTicketDetailModal()
   const inSplit = splitState.originSide !== null
   // Feature flag for SMASH. Server gates with `SPECRAILS_SMASH=0` returning
@@ -721,7 +721,7 @@ const EDITABLE_STATUSES = new Set(['draft', 'todo', 'backlog'])
 function ContinueEditingButton({ ticket, title, description, priority, labels, onClose }: ContinueEditingButtonProps) {
   const { t } = useTranslation('tickets')
   const { triggerResume } = useMinimizedChats()
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const { closeTicketDetail } = useTicketDetailModal()
   if (!EDITABLE_STATUSES.has(ticket.status)) return null
   const handleClick = () => {

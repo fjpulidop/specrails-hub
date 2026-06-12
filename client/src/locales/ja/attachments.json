@@ -28,7 +28,7 @@
   },
   "lightbox": {
     "preview": "{{name}} をプレビュー",
-    "backToHub": "ハブに戻る",
+    "backToDesktop": "Specrails に戻る",
     "download": "ダウンロード",
     "downloadFile": "{{name}} をダウンロード",
     "loading": "添付ファイルを読み込み中...",

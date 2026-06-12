@@ -18,7 +18,7 @@ import { LogViewer } from '../components/LogViewer'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import type { JobSummary, EventRow, PhaseDefinition } from '../types'
 import type { PhaseMap, PhaseState } from '../hooks/usePipeline'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { formatCommandForProvider } from '../lib/format-command'
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'running' | 'queued' | 'failed' | 'canceled'
@@ -34,7 +34,7 @@ const STATUS_BADGE: Record<string, { variant: BadgeVariant; labelKey: string; to
 export default function JobDetailPage() {
   const { t } = useTranslation('jobs')
   const { id } = useParams<{ id: string }>()
-  const { activeProjectId, projects } = useHub()
+  const { activeProjectId, projects } = useDesktop()
   const activeProvider = projects.find((p) => p.id === activeProjectId)?.provider
   const navigate = useNavigate()
   const { openTicketDetail } = useTicketDetailModal()
@@ -212,7 +212,7 @@ export default function JobDetailPage() {
   async function handleExportDiagnostic() {
     if (!job) return
     try {
-      // Use fetch so the global auth interceptor attaches X-Hub-Token;
+      // Use fetch so the global auth interceptor attaches X-Desktop-Token;
       // a plain <a download> would bypass JS and get a 401 from the API.
       const res = await fetch(`${getApiBase()}/jobs/${job.id}/diagnostic`)
       if (!res.ok) {

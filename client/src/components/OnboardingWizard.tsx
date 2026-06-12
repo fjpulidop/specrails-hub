@@ -36,7 +36,7 @@ import {
 import { cn } from '../lib/utils'
 import { Button } from './ui/button'
 
-const ONBOARDING_KEY = 'specrails-hub:onboarding-dismissed'
+const ONBOARDING_KEY = 'specrails-desktop:onboarding-dismissed'
 
 export function hasSeenOnboarding(): boolean {
   try {
@@ -553,7 +553,6 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
                 <p className="text-sm font-bold tracking-tight">
                   <span className="text-accent-primary">spec</span>
                   <span className="text-accent-secondary">rails</span>
-                  <span className="text-muted-foreground"> hub</span>
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">{t('onboarding.productTour')}</p>
               </div>

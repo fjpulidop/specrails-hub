@@ -26,7 +26,7 @@ export const CONTRACT_MARKER_USER_MESSAGE = [
 // ─── Kill switch ─────────────────────────────────────────────────────────────
 
 /**
- * Returns `true` when the hub-wide kill switch is active and Contract Refine
+ * Returns `true` when the app-wide kill switch is active and Contract Refine
  * spawns MUST be skipped regardless of per-project toggles.
  *
  * The env var `SPECRAILS_EXPLORE_CONTRACT_REFINE` controls the feature:

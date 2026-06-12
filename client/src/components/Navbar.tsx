@@ -15,7 +15,7 @@ function CLIBadge() {
   const [status, setStatus] = useState<CLIStatus | null>(null)
 
   useEffect(() => {
-    fetch('/api/hub/cli-status')
+    fetch('/api/cli-status')
       .then((r) => r.json() as Promise<CLIStatus>)
       .then(setStatus)
       .catch(() => setStatus({ provider: null, version: null }))

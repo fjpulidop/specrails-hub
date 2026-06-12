@@ -13,12 +13,12 @@ We only provide security fixes for the latest release. Please upgrade to the lat
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-Use GitHub's [private security advisory feature](https://github.com/fjpulidop/specrails-hub/security/advisories/new) to report vulnerabilities confidentially.
+Use GitHub's [private security advisory feature](https://github.com/fjpulidop/specrails-desktop/security/advisories/new) to report vulnerabilities confidentially.
 
 Include in your report:
 - A clear description of the vulnerability and its potential impact
 - Steps to reproduce the issue
-- The version of specrails-hub affected (server, CLI, and/or client)
+- The version of specrails-desktop affected (server, CLI, and/or client)
 - Any relevant configuration or environment details
 - Proof of concept or exploit code (if applicable)
 
@@ -48,20 +48,20 @@ In return, we commit to:
 Security patches are released as patch releases as soon as practicable. We recommend always running the latest version:
 
 ```bash
-npm update -g specrails-hub
+npm update -g specrails-desktop
 ```
 
-Subscribe to [GitHub security advisories](https://github.com/fjpulidop/specrails-hub/security/advisories) for this repository to receive notifications.
+Subscribe to [GitHub security advisories](https://github.com/fjpulidop/specrails-desktop/security/advisories) for this repository to receive notifications.
 
 ## Scope
 
 This policy covers:
-- The specrails-hub server (`server/`)
-- The specrails-hub CLI (`cli/`)
-- The specrails-hub web client (`client/`)
-- The specrails-hub desktop application (`src-tauri/`, built on Tauri v2), including its bundled Node and Git runtimes and the auto-updater
+- The specrails-desktop server (`server/`)
+- The specrails-desktop CLI (`cli/`)
+- The specrails-desktop web client (`client/`)
+- The Specrails desktop application (`src-tauri/`, built on Tauri v2), including its bundled Node and Git runtimes and the auto-updater
 
-It does not cover vulnerabilities in third-party tools invoked by the hub (e.g., Claude Code, Codex CLI, GitHub CLI), or issues in the user's own project repositories managed through specrails-hub.
+It does not cover vulnerabilities in third-party tools invoked by the app (e.g., Claude Code, Codex CLI, GitHub CLI), or issues in the user's own project repositories managed through specrails-desktop.
 
 ## Build & Artifact Integrity
 

@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { JobComparisonModal } from './JobComparisonModal'
 import type { JobSummary, JobStatus, JobPriority } from '../types'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { formatCommandForProvider } from '../lib/format-command'
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'running' | 'queued' | 'failed' | 'canceled'
@@ -84,7 +84,7 @@ const PAGE_SIZE = 10
 export function RecentJobs({ jobs, isLoading, onJobsCleared, onProposalClick, onProposalDelete }: RecentJobsProps) {
   const { t } = useTranslation('jobs')
   const navigate = useNavigate()
-  const { activeProjectId, projects } = useHub()
+  const { activeProjectId, projects } = useDesktop()
   const activeProvider = projects.find((p) => p.id === activeProjectId)?.provider
   const [statusFilter, setStatusFilter] = useState<JobStatus | null>(null)
   const [dateFrom, setDateFrom] = useState('')

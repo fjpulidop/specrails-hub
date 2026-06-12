@@ -7,7 +7,7 @@ import request from 'supertest'
 
 import { createProjectRouter } from './project-router'
 import { initDb, type DbInstance } from './db'
-import { initHubDb } from './hub-db'
+import { initDesktopDb } from './desktop-db'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import {
   mutateStore,
@@ -28,16 +28,16 @@ function makeContext(db: DbInstance, projectPath: string): ProjectContext {
     setupManager: {} as any,
     proposalManager: {} as any,
     specLauncherManager: {} as any,
-    ticketWatcher: { notifyHubWrite: vi.fn(), start: vi.fn(), close: vi.fn() } as any,
+    ticketWatcher: { notifyDesktopWrite: vi.fn(), start: vi.fn(), close: vi.fn() } as any,
     broadcast: vi.fn(),
   }
 }
 
 function makeRegistry(ctx: ProjectContext): ProjectRegistry {
-  const hubDb = initHubDb(':memory:')
+  const desktopDb = initDesktopDb(':memory:')
   const map = new Map([[ctx.project.id, ctx]])
   return {
-    hubDb,
+    desktopDb,
     getContext: vi.fn((id: string) => map.get(id)),
     getContextByPath: vi.fn(() => undefined),
     addProject: vi.fn() as any,

@@ -275,14 +275,14 @@ describe('setup prerequisites', () => {
           executable: false,
           meetsMinimum: false,
           installUrl: 'https://git-scm.com/downloads',
-          installHint: 'Install Git and restart SpecRails Hub.',
+          installHint: 'Install Git and restart Specrails.',
         },
       ],
     }
 
     expect(formatMissingSetupPrerequisites(ready)).toBeNull()
     expect(formatMissingSetupPrerequisites(missing)).toContain('Git (git) is not on PATH')
-    expect(formatMissingSetupPrerequisites(missing)).toContain('restart SpecRails Hub')
+    expect(formatMissingSetupPrerequisites(missing)).toContain('restart Specrails')
   })
 })
 

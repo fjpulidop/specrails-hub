@@ -1,13 +1,13 @@
 # Terminal panel
 
-specrails-hub ships a full-featured terminal at the bottom of the window. Toggle it with `Cmd+J` (macOS) or `Ctrl+J` (other). It's a real xterm.js with WebGL rendering, shell integration, scrollback search, file drag-and-drop, inline images, and a few quality-of-life touches you won't find in a plain terminal app.
+specrails-desktop ships a full-featured terminal at the bottom of the window. Toggle it with `Cmd+J` (macOS) or `Ctrl+J` (other). It's a real xterm.js with WebGL rendering, shell integration, scrollback search, file drag-and-drop, inline images, and a few quality-of-life touches you won't find in a plain terminal app.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │   Dashboard content                                         │
 │                                                              │
 ├─────────────────────────────── Cmd+J ────────────────────────┤
-│ ▶ specrails-hub  /Users/you/repos/my-app                    │
+│ ▶ specrails-desktop  /Users/you/repos/my-app                │
 │ $ git status                                                 │
 │ ↳ 28ms · cwd: /Users/you/repos/my-app                       │
 │                                                              │
@@ -22,7 +22,7 @@ You don't have to. You can keep using iTerm/Windows Terminal/Alacritty/whatever 
 - **Long-running command notifications** — when a command exceeds 60 seconds and you've context-switched away, you get a native desktop notification.
 - **Open this directory** in the right-click menu when a CWD has been observed (Tauri desktop app only).
 - **Drag a file from Finder/Explorer** onto the terminal to paste its absolute path (Tauri desktop app only).
-- **Live theme switching** — the terminal recolours when you change the hub theme without losing scrollback.
+- **Live theme switching** — the terminal recolours when you change the app theme without losing scrollback.
 
 ### Toolbar shortcuts
 
@@ -59,7 +59,7 @@ Menu position flips when near the bottom-right corner of the viewport.
 
 ## Shell integration
 
-Shell integration is **on by default** (toggle in Settings → Terminal panel). The hub auto-injects a small shim per shell that emits OSC 133 prompt marks plus OSC 1337 `CurrentDir=…`. The shim runs only in the hub's spawned shell — your normal terminal apps elsewhere are untouched.
+Shell integration is **on by default** (toggle in Settings → Terminal panel). The app auto-injects a small shim per shell that emits OSC 133 prompt marks plus OSC 1337 `CurrentDir=…`. The shim runs only in the app's spawned shell — your normal terminal apps elsewhere are untouched.
 
 Per shell:
 
@@ -93,10 +93,10 @@ Disable in Settings → Terminal panel → Image rendering if you hit memory pre
 
 Two layers:
 
-- **Hub-wide defaults** — Hub Settings (gear icon on the sidebar) → Terminal panel.
+- **App-wide defaults** — Desktop Settings (gear icon on the sidebar) → Terminal panel.
 - **Per-project overrides** — Project Settings (gear in the project navbar) → Terminal panel.
 
-Project wins per-field; absent fields fall back to hub defaults.
+Project wins per-field; absent fields fall back to app-wide defaults.
 
 Hot-reload semantics:
 
@@ -130,9 +130,9 @@ If something looks broken:
 3. Open a session, then `printf '\x1b]133;A\x07'` manually and watch the gutter — a marker should appear.
 4. As a last resort, disable shell integration in Settings and re-enable; new sessions receive a fresh shim.
 
-For deeper inspection of how the panel resolves PATH at startup (relevant for Volta/nvm/asdf shims), call `GET /api/hub/setup-prerequisites?diagnostic=1` from the hub and check the `pathSegments` / `pathSources` in the response. The install-instructions modal has a **Copy diagnostics** button that does this for you.
+For deeper inspection of how the panel resolves PATH at startup (relevant for Volta/nvm/asdf shims), call `GET /api/setup-prerequisites?diagnostic=1` from the app and check the `pathSegments` / `pathSources` in the response. The install-instructions modal has a **Copy diagnostics** button that does this for you.
 
 ## Where to go next
 
-- [Customising the hub](customizing.md) — terminal settings, themes.
+- [Customising the app](customizing.md) — terminal settings, themes.
 - [Getting started](getting-started.md) — registering a project.

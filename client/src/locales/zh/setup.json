@@ -41,12 +41,12 @@
       "title": "设置失败",
       "skipSetup": "跳过设置",
       "prereqMissing": "SpecRails 设置需要 Node.js、npm、npx 和 Git 在 PATH 上可用后才能安装此项目。",
-      "prereqRetryHint": "安装缺失的工具，重启 SpecRails Hub，然后重试设置。"
+      "prereqRetryHint": "安装缺失的工具，重启 Specrails，然后重试设置。"
     }
   },
   "addProject": {
     "title": "添加项目",
-    "description": "注册一个项目目录，以便从 Hub 中管理。",
+    "description": "注册一个项目目录，以便在 Specrails 中管理。",
     "noProviderDetected": "未检测到 AI CLI。请先安装 Claude Code 或 Codex CLI。",
     "pathLabel": "项目路径",
     "pathPlaceholder": "/Users/me/my-project",
@@ -89,7 +89,7 @@
     "bundleCorruptedTitle": "应用包已损坏",
     "toolsRequired_one": "需要 {{count}} 个开发工具",
     "toolsRequired_other": "需要 {{count}} 个开发工具",
-    "reinstallHint": "请重新安装 SpecRails Hub 应用以恢复内置工具。",
+    "reinstallHint": "请重新安装 Specrails 应用以恢复内置工具。",
     "installMissingHint": "请安装缺失的工具以继续。",
     "moreInfo": "更多信息",
     "bundledBadge": "内置"
@@ -105,7 +105,7 @@
       "intro": "Winget 随 Windows 11 及较新的 Windows 10 提供。打开 PowerShell 或终端并运行：",
       "installNode": "安装 Node.js LTS",
       "installGit": "安装 Git",
-      "note": "安装后请重启 SpecRails Hub，以便 Windows 刷新 PATH。"
+      "note": "安装后请重启 Specrails，以便 Windows 刷新 PATH。"
     },
     "linux": {
       "intro": "使用你发行版的包管理器：",
@@ -128,7 +128,7 @@
     "corrupted": {
       "title": "应用包已损坏",
       "description": "一个或多个内置工具（Node.js、Git）无法通过验证。",
-      "body": "此工具随 SpecRails Hub 应用内置，无法单独安装。如果你看到此消息，说明应用包可能已损坏，请重新安装 SpecRails Hub。"
+      "body": "此工具随 Specrails 应用内置，无法单独安装。如果你看到此消息，说明应用包可能已损坏，请重新安装 Specrails。"
     }
   },
   "checkpoints": {
@@ -145,8 +145,8 @@
     "keyboardHint": "Enter 发送，Shift+Enter 换行"
   },
   "welcome": {
-    "title": "欢迎使用 <spec>spec</spec><rails>rails</rails> hub",
-    "description": "Hub 让你在一个界面中管理多个项目。添加第一个项目即可开始。",
+    "title": "欢迎使用 <spec>spec</spec><rails>rails</rails>",
+    "description": "Specrails 让你在一个界面中管理多个项目。添加第一个项目即可开始。",
     "addFirstProject": "添加你的第一个项目"
   },
   "onboarding": {
@@ -168,13 +168,13 @@
     },
     "welcome": {
       "nav": "欢迎",
-      "title": "欢迎使用 specrails-hub",
+      "title": "欢迎使用 Specrails",
       "subtitle": "用 AI Agent 交付软件的本地驾驶舱",
-      "intro": "specrails-hub 把想法变成已交付的代码——并让你<b>看见、掌控、信任</b>每一步。与 AI 对话起草 spec，把它放到执行 rail 上，点击播放。流水线会自动处理架构、实现、评审与 pull request，全程实时直播它的工作。",
+      "intro": "Specrails 把想法变成已交付的代码——并让你<b>看见、掌控、信任</b>每一步。与 AI 对话起草 spec，把它放到执行 rail 上，点击播放。流水线会自动处理架构、实现、评审与 pull request，全程实时直播它的工作。",
       "coreLoopLabel": "核心循环",
       "flowCaption": "每个 spec 都会自动流经<b>架构师 → 开发者 → 评审员 → 交付</b>。",
       "localNote": "<b>100% 本地 · 单用户 · 无需账号。</b>一切都在你的机器上运行。除非<i>你</i>主动对代码启动 Agent，否则代码绝不离开你的电脑。",
-      "tourNote": "这个快速导览会带你了解 Hub 的全部能力——大约一分钟。"
+      "tourNote": "这个快速导览会带你了解应用的全部能力——大约一分钟。"
     },
     "authorSpecs": {
       "nav": "撰写 spec",
@@ -214,7 +214,7 @@
       "nav": "你的 Agent",
       "title": "自带 Agent",
       "subtitle": "Claude Code 和 Codex，均为一等公民引擎",
-      "intro": "Hub 将 <b>Claude Code</b> 和 <b>Codex CLI</b> 视为同一契约下可互换的引擎。项目可以安装其中之一或两者——在安装时选择。",
+      "intro": "应用将 <b>Claude Code</b> 和 <b>Codex CLI</b> 视为同一契约下可互换的引擎。项目可以安装其中之一或两者——在安装时选择。",
       "table": {
         "capability": "能力",
         "streamingResume": "流式输出与会话恢复",
@@ -227,7 +227,7 @@
         "agentProfiles": "Agent Profile"
       },
       "calloutLabel": "两者都安装时",
-      "calloutBody": "可<b>按 spec、按 rail 或按终端启动</b>选择引擎。Hub 会记住每个项目的上次选择。Codex 成本基于本地费率表估算，并始终以 <mono>~</mono> 标注。"
+      "calloutBody": "可<b>按 spec、按 rail 或按终端启动</b>选择引擎。应用会记住每个项目的上次选择。Codex 成本基于本地费率表估算，并始终以 <mono>~</mono> 标注。"
     },
     "cost": {
       "nav": "成本追踪",
@@ -241,7 +241,7 @@
       "honestLabel": "诚实的数字",
       "honestBody": "Claude 成本为提供商实际计费；Codex 为估算值并以 <mono>~</mono> 标注。Token 总数包含各缓存层级，数字真正对得上账。",
       "budgetsLabel": "预算与告警",
-      "budgetsBody": "设置每日预算和单任务成本告警；超限时 Hub 会自动暂停队列。任何数据都可导出为 CSV 或 JSON。"
+      "budgetsBody": "设置每日预算和单任务成本告警；超限时应用会自动暂停队列。任何数据都可导出为 CSV 或 JSON。"
     },
     "workspace": {
       "nav": "工作区",
@@ -258,7 +258,7 @@
       "chatsLabel": "可最小化的聊天",
       "chatsBody": "把 Explore 或 AI 编辑会话停靠为底部芯片，稍后继续——刷新或切换项目都不会丢失。",
       "desktopLabel": "桌面或浏览器",
-      "desktopBody": "在浏览器中运行 Hub，或下载已签名的桌面应用（macOS 和 Windows），它自带服务器与运行时。"
+      "desktopBody": "在浏览器中运行 Specrails，或下载已签名的桌面应用（macOS 和 Windows），它自带服务器与运行时。"
     },
     "moveFast": {
       "nav": "高效操作",

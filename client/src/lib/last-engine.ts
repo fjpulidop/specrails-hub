@@ -3,12 +3,12 @@
 // then remember the user's last explicit choice per project. Single-provider
 // projects never call this (there is no choice to remember).
 //
-// Mirrors the localStorage pattern used elsewhere in the hub
-// (e.g. specrails-hub:terminal-panel:<projectId>).
+// Mirrors the localStorage pattern used elsewhere in the app
+// (e.g. specrails-desktop:terminal-panel:<projectId>).
 
 import type { ProviderId } from './provider-capabilities'
 
-const KEY_PREFIX = 'specrails-hub:last-engine:'
+const KEY_PREFIX = 'specrails-desktop:last-engine:'
 
 function key(projectId: string): string {
   return `${KEY_PREFIX}${projectId}`

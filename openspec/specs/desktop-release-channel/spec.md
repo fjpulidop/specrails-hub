@@ -5,11 +5,11 @@ Defines the desktop release publishing contract for stable latest downloads, ver
 
 ## Requirements
 ### Requirement: Stable "latest" download URL for macOS build
-The system SHALL publish the most recent signed and notarised `.dmg` for specrails-hub to a stable, version-independent URL at `https://specrails.dev/downloads/specrails-hub/latest/`. The file SHALL be the same signed and notarised artifact that is published to the versioned folder for the corresponding tag.
+The system SHALL publish the most recent signed and notarised `.dmg` for specrails-desktop to a stable, version-independent URL at `https://specrails.dev/downloads/specrails-desktop/latest/`. The file SHALL be the same signed and notarised artifact that is published to the versioned folder for the corresponding tag.
 
 #### Scenario: Tag push publishes to latest folder
 - **WHEN** a commit tagged `v<version>` is pushed and the `Desktop Release` workflow completes successfully
-- **THEN** a file named `specrails-hub-<version>-aarch64.dmg` exists at `https://specrails.dev/downloads/specrails-hub/latest/` and returns HTTP 200
+- **THEN** a file named `specrails-desktop-<version>-aarch64.dmg` exists at `https://specrails.dev/downloads/specrails-desktop/latest/` and returns HTTP 200
 
 #### Scenario: Latest file matches versioned file
 - **WHEN** both the `latest/` and the corresponding `v<version>/` folder have been populated by the same workflow run
@@ -17,15 +17,15 @@ The system SHALL publish the most recent signed and notarised `.dmg` for specrai
 
 #### Scenario: Subsequent release replaces latest
 - **WHEN** a newer tag `v<version+1>` is released
-- **THEN** `https://specrails.dev/downloads/specrails-hub/latest/specrails-hub-<version+1>-aarch64.dmg` is served and any prior `.dmg` left in `latest/` from a previous release SHALL NOT be served from that folder
+- **THEN** `https://specrails.dev/downloads/specrails-desktop/latest/specrails-desktop-<version+1>-aarch64.dmg` is served and any prior `.dmg` left in `latest/` from a previous release SHALL NOT be served from that folder
 
 ### Requirement: Stable "latest" download URL for Windows build
-The system SHALL publish the most recent Windows x64 installer for specrails-hub to a stable, version-independent URL at `https://specrails.dev/downloads/specrails-hub/latest/`. The Windows installer SHALL be the same artifact published to the versioned folder for the corresponding tag. The v1 Windows installer MAY be unsigned; Authenticode code-signing is not required by this requirement.
+The system SHALL publish the most recent Windows x64 installer for specrails-desktop to a stable, version-independent URL at `https://specrails.dev/downloads/specrails-desktop/latest/`. The Windows installer SHALL be the same artifact published to the versioned folder for the corresponding tag. The v1 Windows installer MAY be unsigned; Authenticode code-signing is not required by this requirement.
 
 #### Scenario: Tag push publishes Windows installer to latest folder
 - **WHEN** a commit tagged `v<version>` is pushed and the `Desktop Release` workflow completes successfully
-- **THEN** a file named `specrails-hub-<version>-x64-setup.exe` exists at `https://specrails.dev/downloads/specrails-hub/latest/` and returns HTTP 200
-- **AND** a file named `specrails-hub-<version>-x64.msi` exists at the same folder and returns HTTP 200
+- **THEN** a file named `specrails-desktop-<version>-x64-setup.exe` exists at `https://specrails.dev/downloads/specrails-desktop/latest/` and returns HTTP 200
+- **AND** a file named `specrails-desktop-<version>-x64.msi` exists at the same folder and returns HTTP 200
 
 #### Scenario: Latest Windows installer matches versioned file
 - **WHEN** both the `latest/` and the corresponding `v<version>/` folder have been populated by the same workflow run
@@ -34,25 +34,25 @@ The system SHALL publish the most recent Windows x64 installer for specrails-hub
 
 #### Scenario: Subsequent release replaces latest Windows installer
 - **WHEN** a newer tag `v<version+1>` is released
-- **THEN** `https://specrails.dev/downloads/specrails-hub/latest/specrails-hub-<version+1>-x64-setup.exe` is served
+- **THEN** `https://specrails.dev/downloads/specrails-desktop/latest/specrails-desktop-<version+1>-x64-setup.exe` is served
 - **AND** any prior Windows installer left in `latest/` from a previous release SHALL NOT be served from that folder
 
 ### Requirement: Versioned download URL remains available
-The system SHALL continue to publish each released `.dmg` to its version-specific folder `https://specrails.dev/downloads/specrails-hub/v<version>/` for archival and deep linking.
+The system SHALL continue to publish each released `.dmg` to its version-specific folder `https://specrails.dev/downloads/specrails-desktop/v<version>/` for archival and deep linking.
 
 #### Scenario: Versioned URL remains reachable after new release
 - **WHEN** a new release is published and `latest/` has been updated
-- **THEN** the previous release's `.dmg` at `https://specrails.dev/downloads/specrails-hub/v<previous-version>/` still returns HTTP 200
+- **THEN** the previous release's `.dmg` at `https://specrails.dev/downloads/specrails-desktop/v<previous-version>/` still returns HTTP 200
 
 ### Requirement: Versioned download URL for Windows build remains available
-The system SHALL publish each released Windows installer (`.exe` and `.msi`) to its version-specific folder `https://specrails.dev/downloads/specrails-hub/v<version>/` for archival and deep linking.
+The system SHALL publish each released Windows installer (`.exe` and `.msi`) to its version-specific folder `https://specrails.dev/downloads/specrails-desktop/v<version>/` for archival and deep linking.
 
 #### Scenario: Versioned Windows URL remains reachable after new release
 - **WHEN** a new release is published and `latest/` has been updated
-- **THEN** the previous release's Windows `.exe` at `https://specrails.dev/downloads/specrails-hub/v<previous-version>/specrails-hub-<previous-version>-x64-setup.exe` still returns HTTP 200
+- **THEN** the previous release's Windows `.exe` at `https://specrails.dev/downloads/specrails-desktop/v<previous-version>/specrails-desktop-<previous-version>-x64-setup.exe` still returns HTTP 200
 
 ### Requirement: Release manifest describes the latest build
-The system SHALL publish a `manifest.json` file at `https://specrails.dev/downloads/specrails-hub/latest/manifest.json` that describes the most recent release. The manifest SHALL be a UTF-8 encoded JSON document with the following fields:
+The system SHALL publish a `manifest.json` file at `https://specrails.dev/downloads/specrails-desktop/latest/manifest.json` that describes the most recent release. The manifest SHALL be a UTF-8 encoded JSON document with the following fields:
 
 - `schemaVersion` (integer): currently `1`.
 - `version` (string): semver version of the release, without a leading `v` (e.g. `"1.40.0"`).
@@ -71,7 +71,7 @@ The system SHALL publish a `manifest.json` file at `https://specrails.dev/downlo
 #### Scenario: Manifest includes windows-x64 entry
 - **WHEN** a release completes for which the `build-windows` job succeeded
 - **THEN** `manifest.json.platforms["windows-x64"]` exists and contains `filename`, `url`, `sha256`, and `size`
-- **AND** `platforms["windows-x64"].filename` matches `^specrails-hub-\d+\.\d+\.\d+-x64-setup\.exe$`
+- **AND** `platforms["windows-x64"].filename` matches `^specrails-desktop-\d+\.\d+\.\d+-x64-setup\.exe$`
 
 #### Scenario: Manifest reflects the most recent release
 - **WHEN** the release for tag `v<version>` completes
@@ -113,15 +113,15 @@ The `.dmg` filename published to both `latest/` and `v<version>/` SHALL contain 
 
 #### Scenario: Filename contains semver
 - **WHEN** the release for tag `v<version>` publishes
-- **THEN** the `.dmg` filename matches the regular expression `^specrails-hub-\d+\.\d+\.\d+-aarch64\.dmg$` and the captured version equals the release version
+- **THEN** the `.dmg` filename matches the regular expression `^specrails-desktop-\d+\.\d+\.\d+-aarch64\.dmg$` and the captured version equals the release version
 
 ### Requirement: Windows installer filename includes the version and architecture
 The Windows installer filenames published to both `latest/` and `v<version>/` SHALL contain the release version and architecture so that consumers can derive both by parsing the filename when the manifest is unavailable.
 
 #### Scenario: NSIS filename contains semver and arch
 - **WHEN** the release for tag `v<version>` publishes
-- **THEN** the NSIS installer filename matches the regular expression `^specrails-hub-\d+\.\d+\.\d+-x64-setup\.exe$` and the captured version equals the release version
+- **THEN** the NSIS installer filename matches the regular expression `^specrails-desktop-\d+\.\d+\.\d+-x64-setup\.exe$` and the captured version equals the release version
 
 #### Scenario: MSI filename contains semver and arch
 - **WHEN** the release for tag `v<version>` publishes
-- **THEN** the MSI filename matches the regular expression `^specrails-hub-\d+\.\d+\.\d+-x64\.msi$` and the captured version equals the release version
+- **THEN** the MSI filename matches the regular expression `^specrails-desktop-\d+\.\d+\.\d+-x64\.msi$` and the captured version equals the release version
