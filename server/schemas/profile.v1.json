@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/fjpulidop/specrails-core/main/schemas/profile.v1.json",
+  "$id": "https://raw.githubusercontent.com/fjpulidop/specrails-desktop/main/server/schemas/profile.v1.json",
   "title": "specrails agent profile (v1)",
-  "description": "Declarative configuration for the specrails implement pipeline. Describes which agents participate, which models they run with, and how tasks are routed to specialists. Consumed by `implement.md` and produced by tools like specrails-desktop.",
+  "description": "Declarative configuration for the specrails implement pipeline. Describes which agents participate, which models they run with, and how tasks are routed to specialists. Consumed by `implement.md` and produced by tools like specrails-desktop. This is specrails-desktop's derivative of specrails-core's canonical v1 profile schema: it adds the optional top-level `provider` field and relaxes `modelAlias` to any non-empty string (provider-catalog validation happens in profile-manager.validateStructural). Per core's schema-identity contract, a diverging vendored copy must carry its own $id — only byte-identical copies may share the canonical core $id.",
   "type": "object",
   "required": ["schemaVersion", "name", "orchestrator", "agents", "routing"],
   "additionalProperties": false,
