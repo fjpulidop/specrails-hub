@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.67.0](https://github.com/fjpulidop/specrails-hub/compare/v1.66.0...v1.67.0) (2026-06-12)
+
+
+### Features
+
+* **i18n:** add multi-language UI with hot switching ([#372](https://github.com/fjpulidop/specrails-hub/issues/372)) ([aee381d](https://github.com/fjpulidop/specrails-hub/commit/aee381dbf9b419e41fe7404281ba4051d19af8be))
+
 ## [1.66.0](https://github.com/fjpulidop/specrails-hub/compare/v1.65.4...v1.66.0) (2026-06-11)
 
 
