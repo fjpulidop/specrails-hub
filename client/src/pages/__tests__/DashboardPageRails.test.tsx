@@ -78,7 +78,7 @@ describe('DashboardPage — rail interactions', () => {
     render(<DashboardPage />)
     const batchButtons = screen.getAllByText('Batch')
     fireEvent.click(batchButtons[0])
-    // saveRails stores under specrails-hub:rails:<projectId>
+    // saveRails stores under specrails-desktop:rails:<projectId>
     // projectId is null in test so no-op — just verify no crash
     expect(screen.getAllByText('Batch').length).toBeGreaterThan(0)
   })

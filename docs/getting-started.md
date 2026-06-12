@@ -1,6 +1,6 @@
 # Getting started
 
-This guide walks you from "I just heard about specrails-hub" to "I just shipped my first AI-driven change" in about ten minutes. No prior knowledge of specrails-core required — the hub installs it for you.
+This guide walks you from "I just heard about specrails-desktop" to "I just shipped my first AI-driven change" in about ten minutes. No prior knowledge of specrails-core required — the app installs it for you.
 
 ## What you'll need
 
@@ -9,7 +9,7 @@ This guide walks you from "I just heard about specrails-hub" to "I just shipped 
 
 If you install with **npm** (Option 2 below) you'll also need **Node.js 20+** and **`git`** on your PATH. The **desktop app** bundles its own Node and Git runtimes, so you don't need those installed separately.
 
-That's it. specrails-hub will install specrails-core in your project on first run if it isn't there yet.
+That's it. specrails-desktop will install specrails-core in your project on first run if it isn't there yet.
 
 ## Install
 
@@ -17,10 +17,10 @@ Two options:
 
 ### Option 1 — Desktop app (recommended)
 
-Download a signed build for your OS from `https://specrails.dev/downloads/specrails-hub/latest/`:
+Download a signed build for your OS from `https://specrails.dev/downloads/specrails-desktop/latest/`:
 
-- **macOS** — `specrails-hub-<version>-aarch64.dmg` (Apple Silicon, notarised)
-- **Windows** — `specrails-hub-<version>-x64-setup.exe` (NSIS) or `.msi`
+- **macOS** — `specrails-desktop-<version>-aarch64.dmg` (Apple Silicon, notarised)
+- **Windows** — `specrails-desktop-<version>-x64-setup.exe` (NSIS) or `.msi`
 
 Open the installer, drag to Applications (macOS) or click through the wizard (Windows). The app bundles the server, so you don't need a separate process. macOS handles all the Homebrew/Volta/nvm PATH gymnastics for you — see [platforms/macos.md](platforms/macos.md) if anything looks off.
 
@@ -29,11 +29,11 @@ Open the installer, drag to Applications (macOS) or click through the wizard (Wi
 ### Option 2 — npm
 
 ```bash
-npm install -g specrails-hub
-specrails-hub start
+npm install -g specrails-desktop
+specrails-desktop start
 ```
 
-By default the hub binds to `http://127.0.0.1:4200`. Open it in your browser.
+By default the app binds to `http://127.0.0.1:4200`. Open it in your browser.
 
 ## Add a project
 
@@ -50,8 +50,8 @@ There are two ways. Pick whichever feels natural.
 **From the CLI:**
 
 ```bash
-specrails-hub add /path/to/your/project
-specrails-hub list   # verify
+specrails-desktop add /path/to/your/project
+specrails-desktop list   # verify
 ```
 
 ### If the project doesn't have specrails-core yet
@@ -59,14 +59,14 @@ specrails-hub list   # verify
 The setup wizard runs automatically. Three steps:
 
 1. **Configure** — choose which agents to install (the baseline trio `sr-architect`, `sr-developer`, `sr-reviewer` is always selected; optional agents like Test Writer or Security Reviewer are opt-in). Pick a model preset (Balanced / Budget / Max) and optionally override the model per agent.
-2. **Install** — the hub runs the installer (`npx specrails-core@latest init --yes --from-config <config>`) non-interactively and streams the output live.
+2. **Install** — the app runs the installer (`npx specrails-core@latest init --yes --from-config <config>`) non-interactively and streams the output live.
 3. **Done** — a summary tells you how many agents and commands landed. Click **Continue to project**.
 
 That's the whole onboarding. No tier picker, no second wizard. You can manage agents and their per-agent models later from the **Agents** page (Profiles tab).
 
 ## Your first spec
 
-A "spec" is a description of work you want done. specrails-hub gives you two ways to author them.
+A "spec" is a description of work you want done. specrails-desktop gives you two ways to author them.
 
 ### Quick mode — one-shot generation
 
@@ -84,7 +84,7 @@ Your AI CLI generates the full spec in one turn. A small toast at the bottom rig
 When the spec needs shaping:
 
 1. Click **+ Add Spec → Explore**.
-2. (Optional) pick a context preset from the slider — `Minimal` (just your message) up to `Hub` (the full codebase + Contract Layer enrichment + project and user-approved MCPs).
+2. (Optional) pick a context preset from the slider — `Minimal` (just your message) up to `Desktop` (the full codebase + Contract Layer enrichment + project and user-approved MCPs).
 3. Type a starting message. The AI responds with a live draft below.
 4. Iterate. Each turn updates the draft.
 5. Click **Save as Draft** to come back later, or **Create Spec** when the draft looks right.
@@ -114,26 +114,26 @@ Token usage, duration, and cost are tracked per turn and surface in:
 - **[Tracking cost](tracking-cost.md)** — analytics deep dive and CSV exports.
 - **[Codex](codex.md)** — using the Codex CLI as a provider, alongside or instead of Claude.
 - **[Terminal panel](terminal.md)** — the built-in per-project terminal (toggle with `Cmd/Ctrl+J`).
-- **[Customising the hub](customizing.md)** — themes, terminal settings, kill switches.
-- **[CLI reference](cli.md)** — drive specrails-hub from the terminal.
+- **[Customising the app](customizing.md)** — themes, terminal settings, kill switches.
+- **[CLI reference](cli.md)** — drive specrails-desktop from the terminal.
 
 ## Troubleshooting
 
 **"Port 4200 already in use" on start**
 
 ```bash
-specrails-hub stop                # stops the running hub cleanly
+specrails-desktop stop                # stops the running server cleanly
 # or kill the process holding the port
 lsof -i :4200    # macOS / Linux
 ```
 
-**The `claude` command isn't found inside the hub**
+**The `claude` command isn't found inside the app**
 
-On macOS, this usually means the hub was launched from Finder/Dock and didn't pick up Homebrew/Volta paths. The hub fixes this at startup automatically, but if it still fails, see [platforms/macos.md](platforms/macos.md).
+On macOS, this usually means the app was launched from Finder/Dock and didn't pick up Homebrew/Volta paths. The app fixes this at startup automatically, but if it still fails, see [platforms/macos.md](platforms/macos.md).
 
 **The setup wizard fails on `npx specrails-core@latest init`**
 
-Most likely Node is missing from the shell environment that launched the hub, or your AI CLI isn't authenticated (sign in to the `claude` CLI or set `ANTHROPIC_API_KEY`; for Codex, sign in to the `codex` CLI). Click **Copy diagnostics** in the install-instructions modal — that prints the resolved PATH, where the hub found each tool, and login-shell status. Paste it into a bug report if you can't figure it out.
+Most likely Node is missing from the shell environment that launched the app, or your AI CLI isn't authenticated (sign in to the `claude` CLI or set `ANTHROPIC_API_KEY`; for Codex, sign in to the `codex` CLI). Click **Copy diagnostics** in the install-instructions modal — that prints the resolved PATH, where the app found each tool, and login-shell status. Paste it into a bug report if you can't figure it out.
 
 **More**
 

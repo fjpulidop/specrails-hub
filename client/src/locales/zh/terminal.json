@@ -53,11 +53,11 @@
   },
   "errors": {
     "limitReached": "已达到终端数量上限（最多 {{max}} 个）。",
-    "spawnFailed": "Shell 启动失败 — Hub 的文件描述符可能不足。请尝试重启 Hub。",
+    "spawnFailed": "Shell 启动失败 — 应用的文件描述符可能不足。请尝试重启应用。",
     "invalidName": "终端名称无效。",
     "openFailed": "打开终端失败。",
     "serverUnreachable": "无法连接服务器以打开终端。",
-    "exitedImmediately": "终端立即退出 — Shell 可能启动失败。如果持续发生，请重启 Hub。"
+    "exitedImmediately": "终端立即退出 — Shell 可能启动失败。如果持续发生，请重启应用。"
   },
   "session": {
     "processExited": "[进程已退出]",

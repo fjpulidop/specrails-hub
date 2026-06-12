@@ -15,8 +15,8 @@ vi.mock('../../lib/api', () => ({
   getApiBase: () => '/api',
 }))
 
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({
     activeProjectId: 'proj-1',
     projects: [],
     isLoading: false,

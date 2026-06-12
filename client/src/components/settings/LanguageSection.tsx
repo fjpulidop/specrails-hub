@@ -5,7 +5,7 @@ import { useLanguageOptional } from '../../context/LanguageContext'
 import { LANGUAGE_IDS, LANGUAGES, type LanguageId } from '../../lib/i18n'
 
 /**
- * Hub-wide language picker. One card per supported language — rendered from
+ * Desktop-wide language picker. One card per supported language — rendered from
  * the `LANGUAGE_IDS` registry so adding a language requires zero changes
  * here. Click applies hot (no restart) and persists to the server; failure
  * reverts to the previously active language.

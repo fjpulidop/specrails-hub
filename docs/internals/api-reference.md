@@ -1,21 +1,21 @@
 # API reference
 
-REST and WebSocket endpoints exposed by the hub server. The server binds to `127.0.0.1` only (loopback); the default port is `4200` but it can be overridden with `--port <n>` on the server command line.
+REST and WebSocket endpoints exposed by the app server. The server binds to `127.0.0.1` only (loopback); the default port is `4200` but it can be overridden with `--port <n>` on the server command line.
 
 ## Authentication
 
-A hub token is **auto-generated on first run** (two concatenated UUIDs) and persisted to `~/.specrails/hub.token` with mode `0600`. It is **mandatory**, not optional. Every `/api/*` route is protected by it, with two exceptions that are mounted before the auth middleware: `/api/health` and `/api/hub/token`.
+An app token is **auto-generated on first run** (two concatenated UUIDs) and persisted to `~/.specrails/desktop.token` with mode `0600`. It is **mandatory**, not optional. Every `/api/*` route is protected by it, with two exceptions that are mounted before the auth middleware: `/api/health` and `/api/token`.
 
-Send the token either as a Bearer header or an `X-Hub-Token` header:
+Send the token either as a Bearer header or an `X-Desktop-Token` header:
 
 ```http
 Authorization: Bearer <token>
-X-Hub-Token: <token>
+X-Desktop-Token: <token>
 ```
 
-The CLI and the desktop client read the token automatically. The browser client fetches it same-origin from `GET /api/hub/token`. WebSocket upgrades carry it as the `token` query parameter.
+The CLI and the desktop client read the token automatically. The browser client fetches it same-origin from `GET /api/token`. WebSocket upgrades carry it as the `token` query parameter.
 
-There is no UI to set or clear the token, and it is not a hub setting.
+There is no UI to set or clear the token, and it is not an app setting.
 
 This page is hand-maintained against the route declarations in `server/*-router.ts`. If you spot a discrepancy, please file an issue.
 
@@ -26,23 +26,28 @@ This page is hand-maintained against the route declarations in `server/*-router.
 | Prefix | Router | Auth | Notes |
 |--------|--------|------|-------|
 | `/api/health` | direct | none | Liveness probe (`{ status, version, uptime, projects, mode }`) |
-| `/api/hub/token` | direct | none | Returns the auth token for local bootstrapping (loopback-only) |
+| `/api/token` | direct | none | Returns the auth token for local bootstrapping (loopback-only) |
 | `/api/docs` | `docs-router` | none (mounted before auth) | Bundled documentation portal |
-| `/api/hub/*` | `hub-router` | Bearer / X-Hub-Token | Cross-project operations |
-| `/api/projects/:projectId/*` | `project-router` | Bearer / X-Hub-Token | Project-scoped operations |
-| `/api/projects/:projectId/code/*` | `code-explorer-router` | Bearer / X-Hub-Token | Read-only Code explorer |
-| `/api/projects/:projectId/rails/*` | `rails-router` | Bearer / X-Hub-Token | Rails (execution lanes) |
-| `/api/projects/:projectId/profiles/*` | `profiles-router` | Bearer / X-Hub-Token | Agent profiles + catalog studio |
-| `/api/projects/:projectId/plugins/*` | `plugins-router` | Bearer / X-Hub-Token | Plugin marketplace |
+| `/api/mobile/*` | `mobile-admin-router` | Bearer / X-Desktop-Token + loopback | Mobile Gateway admin (enable/pair/devices) |
+| `/api/*` | `desktop-router` | Bearer / X-Desktop-Token | Cross-project operations |
+| `/api/projects/:projectId/*` | `project-router` | Bearer / X-Desktop-Token | Project-scoped operations |
+| `/api/projects/:projectId/code/*` | `code-explorer-router` | Bearer / X-Desktop-Token | Read-only Code explorer |
+| `/api/projects/:projectId/rails/*` | `rails-router` | Bearer / X-Desktop-Token | Rails (execution lanes) |
+| `/api/projects/:projectId/profiles/*` | `profiles-router` | Bearer / X-Desktop-Token | Agent profiles + catalog studio |
+| `/api/projects/:projectId/plugins/*` | `plugins-router` | Bearer / X-Desktop-Token | Plugin marketplace |
 | `/otlp/v1/{traces,metrics,logs}` | `telemetry-receiver` | none (gated by job id) | OTLP/JSON receiver |
-| `/ws` | WebSocket | token in query | Project + hub event stream |
+| `/ws` | WebSocket | token in query | Project + app event stream |
 | `/ws/terminal/:id` | WebSocket | token in query | PTY traffic for the terminal panel |
+
+**Mount order matters**: the `desktop-router` is mounted at `/api` **before** the project router, so exact routes such as `GET /api/projects` and `DELETE /api/projects/:id` are answered by the desktop router, while everything under `/api/projects/:projectId/*` falls through to the project router.
 
 A non-localhost `Origin` header is rejected by the CORS middleware with `403 Forbidden: cross-origin requests not allowed`.
 
+> **Breaking change (Specrails Desktop rebrand)**: the former `/api/hub/*` prefix is now `/api/*` (e.g. `/api/hub/state` → `/api/state`, `/api/hub/token` → `/api/token`, `/api/hub/projects` → `/api/projects`), the auth header `X-Hub-Token` is now `X-Desktop-Token`, the WebSocket auth subprotocol `hub-token.<token>` is now `desktop-token.<token>`, and the webhook/WS event `hub_daily_budget_exceeded` is now `desktop_daily_budget_exceeded`. There is no server-side alias for the old paths or header.
+
 ---
 
-## `/api/hub/*`
+## `/api/*`
 
 ### Projects
 
@@ -53,7 +58,7 @@ A non-localhost `Origin` header is rejected by the CORS middleware with `403 For
 | `DELETE` | `/projects/:id` | Unregister (does not delete the project directory) |
 | `GET` | `/resolve?path=…` | Find a project by **exact** canonical filesystem path. No parent-directory walking — a subdirectory returns 404 |
 
-### Hub state
+### App state
 
 | Method | Path | Notes |
 |--------|------|-------|
@@ -67,27 +72,47 @@ A non-localhost `Origin` header is rejected by the CORS middleware with `403 For
 
 | Method | Path | Notes |
 |--------|------|-------|
-| `GET` | `/settings` | Hub-wide settings |
+| `GET` | `/settings` | App-wide settings |
 | `PUT` | `/settings` | Update any subset of `{ port?, specrailsTechUrl?, costAlertThresholdUsd? }` |
-| `GET` | `/budget` | Hub-wide budget config |
-| `PATCH` | `/budget` | Update the hub-wide daily budget |
+| `GET` | `/budget` | App-wide budget config |
+| `PATCH` | `/budget` | Update the app-wide daily budget |
 | `GET` | `/theme` | Current UI theme (defaults to `specrails`) |
 | `PATCH` | `/theme` | Set UI theme. Body `{ theme }`; one of `dracula`, `aurora-light`, `obsidian-dark`, `matrix`, `specrails`. 400 on an unknown value |
+| `GET` | `/language` | Current UI language; `{ language: null }` when the user never chose one (the client then follows the OS language) |
+| `PATCH` | `/language` | Set UI language. Body `{ language }`; one of `en`, `es`, `fr`, `de`, `pt`, `it`, `zh`, `ja`. 400 on an unknown value |
 | `GET` | `/code-explorer-settings` | `{ language, monthlyBudgetUsd }` (summary language `en`/`es`, default budget $5) |
 | `PATCH` | `/code-explorer-settings` | Update `{ language?, monthlyBudgetUsd? }` |
-| `GET` | `/terminal-settings` | Hub-wide terminal panel defaults |
-| `PATCH` | `/terminal-settings` | Update hub terminal defaults |
+| `GET` | `/terminal-settings` | App-wide terminal panel defaults |
+| `PATCH` | `/terminal-settings` | Update app-wide terminal defaults |
 
-### Analytics (hub-wide)
+### Analytics (app-wide)
 
 | Method | Path | Notes |
 |--------|------|-------|
-| `GET` | `/analytics?period=&from=&to=` | Cross-project aggregated spending (the Hub Analytics page; supports a custom `from`/`to` range) |
+| `GET` | `/analytics?period=&from=&to=` | Cross-project aggregated spending (the Desktop Analytics page; supports a custom `from`/`to` range) |
 | `GET` | `/recent-jobs?limit=` | Recent jobs across all projects (1–50) |
+
+### Mobile Gateway admin (`/api/mobile/*`)
+
+Loopback-only admin surface for the Mobile Gateway (the gateway itself is a separate HTTPS+WSS listener the phone talks to). The wire contract the phone consumes intentionally keeps the legacy `hub.*` names — see the frozen mobile wire-compat note in `CLAUDE.md`.
+
+| Method | Path | Notes |
+|--------|------|-------|
+| `GET` | `/status` | Gateway status (`{ enabled, running, port, certFingerprint, lanAddresses, mdnsEnabled, desktopName }`) |
+| `POST` | `/enable` | Start the gateway (generates the TLS identity on first run) |
+| `POST` | `/disable` | Stop the gateway |
+| `POST` | `/pairing-session` | Open a pairing session; returns the QR payload |
+| `GET` | `/pairing-session` | Poll the current pairing session (pending claim, if any) |
+| `POST` | `/pairing-session/approve` | Approve the pending claim (pairs the device) |
+| `POST` | `/pairing-session/deny` | Deny the pending claim |
+| `DELETE` | `/pairing-session` | Cancel the pairing session |
+| `GET` | `/devices` | List paired devices |
+| `DELETE` | `/devices/:id` | Revoke a paired device |
+| `POST` | `/cert/rotate` | Rotate the gateway TLS identity (unpairs every device) |
 
 ### specrails-tech proxy
 
-Proxies the external specrails-tech agents service (base URL from `hub_settings.specrails_tech_url`).
+Proxies the external specrails-tech agents service (base URL from `desktop_settings.specrails_tech_url`).
 
 | Method | Path | Notes |
 |--------|------|-------|
@@ -97,7 +122,7 @@ Proxies the external specrails-tech agents service (base URL from `hub_settings.
 | `GET` | `/specrails-tech/docs` | List remote docs |
 | `GET` | `/specrails-tech/docs/:page` | Doc page detail |
 
-### Agents catalogue (hub-wide)
+### Agents catalogue (app-wide)
 
 | Method | Path | Notes |
 |--------|------|-------|
@@ -115,6 +140,8 @@ Proxies the external specrails-tech agents service (base URL from `hub_settings.
 | `PATCH` | `/webhooks/:id` | Update |
 | `DELETE` | `/webhooks/:id` | Delete |
 | `POST` | `/webhooks/:id/test` | Fire a test payload |
+
+Subscribable events: `job.completed`, `job.failed`, `job.canceled`, `daily_budget_exceeded`, `desktop_daily_budget_exceeded`. **Breaking**: the event formerly named `hub_daily_budget_exceeded` is now `desktop_daily_budget_exceeded` — stored webhook subscriptions are rewritten automatically by a one-time migration, but external consumers matching on the event name must update.
 
 ---
 
@@ -222,7 +249,7 @@ Spending is tracked across six surfaces: `job`, `quick-spec`, `explore-spec`, `a
 
 ### Setup wizard
 
-The setup wizard is a three-step flow (Configure / Install / Done). The `enrich/*` and `setup/start`+`setup/message` endpoints back the legacy AI-enriched flow that the hub UI does not expose; they remain mounted for forward compatibility.
+The setup wizard is a three-step flow (Configure / Install / Done). The `enrich/*` and `setup/start`+`setup/message` endpoints back the legacy AI-enriched flow that the app UI does not expose; they remain mounted for forward compatibility.
 
 | Method | Path | Notes |
 |--------|------|-------|
@@ -448,9 +475,9 @@ OTLP/JSON receiver (`telemetry-receiver`) used by the pipeline-telemetry feature
 
 ## WebSocket — `/ws`
 
-A single connection at `ws://127.0.0.1:4200/ws?token=<authToken>` multiplexes every project and hub event. The token query param is required.
+A single connection at `ws://127.0.0.1:4200/ws?token=<authToken>` multiplexes every project and app-level event. The token query param is required.
 
-Every project-scoped message includes a `projectId` field. Hub-level messages have no `projectId` and reach every handler.
+Every project-scoped message includes a `projectId` field. App-level messages have no `projectId` and reach every handler.
 
 ### Job, queue & pipeline
 
@@ -470,7 +497,7 @@ Every project-scoped message includes a `projectId` field. Hub-level messages ha
 |------|-------|-------|
 | `cost_alert` | project | Job exceeded the per-job alert threshold |
 | `daily_budget_exceeded` | project | Project daily budget hit; queue paused |
-| `hub_daily_budget_exceeded` | hub | Hub-level daily budget hit |
+| `desktop_daily_budget_exceeded` | app | App-wide daily budget hit |
 | `spending.invalidated` | project | Analytics cache should refetch (no payload) |
 
 ### Tickets, specs & drafts
@@ -545,13 +572,13 @@ Every project-scoped message includes a `projectId` field. Hub-level messages ha
 | `setup_complete` | project | Setup wrapping up |
 | `setup_error` | project | Setup failed |
 
-### Hub-level
+### App-level
 
 | Type | Scope | Notes |
 |------|-------|-------|
-| `hub.project_added` | hub | New project registered |
-| `hub.project_removed` | hub | Project unregistered |
-| `hub.projects` | hub | Bulk project list refresh |
+| `desktop.project_added` | app | New project registered |
+| `desktop.project_removed` | app | Project unregistered |
+| `desktop.projects` | app | Bulk project list refresh |
 
 ### Client filtering pattern
 
@@ -565,7 +592,7 @@ useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProject
 if (msg.projectId && msg.projectId !== activeProjectIdRef.current) return
 ```
 
-Hub-level messages (no `projectId`) are processed by every handler.
+App-level messages (no `projectId`) are processed by every handler.
 
 ---
 
@@ -588,10 +615,10 @@ Client → server: text input as binary; `{ type: "resize", cols, rows }` JSON o
 
 ## Errors
 
-The hub uses standard HTTP status codes. Notable conventions:
+The app uses standard HTTP status codes. Notable conventions:
 
 - `400` — malformed body / invalid params
-- `401` — missing or invalid token (Bearer or `X-Hub-Token`)
+- `401` — missing or invalid token (Bearer or `X-Desktop-Token`)
 - `403` — cross-origin request (a non-localhost `Origin` header)
 - `404` — resource not found (including a project resolved from an unregistered path)
 - `409` — write conflict (file-lock contention on tickets, plugin name collision, project path already registered)
@@ -603,5 +630,5 @@ Error responses are `{ "error": "<message>" }`.
 
 ## Caveats
 
-- **Surface drift**: this file is hand-maintained against the route declarations in `server/*-router.ts` and `server/code-explorer-router.ts`. The hub adds endpoints regularly; if a route exists in code but not here, please open an issue.
-- **Stability**: routes under `/api/hub/*` and `/api/projects/:projectId/*` are considered stable. A few legacy setup endpoints (`setup/start`, `setup/message`, `enrich/*`) back a flow the UI does not expose and remain only for forward compatibility.
+- **Surface drift**: this file is hand-maintained against the route declarations in `server/*-router.ts` and `server/code-explorer-router.ts`. The app adds endpoints regularly; if a route exists in code but not here, please open an issue.
+- **Stability**: routes under `/api/*` and `/api/projects/:projectId/*` are considered stable. A few legacy setup endpoints (`setup/start`, `setup/message`, `enrich/*`) back a flow the UI does not expose and remain only for forward compatibility.

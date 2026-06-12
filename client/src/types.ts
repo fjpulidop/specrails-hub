@@ -146,7 +146,7 @@ export interface AnalyticsResponse {
   }
 }
 
-export interface HubProjectStats {
+export interface DesktopProjectStats {
   projectId: string
   projectName: string
   totalCostUsd: number
@@ -155,7 +155,7 @@ export interface HubProjectStats {
   avgDurationMs: number | null
 }
 
-export interface HubAnalyticsResponse {
+export interface DesktopAnalyticsResponse {
   period: {
     label: string
     from: string | null
@@ -168,7 +168,7 @@ export interface HubAnalyticsResponse {
     costToday: number
     jobsToday: number
   }
-  projectBreakdown: HubProjectStats[]
+  projectBreakdown: DesktopProjectStats[]
   costTimeline: Array<{ date: string; costUsd: number }>
 }
 
@@ -278,7 +278,7 @@ export interface LocalTicket {
   updated_at: string
   created_by: string
   source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'explore-draft' | 'specs-smash' | 'free-prompt'
-  /** Hub-managed: set when a job that had already marked this spec `done` then
+  /** Desktop-managed: set when a job that had already marked this spec `done` then
    *  failed/was canceled/zombie-killed. The board shows a "review" badge on the
    *  Done card. Cleared on the next clean completion. */
   needs_review?: boolean

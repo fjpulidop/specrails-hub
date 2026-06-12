@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react
 import i18n from '../lib/i18n'
 import { getApiBase } from '../lib/api'
 import { useSharedWebSocket } from './useSharedWebSocket'
-import { useHub } from './useHub'
+import { useDesktop } from './useDesktop'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ export interface RailJobInfo {
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useRails() {
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const [rails, setRails] = useState<RailState[]>([
     { railIndex: 0, ticketIds: [], mode: 'implement' },
     { railIndex: 1, ticketIds: [], mode: 'implement' },

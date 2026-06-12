@@ -120,8 +120,8 @@
     "noData": "No data for current filters",
     "failed": "Export failed"
   },
-  "hub": {
-    "title": "Hub Analytics",
+  "desktop": {
+    "title": "Desktop Analytics",
     "refreshAria": "Refresh analytics",
     "failedToLoad": "Failed to load analytics: {{error}}",
     "totalCost": "Total Cost",

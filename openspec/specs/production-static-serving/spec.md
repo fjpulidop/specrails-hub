@@ -35,7 +35,7 @@ The `package.json` `files` field SHALL list exactly the directories needed at ru
 
 #### Scenario: Published package contains compiled CLI
 - **WHEN** the package is installed from npm
-- **THEN** `cli/dist/specrails-hub.js` is present
+- **THEN** `cli/dist/specrails-desktop.js` is present
 
 #### Scenario: Published package contains built client
 - **WHEN** the package is installed from npm

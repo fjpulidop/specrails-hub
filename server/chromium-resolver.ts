@@ -134,7 +134,10 @@ const ARCHIVE_NAMES = ['chromium.pak', 'chromium.tar.gz', 'chromium.tar']
 
 // XOR key for the obfuscated `chromium.pak` blob. Keep byte-identical to KEY in
 // scripts/obfuscate-chromium.mjs — the round-trip is covered by a unit test.
-const OBFUSCATION_KEY = Buffer.from('specrails-hub-chromium-pack-v1', 'utf8')
+// (Safe to have changed at the rebrand: the .pak and this binary always ship
+// together in the same bundle, and the extraction cache re-extracts on a new
+// archive via the `.source` marker.)
+const OBFUSCATION_KEY = Buffer.from('specrails-desktop-chromium-pack-v1', 'utf8')
 
 /** Streaming XOR transform (symmetric: packs and unpacks). */
 function xorStream(): Transform {

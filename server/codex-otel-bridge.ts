@@ -3,13 +3,13 @@
 //
 // Lifecycle:
 //
-//   const bridge = createCodexOtelBridge({ jobId, projectId, hubPort, model, threadId? })
+//   const bridge = createCodexOtelBridge({ jobId, projectId, desktopPort, model, threadId? })
 //   for each parsed AdapterEvent → bridge.consumeEvent(event)
 //   on child close → await bridge.finalize({ exitCode, stderr? })
 //
 // On finalize, the bridge composes one OTLP/JSON payload per signal (traces,
 // metrics, logs) and POSTs them to the in-process receiver at
-// http://127.0.0.1:<hubPort>/otlp/v1/{traces,metrics,logs}. The receiver
+// http://127.0.0.1:<desktopPort>/otlp/v1/{traces,metrics,logs}. The receiver
 // already routes by resource attributes, enforces the 10 MB cap, gzips the
 // NDJSON, and updates `telemetry_blobs` — the bridge does not bypass any of
 // that.
@@ -23,7 +23,7 @@ import type { AdapterEvent } from './providers/types'
 export interface BridgeOptions {
   jobId: string
   projectId: string
-  hubPort: number
+  desktopPort: number
   /** Model the codex spawn used. Captured as a span attribute. */
   model?: string
   /** codex --version. Captured as `specrails.codex.cli_version` resource attr. */
@@ -76,7 +76,7 @@ function makeResource(opts: BridgeOptions, threadId: string | undefined) {
     attr('specrails.job_id', opts.jobId),
     attr('specrails.project_id', opts.projectId),
     attr('specrails.provider', 'codex'),
-    attr('service.name', 'specrails-hub.codex-bridge'),
+    attr('service.name', 'specrails-desktop.codex-bridge'),
   ]
   if (opts.model) attrs.push(attr('specrails.codex.model', opts.model))
   if (opts.cliVersion) attrs.push(attr('specrails.codex.cli_version', opts.cliVersion))
@@ -153,7 +153,7 @@ export function createCodexOtelBridge(opts: BridgeOptions): CodexOtelBridge {
     const endedAtUnixNs = String(BigInt(endedAtMs) * 1_000_000n)
 
     const resource = makeResource(opts, threadId)
-    const scopeKey = { name: 'specrails-hub.codex-bridge' }
+    const scopeKey = { name: 'specrails-desktop.codex-bridge' }
 
     // ── Spans ──────────────────────────────────────────────────────────────
     const usage = (resultPayload?.usage as Record<string, number> | undefined) ?? {}
@@ -252,7 +252,7 @@ export function createCodexOtelBridge(opts: BridgeOptions): CodexOtelBridge {
     }
 
     const url = (signal: 'traces' | 'metrics' | 'logs') =>
-      `http://127.0.0.1:${opts.hubPort}/otlp/v1/${signal}`
+      `http://127.0.0.1:${opts.desktopPort}/otlp/v1/${signal}`
 
     const results = await Promise.allSettled([
       poster(url('traces'), JSON.stringify(tracesPayload)),

@@ -5,7 +5,7 @@ category: Workflow
 tags: [workflow, compatibility, breaking-changes, migration]
 ---
 
-Analyze the API surface of **specrails-hub** for backwards compatibility. Extracts the current contract surface (CLI flags, template placeholders, command names, argument flags, agent names, config keys), compares against a stored baseline, classifies each change by severity, and generates a migration guide when breaking changes are found.
+Analyze the API surface of **specrails-desktop** for backwards compatibility. Extracts the current contract surface (CLI flags, template placeholders, command names, argument flags, agent names, config keys), compares against a stored baseline, classifies each change by severity, and generates a migration guide when breaking changes are found.
 
 **Input:** `$ARGUMENTS` — optional flags:
 - `--diff` — compare current surface to most recent snapshot (default when snapshots exist)
@@ -175,7 +175,7 @@ Build two lists:
 Print the full compatibility report.
 
 ```
-## Compatibility Impact Report — specrails-hub
+## Compatibility Impact Report — specrails-desktop
 Date: <ISO date> | Commit: <git_short_sha or "unknown">
 
 ### Surface Snapshot

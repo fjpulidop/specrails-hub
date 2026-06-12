@@ -1,5 +1,5 @@
-# SpecRails Hub — bash shell-integration shim
-# Loaded via --rcfile when the user spawns a terminal in the hub.
+# Specrails — bash shell-integration shim
+# Loaded via --rcfile when the user spawns a terminal in the app.
 # Sources the user's real ~/.bashrc, then layers OSC 133 / OSC 1337 hooks on top.
 
 export SPECRAILS_SHELL_INTEGRATION_LOADED=1

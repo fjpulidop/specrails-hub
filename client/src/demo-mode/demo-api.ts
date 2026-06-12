@@ -5,10 +5,10 @@
  * data instead of hitting a real backend.  Installed once from demo-entry.tsx
  * before the React tree mounts.
  *
- * Runs the app in **hub mode** with a single fake project so the real
- * useTickets / useRails / useHub hooks produce the full dashboard instead
+ * Runs the app in **Super mode** with a single fake project so the real
+ * useTickets / useRails / useDesktop hooks produce the full dashboard instead
  * of the empty "No specs yet" state. Both legacy `/api/tickets` and the
- * hub-mode `/api/projects/<id>/tickets` variants are matched by the same
+ * Super-mode `/api/projects/<id>/tickets` variants are matched by the same
  * route patterns.
  */
 
@@ -17,9 +17,9 @@ import { demoJobs } from './fixtures/jobs'
 import { demoAnalytics } from './fixtures/analytics'
 import { demoActivity } from './fixtures/activity'
 import { demoConfig } from './fixtures/config'
-import type { HubProject } from '../hooks/useHub'
+import type { DesktopProject } from '../hooks/useDesktop'
 
-export const DEMO_PROJECT: HubProject = {
+export const DEMO_PROJECT: DesktopProject = {
   id: 'demo-project-001',
   slug: 'my-saas-app',
   name: 'my-saas-app',
@@ -37,29 +37,29 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
-/** Matches both legacy `/api/<thing>` and hub `/api/projects/<id>/<thing>` shapes. */
+/** Matches both legacy `/api/<thing>` and Super-mode `/api/projects/<id>/<thing>` shapes. */
 const projectScoped = (suffix: string) =>
   new RegExp(`\\/api\\/(?:projects\\/[^/]+\\/)?${suffix}`)
 
 const routes: Array<[RegExp, () => Response]> = [
-  // ── Hub-level endpoints ───────────────────────────────────────────────
-  [/\/api\/hub\/token$/, () => json({ token: 'demo-token' })],
+  // ── Desktop-level endpoints ───────────────────────────────────────────────
+  [/\/api\/token$/, () => json({ token: 'demo-token' })],
   [
-    /\/api\/hub\/state$/,
+    /\/api\/state$/,
     () =>
       json({
-        mode: 'hub',
+        mode: 'super',
         activeProjectId: DEMO_PROJECT.id,
-        hubDailyBudget: null,
-        hubDailySpend: 0,
+        desktopDailyBudget: null,
+        desktopDailySpend: 0,
       }),
   ],
   [
-    /\/api\/hub\/projects(\b|\/)/,
+    /\/api\/projects\/?$/,
     () => json({ projects: [DEMO_PROJECT], setupProjectIds: [] }),
   ],
-  [/\/api\/hub\/cli-status/, () => json({ provider: 'claude', version: '1.0.0' })],
-  [/\/api\/hub\/settings/, () => json({})],
+  [/\/api\/cli-status/, () => json({ provider: 'claude', version: '1.0.0' })],
+  [/\/api\/settings/, () => json({})],
 
   // ── Per-project endpoints (also match the legacy un-scoped variants) ──
   [projectScoped('tickets(\\/|\\?|$)'), () => json({ tickets: demoTickets })],

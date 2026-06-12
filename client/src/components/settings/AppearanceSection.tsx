@@ -5,7 +5,7 @@ import { useThemeOptional } from '../../context/ThemeContext'
 import { THEME_IDS, THEMES, type ThemeId } from '../../lib/themes'
 
 /**
- * Hub-wide theme picker. One card per built-in theme — rendered from the
+ * Desktop-wide theme picker. One card per built-in theme — rendered from the
  * `THEME_IDS` registry so adding a theme requires zero changes here. Click
  * to apply optimistically and persist to the server. Failure reverts to the
  * previously active theme. No live preview on hover (intentional v1

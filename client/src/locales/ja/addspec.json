@@ -102,7 +102,7 @@
       "standard": "標準",
       "rich": "リッチ",
       "max": "最大",
-      "hub": "Hub"
+      "desktop": "Desktop"
     },
     "presetCost": {
       "minimal": "1× コスト · 最速の初回トークン · スペック読み込みなし",
@@ -110,7 +110,7 @@
       "standard": "1.6× コスト · Specrails + OpenSpec スペックを読み込み",
       "rich": "2× コスト · リポジトリ全体の読み取りアクセス",
       "max": "4× コスト · 全読み取り + Contract Layer 改良",
-      "hub": "4–6× コスト · 全機能 + プロジェクトおよび承認済み MCP"
+      "desktop": "4–6× コスト · 全機能 + プロジェクトおよび承認済み MCP"
     },
     "smashCapable": "SMASH 対応",
     "smashHint": "Contract Layer が有効なため、このスペックは後で Sub-Spec に分解できます。",

@@ -7,21 +7,21 @@ Gate the "Add project" flow on local developer prerequisites (Node.js, npm, npx,
 ## Requirements
 
 ### Requirement: AddProjectDialog runs a prerequisites check on open
-The "Add project" dialog SHALL invoke the prerequisites status fetch (`GET /api/hub/setup-prerequisites`) every time it transitions from closed to open, subject to a 60-second client-side cache.
+The "Add project" dialog SHALL invoke the prerequisites status fetch (`GET /api/setup-prerequisites`) every time it transitions from closed to open, subject to a 60-second client-side cache.
 
 #### Scenario: First open within a session
 - **WHEN** the user clicks the "+" button to open `AddProjectDialog` for the first time after page load
-- **THEN** the dialog issues `GET /api/hub/setup-prerequisites`
+- **THEN** the dialog issues `GET /api/setup-prerequisites`
 - **AND** while the response is in flight, the prerequisites panel renders a loading skeleton
 
 #### Scenario: Re-open within the cache window
 - **WHEN** the dialog is closed and re-opened within 60 seconds of a successful previous fetch
 - **THEN** the cached status is rendered immediately
-- **AND** no new request to `/api/hub/setup-prerequisites` is made
+- **AND** no new request to `/api/setup-prerequisites` is made
 
 #### Scenario: Re-open after the cache window
 - **WHEN** the dialog is opened more than 60 seconds after the previous fetch
-- **THEN** a fresh request to `/api/hub/setup-prerequisites` is issued
+- **THEN** a fresh request to `/api/setup-prerequisites` is issued
 
 #### Scenario: Network failure does not block the user
 - **WHEN** the prereq fetch fails (network error, non-2xx response)
@@ -94,7 +94,7 @@ The install-instructions modal SHALL display copy-paste install commands for the
 - **THEN** the Windows section is the visible default
 - **AND** the section shows `winget install OpenJS.NodeJS.LTS` and `winget install Git.Git`
 - **AND** the section also links to `https://nodejs.org/en/download` and `https://git-scm.com/download/win`
-- **AND** the section reminds the user to restart SpecRails Hub so PATH refreshes
+- **AND** the section reminds the user to restart Specrails so PATH refreshes
 
 #### Scenario: Linux host
 - **WHEN** `platform: "linux"`
@@ -131,7 +131,7 @@ A single hook (`usePrerequisites`) SHALL provide the prereq status, loading stat
 - **THEN** the wizard's prereq panel reflects the new status without an additional explicit fetch
 
 ### Requirement: Server response carries platform and version metadata
-`GET /api/hub/setup-prerequisites` SHALL return, in addition to the existing fields:
+`GET /api/setup-prerequisites` SHALL return, in addition to the existing fields:
 
 - `platform: "darwin" | "win32" | "linux"` at the response root.
 - `minVersion: string` per `SetupPrerequisite` record (semver, `major.minor.patch`).

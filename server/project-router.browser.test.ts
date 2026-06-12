@@ -3,7 +3,7 @@ import express from 'express'
 import request from 'supertest'
 import { createProjectRouter } from './project-router'
 import { initDb, type DbInstance } from './db'
-import { initHubDb } from './hub-db'
+import { initDesktopDb } from './desktop-db'
 import { BrowserLimitExceededError, BrowserLaunchError } from './browser-capture-types'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 
@@ -37,7 +37,7 @@ function createApp(ctx: ProjectContext | null) {
   const contexts = new Map<string, ProjectContext>()
   if (ctx) contexts.set('proj-1', ctx)
   const registry = {
-    hubDb: initHubDb(':memory:'),
+    desktopDb: initDesktopDb(':memory:'),
     getContext: vi.fn((id: string) => contexts.get(id)),
     getContextByPath: vi.fn(() => undefined),
     touchProject: vi.fn(),

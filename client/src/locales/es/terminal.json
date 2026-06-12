@@ -53,11 +53,11 @@
   },
   "errors": {
     "limitReached": "Límite de terminales alcanzado (máx. {{max}}).",
-    "spawnFailed": "El shell no pudo iniciarse — puede que el hub se esté quedando sin descriptores de archivo. Prueba a reiniciar el hub.",
+    "spawnFailed": "El shell no pudo iniciarse — puede que la aplicación se esté quedando sin descriptores de archivo. Prueba a reiniciar la aplicación.",
     "invalidName": "Nombre de terminal no válido.",
     "openFailed": "No se pudo abrir el terminal.",
     "serverUnreachable": "No se pudo contactar con el servidor para abrir un terminal.",
-    "exitedImmediately": "El terminal terminó de inmediato — puede que el shell no haya podido iniciarse. Si sigue ocurriendo, reinicia el hub."
+    "exitedImmediately": "El terminal terminó de inmediato — puede que el shell no haya podido iniciarse. Si sigue ocurriendo, reinicia la aplicación."
   },
   "session": {
     "processExited": "[proceso terminado]",

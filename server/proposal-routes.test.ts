@@ -108,7 +108,7 @@ function createTestApp() {
   const broadcast = vi.fn()
   const db = initDb(':memory:')
 
-  // Register a fake project in the hub DB
+  // Register a fake project in the desktop DB
   const registry = new ProjectRegistry(broadcast)
 
   // Manually add a context by calling addProject with a fake path

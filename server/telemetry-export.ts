@@ -197,7 +197,7 @@ function buildSummaryFromRows(
 
 // ─── Log extraction ────────────────────────────────────────────────────────────
 
-// Hub log output is never written to a flat file — it is streamed over
+// App log output is never written to a flat file — it is streamed over
 // WebSocket and persisted per-event in the `events` table. Reconstruct a
 // readable logs.txt by formatting every event row in seq order.
 function buildLogsFromEvents(events: EventRow[]): string {

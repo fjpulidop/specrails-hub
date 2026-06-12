@@ -13,7 +13,7 @@ The `TitleBar` component SHALL render only when `window.__TAURI_INTERNALS__` is 
 #### Scenario: Running inside Tauri on Windows or Linux
 - **WHEN** the React app loads inside the Tauri WebView on Windows or Linux
 - **AND** `navigator.windowControlsOverlay?.visible` is `false` or `undefined`
-- **THEN** a 38px title bar strip is rendered with SR icon, "SpecRails Hub" label, and custom window control buttons
+- **THEN** a 38px title bar strip is rendered with SR icon, Specrails label, and custom window control buttons
 
 #### Scenario: Running in a browser
 - **WHEN** the React app loads in a regular browser

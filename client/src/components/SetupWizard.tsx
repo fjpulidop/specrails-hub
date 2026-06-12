@@ -10,7 +10,7 @@ import { AgentSelector, ALL_AGENTS, CORE_AGENTS, DEFAULT_SELECTED } from './Agen
 import { ModelSelector, type ModelPreset, type ModelOverrides } from './ModelSelector'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import { cn } from '../lib/utils'
-import { type HubProject, projectProviders } from '../hooks/useHub'
+import { type DesktopProject, projectProviders } from '../hooks/useDesktop'
 import { providerLabel } from '../lib/provider-capabilities'
 import { usePrerequisites, type SetupPrerequisitesStatus } from '../hooks/usePrerequisites'
 import { PrerequisitesPanel } from './PrerequisitesPanel'
@@ -506,7 +506,7 @@ function StepIndicator({ wizardStep, providers }: { wizardStep: WizardStep; prov
 // ─── SetupWizard ──────────────────────────────────────────────────────────────
 
 interface SetupWizardProps {
-  project: HubProject
+  project: DesktopProject
   onComplete: () => void
   onSkip: () => void
 }
@@ -709,7 +709,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
     setWizardStep({ step: 'installing', providerIndex: index })
 
     // Write install config matching specrails-core's install-config.yaml schema.
-    // `tier: 'quick'` is hardcoded — the hub only exposes the template-agent
+    // `tier: 'quick'` is hardcoded — the app only exposes the template-agent
     // install flow now; the legacy AI-enrich flow lives in specrails-core's
     // standalone `npx specrails-core@latest init` for users who want it.
     // install-config is written then `install` is started; the server runs ONE

@@ -4,29 +4,29 @@
 TBD - created by archiving change add-plugin-system. Update Purpose after archive.
 ## Requirements
 ### Requirement: Bundled plugin registry
-The hub SHALL expose a typed, in-process registry of bundled plugins. Every plugin available to projects MUST be discoverable through this registry; no remote, user-installable, or dynamically-loaded plugins are permitted in v1.
+The app SHALL expose a typed, in-process registry of bundled plugins. Every plugin available to projects MUST be discoverable through this registry; no remote, user-installable, or dynamically-loaded plugins are permitted in v1.
 
 #### Scenario: Listing the registry returns all bundled plugins
-- **WHEN** the hub starts
+- **WHEN** the app starts
 - **THEN** `PluginManager.listAvailable()` returns one entry per plugin bundled at build time, each carrying its full manifest
 
 #### Scenario: Adding a new plugin requires only a registry import
 - **WHEN** a developer appends a new plugin module to `server/plugins/index.ts`
-- **THEN** the new plugin appears in the registry on next hub start with no other code changes elsewhere
+- **THEN** the new plugin appears in the registry on next app start with no other code changes elsewhere
 
 ### Requirement: Plugin manifest declares ownership
 Every plugin MUST declare, in its manifest, the artifacts it owns: MCP server names (`owns.mcpServers`), agent fragment file paths (`owns.agentFragments`), and any project-state config keys (`owns.configKeys`). The manifest MUST also include `name` (kebab-case unique id), `version` (semver), `description`, `whatItDoes` (bullet list for the marketplace card), and `requirements` (executable prerequisites such as `uv >= 0.1`).
 
 #### Scenario: Manifest with overlapping ownership is rejected at startup
 - **WHEN** two registered plugins claim the same `mcpServers` entry
-- **THEN** the hub fails fast at startup with an error naming both plugins and the conflicting key
+- **THEN** the app fails fast at startup with an error naming both plugins and the conflicting key
 
 #### Scenario: Manifest missing required fields is rejected at startup
 - **WHEN** a registered plugin's manifest lacks `name`, `version`, or `owns`
-- **THEN** the hub fails fast at startup with a validation error pointing at the offending plugin
+- **THEN** the app fails fast at startup with a validation error pointing at the offending plugin
 
 ### Requirement: Per-project plugin state
-The hub SHALL persist per-project plugin state at `<project>/.specrails/plugins/state.json`. The state file MUST be a JSON object of shape `{ schemaVersion: 1, plugins: { [name]: { version, installedAt, health } } }`. The file MUST be created lazily on first install and never deleted by the hub even when no plugins remain installed.
+The app SHALL persist per-project plugin state at `<project>/.specrails/plugins/state.json`. The state file MUST be a JSON object of shape `{ schemaVersion: 1, plugins: { [name]: { version, installedAt, health } } }`. The file MUST be created lazily on first install and never deleted by the app even when no plugins remain installed.
 
 #### Scenario: Project with no plugins has no state file
 - **WHEN** a project has never installed a plugin
@@ -55,14 +55,14 @@ Installing or uninstalling plugin N MUST NOT mutate any artifact owned by anothe
 - **THEN** `custom-foo.md` is untouched
 
 ### Requirement: Atomic, locked file mutation
-All writes to `<project>/.mcp.json` and `<project>/.specrails/plugins/state.json` performed by the hub MUST hold a `proper-lockfile` advisory lock for the duration of the read-modify-write and MUST replace the file via temp-file + rename so partial writes are never observable.
+All writes to `<project>/.mcp.json` and `<project>/.specrails/plugins/state.json` performed by the app MUST hold a `proper-lockfile` advisory lock for the duration of the read-modify-write and MUST replace the file via temp-file + rename so partial writes are never observable.
 
 #### Scenario: Concurrent installs serialize correctly
 - **WHEN** two installs of different plugins start within the same millisecond
 - **THEN** both ultimately succeed and the final `.mcp.json` contains entries from both with no lost update
 
 #### Scenario: Crash mid-write leaves the previous file intact
-- **WHEN** the hub process is killed between the temp write and the rename
+- **WHEN** the app process is killed between the temp write and the rename
 - **THEN** the original `.mcp.json` remains valid JSON with its prior contents
 
 ### Requirement: Install rollback on failure
@@ -85,7 +85,7 @@ If `Plugin.install` fails or `Plugin.verify` returns `ok: false` immediately aft
 - **THEN** `PluginManager.verify(projectId, "serena")` resolves with `{ ok: true }`
 
 ### Requirement: Orphan handling
-When a project's `state.json` references a plugin that is no longer in the bundled registry, the hub MUST mark that entry as `orphan: true` in API responses but MUST NOT delete it silently. The user MUST be offered an explicit "remove orphan" action.
+When a project's `state.json` references a plugin that is no longer in the bundled registry, the app MUST mark that entry as `orphan: true` in API responses but MUST NOT delete it silently. The user MUST be offered an explicit "remove orphan" action.
 
 #### Scenario: Removed plugin shows as orphan
 - **GIVEN** state.json contains plugin "old-thing" and the registry does not
@@ -93,7 +93,7 @@ When a project's `state.json` references a plugin that is no longer in the bundl
 - **THEN** the response includes one card with `status: "orphan"` and a separate uninstall path
 
 ### Requirement: REST API surface
-The hub SHALL expose plugin operations under `/api/projects/:projectId/plugins`:
+The app SHALL expose plugin operations under `/api/projects/:projectId/plugins`:
 - `GET /` — list catalog with per-plugin status (`installed | not-installed | orphan | degraded`).
 - `GET /:name/preview-install` — return a structured diff describing every file the install would create or modify.
 - `POST /:name/install` — perform install; streams progress over the existing project WebSocket using `plugin.installed` and progress events.

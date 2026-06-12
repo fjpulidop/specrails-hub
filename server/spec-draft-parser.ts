@@ -1,6 +1,6 @@
 // Parses ` ```spec-draft ` fenced JSON blocks emitted by Claude during an
 // Explore Spec conversation. Each block carries a partial structured draft
-// that the hub merges into the per-conversation latest draft state and
+// that the app merges into the per-conversation latest draft state and
 // broadcasts to clients. Blocks are stripped from the chat content before it
 // reaches the WS so the user never sees raw JSON.
 

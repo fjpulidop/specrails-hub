@@ -7,13 +7,13 @@ const MINIMAL: ContextScope = PRESETS[0].scope
 const STANDARD: ContextScope = PRESETS[2].scope
 const RICH: ContextScope = PRESETS[3].scope
 const MAX_SCOPE: ContextScope = PRESETS[4].scope
-const HUB: ContextScope = PRESETS[5].scope
+const DESKTOP: ContextScope = PRESETS[5].scope
 
 describe('presetIndexFor', () => {
   it('returns the matching preset index', () => {
     expect(presetIndexFor(MINIMAL)).toBe(0)
     expect(presetIndexFor(STANDARD)).toBe(2)
-    expect(presetIndexFor(HUB)).toBe(5)
+    expect(presetIndexFor(DESKTOP)).toBe(5)
   })
 
   it('returns -1 for off-preset combinations (Custom)', () => {
@@ -62,13 +62,13 @@ describe('ContextScopeSlider', () => {
     expect(onChange).toHaveBeenCalledWith(PRESETS[1].scope)
   })
 
-  it('Home jumps to Minimal, End jumps to Hub', () => {
+  it('Home jumps to Minimal, End jumps to Desktop', () => {
     const onChange = vi.fn()
     render(<ContextScopeSlider value={STANDARD} onChange={onChange} />)
     const slider = screen.getByRole('slider')
     slider.focus()
     fireEvent.keyDown(slider, { key: 'End' })
-    expect(onChange).toHaveBeenLastCalledWith(HUB)
+    expect(onChange).toHaveBeenLastCalledWith(DESKTOP)
     fireEvent.keyDown(slider, { key: 'Home' })
     expect(onChange).toHaveBeenLastCalledWith(MINIMAL)
   })
@@ -87,12 +87,12 @@ describe('ContextScopeSlider', () => {
     )
     expect(onPresetChange).toHaveBeenCalledWith('standard')
     rerender(
-      <ContextScopeSlider value={HUB} onChange={() => {}} onPresetChange={onPresetChange} />,
+      <ContextScopeSlider value={DESKTOP} onChange={() => {}} onPresetChange={onPresetChange} />,
     )
-    expect(onPresetChange).toHaveBeenLastCalledWith('hub')
+    expect(onPresetChange).toHaveBeenLastCalledWith('desktop')
   })
 
-  it('contractRefine is only true at Max and Hub presets', () => {
+  it('contractRefine is only true at Max and Desktop presets', () => {
     expect(PRESETS[0].scope.contractRefine).toBe(false)
     expect(PRESETS[1].scope.contractRefine).toBe(false)
     expect(PRESETS[2].scope.contractRefine).toBe(false)
@@ -101,9 +101,9 @@ describe('ContextScopeSlider', () => {
     expect(PRESETS[5].scope.contractRefine).toBe(true)
   })
 
-  it('userMcp is only enabled by the Hub preset', () => {
+  it('userMcp is only enabled by the Desktop preset', () => {
     for (let i = 0; i < 5; i++) expect(PRESETS[i].scope.userMcp ?? false).toBe(false)
-    expect(PRESETS[5].id).toBe('hub')
+    expect(PRESETS[5].id).toBe('desktop')
     expect(PRESETS[5].scope.userMcp).toBe(true)
   })
 
@@ -114,8 +114,8 @@ describe('ContextScopeSlider', () => {
     expect(hint.textContent).toMatch(/SMASH-capable/)
   })
 
-  it('shows the SMASH-capable hint for Hub preset', () => {
-    render(<ContextScopeSlider value={HUB} onChange={() => {}} />)
+  it('shows the SMASH-capable hint for Desktop preset', () => {
+    render(<ContextScopeSlider value={DESKTOP} onChange={() => {}} />)
     expect(screen.getByTestId('scope-smash-hint')).toBeInTheDocument()
   })
 
@@ -135,8 +135,8 @@ describe('ContextScopeSlider', () => {
     expect(screen.queryByTestId('scope-smash-hint')).not.toBeInTheDocument()
   })
 
-  it('hides the SMASH hint when smashCapable=false with Hub preset', () => {
-    render(<ContextScopeSlider value={HUB} onChange={() => {}} smashCapable={false} />)
+  it('hides the SMASH hint when smashCapable=false with Desktop preset', () => {
+    render(<ContextScopeSlider value={DESKTOP} onChange={() => {}} smashCapable={false} />)
     expect(screen.queryByTestId('scope-smash-hint')).not.toBeInTheDocument()
   })
 
@@ -147,7 +147,7 @@ describe('ContextScopeSlider', () => {
 
   it('defaults smashCapable to true (backward-compatible with existing callers)', () => {
     // Omitting smashCapable must still show the hint when contractRefine is on
-    render(<ContextScopeSlider value={HUB} onChange={() => {}} />)
+    render(<ContextScopeSlider value={DESKTOP} onChange={() => {}} />)
     expect(screen.getByTestId('scope-smash-hint')).toBeInTheDocument()
   })
 
@@ -155,7 +155,7 @@ describe('ContextScopeSlider', () => {
     const onChange = vi.fn()
     render(<ContextScopeSlider value={STANDARD} onChange={onChange} maxPresetId="max" />)
     expect(screen.getByTestId('scope-stop-max')).toBeInTheDocument()
-    expect(screen.queryByTestId('scope-stop-hub')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('scope-stop-desktop')).not.toBeInTheDocument()
 
     const slider = screen.getByRole('slider')
     expect(slider).toHaveAttribute('aria-valuemax', '4')

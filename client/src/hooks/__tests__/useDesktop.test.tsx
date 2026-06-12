@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import React from 'react'
-import { HubProvider, useHub } from '../useHub'
+import { DesktopProvider, useDesktop } from '../useDesktop'
 import { SharedWebSocketProvider } from '../useSharedWebSocket'
 
 // ─── Mock lib/api ──────────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ function makeWrapper() {
     return React.createElement(
       SharedWebSocketProvider,
       { url: 'ws://localhost:4200' },
-      React.createElement(HubProvider, null, children)
+      React.createElement(DesktopProvider, null, children)
     )
   }
 }
@@ -63,7 +63,7 @@ function makeProject(overrides: Partial<{ id: string; name: string; slug: string
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe('useHub', () => {
+describe('useDesktop', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     MockWebSocket.instances = []
@@ -74,13 +74,13 @@ describe('useHub', () => {
     })
   })
 
-  it('loads projects from /api/hub/projects on mount', async () => {
+  it('loads projects from /api/projects on mount', async () => {
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ projects: [makeProject()] }),
     })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
 
     await waitFor(() => expect(result.current.isLoading).toBe(false))
     expect(result.current.projects).toHaveLength(1)
@@ -93,7 +93,7 @@ describe('useHub', () => {
       json: () => Promise.resolve({ projects: [makeProject({ id: 'first', name: 'First' })] }),
     })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
 
     await waitFor(() => expect(result.current.isLoading).toBe(false))
     expect(result.current.projects).toHaveLength(1)
@@ -106,7 +106,7 @@ describe('useHub', () => {
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ projects: [] }) })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ project: newProject, has_specrails: true }) })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     let returned: unknown
@@ -115,7 +115,7 @@ describe('useHub', () => {
     })
 
     expect(global.fetch).toHaveBeenCalledWith(
-      '/api/hub/projects',
+      '/api/projects',
       expect.objectContaining({ method: 'POST' })
     )
     expect(returned).toEqual({ project: newProject, has_specrails: true })
@@ -128,7 +128,7 @@ describe('useHub', () => {
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ projects: [makeProject()] }) })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     await act(async () => {
@@ -136,19 +136,19 @@ describe('useHub', () => {
     })
 
     expect(global.fetch).toHaveBeenCalledWith(
-      '/api/hub/projects/proj-1',
+      '/api/projects/proj-1',
       expect.objectContaining({ method: 'DELETE' })
     )
     expect(result.current.projects).toHaveLength(0)
   })
 
-  it('WS hub.projects: bulk update', async () => {
+  it('WS desktop.projects: bulk update', async () => {
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ projects: [] }),
     })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     // Wait for WS to connect
@@ -158,7 +158,7 @@ describe('useHub', () => {
 
     act(() => {
       ws.simulateMessage({
-        type: 'hub.projects',
+        type: 'desktop.projects',
         projects: [makeProject({ id: 'ws-proj', name: 'WS Project' })],
       })
     })
@@ -167,13 +167,13 @@ describe('useHub', () => {
     expect(result.current.projects[0].id).toBe('ws-proj')
   })
 
-  it('WS hub.project_added: adds to list, activates', async () => {
+  it('WS desktop.project_added: adds to list, activates', async () => {
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ projects: [] }),
     })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     await waitFor(() => MockWebSocket.instances.length > 0)
@@ -182,7 +182,7 @@ describe('useHub', () => {
 
     act(() => {
       ws.simulateMessage({
-        type: 'hub.project_added',
+        type: 'desktop.project_added',
         project: makeProject({ id: 'added-proj', name: 'Added Project' }),
       })
     })
@@ -191,13 +191,13 @@ describe('useHub', () => {
     expect(result.current.activeProjectId).toBe('added-proj')
   })
 
-  it('WS hub.project_removed: removes, deactivates if active', async () => {
+  it('WS desktop.project_removed: removes, deactivates if active', async () => {
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ projects: [makeProject({ id: 'to-remove' })] }),
     })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     // Manually activate the project (REST no longer auto-selects)
@@ -209,7 +209,7 @@ describe('useHub', () => {
     await act(async () => { ws.onopen?.() })
 
     act(() => {
-      ws.simulateMessage({ type: 'hub.project_removed', projectId: 'to-remove' })
+      ws.simulateMessage({ type: 'desktop.project_removed', projectId: 'to-remove' })
     })
 
     expect(result.current.projects).toHaveLength(0)
@@ -222,7 +222,7 @@ describe('useHub', () => {
       json: () => Promise.resolve({ projects: [makeProject(), makeProject({ id: 'proj-2', name: 'Project Two' })] }),
     })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     act(() => { result.current.setActiveProjectId('proj-2') })
@@ -237,7 +237,7 @@ describe('useHub', () => {
       json: () => Promise.resolve({ projects: [] }),
     })
 
-    const { result } = renderHook(() => useHub(), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useDesktop(), { wrapper: makeWrapper() })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     act(() => { result.current.startSetupWizard('proj-setup') })
@@ -247,9 +247,9 @@ describe('useHub', () => {
     expect(result.current.setupProjectIds.has('proj-setup')).toBe(false)
   })
 
-  it('legacy fallback: useHub() returns LEGACY_FALLBACK when no provider', () => {
-    // Render without HubProvider or SharedWebSocketProvider
-    const { result } = renderHook(() => useHub())
+  it('legacy fallback: useDesktop() returns LEGACY_FALLBACK when no provider', () => {
+    // Render without DesktopProvider or SharedWebSocketProvider
+    const { result } = renderHook(() => useDesktop())
 
     expect(result.current.projects).toEqual([])
     expect(result.current.activeProjectId).toBeNull()

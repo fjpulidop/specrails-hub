@@ -13,7 +13,7 @@
  * Components use SEMANTIC tokens only (e.g. `text-accent-primary`,
  * `bg-surface`, `border-border`). Brand-named tokens (`dracula-*`) MUST NOT
  * appear in component code — see `client/src/lib/themes.ts` for the registry
- * and `openspec/specs/hub-theme-system/spec.md` for the contract.
+ * and `openspec/specs/desktop-theme-system/spec.md` for the contract.
  *
  * To add a new theme:
  *   1. Append a `[data-theme="<id>"] { ... }` block below redefining every
@@ -493,14 +493,14 @@
 }
 
 /* ─── Portfolio PDF print layer ─────────────────────────────────────────────
- * When the user invokes Export PDF (Tauri webview print-to-pdf), we hide hub
+ * When the user invokes Export PDF (Tauri webview print-to-pdf), we hide app
  * chrome (left/right sidebar, top bar, terminal panel, toolbar buttons) and
  * force a page break before each major Portfolio section so the result reads
  * as a structured document, not a single long page.
  */
 @media print {
   body, html { background: white !important; }
-  /* Hide hub chrome */
+  /* Hide app chrome */
   .portfolio-toolbar,
   nav,
   [role='navigation'],

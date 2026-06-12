@@ -1,7 +1,7 @@
 import { createHmac } from 'crypto'
 import type { DbInstance } from './db'
-import { listWebhooksForProject } from './hub-db'
-import type { WebhookRow, WebhookEvent } from './hub-db'
+import { listWebhooksForProject } from './desktop-db'
+import type { WebhookRow, WebhookEvent } from './desktop-db'
 
 const WEBHOOK_TIMEOUT_MS = 10_000
 const MAX_ATTEMPTS = 3
@@ -20,10 +20,10 @@ export interface WebhookPayload {
 // ─── WebhookManager ───────────────────────────────────────────────────────────
 
 export class WebhookManager {
-  private _hubDb: DbInstance
+  private _desktopDb: DbInstance
 
-  constructor(hubDb: DbInstance) {
-    this._hubDb = hubDb
+  constructor(desktopDb: DbInstance) {
+    this._desktopDb = desktopDb
   }
 
   /**
@@ -34,7 +34,7 @@ export class WebhookManager {
       event: 'job.completed',
       timestamp: new Date().toISOString(),
       projectId: webhook.project_id ?? '*',
-      data: { test: true, message: 'specrails-hub webhook test ping' },
+      data: { test: true, message: 'specrails-desktop webhook test ping' },
     }
     setImmediate(() => {
       this._deliverWithRetry(webhook, payload).catch(() => {})
@@ -46,7 +46,7 @@ export class WebhookManager {
    * Non-blocking: fires and forgets with retry logic.
    */
   deliver(projectId: string, event: WebhookEvent, data: Record<string, unknown>): void {
-    const webhooks = listWebhooksForProject(this._hubDb, projectId)
+    const webhooks = listWebhooksForProject(this._desktopDb, projectId)
     const matching = webhooks.filter((w) => {
       try {
         const events = JSON.parse(w.events) as string[]
@@ -74,7 +74,7 @@ export class WebhookManager {
     const body = JSON.stringify(payload)
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'User-Agent': 'specrails-hub',
+      'User-Agent': 'specrails-desktop',
     }
 
     if (webhook.secret) {

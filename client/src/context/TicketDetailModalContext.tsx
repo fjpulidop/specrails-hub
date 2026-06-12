@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react'
 import { useTickets } from '../hooks/useTickets'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { SplitViewShell } from '../components/SplitViewShell'
 import { TicketDetailModal } from '../components/TicketDetailModal'
 
@@ -104,7 +104,7 @@ const COMPARE_VIEWPORT_MIN = 900
 export function TicketDetailModalProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reduceSplit, INITIAL_STATE)
   const { tickets, updateTicket, deleteTicket } = useTickets()
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
 
   // M22: this provider sits ABOVE the project-keyed route boundary, so an open
   // modal / split-view survives a project switch. Ticket ids are per-project

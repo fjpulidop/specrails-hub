@@ -10,7 +10,7 @@ import { Badge } from './ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import type { PhaseMap, PhaseState, QueueJob } from '../hooks/usePipeline'
 import type { PhaseDefinition } from '../types'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { formatCommandForProvider } from '../lib/format-command'
 
 interface ActiveJobCardProps {
@@ -30,7 +30,7 @@ function formatDuration(startedAt: string): string {
 export function ActiveJobCard({ activeJob, phases, phaseDefinitions }: ActiveJobCardProps) {
   const { t } = useTranslation('jobs')
   const [elapsed, setElapsed] = useState<string>('')
-  const { activeProjectId, projects } = useHub()
+  const { activeProjectId, projects } = useDesktop()
   const activeProvider = projects.find((p) => p.id === activeProjectId)?.provider
 
   useEffect(() => {

@@ -30,7 +30,7 @@ import { toast } from 'sonner'
 import i18n from '../lib/i18n'
 import { API_ORIGIN } from '../lib/origin'
 import { WS_URL } from '../lib/ws-url'
-import { getHubTokenProtocol } from '../lib/auth'
+import { getDesktopTokenProtocol } from '../lib/auth'
 import { useThemeOptional } from './ThemeContext'
 import { getActiveTheme } from '../lib/theme-palette'
 import { readClipboardText, writeClipboardText } from '../lib/tauri-clipboard'
@@ -141,7 +141,7 @@ export interface MarkFrame {
 }
 
 function storageKey(projectId: string): string {
-  return `specrails-hub:terminal-panel:${projectId}`
+  return `specrails-desktop:terminal-panel:${projectId}`
 }
 
 interface StoredPanel { visibility: PanelVisibility; userHeight: number }
@@ -193,7 +193,7 @@ function ensureTerminalHost(): HTMLDivElement {
   return host
 }
 
-// ─── xterm theme — driven by the active hub theme ─────────────────────────────
+// ─── xterm theme — driven by the active app theme ─────────────────────────────
 // `getActiveTheme()` reads `<html data-theme>` and returns the matching xterm
 // palette from `themes.ts`. Existing terminal instances are reconfigured live
 // by the TerminalsProvider effect that subscribes to ThemeContext.
@@ -202,7 +202,7 @@ function ensureTerminalHost(): HTMLDivElement {
 
 interface ProviderProps {
   children: ReactNode
-  /** Active project ID from HubProvider — used to focus panel on Cmd+J. */
+  /** Active project ID from DesktopProvider — used to focus panel on Cmd+J. */
   activeProjectId: string | null
 }
 
@@ -229,7 +229,7 @@ export function TerminalsProvider({ children, activeProjectId }: ProviderProps) 
   }, [])
 
   // ─── Live theme reconciliation ────────────────────────────────────────────
-  // When the hub theme changes, update every existing terminal in place. xterm
+  // When the app theme changes, update every existing terminal in place. xterm
   // supports live `options.theme` swaps without recreating the instance, so
   // scrollback, marks, and shell-integration state are preserved. Uses the
   // optional theme hook so unit tests that mount TerminalsProvider in
@@ -449,7 +449,7 @@ export function TerminalsProvider({ children, activeProjectId }: ProviderProps) 
   }, [])
 
   const disposeProject = useCallback((projectId: string) => {
-    // Called when a project is removed from the hub
+    // Called when a project is removed from the app
     for (const [sid, owner] of sessionOwners.current.entries()) {
       if (owner !== projectId) continue
       const h = xtermHandles.current.get(sid)
@@ -772,8 +772,8 @@ function ensureXtermForSession(
     : 'ws://localhost:4200')
   const wsUrl = `${wsBase}/ws/terminal/${sessionId}?projectId=${encodeURIComponent(projectId)}`
 
-  const protocol = getHubTokenProtocol()
-  const ws = protocol ? new WebSocket(wsUrl, ['specrails-hub', protocol]) : new WebSocket(wsUrl)
+  const protocol = getDesktopTokenProtocol()
+  const ws = protocol ? new WebSocket(wsUrl, ['specrails-desktop', protocol]) : new WebSocket(wsUrl)
   ws.binaryType = 'arraybuffer'
 
   const disposers: Array<() => void> = []

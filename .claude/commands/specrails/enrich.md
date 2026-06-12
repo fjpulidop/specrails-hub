@@ -2,11 +2,11 @@
 
 Interactive wizard to configure the full agent workflow system for this repository. Analyzes the codebase, discovers target users, generates VPC personas, and creates all agents, commands, rules, and configuration adapted to this project. Supports config-driven mode for direct installation from a pre-built config file.
 
-**Prerequisites:** Ensure this repo was initialized with `npx specrails-core@latest init` (or via specrails-hub) so `.specrails/setup-templates/` exists.
+**Prerequisites:** Ensure this repo was initialized with `npx specrails-core@latest init` (or via specrails-desktop) so `.specrails/setup-templates/` exists.
 
-### Hub Checkpoint Protocol
+### Desktop Checkpoint Protocol
 
-When running inside specrails-hub, emit checkpoint markers at key transitions so the hub `CheckpointTracker` can display progress. Each checkpoint is a single line printed to stdout:
+When running inside specrails-desktop, emit checkpoint markers at key transitions so the app's `CheckpointTracker` can display progress. Each checkpoint is a single line printed to stdout:
 
 ```
 [checkpoint:phase_1_analysis] Codebase analysis complete
@@ -16,7 +16,7 @@ When running inside specrails-hub, emit checkpoint markers at key transitions so
 [checkpoint:phase_5_cleanup] Cleanup and summary complete
 ```
 
-The hub parses these via `detectCheckpointFromText()` regex patterns. Always emit checkpoints at the end of each phase, even in `--from-config` and `--quick` modes.
+The app parses these via `detectCheckpointFromText()` regex patterns. Always emit checkpoints at the end of each phase, even in `--from-config` and `--quick` modes.
 
 ---
 
@@ -248,7 +248,7 @@ For each agent in the "changed" list:
 
 1. Read the NEW template from `.specrails/setup-templates/agents/sr-<name>.md`
 2. Use the codebase analysis from Phase U2 to fill in all `` values, using the same substitution rules as Phase 4.1 of the full setup:
-   - `specrails-hub` → project name (from README.md or directory name)
+   - `specrails-desktop` → project name (from README.md or directory name)
    - `` → detected architecture layers
    - `` → detected layer tags (e.g., `[backend]`, `[frontend]`, `[api]`)
    - `` → backend CI commands
@@ -498,7 +498,7 @@ Generate files using the Quick Mode defaults.
 Read `.specrails/setup-templates/claude-md/CLAUDE-quickstart.md` (or fall back to `.specrails/setup-templates/claude-md/default.md` if quickstart template is not found).
 
 Replace placeholders:
-- `specrails-hub` → derive from directory name or README.md first heading
+- `specrails-desktop` → derive from directory name or README.md first heading
 - `` → `QS_GIT_ACCESS`
 
 Write to `CLAUDE.md` in the repo root. If `CLAUDE.md` already exists, ask:
@@ -514,7 +514,7 @@ For each default agent (sr-architect, sr-developer, sr-reviewer, sr-product-mana
 If `.specrails/agents.yaml` exists, read it and apply model resolution (per-agent override → defaults → template value) before writing each agent file.
 
 Fill placeholders with best-effort values from the limited context available:
-- `specrails-hub` → directory name or README first heading
+- `specrails-desktop` → directory name or README first heading
 - `` → `QS_GIT_ACCESS`
 - `` → "(Quick Mode — run `/specrails:enrich` for full architecture analysis)"
 - `` → "(Quick Mode — run `/specrails:enrich` for codebase-specific expertise)"
@@ -937,7 +937,7 @@ Local tickets are always read-write — there is no "read only" mode since the f
 **Labels:** Freeform strings following the `area:*` and `effort:*` convention
 **Source values:** `manual`, `get-backlog-specs`, `propose-spec`
 
-**Advisory file locking protocol** (CLI agents and hub server must both follow this):
+**Advisory file locking protocol** (CLI agents and app server must both follow this):
 
 The `revision` counter in the JSON root enables optimistic concurrency — increment it on **every** write. The lock file prevents concurrent corruption:
 
@@ -950,7 +950,7 @@ The `revision` counter in the JSON root enables optimistic concurrency — incre
 4. **Release lock:** Delete `.specrails/local-tickets.json.lock`
 5. **Always increment `revision`** by 1 and update `last_updated` on every successful write
 
-The hub server uses `proper-lockfile` (or equivalent) to honor the same protocol via the `.lock` file path.
+The app server uses `proper-lockfile` (or equivalent) to honor the same protocol via the `.lock` file path.
 
 #### If GitHub Issues
 
@@ -1188,7 +1188,7 @@ For each selected agent, read the template and generate the adapted version.
 When generating each agent:
 1. Read the template
 2. Replace all `` values with project-specific content:
-   - `specrails-hub` → project name
+   - `specrails-desktop` → project name
    - `` → detected architecture
    - `` → detected layer tags (e.g., `[backend]`, `[frontend]`, `[api]`, `[mobile]`)
    - `` → backend CI commands from Phase 1

@@ -113,7 +113,7 @@ describe('themes', () => {
 
   describe('THEME_LOCAL_STORAGE_KEY', () => {
     it('is namespaced and stable', () => {
-      expect(THEME_LOCAL_STORAGE_KEY).toBe('specrails-hub:ui-theme')
+      expect(THEME_LOCAL_STORAGE_KEY).toBe('specrails-desktop:ui-theme')
     })
   })
 

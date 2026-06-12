@@ -76,7 +76,7 @@ Cards whose status is `orphan` MUST be rendered in a clearly separated section w
 - **THEN** they render under a "Deprecated" subheader, after the active catalog, with only a Remove action
 
 ### Requirement: Empty and error states
-The page MUST handle three non-happy states with explicit copy: (1) catalog fetch in flight (skeleton cards), (2) catalog fetch failed (error state with Retry), (3) catalog empty (calm copy explaining no plugins are bundled in this hub build).
+The page MUST handle three non-happy states with explicit copy: (1) catalog fetch in flight (skeleton cards), (2) catalog fetch failed (error state with Retry), (3) catalog empty (calm copy explaining no plugins are bundled in this app build).
 
 #### Scenario: Fetch failure shows retry
 - **WHEN** the catalog endpoint returns 5xx

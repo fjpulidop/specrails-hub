@@ -56,9 +56,9 @@ function buildCodexArgs(action: SpawnAction, opts: SpawnOptions): string[] {
 
   switch (action) {
     case 'chat-turn': {
-      // chat-turn (Explore) spawns codex from the hub-managed explore-cwd,
+      // chat-turn (Explore) spawns codex from the app-managed explore-cwd,
       // which already ships an AGENTS.md with the Explore stance. Folding the
-      // hub's system prompt into the positional argv would double-inject the
+      // app's system prompt into the positional argv would double-inject the
       // framing AND, because the user message in Explore is often very short
       // ("quiero hacer un tetris"), the long system text dominates the prompt
       // and codex responds to the system instructions instead of the user.

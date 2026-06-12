@@ -10,8 +10,8 @@ vi.mock('../../lib/api', () => ({
 }))
 
 let mockActiveProjectId: string | null = 'test-project'
-vi.mock('../useHub', () => ({
-  useHub: () => ({ activeProjectId: mockActiveProjectId }),
+vi.mock('../useDesktop', () => ({
+  useDesktop: () => ({ activeProjectId: mockActiveProjectId }),
 }))
 
 let mockRegisterHandler: ReturnType<typeof vi.fn>

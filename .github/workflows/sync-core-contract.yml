@@ -53,6 +53,6 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `core-sync-required: specrails-core ${coreVersion} has breaking changes`,
-              body: 'The `sync-core-contract` workflow detected drift between specrails-core and specrails-hub.\n\nRun `npx tsx scripts/check-core-compat.ts` locally after installing the new core version to see the full diff.',
+              body: 'The `sync-core-contract` workflow detected drift between specrails-core and specrails-desktop.\n\nRun `npx tsx scripts/check-core-compat.ts` locally after installing the new core version to see the full diff.',
               labels: ['core-sync-required']
             })

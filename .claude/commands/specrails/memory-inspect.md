@@ -5,7 +5,7 @@ category: Workflow
 tags: [workflow, memory, agents, maintenance, diagnostics]
 ---
 
-Inspect agent memory directories under `.claude/agent-memory/sr-*/` for **specrails-hub**. Show per-agent stats, recent entries, and actionable recommendations.
+Inspect agent memory directories under `.claude/agent-memory/sr-*/` for **specrails-desktop**. Show per-agent stats, recent entries, and actionable recommendations.
 
 **Input:** `$ARGUMENTS` — optional:
 - `<agent-name>` — inspect a specific agent's memory (e.g. `sr-developer`, `sr-reviewer`)

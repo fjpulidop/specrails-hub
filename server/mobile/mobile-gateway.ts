@@ -7,7 +7,7 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import type { IncomingMessage } from 'http'
 import type { DbInstance } from '../db'
 import type { WsMessage } from '../types'
-import { getHubSetting, setHubSetting } from '../hub-db'
+import { getDesktopSetting, setDesktopSetting } from '../desktop-db'
 import { loadOrCreateCert, rotateCert, mobileDir, type GatewayCert } from './mobile-tls'
 import { PairingManager } from './mobile-pairing'
 import { createMobileRouter } from './mobile-router'
@@ -18,21 +18,28 @@ import { resolveDevice, extractBearer } from './mobile-auth'
 import type { MobilePlatform } from './mobile-types'
 
 // Lifecycle owner of the second HTTPS+WSS listener (default :4202), hard-isolated
-// from the main hub server. Off by default; started on enable or boot-if-enabled.
+// from the main server. Off by default; started on enable or boot-if-enabled.
 
 const DEFAULT_PORT = 4202
 const SETTING = {
   enabled: 'mobile.enabled',
   port: 'mobile.port',
-  instanceId: 'mobile.hub_instance_id',
-  name: 'mobile.hub_name',
+  instanceId: 'mobile.desktop_instance_id',
+  name: 'mobile.desktop_name',
   mdns: 'mobile.mdns_enabled',
   fingerprint: 'mobile.cert_fingerprint',
 } as const
+// Legacy fallback — pre-rebrand (Specrails Hub) setting keys. Values are
+// read-migrated to the renamed keys on first access so the stable instance id
+// (which paired phones already store as `hubInstanceId`) survives the rename.
+const LEGACY_SETTING = {
+  instanceId: 'mobile.hub_instance_id',
+  name: 'mobile.hub_name',
+} as const
 
 export interface MobileGatewayDeps {
-  hubDb: DbInstance
-  hubPort: number
+  desktopDb: DbInstance
+  desktopPort: number
   broadcast: (msg: WsMessage) => void
   /** Test seams. */
   bindHost?: string
@@ -47,7 +54,7 @@ export interface MobileGatewayStatus {
   certFingerprint: string | null
   lanAddresses: string[]
   mdnsEnabled: boolean
-  hubName: string
+  desktopName: string
 }
 
 function lanAddresses(): string[] {
@@ -63,7 +70,7 @@ function lanAddresses(): string[] {
 
 export class MobileGateway {
   private readonly _db: DbInstance
-  private readonly _hubPort: number
+  private readonly _desktopPort: number
   private readonly _broadcast: (msg: WsMessage) => void
   private readonly _bindHost: string
   private _cert: GatewayCert | null = null
@@ -76,8 +83,8 @@ export class MobileGateway {
   private readonly _portOverride?: number
 
   constructor(deps: MobileGatewayDeps) {
-    this._db = deps.hubDb
-    this._hubPort = deps.hubPort
+    this._db = deps.desktopDb
+    this._desktopPort = deps.desktopPort
     this._broadcast = deps.broadcast
     this._bindHost = deps.bindHost ?? '0.0.0.0'
     this._portOverride = deps.port
@@ -95,32 +102,42 @@ export class MobileGateway {
 
   private configuredPort(): number {
     if (this._portOverride !== undefined) return this._portOverride
-    const raw = getHubSetting(this._db, SETTING.port)
+    const raw = getDesktopSetting(this._db, SETTING.port)
     const n = raw ? parseInt(raw, 10) : NaN
     return Number.isInteger(n) && n > 0 && n < 65536 ? n : DEFAULT_PORT
   }
 
-  private hubName(): string {
-    const v = getHubSetting(this._db, SETTING.name)
+  /** Read a setting, falling back to (and one-time migrating from) its
+   *  pre-rebrand key. Legacy fallback — keeps values written by Specrails Hub. */
+  private settingWithLegacyFallback(key: string, legacyKey: string): string | undefined {
+    const v = getDesktopSetting(this._db, key)
+    if (v !== undefined) return v
+    const legacy = getDesktopSetting(this._db, legacyKey)
+    if (legacy !== undefined) setDesktopSetting(this._db, key, legacy)
+    return legacy
+  }
+
+  private desktopName(): string {
+    const v = this.settingWithLegacyFallback(SETTING.name, LEGACY_SETTING.name)
     if (v && v.trim()) return v
-    try { return os.hostname() } catch { return 'SpecRails Hub' }
+    try { return os.hostname() } catch { return 'Specrails' }
   }
 
   private instanceId(): string {
-    let id = getHubSetting(this._db, SETTING.instanceId)
+    let id = this.settingWithLegacyFallback(SETTING.instanceId, LEGACY_SETTING.instanceId)
     if (!id) {
       id = randomUUID()
-      setHubSetting(this._db, SETTING.instanceId, id)
+      setDesktopSetting(this._db, SETTING.instanceId, id)
     }
     return id
   }
 
   private mdnsEnabled(): boolean {
-    return getHubSetting(this._db, SETTING.mdns) !== 'false'
+    return getDesktopSetting(this._db, SETTING.mdns) !== 'false'
   }
 
   isEnabledSetting(): boolean {
-    return getHubSetting(this._db, SETTING.enabled) === 'true'
+    return getDesktopSetting(this._db, SETTING.enabled) === 'true'
   }
 
   status(): MobileGatewayStatus {
@@ -128,16 +145,16 @@ export class MobileGateway {
       enabled: this.isEnabledSetting(),
       running: this._running,
       port: this._running ? this._boundPort : this.configuredPort(),
-      certFingerprint: this._cert?.fingerprint ?? getHubSetting(this._db, SETTING.fingerprint) ?? null,
+      certFingerprint: this._cert?.fingerprint ?? getDesktopSetting(this._db, SETTING.fingerprint) ?? null,
       lanAddresses: lanAddresses(),
       mdnsEnabled: this.mdnsEnabled(),
-      hubName: this.hubName(),
+      desktopName: this.desktopName(),
     }
   }
 
   /** Flip the persisted enable flag + (start|stop). */
   async setEnabled(enabled: boolean): Promise<MobileGatewayStatus> {
-    setHubSetting(this._db, SETTING.enabled, enabled ? 'true' : 'false')
+    setDesktopSetting(this._db, SETTING.enabled, enabled ? 'true' : 'false')
     if (enabled) await this.start()
     else await this.stop()
     this._broadcast({ type: 'mobile.gateway_state', running: this._running, port: this._boundPort, timestamp: new Date().toISOString() })
@@ -151,12 +168,12 @@ export class MobileGateway {
     try { sweepExpiredDevices(this._db) } catch { /* non-fatal */ }
 
     this._cert = await loadOrCreateCert(mobileDir())
-    setHubSetting(this._db, SETTING.fingerprint, this._cert.fingerprint)
+    setDesktopSetting(this._db, SETTING.fingerprint, this._cert.fingerprint)
 
     this._pairing = new PairingManager({
       certFingerprint: () => this._cert!.fingerprint,
-      hubInstanceId: () => this.instanceId(),
-      hubName: () => this.hubName(),
+      desktopInstanceId: () => this.instanceId(),
+      desktopName: () => this.desktopName(),
       port: () => this._boundPort,
       lanAddresses,
       createDevice: ({ name, platform, token, certFingerprint }) => {
@@ -173,7 +190,7 @@ export class MobileGateway {
     app.use(express.json({ limit: '256kb' }))
     app.use(createMobileRouter({
       db: this._db,
-      hubPort: this._hubPort,
+      desktopPort: this._desktopPort,
       currentFingerprint: () => this._cert!.fingerprint,
       pairing: this._pairing,
     }))
@@ -226,7 +243,7 @@ export class MobileGateway {
 
     if (this.mdnsEnabled()) {
       void advertiseMdns({
-        name: this.hubName(),
+        name: this.desktopName(),
         port: this._boundPort,
         instanceId: this.instanceId(),
         fingerprint: this._cert.fingerprint,
@@ -256,7 +273,7 @@ export class MobileGateway {
       await this.start()
     } else {
       this._cert = await loadOrCreateCert(mobileDir())
-      setHubSetting(this._db, SETTING.fingerprint, this._cert.fingerprint)
+      setDesktopSetting(this._db, SETTING.fingerprint, this._cert.fingerprint)
     }
     this._broadcast({ type: 'mobile.gateway_state', running: this._running, port: this._boundPort, timestamp: new Date().toISOString() })
     return this.status()
@@ -264,7 +281,7 @@ export class MobileGateway {
 }
 
 /** Extract a device token from a /mws upgrade: Authorization header (native
- *  clients can set it) or the `hub-token.<token>` subprotocol carrier. */
+ *  clients can set it) or a token-carrying subprotocol. */
 function tokenFromUpgrade(request: IncomingMessage): string | null {
   const fake = { headers: request.headers } as unknown as import('express').Request
   const bearer = extractBearer(fake)
@@ -273,6 +290,9 @@ function tokenFromUpgrade(request: IncomingMessage): string | null {
   if (typeof proto === 'string') {
     for (const part of proto.split(',')) {
       const p = part.trim()
+      if (p.startsWith('desktop-token.')) return p.slice('desktop-token.'.length).trim()
+      // mobile-app v1 wire compat — do not rename: the phone app (v1.0.0)
+      // carries its device token in a `hub-token.<token>` subprotocol.
       if (p.startsWith('hub-token.')) return p.slice('hub-token.'.length).trim()
     }
   }

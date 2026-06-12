@@ -8,7 +8,7 @@ Read-only **Code** section per project for non-developers: virtualised file tree
 
 ### Requirement: Code section sidebar entry and route
 
-The hub SHALL render a **Code** entry in the project's left sidebar (`ProjectLayout`) that navigates to the route `/code` for the active project, gated behind the client feature flag `VITE_FEATURE_CODE_EXPLORER` and the server feature flag `SPECRAILS_CODE_EXPLORER`.
+The app SHALL render a **Code** entry in the project's left sidebar (`ProjectLayout`) that navigates to the route `/code` for the active project, gated behind the client feature flag `VITE_FEATURE_CODE_EXPLORER` and the server feature flag `SPECRAILS_CODE_EXPLORER`.
 
 #### Scenario: Sidebar entry hidden when client flag is off
 
@@ -148,7 +148,7 @@ The `TicketDetailModal` SHALL include a "Files touched by this ticket" section l
 #### Scenario: Clicking a file navigates to the Code viewer
 
 - **WHEN** the user clicks a file row in the modal
-- **THEN** the hub MUST navigate to `/code` for the active project
+- **THEN** the app MUST navigate to `/code` for the active project
 - **AND** the Code page MUST open that file in the viewer
 - **AND** the modal MUST close
 

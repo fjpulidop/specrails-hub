@@ -53,11 +53,11 @@
   },
   "errors": {
     "limitReached": "Terminal limit reached (max {{max}}).",
-    "spawnFailed": "The shell failed to start — the hub may be low on file descriptors. Try restarting the hub.",
+    "spawnFailed": "The shell failed to start — the app may be low on file descriptors. Try restarting the app.",
     "invalidName": "Invalid terminal name.",
     "openFailed": "Failed to open terminal.",
     "serverUnreachable": "Could not reach the server to open a terminal.",
-    "exitedImmediately": "Terminal exited immediately — the shell may have failed to start. If this keeps happening, restart the hub."
+    "exitedImmediately": "Terminal exited immediately — the shell may have failed to start. If this keeps happening, restart the app."
   },
   "session": {
     "processExited": "[process exited]",

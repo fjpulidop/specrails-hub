@@ -1,10 +1,10 @@
 # OpenSpec (opsx) Workflow
 
-> **Note:** The OpenSpec Changes UI (the `/changes` route in the dashboard) was removed in the SPEA-341 redesign. There is no dashboard surface for the `opsx:*` workflow — you drive it from a Claude Code conversation, not from the hub UI.
+> **Note:** The OpenSpec Changes UI (the `/changes` route in the dashboard) was removed in the SPEA-341 redesign. There is no dashboard surface for the `opsx:*` workflow — you drive it from a Claude Code conversation, not from the app UI.
 
 OpenSpec is the structured change-management workflow this repository uses to evolve itself. Every feature, fix, or refactor goes through a lifecycle of **artifacts** — from a proposal to an archived implementation — so that whoever (human or AI) picks up the work always has the full context.
 
-This is a **contributor** workflow: it manages the hub's _own_ changes under `openspec/`. It is not a per-project end-user feature exposed in the dashboard.
+This is a **contributor** workflow: it manages the app's _own_ changes under `openspec/`. It is not a per-project end-user feature exposed in the dashboard.
 
 ---
 
@@ -14,8 +14,8 @@ The `opsx:*` commands are **Claude Code slash commands** (defined in `.claude/co
 
 Two consequences worth internalizing:
 
-- **They do not require the specrails-hub server.** `opsx:*` is independent of the hub process; nothing is queued, no rail is launched, and nothing streams to the Dashboard.
-- **They are distinct from `/specrails:implement`.** The Architect → Developer → Reviewer agent pipeline is a _separate_ flow (`specrails-hub implement`, backed by the `sr-architect` / `sr-developer` / `sr-reviewer` agents). `opsx:apply` does **not** spawn those agents — it implements tasks itself, in the same conversation.
+- **They do not require the specrails-desktop server.** `opsx:*` is independent of the app process; nothing is queued, no rail is launched, and nothing streams to the Dashboard.
+- **They are distinct from `/specrails:implement`.** The Architect → Developer → Reviewer agent pipeline is a _separate_ flow (`specrails-desktop implement`, backed by the `sr-architect` / `sr-developer` / `sr-reviewer` agents). `opsx:apply` does **not** spawn those agents — it implements tasks itself, in the same conversation.
 
 Under the hood the assistant calls the `openspec` binary for state, e.g.:
 
@@ -160,7 +160,7 @@ Reads the change's context files (via `openspec instructions apply --json`), the
 /opsx:apply add-user-auth
 ```
 
-> **Not the hub pipeline.** `opsx:apply` does the work itself, in-conversation. It does **not** queue a hub job, spawn Architect/Developer/Reviewer agents, or stream to the Dashboard. For the agent pipeline, use `specrails-hub implement` instead.
+> **Not the app pipeline.** `opsx:apply` does the work itself, in-conversation. It does **not** queue a server job, spawn Architect/Developer/Reviewer agents, or stream to the Dashboard. For the agent pipeline, use `specrails-desktop implement` instead.
 
 ---
 
@@ -262,7 +262,7 @@ Use `opsx:explore` to think first, then create artifacts one at a time:
 
 ---
 
-## Browsing changes via the hub API
+## Browsing changes via the app API
 
 Although the dashboard `/changes` UI was removed, the server still **reads** the OpenSpec directory and exposes two read-only endpoints (per project):
 
@@ -277,6 +277,6 @@ These are handy for tooling that wants to surface the artifact set without parsi
 
 ## Further reading
 
-- [CLI reference](../cli.md) — the `specrails-hub` CLI and its verbs
-- [Architecture](architecture.md) — server modules and how the hub is wired
+- [CLI reference](../cli.md) — the `specrails-desktop` CLI and its verbs
+- [Architecture](architecture.md) — server modules and how the app is wired
 - [Adding a provider](adding-a-provider.md) — extending the provider adapter contract

@@ -10,7 +10,7 @@ export type Platform = 'darwin' | 'win32' | 'linux'
 /** Discriminator on `SetupPrerequisite.kind`. `'tool'` is a dev prerequisite
  *  always required (node, npm, npx, git) or always optional (uv). `'provider'`
  *  is an AI CLI registered in `providerRegistry`; at least one must be
- *  usable for the hub to accept Add Project. */
+ *  usable for the app to accept Add Project. */
 export type PrerequisiteKind = 'tool' | 'provider'
 
 export interface SetupPrerequisite {
@@ -231,8 +231,8 @@ function computeSetupPrerequisitesStatus(options: PrerequisiteOptions = {}): Set
       minVersion: MIN_VERSIONS.node,
       installUrl: 'https://nodejs.org/en/download',
       installHint: process.platform === 'win32'
-        ? 'Install Node.js LTS, then restart SpecRails Hub so Windows refreshes PATH.'
-        : 'Install Node.js LTS, then restart SpecRails Hub so PATH is refreshed.',
+        ? 'Install Node.js LTS, then restart Specrails so Windows refreshes PATH.'
+        : 'Install Node.js LTS, then restart Specrails so PATH is refreshed.',
     },
     {
       key: 'npm',
@@ -264,8 +264,8 @@ function computeSetupPrerequisitesStatus(options: PrerequisiteOptions = {}): Set
         ? 'https://git-scm.com/download/win'
         : 'https://git-scm.com/downloads',
       installHint: process.platform === 'win32'
-        ? 'Install Git for Windows and enable the option that adds Git to PATH, then restart SpecRails Hub.'
-        : 'Install Git and restart SpecRails Hub if PATH changed.',
+        ? 'Install Git for Windows and enable the option that adds Git to PATH, then restart Specrails.'
+        : 'Install Git and restart Specrails if PATH changed.',
     },
   ]
 
@@ -295,10 +295,10 @@ function computeSetupPrerequisitesStatus(options: PrerequisiteOptions = {}): Set
       minVersion: MIN_VERSIONS.uv,
       installUrl: 'https://docs.astral.sh/uv/getting-started/installation/',
       installHint: process.platform === 'win32'
-        ? 'Install uv via winget (`winget install astral-sh.uv`) or PowerShell installer, then restart SpecRails Hub.'
+        ? 'Install uv via winget (`winget install astral-sh.uv`) or PowerShell installer, then restart Specrails.'
         : process.platform === 'darwin'
-          ? 'Install uv via Homebrew (`brew install uv`) or the curl installer, then restart SpecRails Hub.'
-          : 'Install uv via the curl installer (`curl -LsSf https://astral.sh/uv/install.sh | sh`), then restart SpecRails Hub.',
+          ? 'Install uv via Homebrew (`brew install uv`) or the curl installer, then restart Specrails.'
+          : 'Install uv via the curl installer (`curl -LsSf https://astral.sh/uv/install.sh | sh`), then restart Specrails.',
     })
   }
 
@@ -327,7 +327,7 @@ function computeSetupPrerequisitesStatus(options: PrerequisiteOptions = {}): Set
             resolvedPath: bundledPath,
             executionError: probe.error,
             meetsMinimum: false,
-            installHint: 'Bundle corrupted — reinstall the SpecRails Hub app.',
+            installHint: 'Bundle corrupted — reinstall the Specrails app.',
           }
         }
         return {
@@ -414,15 +414,15 @@ function providerInstallUrl(id: string): string {
 function providerInstallHint(id: string, platform: NodeJS.Platform): string {
   switch (id) {
     case 'claude':
-      return 'Install Claude Code from https://claude.com/download, run `claude login`, then restart SpecRails Hub.'
+      return 'Install Claude Code from https://claude.com/download, run `claude login`, then restart Specrails.'
     case 'codex':
       return platform === 'darwin'
-        ? 'Install Codex CLI via `brew install codex` (or follow https://developers.openai.com/codex), authenticate with `codex login`, then restart SpecRails Hub.'
+        ? 'Install Codex CLI via `brew install codex` (or follow https://developers.openai.com/codex), authenticate with `codex login`, then restart Specrails.'
         : platform === 'win32'
-          ? 'Install Codex CLI from https://developers.openai.com/codex, authenticate with `codex login`, then restart SpecRails Hub.'
-          : 'Install Codex CLI from https://developers.openai.com/codex (or `pipx install codex-cli`), authenticate with `codex login`, then restart SpecRails Hub.'
+          ? 'Install Codex CLI from https://developers.openai.com/codex, authenticate with `codex login`, then restart Specrails.'
+          : 'Install Codex CLI from https://developers.openai.com/codex (or `pipx install codex-cli`), authenticate with `codex login`, then restart Specrails.'
     default:
-      return `Install the ${id} CLI and restart SpecRails Hub.`
+      return `Install the ${id} CLI and restart Specrails.`
   }
 }
 
@@ -443,6 +443,6 @@ export function formatMissingSetupPrerequisites(status = getSetupPrerequisitesSt
       return `- ${item.label} ${item.version ?? '?'} found, but version ${item.minVersion}+ is required. ${item.installHint}`
     }),
     '',
-    'Install the missing tools, restart SpecRails Hub, then retry setup.',
+    'Install the missing tools, restart Specrails, then retry setup.',
   ].join('\n')
 }

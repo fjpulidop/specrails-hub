@@ -120,8 +120,8 @@
     "noData": "Sin datos para los filtros actuales",
     "failed": "Error al exportar"
   },
-  "hub": {
-    "title": "Analíticas del Hub",
+  "desktop": {
+    "title": "Analíticas de Desktop",
     "refreshAria": "Actualizar analíticas",
     "failedToLoad": "No se pudieron cargar las analíticas: {{error}}",
     "totalCost": "Coste total",

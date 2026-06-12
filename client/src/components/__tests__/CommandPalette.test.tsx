@@ -14,8 +14,8 @@ beforeEach(() => {
 })
 
 const mockSetActiveProjectId = vi.fn()
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({
     projects: [
       { id: 'p1', slug: 'project-alpha', name: 'Project Alpha', path: '/a', db_path: '/a/db', provider: 'claude', added_at: '', last_seen_at: '' },
       { id: 'p2', slug: 'project-beta', name: 'Project Beta', path: '/b', db_path: '/b/db', provider: 'codex', added_at: '', last_seen_at: '' },
@@ -173,7 +173,7 @@ describe('CommandPalette', () => {
       expect(screen.getByText('Dashboard')).toBeInTheDocument()
       expect(screen.getByText('Project Analytics')).toBeInTheDocument()
       expect(screen.getByText('Activity Feed')).toBeInTheDocument()
-      expect(screen.getByText('Hub Settings')).toBeInTheDocument()
+      expect(screen.getByText('Desktop Settings')).toBeInTheDocument()
       expect(screen.getByText('Docs')).toBeInTheDocument()
     })
   })
@@ -293,35 +293,35 @@ describe('CommandPalette', () => {
     })
   })
 
-  // ─── Hub mode callbacks ────────────────────────────────────────────────────
+  // ─── Super mode callbacks ────────────────────────────────────────────────────
 
-  it('calls onOpenSettings instead of navigating in hub mode', async () => {
+  it('calls onOpenSettings instead of navigating in Super mode', async () => {
     const onOpenSettings = vi.fn()
     const user = userEvent.setup()
     render(<CommandPalette onOpenSettings={onOpenSettings} />)
 
     await user.keyboard('{Meta>}k{/Meta}')
     await waitFor(() => {
-      expect(screen.getByText('Hub Settings')).toBeInTheDocument()
+      expect(screen.getByText('Desktop Settings')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByText('Hub Settings'))
+    await user.click(screen.getByText('Desktop Settings'))
 
     expect(onOpenSettings).toHaveBeenCalled()
     expect(mockNavigate).not.toHaveBeenCalledWith('/settings')
   })
 
-  it('shows Hub Analytics when onOpenAnalytics provided', async () => {
+  it('shows Desktop Analytics when onOpenAnalytics provided', async () => {
     const onOpenAnalytics = vi.fn()
     const user = userEvent.setup()
     render(<CommandPalette onOpenAnalytics={onOpenAnalytics} />)
 
     await user.keyboard('{Meta>}k{/Meta}')
     await waitFor(() => {
-      expect(screen.getByText('Hub Analytics')).toBeInTheDocument()
+      expect(screen.getByText('Desktop Analytics')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByText('Hub Analytics'))
+    await user.click(screen.getByText('Desktop Analytics'))
     expect(onOpenAnalytics).toHaveBeenCalled()
   })
 
@@ -400,10 +400,10 @@ describe('CommandPalette', () => {
 
     await user.keyboard('{Meta>}k{/Meta}')
     await waitFor(() => {
-      expect(screen.getByText('Hub Settings')).toBeInTheDocument()
+      expect(screen.getByText('Desktop Settings')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByText('Hub Settings'))
+    await user.click(screen.getByText('Desktop Settings'))
     expect(mockNavigate).toHaveBeenCalledWith('/settings')
   })
 

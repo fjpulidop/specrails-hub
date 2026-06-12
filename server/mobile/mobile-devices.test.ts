@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { initHubDb } from '../hub-db'
+import { initDesktopDb } from '../desktop-db'
 import type { DbInstance } from '../db'
 import {
   hashToken,
@@ -15,7 +15,7 @@ import {
 describe('mobile-devices', () => {
   let db: DbInstance
   beforeEach(() => {
-    db = initHubDb(':memory:')
+    db = initDesktopDb(':memory:')
   })
 
   it('hashToken is deterministic sha256 hex', () => {

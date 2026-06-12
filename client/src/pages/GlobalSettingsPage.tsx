@@ -16,8 +16,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from '../components/ui/dialog'
-import { useHub } from '../hooks/useHub'
-import type { HubProject } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
+import type { DesktopProject } from '../hooks/useDesktop'
 import {
   getOsNotificationPrefs,
   setOsNotificationPrefs,
@@ -42,7 +42,7 @@ interface WebhookRow {
   created_at: string
 }
 
-interface HubSettings {
+interface DesktopSettings {
   port: number
   specrailsTechUrl: string
   costAlertThresholdUsd: number | null
@@ -58,7 +58,7 @@ function ProjectListItem({
   project,
   onRemove,
 }: {
-  project: HubProject
+  project: DesktopProject
   onRemove: (id: string) => void
 }) {
   const { t } = useTranslation('settings')
@@ -82,15 +82,15 @@ function ProjectListItem({
 
 export default function SettingsDialog({ open, onClose, onOpenOnboarding }: SettingsDialogProps) {
   const { t } = useTranslation('settings')
-  const { projects, removeProject } = useHub()
-  const [hubSettings, setHubSettings] = useState<HubSettings | null>(null)
+  const { projects, removeProject } = useDesktop()
+  const [desktopSettings, setDesktopSettings] = useState<DesktopSettings | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [specrailsTechUrl, setSpecrailsTechUrl] = useState('')
   const [isSavingUrl, setIsSavingUrl] = useState(false)
   const [costAlertThreshold, setCostAlertThreshold] = useState('')
   const [isSavingThreshold, setIsSavingThreshold] = useState(false)
-  const [hubDailyBudget, setHubDailyBudget] = useState('')
-  const [isSavingHubBudget, setIsSavingHubBudget] = useState(false)
+  const [desktopDailyBudget, setDesktopDailyBudget] = useState('')
+  const [isSavingDesktopBudget, setIsSavingDesktopBudget] = useState(false)
 
   // Webhook state
   const [webhooks, setWebhooks] = useState<WebhookRow[]>([])
@@ -116,7 +116,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
 
   const loadWebhooks = useCallback(async () => {
     try {
-      const res = await fetch('/api/hub/webhooks')
+      const res = await fetch('/api/webhooks')
       if (res.ok) {
         const data = await res.json() as { webhooks: WebhookRow[] }
         setWebhooks(data.webhooks)
@@ -129,10 +129,10 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
     setIsLoading(true)
     async function load() {
       try {
-        const res = await fetch('/api/hub/settings')
+        const res = await fetch('/api/settings')
         if (res.ok) {
-          const data = await res.json() as HubSettings
-          setHubSettings(data)
+          const data = await res.json() as DesktopSettings
+          setDesktopSettings(data)
           setSpecrailsTechUrl(data.specrailsTechUrl ?? 'http://localhost:3000')
           setCostAlertThreshold(data.costAlertThresholdUsd != null ? String(data.costAlertThresholdUsd) : '')
         }
@@ -148,11 +148,11 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
 
   useEffect(() => {
     if (!open) return
-    fetch('/api/hub/budget')
+    fetch('/api/budget')
       .then((r) => r.json())
-      .then((data: { hubDailyBudgetUsd?: number | null }) => {
-        if (data.hubDailyBudgetUsd != null) setHubDailyBudget(String(data.hubDailyBudgetUsd))
-        else setHubDailyBudget('')
+      .then((data: { desktopDailyBudgetUsd?: number | null }) => {
+        if (data.desktopDailyBudgetUsd != null) setDesktopDailyBudget(String(data.desktopDailyBudgetUsd))
+        else setDesktopDailyBudget('')
       })
       .catch(() => {})
   }, [open])
@@ -161,18 +161,18 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
     if (!specrailsTechUrl.trim()) return
     setIsSavingUrl(true)
     try {
-      const res = await fetch('/api/hub/settings', {
+      const res = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ specrailsTechUrl: specrailsTechUrl.trim() }),
       })
       if (res.ok) {
-        toast.success(t('hub.techUrlSaved'))
+        toast.success(t('desktop.techUrlSaved'))
       } else {
-        toast.error(t('hub.techUrlSaveFailed'))
+        toast.error(t('desktop.techUrlSaveFailed'))
       }
     } catch {
-      toast.error(t('hub.techUrlSaveFailed'))
+      toast.error(t('desktop.techUrlSaveFailed'))
     } finally {
       setIsSavingUrl(false)
     }
@@ -186,13 +186,13 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
         toast.error(t('budget.invalidNumber'))
         return
       }
-      const res = await fetch('/api/hub/settings', {
+      const res = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ costAlertThresholdUsd: parsed }),
       })
       if (res.ok) {
-        toast.success(parsed == null ? t('hub.costAlertsDisabled') : t('budget.alertSet', { amount: parsed }))
+        toast.success(parsed == null ? t('desktop.costAlertsDisabled') : t('budget.alertSet', { amount: parsed }))
       } else {
         toast.error(t('budget.saveThresholdFailed'))
       }
@@ -203,37 +203,37 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
     }
   }
 
-  async function handleSaveHubDailyBudget() {
-    setIsSavingHubBudget(true)
+  async function handleSaveDesktopDailyBudget() {
+    setIsSavingDesktopBudget(true)
     try {
-      const val = hubDailyBudget.trim() === '' ? null : parseFloat(hubDailyBudget)
+      const val = desktopDailyBudget.trim() === '' ? null : parseFloat(desktopDailyBudget)
       if (val !== null && (isNaN(val) || val <= 0)) {
         toast.error(t('budget.invalidNumber'))
         return
       }
-      const res = await fetch('/api/hub/budget', {
+      const res = await fetch('/api/budget', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hubDailyBudgetUsd: val }),
+        body: JSON.stringify({ desktopDailyBudgetUsd: val }),
       })
       if (res.ok) {
-        toast.success(val == null ? t('hub.dailyBudgetRemoved') : t('hub.dailyBudgetSet', { amount: val }))
+        toast.success(val == null ? t('desktop.dailyBudgetRemoved') : t('desktop.dailyBudgetSet', { amount: val }))
       } else {
-        toast.error(t('hub.dailyBudgetSaveFailed'))
+        toast.error(t('desktop.dailyBudgetSaveFailed'))
       }
     } catch {
-      toast.error(t('hub.dailyBudgetSaveFailed'))
+      toast.error(t('desktop.dailyBudgetSaveFailed'))
     } finally {
-      setIsSavingHubBudget(false)
+      setIsSavingDesktopBudget(false)
     }
   }
 
   async function handleRemoveProject(id: string) {
     try {
       await removeProject(id)
-      toast.success(t('hub.projectRemoved'))
+      toast.success(t('desktop.projectRemoved'))
     } catch (err) {
-      toast.error(t('hub.projectRemoveFailed'), { description: (err as Error).message })
+      toast.error(t('desktop.projectRemoveFailed'), { description: (err as Error).message })
     }
   }
 
@@ -248,7 +248,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
     }
     setIsAddingWebhook(true)
     try {
-      const res = await fetch('/api/hub/webhooks', {
+      const res = await fetch('/api/webhooks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: newWebhookUrl.trim(), secret: newWebhookSecret.trim(), events: newWebhookEvents }),
@@ -272,7 +272,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
 
   async function handleToggleWebhook(id: string, enabled: boolean) {
     try {
-      await fetch(`/api/hub/webhooks/${id}`, {
+      await fetch(`/api/webhooks/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled }),
@@ -285,7 +285,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
 
   async function handleDeleteWebhook(id: string) {
     try {
-      const res = await fetch(`/api/hub/webhooks/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/webhooks/${id}`, { method: 'DELETE' })
       if (res.ok) {
         toast.success(t('webhooks.removed'))
         await loadWebhooks()
@@ -297,7 +297,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
 
   async function handleTestWebhook(id: string) {
     try {
-      const res = await fetch(`/api/hub/webhooks/${id}/test`, { method: 'POST' })
+      const res = await fetch(`/api/webhooks/${id}/test`, { method: 'POST' })
       if (res.ok) {
         toast.success(t('webhooks.testPingSent'))
       }
@@ -318,10 +318,10 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
-            {t('hub.title')}
+            {t('desktop.title')}
           </DialogTitle>
           <DialogDescription>
-            {t('hub.description')}
+            {t('desktop.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -343,11 +343,11 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
             {/* Projects section */}
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                {t('hub.registeredProjects')}
+                {t('desktop.registeredProjects')}
               </h3>
               {projects.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border p-4 text-center">
-                  <p className="text-xs text-muted-foreground">{t('hub.noProjects')}</p>
+                  <p className="text-xs text-muted-foreground">{t('desktop.noProjects')}</p>
                 </div>
               ) : (
                 <div className="space-y-1.5">
@@ -369,7 +369,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
               </h3>
               <div className="rounded-md border border-border p-3 space-y-2">
                 <p className="text-[10px] text-muted-foreground">
-                  {t('hub.techUrlDescription')}
+                  {t('desktop.techUrlDescription')}
                 </p>
                 <div className="flex gap-2">
                   <Input
@@ -394,31 +394,31 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
             {/* Budget & Alerts */}
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                {t('hub.budgetAlertsHeading')}
+                {t('desktop.budgetAlertsHeading')}
               </h3>
               <div className="rounded-md border border-border p-3 space-y-4">
-                {/* Hub daily budget */}
+                {/* Desktop daily budget */}
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium">{t('hub.dailyBudgetLabel')}</p>
+                  <p className="text-xs font-medium">{t('desktop.dailyBudgetLabel')}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    {t('hub.dailyBudgetHelper')}
+                    {t('desktop.dailyBudgetHelper')}
                   </p>
                   <div className="flex gap-2">
                     <Input
                       type="number"
                       min="0"
                       step="0.01"
-                      value={hubDailyBudget}
-                      onChange={(e) => setHubDailyBudget(e.target.value)}
-                      placeholder={t('hub.dailyBudgetPlaceholder')}
+                      value={desktopDailyBudget}
+                      onChange={(e) => setDesktopDailyBudget(e.target.value)}
+                      placeholder={t('desktop.dailyBudgetPlaceholder')}
                       className="h-7 text-xs font-mono"
                     />
                     <Button
                       size="sm"
                       variant="secondary"
                       className="h-7 text-xs shrink-0"
-                      disabled={isSavingHubBudget}
-                      onClick={() => void handleSaveHubDailyBudget()}
+                      disabled={isSavingDesktopBudget}
+                      onClick={() => void handleSaveDesktopDailyBudget()}
                     >
                       {t('common:actions.save')}
                     </Button>
@@ -429,7 +429,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                 <div className="space-y-1.5 border-t border-border pt-3">
                   <p className="text-xs font-medium">{t('budget.perJobLabel')}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    {t('hub.perJobHelper')}
+                    {t('desktop.perJobHelper')}
                   </p>
                   <div className="flex gap-2">
                     <Input
@@ -599,14 +599,14 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
             {onOpenOnboarding && (
               <div className="space-y-2">
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {t('hub.onboardingHeading')}
+                  {t('desktop.onboardingHeading')}
                 </h3>
                 <div className="rounded-md border border-border p-3">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <p className="text-xs font-medium">{t('hub.platformTour')}</p>
+                      <p className="text-xs font-medium">{t('desktop.platformTour')}</p>
                       <p className="text-[10px] text-muted-foreground">
-                        {t('hub.platformTourDescription')}
+                        {t('desktop.platformTourDescription')}
                       </p>
                     </div>
                     <Button
@@ -617,7 +617,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                       data-testid="replay-onboarding"
                     >
                       <GraduationCap className="w-3 h-3 mr-1" />
-                      {t('hub.replayTour')}
+                      {t('desktop.replayTour')}
                     </Button>
                   </div>
                 </div>
@@ -627,28 +627,28 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
             {/* Terminal panel */}
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                {t('hub.terminalPanelHeading')}
+                {t('desktop.terminalPanelHeading')}
               </h3>
-              <TerminalSettingsSection mode="hub" />
+              <TerminalSettingsSection mode="desktop" />
             </div>
 
-            {/* Hub info */}
+            {/* Desktop info */}
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                {t('hub.infoHeading')}
+                {t('desktop.infoHeading')}
               </h3>
               <div className="rounded-md border border-border p-3 space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">{t('hub.infoPort')}</span>
-                  <span className="font-mono">{hubSettings?.port ?? 4200}</span>
+                  <span className="text-muted-foreground">{t('desktop.infoPort')}</span>
+                  <span className="font-mono">{desktopSettings?.port ?? 4200}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">{t('hub.infoProjects')}</span>
+                  <span className="text-muted-foreground">{t('desktop.infoProjects')}</span>
                   <span className="font-mono">{projects.length}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">{t('hub.infoDb')}</span>
-                  <span className="font-mono text-[10px] text-muted-foreground">~/.specrails/hub.sqlite</span>
+                  <span className="text-muted-foreground">{t('desktop.infoDb')}</span>
+                  <span className="font-mono text-[10px] text-muted-foreground">~/.specrails/desktop.sqlite</span>
                 </div>
               </div>
             </div>

@@ -14,8 +14,8 @@ vi.mock('../../hooks/useSharedWebSocket', () => ({
     unregisterHandler: vi.fn(),
   }),
 }))
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({
     projects: [],
     activeProjectId: 'proj-test',
     setActiveProjectId: vi.fn(),

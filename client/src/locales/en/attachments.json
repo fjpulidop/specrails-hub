@@ -28,7 +28,7 @@
   },
   "lightbox": {
     "preview": "Preview {{name}}",
-    "backToHub": "Back to hub",
+    "backToDesktop": "Back to Specrails",
     "download": "Download",
     "downloadFile": "Download {{name}}",
     "loading": "Loading attachment...",

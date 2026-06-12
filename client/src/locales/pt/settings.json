@@ -1,7 +1,7 @@
 {
   "language": {
     "title": "Idioma",
-    "description": "Idioma da UI em todo o hub. Aplica-se de imediato — sem reiniciar.",
+    "description": "Idioma da UI em todo o Desktop. Aplica-se de imediato — sem reiniciar.",
     "selectLabel": "Idioma da interface",
     "updateFailed": "Não foi possível guardar a preferência de idioma"
   },
@@ -59,23 +59,23 @@
     "saveBudgetFailed": "Falha ao guardar o orçamento",
     "saveThresholdFailed": "Falha ao guardar o limiar"
   },
-  "hub": {
-    "title": "Definições do hub",
-    "description": "Faça a gestão dos projetos registados e consulte informações do hub.",
+  "desktop": {
+    "title": "Definições do Desktop",
+    "description": "Faça a gestão dos projetos registados e consulte informações do Desktop.",
     "registeredProjects": "Projetos registados",
     "noProjects": "Ainda não há projetos registados",
     "techUrlDescription": "URL base para a API specrails-tech (predefinição: http://localhost:3000)",
     "techUrlSaved": "URL do specrails-tech guardado",
     "techUrlSaveFailed": "Falha ao guardar o URL",
     "budgetAlertsHeading": "Orçamento e alertas",
-    "dailyBudgetLabel": "Orçamento diário do hub (USD)",
+    "dailyBudgetLabel": "Orçamento diário do Desktop (USD)",
     "dailyBudgetHelper": "Limite global de gasto diário em todos os projetos. As filas pausam automaticamente quando é excedido.",
     "dailyBudgetPlaceholder": "ex.: 10.00",
     "perJobHelper": "Alertar quando um único job excede este valor. Deixe em branco para desativar.",
     "costAlertsDisabled": "Alertas de custo desativados",
-    "dailyBudgetRemoved": "Orçamento diário do hub removido",
-    "dailyBudgetSet": "Orçamento diário do hub definido como ${{amount}}",
-    "dailyBudgetSaveFailed": "Falha ao guardar o orçamento diário do hub",
+    "dailyBudgetRemoved": "Orçamento diário do Desktop removido",
+    "dailyBudgetSet": "Orçamento diário do Desktop definido como ${{amount}}",
+    "dailyBudgetSaveFailed": "Falha ao guardar o orçamento diário do Desktop",
     "projectRemoved": "Projeto removido",
     "projectRemoveFailed": "Falha ao remover o projeto",
     "onboardingHeading": "Onboarding",
@@ -83,10 +83,10 @@
     "platformTourDescription": "Repita o assistente de boas-vindas para rever as funcionalidades principais.",
     "replayTour": "Repetir tour",
     "terminalPanelHeading": "Painel de terminal",
-    "infoHeading": "Informações do hub",
+    "infoHeading": "Informações do Desktop",
     "infoPort": "Porta",
     "infoProjects": "Projetos",
-    "infoDb": "BD do hub"
+    "infoDb": "BD do Desktop"
   },
   "notifications": {
     "heading": "Notificações do SO",
@@ -101,7 +101,7 @@
   },
   "webhooks": {
     "heading": "Webhooks de saída",
-    "description": "Notifique ferramentas externas (Slack, Zapier, CI/CD) sobre eventos do hub. Os pedidos são assinados via <code>X-Specrails-Signature</code> quando há um segredo definido.",
+    "description": "Notifique ferramentas externas (Slack, Zapier, CI/CD) sobre eventos do Desktop. Os pedidos são assinados via <code>X-Specrails-Signature</code> quando há um segredo definido.",
     "eventJobCompleted": "Job concluído",
     "eventJobFailed": "Job falhado",
     "eventDailyBudgetExceeded": "Orçamento diário excedido",
@@ -125,8 +125,8 @@
   },
   "terminal": {
     "title": "Painel de terminal",
-    "hubDescription": "Predefinições do hub aplicadas a todos os projetos, salvo override por projeto.",
-    "projectDescription": "Overrides por projeto para o painel de terminal. Deixe um campo inalterado para herdar a predefinição do hub.",
+    "desktopDescription": "Predefinições do Desktop aplicadas a todos os projetos, salvo override por projeto.",
+    "projectDescription": "Overrides por projeto para o painel de terminal. Deixe um campo inalterado para herdar a predefinição do Desktop.",
     "fontFamily": "Tipo de letra",
     "fontSize": "Tamanho da letra ({{min}}–{{max}})",
     "renderMode": "Modo de renderização",
@@ -141,7 +141,7 @@
     "unsavedChanges": "Alterações não guardadas",
     "clearOverride": "Limpar override",
     "clear": "Limpar",
-    "inheritingDefault": "A herdar a predefinição do hub",
+    "inheritingDefault": "A herdar a predefinição do Desktop",
     "nothingToSave": "Nada para guardar",
     "saved": "Definições do terminal guardadas"
   },
@@ -159,7 +159,7 @@
   },
   "mobile": {
     "heading": "Companion móvel",
-    "description": "Controle este hub a partir da app SpecRails Companion no seu telemóvel, 100% através da sua rede local. Desativado por omissão.",
+    "description": "Controle o Specrails a partir da app SpecRails Companion no seu telemóvel, 100% através da sua rede local. Desativado por omissão.",
     "accessOn": "Acesso móvel ligado",
     "accessOff": "Acesso móvel desligado",
     "listeningOnPort": "À escuta na porta {{port}}",
@@ -186,7 +186,7 @@
     "approve": "Aprovar",
     "paired": "✓ Emparelhado",
     "waiting": "À espera de um dispositivo… (em {{host}}:{{port}})",
-    "thisHub": "este hub",
+    "thisDesktop": "este computador",
     "copyCode": "Copiar código (para \"Introduzir manualmente\")",
     "pairedToast": "Dispositivo emparelhado",
     "approveFailed": "Falha na aprovação: {{message}}",

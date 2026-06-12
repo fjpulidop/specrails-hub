@@ -14,7 +14,7 @@ afterEach(() => {
 
 // Reset fetch mock and seed an active project before each test so that
 // `getApiBase()` (which throws when no project is active) works in component
-// tests that don't set up a HubProvider.
+// tests that don't set up a DesktopProvider.
 beforeEach(() => {
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,

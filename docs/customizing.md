@@ -1,10 +1,10 @@
-# Customising the hub
+# Customising the app
 
 Every setting you can change, grouped by where you'll find it.
 
 ## Themes
 
-Open **Hub Settings** (gear icon at the bottom of the Arc sidebar) → **Appearance**.
+Open **Desktop Settings** (gear icon at the bottom of the Arc sidebar) → **Appearance**.
 
 Five built-in themes:
 
@@ -16,7 +16,7 @@ Five built-in themes:
 | **Obsidian Dark** | Premium dark — near-black blue-tinted with electric accents |
 | **Matrix** | Phosphor terminal — soft mint on green-tinted near-black |
 
-The selection is hub-wide (one theme across all projects) and applies instantly:
+The selection is app-wide (one theme across all projects) and applies instantly:
 
 - All UI components recolour live.
 - The terminal panel reconfigures without losing scrollback or shell integration.
@@ -25,7 +25,7 @@ The selection is hub-wide (one theme across all projects) and applies instantly:
 
 There's an inline anti-FOUC script in `client/index.html` so a page refresh never shows a flash of the wrong theme.
 
-The active theme persists to `hub_settings.ui_theme` on the server and mirrors to `localStorage` so the desktop app and browser stay in sync if you use both.
+The active theme persists to `desktop_settings.ui_theme` on the server and mirrors to `localStorage` so the desktop app and browser stay in sync if you use both.
 
 > Want a sixth theme? It's a small contribution — see `client/src/lib/themes.ts` and [internals/architecture.md](internals/architecture.md) for the contract.
 
@@ -98,39 +98,39 @@ Hot-reload semantics: font family/size, copy-on-select, long-running command thr
 | Long-running command threshold | 60 s | Trigger a notification after this duration |
 | Notify on completion when unfocused | on | Emits a desktop notification when a long-running command finishes and the window isn't focused |
 
-Project overrides win per-field; missing fields fall back to hub defaults; missing hub defaults fall back to built-ins.
+Project overrides win per-field; missing fields fall back to app defaults; missing app defaults fall back to built-ins.
 
 See [terminal.md](terminal.md) for the full reference of keyboard shortcuts and shell integration.
 
-## Hub-wide settings
+## App-wide settings
 
-Open **Hub Settings** from the Arc sidebar. These apply across every project.
+Open **Desktop Settings** from the Arc sidebar. These apply across every project.
 
 | Section | What it does |
 |---------|--------------|
 | **Appearance** | Theme picker — see above. |
 | **Registered Projects** | The project registry. Re-resolve, rename, or remove projects. |
 | **specrails-tech** | Base URL for the external specrails-tech agents service (default `http://localhost:3000`). |
-| **Budget & Alerts** | Hub-wide daily budget (a global spend cap across all projects — queues auto-pause when exceeded) plus a per-job cost alert threshold. Distinct from the per-project budget. |
+| **Budget & Alerts** | App-wide daily budget (a global spend cap across all projects — queues auto-pause when exceeded) plus a per-job cost alert threshold. Distinct from the per-project budget. |
 | **OS Notifications** | Native desktop notifications when jobs complete or fail. Notifications only fire when the tab isn't focused. Filter on all / completed-only / failed-only. |
-| **Outbound Webhooks** | Notify external tools (Slack, Zapier, CI/CD) on hub events. Requests are signed with `X-Specrails-Signature` when a secret is set. |
-| **Terminal Panel** | The same terminal fields as per-project, applied hub-wide as defaults. Per-project values override them. |
+| **Outbound Webhooks** | Notify external tools (Slack, Zapier, CI/CD) on app events. Requests are signed with `X-Specrails-Signature` when a secret is set. |
+| **Terminal Panel** | The same terminal fields as per-project, applied app-wide as defaults. Per-project values override them. |
 | **Onboarding** | Re-run the welcome tour. |
-| **Hub Information** | Version, paths, and diagnostics. |
+| **Desktop Information** | Version, paths, and diagnostics. |
 
 ## Authentication
 
-There is no token to configure — the hub manages it for you.
+There is no token to configure — the app manages it for you.
 
-On first run the hub generates a token and persists it to `~/.specrails/hub.token` (mode `0600`). Every `/api/*` route requires it (the only exceptions are `/api/health` and `/api/hub/token`), and WebSocket upgrades carry it as a subprotocol. The browser client fetches the token same-origin, so you never see it.
+On first run the app generates a token and persists it to `~/.specrails/desktop.token` (mode `0600`). Every `/api/*` route requires it (the only exceptions are `/api/health` and `/api/token`), and WebSocket upgrades carry it as a subprotocol. The browser client fetches the token same-origin, so you never see it.
 
-The hub binds to `127.0.0.1` only, so it's never exposed to your network. To rotate the token, stop the hub, delete `~/.specrails/hub.token`, and start it again — a fresh token is generated on the next boot.
+The app binds to `127.0.0.1` only, so it's never exposed to your network. To rotate the token, stop the app, delete `~/.specrails/desktop.token`, and start it again — a fresh token is generated on the next boot.
 
 ## Environment variables
 
-Most settings live in the UI. A few hub-level switches are env-only because they're guardrails ops people want to flip without opening the dashboard.
+Most settings live in the UI. A few app-level switches are env-only because they're guardrails ops people want to flip without opening the dashboard.
 
-### Server-side (read at hub startup or by spawned children)
+### Server-side (read at app startup or by spawned children)
 
 | Variable | Effect |
 |----------|--------|
@@ -141,10 +141,10 @@ Most settings live in the UI. A few hub-level switches are env-only because they
 | `SPECRAILS_TERMINAL_PANEL=false` | Disable the bottom terminal panel everywhere |
 | `SPECRAILS_CODE_EXPLORER=false` | Disable the read-only Code section server-side |
 | `SPECRAILS_BROWSER_CAPTURE=false` | Disable Add-Spec-from-browser capture |
-| `SPECRAILS_HUB_CODEX_BETA=0` | Emergency rollback — disable the Codex provider |
+| `SPECRAILS_CODEX_BETA=0` | Emergency rollback — disable the Codex provider (legacy `SPECRAILS_HUB_CODEX_BETA` still honoured as a fallback) |
 | `SPECRAILS_SMASH=0` | Kill switch for SMASH spec decomposition (`0` / `false` / `off`; endpoints return 409) |
-| `SPECRAILS_EXPLORE_CONTRACT_REFINE=0` | Hub-wide kill switch for Contract Refine (auto-fire + retry endpoint; accepts `0` / `false` / `off`) |
-| `SPECRAILS_EXPLORE_LEGACY_CWD=1` | Force Explore spawns to use the project root instead of the hub-managed `explore-cwd/` |
+| `SPECRAILS_EXPLORE_CONTRACT_REFINE=0` | App-wide kill switch for Contract Refine (auto-fire + retry endpoint; accepts `0` / `false` / `off`) |
+| `SPECRAILS_EXPLORE_LEGACY_CWD=1` | Force Explore spawns to use the project root instead of the app-managed `explore-cwd/` |
 | `SPECRAILS_FILE_SUMMARY_MODEL` | Override the model used for Code-section file summaries |
 | `SPECRAILS_ALLOW_LOCAL_WEBHOOKS=1` | Allow outbound webhooks to target loopback / private-network addresses |
 
@@ -160,27 +160,27 @@ These feature flags are **default ON**. Set the flag to `false` to hide the feat
 | `VITE_FEATURE_EXPLORE_REVIEW=false` | Disable the Review step in the Explore shell |
 | `VITE_FEATURE_EXPLORE_PREMIUM_UX=false` | Disable the "Conectando…/Pensando…/Consultando código…" pills above the Explore streaming bubble |
 
-> **Port:** the hub doesn't read an env var for its port — use the `--port <n>` global flag: `specrails-hub --port 5000 start`.
+> **Port:** the app doesn't read an env var for its port — use the `--port <n>` global flag: `specrails-desktop --port 5000 start`.
 
-Set them in the shell that launches the hub. Desktop app users can set them in their shell rc files since the desktop app inherits the launchd PATH and env.
+Set them in the shell that launches the app. Desktop app users can set them in their shell rc files since the desktop app inherits the launchd PATH and env.
 
-## Resetting the hub
+## Resetting the app
 
-To wipe all hub state (project registry, settings, theme) but keep your project source code intact:
+To wipe all app state (project registry, settings, theme) but keep your project source code intact:
 
 ```bash
-specrails-hub stop
-rm -rf ~/.specrails/hub.sqlite* ~/.specrails/projects/
-specrails-hub start
+specrails-desktop stop
+rm -rf ~/.specrails/desktop.sqlite* ~/.specrails/projects/
+specrails-desktop start
 ```
 
-The `hub.sqlite*` glob also removes the SQLite WAL/SHM sidecars. This deletes the project registry and every per-project SQLite. Your project directories on disk and their `.specrails/` folders (specs, profiles, plugins) are untouched. `hub.token` and `manager.pid` regenerate harmlessly on the next start.
+The `desktop.sqlite*` glob also removes the SQLite WAL/SHM sidecars. This deletes the project registry and every per-project SQLite. Your project directories on disk and their `.specrails/` folders (specs, profiles, plugins) are untouched. `desktop.token` and `manager.pid` regenerate harmlessly on the next start.
 
 For a more surgical reset (e.g. clear job history for one project but keep the registration), see [internals/operations-runbook.md](internals/operations-runbook.md).
 
 ## Backup
 
-Everything the hub knows is in `~/.specrails/`. Back it up:
+Everything the app knows is in `~/.specrails/`. Back it up:
 
 ```bash
 tar -czf specrails-backup-$(date +%F).tar.gz -C ~ .specrails

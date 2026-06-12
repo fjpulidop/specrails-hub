@@ -2,7 +2,7 @@ import { useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { CheckCircle2, XCircle, Ban, Loader2, Activity, Zap } from 'lucide-react'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { useActivity } from '../hooks/useActivity'
 import type { ActivityItem } from '../hooks/useActivity'
 
@@ -51,7 +51,7 @@ function typeLabelClass(type: ActivityItem['type']): string {
 
 export default function ActivityFeedPage() {
   const { t } = useTranslation('activity')
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const { items, loading, hasMore, loadMore } = useActivity({ activeProjectId })
   const sentinelRef = useRef<HTMLDivElement>(null)
 

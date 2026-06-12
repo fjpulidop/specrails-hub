@@ -1,6 +1,6 @@
 import { getApiBase } from './api'
 import { WS_URL } from './ws-url'
-import { getHubTokenProtocol } from './auth'
+import { getDesktopTokenProtocol } from './auth'
 import type { Attachment } from '../types'
 import type { AnnotationSet } from './annotations'
 
@@ -278,8 +278,8 @@ export function browserWsUrl(sessionId: string, projectId: string): string {
 
 export function openBrowserWs(sessionId: string, projectId: string): WebSocket {
   const url = browserWsUrl(sessionId, projectId)
-  const protocol = getHubTokenProtocol()
-  const ws = protocol ? new WebSocket(url, ['specrails-hub', protocol]) : new WebSocket(url)
+  const protocol = getDesktopTokenProtocol()
+  const ws = protocol ? new WebSocket(url, ['specrails-desktop', protocol]) : new WebSocket(url)
   ws.binaryType = 'arraybuffer'
   return ws
 }

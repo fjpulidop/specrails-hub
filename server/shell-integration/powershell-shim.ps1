@@ -1,4 +1,4 @@
-# SpecRails Hub — PowerShell shell-integration shim
+# Specrails — PowerShell shell-integration shim
 # Loaded via -NoLogo -NoExit -File <shim.ps1>. Dot-sources the user's real
 # $PROFILE if it exists, then wraps the prompt function with OSC 133 marks.
 

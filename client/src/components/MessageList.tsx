@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { MessageSquare } from 'lucide-react'
 import { MessageBubble } from './MessageBubble'
 import type { ChatMessage } from '../types'
-import type { HubProject } from '../hooks/useHub'
+import type { DesktopProject } from '../hooks/useDesktop'
 
 const SUGGESTION_KEYS = [
   'currentStatus',
@@ -16,7 +16,7 @@ interface MessageListProps {
   messages: ChatMessage[]
   streamingText: string
   isStreaming: boolean
-  project?: HubProject
+  project?: DesktopProject
   onConfirmCommand: (command: string) => void
   onDismissCommand: (command: string) => void
   onSuggestion?: (text: string) => void

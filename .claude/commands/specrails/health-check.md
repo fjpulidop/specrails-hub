@@ -5,7 +5,7 @@ category: Workflow
 tags: [workflow, health, quality, dashboard]
 ---
 
-Run a full health check for **specrails-hub**: detect available tools, execute each quality check, compare results against the previous run, detect regressions, compute a health grade, and store a snapshot for future comparison.
+Run a full health check for **specrails-desktop**: detect available tools, execute each quality check, compare results against the previous run, detect regressions, compute a health grade, and store a snapshot for future comparison.
 
 **Input:** $ARGUMENTS — optional flags:
 - `--since <date>` — use the report from this date (ISO format: YYYY-MM-DD) as the comparison baseline instead of the most recent
@@ -398,7 +398,7 @@ Build `HEALTH_REPORT` as a structured object matching the JSON storage schema ex
 ```
 HEALTH_REPORT = {
   schema_version: "1",
-  project: "specrails-hub",
+  project: "specrails-desktop",
   timestamp: <ISO 8601 current datetime>,
   git_sha: <full SHA from `git rev-parse HEAD` or "unknown">,
   git_short_sha: <7-char SHA from `git rev-parse --short HEAD` or "unknown">,
@@ -427,7 +427,7 @@ HEALTH_REPORT = {
 Render the health report to the terminal using Markdown formatting:
 
 ```
-## Codebase Health Report — specrails-hub
+## Codebase Health Report — specrails-desktop
 Date: <ISO date> | Commit: <git_short_sha> | Compared to: <previous report date or "first run">
 
 Overall Grade: <A/B/C/D/F>  (<one-line summary>)

@@ -7,7 +7,7 @@ import { readChanges } from './changes-reader'
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeTmpDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-hub-test-'))
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-desktop-test-'))
 }
 
 function makeChange(

@@ -1,20 +1,20 @@
-# Contributing to specrails-hub
+# Contributing to specrails-desktop
 
-Thank you for your interest in contributing to specrails-hub. This document covers how to set up a development environment, run tests, and submit changes.
+Thank you for your interest in contributing to specrails-desktop. This document covers how to set up a development environment, run tests, and submit changes.
 
 ## Prerequisites
 
-- **Node.js** >= 20 (hub requirement, declared in `package.json` engines; CI runs Node 20)
+- **Node.js** >= 20 (declared in `package.json` engines; CI runs Node 20)
 - **npm** 9+
 - **claude** CLI on your PATH ([Claude Code](https://claude.com/claude-code)) — needed to test job spawning
 - **codex** CLI on your PATH (optional) — second supported provider; needed only to test the multi-provider paths. See [docs/codex.md](docs/codex.md) and the internals guide [docs/internals/adding-a-provider.md](docs/internals/adding-a-provider.md).
-- **OS:** macOS, Linux, or Windows 10/11 (1809+). The hub is cross-platform; the desktop build ships as `.dmg` (macOS) and `.exe`/`.msi` (Windows). See [docs/platforms/windows.md](docs/platforms/windows.md) for Windows-specific notes.
+- **OS:** macOS, Linux, or Windows 10/11 (1809+). The app is cross-platform; the desktop build ships as `.dmg` (macOS) and `.exe`/`.msi` (Windows). See [docs/platforms/windows.md](docs/platforms/windows.md) for Windows-specific notes.
 
 ## Local Setup
 
 ```bash
-git clone https://github.com/fjpulidop/specrails-hub.git
-cd specrails-hub
+git clone https://github.com/fjpulidop/specrails-desktop.git
+cd specrails-desktop
 
 # Install server + CLI dependencies
 npm install
@@ -38,8 +38,8 @@ This wires up `.githooks/pre-commit` (staged-file secret scan) and `.githooks/pr
 ## Project Structure
 
 ```
-specrails-hub/
-├── cli/          # CLI bridge (specrails-hub command)
+specrails-desktop/
+├── cli/          # CLI bridge (specrails-desktop command)
 ├── client/       # Web UI (Vite + React + Tailwind v4)
 ├── server/       # Express server (API + WebSocket + SQLite)
 ├── src-tauri/    # Tauri v2 desktop shell (Rust host + bundling)
@@ -67,7 +67,7 @@ npm test             # Run vitest (server + CLI tests), then the core-compat con
 npm run test:watch   # Vitest in watch mode
 ```
 
-`npm test` runs `vitest run` and then `tsx scripts/check-core-compat.ts`, which validates the hub's checkpoints/verbs against specrails-core (it exits 0 cleanly if core isn't installed locally).
+`npm test` runs `vitest run` and then `tsx scripts/check-core-compat.ts`, which validates the app's checkpoints/verbs against specrails-core (it exits 0 cleanly if core isn't installed locally).
 
 Run a single file:
 
@@ -175,7 +175,7 @@ vi.mock('./db')
 
 ## Reporting Issues
 
-Use [GitHub Issues](https://github.com/fjpulidop/specrails-hub/issues). Include:
+Use [GitHub Issues](https://github.com/fjpulidop/specrails-desktop/issues). Include:
 - Your OS and Node.js version
 - The command you ran
 - The full error output or screenshot

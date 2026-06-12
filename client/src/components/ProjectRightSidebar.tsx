@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { LayoutDashboard, Briefcase, BarChart3, Bot, Code2, Puzzle, Settings, PanelRight } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useSidebarPin } from '../context/SidebarPinContext'
-import { useHub, projectProviders } from '../hooks/useHub'
+import { useDesktop, projectProviders } from '../hooks/useDesktop'
 import { FEATURE_AGENTS_SECTION, FEATURE_CODE_EXPLORER } from '../lib/feature-flags'
 import { sectionVisibleForProviders } from '../lib/provider-capabilities'
 
@@ -17,7 +17,7 @@ const RIGHT_PIN_LABEL_KEY: Record<'pinned-open' | 'pinned-collapsed' | 'unpinned
 export function ProjectRightSidebar() {
   const { t } = useTranslation('nav')
   const { rightMode, cycleRightMode } = useSidebarPin()
-  const { projects, activeProjectId } = useHub()
+  const { projects, activeProjectId } = useDesktop()
   const [hovered, setHovered] = useState(false)
   const expanded = rightMode === 'pinned-open' || (rightMode === 'unpinned' && hovered)
   const lit = rightMode !== 'unpinned'
@@ -25,7 +25,7 @@ export function ProjectRightSidebar() {
 
   // Agents (agent-profile catalogue, per-agent model overrides) and
   // Integrations (plugins / MCP via `.mcp.json`) are Claude-only mechanics with
-  // no Codex equivalent in the hub today. We show a section only when EVERY
+  // no Codex equivalent in the app today. We show a section only when EVERY
   // installed provider supports it (the intersection): so a Claude-only project
   // sees both, a Codex-only project sees neither (unchanged), and a project
   // with BOTH engines hides them — surfacing a Claude-only section for a project

@@ -8,7 +8,7 @@ import request from 'supertest'
 import { createProjectRouter, stripSpecMetadataSections, formatDescriptionWithCriteria, extractShortSummary } from './project-router'
 import { resolveTicketStoragePath, mutateStore, readStore } from './ticket-store'
 import { initDb } from './db'
-import { initHubDb } from './hub-db'
+import { initDesktopDb } from './desktop-db'
 import { ClaudeNotFoundError, JobNotFoundError, JobAlreadyTerminalError } from './queue-manager'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import type { DbInstance } from './db'
@@ -127,16 +127,16 @@ function makeContext(db: DbInstance, overrides: Partial<ProjectContext> = {}): P
     setupManager: makeSetupManager() as any,
     proposalManager: makeProposalManager() as any,
     specLauncherManager: makeSpecLauncherManager() as any,
-    ticketWatcher: { notifyHubWrite: vi.fn(), start: vi.fn(), close: vi.fn() } as any,
+    ticketWatcher: { notifyDesktopWrite: vi.fn(), start: vi.fn(), close: vi.fn() } as any,
     broadcast: vi.fn(),
     ...overrides,
   }
 }
 
 function makeRegistry(contexts: Map<string, ProjectContext>): ProjectRegistry {
-  const hubDb = initHubDb(':memory:')
+  const desktopDb = initDesktopDb(':memory:')
   return {
-    hubDb,
+    desktopDb,
     getContext: vi.fn((id: string) => contexts.get(id)),
     getContextByPath: vi.fn(() => undefined),
     addProject: vi.fn() as any,
@@ -317,7 +317,7 @@ describe('project-router', () => {
 
     describe('tickets field', () => {
       function withProjectDir(): string {
-        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shub-jobtickets-'))
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdesktop-jobtickets-'))
         fs.mkdirSync(path.join(dir, '.specrails'), { recursive: true })
         return dir
       }
@@ -852,7 +852,7 @@ describe('project-router', () => {
     let tmpDir: string
 
     beforeEach(() => {
-      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-hub-changes-test-'))
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-desktop-changes-test-'))
     })
 
     afterEach(() => {
@@ -893,7 +893,7 @@ describe('project-router', () => {
     let tmpDir: string
 
     beforeEach(() => {
-      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-hub-artifacts-test-'))
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-desktop-artifacts-test-'))
     })
 
     afterEach(() => {
@@ -2689,7 +2689,7 @@ describe('project-router', () => {
     let tmpDir: string
 
     beforeEach(() => {
-      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-hub-changes-active-'))
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-desktop-changes-active-'))
     })
 
     afterEach(() => {
@@ -2874,13 +2874,13 @@ describe('project-router', () => {
   })
 
   describe('terminal-settings (per-project override)', () => {
-    it('GET returns { resolved, override, hubDefaults } shape with empty override', async () => {
+    it('GET returns { resolved, override, desktopDefaults } shape with empty override', async () => {
       const ctx = makeContext(db)
       const { app } = createApp(new Map([['proj-1', ctx]]))
       const res = await request(app).get('/api/projects/proj-1/terminal-settings')
       expect(res.status).toBe(200)
       expect(res.body.override).toEqual({})
-      expect(res.body.hubDefaults.fontSize).toBe(12)
+      expect(res.body.desktopDefaults.fontSize).toBe(12)
       expect(res.body.resolved.fontSize).toBe(12)
     })
 
@@ -2894,7 +2894,7 @@ describe('project-router', () => {
       expect(res.body.override).toEqual({ fontSize: 18, renderMode: 'webgl' })
       expect(res.body.resolved.fontSize).toBe(18)
       expect(res.body.resolved.renderMode).toBe('webgl')
-      expect(res.body.hubDefaults.fontSize).toBe(12)
+      expect(res.body.desktopDefaults.fontSize).toBe(12)
     })
 
     it('PATCH with null clears that override field', async () => {
@@ -2973,7 +2973,7 @@ describe('project-router', () => {
         'Users want dark mode.',
         '',
         '## Short Summary',
-        'Lets users switch to a dark theme persisted hub-wide.',
+        'Lets users switch to a dark theme persisted app-wide.',
       ].join('\n')
       const out = stripSpecMetadataSections(input)
       expect(out).not.toMatch(/Short Summary/)

@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PanelLeft, FolderOpen, Plus, BarChart2, BookOpen, Settings, X } from 'lucide-react'
 import { cn } from '../lib/utils'
-import { useHub } from '../hooks/useHub'
-import type { HubProject } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
+import type { DesktopProject } from '../hooks/useDesktop'
 import { useSidebarPin } from '../context/SidebarPinContext'
 
 interface ArcSidebarProps {
@@ -20,7 +20,7 @@ function ProjectItem({
   onSelect,
   onRemove,
 }: {
-  project: HubProject
+  project: DesktopProject
   isActive: boolean
   expanded: boolean
   onSelect: () => void
@@ -115,7 +115,7 @@ export function ArcSidebar({
   onOpenSettings,
 }: ArcSidebarProps) {
   const { t } = useTranslation('nav')
-  const { projects, activeProjectId, setActiveProjectId, removeProject } = useHub()
+  const { projects, activeProjectId, setActiveProjectId, removeProject } = useDesktop()
   const { leftMode, cycleLeftMode } = useSidebarPin()
   const [hovered, setHovered] = useState(false)
   const expanded = leftMode === 'pinned-open' || (leftMode === 'unpinned' && hovered)
@@ -128,7 +128,7 @@ export function ArcSidebar({
     { label: t('arcSidebar.settings'), icon: Settings, action: onOpenSettings },
   ]
 
-  async function handleRemove(project: HubProject) {
+  async function handleRemove(project: DesktopProject) {
     try {
       await removeProject(project.id)
     } catch {
@@ -155,7 +155,7 @@ export function ArcSidebar({
       >
         {expanded && (
           <span className="font-mono text-sm font-bold whitespace-nowrap overflow-hidden text-accent-primary">
-            {t('arcSidebar.hubTitle')}
+            {t('arcSidebar.desktopTitle')}
           </span>
         )}
         <button
@@ -204,7 +204,7 @@ export function ArcSidebar({
         </button>
       </div>
 
-      {/* Hub nav items */}
+      {/* Desktop nav items */}
       <div className="border-t border-border py-2 px-1.5 space-y-0.5">
         {navItems.map(({ label, icon: Icon, action }) => (
           <button

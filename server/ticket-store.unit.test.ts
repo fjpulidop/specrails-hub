@@ -130,7 +130,7 @@ describe('readStore', () => {
       assignee: 'alice',
       prerequisites: [1, 2],
       metadata: { effort_level: 'Large' },
-      source: 'hub',
+      source: 'hub', // legacy on-disk wire value
     })
     writeStore(filePath, makeStore({ tickets: { '7': ticket } }))
 
@@ -144,7 +144,7 @@ describe('readStore', () => {
     expect(t.assignee).toBe('alice')
     expect(t.prerequisites).toEqual([1, 2])
     expect(t.metadata.effort_level).toBe('Large')
-    expect(t.source).toBe('hub')
+    expect(t.source).toBe('hub') // legacy on-disk wire value
   })
 })
 

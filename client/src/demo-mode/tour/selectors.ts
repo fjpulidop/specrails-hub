@@ -3,7 +3,7 @@
  * selector so the `selectors.test.ts` unit test can iterate and assert each
  * resolves to exactly one element in the demo build.
  *
- * openspec: hub-demo-scripted-tour
+ * openspec: desktop-demo-scripted-tour
  */
 
 export const TOUR_SELECTORS = {

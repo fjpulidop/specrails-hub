@@ -86,11 +86,11 @@ export class TicketWatcher {
   }
 
   /**
-   * Notify the watcher that the hub itself just wrote to the file,
+   * Notify the watcher that the app itself just wrote to the file,
    * so the next file-change event should be skipped (avoids echo).
    * Call this from ticket API mutation handlers.
    */
-  notifyHubWrite(newRevision: number): void {
+  notifyDesktopWrite(newRevision: number): void {
     this._lastRevision = newRevision
   }
 
@@ -108,7 +108,7 @@ export class TicketWatcher {
     const revision = this._readRevision(filePath)
     if (revision === null) return // file unreadable or malformed
 
-    // Skip if revision hasn't changed (hub's own write)
+    // Skip if revision hasn't changed (app's own write)
     if (this._lastRevision !== null && revision === this._lastRevision) return
     this._lastRevision = revision
 

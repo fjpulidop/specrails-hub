@@ -19,7 +19,7 @@ export interface PendingSpec {
   truncated: string
 }
 
-const KEY = 'specrails-hub:pending-specs'
+const KEY = 'specrails-desktop:pending-specs'
 
 export function readPendingSpecs(): PendingSpec[] {
   try { return JSON.parse(localStorage.getItem(KEY) ?? '[]') } catch { return [] }

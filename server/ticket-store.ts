@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// âââ Types âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 export type TicketStatus = 'draft' | 'todo' | 'in_progress' | 'done' | 'cancelled'
 export type TicketPriority = 'critical' | 'high' | 'medium' | 'low'
@@ -45,11 +45,13 @@ export interface Ticket {
   created_at: string
   updated_at: string
   created_by: string
+  // 'hub' is a persisted on-disk value (tickets.json) shared with specrails-core —
+  // legacy wire value kept for compat, do not rename.
   source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'hub' | 'explore-draft' | 'specs-smash' | 'free-prompt'
   /**
-   * Hub-managed review flag. Set when a job had already marked this spec `done`
+   * App-managed review flag. Set when a job had already marked this spec `done`
    * (the agent reached its Ship phase) but the job then failed / was canceled /
-   * was zombie-killed — so the spec stays in the Done column but the board warns
+   * was zombie-killed â so the spec stays in the Done column but the board warns
    * it may be incomplete. Cleared on the next clean completion. specrails-core
    * never reads or writes this field.
    */
@@ -94,7 +96,7 @@ const DEFAULT_STORAGE_PATH = '.specrails/local-tickets.json'
 const LOCK_SUFFIX = '.lock'
 const LOCK_STALE_MS = 10_000 // 10 seconds
 
-// ─── Path resolution ─────────────────────────────────────────────────────────
+// âââ Path resolution âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 /** True when `candidate` resolves to a path inside (or equal to) `root`. */
 function isContainedIn(root: string, candidate: string): boolean {
@@ -117,7 +119,7 @@ export function resolveTicketStoragePath(projectPath: string): string {
         // A2: integration-contract.json is read FROM THE PROJECT REPO and is
         // therefore untrusted (a hostile repo added as a project). path.resolve
         // lets an absolute or '../../..'-escaping storagePath redirect the ticket
-        // store to ANY file on disk — and every ticket mutation then overwrites
+        // store to ANY file on disk â and every ticket mutation then overwrites
         // that file via writeStore(). Reject anything outside the project root
         // and fall back to the default location.
         if (isContainedIn(projectPath, resolved)) {
@@ -132,7 +134,7 @@ export function resolveTicketStoragePath(projectPath: string): string {
   return fallback
 }
 
-// ─── Advisory file locking ───────────────────────────────────────────────────
+// âââ Advisory file locking âââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 function acquireLock(filePath: string): void {
   const lockPath = filePath + LOCK_SUFFIX
@@ -185,7 +187,7 @@ function releaseLock(filePath: string): void {
   }
 }
 
-// ─── Store operations ────────────────────────────────────────────────────────
+// âââ Store operations ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 function emptyStore(): TicketStore {
   return {
@@ -208,7 +210,7 @@ function normalizeTicket(t: Ticket): Ticket {
   }
   if (t.priority === undefined) {
     // Older stores guaranteed a non-null priority; treat undefined defensively
-    // as null only when status is 'draft', otherwise keep undefined → caller
+    // as null only when status is 'draft', otherwise keep undefined â caller
     // sees it as TicketPriority|null which it must handle.
     t.priority = null
   }
@@ -230,7 +232,7 @@ function normalizeTicket(t: Ticket): Ticket {
 }
 
 /**
- * Defensive integrity check used after épica/child mutations: every ticket
+ * Defensive integrity check used after Ã©pica/child mutations: every ticket
  * with parent_epic_id must reference an existing ticket whose is_epic === true.
  * Returns an array of violation messages (empty when the store is consistent).
  */
@@ -263,7 +265,7 @@ export function readStore(filePath: string): TicketStore {
       return emptyStore()
     }
     // Normalise per-ticket fields added in schema 1.1 without rewriting the
-    // file — version bump only happens on next write via writeStore. Guard each
+    // file â version bump only happens on next write via writeStore. Guard each
     // entry so a single corrupt/non-object value (hand-edit, partial-write
     // recovery, schema drift) drops only that ticket instead of discarding the
     // ENTIRE store (which the next mutation would then persist permanently).
@@ -297,7 +299,7 @@ function writeStore(filePath: string, store: TicketStore): void {
     fs.mkdirSync(dir, { recursive: true })
   }
   // Atomic write: serialise to a sibling temp file then rename over the target.
-  // A crash mid-write can only leave the (ignored) temp file truncated — the
+  // A crash mid-write can only leave the (ignored) temp file truncated â the
   // real store is replaced in one atomic rename, never left half-written. Always
   // runs under the advisory lock (mutateStore/withLock), so the fixed temp name
   // cannot collide with a concurrent writer in this process.
@@ -312,9 +314,9 @@ export type JobOutcome = 'completed' | 'failed' | 'canceled' | 'zombie_terminate
  * Apply a finished job's outcome to the referenced tickets, in place, and return
  * the ids that actually changed (so the caller can broadcast just those).
  *
- * - `completed`: promote `todo`/`in_progress` → `done` (never resurrect a `draft`
+ * - `completed`: promote `todo`/`in_progress` â `done` (never resurrect a `draft`
  *   or a `cancelled` spec into Done); clear any stale `needs_review` flag.
- * - `failed`/`canceled`/`zombie_terminated`: revert an `in_progress` spec → `todo`
+ * - `failed`/`canceled`/`zombie_terminated`: revert an `in_progress` spec â `todo`
  *   (back to the Specs column). If the agent had already marked it `done` (its
  *   Ship phase ran, then the process died), keep it `done` but set `needs_review`
  *   so the board flags it for review.
@@ -373,7 +375,7 @@ export function mutateStore(filePath: string, fn: (store: TicketStore) => void):
   }
 }
 
-// ─── Query helpers ───────────────────────────────────────────────────────────
+// âââ Query helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 /**
  * Extract unique ticket ids referenced via `#<digits>` tokens in a command
@@ -442,7 +444,7 @@ export function filterTickets(tickets: Ticket[], filters: TicketFilters): Ticket
   return result
 }
 
-// ─── Validation helpers ──────────────────────────────────────────────────────
+// âââ Validation helpers ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 export function isValidStatus(s: unknown): s is TicketStatus {
   return typeof s === 'string' && VALID_STATUSES.has(s as TicketStatus)

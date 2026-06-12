@@ -37,9 +37,9 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-// Mock useHub
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({
+// Mock useDesktop
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({
     activeProjectId: 'proj-1',
     projects: [],
     isLoading: false,

@@ -24,8 +24,29 @@
     -->
     <script>
       (function () {
+        // One-time migration: legacy `specrails-hub:*` localStorage keys are
+        // renamed to `specrails-desktop:*` (Specrails Hub → Specrails rebrand).
+        // Must run BEFORE the anti-FOUC theme/language reads below so the very
+        // first paint after an upgrade still honours the user's saved settings.
         try {
-          var k = 'specrails-hub:ui-theme'
+          var legacyPrefix = 'specrails-hub:'
+          var newPrefix = 'specrails-desktop:'
+          var legacyKeys = []
+          for (var i = 0; i < localStorage.length; i++) {
+            var key = localStorage.key(i)
+            if (key && key.indexOf(legacyPrefix) === 0) legacyKeys.push(key)
+          }
+          for (var j = 0; j < legacyKeys.length; j++) {
+            var oldKey = legacyKeys[j]
+            var renamed = newPrefix + oldKey.slice(legacyPrefix.length)
+            if (localStorage.getItem(renamed) === null) {
+              localStorage.setItem(renamed, localStorage.getItem(oldKey))
+            }
+            localStorage.removeItem(oldKey)
+          }
+        } catch (_) { /* storage unavailable — nothing to migrate */ }
+        try {
+          var k = 'specrails-desktop:ui-theme'
           var allowed = ['dracula', 'aurora-light', 'obsidian-dark', 'matrix', 'specrails']
           var v = localStorage.getItem(k)
           document.documentElement.dataset.theme =

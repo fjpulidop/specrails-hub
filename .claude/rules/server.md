@@ -10,12 +10,12 @@ paths:
 
 - CommonJS output (`"module": "commonjs"` in `tsconfig.json`) — use `require()` for imports where needed, but prefer `import` syntax compiled to CJS
 - Strict mode enabled — no implicit `any`
-- File naming: kebab-case (e.g., `queue-manager.ts`, `hub-router.ts`)
+- File naming: kebab-case (e.g., `queue-manager.ts`, `desktop-router.ts`)
 
 ## Express patterns
 
 - All project-scoped routes live in `server/project-router.ts` under `router.<method>('/...')`
-- All hub-scoped routes live in `server/hub-router.ts` under `router.<method>('/...')`
+- All app-scoped routes live in `server/desktop-router.ts` under `router.<method>('/...')`
 - Route handlers should be thin — delegate business logic to manager classes
 - Always validate `projectId` existence via `ProjectRegistry` before accessing `ProjectContext`
 
@@ -32,7 +32,7 @@ paths:
 
 - Every project-scoped message MUST include `projectId`
 - Client-side handlers filter by `activeProjectId` using a ref (not state) to avoid stale closures
-- Hub-level messages (`hub.project_added`, `hub.project_removed`, `hub.projects`) have NO `projectId` field
+- App-level messages (`desktop.project_added`, `desktop.project_removed`, `desktop.projects`) have NO `projectId` field
 - Use `boundBroadcast` closures to inject `projectId` — do not pass it as a constructor argument
 
 ## Process spawning
@@ -40,11 +40,11 @@ paths:
 - `QueueManager` and `ChatManager` spawn `claude` CLI processes — always set `cwd` to `project.path`
 - Validate and sanitize any user-provided arguments before passing to `spawn()` or `exec()`
 
-## Hub mode
+## Super mode
 
-- Server runs in hub mode by default — one Express process, multiple projects
+- Server runs in Super mode by default — one Express process, multiple projects
 - `ProjectRegistry` loads all `ProjectContext` instances at startup
-- `~/.specrails/hub.sqlite` — hub-level SQLite (project registry)
+- `~/.specrails/desktop.sqlite` — app-level SQLite (project registry)
 - `~/.specrails/projects/<slug>/jobs.sqlite` — per-project SQLite
 
 ## Testing

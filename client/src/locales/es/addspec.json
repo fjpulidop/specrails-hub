@@ -102,7 +102,7 @@
       "standard": "Estándar",
       "rich": "Amplio",
       "max": "Max",
-      "hub": "Hub"
+      "desktop": "Desktop"
     },
     "presetCost": {
       "minimal": "Coste 1× · primer token más rápido · sin specs cargadas",
@@ -110,7 +110,7 @@
       "standard": "Coste 1,6× · specs de Specrails + OpenSpec cargadas",
       "rich": "Coste 2× · acceso de lectura a todo el repo",
       "max": "Coste 4× · lectura completa + refinamiento de Contract Layer",
-      "hub": "Coste 4–6× · todas las funciones + MCP del proyecto y tus MCP aprobados"
+      "desktop": "Coste 4–6× · todas las funciones + MCP del proyecto y tus MCP aprobados"
     },
     "smashCapable": "Compatible con SMASH",
     "smashHint": "La Contract Layer está activada, así que esta spec podrá descomponerse después en Sub-Specs.",

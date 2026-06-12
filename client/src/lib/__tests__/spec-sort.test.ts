@@ -134,8 +134,8 @@ describe('loadSpecSort / saveSpecSort', () => {
   })
 
   it('falls back to default mode on invalid stored value', () => {
-    localStorage.setItem('specrails-hub:spec-sort-mode:p1', 'bogus')
-    localStorage.setItem('specrails-hub:spec-sort-dir:p1', 'asc')
+    localStorage.setItem('specrails-desktop:spec-sort-mode:p1', 'bogus')
+    localStorage.setItem('specrails-desktop:spec-sort-dir:p1', 'asc')
     expect(loadSpecSort('p1')).toEqual({ mode: 'default', dir: 'asc' })
   })
 

@@ -5,7 +5,7 @@ TBD - created by archiving change minimize-chat-windows-to-dock. Update Purpose 
 ## Requirements
 ### Requirement: Global minimized chats dock
 
-The hub SHALL render a global, hub-wide dock fixed to the bottom-right of the viewport that displays one chip per minimized chat session. The dock MUST be visible regardless of which project is active, and MUST be hidden only when (a) the project setup wizard is taking over the viewport, or (b) no minimized chats exist.
+The app SHALL render a global, app-wide dock fixed to the bottom-right of the viewport that displays one chip per minimized chat session. The dock MUST be visible regardless of which project is active, and MUST be hidden only when (a) the project setup wizard is taking over the viewport, or (b) no minimized chats exist.
 
 #### Scenario: Dock hidden when no chips exist
 - **WHEN** the user has no minimized chat sessions
@@ -73,10 +73,10 @@ The dock SHALL allow an unlimited number of minimized sessions to coexist, inclu
 
 ### Requirement: Persistence across reload
 
-Chip metadata (id, kind, projectId, label, restoreRoute, params required to bootstrap the shell, createdAt) SHALL be persisted to `localStorage` under the key `specrails-hub:minimized-chats`. On hub load, the provider SHALL rehydrate chips and validate each: chips whose owning project no longer exists or whose backing session cannot be resolved MUST be dropped silently. The provider MUST NOT persist full chat transcripts.
+Chip metadata (id, kind, projectId, label, restoreRoute, params required to bootstrap the shell, createdAt) SHALL be persisted to `localStorage` under the key `specrails-desktop:minimized-chats`. On app load, the provider SHALL rehydrate chips and validate each: chips whose owning project no longer exists or whose backing session cannot be resolved MUST be dropped silently. The provider MUST NOT persist full chat transcripts.
 
 #### Scenario: Chip survives reload
-- **WHEN** the user has minimized chats and reloads the hub
+- **WHEN** the user has minimized chats and reloads the app
 - **THEN** the dock re-renders the same chips
 - **AND** clicking a chip restores the shell with whatever state can be rehydrated from the chip's backing store
 
@@ -91,10 +91,10 @@ Chip metadata (id, kind, projectId, label, restoreRoute, params required to boot
 
 ### Requirement: Owning-project deletion drops chips silently
 
-When a project is removed from the hub, the provider SHALL drop all chips whose `projectId` matches the removed project. Any visible shell belonging to that project MUST be unmounted as part of the same cleanup. No toast, dialog, or confirmation is shown.
+When a project is removed from the app, the provider SHALL drop all chips whose `projectId` matches the removed project. Any visible shell belonging to that project MUST be unmounted as part of the same cleanup. No toast, dialog, or confirmation is shown.
 
 #### Scenario: Project removed mid-session
-- **WHEN** the user has a minimized AiEdit chip for project "Alpha" and the user removes "Alpha" from the hub
+- **WHEN** the user has a minimized AiEdit chip for project "Alpha" and the user removes "Alpha" from the app
 - **THEN** the chip is removed from the dock and from `localStorage`
 - **AND** no notification is surfaced
 

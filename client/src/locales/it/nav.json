@@ -21,7 +21,7 @@
     "removed": "Progetto rimosso"
   },
   "arcSidebar": {
-    "hubTitle": "Hub",
+    "desktopTitle": "Desktop",
     "docs": "Docs",
     "analytics": "Analytics",
     "settings": "Impostazioni"
@@ -64,8 +64,8 @@
     "costAlertDescription": "Costo del job ${{cost}} — la soglia è ${{threshold}}",
     "dailyBudgetTitle": "Budget giornaliero superato",
     "dailyBudgetDescription": "Spesi ${{spent}} su ${{budget}} oggi. Coda in pausa.",
-    "hubBudgetTitle": "Budget giornaliero dell'hub superato",
-    "hubBudgetDescription": "Spesa totale dell'hub ${{spent}} su ${{budget}}. Coda in pausa.",
+    "desktopBudgetTitle": "Budget giornaliero di Desktop superato",
+    "desktopBudgetDescription": "Spesa totale di Desktop ${{spent}} su ${{budget}}. Coda in pausa.",
     "bannerMessage": "Budget giornaliero superato — spesi ${{spent}} su ${{budget}}. La coda è in pausa.",
     "dismiss": "Ignora"
   },

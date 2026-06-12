@@ -53,7 +53,7 @@ describe('applyContributors / revertContributors', () => {
     expect(touched).toEqual(['CLAUDE.md'])
     const text = fs.readFileSync(path.join(projectPath, 'CLAUDE.md'), 'utf8')
     expect(text).toContain('## serena hint')
-    expect(text).toContain('specrails-hub-managed:serena')
+    expect(text).toContain('specrails-desktop-managed:serena')
 
     await revertContributors(plugin, projectPath)
     // CLAUDE.md is deleted when the only content was the managed block.
@@ -61,7 +61,7 @@ describe('applyContributors / revertContributors', () => {
     if (fs.existsSync(claudeMd)) {
       const after = fs.readFileSync(claudeMd, 'utf8')
       expect(after).not.toContain('serena hint')
-      expect(after).not.toContain('specrails-hub-managed:serena')
+      expect(after).not.toContain('specrails-desktop-managed:serena')
     }
   })
 
@@ -70,7 +70,7 @@ describe('applyContributors / revertContributors', () => {
     await applyContributors(plugin, projectPath)
     await applyContributors(plugin, projectPath)
     const text = fs.readFileSync(path.join(projectPath, 'CLAUDE.md'), 'utf8')
-    const occurrences = (text.match(/specrails-hub-managed:serena:start/g) || []).length
+    const occurrences = (text.match(/specrails-desktop-managed:serena:start/g) || []).length
     expect(occurrences).toBe(1)
   })
 
@@ -102,14 +102,14 @@ describe('applyContributors / revertContributors', () => {
     expect(fs.existsSync(path.join(projectPath, 'CLAUDE.md'))).toBe(false)
     const agentsMd = fs.readFileSync(path.join(projectPath, 'AGENTS.md'), 'utf8')
     expect(agentsMd).toContain('## codex-aware hint')
-    expect(agentsMd).toContain('specrails-hub-managed:serena')
+    expect(agentsMd).toContain('specrails-desktop-managed:serena')
 
     await revertContributors(plugin, projectPath, 'codex')
     // AGENTS.md deleted when only managed block was its content
     const agentsMdPath = path.join(projectPath, 'AGENTS.md')
     if (fs.existsSync(agentsMdPath)) {
       const after = fs.readFileSync(agentsMdPath, 'utf8')
-      expect(after).not.toContain('specrails-hub-managed:serena')
+      expect(after).not.toContain('specrails-desktop-managed:serena')
     }
   })
 

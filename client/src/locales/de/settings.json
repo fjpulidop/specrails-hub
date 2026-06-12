@@ -1,7 +1,7 @@
 {
   "language": {
     "title": "Sprache",
-    "description": "Hub-weite UI-Sprache. Wird sofort angewendet – kein Neustart nötig.",
+    "description": "Desktop-weite UI-Sprache. Wird sofort angewendet – kein Neustart nötig.",
     "selectLabel": "Oberflächensprache",
     "updateFailed": "Spracheinstellung konnte nicht gespeichert werden"
   },
@@ -59,23 +59,23 @@
     "saveBudgetFailed": "Budget konnte nicht gespeichert werden",
     "saveThresholdFailed": "Schwellenwert konnte nicht gespeichert werden"
   },
-  "hub": {
-    "title": "Hub-Einstellungen",
-    "description": "Registrierte Projekte verwalten und Hub-Informationen einsehen.",
+  "desktop": {
+    "title": "Desktop-Einstellungen",
+    "description": "Registrierte Projekte verwalten und Desktop-Informationen einsehen.",
     "registeredProjects": "Registrierte Projekte",
     "noProjects": "Noch keine Projekte registriert",
     "techUrlDescription": "Basis-URL für die specrails-tech-API (Standard: http://localhost:3000)",
     "techUrlSaved": "specrails-tech-URL gespeichert",
     "techUrlSaveFailed": "URL konnte nicht gespeichert werden",
     "budgetAlertsHeading": "Budget & Alarme",
-    "dailyBudgetLabel": "Hub-Tagesbudget (USD)",
+    "dailyBudgetLabel": "Desktop-Tagesbudget (USD)",
     "dailyBudgetHelper": "Globales Tagesausgabenlimit über alle Projekte. Queues pausieren automatisch bei Überschreitung.",
     "dailyBudgetPlaceholder": "z. B. 10.00",
     "perJobHelper": "Alarm, wenn ein einzelner Job diesen Betrag überschreitet. Leer lassen zum Deaktivieren.",
     "costAlertsDisabled": "Kostenalarme deaktiviert",
-    "dailyBudgetRemoved": "Hub-Tagesbudget entfernt",
-    "dailyBudgetSet": "Hub-Tagesbudget auf ${{amount}} gesetzt",
-    "dailyBudgetSaveFailed": "Hub-Tagesbudget konnte nicht gespeichert werden",
+    "dailyBudgetRemoved": "Desktop-Tagesbudget entfernt",
+    "dailyBudgetSet": "Desktop-Tagesbudget auf ${{amount}} gesetzt",
+    "dailyBudgetSaveFailed": "Desktop-Tagesbudget konnte nicht gespeichert werden",
     "projectRemoved": "Projekt entfernt",
     "projectRemoveFailed": "Projekt konnte nicht entfernt werden",
     "onboardingHeading": "Onboarding",
@@ -83,10 +83,10 @@
     "platformTourDescription": "Den Willkommensassistenten erneut abspielen, um die wichtigsten Funktionen zu sehen.",
     "replayTour": "Tour erneut abspielen",
     "terminalPanelHeading": "Terminal-Panel",
-    "infoHeading": "Hub-Informationen",
+    "infoHeading": "Desktop-Informationen",
     "infoPort": "Port",
     "infoProjects": "Projekte",
-    "infoDb": "Hub-DB"
+    "infoDb": "Desktop-DB"
   },
   "notifications": {
     "heading": "OS-Benachrichtigungen",
@@ -101,7 +101,7 @@
   },
   "webhooks": {
     "heading": "Ausgehende Webhooks",
-    "description": "Externe Tools (Slack, Zapier, CI/CD) bei Hub-Ereignissen benachrichtigen. Anfragen werden über <code>X-Specrails-Signature</code> signiert, wenn ein Secret gesetzt ist.",
+    "description": "Externe Tools (Slack, Zapier, CI/CD) bei Desktop-Ereignissen benachrichtigen. Anfragen werden über <code>X-Specrails-Signature</code> signiert, wenn ein Secret gesetzt ist.",
     "eventJobCompleted": "Job abgeschlossen",
     "eventJobFailed": "Job fehlgeschlagen",
     "eventDailyBudgetExceeded": "Tagesbudget überschritten",
@@ -125,8 +125,8 @@
   },
   "terminal": {
     "title": "Terminal-Panel",
-    "hubDescription": "Hub-weite Standardwerte für alle Projekte, sofern kein projektspezifischer Override gesetzt ist.",
-    "projectDescription": "Projektspezifische Overrides für das Terminal-Panel. Lassen Sie ein Feld unverändert, um den Hub-Standard zu erben.",
+    "desktopDescription": "Desktop-weite Standardwerte für alle Projekte, sofern kein projektspezifischer Override gesetzt ist.",
+    "projectDescription": "Projektspezifische Overrides für das Terminal-Panel. Lassen Sie ein Feld unverändert, um den Desktop-Standard zu erben.",
     "fontFamily": "Schriftfamilie",
     "fontSize": "Schriftgröße ({{min}}–{{max}})",
     "renderMode": "Render-Modus",
@@ -141,7 +141,7 @@
     "unsavedChanges": "Ungespeicherte Änderungen",
     "clearOverride": "Override entfernen",
     "clear": "Entfernen",
-    "inheritingDefault": "Erbt Hub-Standard",
+    "inheritingDefault": "Erbt Desktop-Standard",
     "nothingToSave": "Nichts zu speichern",
     "saved": "Terminal-Einstellungen gespeichert"
   },
@@ -159,7 +159,7 @@
   },
   "mobile": {
     "heading": "Mobile Companion",
-    "description": "Steuern Sie diesen Hub über die SpecRails Companion-App auf Ihrem Smartphone – zu 100 % über Ihr lokales Netzwerk. Standardmäßig aus.",
+    "description": "Steuern Sie Specrails über die SpecRails Companion-App auf Ihrem Smartphone – zu 100 % über Ihr lokales Netzwerk. Standardmäßig aus.",
     "accessOn": "Mobilzugriff an",
     "accessOff": "Mobilzugriff aus",
     "listeningOnPort": "Lauscht auf Port {{port}}",
@@ -186,7 +186,7 @@
     "approve": "Genehmigen",
     "paired": "✓ Gekoppelt",
     "waiting": "Warte auf ein Gerät… (auf {{host}}:{{port}})",
-    "thisHub": "diesem Hub",
+    "thisDesktop": "diesem Computer",
     "copyCode": "Code kopieren (für „Manuell eingeben“)",
     "pairedToast": "Gerät gekoppelt",
     "approveFailed": "Genehmigung fehlgeschlagen: {{message}}",

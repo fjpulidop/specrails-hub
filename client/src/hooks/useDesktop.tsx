@@ -15,7 +15,7 @@ import i18n from '../lib/i18n'
 import { useSharedWebSocket } from './useSharedWebSocket'
 import { setActiveProjectId as setApiActiveProjectId } from '../lib/api'
 
-export interface HubProject {
+export interface DesktopProject {
   id: string
   slug: string
   name: string
@@ -32,17 +32,17 @@ export interface HubProject {
 }
 
 /** Installed providers for a project, tolerant of legacy payloads w/o `providers`. */
-export function projectProviders(p: Pick<HubProject, 'provider' | 'providers'>): ('claude' | 'codex')[] {
+export function projectProviders(p: Pick<DesktopProject, 'provider' | 'providers'>): ('claude' | 'codex')[] {
   return p.providers && p.providers.length > 0 ? p.providers : [p.provider]
 }
 
 export interface AddProjectResult {
-  project: HubProject
+  project: DesktopProject
   has_specrails: boolean
 }
 
-interface HubContextValue {
-  projects: HubProject[]
+interface DesktopContextValue {
+  projects: DesktopProject[]
   activeProjectId: string | null
   setActiveProjectId: (id: string | null) => void
   addProject: (path: string, name?: string, providers?: ('claude' | 'codex')[]) => Promise<AddProjectResult | null>
@@ -56,9 +56,9 @@ interface HubContextValue {
   completeSetupWizard: (projectId: string) => void
 }
 
-const HubContext = createContext<HubContextValue | null>(null)
+const DesktopContext = createContext<DesktopContextValue | null>(null)
 
-const ACTIVE_PROJECT_KEY = 'specrails-hub:activeProjectId'
+const ACTIVE_PROJECT_KEY = 'specrails-desktop:activeProjectId'
 
 function writeSavedProjectId(id: string | null): void {
   try {
@@ -73,8 +73,8 @@ function readSavedProjectId(): string | null {
   try { return localStorage.getItem(ACTIVE_PROJECT_KEY) } catch { return null }
 }
 
-export function HubProvider({ children }: { children: ReactNode }) {
-  const [projects, setProjects] = useState<HubProject[]>([])
+export function DesktopProvider({ children }: { children: ReactNode }) {
+  const [projects, setProjects] = useState<DesktopProject[]>([])
   const [activeProjectId, setActiveProjectIdRaw] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSwitchingProject, setIsSwitchingProject] = useState(false)
@@ -100,9 +100,9 @@ export function HubProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`${API_ORIGIN}/api/hub/projects`)
+        const res = await fetch(`${API_ORIGIN}/api/projects`)
         if (!res.ok) return
-        const data = await res.json() as { projects: HubProject[]; setupProjectIds?: string[] }
+        const data = await res.json() as { projects: DesktopProject[]; setupProjectIds?: string[] }
         setProjects(data.projects)
         // Restore setup wizard state from server (survives page refresh)
         if (data.setupProjectIds && data.setupProjectIds.length > 0) {
@@ -117,13 +117,13 @@ export function HubProvider({ children }: { children: ReactNode }) {
     load()
   }, [])
 
-  // Handle hub-level WebSocket messages
+  // Handle app-level WebSocket messages
   const handleMessage = useCallback((raw: unknown) => {
     const msg = raw as Record<string, unknown>
     if (typeof msg.type !== 'string') return
 
-    if (msg.type === 'hub.projects') {
-      const incoming = msg.projects as HubProject[]
+    if (msg.type === 'desktop.projects') {
+      const incoming = msg.projects as DesktopProject[]
       setProjects(incoming)
       setActiveProjectIdRaw((prev) => {
         let next: string | null
@@ -142,8 +142,8 @@ export function HubProvider({ children }: { children: ReactNode }) {
         return next
       })
       setIsLoading(false)
-    } else if (msg.type === 'hub.project_added') {
-      const project = msg.project as HubProject
+    } else if (msg.type === 'desktop.project_added') {
+      const project = msg.project as DesktopProject
       setProjects((prev) => {
         if (prev.find((p) => p.id === project.id)) return prev
         return [...prev, project]
@@ -151,7 +151,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
       toast.success(i18n.t('nav:projects.added', { name: project.name }))
       // Activate the newly added project
       setActiveProjectId(project.id)
-    } else if (msg.type === 'hub.project_removed') {
+    } else if (msg.type === 'desktop.project_removed') {
       const projectId = msg.projectId as string
       toast.success(i18n.t('nav:projects.removed'))
       setProjects((prev) => prev.filter((p) => p.id !== projectId))
@@ -165,8 +165,8 @@ export function HubProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useLayoutEffect(() => {
-    registerHandler('hub', handleMessage)
-    return () => unregisterHandler('hub')
+    registerHandler('desktop', handleMessage)
+    return () => unregisterHandler('desktop')
   }, [handleMessage, registerHandler, unregisterHandler])
 
   const addProject = useCallback(async (projectPath: string, name?: string, providers: ('claude' | 'codex')[] = ['claude']): Promise<AddProjectResult | null> => {
@@ -175,7 +175,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
       const body: Record<string, unknown> = { path: projectPath, providers: list }
       if (name) body.name = name
 
-      const res = await fetch('/api/hub/projects', {
+      const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -194,14 +194,14 @@ export function HubProvider({ children }: { children: ReactNode }) {
       setActiveProjectId(data.project.id)
       return data
     } catch (err) {
-      console.error('[useHub] addProject error:', err)
+      console.error('[useDesktop] addProject error:', err)
       throw err
     }
   }, [setActiveProjectId])
 
   const removeProject = useCallback(async (id: string): Promise<void> => {
     try {
-      const res = await fetch(`${API_ORIGIN}/api/hub/projects/${id}`, { method: 'DELETE' })
+      const res = await fetch(`${API_ORIGIN}/api/projects/${id}`, { method: 'DELETE' })
       if (!res.ok) {
         const err = await res.json() as { error?: string }
         throw new Error(err.error ?? `HTTP ${res.status}`)
@@ -220,7 +220,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
         return null
       })
     } catch (err) {
-      console.error('[useHub] removeProject error:', err)
+      console.error('[useDesktop] removeProject error:', err)
       throw err
     }
   }, [])
@@ -251,13 +251,13 @@ export function HubProvider({ children }: { children: ReactNode }) {
   }), [projects, activeProjectId, setActiveProjectId, addProject, removeProject, isLoading, isSwitchingProject, setupProjectIds, startSetupWizard, completeSetupWizard])
 
   return (
-    <HubContext.Provider value={contextValue}>
+    <DesktopContext.Provider value={contextValue}>
       {children}
-    </HubContext.Provider>
+    </DesktopContext.Provider>
   )
 }
 
-const LEGACY_FALLBACK: HubContextValue = {
+const LEGACY_FALLBACK: DesktopContextValue = {
   projects: [],
   activeProjectId: null,
   setActiveProjectId: () => {},
@@ -270,8 +270,8 @@ const LEGACY_FALLBACK: HubContextValue = {
   completeSetupWizard: () => {},
 }
 
-export function useHub(): HubContextValue {
-  const ctx = useContext(HubContext)
-  // In legacy (non-hub) mode there is no HubProvider — return safe defaults
+export function useDesktop(): DesktopContextValue {
+  const ctx = useContext(DesktopContext)
+  // In legacy (non-Super) mode there is no DesktopProvider — return safe defaults
   return ctx ?? LEGACY_FALLBACK
 }

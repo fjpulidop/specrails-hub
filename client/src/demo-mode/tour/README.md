@@ -1,8 +1,8 @@
-# hub-demo scripted tour
+# desktop-demo scripted tour
 
-openspec: `hub-demo-scripted-tour`
+openspec: `desktop-demo-scripted-tour`
 
-Auto-playing visual tour that runs inside the static `hub-demo` build (loaded
+Auto-playing visual tour that runs inside the static `desktop-demo` build (loaded
 by `demo-entry.tsx`, output to `dist-demo/`). Not compiled into the production
 client bundle.
 
@@ -13,7 +13,7 @@ production components with programmatic clicks; instead it renders its own
 lightweight fake visuals (modal, spec card, rail chrome, log drawer) over the
 live dashboard and glides a synthetic cursor between them.
 
-This keeps the tour self-contained and zero-risk for the real hub client at
+This keeps the tour self-contained and zero-risk for the real app client at
 the cost of a small visual-state drift as the real UI evolves.
 
 ```

@@ -37,7 +37,7 @@ import { binaryOnPath } from './binary-probe'
 export function buildTelemetryEnv(
   jobId: string,
   projectId: string,
-  hubPort: number,
+  desktopPort: number,
   extraResourceAttributes: Record<string, string | number> = {},
 ): Record<string, string> {
   const baseAttrs: Array<[string, string]> = [
@@ -49,7 +49,7 @@ export function buildTelemetryEnv(
   }
   return {
     CLAUDE_CODE_ENABLE_TELEMETRY: '1',
-    OTEL_EXPORTER_OTLP_ENDPOINT: `http://127.0.0.1:${hubPort}/otlp`,
+    OTEL_EXPORTER_OTLP_ENDPOINT: `http://127.0.0.1:${desktopPort}/otlp`,
     OTEL_EXPORTER_OTLP_PROTOCOL: 'http/json',
     OTEL_METRICS_EXPORTER: 'otlp',
     OTEL_LOGS_EXPORTER: 'otlp',
@@ -214,7 +214,7 @@ export class QueueManager {
   private _disposed: boolean
 
   private _getCostAlertThreshold: (() => number | null) | null
-  private _getHubDailyBudget: (() => { budget: number | null; totalSpend: number }) | null
+  private _getDesktopDailyBudget: (() => { budget: number | null; totalSpend: number }) | null
   private _adapter: ProviderAdapter
   /** Effective model to use when spawning processes. For Claude the adapter
    *  reads its own config; this is the override that gets passed via `--model`.
@@ -222,11 +222,11 @@ export class QueueManager {
    *  fallback model name stamped onto the ai_invocations row. */
   private _resolvedModel: string | null
   private _onJobFinished: ((jobId: string, status: Job['status'], costUsd?: number) => void) | null
-  /** Project ID used for OTEL resource attributes (hub mode only) */
+  /** Project ID used for OTEL resource attributes (Super mode only) */
   private _projectId: string | null
-  /** Hub port used to construct the OTLP endpoint URL for env injection */
-  private _hubPort: number
-  /** Project slug used for per-job profile snapshots (hub mode only) */
+  /** Server port used to construct the OTLP endpoint URL for env injection */
+  private _desktopPort: number
+  /** Project slug used for per-job profile snapshots (Super mode only) */
   private _projectSlug: string | null
   /** Pending profile selection keyed by jobId — read at spawn time */
   private _jobProfileSelection: Map<string, string | null>
@@ -249,13 +249,13 @@ export class QueueManager {
     options?: {
       zombieTimeoutMs?: number
       getCostAlertThreshold?: () => number | null
-      getHubDailyBudget?: () => { budget: number | null; totalSpend: number }
+      getDesktopDailyBudget?: () => { budget: number | null; totalSpend: number }
       provider?: 'claude' | 'codex'
       /** Effective model for codex spawns. If omitted, falls back to 'gpt-5.5'. */
       resolvedModel?: string
       onJobFinished?: (jobId: string, status: Job['status'], costUsd?: number) => void
       projectId?: string
-      hubPort?: number
+      desktopPort?: number
       /** Project slug used to locate per-job profile snapshots at
        *  ~/.specrails/projects/<slug>/jobs/<jobId>/profile.json */
       projectSlug?: string
@@ -278,12 +278,12 @@ export class QueueManager {
     this._disposed = false
 
     this._getCostAlertThreshold = options?.getCostAlertThreshold ?? null
-    this._getHubDailyBudget = options?.getHubDailyBudget ?? null
+    this._getDesktopDailyBudget = options?.getDesktopDailyBudget ?? null
     this._adapter = getAdapter(options?.provider ?? 'claude')
     this._resolvedModel = options?.resolvedModel ?? null
     this._onJobFinished = options?.onJobFinished ?? null
     this._projectId = options?.projectId ?? null
-    this._hubPort = options?.hubPort ?? 4200
+    this._desktopPort = options?.desktopPort ?? 4200
     this._projectSlug = options?.projectSlug ?? null
     this._jobProfileSelection = new Map()
     this._jobProviderSelection = new Map()
@@ -318,7 +318,7 @@ export class QueueManager {
    * (SIGTERM, then SIGKILL after a grace period), and drop the DB handle so a
    * late child 'close' event cannot run prepared statements against a closed
    * connection (which would throw uncaught inside the EventEmitter listener and
-   * crash the whole hub). Idempotent. Must be called BEFORE the per-project DB
+   * crash the whole app). Idempotent. Must be called BEFORE the per-project DB
    * is closed (e.g. in ProjectRegistry.removeProject) and on graceful shutdown.
    */
   shutdown(): void {
@@ -839,7 +839,7 @@ export class QueueManager {
     })
 
     // Resolve agent profile (if any) and snapshot per-job before spawn.
-    // Hub mode only (projectId + projectSlug + cwd all present).
+    // Super mode only (projectId + projectSlug + cwd all present).
     // Skipped when the adapter does not honour `SPECRAILS_PROFILE_PATH` AND
     // when the project's installed specrails-core is older than the
     // provider's minimum core version (legacy fallback). Codex skill rails
@@ -889,7 +889,7 @@ export class QueueManager {
       if (profileName) extra['specrails.profile_schema_version'] = '1'
       spawnEnv = {
         ...process.env,
-        ...buildTelemetryEnv(jobId, this._projectId, this._hubPort, extra),
+        ...buildTelemetryEnv(jobId, this._projectId, this._desktopPort, extra),
       }
     }
     // Inject the profile path whenever the adapter honours it (was: claude-
@@ -961,7 +961,7 @@ export class QueueManager {
         }
         spawnEnv = {
           ...spawnEnv,
-          ...buildTelemetryEnv(jobId, this._projectId, this._hubPort, extra),
+          ...buildTelemetryEnv(jobId, this._projectId, this._desktopPort, extra),
         }
       }
     }
@@ -989,7 +989,7 @@ export class QueueManager {
     this._activeJobId = jobId
 
     // Without this listener, an ENOENT (e.g. claude not on PATH) propagates
-    // as an unhandled 'error' event and crashes the entire hub. Node still
+    // as an unhandled 'error' event and crashes the entire app. Node still
     // emits 'close' afterwards, so the existing close handler fails the job
     // through the normal path — we only need to absorb the error event.
     /* c8 ignore next 3 -- spawn-failure path; exercised manually, not in CI */
@@ -1017,7 +1017,7 @@ export class QueueManager {
       otelBridge = createCodexOtelBridge({
         jobId,
         projectId: this._projectId,
-        hubPort: this._hubPort,
+        desktopPort: this._desktopPort,
         model: railModel,
       })
     }
@@ -1338,17 +1338,17 @@ export class QueueManager {
       const costStr = jobCost != null ? ` | cost: ${estimated ? '~' : ''}$${jobCost.toFixed(4)}` : ''
       emitLine('stdout', `[process exited with code ${code ?? 'unknown'}${costStr}]`)
 
-      // Cost alert: check per-job threshold (hub-level, then per-project).
+      // Cost alert: check per-job threshold (app-level, then per-project).
       // These prepared statements touch the DB, which may have been closed
       // mid-job; guard so a throw never escapes the child 'close' listener.
       if (jobCost != null && finalStatus === 'completed') {
         try {
-          const hubThreshold = this._getCostAlertThreshold?.() ?? null
-          if (hubThreshold != null && jobCost >= hubThreshold) {
-            this._broadcast({ type: 'cost_alert', projectId: '', jobId, cost: jobCost, threshold: hubThreshold })
+          const desktopThreshold = this._getCostAlertThreshold?.() ?? null
+          if (desktopThreshold != null && jobCost >= desktopThreshold) {
+            this._broadcast({ type: 'cost_alert', projectId: '', jobId, cost: jobCost, threshold: desktopThreshold })
           }
 
-          // Per-project job cost threshold (alerts independently of hub threshold)
+          // Per-project job cost threshold (alerts independently of app threshold)
           const projectThresholdRow = this._db.prepare(
             `SELECT value FROM queue_state WHERE key = 'config.job_cost_threshold_usd'`
           ).get() as { value: string } | undefined
@@ -1381,16 +1381,16 @@ export class QueueManager {
             }
           }
 
-          // Hub-level daily budget enforcement
-          if (this._getHubDailyBudget) {
-            const { budget: hubBudget, totalSpend: hubTotalSpend } = this._getHubDailyBudget()
-            if (hubBudget != null && hubBudget > 0 && hubTotalSpend >= hubBudget) {
+          // App-level daily budget enforcement
+          if (this._getDesktopDailyBudget) {
+            const { budget: desktopBudget, totalSpend: desktopTotalSpend } = this._getDesktopDailyBudget()
+            if (desktopBudget != null && desktopBudget > 0 && desktopTotalSpend >= desktopBudget) {
               const wasPaused = this._paused
               this._paused = true
               if (!wasPaused) {
                 this._db.prepare(`INSERT OR REPLACE INTO queue_state (key, value) VALUES ('paused', 'true')`).run()
               }
-              this._broadcast({ type: 'hub_daily_budget_exceeded', projectId: '', hubDailySpend: hubTotalSpend, hubBudget, queuePaused: true })
+              this._broadcast({ type: 'desktop_daily_budget_exceeded', projectId: '', desktopDailySpend: desktopTotalSpend, desktopBudget, queuePaused: true })
             }
           }
         } catch (err) {

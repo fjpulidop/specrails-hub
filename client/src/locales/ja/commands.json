@@ -12,10 +12,10 @@
     },
     "nav": {
       "dashboard": "ダッシュボード",
-      "hubAnalytics": "ハブ分析",
+      "desktopAnalytics": "Desktop 分析",
       "projectAnalytics": "プロジェクト分析",
       "activityFeed": "アクティビティフィード",
-      "hubSettings": "ハブ設定",
+      "desktopSettings": "Desktop 設定",
       "docs": "ドキュメント"
     },
     "sidebar": {
@@ -96,7 +96,7 @@
       "error": "アップデートに失敗しました"
     },
     "desc": {
-      "available": "SpecRails Hub の新しいバージョンをインストールできます。",
+      "available": "Specrails の新しいバージョンをインストールできます。",
       "fetching": "{{size}} を取得中…",
       "progress": "{{percent}}% · {{total}} 中 {{downloaded}}",
       "installing": "署名を検証して仕上げています…",

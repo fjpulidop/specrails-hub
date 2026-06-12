@@ -26,7 +26,7 @@ function resolveInstallerCommand(name: string): InstallerCommand | null {
   if (process.platform === 'win32') {
     // PowerShell installer is the cross-version path. winget would be nicer
     // but isn't always present. The Astral installer adds uv to PATH for the
-    // user; the hub's PATH augmentation on next start picks it up.
+    // user; the app's PATH augmentation on next start picks it up.
     return {
       label: 'Astral uv installer (PowerShell)',
       shell: 'powershell -ExecutionPolicy ByPass -NoProfile -Command "irm https://astral.sh/uv/install.ps1 | iex"',

@@ -194,7 +194,7 @@ function CopyDiagnosticsButton() {
   const onClick = async () => {
     setState('copying')
     try {
-      const res = await fetch(`${API_ORIGIN}/api/hub/setup-prerequisites?diagnostic=1`)
+      const res = await fetch(`${API_ORIGIN}/api/setup-prerequisites?diagnostic=1`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = await res.json()
       await navigator.clipboard.writeText(JSON.stringify(json, null, 2))

@@ -1,6 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
+import Database from 'better-sqlite3'
 import {
-  initHubDb,
+  initDesktopDb,
   addProject,
   removeProject,
   listProjects,
@@ -8,8 +12,8 @@ import {
   getProjectBySlug,
   getProjectByPath,
   touchProject,
-  getHubSetting,
-  setHubSetting,
+  getDesktopSetting,
+  setDesktopSetting,
   setProjectSetupSession,
   getProjectSetupSession,
   clearProjectSetupSession,
@@ -26,11 +30,11 @@ import {
   updateWebhook,
   removeWebhook,
   listWebhooksForProject,
-} from './hub-db'
+} from './desktop-db'
 import type { DbInstance } from './db'
 
 function makeDb(): DbInstance {
-  return initHubDb(':memory:')
+  return initDesktopDb(':memory:')
 }
 
 function makeProjectOpts(suffix = '1') {
@@ -42,7 +46,7 @@ function makeProjectOpts(suffix = '1') {
   }
 }
 
-describe('hub-db', () => {
+describe('desktop-db', () => {
   let db: DbInstance
 
   beforeEach(() => {
@@ -51,12 +55,12 @@ describe('hub-db', () => {
 
   // ─── Schema & Init ──────────────────────────────────────────────────────────
 
-  describe('initHubDb', () => {
-    it('creates the projects, hub_settings, agents and webhooks tables', () => {
+  describe('initDesktopDb', () => {
+    it('creates the projects, desktop_settings, agents and webhooks tables', () => {
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]
       const names = tables.map((t) => t.name)
       expect(names).toContain('projects')
-      expect(names).toContain('hub_settings')
+      expect(names).toContain('desktop_settings')
       expect(names).toContain('schema_migrations')
       expect(names).toContain('agents')
       expect(names).toContain('webhooks')
@@ -69,17 +73,17 @@ describe('hub-db', () => {
       expect(names).toContain('idx_projects_path')
     })
 
-    it('applies migrations 1 through 12 and records them', () => {
+    it('applies migrations 1 through 13 and records them', () => {
       const versions = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as { version: number }[]
-      expect(versions).toHaveLength(12)
-      expect(versions.map((v) => v.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+      expect(versions).toHaveLength(13)
+      expect(versions.map((v) => v.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
     })
 
-    it('is idempotent — calling initHubDb again does not fail', () => {
+    it('is idempotent — calling initDesktopDb again does not fail', () => {
       // Re-init on same DB (in-memory so we just call again)
       const db2 = makeDb()
       const versions = db2.prepare('SELECT version FROM schema_migrations').all() as { version: number }[]
-      expect(versions).toHaveLength(12)
+      expect(versions).toHaveLength(13)
     })
   })
 
@@ -193,29 +197,29 @@ describe('hub-db', () => {
     })
   })
 
-  // ─── Hub Settings ─────────────────────────────────────────────────────────
+  // ─── Desktop Settings ─────────────────────────────────────────────────────────
 
-  describe('hub settings', () => {
+  describe('desktop settings', () => {
     it('returns undefined for non-existent key', () => {
-      expect(getHubSetting(db, 'nonexistent')).toBeUndefined()
+      expect(getDesktopSetting(db, 'nonexistent')).toBeUndefined()
     })
 
     it('sets and gets a setting', () => {
-      setHubSetting(db, 'port', '4200')
-      expect(getHubSetting(db, 'port')).toBe('4200')
+      setDesktopSetting(db, 'port', '4200')
+      expect(getDesktopSetting(db, 'port')).toBe('4200')
     })
 
     it('upserts — replaces existing value', () => {
-      setHubSetting(db, 'port', '4200')
-      setHubSetting(db, 'port', '8080')
-      expect(getHubSetting(db, 'port')).toBe('8080')
+      setDesktopSetting(db, 'port', '4200')
+      setDesktopSetting(db, 'port', '8080')
+      expect(getDesktopSetting(db, 'port')).toBe('8080')
     })
 
     it('handles multiple different keys', () => {
-      setHubSetting(db, 'key1', 'value1')
-      setHubSetting(db, 'key2', 'value2')
-      expect(getHubSetting(db, 'key1')).toBe('value1')
-      expect(getHubSetting(db, 'key2')).toBe('value2')
+      setDesktopSetting(db, 'key1', 'value1')
+      setDesktopSetting(db, 'key2', 'value2')
+      expect(getDesktopSetting(db, 'key1')).toBe('value1')
+      expect(getDesktopSetting(db, 'key2')).toBe('value2')
     })
   })
 
@@ -456,5 +460,97 @@ describe('hub-db', () => {
       updateWebhook(db, 'wh-disabled', { enabled: false })
       expect(listWebhooksForProject(db, project.id)).toHaveLength(0)
     })
+  })
+})
+
+// ─── Rebrand migrations (Specrails Hub → Specrails Desktop) ────────────────────
+// These tests need real temp files: the rename-on-open migration moves
+// `hub.sqlite` → `desktop.sqlite` on disk, which `:memory:` cannot exercise.
+
+describe('legacy hub → desktop migrations', () => {
+  let dir: string
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-db-migration-'))
+  })
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  /** Simulates a pre-rebrand database: schema_migrations at version 12 with the
+   *  legacy hub_settings table, the legacy budget key, and a legacy webhook
+   *  event subscription. Legacy identifiers used here only — migration tests. */
+  function seedLegacyDb(legacyPath: string): void {
+    const legacy = new Database(legacyPath)
+    legacy.exec(`
+      CREATE TABLE schema_migrations (
+        version    INTEGER PRIMARY KEY,
+        applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE hub_settings (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+      CREATE TABLE webhooks (
+        id         TEXT PRIMARY KEY,
+        project_id TEXT,
+        url        TEXT NOT NULL,
+        secret     TEXT NOT NULL DEFAULT '',
+        events     TEXT NOT NULL DEFAULT '["job.completed","job.failed"]',
+        enabled    INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `)
+    const ins = legacy.prepare('INSERT INTO schema_migrations (version) VALUES (?)')
+    for (let v = 1; v <= 12; v++) ins.run(v)
+    legacy.prepare("INSERT INTO hub_settings (key, value) VALUES ('hub_daily_budget_usd', '7.5')").run()
+    legacy.prepare("INSERT INTO hub_settings (key, value) VALUES ('ui_theme', 'matrix')").run()
+    legacy.prepare(
+      `INSERT INTO webhooks (id, url, events) VALUES ('wh-legacy', 'https://example.com/h', '["job.completed","hub_daily_budget_exceeded"]')`
+    ).run()
+    legacy.close()
+  }
+
+  it('renames hub.sqlite to desktop.sqlite on open and preserves data', () => {
+    const legacyPath = path.join(dir, 'hub.sqlite')
+    const desktopPath = path.join(dir, 'desktop.sqlite')
+    seedLegacyDb(legacyPath)
+
+    const db = initDesktopDb(desktopPath)
+    expect(fs.existsSync(legacyPath)).toBe(false)
+    expect(fs.existsSync(desktopPath)).toBe(true)
+    expect(getDesktopSetting(db, 'ui_theme')).toBe('matrix')
+    db.close()
+  })
+
+  it('does not touch hub.sqlite when desktop.sqlite already exists', () => {
+    const legacyPath = path.join(dir, 'hub.sqlite')
+    const desktopPath = path.join(dir, 'desktop.sqlite')
+    initDesktopDb(desktopPath).close()
+    seedLegacyDb(legacyPath)
+
+    const db = initDesktopDb(desktopPath)
+    expect(fs.existsSync(legacyPath)).toBe(true)
+    // The fresh desktop DB was kept — no legacy keys leaked in.
+    expect(getDesktopSetting(db, 'desktop_daily_budget_usd')).toBeUndefined()
+    db.close()
+  })
+
+  it('migration 13 renames hub_settings, the budget key and webhook events', () => {
+    const legacyPath = path.join(dir, 'hub.sqlite')
+    seedLegacyDb(legacyPath)
+
+    const db = initDesktopDb(path.join(dir, 'desktop.sqlite'))
+    const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[])
+      .map((t) => t.name)
+    expect(tables).toContain('desktop_settings')
+    expect(tables).not.toContain('hub_settings')
+    expect(getDesktopSetting(db, 'desktop_daily_budget_usd')).toBe('7.5')
+    expect(getDesktopSetting(db, 'hub_daily_budget_usd')).toBeUndefined()
+    const wh = getWebhook(db, 'wh-legacy')
+    expect(JSON.parse(wh!.events)).toEqual(['job.completed', 'desktop_daily_budget_exceeded'])
+    db.close()
   })
 })

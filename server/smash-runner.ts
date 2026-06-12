@@ -152,7 +152,7 @@ export function prepareSmashSpawn(
   const userPrompt = `${ticket.title}\n\n${ticket.description}`
   let cwd: string
   // Full mode needs access to the project tree (so Read/Grep/Glob hit the
-  // real repo). Simple mode keeps the hub-managed dir for a clean scope.
+  // real repo). Simple mode keeps the app-managed dir for a clean scope.
   if (mode === 'full') {
     cwd = deps.projectPath
   } else {

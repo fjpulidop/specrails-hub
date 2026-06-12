@@ -1,7 +1,7 @@
 export const TERMINAL_SETTINGS_UPDATED_EVENT = 'specrails:terminal-settings-updated'
 
 export interface TerminalSettingsUpdatedEventDetail {
-  mode: 'hub' | 'project'
+  mode: 'desktop' | 'project'
   projectId: string | null
 }
 

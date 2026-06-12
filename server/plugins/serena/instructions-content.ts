@@ -1,7 +1,7 @@
 /* Embedded so the plugin survives bundling/packaging without external assets. */
 export const SERENA_INSTRUCTIONS_MD = `---
 name: serena-helper
-description: "Serena MCP semantic-navigation hints (auto-installed by specrails-hub). Prefer Serena tools over raw Read/Grep when locating symbols, references, or definitions."
+description: "Serena MCP semantic-navigation hints (auto-installed by Specrails). Prefer Serena tools over raw Read/Grep when locating symbols, references, or definitions."
 color: violet
 memory: project
 ---

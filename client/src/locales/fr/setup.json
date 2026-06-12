@@ -41,12 +41,12 @@
       "title": "Échec de la configuration",
       "skipSetup": "Ignorer la configuration",
       "prereqMissing": "La configuration de SpecRails a besoin de Node.js, npm, npx et Git disponibles sur le PATH pour pouvoir installer ce projet.",
-      "prereqRetryHint": "Installez les outils manquants, redémarrez SpecRails Hub, puis relancez la configuration."
+      "prereqRetryHint": "Installez les outils manquants, redémarrez Specrails, puis relancez la configuration."
     }
   },
   "addProject": {
     "title": "Ajouter un projet",
-    "description": "Enregistrez un répertoire de projet pour le gérer depuis le hub.",
+    "description": "Enregistrez un répertoire de projet pour le gérer depuis Specrails.",
     "noProviderDetected": "Aucune CLI d'IA détectée. Installez d'abord Claude Code ou Codex CLI.",
     "pathLabel": "Chemin du projet",
     "pathPlaceholder": "/Users/moi/mon-projet",
@@ -89,7 +89,7 @@
     "bundleCorruptedTitle": "Bundle de l'application corrompu",
     "toolsRequired_one": "{{count}} outil de développement requis",
     "toolsRequired_other": "{{count}} outils de développement requis",
-    "reinstallHint": "Réinstallez l'application SpecRails Hub pour restaurer les outils embarqués.",
+    "reinstallHint": "Réinstallez l'application Specrails pour restaurer les outils embarqués.",
     "installMissingHint": "Installez les outils manquants pour continuer.",
     "moreInfo": "Plus d'infos",
     "bundledBadge": "embarqué"
@@ -105,7 +105,7 @@
       "intro": "Winget est fourni avec Windows 11 et les versions récentes de Windows 10. Ouvrez PowerShell ou le Terminal et exécutez :",
       "installNode": "Installer Node.js LTS",
       "installGit": "Installer Git",
-      "note": "Après l'installation, redémarrez SpecRails Hub pour que Windows actualise le PATH."
+      "note": "Après l'installation, redémarrez Specrails pour que Windows actualise le PATH."
     },
     "linux": {
       "intro": "Utilisez le gestionnaire de paquets de votre distribution :",
@@ -128,7 +128,7 @@
     "corrupted": {
       "title": "Bundle de l'application corrompu",
       "description": "Un ou plusieurs outils embarqués (Node.js, Git) n'ont pas pu être vérifiés.",
-      "body": "Cet outil est embarqué avec l'application SpecRails Hub et ne peut pas être installé séparément. Si vous voyez ce message, le bundle de l'application est peut-être corrompu. Veuillez réinstaller SpecRails Hub."
+      "body": "Cet outil est embarqué avec l'application Specrails et ne peut pas être installé séparément. Si vous voyez ce message, le bundle de l'application est peut-être corrompu. Veuillez réinstaller Specrails."
     }
   },
   "checkpoints": {
@@ -145,8 +145,8 @@
     "keyboardHint": "Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne"
   },
   "welcome": {
-    "title": "Bienvenue dans <spec>spec</spec><rails>rails</rails> hub",
-    "description": "Le hub gère plusieurs projets depuis une seule interface. Ajoutez votre premier projet pour commencer.",
+    "title": "Bienvenue dans <spec>spec</spec><rails>rails</rails>",
+    "description": "Specrails gère plusieurs projets depuis une seule interface. Ajoutez votre premier projet pour commencer.",
     "addFirstProject": "Ajouter votre premier projet"
   },
   "onboarding": {
@@ -168,13 +168,13 @@
     },
     "welcome": {
       "nav": "Bienvenue",
-      "title": "Bienvenue dans specrails-hub",
+      "title": "Bienvenue dans Specrails",
       "subtitle": "Votre cockpit local pour livrer du logiciel avec des agents IA",
-      "intro": "specrails-hub transforme une idée en code livré — et vous laisse <b>voir, piloter et vérifier</b> chaque étape. Rédigez une spec en discutant avec une IA, déposez-la sur un rail d'exécution et appuyez sur Play. Le pipeline gère l'architecture, l'implémentation, la revue et la pull request, en streamant son travail en direct du début à la fin.",
+      "intro": "Specrails transforme une idée en code livré — et vous laisse <b>voir, piloter et vérifier</b> chaque étape. Rédigez une spec en discutant avec une IA, déposez-la sur un rail d'exécution et appuyez sur Play. Le pipeline gère l'architecture, l'implémentation, la revue et la pull request, en streamant son travail en direct du début à la fin.",
       "coreLoopLabel": "La boucle de base",
       "flowCaption": "Chaque spec passe automatiquement par <b>Architecte → Développeur → Relecteur → Livraison</b>.",
       "localNote": "<b>100 % local · mono-utilisateur · sans compte.</b> Tout s'exécute sur votre machine. Votre code ne quitte jamais le laptop, sauf si <i>vous</i> lancez un agent dessus.",
-      "tourNote": "Cette visite rapide passe en revue tout ce que le hub sait faire — environ une minute."
+      "tourNote": "Cette visite rapide passe en revue tout ce que l'application sait faire — environ une minute."
     },
     "authorSpecs": {
       "nav": "Rédiger des specs",
@@ -214,7 +214,7 @@
       "nav": "Votre agent",
       "title": "Apportez votre propre agent",
       "subtitle": "Claude Code et Codex, des moteurs de premier rang",
-      "intro": "Le hub traite <b>Claude Code</b> et <b>Codex CLI</b> comme des moteurs interchangeables derrière un même contrat. Un projet peut en installer un ou les deux — le choix se fait à l'installation.",
+      "intro": "L'application traite <b>Claude Code</b> et <b>Codex CLI</b> comme des moteurs interchangeables derrière un même contrat. Un projet peut en installer un ou les deux — le choix se fait à l'installation.",
       "table": {
         "capability": "Capacité",
         "streamingResume": "Streaming & reprise de session",
@@ -227,7 +227,7 @@
         "agentProfiles": "Profils d'agents"
       },
       "calloutLabel": "Quand les deux sont installés",
-      "calloutBody": "Choisissez le moteur <b>par spec, par rail ou par lancement de terminal</b>. Le hub mémorise votre dernier choix par projet. Le coût de Codex est estimé à partir d'une grille tarifaire locale et toujours signalé par un <mono>~</mono>."
+      "calloutBody": "Choisissez le moteur <b>par spec, par rail ou par lancement de terminal</b>. L'application mémorise votre dernier choix par projet. Le coût de Codex est estimé à partir d'une grille tarifaire locale et toujours signalé par un <mono>~</mono>."
     },
     "cost": {
       "nav": "Suivre les coûts",
@@ -241,7 +241,7 @@
       "honestLabel": "Des chiffres honnêtes",
       "honestBody": "Le coût Claude est le montant facturé par le fournisseur ; celui de Codex est estimé et signalé par un <mono>~</mono>. Les totaux de tokens incluent les niveaux de cache, donc les chiffres se recoupent vraiment.",
       "budgetsLabel": "Budgets & alertes",
-      "budgetsBody": "Définissez un budget quotidien et une alerte de coût par job ; le hub met automatiquement la file en pause quand vous franchissez la limite. Exportez tout en CSV ou JSON."
+      "budgetsBody": "Définissez un budget quotidien et une alerte de coût par job ; l'application met automatiquement la file en pause quand vous franchissez la limite. Exportez tout en CSV ou JSON."
     },
     "workspace": {
       "nav": "Espace de travail",
@@ -258,7 +258,7 @@
       "chatsLabel": "Chats minimisables",
       "chatsBody": "Rangez une session Explore ou Édition IA dans une puce du dock et reprenez-la plus tard — jamais perdue, même après un rechargement ou un changement de projet.",
       "desktopLabel": "Desktop ou navigateur",
-      "desktopBody": "Lancez le hub dans votre navigateur, ou prenez l'application desktop signée (macOS & Windows) qui embarque son propre serveur et ses runtimes."
+      "desktopBody": "Lancez Specrails dans votre navigateur, ou prenez l'application desktop signée (macOS & Windows) qui embarque son propre serveur et ses runtimes."
     },
     "moveFast": {
       "nav": "Aller vite",

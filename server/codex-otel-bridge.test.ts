@@ -40,7 +40,7 @@ describe('createCodexOtelBridge — finalize emits all three signals', () => {
     const bridge = createCodexOtelBridge({
       jobId: 'J1',
       projectId: 'P1',
-      hubPort: 4200,
+      desktopPort: 4200,
       model: 'gpt-5.4-mini',
       cliVersion: '0.128.0',
       poster,
@@ -106,7 +106,7 @@ describe('createCodexOtelBridge — finalize emits all three signals', () => {
   it('emits tool-use events as span events', async () => {
     const { calls, poster } = recordingPoster()
     const bridge = createCodexOtelBridge({
-      jobId: 'J', projectId: 'P', hubPort: 4200, poster,
+      jobId: 'J', projectId: 'P', desktopPort: 4200, poster,
       clock: deterministicClock(), randomBytes: deterministicRb(1),
     })
     bridge.consumeEvent({ kind: 'tool-use', name: 'shell', inputPreview: 'ls -la' })
@@ -126,7 +126,7 @@ describe('createCodexOtelBridge — finalize emits all three signals', () => {
   it('logs cap: emits truncation marker exactly once and stops appending', async () => {
     const { calls, poster } = recordingPoster()
     const bridge = createCodexOtelBridge({
-      jobId: 'J', projectId: 'P', hubPort: 4200, poster,
+      jobId: 'J', projectId: 'P', desktopPort: 4200, poster,
       clock: deterministicClock(), randomBytes: deterministicRb(1),
     })
 
@@ -150,7 +150,7 @@ describe('createCodexOtelBridge — finalize emits all three signals', () => {
   it('survives a poster that throws (best-effort)', async () => {
     const poster: PosterFn = async () => { throw new Error('network down') }
     const bridge = createCodexOtelBridge({
-      jobId: 'J', projectId: 'P', hubPort: 4200, poster,
+      jobId: 'J', projectId: 'P', desktopPort: 4200, poster,
       clock: deterministicClock(), randomBytes: deterministicRb(1),
     })
     bridge.consumeEvent({ kind: 'session-started', sessionId: 'T' })
@@ -161,7 +161,7 @@ describe('createCodexOtelBridge — finalize emits all three signals', () => {
   it('failed run produces error status code on the span', async () => {
     const { calls, poster } = recordingPoster()
     const bridge = createCodexOtelBridge({
-      jobId: 'J', projectId: 'P', hubPort: 4200, poster,
+      jobId: 'J', projectId: 'P', desktopPort: 4200, poster,
       clock: deterministicClock(), randomBytes: deterministicRb(1),
     })
     bridge.consumeEvent({ kind: 'result', payload: { type: 'turn.completed' } })
@@ -176,7 +176,7 @@ describe('createCodexOtelBridge — finalize emits all three signals', () => {
   it('ignores other-kind events silently', async () => {
     const { calls, poster } = recordingPoster()
     const bridge = createCodexOtelBridge({
-      jobId: 'J', projectId: 'P', hubPort: 4200, poster,
+      jobId: 'J', projectId: 'P', desktopPort: 4200, poster,
       clock: deterministicClock(), randomBytes: deterministicRb(1),
     })
     bridge.consumeEvent({ kind: 'other', type: 'turn.started', raw: {} })
@@ -192,7 +192,7 @@ describe('createCodexOtelBridge — fixture-driven end-to-end', () => {
   it('consumes a real codex fixture and emits expected token sums', async () => {
     const { calls, poster } = recordingPoster()
     const bridge = createCodexOtelBridge({
-      jobId: 'J', projectId: 'P', hubPort: 4200, poster, model: 'gpt-5.4-mini',
+      jobId: 'J', projectId: 'P', desktopPort: 4200, poster, model: 'gpt-5.4-mini',
       clock: deterministicClock(), randomBytes: deterministicRb(1),
     })
 

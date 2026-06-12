@@ -209,7 +209,7 @@ describe('useOsNotifications', () => {
     renderOsNotifications()
     act(() => {
       capturedHandler?.({ type: 'phase', phase: 'architect', state: 'running' })
-      capturedHandler?.({ type: 'hub.projects', projects: [] })
+      capturedHandler?.({ type: 'desktop.projects', projects: [] })
     })
     expect(MockNotification.instances).toHaveLength(0)
   })

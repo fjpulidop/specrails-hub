@@ -8,18 +8,18 @@ import {
   type LanguageId,
   type LanguageDescriptor,
 } from '../lib/i18n'
-import { getHubToken } from '../lib/auth'
+import { getDesktopToken } from '../lib/auth'
 
 /**
- * Build headers including the hub auth token. Defense-in-depth: the global
- * fetch interceptor in `lib/auth.ts` also attaches X-Hub-Token to /api/*
+ * Build headers including the app auth token. Defense-in-depth: the global
+ * fetch interceptor in `lib/auth.ts` also attaches X-Desktop-Token to /api/*
  * requests, but explicit attachment here means language switches work even if
  * the interceptor has not yet been installed.
  */
 function authedHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const headers: Record<string, string> = { ...extra }
-  const token = getHubToken()
-  if (token) headers['X-Hub-Token'] = token
+  const token = getDesktopToken()
+  if (token) headers['X-Desktop-Token'] = token
   return headers
 }
 
@@ -56,12 +56,12 @@ function removeLanguageFromLocalStorage(): void {
 
 interface LanguageProviderProps {
   children: ReactNode
-  /** Test seam: override fetch/PATCH target. Defaults to real `/api/hub/language`. */
+  /** Test seam: override fetch/PATCH target. Defaults to real `/api/language`. */
   endpoint?: string
 }
 
 /**
- * Hub-wide language provider. Mirrors ThemeProvider's reconcile pattern:
+ * Desktop-wide language provider. Mirrors ThemeProvider's reconcile pattern:
  *  - Boot value comes from `initI18n()` in main.tsx (localStorage → OS
  *    language → English).
  *  - On mount, reconcile against the server. The server only stores an
@@ -70,7 +70,7 @@ interface LanguageProviderProps {
  *  - `setLanguage` applies optimistically (hot switch, no restart), mirrors
  *    to localStorage, then PATCHes the server; failure reverts everywhere.
  */
-export function LanguageProvider({ children, endpoint = '/api/hub/language' }: LanguageProviderProps) {
+export function LanguageProvider({ children, endpoint = '/api/language' }: LanguageProviderProps) {
   const [languageId, setLanguageIdState] = useState<LanguageId>(() => getActiveLanguage())
   const [isUpdating, setIsUpdating] = useState(false)
   const reconciledOnMount = useRef(false)

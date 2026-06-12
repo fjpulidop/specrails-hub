@@ -1,12 +1,12 @@
-# specrails-hub documentation
+# specrails-desktop documentation
 
-Welcome. These guides are written for **you, the user**: how to get specrails-hub running, how to use each feature, and what to do when something looks off.
+Welcome. These guides are written for **you, the user**: how to get specrails-desktop running, how to use each feature, and what to do when something looks off.
 
-If you're contributing to the hub itself or building on its API, head over to [`internals/`](internals/) for the technical deep dive.
+If you're contributing to the app itself or building on its API, head over to [`internals/`](internals/) for the technical deep dive.
 
 ## Start here
 
-1. [Getting started](getting-started.md) — install the hub, register your first project, run your first pipeline. ~10 minutes.
+1. [Getting started](getting-started.md) — install the app, register your first project, run your first pipeline. ~10 minutes.
 
 ## Doing things
 
@@ -16,9 +16,9 @@ If you're contributing to the hub itself or building on its API, head over to [`
 | [Running pipelines](running-pipelines.md) | …you want to launch the AI pipeline against a spec, manage rails, pick agent profiles, or install plugins |
 | [Using Codex](codex.md) | …you added a project with OpenAI's Codex CLI instead of (or alongside) Claude |
 | [Tracking cost](tracking-cost.md) | …you want to see what AI is costing you and which specs are the most expensive |
-| [Customising the hub](customizing.md) | …you want to change theme, configure settings, set a budget, or turn on telemetry |
+| [Customising the app](customizing.md) | …you want to change theme, configure settings, set a budget, or turn on telemetry |
 | [Terminal panel](terminal.md) | …you want to use the built-in terminal: shortcuts, shell integration, drag-and-drop |
-| [CLI reference](cli.md) | …you want to drive specrails-hub from the terminal instead of (or alongside) the dashboard |
+| [CLI reference](cli.md) | …you want to drive specrails-desktop from the terminal instead of (or alongside) the dashboard |
 
 ## Platform-specific notes
 
@@ -38,17 +38,17 @@ If you're contributing to the hub itself or building on its API, head over to [`
 - **"What's an agent profile?"** → [Running pipelines › Agent profiles](running-pipelines.md#agent-profiles)
 - **"How do I install Serena?"** → [Running pipelines › Plugins](running-pipelines.md#plugins)
 - **"How much did I spend last week?"** → [Tracking cost](tracking-cost.md)
-- **"How do I change the theme?"** → [Customising the hub › Themes](customizing.md#themes)
-- **"How do I set a daily budget?"** → [Customising the hub › Budget](customizing.md#budget)
+- **"How do I change the theme?"** → [Customising the app › Themes](customizing.md#themes)
+- **"How do I set a daily budget?"** → [Customising the app › Budget](customizing.md#budget)
 
 ## Internals
 
-If you're hacking on the hub, building on its API, or just curious about how it works:
+If you're hacking on the app, building on its API, or just curious about how it works:
 
 - [Architecture](internals/architecture.md) — server modules, client layout, WebSocket protocol
 - [API reference](internals/api-reference.md) — REST routes catalogue
 - [Configuration](internals/configuration.md) — env vars, kill switches, advanced settings
 - [Operations runbook](internals/operations-runbook.md) — start/stop, recovery, backups
-- [OpenSpec workflow](internals/openspec-workflow.md) — `opsx:*` change lifecycle (used by the hub itself)
+- [OpenSpec workflow](internals/openspec-workflow.md) — `opsx:*` change lifecycle (used by the app itself)
 - [Profiles deep dive](internals/profiles.md) — agent profile internals
 - [Adding a provider](internals/adding-a-provider.md) — one-file guide to wiring a third AI CLI adapter

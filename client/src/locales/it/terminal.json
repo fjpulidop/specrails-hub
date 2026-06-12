@@ -53,11 +53,11 @@
   },
   "errors": {
     "limitReached": "Limite di terminali raggiunto (max {{max}}).",
-    "spawnFailed": "Avvio della shell non riuscito — l'hub potrebbe avere pochi file descriptor. Prova a riavviare l'hub.",
+    "spawnFailed": "Avvio della shell non riuscito — l'app potrebbe avere pochi file descriptor. Prova a riavviare l'app.",
     "invalidName": "Nome del terminale non valido.",
     "openFailed": "Impossibile aprire il terminale.",
     "serverUnreachable": "Impossibile raggiungere il server per aprire un terminale.",
-    "exitedImmediately": "Il terminale si è chiuso immediatamente — la shell potrebbe non essersi avviata. Se il problema persiste, riavvia l'hub."
+    "exitedImmediately": "Il terminale si è chiuso immediatamente — la shell potrebbe non essersi avviata. Se il problema persiste, riavvia l'app."
   },
   "session": {
     "processExited": "[processo terminato]",

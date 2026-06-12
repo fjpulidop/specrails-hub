@@ -9,8 +9,8 @@ vi.mock('../../../context/TicketDetailModalContext', () => ({
   useTicketDetailModal: () => ({ openTicketDetail }),
 }))
 
-vi.mock('../../../hooks/useHub', () => ({
-  useHub: () => ({ activeProjectId: 'p1' }),
+vi.mock('../../../hooks/useDesktop', () => ({
+  useDesktop: () => ({ activeProjectId: 'p1' }),
 }))
 
 const fakeWs = {

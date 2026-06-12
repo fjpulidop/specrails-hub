@@ -1,10 +1,10 @@
 /**
  * Client-side auth bootstrap.
  *
- * The hub server generates a static API token and exposes it via the public
- * `/api/hub/token` endpoint (safe because the server binds to 127.0.0.1 only).
+ * The server generates a static API token and exposes it via the public
+ * `/api/token` endpoint (safe because the server binds to 127.0.0.1 only).
  * This module fetches that token once and installs a fetch interceptor that
- * automatically attaches `X-Hub-Token` to every request targeting localhost.
+ * automatically attaches `X-Desktop-Token` to every request targeting localhost.
  */
 
 import { API_ORIGIN } from './origin'
@@ -18,7 +18,7 @@ export async function initAuth(): Promise<void> {
 
   for (let i = 0; i < ATTEMPTS; i++) {
     try {
-      const res = await fetch(`${API_ORIGIN}/api/hub/token`)
+      const res = await fetch(`${API_ORIGIN}/api/token`)
       if (res.ok) {
         const data = await res.json() as { token: string }
         _token = data.token ?? null
@@ -32,19 +32,19 @@ export async function initAuth(): Promise<void> {
   // Non-fatal — app will handle 401s gracefully
 }
 
-/** Returns the cached hub token, or null if not yet initialized. */
-export function getHubToken(): string | null {
+/** Returns the cached desktop token, or null if not yet initialized. */
+export function getDesktopToken(): string | null {
   return _token
 }
 
-export function getHubTokenProtocol(): string | undefined {
-  return _token ? `hub-token.${_token}` : undefined
+export function getDesktopTokenProtocol(): string | undefined {
+  return _token ? `desktop-token.${_token}` : undefined
 }
 
 /**
  * Patches `window.fetch` so that:
  * 1. In Tauri: relative /api/* paths are rewritten to http://localhost:4200/api/*
- * 2. Requests to the hub API origin get X-Hub-Token attached.
+ * 2. Requests to the app API origin get X-Desktop-Token attached.
  *
  * Call this once after `initAuth()` succeeds.
  */
@@ -74,7 +74,7 @@ export function installFetchInterceptor(): void {
       input = url
     }
 
-    const isHubApiRequest = (() => {
+    const isDesktopApiRequest = (() => {
       if (url.startsWith('/')) return true
       try {
         const target = new URL(url)
@@ -87,10 +87,10 @@ export function installFetchInterceptor(): void {
       }
     })()
 
-    if (isHubApiRequest && _token) {
+    if (isDesktopApiRequest && _token) {
       const headers = new Headers(init.headers)
-      if (!headers.has('X-Hub-Token')) {
-        headers.set('X-Hub-Token', _token)
+      if (!headers.has('X-Desktop-Token')) {
+        headers.set('X-Desktop-Token', _token)
       }
       return origFetch(input, { ...init, headers })
     }

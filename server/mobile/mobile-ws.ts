@@ -37,6 +37,8 @@ interface SockState {
   logDropped: Map<string, number>
 }
 
+// The topic NAME 'hub' is part of the mobile wire contract (the phone
+// subscribes to it) — mobile-app v1 wire compat, do not rename the topic.
 type TopicName = 'queue' | 'phase' | 'tickets' | 'rails' | 'spending' | 'activity' | 'alerts' | 'chat'
 
 function topicFor(type: string): TopicName | 'jobtail' | 'hub' | null {
@@ -62,14 +64,39 @@ function topicFor(type: string): TopicName | 'jobtail' | 'hub' | null {
     case 'spec_draft.update': return 'chat'
     case 'cost_alert':
     case 'daily_budget_exceeded':
-    case 'hub_daily_budget_exceeded': return 'alerts'
+    case 'desktop_daily_budget_exceeded': return 'alerts'
     case 'log':
     case 'event': return 'jobtail'
-    case 'hub.projects':
-    case 'hub.project_added':
-    case 'hub.project_removed': return 'hub'
+    case 'desktop.projects':
+    case 'desktop.project_added':
+    case 'desktop.project_removed': return 'hub' // mobile-app v1 wire compat — topic name frozen
     default: return null
   }
+}
+
+// ─── Mobile wire compat ───────────────────────────────────────────────────────
+// mobile-app v1 wire compat — do not rename: the phone app (v1.0.0, in App
+// Review) matches these exact legacy `type` strings (and the legacy budget
+// payload field names). The internal broadcast types were renamed `desktop.*`
+// in the Specrails Desktop rebrand; this outbound boundary translates them
+// back before anything reaches a mobile socket.
+const LEGACY_WIRE_TYPES: Record<string, string> = {
+  'desktop.projects': 'hub.projects',
+  'desktop.project_added': 'hub.project_added',
+  'desktop.project_removed': 'hub.project_removed',
+  desktop_daily_budget_exceeded: 'hub_daily_budget_exceeded',
+}
+
+function toMobileWire(msg: WsMessage): unknown {
+  const legacyType = LEGACY_WIRE_TYPES[msg.type]
+  if (!legacyType) return msg
+  const out: Record<string, unknown> = { ...(msg as unknown as Record<string, unknown>), type: legacyType }
+  if (msg.type === 'desktop_daily_budget_exceeded') {
+    // mobile-app v1 wire compat — restore the legacy payload field names.
+    if ('desktopDailySpend' in out) { out.hubDailySpend = out.desktopDailySpend; delete out.desktopDailySpend }
+    if ('desktopBudget' in out) { out.hubBudget = out.desktopBudget; delete out.desktopBudget }
+  }
+  return out
 }
 
 export class MobileWsBridge {
@@ -173,8 +200,9 @@ export class MobileWsBridge {
     if (!topic) return
     for (const s of this._socks) {
       if (topic === 'hub') {
-        // Hub-level: always forward, but redact (hub.projects carries `path`).
-        this.send(s, redact(msg))
+        // App-level (project registry): always forward, but translate to the
+        // legacy mobile wire types and redact (the projects payload carries `path`).
+        this.send(s, redact(toMobileWire(msg)))
         continue
       }
       const projectId = (msg as { projectId?: string }).projectId
@@ -194,7 +222,7 @@ export class MobileWsBridge {
       }
 
       if (s.topics.has(topic)) {
-        this.send(s, redact(msg))
+        this.send(s, redact(toMobileWire(msg)))
       }
     }
   }

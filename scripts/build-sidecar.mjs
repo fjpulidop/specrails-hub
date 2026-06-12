@@ -1,7 +1,7 @@
 /**
  * build-sidecar.mjs
  *
- * Builds the specrails-hub Express server as a self-contained native binary
+ * Builds the specrails-desktop Express server as a self-contained native binary
  * and places it in src-tauri/binaries/ following Tauri's sidecar naming:
  *   specrails-server-<rustc-target-triple>
  *
@@ -324,7 +324,7 @@ async function downloadSqliteAddonForNode22(triple) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('\n=== SpecRails Hub Sidecar Build ===\n')
+  console.log('\n=== Specrails Sidecar Build ===\n')
 
   const triple = getTargetTriple()
   const pkgTarget = getPkgTarget(triple)

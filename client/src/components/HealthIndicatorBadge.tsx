@@ -1,5 +1,5 @@
 import { useProjectCache } from '../hooks/useProjectCache'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { getApiBase } from '../lib/api'
 
 interface HealthMetrics {
@@ -7,7 +7,7 @@ interface HealthMetrics {
 }
 
 export function HealthIndicatorBadge() {
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
 
   const { data: metrics } = useProjectCache<HealthMetrics | null>({
     namespace: 'metrics',

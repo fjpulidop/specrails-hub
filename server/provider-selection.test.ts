@@ -5,7 +5,7 @@ import {
   resolveProvider,
   validateRequestedProvider,
 } from './provider-selection'
-import type { CliProvider } from './hub-db'
+import type { CliProvider } from './desktop-db'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

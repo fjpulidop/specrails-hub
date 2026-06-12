@@ -8,8 +8,8 @@ vi.mock('../../lib/api', () => ({
   getApiBase: () => '/api',
 }))
 
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({ activeProjectId: 'project-1' }),
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({ activeProjectId: 'project-1' }),
 }))
 
 vi.mock('../../components/code-explorer/FileTree', () => ({
@@ -121,9 +121,9 @@ describe('CodePage', () => {
   })
 
   it('persists tree width when the splitter is double-clicked', () => {
-    localStorage.setItem('specrails-hub:code-tree-width:project-1', '500')
+    localStorage.setItem('specrails-desktop:code-tree-width:project-1', '500')
     render(<CodePage />, { route: '/code' })
     fireEvent.doubleClick(screen.getByTestId('code-tree-resizer'))
-    expect(localStorage.getItem('specrails-hub:code-tree-width:project-1')).toBe('320')
+    expect(localStorage.getItem('specrails-desktop:code-tree-width:project-1')).toBe('320')
   })
 })

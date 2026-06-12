@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import React from 'react'
 import { SharedWebSocketProvider, useSharedWebSocket } from '../useSharedWebSocket'
-import { getHubTokenProtocol } from '../../lib/auth'
+import { getDesktopTokenProtocol } from '../../lib/auth'
 
 vi.mock('../../lib/auth', () => ({
-  getHubTokenProtocol: vi.fn(() => undefined),
+  getDesktopTokenProtocol: vi.fn(() => undefined),
 }))
 
 // ─── Mock WebSocket ────────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ describe('useSharedWebSocket', () => {
     MockWebSocket.instances = []
     MockWebSocket.lastInstance = null
     vi.clearAllMocks()
-    vi.mocked(getHubTokenProtocol).mockReturnValue(undefined)
+    vi.mocked(getDesktopTokenProtocol).mockReturnValue(undefined)
     ;(global as unknown as Record<string, unknown>).WebSocket = MockWebSocket
   })
 
@@ -81,12 +81,12 @@ describe('useSharedWebSocket', () => {
     expect(MockWebSocket.instances[0].url).toBe('ws://localhost:4200')
   })
 
-  it('uses hub token subprotocol when available', async () => {
-    vi.mocked(getHubTokenProtocol).mockReturnValue('hub-token.test')
+  it('uses desktop token subprotocol when available', async () => {
+    vi.mocked(getDesktopTokenProtocol).mockReturnValue('desktop-token.test')
 
     renderHook(() => useSharedWebSocket(), { wrapper: makeWrapper() })
 
-    expect(MockWebSocket.instances[0].protocols).toEqual(['specrails-hub', 'hub-token.test'])
+    expect(MockWebSocket.instances[0].protocols).toEqual(['specrails-desktop', 'desktop-token.test'])
   })
 
   it('sets connectionStatus to connected on open', async () => {

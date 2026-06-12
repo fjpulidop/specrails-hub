@@ -12,11 +12,11 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import type { JobSummary } from '../types'
 import { getApiBase } from '../lib/api'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 
 export default function JobsPage() {
   const { t } = useTranslation('jobs')
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const { recentJobs } = usePipeline(activeProjectId)
 
   const { data: rawJobs, isFirstLoad: isLoadingJobs, refresh: refreshJobs } = useProjectCache<JobSummary[]>({

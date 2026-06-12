@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { getLastEngine, setLastEngine } from '../last-engine'
 
-const KEY_PREFIX = 'specrails-hub:last-engine:'
+const KEY_PREFIX = 'specrails-desktop:last-engine:'
 
 describe('last-engine', () => {
   beforeEach(() => {

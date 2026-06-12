@@ -28,7 +28,7 @@
   },
   "lightbox": {
     "preview": "Pré-visualizar {{name}}",
-    "backToHub": "Voltar ao hub",
+    "backToDesktop": "Voltar ao Specrails",
     "download": "Transferir",
     "downloadFile": "Transferir {{name}}",
     "loading": "A carregar anexo...",

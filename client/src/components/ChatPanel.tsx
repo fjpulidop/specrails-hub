@@ -6,7 +6,7 @@ import { ChatHeader } from './ChatHeader'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import type { UseChatReturn } from '../hooks/useChat'
-import type { HubProject } from '../hooks/useHub'
+import type { DesktopProject } from '../hooks/useDesktop'
 
 const MIN_WIDTH = 240
 const MAX_WIDTH = 720
@@ -14,7 +14,7 @@ const DEFAULT_WIDTH = 320
 
 interface ChatPanelProps {
   chat: UseChatReturn
-  project?: HubProject
+  project?: DesktopProject
 }
 
 export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {

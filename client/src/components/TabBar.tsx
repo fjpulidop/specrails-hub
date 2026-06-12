@@ -2,8 +2,8 @@ import { Plus, X, FolderOpen } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
-import { useHub } from '../hooks/useHub'
-import type { HubProject } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
+import type { DesktopProject } from '../hooks/useDesktop'
 
 interface TabBarProps {
   onAddProject: () => void
@@ -15,7 +15,7 @@ function ProjectTab({
   onSelect,
   onRemove,
 }: {
-  project: HubProject
+  project: DesktopProject
   isActive: boolean
   onSelect: () => void
   onRemove: () => void
@@ -92,9 +92,9 @@ function ProjectTab({
 
 export function TabBar({ onAddProject }: TabBarProps) {
   const { t } = useTranslation('nav')
-  const { projects, activeProjectId, setActiveProjectId, removeProject } = useHub()
+  const { projects, activeProjectId, setActiveProjectId, removeProject } = useDesktop()
 
-  async function handleRemove(project: HubProject) {
+  async function handleRemove(project: DesktopProject) {
     try {
       await removeProject(project.id)
     } catch {

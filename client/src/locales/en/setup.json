@@ -41,12 +41,12 @@
       "title": "Setup failed",
       "skipSetup": "Skip setup",
       "prereqMissing": "SpecRails setup needs Node.js, npm, npx and Git available on PATH before it can install this project.",
-      "prereqRetryHint": "Install the missing tools, restart SpecRails Hub, then retry setup."
+      "prereqRetryHint": "Install the missing tools, restart Specrails, then retry setup."
     }
   },
   "addProject": {
     "title": "Add Project",
-    "description": "Register a project directory to manage it from the hub.",
+    "description": "Register a project directory to manage it from Specrails.",
     "noProviderDetected": "No AI CLI detected. Install Claude Code or Codex CLI first.",
     "pathLabel": "Project path",
     "pathPlaceholder": "/Users/me/my-project",
@@ -89,7 +89,7 @@
     "bundleCorruptedTitle": "App bundle corrupted",
     "toolsRequired_one": "{{count}} developer tool required",
     "toolsRequired_other": "{{count}} developer tools required",
-    "reinstallHint": "Reinstall the SpecRails Hub app to restore bundled tools.",
+    "reinstallHint": "Reinstall the Specrails app to restore bundled tools.",
     "installMissingHint": "Install the missing tools to continue.",
     "moreInfo": "More info",
     "bundledBadge": "bundled"
@@ -105,7 +105,7 @@
       "intro": "Winget ships with Windows 11 and recent Windows 10. Open PowerShell or Terminal and run:",
       "installNode": "Install Node.js LTS",
       "installGit": "Install Git",
-      "note": "After install, restart SpecRails Hub so Windows refreshes PATH."
+      "note": "After install, restart Specrails so Windows refreshes PATH."
     },
     "linux": {
       "intro": "Use your distro package manager:",
@@ -128,7 +128,7 @@
     "corrupted": {
       "title": "App bundle corrupted",
       "description": "One or more bundled tools (Node.js, Git) could not be verified.",
-      "body": "This tool is bundled with the SpecRails Hub app and cannot be installed separately. If you see this message, the app bundle may be corrupted. Please reinstall SpecRails Hub."
+      "body": "This tool is bundled with the Specrails app and cannot be installed separately. If you see this message, the app bundle may be corrupted. Please reinstall Specrails."
     }
   },
   "checkpoints": {
@@ -145,8 +145,8 @@
     "keyboardHint": "Enter to send, Shift+Enter for new line"
   },
   "welcome": {
-    "title": "Welcome to <spec>spec</spec><rails>rails</rails> hub",
-    "description": "The hub manages multiple projects from a single interface. Add your first project to get started.",
+    "title": "Welcome to <spec>spec</spec><rails>rails</rails>",
+    "description": "Specrails manages multiple projects from a single interface. Add your first project to get started.",
     "addFirstProject": "Add your first project"
   },
   "onboarding": {
@@ -168,13 +168,13 @@
     },
     "welcome": {
       "nav": "Welcome",
-      "title": "Welcome to specrails-hub",
+      "title": "Welcome to Specrails",
       "subtitle": "Your local cockpit for shipping software with AI agents",
-      "intro": "specrails-hub turns an idea into shipped code — and lets you <b>see, steer, and trust</b> every step. Draft a spec by talking to an AI, drop it on an execution rail, and hit Play. The pipeline handles architecture, implementation, review and the pull request, streaming its work live the whole way.",
+      "intro": "Specrails turns an idea into shipped code — and lets you <b>see, steer, and trust</b> every step. Draft a spec by talking to an AI, drop it on an execution rail, and hit Play. The pipeline handles architecture, implementation, review and the pull request, streaming its work live the whole way.",
       "coreLoopLabel": "The core loop",
       "flowCaption": "Each spec flows through <b>Architect → Developer → Reviewer → Ship</b> automatically.",
       "localNote": "<b>100% local · single user · no accounts.</b> Everything runs on your machine. Your code never leaves the laptop unless <i>you</i> spawn an agent against it.",
-      "tourNote": "This quick tour walks through everything the hub can do — about a minute."
+      "tourNote": "This quick tour walks through everything the app can do — about a minute."
     },
     "authorSpecs": {
       "nav": "Author specs",
@@ -214,7 +214,7 @@
       "nav": "Your agent",
       "title": "Bring your own agent",
       "subtitle": "Claude Code and Codex, as first-class engines",
-      "intro": "The hub treats <b>Claude Code</b> and <b>Codex CLI</b> as interchangeable engines behind one contract. A project can install one or both — the choice is made at install time.",
+      "intro": "The app treats <b>Claude Code</b> and <b>Codex CLI</b> as interchangeable engines behind one contract. A project can install one or both — the choice is made at install time.",
       "table": {
         "capability": "Capability",
         "streamingResume": "Streaming & session resume",
@@ -227,7 +227,7 @@
         "agentProfiles": "Agent profiles"
       },
       "calloutLabel": "When both are installed",
-      "calloutBody": "Pick the engine <b>per spec, per rail, or per terminal launch</b>. The hub remembers your last choice per project. Codex cost is estimated from a local rate-card and always flagged with a <mono>~</mono>."
+      "calloutBody": "Pick the engine <b>per spec, per rail, or per terminal launch</b>. The app remembers your last choice per project. Codex cost is estimated from a local rate-card and always flagged with a <mono>~</mono>."
     },
     "cost": {
       "nav": "Track cost",
@@ -241,7 +241,7 @@
       "honestLabel": "Honest numbers",
       "honestBody": "Claude cost is the provider-billed figure; Codex is estimated and flagged with <mono>~</mono>. Token totals include the cache tiers, so the figures actually reconcile.",
       "budgetsLabel": "Budgets & alerts",
-      "budgetsBody": "Set a daily budget and a per-job cost alert; the hub auto-pauses the queue when you cross the line. Export anything to CSV or JSON."
+      "budgetsBody": "Set a daily budget and a per-job cost alert; the app auto-pauses the queue when you cross the line. Export anything to CSV or JSON."
     },
     "workspace": {
       "nav": "Workspace",
@@ -258,7 +258,7 @@
       "chatsLabel": "Minimizable chats",
       "chatsBody": "Park an Explore or AI-Edit session into a dock chip and pick it back up later — never lost across refreshes or project switches.",
       "desktopLabel": "Desktop or browser",
-      "desktopBody": "Run the hub in your browser, or grab the signed desktop app (macOS & Windows) that bundles its own server and runtimes."
+      "desktopBody": "Run Specrails in your browser, or grab the signed desktop app (macOS & Windows) that bundles its own server and runtimes."
     },
     "moveFast": {
       "nav": "Move fast",

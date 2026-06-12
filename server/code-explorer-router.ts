@@ -31,7 +31,7 @@ const MAX_TREE_PAGE = 2000
 const MAX_FILE_BYTES = 2 * 1024 * 1024
 const BINARY_PROBE_BYTES = 8 * 1024
 
-// Hard-coded hub deny-list (mirrors design D8). Dotfiles are excluded by name
+// Hard-coded app deny-list (mirrors design D8). Dotfiles are excluded by name
 // prefix; build/dep dirs come from the shared BUILD_DIRS set (node_modules, dist,
 // build, out, coverage, target, vendor) so the on-demand tree walk skips the same
 // heavy trees the file-summary watcher prunes; extensions handled below.
@@ -679,7 +679,7 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
     const body = (req.body ?? {}) as { overrideBudget?: boolean }
     try {
       // force: true — an explicit "Regenerate" click should re-summarise even if
-      // the content hash is unchanged (e.g. after a hub language switch).
+      // the content hash is unchanged (e.g. after an app language switch).
       const result = await deps.fileSummaryManager.enqueue({
         projectPath: deps.projectPath,
         projectId: deps.projectId,

@@ -7,7 +7,7 @@ TBD - created by archiving change add-multi-provider-support. Update Purpose aft
 
 ### Requirement: ProviderAdapter interface is the single integration point
 
-The hub SHALL define a TypeScript interface `ProviderAdapter` in `server/providers/provider-adapter.ts` that every provider implements. Manager code (chat, queue, agent-refine, setup, profile, plugin, explore-cwd, result-event, project-router) MUST consume the adapter exclusively for spawn-time decisions (argv shape, stream parsing, session-id capture, result normalisation, MCP registration mode, filesystem-convention paths). No new `if (provider === '<id>')` branch SHALL be introduced in manager code; existing such branches MUST be migrated to capability-flag or method dispatches as those managers are touched.
+The app SHALL define a TypeScript interface `ProviderAdapter` in `server/providers/provider-adapter.ts` that every provider implements. Manager code (chat, queue, agent-refine, setup, profile, plugin, explore-cwd, result-event, project-router) MUST consume the adapter exclusively for spawn-time decisions (argv shape, stream parsing, session-id capture, result normalisation, MCP registration mode, filesystem-convention paths). No new `if (provider === '<id>')` branch SHALL be introduced in manager code; existing such branches MUST be migrated to capability-flag or method dispatches as those managers are touched.
 
 #### Scenario: Adding a third provider does not require manager changes
 - **WHEN** a developer adds `server/providers/example-adapter.ts` exporting an object that implements `ProviderAdapter` and registers it in `server/providers/registry.ts`
@@ -19,7 +19,7 @@ The hub SHALL define a TypeScript interface `ProviderAdapter` in `server/provide
 
 ### Requirement: Provider registry exposes lookup by id
 
-The hub SHALL expose a `providerRegistry` exporting `getAdapter(id: string): ProviderAdapter`, `listAdapters(): ProviderAdapter[]`, and `hasAdapter(id: string): boolean`. Lookups for unknown ids SHALL throw `UnknownProviderError`. The registry MUST be populated at module-load time by importing each adapter's registration call.
+The app SHALL expose a `providerRegistry` exporting `getAdapter(id: string): ProviderAdapter`, `listAdapters(): ProviderAdapter[]`, and `hasAdapter(id: string): boolean`. Lookups for unknown ids SHALL throw `UnknownProviderError`. The registry MUST be populated at module-load time by importing each adapter's registration call.
 
 #### Scenario: Lookup returns the matching adapter
 - **WHEN** `getAdapter('claude')` is called
@@ -193,20 +193,20 @@ Every adapter MUST implement:
 
 ### Requirement: Provider discovery endpoint walks the registry
 
-The hub SHALL expose `GET /api/hub/available-providers` returning `{ <providerId>: boolean, ..., tiers: ('quick' | 'full')[] }` where each key is the id of a registered provider and the boolean reflects whether that provider's CLI is currently detectable on the host. The endpoint MUST NOT hardcode any provider id; the response shape MUST be derived from `providerRegistry.listAdapters()`. The `tiers` array MUST include `'quick'` always; `'full'` only when at least one provider's CLI is detected.
+The app SHALL expose `GET /api/available-providers` returning `{ <providerId>: boolean, ..., tiers: ('quick' | 'full')[] }` where each key is the id of a registered provider and the boolean reflects whether that provider's CLI is currently detectable on the host. The endpoint MUST NOT hardcode any provider id; the response shape MUST be derived from `providerRegistry.listAdapters()`. The `tiers` array MUST include `'quick'` always; `'full'` only when at least one provider's CLI is detected.
 
 #### Scenario: Endpoint reports detected state for every registered provider
-- **WHEN** `GET /api/hub/available-providers` is called on a host where claude is installed and codex is not
+- **WHEN** `GET /api/available-providers` is called on a host where claude is installed and codex is not
 - **THEN** the response is `{ claude: true, codex: false, tiers: ['quick', 'full'] }`
 
 #### Scenario: Endpoint shape extends to new providers automatically
 - **WHEN** a third provider `example` is registered and its binary is on PATH
-- **THEN** `GET /api/hub/available-providers` returns an object with a top-level `example: true` key alongside `claude` and `codex`
-- **AND** no source-code change to `hub-router.ts` is required for the new key to appear
+- **THEN** `GET /api/available-providers` returns an object with a top-level `example: true` key alongside `claude` and `codex`
+- **AND** no source-code change to `desktop-router.ts` is required for the new key to appear
 
 ### Requirement: POST /projects accepts any registered provider id
 
-The hub SHALL accept `provider: <id>` in the body of `POST /api/hub/projects` if and only if `providerRegistry.hasAdapter(id)`. Unknown ids MUST be rejected with HTTP 400 and a body identifying the unknown id and listing the registered ids. The default when `provider` is omitted MUST be `'claude'` (preserves backwards compatibility for existing client code paths).
+The app SHALL accept `provider: <id>` in the body of `POST /api/projects` if and only if `providerRegistry.hasAdapter(id)`. Unknown ids MUST be rejected with HTTP 400 and a body identifying the unknown id and listing the registered ids. The default when `provider` is omitted MUST be `'claude'` (preserves backwards compatibility for existing client code paths).
 
 #### Scenario: Codex project creation succeeds
 - **WHEN** a client POSTs `{ path: '/tmp/ok', provider: 'codex' }` to a host with codex installed and the path being a valid directory
@@ -218,7 +218,7 @@ The hub SHALL accept `provider: <id>` in the body of `POST /api/hub/projects` if
 
 ### Requirement: Setup-prerequisites reports every registered provider
 
-`GET /api/hub/setup-prerequisites` SHALL include one entry per registered provider in the prerequisites array. Each entry MUST report `installed`, `executable`, `version`, and `meetsMinimum` derived from the adapter's `detectInstalled()`. The endpoint MUST surface a project as installable when at least one provider is in a usable state (`installed && executable && meetsMinimum !== false`).
+`GET /api/setup-prerequisites` SHALL include one entry per registered provider in the prerequisites array. Each entry MUST report `installed`, `executable`, `version`, and `meetsMinimum` derived from the adapter's `detectInstalled()`. The endpoint MUST surface a project as installable when at least one provider is in a usable state (`installed && executable && meetsMinimum !== false`).
 
 #### Scenario: Both providers usable
 - **WHEN** claude and codex are both installed at supported versions
@@ -233,10 +233,10 @@ The hub SHALL accept `provider: <id>` in the body of `POST /api/hub/projects` if
 
 ### Requirement: Provider field on project is immutable post-creation
 
-The hub SHALL NOT expose any endpoint that changes a project's `provider` after creation. The `provider` column on `projects` is set on `POST /projects` and is read-only thereafter. UI surfaces that display the provider SHALL render it as informational, not as a control.
+The app SHALL NOT expose any endpoint that changes a project's `provider` after creation. The `provider` column on `projects` is set on `POST /projects` and is read-only thereafter. UI surfaces that display the provider SHALL render it as informational, not as a control.
 
 #### Scenario: No PATCH endpoint accepts provider
-- **WHEN** any existing `PATCH /api/hub/projects/:id` or per-project settings endpoint is inspected
+- **WHEN** any existing `PATCH /api/projects/:id` or per-project settings endpoint is inspected
 - **THEN** none of them accept a `provider` field
 - **AND** sending one is silently dropped or rejected with 400 depending on the endpoint's strictness mode
 
@@ -247,7 +247,7 @@ The hub SHALL NOT expose any endpoint that changes a project's `provider` after 
 
 ### Requirement: Provider-aware filesystem conventions are honoured by all writers
 
-Every hub-managed writer of `CLAUDE.md` / `AGENTS.md` / `.claude/*` / `.codex/*` paths MUST resolve the filename via `adapter.instructionsFilename` and the directory via `adapter.projectDirName`. Hardcoded paths to `.claude/` or `CLAUDE.md` in manager code are forbidden going forward; any pre-existing hardcoded paths MUST be migrated when the surrounding code is touched.
+Every app-managed writer of `CLAUDE.md` / `AGENTS.md` / `.claude/*` / `.codex/*` paths MUST resolve the filename via `adapter.instructionsFilename` and the directory via `adapter.projectDirName`. Hardcoded paths to `.claude/` or `CLAUDE.md` in manager code are forbidden going forward; any pre-existing hardcoded paths MUST be migrated when the surrounding code is touched.
 
 #### Scenario: Explore-cwd writes the right instructions file
 - **WHEN** the explore-cwd is materialised for a codex project
@@ -256,16 +256,16 @@ Every hub-managed writer of `CLAUDE.md` / `AGENTS.md` / `.claude/*` / `.codex/*`
 
 #### Scenario: Plugin contributors write to the right instructions file
 - **WHEN** a plugin's shared-file contributor runs on a codex project
-- **THEN** the contributor's `<!-- specrails-hub-managed:<plugin> -->` block is written to `AGENTS.md`
+- **THEN** the contributor's `<!-- specrails-desktop-managed:<plugin> -->` block is written to `AGENTS.md`
 - **AND** the project's `CLAUDE.md` is not touched (and need not exist)
 
 ### Requirement: Minimum CLI version is enforced at startup
 
-When `adapter.minCliVersion` is non-null, the hub SHALL surface an error in `setup-prerequisites` if the detected CLI version is less than the minimum. The error MUST include the detected version, the required minimum, and an upgrade hint. Spawn-time enforcement MUST NOT block: managers SHALL spawn the CLI regardless and let the CLI's own error path surface to the user via existing stderr capture.
+When `adapter.minCliVersion` is non-null, the app SHALL surface an error in `setup-prerequisites` if the detected CLI version is less than the minimum. The error MUST include the detected version, the required minimum, and an upgrade hint. Spawn-time enforcement MUST NOT block: managers SHALL spawn the CLI regardless and let the CLI's own error path surface to the user via existing stderr capture.
 
 #### Scenario: Old codex version surfaced in prerequisites
 - **GIVEN** `codexAdapter.minCliVersion === '0.128.0'` and the host has codex 0.120.0
-- **WHEN** `GET /api/hub/setup-prerequisites` is called
+- **WHEN** `GET /api/setup-prerequisites` is called
 - **THEN** the codex entry reports `installed: true, executable: true, meetsMinimum: false, version: '0.120.0'`
 - **AND** the entry's `error` field names `0.128.0` as the minimum and includes an `upgrade hint`
 

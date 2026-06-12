@@ -65,10 +65,35 @@ export interface AgentRow {
   created_at: string
 }
 
-// ─── Hub DB path ──────────────────────────────────────────────────────────────
+// ─── Desktop DB path ──────────────────────────────────────────────────────────
 
-export function getHubDbPath(): string {
-  return path.join(os.homedir(), '.specrails', 'hub.sqlite')
+export function getDesktopDbPath(): string {
+  return path.join(os.homedir(), '.specrails', 'desktop.sqlite')
+}
+
+/**
+ * Rebrand migration (Specrails Hub → Specrails Desktop): when the legacy
+ * `hub.sqlite` exists next to the requested `desktop.sqlite` and the new file
+ * does not exist yet, rename it (plus any `-wal`/`-shm` siblings) so user data
+ * is preserved across the rename. Legacy filename allowed here only —
+ * migration/compat code.
+ */
+function migrateLegacyDbFile(dbPath: string): void {
+  if (dbPath === ':memory:') return
+  if (path.basename(dbPath) !== 'desktop.sqlite') return
+  const legacyPath = path.join(path.dirname(dbPath), 'hub.sqlite') // legacy (pre-rebrand) filename
+  try {
+    if (fs.existsSync(legacyPath) && !fs.existsSync(dbPath)) {
+      fs.renameSync(legacyPath, dbPath)
+      for (const suffix of ['-wal', '-shm']) {
+        if (fs.existsSync(legacyPath + suffix)) {
+          fs.renameSync(legacyPath + suffix, dbPath + suffix)
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[desktop-db] could not migrate legacy hub.sqlite:', err)
+  }
 }
 
 function getProjectDbPath(slug: string): string {
@@ -77,7 +102,12 @@ function getProjectDbPath(slug: string): string {
 
 // ─── Schema migrations ────────────────────────────────────────────────────────
 
-function applyHubMigrations(db: DbInstance): void {
+// NOTE: existing migrations below intentionally keep the legacy `hub_settings`
+// table name — they are append-only history and must stay byte-identical for
+// already-migrated databases. Migration 13 renames the table to
+// `desktop_settings`; fresh databases run 1→13 in order and converge on the
+// new name. Legacy identifiers allowed here only — migration/compat code.
+function applyDesktopMigrations(db: DbInstance): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version     INTEGER PRIMARY KEY,
@@ -153,7 +183,7 @@ function applyHubMigrations(db: DbInstance): void {
         CREATE INDEX IF NOT EXISTS idx_webhooks_project_id ON webhooks(project_id);
       `)
     },
-    // Migration 5: seed terminal-settings defaults under reserved hub_settings keys.
+    // Migration 5: seed terminal-settings defaults under reserved settings keys.
     // Idempotent — uses INSERT OR IGNORE so re-running never overwrites a user's
     // chosen value. See server/terminal-settings.ts for the typed access layer.
     () => {
@@ -183,16 +213,16 @@ function applyHubMigrations(db: DbInstance): void {
         'terminal.quickScript', value,
       )
     },
-    // Migration 8: seed default ui_theme for the new hub-wide theme system.
-    // Allow-list enforced at the route layer (server/hub-router.ts) and the
+    // Migration 8: seed default ui_theme for the app-wide theme system.
+    // Allow-list enforced at the route layer (server/desktop-router.ts) and the
     // client (client/src/lib/themes.ts).
     () => {
       db.prepare('INSERT OR IGNORE INTO hub_settings (key, value) VALUES (?, ?)').run(
         'ui_theme', 'specrails',
       )
     },
-    // Migration 9: seed code-explorer hub settings — summary language + monthly
-    // budget cap. Enforced by FileSummaryManager + hub-router.
+    // Migration 9: seed code-explorer app settings — summary language + monthly
+    // budget cap. Enforced by FileSummaryManager + desktop-router.
     () => {
       const seed = db.prepare('INSERT OR IGNORE INTO hub_settings (key, value) VALUES (?, ?)')
       seed.run('summary_language', 'en')
@@ -240,7 +270,7 @@ function applyHubMigrations(db: DbInstance): void {
       }
     },
     // Migration 12: mobile companion devices. Each paired phone/tablet gets a
-    // hashed per-device bearer token (never the master hub token), scoped to
+    // hashed per-device bearer token (never the master server token), scoped to
     // `companion`, bound to the gateway cert fingerprint active at pair time
     // (rotating the cert revokes every device), with a sliding-expiry last_seen
     // and a one-tap revoke (revoked_at). See server/mobile/* for the gateway.
@@ -262,6 +292,30 @@ function applyHubMigrations(db: DbInstance): void {
         CREATE INDEX IF NOT EXISTS idx_mobile_devices_token ON mobile_devices(token_hash);
       `)
     },
+    // Migration 13: Specrails Hub → Specrails Desktop rebrand. Renames the
+    // legacy `hub_settings` table to `desktop_settings` (guard: skip if a
+    // future code path ever created `desktop_settings` directly), migrates the
+    // `hub_daily_budget_usd` settings key to `desktop_daily_budget_usd`, and
+    // rewrites stored webhook event subscriptions from
+    // `hub_daily_budget_exceeded` to `desktop_daily_budget_exceeded`.
+    // Legacy identifiers allowed here only — migration/compat code.
+    () => {
+      const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[])
+        .map((t) => t.name)
+      if (tables.includes('hub_settings') && !tables.includes('desktop_settings')) {
+        db.exec('ALTER TABLE hub_settings RENAME TO desktop_settings')
+      }
+      db.prepare(
+        "UPDATE OR IGNORE desktop_settings SET key = 'desktop_daily_budget_usd' WHERE key = 'hub_daily_budget_usd'"
+      ).run()
+      const hooks = db.prepare(
+        "SELECT id, events FROM webhooks WHERE events LIKE '%hub_daily_budget_exceeded%'"
+      ).all() as { id: string; events: string }[]
+      const upd = db.prepare('UPDATE webhooks SET events = ? WHERE id = ?')
+      for (const h of hooks) {
+        upd.run(h.events.split('hub_daily_budget_exceeded').join('desktop_daily_budget_exceeded'), h.id)
+      }
+    },
   ]
 
   for (let i = 0; i < migrations.length; i++) {
@@ -275,18 +329,21 @@ function applyHubMigrations(db: DbInstance): void {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-export function initHubDb(dbPath: string = getHubDbPath()): DbInstance {
+export function initDesktopDb(dbPath: string = getDesktopDbPath()): DbInstance {
   const dir = path.dirname(dbPath)
   fs.mkdirSync(dir, { recursive: true })
   if (dbPath !== ':memory:') secureDir(dir) // H-13: owner-only ~/.specrails
+
+  // Rebrand compat: pick up a pre-rename hub.sqlite before opening.
+  migrateLegacyDbFile(dbPath)
 
   const db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
 
-  applyHubMigrations(db)
+  applyDesktopMigrations(db)
 
-  // H-13: hub.sqlite stores webhook HMAC secrets in plaintext — restrict it
+  // H-13: desktop.sqlite stores webhook HMAC secrets in plaintext — restrict it
   // (and its WAL sidecars) to owner read/write.
   if (dbPath !== ':memory:') secureDbFile(dbPath)
   return db
@@ -345,29 +402,29 @@ export function touchProject(db: DbInstance, id: string): void {
   ).run(id)
 }
 
-export function getHubSetting(db: DbInstance, key: string): string | undefined {
-  const row = db.prepare('SELECT value FROM hub_settings WHERE key = ?').get(key) as { value: string } | undefined
+export function getDesktopSetting(db: DbInstance, key: string): string | undefined {
+  const row = db.prepare('SELECT value FROM desktop_settings WHERE key = ?').get(key) as { value: string } | undefined
   return row?.value
 }
 
-export function setHubSetting(db: DbInstance, key: string, value: string): void {
+export function setDesktopSetting(db: DbInstance, key: string, value: string): void {
   db.prepare(
-    'INSERT OR REPLACE INTO hub_settings (key, value) VALUES (?, ?)'
+    'INSERT OR REPLACE INTO desktop_settings (key, value) VALUES (?, ?)'
   ).run(key, value)
 }
 
 // ─── Setup session persistence ────────────────────────────────────────────────
 
 export function setProjectSetupSession(db: DbInstance, projectId: string, sessionId: string): void {
-  setHubSetting(db, `setup_session:${projectId}`, sessionId)
+  setDesktopSetting(db, `setup_session:${projectId}`, sessionId)
 }
 
 export function getProjectSetupSession(db: DbInstance, projectId: string): string | undefined {
-  return getHubSetting(db, `setup_session:${projectId}`)
+  return getDesktopSetting(db, `setup_session:${projectId}`)
 }
 
 export function clearProjectSetupSession(db: DbInstance, projectId: string): void {
-  db.prepare('DELETE FROM hub_settings WHERE key = ?').run(`setup_session:${projectId}`)
+  db.prepare('DELETE FROM desktop_settings WHERE key = ?').run(`setup_session:${projectId}`)
 }
 
 // ─── Agent CRUD ───────────────────────────────────────────────────────────────
@@ -429,7 +486,7 @@ export function clearAgentJob(db: DbInstance, jobId: string): void {
 
 // ─── Webhook CRUD ─────────────────────────────────────────────────────────────
 
-export type WebhookEvent = 'job.completed' | 'job.failed' | 'job.canceled' | 'daily_budget_exceeded' | 'hub_daily_budget_exceeded'
+export type WebhookEvent = 'job.completed' | 'job.failed' | 'job.canceled' | 'daily_budget_exceeded' | 'desktop_daily_budget_exceeded'
 
 export interface WebhookRow {
   id: string

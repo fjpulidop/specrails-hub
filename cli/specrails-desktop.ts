@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
- * specrails-hub — specrails CLI bridge
+ * specrails-desktop — specrails CLI bridge
  *
  * Routes commands to the manager when running, or falls back to invoking
  * claude directly when the manager is not reachable.
  *
  * Usage:
- *   specrails-hub implement #42           → /specrails:implement #42 (via manager or direct)
- *   specrails-hub "any raw prompt"        → raw prompt (no /specrails: prefix)
- *   specrails-hub --status                → print manager state
- *   specrails-hub --jobs                  → print job history table
- *   specrails-hub --port 5000 <command>   → use port 5000 instead of 4200
- *   specrails-hub --help                  → print usage and exit 0
+ *   specrails-desktop implement #42           → /specrails:implement #42 (via manager or direct)
+ *   specrails-desktop "any raw prompt"        → raw prompt (no /specrails: prefix)
+ *   specrails-desktop --status                → print manager state
+ *   specrails-desktop --jobs                  → print job history table
+ *   specrails-desktop --port 5000 <command>   → use port 5000 instead of 4200
+ *   specrails-desktop --help                  → print usage and exit 0
  */
 
 import http from 'http'
@@ -63,7 +63,7 @@ const bold = (t: string) => ansi('1', t)
 const dimCyan = (t: string) => ansi('2;36', t)
 
 function cliPrefix(): string {
-  return dim('[specrails-hub]')
+  return dim('[specrails-desktop]')
 }
 
 function cliLog(msg: string): void {
@@ -87,7 +87,7 @@ export type ParsedArgs =
   | { mode: 'version' }
   | { mode: 'status'; port: number }
   | { mode: 'jobs'; port: number }
-  | { mode: 'hub'; subArgs: string[]; port: number }
+  | { mode: 'desktop'; subArgs: string[]; port: number }
   | { mode: 'command'; resolved: string; port: number; projectOverride?: string }
   | { mode: 'raw'; resolved: string; port: number; projectOverride?: string }
 
@@ -129,18 +129,18 @@ export function parseArgs(argv: string[]): ParsedArgs {
     return { mode: 'jobs', port }
   }
 
-  if (args[0] === 'hub') {
-    return { mode: 'hub', subArgs: args.slice(1), port }
+  if (args[0] === 'desktop') {
+    return { mode: 'desktop', subArgs: args.slice(1), port }
   }
 
-  // Allow hub subcommands directly without the 'hub' prefix:
-  //   specrails-hub start  →  specrails-hub hub start
-  //   specrails-hub stop   →  specrails-hub hub stop
-  //   specrails-hub add    →  specrails-hub hub add
+  // Allow server-management subcommands directly without the 'desktop' prefix:
+  //   specrails-desktop start  →  specrails-desktop desktop start
+  //   specrails-desktop stop   →  specrails-desktop desktop stop
+  //   specrails-desktop add    →  specrails-desktop desktop add
   //   etc.
-  const HUB_SUBCOMMANDS = new Set(['start', 'stop', 'status', 'add', 'remove', 'list'])
-  if (HUB_SUBCOMMANDS.has(args[0])) {
-    return { mode: 'hub', subArgs: args, port }
+  const DESKTOP_SUBCOMMANDS = new Set(['start', 'stop', 'status', 'add', 'remove', 'list'])
+  if (DESKTOP_SUBCOMMANDS.has(args[0])) {
+    return { mode: 'desktop', subArgs: args, port }
   }
 
   const first = args[0]
@@ -176,42 +176,42 @@ export function getVersion(): string {
 }
 
 function printVersion(): void {
-  process.stdout.write(`specrails-hub v${getVersion()}\n`)
+  process.stdout.write(`specrails-desktop v${getVersion()}\n`)
 }
 
 function printHelp(): void {
   const version = getVersion()
   process.stdout.write(`
-${bold(`specrails-hub v${version}`)} — specrails CLI bridge
+${bold(`specrails-desktop v${version}`)} — specrails CLI bridge
 
 ${bold('Project Required:')}
   Every command runs in the context of a project registered for the current
   directory. Register your project once before running any commands:
 
     ${dim('# Register your project (run once per project):')}
-    specrails-hub add .
+    specrails-desktop add .
 
     ${dim('# Then run commands from that directory:')}
-    specrails-hub implement #42
+    specrails-desktop implement #42
 
 ${bold('Usage:')}
-  specrails-hub implement #42                Run a known specrails verb (prepends /specrails:)
-  specrails-hub batch-implement #40 #41      Batch implementation across issues
-  specrails-hub why                          Explain recent changes
-  specrails-hub get-backlog-specs            View prioritized spec backlog
-  specrails-hub auto-propose-backlog-specs   Generate new spec ideas
-  specrails-hub propose-spec                 Explore an idea and produce a spec
-  specrails-hub refactor-recommender        Find refactoring opportunities
-  specrails-hub health-check                Run codebase health check
-  specrails-hub compat-check                Check for breaking API changes
-  specrails-hub "any raw prompt"             Pass a raw prompt directly to claude
-  specrails-hub --status                     Print manager status and exit
-  specrails-hub --jobs                       Print recent job history and exit
-  specrails-hub start|stop|add|remove|list  Manage the hub
-  specrails-hub --project <name|path>        Override project (default: current directory)
-  specrails-hub --port <n>                   Override default port (${DEFAULT_PORT})
-  specrails-hub --version, -v               Print version and exit
-  specrails-hub --help, -h                  Show this help text
+  specrails-desktop implement #42                Run a known specrails verb (prepends /specrails:)
+  specrails-desktop batch-implement #40 #41      Batch implementation across issues
+  specrails-desktop why                          Explain recent changes
+  specrails-desktop get-backlog-specs            View prioritized spec backlog
+  specrails-desktop auto-propose-backlog-specs   Generate new spec ideas
+  specrails-desktop propose-spec                 Explore an idea and produce a spec
+  specrails-desktop refactor-recommender        Find refactoring opportunities
+  specrails-desktop health-check                Run codebase health check
+  specrails-desktop compat-check                Check for breaking API changes
+  specrails-desktop "any raw prompt"             Pass a raw prompt directly to claude
+  specrails-desktop --status                     Print manager status and exit
+  specrails-desktop --jobs                       Print recent job history and exit
+  specrails-desktop start|stop|add|remove|list  Manage the server
+  specrails-desktop --project <name|path>        Override project (default: current directory)
+  specrails-desktop --port <n>                   Override default port (${DEFAULT_PORT})
+  specrails-desktop --version, -v               Print version and exit
+  specrails-desktop --help, -h                  Show this help text
 
 ${bold('Execution paths:')}
   Manager running → POST /api/spawn + stream logs via WebSocket
@@ -263,19 +263,27 @@ export function detectWebManager(port: number): Promise<DetectionResult> {
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
-function loadHubToken(): string | null {
-  try {
-    const tokenPath = path.join(os.homedir(), '.specrails', 'hub.token')
-    const t = fs.readFileSync(tokenPath, 'utf-8').trim()
-    return t.length >= 32 ? t : null
-  } catch {
-    return null
+function loadDesktopToken(): string | null {
+  const candidates = [
+    path.join(os.homedir(), '.specrails', 'desktop.token'),
+    // Legacy fallback: pre-rename installs keep the token at hub.token until the
+    // server migrates it on next startup. Compat only — do not extend.
+    path.join(os.homedir(), '.specrails', 'hub.token'),
+  ]
+  for (const tokenPath of candidates) {
+    try {
+      const t = fs.readFileSync(tokenPath, 'utf-8').trim()
+      if (t.length >= 32) return t
+    } catch {
+      // try next candidate
+    }
   }
+  return null
 }
 
 function httpGet(url: string): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
-    const token = loadHubToken()
+    const token = loadDesktopToken()
     const parsed = new URL(url)
     const headers: http.OutgoingHttpHeaders = {}
     if (token) headers['Authorization'] = `Bearer ${token}`
@@ -298,7 +306,7 @@ function httpPost(url: string, payload: unknown): Promise<{ status: number; body
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(payload)
     const urlObj = new URL(url)
-    const token = loadHubToken()
+    const token = loadDesktopToken()
     const headers: http.OutgoingHttpHeaders = {
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(data),
@@ -358,7 +366,7 @@ export interface SummaryData {
 }
 
 export function printSummary(data: SummaryData): void {
-  const doneLabel = isTTY ? bold('[specrails-hub] done') : '[specrails-hub] done'
+  const doneLabel = isTTY ? bold('[specrails-desktop] done') : '[specrails-desktop] done'
   const durationPart = `duration: ${formatDuration(data.durationMs)}`
   const costPart = data.costUsd != null ? `  cost: $${data.costUsd.toFixed(2)}` : ''
   const tokenPart = data.totalTokens != null ? `  tokens: ${formatTokens(data.totalTokens)}` : ''
@@ -392,31 +400,31 @@ interface WsInitMessage {
 type WsMsg = WsLogMessage | WsPhaseMessage | WsInitMessage | { type: string }
 
 // ---------------------------------------------------------------------------
-// Hub mode: resolve project context from CWD
+// Super mode: resolve project context from CWD
 // ---------------------------------------------------------------------------
 
-interface HubProject {
+interface DesktopProject {
   id: string
   name: string
   path: string
 }
 
-async function resolveProjectFromCwd(baseUrl: string, projectOverride?: string): Promise<HubProject | null> {
+async function resolveProjectFromCwd(baseUrl: string, projectOverride?: string): Promise<DesktopProject | null> {
   try {
     // --project flag: resolve by path (absolute/relative) or by name
     if (projectOverride) {
       const isPathLike = projectOverride.startsWith('/') || projectOverride.startsWith('.')
       if (isPathLike) {
-        const res = await httpGet(`${baseUrl}/api/hub/resolve?path=${encodeURIComponent(projectOverride)}`)
+        const res = await httpGet(`${baseUrl}/api/resolve?path=${encodeURIComponent(projectOverride)}`)
         if (res.status === 200) {
-          const data = JSON.parse(res.body) as { project?: HubProject }
+          const data = JSON.parse(res.body) as { project?: DesktopProject }
           return data.project ?? null
         }
       } else {
         // Resolve by name: fetch all projects and match
-        const res = await httpGet(`${baseUrl}/api/hub/projects`)
+        const res = await httpGet(`${baseUrl}/api/projects`)
         if (res.status === 200) {
-          const data = JSON.parse(res.body) as { projects?: HubProject[] }
+          const data = JSON.parse(res.body) as { projects?: DesktopProject[] }
           const match = (data.projects ?? []).find(
             (p) => p.name.toLowerCase() === projectOverride.toLowerCase()
           )
@@ -428,32 +436,32 @@ async function resolveProjectFromCwd(baseUrl: string, projectOverride?: string):
 
     // Default: resolve from CWD
     const cwd = process.cwd()
-    const res = await httpGet(`${baseUrl}/api/hub/resolve?path=${encodeURIComponent(cwd)}`)
+    const res = await httpGet(`${baseUrl}/api/resolve?path=${encodeURIComponent(cwd)}`)
     if (res.status === 200) {
-      const data = JSON.parse(res.body) as { project?: HubProject }
+      const data = JSON.parse(res.body) as { project?: DesktopProject }
       return data.project ?? null
     }
   } catch {
-    // Hub endpoint not available — not in hub mode
+    // Resolve endpoint not available — not in Super mode
   }
   return null
 }
 
 async function runViaWebManager(command: string, baseUrl: string, projectOverride?: string): Promise<number> {
-  // Detect hub mode: check if /api/hub/state is reachable
+  // Detect Super mode: check if /api/state is reachable
   let spawnUrl = `${baseUrl}/api/spawn`
   let jobApiBase = `${baseUrl}/api`
 
   try {
-    const hubCheck = await httpGet(`${baseUrl}/api/hub/state`)
-    if (hubCheck.status === 200) {
-      // Hub mode: resolve project from CWD or --project override
+    const superCheck = await httpGet(`${baseUrl}/api/state`)
+    if (superCheck.status === 200) {
+      // Super mode: resolve project from CWD or --project override
       const project = await resolveProjectFromCwd(baseUrl, projectOverride)
       if (!project) {
         const hint = projectOverride
           ? `no project found matching: ${projectOverride}`
-          : `no project registered for the current directory.\n  Run: specrails-hub add ${process.cwd()}`
-        cliError(`hub is running but ${hint}`)
+          : `no project registered for the current directory.\n  Run: specrails-desktop add ${process.cwd()}`
+        cliError(`server is running but ${hint}`)
         return 1
       }
       spawnUrl = `${baseUrl}/api/projects/${project.id}/spawn`
@@ -503,7 +511,7 @@ async function runViaWebManager(command: string, baseUrl: string, projectOverrid
 
   // Connect WebSocket and stream logs
   const wsUrl = baseUrl.replace(/^http/, 'ws')
-  const token = loadHubToken()
+  const token = loadDesktopToken()
   let exitCode = 1
   let resolved = false
 
@@ -755,7 +763,7 @@ async function handleStatus(port: number): Promise<number> {
     }
 
     // Legacy mode: fetch additional per-project details from /api/state
-    if (health.mode !== 'hub') {
+    if (health.mode !== 'super') {
       const stateRes = await httpGet(`${baseUrl}/api/state`)
       if (stateRes.status === 200) {
         const state = JSON.parse(stateRes.body) as {
@@ -888,11 +896,11 @@ async function handleJobs(port: number): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
-// Hub subcommand group
+// Server-management subcommand group
 // ---------------------------------------------------------------------------
 
-const HUB_PID_FILE = path.join(os.homedir(), '.specrails', 'manager.pid')
-const HUB_LOG_FILE = path.join(os.homedir(), '.specrails', 'hub.log')
+const DESKTOP_PID_FILE = path.join(os.homedir(), '.specrails', 'manager.pid')
+const DESKTOP_LOG_FILE = path.join(os.homedir(), '.specrails', 'desktop.log')
 
 function isPortInUse(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -910,7 +918,7 @@ function isPortInUse(port: number): Promise<boolean> {
 
 function readPid(): number | null {
   try {
-    const raw = fs.readFileSync(HUB_PID_FILE, 'utf-8').trim()
+    const raw = fs.readFileSync(DESKTOP_PID_FILE, 'utf-8').trim()
     const pid = parseInt(raw, 10)
     return isNaN(pid) ? null : pid
   } catch {
@@ -927,7 +935,7 @@ function isProcessRunning(pid: number): boolean {
   }
 }
 
-function hubServerPath(): string {
+function desktopServerPath(): string {
   // __dirname differs by runtime:
   //   compiled (npm install): <root>/cli/dist/  → need ../../server/dist/index.js
   //   tsx dev:                <root>/cli/        → need ../server/dist/index.js
@@ -941,10 +949,10 @@ function hubServerPath(): string {
   return fromDist
 }
 
-async function hubStart(port: number): Promise<number> {
+async function desktopStart(port: number): Promise<number> {
   const pid = readPid()
   if (pid !== null && isProcessRunning(pid)) {
-    cliLog(`hub already running (pid ${pid}) on port ${port}`)
+    cliLog(`server already running (pid ${pid}) on port ${port}`)
     return 0
   }
 
@@ -952,12 +960,12 @@ async function hubStart(port: number): Promise<number> {
   const portBusy = await isPortInUse(port)
   if (portBusy) {
     cliError(`port ${port} is already in use by another process`)
-    cliError(`if a previous hub is stale, run: specrails-hub stop`)
-    cliError(`or use a different port: specrails-hub --port <port> start`)
+    cliError(`if a previous server is stale, run: specrails-desktop stop`)
+    cliError(`or use a different port: specrails-desktop --port <port> start`)
     return 1
   }
 
-  const serverPath = hubServerPath()
+  const serverPath = desktopServerPath()
   const isTs = serverPath.endsWith('.ts')
   const args = isTs
     ? ['tsx', serverPath, '--port', String(port)]
@@ -965,12 +973,12 @@ async function hubStart(port: number): Promise<number> {
 
   // Ensure log dir exists and open log file for server output
   try {
-    fs.mkdirSync(path.dirname(HUB_LOG_FILE), { recursive: true })
+    fs.mkdirSync(path.dirname(DESKTOP_LOG_FILE), { recursive: true })
   } catch { /* ignore */ }
 
   let logFd: number | undefined
   try {
-    logFd = fs.openSync(HUB_LOG_FILE, 'a')
+    logFd = fs.openSync(DESKTOP_LOG_FILE, 'a')
   } catch { /* ignore — fall back to silent */ }
 
   const stdio: ['ignore', number | 'ignore', number | 'ignore'] = [
@@ -1000,48 +1008,48 @@ async function hubStart(port: number): Promise<number> {
     await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs))
     const detection = await detectWebManager(port)
     if (detection.running) {
-      cliLog(`hub started on http://127.0.0.1:${port}`)
+      cliLog(`server started on http://127.0.0.1:${port}`)
       return 0
     }
   }
-  cliError(`hub failed to start — logs: ${HUB_LOG_FILE}`)
+  cliError(`server failed to start — logs: ${DESKTOP_LOG_FILE}`)
   return 1
 }
 
-async function hubStop(): Promise<number> {
+async function desktopStop(): Promise<number> {
   const pid = readPid()
   if (pid === null) {
-    cliLog('hub is not running (no pid file)')
+    cliLog('server is not running (no pid file)')
     return 0
   }
   if (!isProcessRunning(pid)) {
-    cliLog('hub is not running (stale pid file)')
-    try { fs.unlinkSync(HUB_PID_FILE) } catch { /* ignore */ }
+    cliLog('server is not running (stale pid file)')
+    try { fs.unlinkSync(DESKTOP_PID_FILE) } catch { /* ignore */ }
     return 0
   }
   try {
     process.kill(pid, 'SIGTERM')
-    cliLog(`hub stopped (pid ${pid})`)
+    cliLog(`server stopped (pid ${pid})`)
     return 0
   } catch (err) {
-    cliError(`failed to stop hub: ${(err as Error).message}`)
+    cliError(`failed to stop server: ${(err as Error).message}`)
     return 1
   }
 }
 
-async function hubStatus(port: number): Promise<number> {
+async function desktopStatus(port: number): Promise<number> {
   const pid = readPid()
   const detection = await detectWebManager(port)
 
   if (!detection.running) {
-    process.stdout.write(`hub: not running\n`)
+    process.stdout.write(`server: not running\n`)
     return 1
   }
 
   try {
-    const res = await httpGet(`${detection.baseUrl}/api/hub/state`)
+    const res = await httpGet(`${detection.baseUrl}/api/state`)
     const state = JSON.parse(res.body) as { projectCount?: number; projects?: Array<{ name: string }> }
-    process.stdout.write(`hub: running (pid ${pid ?? '?'}) on ${detection.baseUrl}\n`)
+    process.stdout.write(`server: running (pid ${pid ?? '?'}) on ${detection.baseUrl}\n`)
     process.stdout.write(`projects: ${state.projectCount ?? 0}\n`)
     if (state.projects) {
       for (const p of state.projects) {
@@ -1050,19 +1058,19 @@ async function hubStatus(port: number): Promise<number> {
     }
     return 0
   } catch {
-    process.stdout.write(`hub: running on ${detection.baseUrl}\n`)
+    process.stdout.write(`server: running on ${detection.baseUrl}\n`)
     return 0
   }
 }
 
-async function hubAdd(projectPath: string, port: number): Promise<number> {
+async function desktopAdd(projectPath: string, port: number): Promise<number> {
   const detection = await detectWebManager(port)
   if (!detection.running) {
-    cliError('hub is not running. Start it first with: specrails-hub start')
+    cliError('server is not running. Start it first with: specrails-desktop start')
     return 1
   }
   try {
-    const res = await httpPost(`${detection.baseUrl}/api/hub/projects`, {
+    const res = await httpPost(`${detection.baseUrl}/api/projects`, {
       path: path.resolve(projectPath),
     })
     if (res.status === 201) {
@@ -1079,25 +1087,29 @@ async function hubAdd(projectPath: string, port: number): Promise<number> {
       return 1
     }
   } catch (err) {
-    cliError(`failed to connect to hub: ${(err as Error).message}`)
+    cliError(`failed to connect to server: ${(err as Error).message}`)
     return 1
   }
 }
 
-async function hubRemove(projectId: string, port: number): Promise<number> {
+async function desktopRemove(projectId: string, port: number): Promise<number> {
   const detection = await detectWebManager(port)
   if (!detection.running) {
-    cliError('hub is not running')
+    cliError('server is not running')
     return 1
   }
   try {
     const deleteRes = await new Promise<{ status: number; body: string }>((resolve, reject) => {
-      const urlObj = new URL(`${detection.baseUrl}/api/hub/projects/${projectId}`)
-      const options = {
+      const urlObj = new URL(`${detection.baseUrl}/api/projects/${projectId}`)
+      const token = loadDesktopToken()
+      const headers: http.OutgoingHttpHeaders = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const options: http.RequestOptions = {
         hostname: urlObj.hostname,
         port: urlObj.port,
         path: urlObj.pathname,
         method: 'DELETE',
+        headers,
       }
       const req = http.request(options, (res) => {
         let body = ''
@@ -1115,19 +1127,19 @@ async function hubRemove(projectId: string, port: number): Promise<number> {
       return 1
     }
   } catch (err) {
-    cliError(`failed to connect to hub: ${(err as Error).message}`)
+    cliError(`failed to connect to server: ${(err as Error).message}`)
     return 1
   }
 }
 
-async function hubList(port: number): Promise<number> {
+async function desktopList(port: number): Promise<number> {
   const detection = await detectWebManager(port)
   if (!detection.running) {
-    cliError('hub is not running')
+    cliError('server is not running')
     return 1
   }
   try {
-    const res = await httpGet(`${detection.baseUrl}/api/hub/projects`)
+    const res = await httpGet(`${detection.baseUrl}/api/projects`)
     const data = JSON.parse(res.body) as { projects: Array<{ id: string; name: string; path: string }> }
     if (!data.projects || data.projects.length === 0) {
       cliLog('no projects registered')
@@ -1146,54 +1158,54 @@ async function hubList(port: number): Promise<number> {
   }
 }
 
-async function handleHub(subArgs: string[], port: number): Promise<number> {
+async function handleDesktop(subArgs: string[], port: number): Promise<number> {
   const sub = subArgs[0]
 
   if (!sub || sub === 'help' || sub === '--help' || sub === '-h') {
     process.stdout.write(`
-${bold('specrails-hub')} — hub management
+${bold('specrails-desktop')} — server management
 
 ${bold('Usage:')}
-  specrails-hub start                  Start the hub server
-  specrails-hub stop                   Stop the hub server
-  specrails-hub status                 Show hub status and registered projects
-  specrails-hub add <path>             Register a project by path
-  specrails-hub remove <id>            Unregister a project by ID
-  specrails-hub list                   List all registered projects
+  specrails-desktop start                  Start the Specrails server
+  specrails-desktop stop                   Stop the Specrails server
+  specrails-desktop status                 Show server status and registered projects
+  specrails-desktop add <path>             Register a project by path
+  specrails-desktop remove <id>            Unregister a project by ID
+  specrails-desktop list                   List all registered projects
 `.trimStart())
     return 0
   }
 
   if (sub === 'start') {
-    return hubStart(port)
+    return desktopStart(port)
   }
   if (sub === 'stop') {
-    return hubStop()
+    return desktopStop()
   }
   if (sub === 'status') {
-    return hubStatus(port)
+    return desktopStatus(port)
   }
   if (sub === 'add') {
     const projectPath = subArgs[1]
     if (!projectPath) {
-      cliError('usage: specrails-hub add <path>')
+      cliError('usage: specrails-desktop add <path>')
       return 1
     }
-    return hubAdd(projectPath, port)
+    return desktopAdd(projectPath, port)
   }
   if (sub === 'remove') {
     const projectId = subArgs[1]
     if (!projectId) {
-      cliError('usage: specrails-hub remove <id>')
+      cliError('usage: specrails-desktop remove <id>')
       return 1
     }
-    return hubRemove(projectId, port)
+    return desktopRemove(projectId, port)
   }
   if (sub === 'list') {
-    return hubList(port)
+    return desktopList(port)
   }
 
-  cliError(`unknown hub subcommand: ${sub}`)
+  cliError(`unknown subcommand: ${sub}`)
   return 1
 }
 
@@ -1225,8 +1237,8 @@ async function main(): Promise<void> {
     process.exit(code)
   }
 
-  if (parsed.mode === 'hub') {
-    const code = await handleHub(parsed.subArgs, parsed.port)
+  if (parsed.mode === 'desktop') {
+    const code = await handleDesktop(parsed.subArgs, parsed.port)
     process.exit(code)
   }
 
@@ -1268,7 +1280,7 @@ if (require.main === module) {
 export const _internal = {
   ansi, dim, red, bold, dimCyan, cliPrefix, cliLog, cliError, cliWarn,
   httpGet, httpPost, formatJobDuration, formatJobStarted, printVersion, printHelp,
-  handleStatus, handleJobs, handleHub, hubStart, hubStop, hubStatus, hubAdd, hubRemove, hubList, hubServerPath,
+  handleStatus, handleJobs, handleDesktop, desktopStart, desktopStop, desktopStatus, desktopAdd, desktopRemove, desktopList, desktopServerPath,
   resolveProjectFromCwd, runViaWebManager, runDirect, isPortInUse, readPid, isProcessRunning, main,
-  isTTY, HUB_PID_FILE, HUB_LOG_FILE, EXIT_PATTERN, DEFAULT_PORT, DETECTION_TIMEOUT_MS,
+  isTTY, DESKTOP_PID_FILE, DESKTOP_LOG_FILE, EXIT_PATTERN, DEFAULT_PORT, DETECTION_TIMEOUT_MS,
 }

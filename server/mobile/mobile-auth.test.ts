@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type { Request, Response } from 'express'
-import { initHubDb } from '../hub-db'
+import { initDesktopDb } from '../desktop-db'
 import type { DbInstance } from '../db'
 import { createDevice, hashToken } from './mobile-devices'
 import { extractBearer, resolveDevice, createMobileAuthMiddleware } from './mobile-auth'
@@ -23,7 +23,7 @@ function fakeRes(): { res: Response; captured: { status: number; body: unknown }
 
 describe('mobile-auth', () => {
   let db: DbInstance
-  beforeEach(() => { db = initHubDb(':memory:') })
+  beforeEach(() => { db = initDesktopDb(':memory:') })
 
   it('extractBearer parses the Authorization header', () => {
     expect(extractBearer(fakeReq({ headers: { authorization: 'Bearer abc' } }))).toBe('abc')

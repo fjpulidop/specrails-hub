@@ -26,7 +26,7 @@ import { TicketDetailModal } from '../components/TicketDetailModal'
 import { CreateTicketModal } from '../components/CreateTicketModal'
 import { UltracodeLaunchDialog } from '../components/UltracodeLaunchDialog'
 import { getApiBase } from '../lib/api'
-import { useHub, projectProviders } from '../hooks/useHub'
+import { useDesktop, projectProviders } from '../hooks/useDesktop'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import { useSpecGenTracker } from '../hooks/useSpecGenTracker'
 import type { LocalTicket } from '../types'
@@ -49,7 +49,7 @@ const INITIAL_RAILS: RailState[] = [
 function loadSpecOrder(projectId: string | null): number[] | null {
   if (!projectId) return null
   try {
-    const raw = localStorage.getItem(`specrails-hub:spec-order:${projectId}`)
+    const raw = localStorage.getItem(`specrails-desktop:spec-order:${projectId}`)
     if (!raw) return null
     const parsed = JSON.parse(raw)
     return Array.isArray(parsed) ? parsed : null
@@ -63,9 +63,9 @@ function saveSpecOrder(projectId: string | null, ids: number[] | null) {
   // best-effort — losing it is acceptable, crashing is not.
   try {
     if (ids) {
-      localStorage.setItem(`specrails-hub:spec-order:${projectId}`, JSON.stringify(ids))
+      localStorage.setItem(`specrails-desktop:spec-order:${projectId}`, JSON.stringify(ids))
     } else {
-      localStorage.removeItem(`specrails-hub:spec-order:${projectId}`)
+      localStorage.removeItem(`specrails-desktop:spec-order:${projectId}`)
     }
   } catch { /* non-fatal */ }
 }
@@ -83,7 +83,7 @@ interface PersistedRail {
 function loadRails(projectId: string | null): RailState[] | null {
   if (!projectId) return null
   try {
-    const raw = localStorage.getItem(`specrails-hub:rails:${projectId}`)
+    const raw = localStorage.getItem(`specrails-desktop:rails:${projectId}`)
     if (!raw) return null
     const parsed = JSON.parse(raw) as PersistedRail[]
     if (!Array.isArray(parsed) || parsed.length === 0) return null
@@ -95,13 +95,13 @@ function saveRails(projectId: string | null, rails: RailState[]) {
   if (!projectId) return
   // B23: best-effort persistence (see saveSpecOrder) — never crash the render.
   try {
-    localStorage.setItem(`specrails-hub:rails:${projectId}`, JSON.stringify(rails))
+    localStorage.setItem(`specrails-desktop:rails:${projectId}`, JSON.stringify(rails))
   } catch { /* non-fatal */ }
 }
 
 export default function DashboardPage() {
   const { t } = useTranslation('dashboard')
-  const { activeProjectId, projects } = useHub()
+  const { activeProjectId, projects } = useDesktop()
   const railProviders = (() => {
     const p = projects.find((pr) => pr.id === activeProjectId)
     return p ? projectProviders(p) : ['claude']
@@ -756,7 +756,7 @@ export default function DashboardPage() {
 
     // M24: capture the API base ONCE up front. getApiBase() is a module-level
     // store that flips on project switch; evaluating it on both sides of the
-    // await below let a mid-flight switch (e.g. hub.project_added auto-activation,
+    // await below let a mid-flight switch (e.g. desktop.project_added auto-activation,
     // a minimized-chat restore) send the ticket sync to project A but the launch
     // POST to project B — spawning a --dangerously-skip-permissions pipeline on the
     // wrong repo. Pinning the base keeps both calls on the project the user aimed at.

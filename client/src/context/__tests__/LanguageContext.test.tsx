@@ -81,7 +81,7 @@ describe('LanguageProvider', () => {
     expect(i18n.language).toBe('es')
     expect(localStorage.getItem(LANGUAGE_LOCAL_STORAGE_KEY)).toBe('es')
     expect(patchCalls).toHaveLength(1)
-    expect(patchCalls[0].url).toBe('/api/hub/language')
+    expect(patchCalls[0].url).toBe('/api/language')
     expect(patchCalls[0].body).toEqual({ language: 'es' })
   })
 

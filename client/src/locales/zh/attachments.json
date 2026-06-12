@@ -28,7 +28,7 @@
   },
   "lightbox": {
     "preview": "预览 {{name}}",
-    "backToHub": "返回 Hub",
+    "backToDesktop": "返回 Specrails",
     "download": "下载",
     "downloadFile": "下载 {{name}}",
     "loading": "正在加载附件...",

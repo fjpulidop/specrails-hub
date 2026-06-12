@@ -5,7 +5,7 @@
  * - Patches window.fetch to return static fixtures (no backend needed)
  * - Mocks WebSocket so SharedWebSocketProvider connects silently
  * - Skips token-based auth entirely
- * - Listens for postMessage from parent (specrails-web HubShowcase) for navigation
+ * - Listens for postMessage from parent (specrails-web DesktopShowcase) for navigation
  */
 
 import { StrictMode } from 'react'
@@ -29,16 +29,16 @@ installDemoFetchInterceptor()
 // demo loads — the demo must always open on the dashboard with a stable
 // layout.
 try {
-  localStorage.removeItem('specrails-hub:routeMemory')
-  localStorage.removeItem('specrails-hub:activeProjectId')
+  localStorage.removeItem('specrails-desktop:routeMemory')
+  localStorage.removeItem('specrails-desktop:activeProjectId')
   // Clear any spec-order keys from previous runs
   for (let i = localStorage.length - 1; i >= 0; i--) {
     const key = localStorage.key(i)
-    if (key && key.startsWith('specrails-hub:spec-order:')) {
+    if (key && key.startsWith('specrails-desktop:spec-order:')) {
       localStorage.removeItem(key)
     }
   }
-  localStorage.setItem('specrails-hub:onboarding-dismissed', 'true')
+  localStorage.setItem('specrails-desktop:onboarding-dismissed', 'true')
 } catch {
   // no-op (private mode, etc.)
 }
@@ -107,16 +107,16 @@ class MockWebSocket {
       this.onmessage?.(msgEvent)
       this._dispatch('message', msgEvent)
 
-      // Send a 'hub.projects' message so HubProvider auto-selects the demo
+      // Send a 'desktop.projects' message so DesktopProvider auto-selects the demo
       // project. Without this, activeProjectId stays null and useTickets /
       // useRails never fire, which is why the Specs column appeared empty.
-      const hubMsg = {
-        type: 'hub.projects',
+      const desktopMsg = {
+        type: 'desktop.projects',
         projects: [DEMO_PROJECT],
       }
-      const hubEvent = new MessageEvent('message', { data: JSON.stringify(hubMsg) })
-      this.onmessage?.(hubEvent)
-      this._dispatch('message', hubEvent)
+      const desktopEvent = new MessageEvent('message', { data: JSON.stringify(desktopMsg) })
+      this.onmessage?.(desktopEvent)
+      this._dispatch('message', desktopEvent)
     }, 50)
   }
 
@@ -154,7 +154,7 @@ class MockWebSocket {
 
 // ─── 3. PostMessage listener for parent navigation ──────────────────────────
 
-// The parent HubShowcase component sends { type: 'navigate', route: '/analytics' }
+// The parent DesktopShowcase component sends { type: 'navigate', route: '/analytics' }
 // via postMessage. We listen and use the React Router navigate function.
 // Since we can't call useNavigate outside React, we store a setter that
 // the NavigationBridge component will register.

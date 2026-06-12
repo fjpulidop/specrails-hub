@@ -79,7 +79,7 @@ function detectJira(): IssueTrackerInfo {
 // H19: `which gh` + `gh auth status` (a network round-trip, 0.3-2s) + `which
 // jira` are project-independent but ran synchronously on every getConfig()
 // call — once per project in the startup loadAll() and again on each
-// GET /config | GET /issues — blocking the single event loop hub-wide.
+// GET /config | GET /issues — blocking the single event loop app-wide.
 // Memoize with a short TTL (same pattern as setup-prerequisites.ts) so startup
 // probes once and hot request paths reuse the cached result; auth/install
 // changes surface after at most TTL.
@@ -254,7 +254,7 @@ function loadPersistedConfig(db: any): { active: string | null; labelFilter: str
 }
 
 export function getConfig(cwd: string, db?: any, projectName?: string): ProjectConfig {
-  // Resolve project root. Hub mode passes project.path directly, which has a
+  // Resolve project root. Super mode passes project.path directly, which has a
   // `.claude` directory at its root; the walk-up fallback covers callers that
   // pass a manager-relative cwd.
   let projectRoot: string

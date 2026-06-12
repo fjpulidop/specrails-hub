@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
 import { Puzzle, AlertTriangle, CheckCircle2, XCircle, Trash2, Download, Loader2 } from 'lucide-react'
 import { getApiBase } from '../lib/api'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import { useProjectCache } from '../hooks/useProjectCache'
 
@@ -56,7 +56,7 @@ interface PluginEvent {
 
 export default function IntegrationsPage() {
   const { t } = useTranslation('integrations')
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
   const projectIdRef = useRef(activeProjectId)
   useEffect(() => { projectIdRef.current = activeProjectId }, [activeProjectId])

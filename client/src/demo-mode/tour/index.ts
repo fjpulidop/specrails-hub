@@ -1,7 +1,7 @@
 /**
- * Public entry for the hub-demo scripted tour.
+ * Public entry for the desktop-demo scripted tour.
  *
- * openspec: hub-demo-scripted-tour
+ * openspec: desktop-demo-scripted-tour
  */
 
 export { TourCursor } from './TourCursor'

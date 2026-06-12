@@ -42,13 +42,13 @@ describe('pending-specs localStorage', () => {
     })
 
     it('returns empty array on parse error', () => {
-      localStorage.setItem('specrails-hub:pending-specs', 'not-json{{{')
+      localStorage.setItem('specrails-desktop:pending-specs', 'not-json{{{')
       expect(readPendingSpecs()).toEqual([])
     })
 
     it('returns stored specs', () => {
       const spec = makeSpec()
-      localStorage.setItem('specrails-hub:pending-specs', JSON.stringify([spec]))
+      localStorage.setItem('specrails-desktop:pending-specs', JSON.stringify([spec]))
       expect(readPendingSpecs()).toEqual([spec])
     })
   })

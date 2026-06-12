@@ -3,7 +3,7 @@ import { useTranslation, Trans } from 'react-i18next'
 import { GitCommit, CheckCircle2, XCircle, AlertCircle, Clock, TriangleAlert } from 'lucide-react'
 import { RadialBarChart, RadialBar, ResponsiveContainer, Tooltip } from 'recharts'
 import { useProjectCache } from '../hooks/useProjectCache'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { getApiBase } from '../lib/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -173,7 +173,7 @@ function timeAgo(iso: string, t: (key: string, opts?: Record<string, unknown>) =
 
 export function ProjectHealthWidget() {
   const { t } = useTranslation('nav')
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
 
   const { data: metrics, isFirstLoad } = useProjectCache<ProjectMetrics | null>({
     namespace: 'metrics',

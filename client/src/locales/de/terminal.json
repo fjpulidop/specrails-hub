@@ -53,11 +53,11 @@
   },
   "errors": {
     "limitReached": "Terminal-Limit erreicht (max. {{max}}).",
-    "spawnFailed": "Die Shell konnte nicht gestartet werden – dem Hub fehlen womöglich File-Deskriptoren. Versuche, den Hub neu zu starten.",
+    "spawnFailed": "Die Shell konnte nicht gestartet werden – der App fehlen womöglich File-Deskriptoren. Versuche, die App neu zu starten.",
     "invalidName": "Ungültiger Terminal-Name.",
     "openFailed": "Terminal konnte nicht geöffnet werden.",
     "serverUnreachable": "Server zum Öffnen eines Terminals nicht erreichbar.",
-    "exitedImmediately": "Terminal wurde sofort beendet – die Shell konnte womöglich nicht starten. Wenn das wiederholt passiert, starte den Hub neu."
+    "exitedImmediately": "Terminal wurde sofort beendet – die Shell konnte womöglich nicht starten. Wenn das wiederholt passiert, starte die App neu."
   },
   "session": {
     "processExited": "[Prozess beendet]",

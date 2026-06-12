@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '../../test-utils'
 import { HealthIndicatorBadge } from '../HealthIndicatorBadge'
 
-// Mock useHub
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({ activeProjectId: 'proj-1' }),
+// Mock useDesktop
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({ activeProjectId: 'proj-1' }),
 }))
 
 describe('HealthIndicatorBadge', () => {

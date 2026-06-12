@@ -120,8 +120,8 @@
     "noData": "現在のフィルターにデータがありません",
     "failed": "エクスポートに失敗しました"
   },
-  "hub": {
-    "title": "Hub アナリティクス",
+  "desktop": {
+    "title": "Desktop アナリティクス",
     "refreshAria": "アナリティクスを更新",
     "failedToLoad": "アナリティクスの読み込みに失敗しました: {{error}}",
     "totalCost": "合計コスト",

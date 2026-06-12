@@ -27,19 +27,19 @@ const MAX_PATCH_BYTES = 512 * 1024
 
 // These git calls run synchronously on the main event loop (pre-spawn snapshot
 // and post-exit diff). Bound every one: a timeout so a stuck index.lock /
-// filesystem stall / credential prompt can't freeze the whole hub, a maxBuffer
+// filesystem stall / credential prompt can't freeze the whole app, a maxBuffer
 // cap, and an env that disables any interactive prompt. The existing try/catch
 // in each function degrades a timeout to empty provenance. Mirrors metrics.ts.
 const GIT_TIMEOUT_MS = 15_000
 const GIT_MAX_BUFFER = 16 * 1024 * 1024
 // Bound on how many per-file patches we collect after a job. Each is a synchronous
 // git spawn on the event loop, so a job touching hundreds of files would otherwise
-// block the whole hub. Provenance ROWS are recorded for every path regardless; only
+// block the whole app. Provenance ROWS are recorded for every path regardless; only
 // the on-demand diff patches beyond this cap are skipped (the UI shows "diff
 // unavailable" for them). Mirrors the existing large-job warn threshold (50).
 const MAX_PATCH_FILES = 50
 const GIT_EXEC_ENV = (() => {
-  // Inherit the parent env but STRIP git-location vars. If the hub process (or a
+  // Inherit the parent env but STRIP git-location vars. If the app process (or a
   // parent) ever exports GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE, every cwd-scoped
   // git call below would silently operate on that repo instead of the project —
   // corrupting provenance. Always pin git to the cwd we pass.
@@ -242,7 +242,7 @@ function truncatePatch(patch: string): StoredPatch {
   const bytes = Buffer.byteLength(patch, 'utf8')
   if (bytes <= MAX_PATCH_BYTES) return { patch, truncated: false }
   return {
-    patch: `${patch.slice(0, MAX_PATCH_BYTES)}\n[specrails-hub] diff truncated at ${MAX_PATCH_BYTES} bytes\n`,
+    patch: `${patch.slice(0, MAX_PATCH_BYTES)}\n[specrails-desktop] diff truncated at ${MAX_PATCH_BYTES} bytes\n`,
     truncated: true,
   }
 }

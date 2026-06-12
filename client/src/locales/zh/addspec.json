@@ -102,7 +102,7 @@
       "standard": "标准",
       "rich": "丰富",
       "max": "最大",
-      "hub": "Hub"
+      "desktop": "Desktop"
     },
     "presetCost": {
       "minimal": "1× 成本 · 首 token 最快 · 不加载 spec",
@@ -110,7 +110,7 @@
       "standard": "1.6× 成本 · 加载 Specrails + OpenSpec spec",
       "rich": "2× 成本 · 完整仓库读取权限",
       "max": "4× 成本 · 完整读取 + Contract Layer 增强",
-      "hub": "4–6× 成本 · 全部功能 + 项目及你已批准的 MCP"
+      "desktop": "4–6× 成本 · 全部功能 + 项目及你已批准的 MCP"
     },
     "smashCapable": "支持 SMASH",
     "smashHint": "已启用 Contract Layer，此 spec 之后可以被拆解为子 spec。",

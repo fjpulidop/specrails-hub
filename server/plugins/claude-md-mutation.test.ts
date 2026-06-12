@@ -15,8 +15,8 @@ describe('upsertBlock', () => {
   it('creates CLAUDE.md when missing', async () => {
     await upsertBlock(projectPath, 'serena', '## hello')
     const text = fs.readFileSync(claudeMdFile(), 'utf8')
-    expect(text).toContain('<!-- specrails-hub-managed:serena:start -->')
-    expect(text).toContain('<!-- specrails-hub-managed:serena:end -->')
+    expect(text).toContain('<!-- specrails-desktop-managed:serena:start -->')
+    expect(text).toContain('<!-- specrails-desktop-managed:serena:end -->')
     expect(text).toContain('## hello')
   })
 
@@ -42,8 +42,8 @@ describe('upsertBlock', () => {
     const text = fs.readFileSync(claudeMdFile(), 'utf8')
     expect(text).toContain('serena content')
     expect(text).toContain('foo content')
-    expect(text).toContain('<!-- specrails-hub-managed:serena:start -->')
-    expect(text).toContain('<!-- specrails-hub-managed:foo:start -->')
+    expect(text).toContain('<!-- specrails-desktop-managed:serena:start -->')
+    expect(text).toContain('<!-- specrails-desktop-managed:foo:start -->')
   })
 })
 
@@ -75,7 +75,7 @@ describe('removeBlock', () => {
     await removeBlock(projectPath, 'serena')
     const text = fs.readFileSync(claudeMdFile(), 'utf8')
     expect(text).not.toContain('serena content')
-    expect(text).not.toContain('specrails-hub-managed:serena')
+    expect(text).not.toContain('specrails-desktop-managed:serena')
     expect(text).toContain('foo content')
   })
 
@@ -92,5 +92,36 @@ describe('removeBlock', () => {
     const text = fs.readFileSync(claudeMdFile(), 'utf8')
     expect(text).toContain('User line.')
     expect(text).not.toContain('plugin content')
+  })
+})
+
+// Pre-rebrand installs wrote `specrails-hub-managed` markers into user files.
+// The mutation layer must keep recognising them so upserts upgrade in place
+// and uninstalls never orphan a legacy block.
+describe('legacy specrails-hub-managed marker compat', () => {
+  const legacyBlock = (name: string, content: string) =>
+    `<!-- specrails-hub-managed:${name}:start -->\n${content}\n<!-- specrails-hub-managed:${name}:end -->\n`
+
+  it('getBlockContent reads a legacy block', () => {
+    fs.writeFileSync(claudeMdFile(), `# project\n\n${legacyBlock('serena', 'legacy hints')}`)
+    expect(getBlockContent(projectPath, 'serena')).toContain('legacy hints')
+  })
+
+  it('upsertBlock replaces a legacy block in place with new markers', async () => {
+    fs.writeFileSync(claudeMdFile(), `# project\n\n${legacyBlock('serena', 'legacy hints')}`)
+    await upsertBlock(projectPath, 'serena', 'new hints')
+    const text = fs.readFileSync(claudeMdFile(), 'utf8')
+    expect(text).toContain('new hints')
+    expect(text).not.toContain('legacy hints')
+    expect(text).toContain('<!-- specrails-desktop-managed:serena:start -->')
+    expect(text).not.toContain('specrails-hub-managed:serena')
+  })
+
+  it('removeBlock strips a legacy block, preserving user content', async () => {
+    fs.writeFileSync(claudeMdFile(), `# project\n\nUser line.\n\n${legacyBlock('serena', 'legacy hints')}`)
+    await removeBlock(projectPath, 'serena')
+    const text = fs.readFileSync(claudeMdFile(), 'utf8')
+    expect(text).toContain('User line.')
+    expect(text).not.toContain('specrails-hub-managed:serena')
   })
 })

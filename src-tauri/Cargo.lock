@@ -3843,7 +3843,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "specrails-hub"
+name = "specrails-desktop"
 version = "0.1.0"
 dependencies = [
  "dirs-next",

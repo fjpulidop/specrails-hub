@@ -12,10 +12,10 @@
     },
     "nav": {
       "dashboard": "Dashboard",
-      "hubAnalytics": "Analíticas del hub",
+      "desktopAnalytics": "Analíticas de Desktop",
       "projectAnalytics": "Analíticas del proyecto",
       "activityFeed": "Actividad",
-      "hubSettings": "Ajustes del hub",
+      "desktopSettings": "Ajustes de Desktop",
       "docs": "Docs"
     },
     "sidebar": {
@@ -96,7 +96,7 @@
       "error": "Error al actualizar"
     },
     "desc": {
-      "available": "Hay una nueva versión de SpecRails Hub lista para instalar.",
+      "available": "Hay una nueva versión de Specrails lista para instalar.",
       "fetching": "Descargando {{size}}…",
       "progress": "{{percent}}% · {{downloaded}} de {{total}}",
       "installing": "Verificando la firma y terminando…",

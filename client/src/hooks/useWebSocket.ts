@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getHubTokenProtocol } from '../lib/auth'
+import { getDesktopTokenProtocol } from '../lib/auth'
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
 
@@ -17,8 +17,8 @@ export function useWebSocket(
   onMessageRef.current = onMessage
 
   const connect = useCallback(() => {
-    const protocol = getHubTokenProtocol()
-    const ws = protocol ? new WebSocket(url, ['specrails-hub', protocol]) : new WebSocket(url)
+    const protocol = getDesktopTokenProtocol()
+    const ws = protocol ? new WebSocket(url, ['specrails-desktop', protocol]) : new WebSocket(url)
     wsRef.current = ws
     setConnectionStatus('connecting')
 

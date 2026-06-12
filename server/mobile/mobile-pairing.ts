@@ -6,7 +6,7 @@ import type { MobilePlatform, QrPayload, PairingSessionState, PairApprovedResult
 // (the desktop opens it when the user clicks "Pair device"). Sessions, lockout
 // counters, and the one-time token delivery live ONLY in memory — they are voided
 // by a process restart/sleep/self-update, which is acceptable (paired devices
-// survive in hub.sqlite; an in-progress pair just restarts).
+// survive in desktop.sqlite; an in-progress pair just restarts).
 //
 // Security (verified gaps from the adversarial review):
 //  - secret: 16 random bytes (128-bit), single-use, 60s TTL → no PAKE needed.
@@ -31,8 +31,8 @@ export type ClaimResult =
 
 export interface PairingDeps {
   certFingerprint: () => string
-  hubInstanceId: () => string
-  hubName: () => string
+  desktopInstanceId: () => string
+  desktopName: () => string
   port: () => number
   lanAddresses: () => string[]
   /** Persists an approved device, returns its new id. */
@@ -92,8 +92,9 @@ export class PairingManager {
     this._globalAttempts = []
     return {
       v: 1,
-      hub: this._deps.hubInstanceId(),
-      name: this._deps.hubName(),
+      // mobile-app v1 wire compat — QR field name `hub` is frozen, do not rename.
+      hub: this._deps.desktopInstanceId(),
+      name: this._deps.desktopName(),
       addrs: this._deps.lanAddresses(),
       port: this._deps.port(),
       fp: this._deps.certFingerprint(),
@@ -160,8 +161,10 @@ export class PairingManager {
       approved: true,
       deviceToken: token,
       deviceId,
-      hubName: this._deps.hubName(),
-      hubInstanceId: this._deps.hubInstanceId(),
+      // mobile-app v1 wire compat — `hubName`/`hubInstanceId` field names are
+      // frozen (delivered to the phone via /pair/status), do not rename.
+      hubName: this._deps.desktopName(),
+      hubInstanceId: this._deps.desktopInstanceId(),
     }
     s.status = 'approved'
     return { ok: true }

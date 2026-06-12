@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/fjpulidop/specrails-hub/main/server/schemas/file-summary.v1.json",
-  "title": "specrails-hub file summary (v1)",
+  "$id": "https://raw.githubusercontent.com/fjpulidop/specrails-desktop/main/server/schemas/file-summary.v1.json",
+  "title": "specrails-desktop file summary (v1)",
   "description": "On-disk JSON shape for an AI-generated file summary persisted under <project>/.specrails/file-summaries/<sha256-of-rel-path>.json.",
   "type": "object",
   "required": [

@@ -4,7 +4,7 @@ import { TOUR_NEW_SPEC } from './tour-spec'
 // The scripted tour's "new spec" sits at the top of the list so, once the
 // tour flips the CSS flag that reveals it, existing tickets shift DOWN to
 // make room — matching the visual expectation of a just-created spec.
-// openspec: hub-demo-scripted-tour
+// openspec: desktop-demo-scripted-tour
 export const demoTickets: LocalTicket[] = [
   TOUR_NEW_SPEC,
   {
@@ -190,7 +190,7 @@ export const demoTickets: LocalTicket[] = [
   {
     id: 13,
     title: 'Persist ticket ordering across devices',
-    description: 'Sync user-chosen spec and rail ordering through the hub sqlite so devices on the same project see the same layout.',
+    description: 'Sync user-chosen spec and rail ordering through the desktop sqlite so devices on the same project see the same layout.',
     status: 'todo',
     priority: 'low',
     labels: ['backend', 'sync'],
@@ -400,7 +400,7 @@ export const demoTickets: LocalTicket[] = [
   {
     id: 27,
     title: 'Add `/specrails:propose-spec` slash command',
-    description: 'Scaffold a new spec draft from a user description using the Claude agent directly inside the hub chat.',
+    description: 'Scaffold a new spec draft from a user description using the Claude agent directly inside the app chat.',
     status: 'done',
     priority: 'high',
     labels: ['cli', 'agent'],
@@ -444,8 +444,8 @@ export const demoTickets: LocalTicket[] = [
   },
   {
     id: 30,
-    title: 'Persist user theme preference on the hub',
-    description: 'Sync user theme choice to hub.sqlite so reinstalling the desktop app keeps the last-used theme.',
+    title: 'Persist user theme preference app-wide',
+    description: 'Sync user theme choice to desktop.sqlite so reinstalling the desktop app keeps the last-used theme.',
     status: 'done',
     priority: 'low',
     labels: ['ux', 'sync'],

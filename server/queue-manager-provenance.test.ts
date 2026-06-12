@@ -77,7 +77,7 @@ describe('QueueManager — code-explorer provenance hook', () => {
     qm = new QueueManager(broadcast, db, [], projectDir, {
       projectId: 'proj-test',
       projectSlug: 'proj-test',
-      hubPort: 4200,
+      desktopPort: 4200,
     })
   })
 

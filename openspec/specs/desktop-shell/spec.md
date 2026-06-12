@@ -4,14 +4,14 @@
 The Tauri shell SHALL start the server sidecar, wait for readiness, then load the WebView at `http://localhost:4200`. The window SHALL be frameless, sized 1280×820 (min 900×600), centered on first launch.
 
 #### Scenario: Successful startup
-- **WHEN** the user opens the SpecRails Hub app
+- **WHEN** the user opens the Specrails app
 - **THEN** the Tauri shell spawns the `specrails-server` sidecar process
-- **AND** polls `GET http://localhost:4200/api/hub/state` every 500ms
+- **AND** polls `GET http://localhost:4200/api/state` every 500ms
 - **AND** navigates the WebView to `http://localhost:4200` once a 200 response is received
 
 #### Scenario: Server does not become ready within timeout
-- **WHEN** `GET http://localhost:4200/api/hub/state` does not return 200 within 30 seconds
-- **THEN** the Tauri shell shows a native error dialog: "SpecRails Hub failed to start. Check that port 4200 is not in use."
+- **WHEN** `GET http://localhost:4200/api/state` does not return 200 within 30 seconds
+- **THEN** the Tauri shell shows a native error dialog: Specrails failed to start. Check that port 4200 is not in use."
 - **AND** the app exits
 
 ### Requirement: Port conflict detected at startup

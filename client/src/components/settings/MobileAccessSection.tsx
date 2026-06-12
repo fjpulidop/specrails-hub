@@ -12,7 +12,7 @@ interface MobileStatus {
   certFingerprint: string | null
   lanAddresses: string[]
   mdnsEnabled: boolean
-  hubName: string
+  desktopName: string
 }
 
 interface MobileDevice {
@@ -31,7 +31,7 @@ function shortFp(fp: string | null): string {
   return `${fp.slice(0, 8)}…${fp.slice(-8)}`
 }
 
-/** Hub-wide "Mobile companion" settings: enable the gateway, pair/revoke devices,
+/** Desktop-wide "Mobile companion" settings: enable the gateway, pair/revoke devices,
  *  rotate the cert identity. Loopback + auth enforced server-side. */
 export function MobileAccessSection() {
   const { t } = useTranslation('settings')
@@ -42,14 +42,14 @@ export function MobileAccessSection() {
 
   const loadStatus = useCallback(async () => {
     try {
-      const r = await fetch('/api/hub/mobile/status')
+      const r = await fetch('/api/mobile/status')
       if (r.ok) setStatus((await r.json()) as MobileStatus)
     } catch { /* ignore */ }
   }, [])
 
   const loadDevices = useCallback(async () => {
     try {
-      const r = await fetch('/api/hub/mobile/devices')
+      const r = await fetch('/api/mobile/devices')
       if (r.ok) setDevices(((await r.json()) as { devices: MobileDevice[] }).devices)
     } catch { /* ignore */ }
   }, [])
@@ -64,7 +64,7 @@ export function MobileAccessSection() {
     setBusy(true)
     try {
       const path = status.enabled ? 'disable' : 'enable'
-      const r = await fetch(`/api/hub/mobile/${path}`, { method: 'POST' })
+      const r = await fetch(`/api/mobile/${path}`, { method: 'POST' })
       if (!r.ok) {
         const body = (await r.json().catch(() => ({}))) as { error?: string }
         throw new Error(body.error ?? `HTTP ${r.status}`)
@@ -82,7 +82,7 @@ export function MobileAccessSection() {
   }
 
   async function revoke(id: string): Promise<void> {
-    await fetch(`/api/hub/mobile/devices/${id}`, { method: 'DELETE' }).catch(() => {})
+    await fetch(`/api/mobile/devices/${id}`, { method: 'DELETE' }).catch(() => {})
     void loadDevices()
   }
 
@@ -90,7 +90,7 @@ export function MobileAccessSection() {
     if (!window.confirm(t('mobile.resetConfirm'))) return
     setBusy(true)
     try {
-      const r = await fetch('/api/hub/mobile/cert/rotate', { method: 'POST' })
+      const r = await fetch('/api/mobile/cert/rotate', { method: 'POST' })
       if (r.ok) setStatus((await r.json()) as MobileStatus)
       void loadDevices()
       toast.success(t('mobile.identityReset'))

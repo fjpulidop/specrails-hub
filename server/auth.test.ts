@@ -2,8 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import express from 'express'
 import request from 'supertest'
 import fs from 'fs'
+import os from 'os'
+import path from 'path'
 
-// Mock fs so we don't touch the real ~/.specrails/hub.token during tests
+// Mock fs so we don't touch the real ~/.specrails/desktop.token during tests
 vi.mock('fs')
 
 import { requireAuth, getServerToken, _resetTokenForTest, loadOrGenerateToken, tokenFromUpgradeRequest, safeEqual, isLoopbackAddress, requireLoopback, isAllowedHost, hostValidationMiddleware } from './auth'
@@ -13,6 +15,7 @@ const mockFs = fs as typeof fs & {
   readFileSync: ReturnType<typeof vi.fn>
   writeFileSync: ReturnType<typeof vi.fn>
   mkdirSync: ReturnType<typeof vi.fn>
+  renameSync: ReturnType<typeof vi.fn>
 }
 
 function createTestApp() {
@@ -67,10 +70,46 @@ describe('auth middleware', () => {
     it('returns the same token on subsequent calls (cached)', () => {
       mockFs.existsSync.mockReturnValue(false)
       const t1 = loadOrGenerateToken()
+      const callsAfterFirst = mockFs.existsSync.mock.calls.length
       const t2 = loadOrGenerateToken()
       expect(t1).toBe(t2)
-      // Only called once — second call uses cache
-      expect(mockFs.existsSync).toHaveBeenCalledTimes(1)
+      // Second call uses the cache — no further fs checks
+      expect(mockFs.existsSync.mock.calls.length).toBe(callsAfterFirst)
+    })
+
+    it('migrates a legacy hub.token to desktop.token before loading (rebrand compat)', () => {
+      const dir = path.join(os.homedir(), '.specrails')
+      const legacyPath = path.join(dir, 'hub.token')
+      const tokenPath = path.join(dir, 'desktop.token')
+      const stored = 'b'.repeat(64)
+      const files = new Map<string, string>([[legacyPath, stored]])
+      mockFs.existsSync.mockImplementation((p: fs.PathLike) => files.has(String(p)))
+      mockFs.readFileSync.mockImplementation((p: fs.PathLike) => files.get(String(p)) ?? '')
+      mockFs.renameSync.mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
+        const v = files.get(String(from))
+        files.delete(String(from))
+        if (v !== undefined) files.set(String(to), v)
+      })
+
+      const token = loadOrGenerateToken()
+      expect(mockFs.renameSync).toHaveBeenCalledWith(legacyPath, tokenPath)
+      expect(token).toBe(stored)
+    })
+
+    it('does not overwrite an existing desktop.token with a legacy hub.token', () => {
+      const dir = path.join(os.homedir(), '.specrails')
+      const legacyPath = path.join(dir, 'hub.token')
+      const tokenPath = path.join(dir, 'desktop.token')
+      const files = new Map<string, string>([
+        [legacyPath, 'l'.repeat(64)],
+        [tokenPath, 'n'.repeat(64)],
+      ])
+      mockFs.existsSync.mockImplementation((p: fs.PathLike) => files.has(String(p)))
+      mockFs.readFileSync.mockImplementation((p: fs.PathLike) => files.get(String(p)) ?? '')
+
+      const token = loadOrGenerateToken()
+      expect(mockFs.renameSync).not.toHaveBeenCalled()
+      expect(token).toBe('n'.repeat(64))
     })
 
     it('generates a new token when stored token is too short', () => {
@@ -99,11 +138,11 @@ describe('auth middleware', () => {
       expect(res.status).toBe(401)
     })
 
-    it('returns 401 for an invalid X-Hub-Token header', async () => {
+    it('returns 401 for an invalid X-Desktop-Token header', async () => {
       const app = createTestApp()
       const res = await request(app)
         .get('/protected')
-        .set('X-Hub-Token', 'wrong-token')
+        .set('X-Desktop-Token', 'wrong-token')
       expect(res.status).toBe(401)
     })
 
@@ -117,12 +156,12 @@ describe('auth middleware', () => {
       expect(res.body.secret).toBe(true)
     })
 
-    it('passes with correct X-Hub-Token header', async () => {
+    it('passes with correct X-Desktop-Token header', async () => {
       const app = createTestApp()
       const token = getServerToken()
       const res = await request(app)
         .get('/protected')
-        .set('X-Hub-Token', token)
+        .set('X-Desktop-Token', token)
       expect(res.status).toBe(200)
       expect(res.body.secret).toBe(true)
     })
@@ -156,8 +195,8 @@ describe('tokenFromUpgradeRequest', () => {
     expect(tokenFromUpgradeRequest(req as any)).toBe('abc')
   })
 
-  it('reads hub-token WebSocket subprotocols', () => {
-    const req = { headers: { 'sec-websocket-protocol': 'json, hub-token.def' } }
+  it('reads desktop-token WebSocket subprotocols', () => {
+    const req = { headers: { 'sec-websocket-protocol': 'json, desktop-token.def' } }
     expect(tokenFromUpgradeRequest(req as any)).toBe('def')
   })
 })
@@ -276,7 +315,7 @@ describe('hostValidationMiddleware', () => {
   })
 })
 
-describe('hub-router path safety', () => {
+describe('desktop-router path safety', () => {
   it('denies /etc', () => {
     const { isPathSafe } = _getPathSafeForTest()
     expect(isPathSafe('/etc')).toBe(false)

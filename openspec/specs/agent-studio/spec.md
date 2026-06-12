@@ -27,7 +27,7 @@ The Agent Studio SHALL offer three entry points when creating a new custom agent
 
 #### Scenario: Generate entry point
 - **WHEN** the user enters a description ("reviews Terraform for IaC misconfigs") and clicks "Generate"
-- **THEN** the hub spawns a dedicated Claude invocation with an agent-authoring system prompt, receives a drafted `.md`, and opens it in a diff-viewer for review before save
+- **THEN** the app spawns a dedicated Claude invocation with an agent-authoring system prompt, receives a drafted `.md`, and opens it in a diff-viewer for review before save
 
 ### Requirement: Live validation
 The Studio SHALL validate agent metadata live as the user edits. Validation SHALL cover: name must match `^custom-[a-z0-9-]+$`, name must not collide with existing agents, `model` must be an accepted alias, required frontmatter fields must be present.
@@ -41,7 +41,7 @@ The Studio SHALL validate agent metadata live as the user edits. Validation SHAL
 - **THEN** the form shows an error: "The `sr-` prefix is reserved for upstream agents"
 
 ### Requirement: Save writes to disk
-The Studio's Save action SHALL write the current buffer to `<project>/.claude/agents/<name>.md` after a final validation pass. A version record SHALL be appended to the `agent_versions` hub DB table.
+The Studio's Save action SHALL write the current buffer to `<project>/.claude/agents/<name>.md` after a final validation pass. A version record SHALL be appended to the `agent_versions` table in the app-level DB.
 
 #### Scenario: Successful save
 - **WHEN** the user clicks Save on a valid draft
@@ -67,7 +67,7 @@ The Studio SHALL provide a "Test agent" action that runs the current draft again
 
 #### Scenario: Test run produces output
 - **WHEN** the user selects a sample task and clicks "Test agent"
-- **THEN** the hub spawns a disposable `claude` process with the draft body inlined and the sample task as input
+- **THEN** the app spawns a disposable `claude` process with the draft body inlined and the sample task as input
 - **AND** streaming output is displayed in the Studio's Test pane
 - **AND** on completion, a row is appended to `agent_tests` with `{agentName, draftHash, sampleTaskId, tokens, durationMs, output}`
 
@@ -87,7 +87,7 @@ The Generate entry point SHALL use a dedicated system prompt for agent authoring
 - **THEN** the invocation uses a system prompt specific to agent authoring, not the user's project system prompt
 
 ### Requirement: Reserved prefix for custom agents
-The hub SHALL only allow creating agents whose name starts with `custom-`. The hub SHALL NOT offer create/edit actions for files matching `sr-*.md`.
+The app SHALL only allow creating agents whose name starts with `custom-`. The app SHALL NOT offer create/edit actions for files matching `sr-*.md`.
 
 #### Scenario: Create blocked for non-custom prefix
 - **WHEN** the user attempts to save a new agent with name `my-agent`

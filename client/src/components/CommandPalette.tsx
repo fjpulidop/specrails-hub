@@ -17,7 +17,7 @@ import {
   PanelLeft,
   PanelRight,
 } from 'lucide-react'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { getApiBase } from '../lib/api'
 import type { CommandInfo, JobSummary } from '../types'
 import { cn } from '../lib/utils'
@@ -34,7 +34,7 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
   const [open, setOpen] = useState(false)
   const [commands, setCommands] = useState<CommandInfo[]>([])
   const [recentJobs, setRecentJobs] = useState<JobSummary[]>([])
-  const { projects, activeProjectId, setActiveProjectId } = useHub()
+  const { projects, activeProjectId, setActiveProjectId } = useDesktop()
   const { leftMode, rightMode, cycleLeftMode, cycleRightMode } = useSidebarPin()
   const leftLabel = leftMode === 'pinned-open'
     ? t('palette.sidebar.collapseLeftKeepPinned')
@@ -123,7 +123,7 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
     navigate(path)
   }, [navigate])
 
-  const handleHubAction = useCallback((action: (() => void) | undefined) => {
+  const handleDesktopAction = useCallback((action: (() => void) | undefined) => {
     if (!action) return
     setOpen(false)
     action()
@@ -240,9 +240,9 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
             <span>{t('palette.nav.dashboard')}</span>
           </Command.Item>
           {onOpenAnalytics && (
-            <Command.Item value={t('palette.nav.hubAnalytics')} keywords={['cross-project', 'hub']} onSelect={() => handleHubAction(onOpenAnalytics)} className={navItemClass}>
+            <Command.Item value={t('palette.nav.desktopAnalytics')} keywords={['cross-project', 'desktop']} onSelect={() => handleDesktopAction(onOpenAnalytics)} className={navItemClass}>
               <PieChart className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span>{t('palette.nav.hubAnalytics')}</span>
+              <span>{t('palette.nav.desktopAnalytics')}</span>
             </Command.Item>
           )}
           <Command.Item value={t('palette.nav.projectAnalytics')} keywords={['metrics']} onSelect={() => handleNavigate('/analytics')} className={navItemClass}>
@@ -253,11 +253,11 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
             <Activity className="w-4 h-4 text-muted-foreground shrink-0" />
             <span>{t('palette.nav.activityFeed')}</span>
           </Command.Item>
-          <Command.Item value={t('palette.nav.hubSettings')} keywords={['configuration']} onSelect={() => onOpenSettings ? handleHubAction(onOpenSettings) : handleNavigate('/settings')} className={navItemClass}>
+          <Command.Item value={t('palette.nav.desktopSettings')} keywords={['configuration']} onSelect={() => onOpenSettings ? handleDesktopAction(onOpenSettings) : handleNavigate('/settings')} className={navItemClass}>
             <Settings className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>{t('palette.nav.hubSettings')}</span>
+            <span>{t('palette.nav.desktopSettings')}</span>
           </Command.Item>
-          <Command.Item value={t('palette.nav.docs')} keywords={['documentation']} onSelect={() => onOpenDocs ? handleHubAction(onOpenDocs) : handleNavigate('/docs')} className={navItemClass}>
+          <Command.Item value={t('palette.nav.docs')} keywords={['documentation']} onSelect={() => onOpenDocs ? handleDesktopAction(onOpenDocs) : handleNavigate('/docs')} className={navItemClass}>
             <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
             <span>{t('palette.nav.docs')}</span>
           </Command.Item>

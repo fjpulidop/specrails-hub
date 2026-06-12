@@ -2,7 +2,7 @@
  * Track E — Integration tests
  *
  * Verifies that REST endpoint operations are fully reflected on disk,
- * completing the Hub↔filesystem contract.
+ * completing the app↔filesystem contract.
  *
  * Unlike ticket-store.test.ts (which asserts HTTP responses), these tests
  * read the actual JSON file from disk after each operation.
@@ -19,7 +19,7 @@ import { vi } from 'vitest'
 
 import { createProjectRouter } from './project-router'
 import { initDb } from './db'
-import { initHubDb } from './hub-db'
+import { initDesktopDb } from './desktop-db'
 import { TicketWatcher } from './ticket-watcher'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import type { DbInstance } from './db'
@@ -82,15 +82,15 @@ function makeContext(db: DbInstance, projectPath: string): ProjectContext & { br
     setupManager: makeSetupManager() as any,
     proposalManager: makeProposalManager() as any,
     specLauncherManager: makeSpecLauncherManager() as any,
-    ticketWatcher: { notifyHubWrite: vi.fn(), start: vi.fn(), close: vi.fn() } as any,
+    ticketWatcher: { notifyDesktopWrite: vi.fn(), start: vi.fn(), close: vi.fn() } as any,
     broadcast,
   } as any
 }
 
 function makeRegistry(contexts: Map<string, ProjectContext>): ProjectRegistry {
-  const hubDb = initHubDb(':memory:')
+  const desktopDb = initDesktopDb(':memory:')
   return {
-    hubDb,
+    desktopDb,
     getContext: vi.fn((id: string) => contexts.get(id)),
     getContextByPath: vi.fn(() => undefined),
     addProject: vi.fn() as any,
@@ -161,7 +161,7 @@ describe('E1: POST /tickets persists correct JSON to disk', () => {
     expect(ticket.labels).toEqual([])
     expect(ticket.assignee).toBeNull()
     expect(ticket.prerequisites).toEqual([])
-    expect(ticket.source).toBe('hub')
+    expect(ticket.source).toBe('hub') // legacy on-disk wire value
     expect(typeof ticket.created_at).toBe('string')
     expect(typeof ticket.updated_at).toBe('string')
   })
@@ -297,7 +297,7 @@ describe('E3: DELETE /tickets/:id removes ticket from JSON file', () => {
 
 // ─── E4: Integration-contract storagePath ────────────────────────────────────
 
-describe('E4: Hub create uses custom storagePath from integration-contract.json', () => {
+describe('E4: App create uses custom storagePath from integration-contract.json', () => {
   it('writes the ticket to the path specified in integration-contract.json', async () => {
     const claudeDir = path.join(tmpDir, '.claude')
     fs.mkdirSync(claudeDir, { recursive: true })
@@ -396,7 +396,7 @@ describe('E5: External file write triggers TicketWatcher broadcast', () => {
     expect(msg.projectId).toBe('proj-1')
   })
 
-  it('suppresses echo when watcher is notified of hub revision', async () => {
+  it('suppresses echo when watcher is notified of app revision', async () => {
     const broadcast = vi.fn()
 
     const storeDir = path.join(tmpDir, '.specrails')
@@ -412,8 +412,8 @@ describe('E5: External file write triggers TicketWatcher broadcast', () => {
     watcher.start()
     await new Promise((r) => setTimeout(r, 300))
 
-    // Hub writes and pre-notifies watcher — should suppress the echo
-    watcher.notifyHubWrite(2)
+    // App writes and pre-notifies watcher — should suppress the echo
+    watcher.notifyDesktopWrite(2)
     const updated = { ...initialStore, revision: 2 }
     fs.writeFileSync(filePath, JSON.stringify(updated), 'utf-8')
 

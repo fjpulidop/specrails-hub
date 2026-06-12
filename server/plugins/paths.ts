@@ -1,7 +1,7 @@
 import os from 'os'
 import path from 'path'
 
-/** `<project>/.specrails/plugins/` — base directory for hub-managed plugin state. */
+/** `<project>/.specrails/plugins/` — base directory for app-managed plugin state. */
 export function pluginsDir(projectPath: string): string {
   return path.join(projectPath, '.specrails', 'plugins')
 }
@@ -26,7 +26,7 @@ export function homeJobSnapshotPath(slug: string, jobId: string): string {
   return path.join(os.homedir(), '.specrails', 'projects', slug, 'jobs', jobId, 'plugins.json')
 }
 
-/** `<project>/.mcp.json` — Claude CLI MCP config (managed surgically by hub). */
+/** `<project>/.mcp.json` — Claude CLI MCP config (managed surgically by the app). */
 export function mcpJsonPath(projectPath: string): string {
   return path.join(projectPath, '.mcp.json')
 }

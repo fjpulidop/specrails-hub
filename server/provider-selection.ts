@@ -9,7 +9,7 @@
 // Invariant: when `providers.length === 1` every helper collapses to the single
 // provider, so single-provider projects behave exactly as before.
 
-import type { CliProvider, ProjectRow } from './hub-db'
+import type { CliProvider, ProjectRow } from './desktop-db'
 
 type ProviderFields = Pick<ProjectRow, 'provider' | 'providers'>
 

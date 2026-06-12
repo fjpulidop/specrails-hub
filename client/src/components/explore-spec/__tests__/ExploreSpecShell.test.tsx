@@ -30,8 +30,8 @@ vi.mock('../../../hooks/useChat', () => ({
   }),
 }))
 
-vi.mock('../../../hooks/useHub', () => ({
-  useHub: () => ({ activeProjectId: 'proj-1', projects: [] }),
+vi.mock('../../../hooks/useDesktop', () => ({
+  useDesktop: () => ({ activeProjectId: 'proj-1', projects: [] }),
 }))
 
 vi.mock('../../../lib/api', () => ({

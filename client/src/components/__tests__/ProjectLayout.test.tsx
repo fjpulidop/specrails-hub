@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import { render } from '../../test-utils'
 import { ProjectLayout } from '../ProjectLayout'
-import type { HubProject } from '../../hooks/useHub' // used by mockProject
+import type { DesktopProject } from '../../hooks/useDesktop' // used by mockProject
 
 // Mock Toaster from sonner
 vi.mock('sonner', () => ({
@@ -71,7 +71,7 @@ vi.mock('../ChatPanel', () => ({
 }))
 
 
-const mockProject: HubProject = {
+const mockProject: DesktopProject = {
   id: 'proj-1',
   slug: 'my-project',
   name: 'My Project',

@@ -49,7 +49,7 @@ The mode chip SHALL open a menu offering exactly three options: `Default`, `Tick
 - **WHEN** the user opens the mode chip menu and selects `Default`
 - **THEN** the mode chip label changes to `Default`
 - **AND** the direction arrow is hidden
-- **AND** the active specs list returns to the user's custom drag-order persisted under `specrails-hub:spec-order:<projectId>`
+- **AND** the active specs list returns to the user's custom drag-order persisted under `specrails-desktop:spec-order:<projectId>`
 - **AND** the Done specs list returns to its native order (no client-side reordering applied)
 
 ### Requirement: Direction toggle inverts current sorted order
@@ -89,7 +89,7 @@ Priority sort SHALL group tickets into buckets `critical`, `high`, `medium`, `lo
 
 ### Requirement: Dragging a card while a non-default mode is active flips mode back to Default
 
-When the user reorders cards via drag-and-drop while the active mode is `Ticket #` or `Priority`, the system SHALL set the mode to `Default`, persist the resulting visible order under `specrails-hub:spec-order:<projectId>`, and keep the dropped card at the position the user released it.
+When the user reorders cards via drag-and-drop while the active mode is `Ticket #` or `Priority`, the system SHALL set the mode to `Default`, persist the resulting visible order under `specrails-desktop:spec-order:<projectId>`, and keep the dropped card at the position the user released it.
 
 #### Scenario: Drag while in Priority mode flips to Default
 

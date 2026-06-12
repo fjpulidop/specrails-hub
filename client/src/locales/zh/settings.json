@@ -1,7 +1,7 @@
 {
   "language": {
     "title": "语言",
-    "description": "Hub 全局界面语言。即时生效，无需重启。",
+    "description": "Desktop 全局界面语言。即时生效，无需重启。",
     "selectLabel": "界面语言",
     "updateFailed": "无法保存语言偏好"
   },
@@ -59,23 +59,23 @@
     "saveBudgetFailed": "保存预算失败",
     "saveThresholdFailed": "保存阈值失败"
   },
-  "hub": {
-    "title": "Hub 设置",
-    "description": "管理已注册的项目并查看 Hub 信息。",
+  "desktop": {
+    "title": "Desktop 设置",
+    "description": "管理已注册的项目并查看 Desktop 信息。",
     "registeredProjects": "已注册项目",
     "noProjects": "尚未注册任何项目",
     "techUrlDescription": "specrails-tech API 的基础 URL（默认：http://localhost:3000）",
     "techUrlSaved": "specrails-tech URL 已保存",
     "techUrlSaveFailed": "保存 URL 失败",
     "budgetAlertsHeading": "预算与告警",
-    "dailyBudgetLabel": "Hub 每日预算（USD）",
+    "dailyBudgetLabel": "Desktop 每日预算（USD）",
     "dailyBudgetHelper": "所有项目的全局每日支出上限。超出后队列自动暂停。",
     "dailyBudgetPlaceholder": "如 10.00",
     "perJobHelper": "当单个任务超过此金额时告警。留空表示禁用。",
     "costAlertsDisabled": "已禁用成本告警",
-    "dailyBudgetRemoved": "已移除 Hub 每日预算",
-    "dailyBudgetSet": "Hub 每日预算已设为 ${{amount}}",
-    "dailyBudgetSaveFailed": "保存 Hub 每日预算失败",
+    "dailyBudgetRemoved": "已移除 Desktop 每日预算",
+    "dailyBudgetSet": "Desktop 每日预算已设为 ${{amount}}",
+    "dailyBudgetSaveFailed": "保存 Desktop 每日预算失败",
     "projectRemoved": "项目已移除",
     "projectRemoveFailed": "移除项目失败",
     "onboardingHeading": "新手引导",
@@ -83,10 +83,10 @@
     "platformTourDescription": "重播欢迎向导，回顾核心功能。",
     "replayTour": "重播导览",
     "terminalPanelHeading": "终端面板",
-    "infoHeading": "Hub 信息",
+    "infoHeading": "Desktop 信息",
     "infoPort": "端口",
     "infoProjects": "项目",
-    "infoDb": "Hub 数据库"
+    "infoDb": "Desktop 数据库"
   },
   "notifications": {
     "heading": "系统通知",
@@ -101,7 +101,7 @@
   },
   "webhooks": {
     "heading": "出站 Webhook",
-    "description": "在 Hub 事件发生时通知外部工具（Slack、Zapier、CI/CD）。设置密钥后，请求会通过 <code>X-Specrails-Signature</code> 进行签名。",
+    "description": "在 Desktop 事件发生时通知外部工具（Slack、Zapier、CI/CD）。设置密钥后，请求会通过 <code>X-Specrails-Signature</code> 进行签名。",
     "eventJobCompleted": "任务完成",
     "eventJobFailed": "任务失败",
     "eventDailyBudgetExceeded": "超出每日预算",
@@ -125,8 +125,8 @@
   },
   "terminal": {
     "title": "终端面板",
-    "hubDescription": "Hub 全局默认值，应用于所有项目，除非设置了项目级覆盖。",
-    "projectDescription": "终端面板的项目级覆盖。保持字段不变即继承 Hub 默认值。",
+    "desktopDescription": "Desktop 全局默认值，应用于所有项目，除非设置了项目级覆盖。",
+    "projectDescription": "终端面板的项目级覆盖。保持字段不变即继承 Desktop 默认值。",
     "fontFamily": "字体",
     "fontSize": "字号（{{min}}–{{max}}）",
     "renderMode": "渲染模式",
@@ -141,7 +141,7 @@
     "unsavedChanges": "有未保存的更改",
     "clearOverride": "清除覆盖",
     "clear": "清除",
-    "inheritingDefault": "正在继承 Hub 默认值",
+    "inheritingDefault": "正在继承 Desktop 默认值",
     "nothingToSave": "没有可保存的内容",
     "saved": "终端设置已保存"
   },
@@ -159,7 +159,7 @@
   },
   "mobile": {
     "heading": "移动伴侣",
-    "description": "通过手机上的 SpecRails Companion 应用控制此 Hub，完全经由本地网络。默认关闭。",
+    "description": "通过手机上的 SpecRails Companion 应用控制 Specrails，完全经由本地网络。默认关闭。",
     "accessOn": "移动访问已开启",
     "accessOff": "移动访问已关闭",
     "listeningOnPort": "正在监听端口 {{port}}",
@@ -186,7 +186,7 @@
     "approve": "批准",
     "paired": "✓ 已配对",
     "waiting": "等待设备中…（位于 {{host}}:{{port}}）",
-    "thisHub": "此 Hub",
+    "thisDesktop": "此电脑",
     "copyCode": "复制配对码（用于“手动输入”）",
     "pairedToast": "设备已配对",
     "approveFailed": "批准失败：{{message}}",

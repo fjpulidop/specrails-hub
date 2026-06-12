@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useTranslation, Trans } from 'react-i18next'
 import { getApiBase } from '../lib/api'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -19,10 +19,10 @@ interface ProjectSettings {
 
 export default function SettingsPage() {
   const { t } = useTranslation('settings')
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const location = useLocation()
-  // SettingsPage is only mounted in hub mode; telemetry toggle is hub-only
-  const isHubMode = activeProjectId !== null
+  // SettingsPage is only mounted in Super mode; telemetry toggle is Super-mode-only
+  const isSuperMode = activeProjectId !== null
 
   // Scroll-to-hash + brief highlight when the page is opened with a hash anchor
   // (e.g. /settings#terminal-browser-shortcut-url from the topbar context menu).
@@ -114,7 +114,7 @@ export default function SettingsPage() {
   }, [activeProjectId])
 
   useEffect(() => {
-    if (!activeProjectId || !isHubMode) return
+    if (!activeProjectId || !isSuperMode) return
     async function loadTelemetrySettings() {
       try {
         const res = await fetch(`${getApiBase()}/settings`)
@@ -128,7 +128,7 @@ export default function SettingsPage() {
       }
     }
     void loadTelemetrySettings()
-  }, [activeProjectId, isHubMode])
+  }, [activeProjectId, isSuperMode])
 
   async function saveDailyBudget() {
     setIsSavingBudget(true)
@@ -256,8 +256,8 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* Pipeline Telemetry Section — hub mode only */}
-      {isHubMode && (
+      {/* Pipeline Telemetry Section — Super mode only */}
+      {isSuperMode && (
         <Card>
           <CardHeader>
             <CardTitle>{t('telemetry.title')}</CardTitle>

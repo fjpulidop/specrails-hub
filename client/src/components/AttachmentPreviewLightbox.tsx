@@ -82,7 +82,7 @@ export function AttachmentPreviewLightbox({ ticketKey, attachment, onClose }: Pr
         <button
           type="button"
           onClick={onClose}
-          aria-label={t('lightbox.backToHub')}
+          aria-label={t('lightbox.backToDesktop')}
           className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-white/85 hover:bg-white/10 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />

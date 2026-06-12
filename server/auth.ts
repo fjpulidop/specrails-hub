@@ -6,9 +6,27 @@ import type { IncomingMessage } from 'http'
 import type { Request, Response, NextFunction } from 'express'
 
 const TOKEN_DIR = path.join(os.homedir(), '.specrails')
-const TOKEN_PATH = path.join(TOKEN_DIR, 'hub.token')
+const TOKEN_PATH = path.join(TOKEN_DIR, 'desktop.token')
+// Legacy (pre-rebrand) token filename — referenced by the one-time migration
+// below only. Migration/compat code.
+const LEGACY_TOKEN_PATH = path.join(TOKEN_DIR, 'hub.token')
 
 let _token: string | null = null
+
+/**
+ * Rebrand migration (Specrails Hub → Specrails Desktop): if the legacy
+ * `hub.token` exists and the new `desktop.token` does not, rename it before
+ * reading so existing clients keep their token across the rename.
+ */
+function migrateLegacyTokenFile(): void {
+  try {
+    if (fs.existsSync(LEGACY_TOKEN_PATH) && !fs.existsSync(TOKEN_PATH)) {
+      fs.renameSync(LEGACY_TOKEN_PATH, TOKEN_PATH)
+    }
+  } catch {
+    // Non-fatal — a fresh token will be generated below if the read fails.
+  }
+}
 
 /**
  * Loads an existing API token from disk, or generates and persists a new one.
@@ -26,6 +44,8 @@ let _token: string | null = null
  */
 export function loadOrGenerateToken(): string {
   if (_token) return _token
+
+  migrateLegacyTokenFile()
 
   try {
     if (fs.existsSync(TOKEN_PATH)) {
@@ -95,7 +115,7 @@ export function isLoopbackAddress(addr: string | undefined): boolean {
  * Express middleware that rejects any request whose peer is not on the loopback
  * interface (H-02/H-03/H-04). Applied to endpoints that must work without a
  * token for the local client/CLI/telemetry to bootstrap, but must never be
- * reachable from the network: `/api/hub/token`, `/otlp`, `/api/docs`.
+ * reachable from the network: `/api/token`, `/otlp`, `/api/docs`.
  */
 export function requireLoopback(req: Request, res: Response, next: NextFunction): void {
   if (isLoopbackAddress(req.socket?.remoteAddress)) {
@@ -140,21 +160,21 @@ export function _resetTokenForTest(): void {
 }
 
 /**
- * Express middleware that requires a valid Bearer or X-Hub-Token header.
+ * Express middleware that requires a valid Bearer or X-Desktop-Token header.
  * Returns 401 for missing or invalid tokens.
  */
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const token = loadOrGenerateToken()
 
   const authHeader = req.headers['authorization']
-  const hubTokenHeader = req.headers['x-hub-token']
+  const desktopTokenHeader = req.headers['x-desktop-token']
 
   let provided: string | null = null
 
   if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
     provided = authHeader.slice(7).trim()
-  } else if (typeof hubTokenHeader === 'string') {
-    provided = hubTokenHeader.trim()
+  } else if (typeof desktopTokenHeader === 'string') {
+    provided = desktopTokenHeader.trim()
   }
 
   if (!provided || !safeEqual(provided, token)) {
@@ -166,11 +186,11 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 }
 
 /**
- * Extracts the hub token from a WebSocket upgrade request.
+ * Extracts the server token from a WebSocket upgrade request.
  *
  * Browsers cannot set custom headers for WebSocket upgrades, so the frontend
- * sends the token as a subprotocol: `hub-token.<token>`. The CLI can use the
- * standard Authorization header.
+ * sends the token as a subprotocol: `desktop-token.<token>`. The CLI can use
+ * the standard Authorization header.
  */
 export function tokenFromUpgradeRequest(request: IncomingMessage): string | null {
   const authHeader = request.headers.authorization
@@ -183,8 +203,8 @@ export function tokenFromUpgradeRequest(request: IncomingMessage): string | null
 
   for (const part of protocolHeader.split(',')) {
     const protocol = part.trim()
-    if (protocol.startsWith('hub-token.')) {
-      return protocol.slice('hub-token.'.length).trim()
+    if (protocol.startsWith('desktop-token.')) {
+      return protocol.slice('desktop-token.'.length).trim()
     }
   }
   return null

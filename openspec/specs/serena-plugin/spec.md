@@ -4,15 +4,15 @@
 TBD - created by archiving change add-plugin-system. Update Purpose after archive.
 ## Requirements
 ### Requirement: Serena ships as a bundled plugin
-The hub SHALL ship a built-in plugin named `serena` registered in `server/plugins/index.ts`, implementing the `Plugin` interface defined by the plugin system. Its manifest MUST declare:
+The app SHALL ship a built-in plugin named `serena` registered in `server/plugins/index.ts`, implementing the `Plugin` interface defined by the plugin system. Its manifest MUST declare:
 - `name: "serena"`, `version` matching the bundled module's package version,
 - `description` and `whatItDoes` copy describing semantic code navigation via LSP+MCP,
 - `requirements: [{ name: "uv", minVersion: "0.1.0" }]`,
 - `owns.mcpServers: ["serena"]`,
 - `owns.agentFragments: [".claude/agents/custom-serena.md"]` (only if the plugin chooses to ship that file; see optional fragment requirement below).
 
-#### Scenario: Hub registers serena at startup
-- **WHEN** the hub process starts with no startup errors
+#### Scenario: App registers serena at startup
+- **WHEN** the app process starts with no startup errors
 - **THEN** `PluginManager.listAvailable()` includes one entry whose `name === "serena"`
 
 #### Scenario: Manifest exposes uv requirement
@@ -45,7 +45,7 @@ The merge MUST be surgical: if `mcpServers` does not exist, it is created; exist
 - **THEN** the file contains both `myown` (byte-identical) and `serena`
 
 ### Requirement: Serena prerequisite resolution
-The Serena plugin MUST advertise `uv` as a prerequisite. The hub's prerequisites detector (`setup-prerequisites.ts`) MUST be extended to detect `uv` (`uv --version` exit 0 with parsed semver) and report it under the same shape as Node/git/etc. The Install dialog MUST surface an "Auto-install uv" affordance when `uv` is missing, using OS-aware install commands consistent with the existing `InstallInstructionsModal`.
+The Serena plugin MUST advertise `uv` as a prerequisite. The app's prerequisites detector (`setup-prerequisites.ts`) MUST be extended to detect `uv` (`uv --version` exit 0 with parsed semver) and report it under the same shape as Node/git/etc. The Install dialog MUST surface an "Auto-install uv" affordance when `uv` is missing, using OS-aware install commands consistent with the existing `InstallInstructionsModal`.
 
 #### Scenario: uv detected when installed
 - **GIVEN** `uv` is on PATH and `uv --version` exits 0

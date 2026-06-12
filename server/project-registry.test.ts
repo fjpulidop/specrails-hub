@@ -60,12 +60,12 @@ vi.mock('./config', () => ({
 
 import { ProjectRegistry } from './project-registry'
 import { setRailTickets, getRail } from './rails-store'
-import { initHubDb, addProject, listProjects, getProject } from './hub-db'
+import { initDesktopDb, addProject, listProjects, getProject } from './desktop-db'
 import type { DbInstance } from './db'
 import type { WsMessage } from './types'
 
 describe('ProjectRegistry', () => {
-  let hubDb: DbInstance
+  let desktopDb: DbInstance
   let broadcast: ReturnType<typeof vi.fn>
   let registry: ProjectRegistry
 
@@ -73,7 +73,7 @@ describe('ProjectRegistry', () => {
     vi.resetAllMocks()
     broadcast = vi.fn()
     registry = new ProjectRegistry(broadcast, ':memory:')
-    hubDb = registry.hubDb
+    desktopDb = registry.desktopDb
   })
 
   afterEach(() => {
@@ -83,8 +83,8 @@ describe('ProjectRegistry', () => {
   // ─── Constructor ────────────────────────────────────────────────────────────
 
   describe('constructor', () => {
-    it('initializes hub DB and empty context map', () => {
-      expect(registry.hubDb).toBeDefined()
+    it('initializes the desktop DB and empty context map', () => {
+      expect(registry.desktopDb).toBeDefined()
       expect(registry.listContexts()).toHaveLength(0)
     })
   })
@@ -92,9 +92,9 @@ describe('ProjectRegistry', () => {
   // ─── loadAll ────────────────────────────────────────────────────────────────
 
   describe('loadAll', () => {
-    it('loads all projects from hub DB', () => {
-      addProject(hubDb, { id: 'p1', slug: 'proj-1', name: 'Project 1', path: '/path/1' })
-      addProject(hubDb, { id: 'p2', slug: 'proj-2', name: 'Project 2', path: '/path/2' })
+    it('loads all projects from the desktop DB', () => {
+      addProject(desktopDb, { id: 'p1', slug: 'proj-1', name: 'Project 1', path: '/path/1' })
+      addProject(desktopDb, { id: 'p2', slug: 'proj-2', name: 'Project 2', path: '/path/2' })
 
       registry.loadAll()
 
@@ -107,11 +107,11 @@ describe('ProjectRegistry', () => {
     })
 
     it('M9: a single failing project DB does not abort loading the rest', () => {
-      addProject(hubDb, { id: 'good', slug: 'good', name: 'Good', path: '/path/good' })
-      addProject(hubDb, { id: 'bad', slug: 'bad', name: 'Bad', path: '/path/bad' })
+      addProject(desktopDb, { id: 'good', slug: 'good', name: 'Good', path: '/path/good' })
+      addProject(desktopDb, { id: 'bad', slug: 'bad', name: 'Bad', path: '/path/bad' })
       // Corrupt the bad project's db_path so initDb throws (ENOTDIR: /dev/null is
       // not a directory, so mkdirSync of its parent fails).
-      hubDb.prepare('UPDATE projects SET db_path = ? WHERE id = ?').run('/dev/null/jobs.sqlite', 'bad')
+      desktopDb.prepare('UPDATE projects SET db_path = ? WHERE id = ?').run('/dev/null/jobs.sqlite', 'bad')
 
       expect(() => registry.loadAll()).not.toThrow()
       expect(registry.getContext('good')).toBeDefined()
@@ -160,7 +160,7 @@ describe('ProjectRegistry', () => {
   // ─── removeProject ─────────────────────────────────────────────────────────
 
   describe('removeProject', () => {
-    it('removes project from contexts and hub DB', () => {
+    it('removes project from contexts and the desktop DB', () => {
       registry.addProject({
         id: 'p1',
         slug: 'my-proj',
@@ -173,7 +173,7 @@ describe('ProjectRegistry', () => {
       registry.removeProject('p1')
 
       expect(registry.getContext('p1')).toBeUndefined()
-      expect(getProject(hubDb, 'p1')).toBeUndefined()
+      expect(getProject(desktopDb, 'p1')).toBeUndefined()
     })
 
     it('handles removing non-existent project gracefully', () => {
@@ -271,7 +271,7 @@ describe('ProjectRegistry', () => {
   // ─── touchProject ──────────────────────────────────────────────────────────
 
   describe('touchProject', () => {
-    it('delegates to hub-db touchProject', () => {
+    it('delegates to desktop-db touchProject', () => {
       registry.addProject({ id: 'p1', slug: 's1', name: 'N1', path: '/p1' })
       expect(() => registry.touchProject('p1')).not.toThrow()
     })
@@ -280,7 +280,7 @@ describe('ProjectRegistry', () => {
   // ─── getProjectRow ─────────────────────────────────────────────────────────
 
   describe('getProjectRow', () => {
-    it('returns project row from hub DB', () => {
+    it('returns project row from the desktop DB', () => {
       registry.addProject({ id: 'p1', slug: 's1', name: 'N1', path: '/p1' })
       const row = registry.getProjectRow('p1')
       expect(row?.id).toBe('p1')
@@ -295,7 +295,7 @@ describe('ProjectRegistry', () => {
 
   describe('double-load prevention', () => {
     it('does not create duplicate contexts for same project', () => {
-      addProject(hubDb, { id: 'p1', slug: 'proj-1', name: 'Project 1', path: '/path/1' })
+      addProject(desktopDb, { id: 'p1', slug: 'proj-1', name: 'Project 1', path: '/path/1' })
 
       registry.loadAll()
       const ctx1 = registry.getContext('p1')
@@ -333,7 +333,7 @@ describe('ProjectRegistry', () => {
   // ─── QueueManager constructor callback tests ──────────────────────────────
 
   describe('QueueManager options callbacks', () => {
-    it('getCostAlertThreshold reads hub setting', async () => {
+    it('getCostAlertThreshold reads desktop setting', async () => {
       const { QueueManager } = await import('./queue-manager')
       registry.addProject({ id: 'cb-1', slug: 'cb-proj', name: 'CB', path: '/cb' })
 
@@ -343,13 +343,13 @@ describe('ProjectRegistry', () => {
       const options = lastCall[4] as any
       expect(options).toBeDefined()
 
-      // getCostAlertThreshold should read from hub settings
+      // getCostAlertThreshold should read from desktop settings
       const threshold = options.getCostAlertThreshold()
       // No setting set, so should return null
       expect(threshold).toBeNull()
     })
 
-    it('getHubDailyBudget returns budget and total spend', async () => {
+    it('getDesktopDailyBudget returns budget and total spend', async () => {
       const { QueueManager } = await import('./queue-manager')
       registry.addProject({ id: 'hb-1', slug: 'hb-proj', name: 'HB', path: '/hb' })
 
@@ -357,7 +357,7 @@ describe('ProjectRegistry', () => {
       const lastCall = constructorCalls[constructorCalls.length - 1]
       const options = lastCall[4] as any
 
-      const result = options.getHubDailyBudget()
+      const result = options.getDesktopDailyBudget()
       expect(result).toHaveProperty('budget')
       expect(result).toHaveProperty('totalSpend')
       expect(typeof result.totalSpend).toBe('number')

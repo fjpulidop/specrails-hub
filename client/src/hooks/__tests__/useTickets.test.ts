@@ -16,12 +16,12 @@ vi.mock('../useSharedWebSocket', () => ({
   }),
 }))
 
-// ─── Mock useHub ───────────────────────────────────────────────────────────────
+// ─── Mock useDesktop ───────────────────────────────────────────────────────────────
 
 let mockActiveProjectId: string | null = 'proj-1'
 
-vi.mock('../useHub', () => ({
-  useHub: () => ({
+vi.mock('../useDesktop', () => ({
+  useDesktop: () => ({
     get activeProjectId() { return mockActiveProjectId },
   }),
 }))

@@ -6,7 +6,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
 
 const SERVER_PORT: u16 = 4200;
-const HEALTH_URL: &str = "http://localhost:4200/api/hub/state";
+const HEALTH_URL: &str = "http://localhost:4200/api/state";
 const HEALTH_TIMEOUT_SECS: u64 = 30;
 
 /// Check whether a TCP port is currently free (bind succeeds → free).
@@ -262,10 +262,10 @@ pub fn run() {
             *sidecar_pid_clone.lock().unwrap() = Some(pid);
 
             // Drain sidecar stdout/stderr to prevent pipe buffer blocking.
-            // Write to ~/Library/Logs/SpecRailsHub/sidecar.log for diagnostics.
+            // Write to ~/Library/Logs/Specrails/sidecar.log for diagnostics.
             let log_path = dirs_next::home_dir()
                 .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-                .join("Library/Logs/SpecRailsHub/sidecar.log");
+                .join("Library/Logs/Specrails/sidecar.log");
             if let Some(parent) = log_path.parent() {
                 let _ = std::fs::create_dir_all(parent);
             }

@@ -8,7 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
-import { getHubTokenProtocol } from '../lib/auth'
+import { getDesktopTokenProtocol } from '../lib/auth'
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
 
@@ -18,7 +18,7 @@ interface SharedWebSocketContextValue {
   registerHandler: (id: string, fn: (msg: unknown) => void) => void
   unregisterHandler: (id: string) => void
   connectionStatus: ConnectionStatus
-  // Hub-level message types (hub.*) are fanned out to ALL registered handlers.
+  // Desktop-level message types (desktop.*) are fanned out to ALL registered handlers.
   // Handlers that only care about project-scoped messages should filter by
   // msg.projectId to ignore cross-project messages.
 }
@@ -37,8 +37,8 @@ export function SharedWebSocketProvider({ url, children }: { url: string; childr
 
     function connect() {
       if (disposed) return
-      const protocol = getHubTokenProtocol()
-      const ws = protocol ? new WebSocket(url, ['specrails-hub', protocol]) : new WebSocket(url)
+      const protocol = getDesktopTokenProtocol()
+      const ws = protocol ? new WebSocket(url, ['specrails-desktop', protocol]) : new WebSocket(url)
       wsRef.current = ws
       setConnectionStatus('connecting')
 

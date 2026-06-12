@@ -13,7 +13,7 @@ import { Button } from '../ui/button'
 
 interface QrPayload {
   v: number
-  hub: string
+  hub: string // mobile-app v1 wire compat — do not rename
   name: string
   addrs: string[]
   port: number
@@ -53,7 +53,7 @@ export function PairDeviceModal({ open, onClose, onPaired }: { open: boolean; on
 
   const close = useCallback(() => {
     stopPolling()
-    void fetch('/api/hub/mobile/pairing-session', { method: 'DELETE' }).catch(() => {})
+    void fetch('/api/mobile/pairing-session', { method: 'DELETE' }).catch(() => {})
     setQr(null)
     setState({ status: 'none' })
     setError(null)
@@ -64,7 +64,7 @@ export function PairDeviceModal({ open, onClose, onPaired }: { open: boolean; on
     if (!open) return
     let cancelled = false
     setError(null)
-    fetch('/api/hub/mobile/pairing-session', { method: 'POST' })
+    fetch('/api/mobile/pairing-session', { method: 'POST' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((data: { qr: QrPayload }) => {
         if (cancelled) return
@@ -72,7 +72,7 @@ export function PairDeviceModal({ open, onClose, onPaired }: { open: boolean; on
         setState({ status: 'pending' })
         pollRef.current = setInterval(async () => {
           try {
-            const res = await fetch('/api/hub/mobile/pairing-session')
+            const res = await fetch('/api/mobile/pairing-session')
             if (!res.ok) return
             const s = (await res.json()) as PairState
             setState(s)
@@ -91,7 +91,7 @@ export function PairDeviceModal({ open, onClose, onPaired }: { open: boolean; on
 
   async function approve(): Promise<void> {
     try {
-      const res = await fetch('/api/hub/mobile/pairing-session/approve', { method: 'POST' })
+      const res = await fetch('/api/mobile/pairing-session/approve', { method: 'POST' })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setState({ status: 'approved' })
       stopPolling()
@@ -104,7 +104,7 @@ export function PairDeviceModal({ open, onClose, onPaired }: { open: boolean; on
   }
 
   async function deny(): Promise<void> {
-    await fetch('/api/hub/mobile/pairing-session/deny', { method: 'POST' }).catch(() => {})
+    await fetch('/api/mobile/pairing-session/deny', { method: 'POST' }).catch(() => {})
     close()
   }
 
@@ -145,7 +145,7 @@ export function PairDeviceModal({ open, onClose, onPaired }: { open: boolean; on
               <QRCodeSVG value={deepLink} size={220} />
             </div>
             <p className="text-xs text-muted-foreground text-center">
-              {t('pairDevice.waiting', { host: qr.addrs[0] ?? t('pairDevice.thisHub'), port: qr.port })}
+              {t('pairDevice.waiting', { host: qr.addrs[0] ?? t('pairDevice.thisDesktop'), port: qr.port })}
             </p>
             <button
               type="button"

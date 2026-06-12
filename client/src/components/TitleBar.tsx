@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { Minus, Search, Square, X } from 'lucide-react'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 
 // ─── Detect Tauri environment ─────────────────────────────────────────────────
 
@@ -154,7 +154,7 @@ export function TitleBar() {
 }
 
 function MacTitleBar() {
-  const { projects, activeProjectId } = useHub()
+  const { projects, activeProjectId } = useDesktop()
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? null
 
   return (
@@ -179,7 +179,7 @@ function MacTitleBar() {
 
 function DefaultTitleBar() {
   const { t } = useTranslation('nav')
-  const { projects, activeProjectId } = useHub()
+  const { projects, activeProjectId } = useDesktop()
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? null
   const appWindow = getCurrentWindow()
 

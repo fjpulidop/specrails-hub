@@ -20,7 +20,7 @@ function isCodex(ctx: PluginLifecycleContext): boolean {
 }
 
 /** Project slug used by codex-mcp helpers — derived from the project path's
- *  basename. The hub maintains the canonical slug elsewhere (ProjectRegistry);
+ *  basename. The app maintains the canonical slug elsewhere (ProjectRegistry);
  *  for the install context we don't have the registry, but the basename is a
  *  stable per-project identifier sufficient for CODEX_HOME isolation. */
 function slugFromProjectPath(projectPath: string): string {
@@ -62,7 +62,7 @@ export async function uninstallSerena(ctx: PluginLifecycleContext): Promise<void
   if (isCodex(ctx)) {
     const slug = slugFromProjectPath(ctx.projectPath)
     // Probe first so removing an already-removed server doesn't surface as an
-    // error (e.g. the user uninstalled via terminal then via the hub).
+    // error (e.g. the user uninstalled via terminal then via the app).
     const listing = codexMcpList(slug)
     if (listing.ok && !listing.servers.includes('serena')) {
       ctx.log('serena not present in codex mcp list — nothing to remove')

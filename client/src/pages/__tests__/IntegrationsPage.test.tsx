@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '../../test-utils'
 import IntegrationsPage from '../IntegrationsPage'
 
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({
     activeProjectId: 'proj-1',
     projects: [],
     isLoading: false,

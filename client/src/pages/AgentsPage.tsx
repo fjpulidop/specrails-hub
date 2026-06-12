@@ -6,7 +6,7 @@ import { ProfilesTab } from '../components/agents/ProfilesTab'
 import { AgentsCatalogTab } from '../components/agents/AgentsCatalogTab'
 import { ProfileAnalyticsCard } from '../components/agents/ProfileAnalyticsCard'
 import { useMinimizedChats } from '../context/MinimizedChatsContext'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 
 type Tab = 'profiles' | 'usage' | 'catalog'
 
@@ -16,7 +16,7 @@ interface CoreVersionStatus {
   profileAware: boolean
 }
 
-const TAB_MEMORY_KEY = 'specrails-hub:agents-tab'
+const TAB_MEMORY_KEY = 'specrails-desktop:agents-tab'
 
 function readTabMemory(): Tab {
   try {
@@ -36,7 +36,7 @@ export default function AgentsPage() {
     try { localStorage.setItem(TAB_MEMORY_KEY, next) } catch { /* ignore */ }
   }
   const [coreStatus, setCoreStatus] = useState<CoreVersionStatus | null>(null)
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const { pendingRestores } = useMinimizedChats()
 
   // The ai-edit restore trigger (usePendingRestore) lives inside

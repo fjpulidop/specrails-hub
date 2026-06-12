@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 
 /**
- * In-process mutex keyed by absolute file path. The hub runs as a single
+ * In-process mutex keyed by absolute file path. The app runs as a single
  * Node process so cross-process locking (proper-lockfile, flock) is not
  * required for v1: every install / uninstall path goes through this module.
  *

@@ -101,7 +101,7 @@ describe('TerminalsContext', () => {
   })
 
   it('hydrates project state from localStorage', () => {
-    localStorage.setItem('specrails-hub:terminal-panel:proj-A', JSON.stringify({ visibility: 'restored', userHeight: 420 }))
+    localStorage.setItem('specrails-desktop:terminal-panel:proj-A', JSON.stringify({ visibility: 'restored', userHeight: 420 }))
     const { ctx } = mountProvider('proj-A')
     // trigger ensureProject via action
     act(() => { ctx!.ensureProject('proj-A') })
@@ -123,7 +123,7 @@ describe('TerminalsContext', () => {
     act(() => { captured.ctx!.ensureProject('proj-A') })
     act(() => { captured.ctx!.togglePanel('proj-A') })
     expect(captured.ctx!.getState('proj-A').visibility).toBe('restored')
-    const stored = JSON.parse(localStorage.getItem('specrails-hub:terminal-panel:proj-A')!)
+    const stored = JSON.parse(localStorage.getItem('specrails-desktop:terminal-panel:proj-A')!)
     expect(stored.visibility).toBe('restored')
     act(() => { captured.ctx!.togglePanel('proj-A') })
     expect(captured.ctx!.getState('proj-A').visibility).toBe('hidden')
@@ -134,7 +134,7 @@ describe('TerminalsContext', () => {
     act(() => { captured.ctx!.ensureProject('proj-A') })
     act(() => { captured.ctx!.setUserHeight('proj-A', 500) })
     expect(captured.ctx!.getState('proj-A').userHeight).toBe(500)
-    const stored = JSON.parse(localStorage.getItem('specrails-hub:terminal-panel:proj-A')!)
+    const stored = JSON.parse(localStorage.getItem('specrails-desktop:terminal-panel:proj-A')!)
     expect(stored.userHeight).toBe(500)
   })
 
@@ -172,9 +172,9 @@ describe('TerminalsContext', () => {
     act(() => { captured.ctx!.ensureProject('proj-A') })
     act(() => { captured.ctx!.setVisibility('proj-A', 'restored') })
     expect(captured.ctx!.getState('proj-A').visibility).toBe('restored')
-    expect(localStorage.getItem('specrails-hub:terminal-panel:proj-A')).toBeTruthy()
+    expect(localStorage.getItem('specrails-desktop:terminal-panel:proj-A')).toBeTruthy()
     act(() => { captured.ctx!.disposeProject('proj-A') })
-    expect(localStorage.getItem('specrails-hub:terminal-panel:proj-A')).toBeNull()
+    expect(localStorage.getItem('specrails-desktop:terminal-panel:proj-A')).toBeNull()
   })
 
   it('setActive updates activeId', () => {
@@ -286,7 +286,7 @@ describe('TerminalsContext', () => {
     const captured = mountProvider('proj-A')
     act(() => { captured.ctx!.ensureProject('proj-A') })
     act(() => { captured.ctx!.setVisibility('proj-A', 'maximized') })
-    const stored = JSON.parse(localStorage.getItem('specrails-hub:terminal-panel:proj-A')!)
+    const stored = JSON.parse(localStorage.getItem('specrails-desktop:terminal-panel:proj-A')!)
     expect(stored.visibility).toBe('maximized')
   })
 
@@ -306,7 +306,7 @@ describe('TerminalsContext', () => {
   })
 
   it('hydrates malformed localStorage gracefully', () => {
-    localStorage.setItem('specrails-hub:terminal-panel:proj-bad', '{not json')
+    localStorage.setItem('specrails-desktop:terminal-panel:proj-bad', '{not json')
     const captured = mountProvider('proj-bad')
     act(() => { captured.ctx!.ensureProject('proj-bad') })
     const state = captured.ctx!.getState('proj-bad')

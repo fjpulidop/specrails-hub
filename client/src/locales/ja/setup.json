@@ -41,12 +41,12 @@
       "title": "セットアップに失敗しました",
       "skipSetup": "セットアップをスキップ",
       "prereqMissing": "SpecRails のセットアップには、PATH 上で利用可能な Node.js、npm、npx、Git が必要です。",
-      "prereqRetryHint": "不足しているツールをインストールし、SpecRails Hub を再起動してからセットアップを再試行してください。"
+      "prereqRetryHint": "不足しているツールをインストールし、Specrails を再起動してからセットアップを再試行してください。"
     }
   },
   "addProject": {
     "title": "プロジェクトを追加",
-    "description": "プロジェクトディレクトリを登録してハブから管理します。",
+    "description": "プロジェクトディレクトリを登録して Specrails から管理します。",
     "noProviderDetected": "AI CLI が見つかりません。まず Claude Code または Codex CLI をインストールしてください。",
     "pathLabel": "プロジェクトパス",
     "pathPlaceholder": "/Users/me/my-project",
@@ -89,7 +89,7 @@
     "bundleCorruptedTitle": "アプリバンドルが破損しています",
     "toolsRequired_one": "{{count}} 個の開発者ツールが必要です",
     "toolsRequired_other": "{{count}} 個の開発者ツールが必要です",
-    "reinstallHint": "SpecRails Hub アプリを再インストールしてバンドルツールを復元してください。",
+    "reinstallHint": "Specrails アプリを再インストールしてバンドルツールを復元してください。",
     "installMissingHint": "続行するには不足しているツールをインストールしてください。",
     "moreInfo": "詳細",
     "bundledBadge": "バンドル"
@@ -105,7 +105,7 @@
       "intro": "Winget は Windows 11 および最近の Windows 10 に同梱されています。PowerShell またはターミナルを開いて実行してください:",
       "installNode": "Node.js LTS をインストール",
       "installGit": "Git をインストール",
-      "note": "インストール後、Windows が PATH を更新するように SpecRails Hub を再起動してください。"
+      "note": "インストール後、Windows が PATH を更新するように Specrails を再起動してください。"
     },
     "linux": {
       "intro": "ディストリビューションのパッケージマネージャーを使用してください:",
@@ -128,7 +128,7 @@
     "corrupted": {
       "title": "アプリバンドルが破損しています",
       "description": "バンドルされたツール（Node.js、Git）の一部を検証できませんでした。",
-      "body": "このツールは SpecRails Hub アプリにバンドルされており、個別にインストールできません。このメッセージが表示される場合、アプリバンドルが破損している可能性があります。SpecRails Hub を再インストールしてください。"
+      "body": "このツールは Specrails アプリにバンドルされており、個別にインストールできません。このメッセージが表示される場合、アプリバンドルが破損している可能性があります。Specrails を再インストールしてください。"
     }
   },
   "checkpoints": {
@@ -145,8 +145,8 @@
     "keyboardHint": "Enter で送信、Shift+Enter で改行"
   },
   "welcome": {
-    "title": "<spec>spec</spec><rails>rails</rails> hub へようこそ",
-    "description": "ハブは複数のプロジェクトを単一のインターフェースで管理します。最初のプロジェクトを追加して始めましょう。",
+    "title": "<spec>spec</spec><rails>rails</rails> へようこそ",
+    "description": "Specrails は複数のプロジェクトを単一のインターフェースで管理します。最初のプロジェクトを追加して始めましょう。",
     "addFirstProject": "最初のプロジェクトを追加"
   },
   "onboarding": {
@@ -168,13 +168,13 @@
     },
     "welcome": {
       "nav": "ようこそ",
-      "title": "specrails-hub へようこそ",
+      "title": "Specrails へようこそ",
       "subtitle": "AI エージェントでソフトウェアを出荷するためのローカルコックピット",
-      "intro": "specrails-hub はアイデアを出荷済みのコードに変えます — そのすべてのステップを<b>見て、操り、信頼</b>できます。AI と対話してスペックを下書きし、実行レールにドロップして再生を押すだけ。パイプラインがアーキテクチャ、実装、レビュー、プルリクエストまで処理し、その作業をライブでストリーミングします。",
+      "intro": "Specrails はアイデアを出荷済みのコードに変えます — そのすべてのステップを<b>見て、操り、信頼</b>できます。AI と対話してスペックを下書きし、実行レールにドロップして再生を押すだけ。パイプラインがアーキテクチャ、実装、レビュー、プルリクエストまで処理し、その作業をライブでストリーミングします。",
       "coreLoopLabel": "コアループ",
       "flowCaption": "各スペックは <b>アーキテクト → デベロッパー → レビュアー → Ship</b> を自動で流れます。",
       "localNote": "<b>100% ローカル · シングルユーザー · アカウント不要。</b>すべてあなたのマシン上で動作します。<i>あなた</i>がエージェントを起動しない限り、コードがラップトップの外に出ることはありません。",
-      "tourNote": "このクイックツアーではハブの全機能を紹介します — 所要時間は約1分です。"
+      "tourNote": "このクイックツアーではアプリの全機能を紹介します — 所要時間は約1分です。"
     },
     "authorSpecs": {
       "nav": "スペック作成",
@@ -214,7 +214,7 @@
       "nav": "あなたのエージェント",
       "title": "自分のエージェントを持ち込む",
       "subtitle": "Claude Code と Codex をファーストクラスのエンジンとして",
-      "intro": "ハブは <b>Claude Code</b> と <b>Codex CLI</b> を、単一のコントラクトの背後で交換可能なエンジンとして扱います。プロジェクトには片方または両方をインストールでき、選択はインストール時に行います。",
+      "intro": "アプリは <b>Claude Code</b> と <b>Codex CLI</b> を、単一のコントラクトの背後で交換可能なエンジンとして扱います。プロジェクトには片方または両方をインストールでき、選択はインストール時に行います。",
       "table": {
         "capability": "機能",
         "streamingResume": "ストリーミングとセッション再開",
@@ -227,7 +227,7 @@
         "agentProfiles": "エージェントプロファイル"
       },
       "calloutLabel": "両方インストールされている場合",
-      "calloutBody": "<b>スペックごと、レールごと、ターミナル起動ごと</b>にエンジンを選べます。ハブはプロジェクトごとに最後の選択を記憶します。Codex のコストはローカルのレートカードからの推定で、常に <mono>~</mono> が付きます。"
+      "calloutBody": "<b>スペックごと、レールごと、ターミナル起動ごと</b>にエンジンを選べます。アプリはプロジェクトごとに最後の選択を記憶します。Codex のコストはローカルのレートカードからの推定で、常に <mono>~</mono> が付きます。"
     },
     "cost": {
       "nav": "コスト追跡",
@@ -241,7 +241,7 @@
       "honestLabel": "正直な数字",
       "honestBody": "Claude のコストはプロバイダー請求額そのもの。Codex は推定で <mono>~</mono> が付きます。トークン合計にはキャッシュ階層が含まれるため、数字がきちんと一致します。",
       "budgetsLabel": "予算とアラート",
-      "budgetsBody": "日次予算とジョブ単位のコストアラートを設定でき、上限を超えるとハブが自動でキューを一時停止します。すべて CSV または JSON にエクスポートできます。"
+      "budgetsBody": "日次予算とジョブ単位のコストアラートを設定でき、上限を超えるとアプリが自動でキューを一時停止します。すべて CSV または JSON にエクスポートできます。"
     },
     "workspace": {
       "nav": "ワークスペース",
@@ -258,7 +258,7 @@
       "chatsLabel": "最小化できるチャット",
       "chatsBody": "Explore や AI 編集のセッションをドックのチップに格納して後で再開 — リフレッシュやプロジェクト切り替えで失われることはありません。",
       "desktopLabel": "デスクトップまたはブラウザ",
-      "desktopBody": "ブラウザでハブを実行するか、サーバーとランタイムを同梱した署名済みデスクトップアプリ（macOS と Windows）を入手できます。"
+      "desktopBody": "ブラウザで Specrails を実行するか、サーバーとランタイムを同梱した署名済みデスクトップアプリ（macOS と Windows）を入手できます。"
     },
     "moveFast": {
       "nav": "高速操作",

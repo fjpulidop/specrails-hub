@@ -15,7 +15,7 @@ phases:
     description: "Print a final status report with outcomes and next steps"
 ---
 
-Resume a failed `/specrails:implement` run for **specrails-hub**. Reads pipeline state written by the implement pipeline to identify which phases completed and which failed, then re-executes only the remaining phases.
+Resume a failed `/specrails:implement` run for **specrails-desktop**. Reads pipeline state written by the implement pipeline to identify which phases completed and which failed, then re-executes only the remaining phases.
 
 **MANDATORY: Follow this pipeline exactly. Do NOT skip phases or re-run phases that already succeeded. Read all context from the pipeline state file — do not rely on memory. Do not re-implement anything yourself; delegate to the same agents used by `/specrails:implement`.**
 

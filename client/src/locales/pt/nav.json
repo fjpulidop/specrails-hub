@@ -21,7 +21,7 @@
     "removed": "Projeto removido"
   },
   "arcSidebar": {
-    "hubTitle": "Hub",
+    "desktopTitle": "Desktop",
     "docs": "Docs",
     "analytics": "Análises",
     "settings": "Definições"
@@ -64,8 +64,8 @@
     "costAlertDescription": "Custo do job ${{cost}} — o limite é ${{threshold}}",
     "dailyBudgetTitle": "Orçamento diário excedido",
     "dailyBudgetDescription": "Gastos ${{spent}} de ${{budget}} hoje. Fila em pausa.",
-    "hubBudgetTitle": "Orçamento diário do hub excedido",
-    "hubBudgetDescription": "Gasto total do hub ${{spent}} de ${{budget}}. Fila em pausa.",
+    "desktopBudgetTitle": "Orçamento diário do Desktop excedido",
+    "desktopBudgetDescription": "Gasto total do Desktop ${{spent}} de ${{budget}}. Fila em pausa.",
     "bannerMessage": "Orçamento diário excedido — gastos ${{spent}} de ${{budget}}. A fila está em pausa.",
     "dismiss": "Dispensar"
   },

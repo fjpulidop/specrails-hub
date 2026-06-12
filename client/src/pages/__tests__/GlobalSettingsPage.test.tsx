@@ -12,12 +12,12 @@ vi.mock('sonner', () => ({
   },
 }))
 
-// Controlled useHub mock: track removeProject calls
+// Controlled useDesktop mock: track removeProject calls
 const mockRemoveProject = vi.fn()
 let mockProjects: Array<{ id: string; slug: string; name: string; path: string; db_path: string; added_at: string; last_seen_at: string }> = []
 
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => ({
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => ({
     projects: mockProjects,
     activeProjectId: null,
     isLoading: false,
@@ -30,12 +30,12 @@ vi.mock('../../hooks/useHub', () => ({
   }),
 }))
 
-const hubSettings = {
+const desktopSettings = {
   port: 4200,
   specrailsTechUrl: 'http://localhost:3000',
 }
 
-const budgetResponse = { hubDailyBudgetUsd: null, costToday: 0, budgetUtilizationPct: null }
+const budgetResponse = { desktopDailyBudgetUsd: null, costToday: 0, budgetUtilizationPct: null }
 
 const defaultTerminalSettings = {
   fontFamily: "'DM Mono', monospace",
@@ -49,29 +49,29 @@ const defaultTerminalSettings = {
 }
 
 function defaultFetchMock(url: string) {
-  if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
+  if (typeof url === 'string' && url.includes('/api/webhooks')) {
     return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
   }
-  if (typeof url === 'string' && url.includes('/api/hub/budget')) {
+  if (typeof url === 'string' && url.includes('/api/budget')) {
     return Promise.resolve({ ok: true, json: async () => budgetResponse })
   }
-  if (typeof url === 'string' && url.includes('/api/hub/terminal-settings')) {
+  if (typeof url === 'string' && url.includes('/api/terminal-settings')) {
     return Promise.resolve({ ok: true, json: async () => defaultTerminalSettings })
   }
-  return Promise.resolve({ ok: true, json: async () => hubSettings })
+  return Promise.resolve({ ok: true, json: async () => desktopSettings })
 }
 
-describe('GlobalSettingsPage (Hub Settings dialog)', () => {
+describe('GlobalSettingsPage (Desktop Settings dialog)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockProjects = []
     global.fetch = vi.fn().mockImplementation(defaultFetchMock)
   })
 
-  it('renders Hub Settings title when open', async () => {
+  it('renders Desktop Settings title when open', async () => {
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
-      expect(screen.getByText('Hub Settings')).toBeInTheDocument()
+      expect(screen.getByText('Desktop Settings')).toBeInTheDocument()
     })
   })
 
@@ -229,7 +229,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     const { toast } = await import('sonner')
 
     global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
+      .mockResolvedValueOnce({ ok: true, json: async () => desktopSettings })          // GET settings
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
       .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })       // GET budget
       .mockResolvedValue({ ok: true, json: async () => defaultTerminalSettings }) // catch-all (terminal-settings + PUT settings)
@@ -252,7 +252,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     const { toast } = await import('sonner')
 
     global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
+      .mockResolvedValueOnce({ ok: true, json: async () => desktopSettings })          // GET settings
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
       .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })       // GET budget
       .mockResolvedValueOnce({ ok: false })                                         // PUT fails
@@ -270,18 +270,18 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     })
   })
 
-  it('renders Hub Information section with port', async () => {
+  it('renders Desktop Information section with port', async () => {
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
-      expect(screen.getByText('Hub Information')).toBeInTheDocument()
+      expect(screen.getByText('Desktop Information')).toBeInTheDocument()
       expect(screen.getByText('4200')).toBeInTheDocument()
     })
   })
 
-  it('renders hub.sqlite path in Hub Information', async () => {
+  it('renders desktop.sqlite path in Desktop Information', async () => {
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
-      expect(screen.getByText('~/.specrails/hub.sqlite')).toBeInTheDocument()
+      expect(screen.getByText('~/.specrails/desktop.sqlite')).toBeInTheDocument()
     })
   })
 
@@ -294,7 +294,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     mockProjects = []
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
-      // Hub Information > Projects count
+      // Desktop Information > Projects count
       expect(screen.getByText('Projects')).toBeInTheDocument()
     })
   })
@@ -305,7 +305,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     // Should not throw — isLoading goes false, settings stay null
     await waitFor(() => {
       // After error, isLoading becomes false
-      expect(screen.queryByText('Hub Settings')).toBeInTheDocument()
+      expect(screen.queryByText('Desktop Settings')).toBeInTheDocument()
     })
   })
 
@@ -333,7 +333,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
     global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
+      .mockResolvedValueOnce({ ok: true, json: async () => desktopSettings })          // GET settings
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
       .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })       // GET budget
       .mockResolvedValue({ ok: true, json: async () => defaultTerminalSettings })  // catch-all
@@ -353,7 +353,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
     global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => hubSettings })          // GET settings
+      .mockResolvedValueOnce({ ok: true, json: async () => desktopSettings })          // GET settings
       .mockResolvedValueOnce({ ok: true, json: async () => ({ webhooks: [] }) })   // GET webhooks
       .mockResolvedValueOnce({ ok: true, json: async () => budgetResponse })       // GET budget
       .mockResolvedValue({ ok: true, json: async () => defaultTerminalSettings })  // catch-all
@@ -383,27 +383,27 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     })
   })
 
-  it('renders hub daily budget input', async () => {
+  it('renders desktop daily budget input', async () => {
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/e\.g\. 10\.00/i)).toBeInTheDocument()
     })
   })
 
-  it('saves hub daily budget successfully', async () => {
+  it('saves desktop daily budget successfully', async () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
     global.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
-      if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
+      if (typeof url === 'string' && url.includes('/api/webhooks')) {
         return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
       }
-      if (typeof url === 'string' && url.includes('/api/hub/budget')) {
+      if (typeof url === 'string' && url.includes('/api/budget')) {
         if (opts?.method === 'PATCH') {
           return Promise.resolve({ ok: true })
         }
         return Promise.resolve({ ok: true, json: async () => budgetResponse })
       }
-      return Promise.resolve({ ok: true, json: async () => hubSettings })
+      return Promise.resolve({ ok: true, json: async () => desktopSettings })
     })
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
@@ -411,32 +411,32 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
     })
     const input = screen.getByPlaceholderText(/e\.g\. 10\.00/i) as HTMLInputElement
     await user.type(input, '10')
-    // Find the Save buttons — hub budget save comes before cost alert save
+    // Find the Save buttons — desktop budget save comes before cost alert save
     // Filter out the (disabled) Terminal Panel Save button from the new
     // section so positional indexing matches the original test layout.
     const saveButtons = screen.getAllByRole('button', { name: /^save$/i })
       .filter((b) => !(b as HTMLButtonElement).disabled)
-    // Click the hub budget Save (second save after specrails-tech URL)
+    // Click the desktop budget Save (second save after specrails-tech URL)
     await user.click(saveButtons[saveButtons.length - 2])
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('Hub daily budget set to $10')
+      expect(toast.success).toHaveBeenCalledWith('Desktop daily budget set to $10')
     })
   })
 
-  it('removes hub daily budget when input is blank', async () => {
+  it('removes desktop daily budget when input is blank', async () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
     global.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
-      if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
+      if (typeof url === 'string' && url.includes('/api/webhooks')) {
         return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
       }
-      if (typeof url === 'string' && url.includes('/api/hub/budget')) {
+      if (typeof url === 'string' && url.includes('/api/budget')) {
         if (opts?.method === 'PATCH') {
           return Promise.resolve({ ok: true })
         }
-        return Promise.resolve({ ok: true, json: async () => ({ hubDailyBudgetUsd: 10 }) })
+        return Promise.resolve({ ok: true, json: async () => ({ desktopDailyBudgetUsd: 10 }) })
       }
-      return Promise.resolve({ ok: true, json: async () => hubSettings })
+      return Promise.resolve({ ok: true, json: async () => desktopSettings })
     })
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
@@ -448,7 +448,7 @@ describe('GlobalSettingsPage (Hub Settings dialog)', () => {
       .filter((b) => !(b as HTMLButtonElement).disabled)
     await user.click(saveButtons[saveButtons.length - 2])
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('Hub daily budget removed')
+      expect(toast.success).toHaveBeenCalledWith('Desktop daily budget removed')
     })
   })
 })
@@ -467,13 +467,13 @@ const mockWebhook = {
 
 function makeFetchWithWebhooks(webhooks: typeof mockWebhook[]) {
   return vi.fn().mockImplementation((url: string) => {
-    if (typeof url === 'string' && url === '/api/hub/webhooks') {
+    if (typeof url === 'string' && url === '/api/webhooks') {
       return Promise.resolve({ ok: true, json: async () => ({ webhooks }) })
     }
-    if (typeof url === 'string' && url.includes('/api/hub/budget')) {
+    if (typeof url === 'string' && url.includes('/api/budget')) {
       return Promise.resolve({ ok: true, json: async () => budgetResponse })
     }
-    return Promise.resolve({ ok: true, json: async () => hubSettings })
+    return Promise.resolve({ ok: true, json: async () => desktopSettings })
   })
 }
 
@@ -515,20 +515,20 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
     // misaligns and the POST response lands on the wrong call.
     let posted = false
     global.fetch = vi.fn().mockImplementation((url: string, opts?: { method?: string }) => {
-      if (typeof url === 'string' && url === '/api/hub/webhooks') {
+      if (typeof url === 'string' && url === '/api/webhooks') {
         if (opts?.method === 'POST') {
           posted = true
           return Promise.resolve({ ok: true, json: async () => ({ webhook: mockWebhook }) })
         }
         return Promise.resolve({ ok: true, json: async () => ({ webhooks: posted ? [mockWebhook] : [] }) })
       }
-      if (typeof url === 'string' && url.includes('/api/hub/budget')) {
+      if (typeof url === 'string' && url.includes('/api/budget')) {
         return Promise.resolve({ ok: true, json: async () => budgetResponse })
       }
-      if (typeof url === 'string' && url.includes('/api/hub/terminal-settings')) {
+      if (typeof url === 'string' && url.includes('/api/terminal-settings')) {
         return Promise.resolve({ ok: true, json: async () => defaultTerminalSettings })
       }
-      return Promise.resolve({ ok: true, json: async () => hubSettings })
+      return Promise.resolve({ ok: true, json: async () => desktopSettings })
     })
 
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
@@ -546,19 +546,19 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
     global.fetch = vi.fn().mockImplementation((url: string, opts?: { method?: string }) => {
-      if (typeof url === 'string' && url === '/api/hub/webhooks') {
+      if (typeof url === 'string' && url === '/api/webhooks') {
         if (opts?.method === 'POST') {
           return Promise.resolve({ ok: false, json: async () => ({ error: 'Invalid URL' }) })
         }
         return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
       }
-      if (typeof url === 'string' && url.includes('/api/hub/budget')) {
+      if (typeof url === 'string' && url.includes('/api/budget')) {
         return Promise.resolve({ ok: true, json: async () => budgetResponse })
       }
-      if (typeof url === 'string' && url.includes('/api/hub/terminal-settings')) {
+      if (typeof url === 'string' && url.includes('/api/terminal-settings')) {
         return Promise.resolve({ ok: true, json: async () => defaultTerminalSettings })
       }
-      return Promise.resolve({ ok: true, json: async () => hubSettings })
+      return Promise.resolve({ ok: true, json: async () => desktopSettings })
     })
 
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
@@ -583,13 +583,13 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
   it('toggles a webhook on/off', async () => {
     const user = userEvent.setup()
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url === '/api/hub/webhooks') {
+      if (url === '/api/webhooks') {
         return Promise.resolve({ ok: true, json: async () => ({ webhooks: [mockWebhook] }) })
       }
-      if (url === '/api/hub/budget') {
+      if (url === '/api/budget') {
         return Promise.resolve({ ok: true, json: async () => budgetResponse })
       }
-      return Promise.resolve({ ok: true, json: async () => hubSettings })
+      return Promise.resolve({ ok: true, json: async () => desktopSettings })
     })
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
@@ -598,7 +598,7 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
     await user.click(screen.getByTitle('Disable'))
     // Patch call should have been made
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/hub/webhooks/wh-1'),
+      expect.stringContaining('/api/webhooks/wh-1'),
       expect.objectContaining({ method: 'PATCH' })
     )
   })
@@ -607,13 +607,13 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url === '/api/hub/webhooks') {
+      if (url === '/api/webhooks') {
         return Promise.resolve({ ok: true, json: async () => ({ webhooks: [mockWebhook] }) })
       }
-      if (url === '/api/hub/budget') {
+      if (url === '/api/budget') {
         return Promise.resolve({ ok: true, json: async () => budgetResponse })
       }
-      return Promise.resolve({ ok: true, json: async () => hubSettings })
+      return Promise.resolve({ ok: true, json: async () => desktopSettings })
     })
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
@@ -629,13 +629,13 @@ describe('GlobalSettingsPage — Outbound Webhooks', () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url === '/api/hub/webhooks') {
+      if (url === '/api/webhooks') {
         return Promise.resolve({ ok: true, json: async () => ({ webhooks: [mockWebhook] }) })
       }
-      if (url === '/api/hub/budget') {
+      if (url === '/api/budget') {
         return Promise.resolve({ ok: true, json: async () => budgetResponse })
       }
-      return Promise.resolve({ ok: true, json: async () => hubSettings })
+      return Promise.resolve({ ok: true, json: async () => desktopSettings })
     })
     render(<GlobalSettingsPage open={true} onClose={vi.fn()} />)
     await waitFor(() => {
@@ -669,10 +669,10 @@ describe('GlobalSettingsPage — OS Notifications', () => {
     localStorage.clear()
     mockProjects = []
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (typeof url === 'string' && url.includes('/api/hub/webhooks')) {
+      if (typeof url === 'string' && url.includes('/api/webhooks')) {
         return Promise.resolve({ ok: true, json: async () => ({ webhooks: [] }) })
       }
-      return Promise.resolve({ ok: true, json: async () => hubSettings })
+      return Promise.resolve({ ok: true, json: async () => desktopSettings })
     })
   })
 

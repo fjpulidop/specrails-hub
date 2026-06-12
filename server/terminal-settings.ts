@@ -201,39 +201,39 @@ export function validatePartial(patch: Record<string, unknown>): PartialTerminal
   return out
 }
 
-// ─── Hub-level access (hub.sqlite, table: hub_settings) ───────────────────────
+// ─── App-level access (desktop.sqlite, table: desktop_settings) ───────────────────────
 
-const HUB_KEY_PREFIX = 'terminal.'
+const DESKTOP_KEY_PREFIX = 'terminal.'
 
-function hubKey(field: keyof TerminalSettings): string {
-  return `${HUB_KEY_PREFIX}${field}`
+function desktopKey(field: keyof TerminalSettings): string {
+  return `${DESKTOP_KEY_PREFIX}${field}`
 }
 
-export function getHubTerminalSettings(hubDb: DbInstance): TerminalSettings {
-  const rows = hubDb
-    .prepare('SELECT key, value FROM hub_settings WHERE key LIKE ?')
-    .all(`${HUB_KEY_PREFIX}%`) as Array<{ key: string; value: string }>
+export function getDesktopTerminalSettings(desktopDb: DbInstance): TerminalSettings {
+  const rows = desktopDb
+    .prepare('SELECT key, value FROM desktop_settings WHERE key LIKE ?')
+    .all(`${DESKTOP_KEY_PREFIX}%`) as Array<{ key: string; value: string }>
   const map = new Map(rows.map((r) => [r.key, r.value]))
   const out: Partial<TerminalSettings> = {}
   for (const field of TERMINAL_SETTINGS_KEYS) {
-    const raw = map.get(hubKey(field))
+    const raw = map.get(desktopKey(field))
     out[field] = (raw !== undefined ? decode(field, raw) : TERMINAL_DEFAULTS[field]) as never
   }
   return out as TerminalSettings
 }
 
-export function patchHubTerminalSettings(hubDb: DbInstance, patch: Record<string, unknown>): TerminalSettings {
+export function patchDesktopTerminalSettings(desktopDb: DbInstance, patch: Record<string, unknown>): TerminalSettings {
   const valid = validatePartial(patch)
-  const upsert = hubDb.prepare('INSERT OR REPLACE INTO hub_settings (key, value) VALUES (?, ?)')
-  const tx = hubDb.transaction((entries: Array<[string, string]>) => {
+  const upsert = desktopDb.prepare('INSERT OR REPLACE INTO desktop_settings (key, value) VALUES (?, ?)')
+  const tx = desktopDb.transaction((entries: Array<[string, string]>) => {
     for (const [k, v] of entries) upsert.run(k, v)
   })
   const entries: Array<[string, string]> = []
   for (const field of Object.keys(valid) as Array<keyof TerminalSettings>) {
-    entries.push([hubKey(field), encode(field, valid[field])])
+    entries.push([desktopKey(field), encode(field, valid[field])])
   }
   if (entries.length > 0) tx(entries)
-  return getHubTerminalSettings(hubDb)
+  return getDesktopTerminalSettings(desktopDb)
 }
 
 // ─── Per-project override (jobs.sqlite, table: terminal_settings_override) ────
@@ -241,10 +241,10 @@ export function patchHubTerminalSettings(hubDb: DbInstance, patch: Record<string
 export function getProjectOverride(projectDb: DbInstance): PartialTerminalSettings {
   const rows = projectDb
     .prepare('SELECT key, value FROM terminal_settings_override WHERE key LIKE ?')
-    .all(`${HUB_KEY_PREFIX}%`) as Array<{ key: string; value: string }>
+    .all(`${DESKTOP_KEY_PREFIX}%`) as Array<{ key: string; value: string }>
   const out: PartialTerminalSettings = {}
   for (const r of rows) {
-    const field = r.key.slice(HUB_KEY_PREFIX.length) as keyof TerminalSettings
+    const field = r.key.slice(DESKTOP_KEY_PREFIX.length) as keyof TerminalSettings
     if (!(TERMINAL_SETTINGS_KEYS as readonly string[]).includes(field)) continue
     ;(out as Record<string, unknown>)[field] = decode(field, r.value)
   }
@@ -265,11 +265,11 @@ export function patchProjectOverride(
     const field = key as keyof TerminalSettings
     const value = patch[key]
     if (value === null) {
-      deleteKeys.push(hubKey(field))
+      deleteKeys.push(desktopKey(field))
       continue
     }
     validateField(field, value as TerminalSettings[typeof field])
-    setEntries.push([hubKey(field), encode(field, value)])
+    setEntries.push([desktopKey(field), encode(field, value)])
   }
   const upsert = projectDb.prepare('INSERT OR REPLACE INTO terminal_settings_override (key, value) VALUES (?, ?)')
   const del = projectDb.prepare('DELETE FROM terminal_settings_override WHERE key = ?')
@@ -281,16 +281,16 @@ export function patchProjectOverride(
   return getProjectOverride(projectDb)
 }
 
-// ─── Resolution: project override → hub default → built-in ────────────────────
+// ─── Resolution: project override → app default → built-in ────────────────────
 
 export function resolveTerminalSettings(
-  hubDb: DbInstance,
+  desktopDb: DbInstance,
   projectDb: DbInstance | null,
 ): TerminalSettings {
-  const hub = getHubTerminalSettings(hubDb)
-  if (!projectDb) return hub
+  const desktop = getDesktopTerminalSettings(desktopDb)
+  if (!projectDb) return desktop
   const override = getProjectOverride(projectDb)
-  const out = { ...hub }
+  const out = { ...desktop }
   for (const field of Object.keys(override) as Array<keyof TerminalSettings>) {
     const v = override[field]
     if (v !== undefined) (out as Record<string, unknown>)[field] = v

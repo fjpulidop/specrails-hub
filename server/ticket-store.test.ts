@@ -8,7 +8,7 @@ import request from 'supertest'
 import { createProjectRouter } from './project-router'
 import { readStore } from './ticket-store'
 import { initDb } from './db'
-import { initHubDb } from './hub-db'
+import { initDesktopDb } from './desktop-db'
 import type { ProjectRegistry, ProjectContext } from './project-registry'
 import type { DbInstance } from './db'
 import { vi } from 'vitest'
@@ -77,15 +77,15 @@ function makeContext(db: DbInstance, projectPath: string): ProjectContext {
     setupManager: makeSetupManager() as any,
     proposalManager: makeProposalManager() as any,
     specLauncherManager: makeSpecLauncherManager() as any,
-    ticketWatcher: { notifyHubWrite: vi.fn(), start: vi.fn(), close: vi.fn() } as any,
+    ticketWatcher: { notifyDesktopWrite: vi.fn(), start: vi.fn(), close: vi.fn() } as any,
     broadcast: vi.fn(),
   } as any
 }
 
 function makeRegistry(contexts: Map<string, ProjectContext>): ProjectRegistry {
-  const hubDb = initHubDb(':memory:')
+  const desktopDb = initDesktopDb(':memory:')
   return {
-    hubDb,
+    desktopDb,
     getContext: vi.fn((id: string) => contexts.get(id)),
     getContextByPath: vi.fn(() => undefined),
     addProject: vi.fn() as any,
@@ -112,7 +112,7 @@ describe('ticket endpoints', () => {
 
   beforeEach(() => {
     db = initDb(':memory:')
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-hub-ticket-test-'))
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'specrails-desktop-ticket-test-'))
   })
 
   afterEach(() => {
@@ -295,7 +295,7 @@ describe('ticket endpoints', () => {
       expect(res.body.ticket.title).toBe('New ticket')
       expect(res.body.ticket.status).toBe('todo')
       expect(res.body.ticket.priority).toBe('medium')
-      expect(res.body.ticket.source).toBe('hub')
+      expect(res.body.ticket.source).toBe('hub') // legacy on-disk wire value
       expect(res.body.revision).toBe(1)
     })
 

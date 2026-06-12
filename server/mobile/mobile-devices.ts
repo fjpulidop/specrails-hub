@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'crypto'
 import type { DbInstance } from '../db'
 import type { MobileDeviceRow, MobileDevicePublic, MobilePlatform } from './mobile-types'
 
-// CRUD over hub.sqlite `mobile_devices` (table created by hub migration 12).
+// CRUD over desktop.sqlite `mobile_devices` (table created by desktop-db migration 12).
 // Tokens are stored ONLY as sha256 hashes; the plaintext token is shown to the
 // phone exactly once at approval and never persisted.
 

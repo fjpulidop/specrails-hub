@@ -115,7 +115,7 @@ The Quick mode chip's hint SHALL display `~15s` by default and `~45s` whenever `
 - **AND** toggling `Full codebase` OFF reverts the hint to `~15s`
 
 ### Requirement: Server context-budget endpoint
-The hub SHALL expose `GET /api/projects/:projectId/context-budget` returning a JSON body `{ specrailsSpecsTokens: number, openspecSpecsTokens: number, codebaseFileCount: number, codebaseEstimatedTokens: number, mcpServers: string[] }`. Each token field SHALL be a rough estimate (sum of file bytes divided by 4 for ASCII heuristic). The response SHALL be cacheable for 60 seconds per project.
+The app SHALL expose `GET /api/projects/:projectId/context-budget` returning a JSON body `{ specrailsSpecsTokens: number, openspecSpecsTokens: number, codebaseFileCount: number, codebaseEstimatedTokens: number, mcpServers: string[] }`. Each token field SHALL be a rough estimate (sum of file bytes divided by 4 for ASCII heuristic). The response SHALL be cacheable for 60 seconds per project.
 
 #### Scenario: Budget for a fresh project with no specs
 - **WHEN** the project has no `.specrails/specs/` and no `openspec/specs/` directories

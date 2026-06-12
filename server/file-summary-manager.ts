@@ -64,11 +64,11 @@ export interface FileSummaryDeps {
   db: DbInstance
   broadcast: (msg: WsMessage) => void
   /** Generate a summary. The optional AbortSignal lets the manager tear down an
-   *  in-flight provider child when the project is removed / the hub shuts down. */
+   *  in-flight provider child when the project is removed / the app shuts down. */
   generate: (input: GenerateInput, signal?: AbortSignal) => Promise<GenerateOutput>
   monthToDateSpend: (projectId: string) => number
   monthlyBudgetUsd: () => number
-  /** Hub-wide summary language. Defaults to 'en' when omitted. */
+  /** App-wide summary language. Defaults to 'en' when omitted. */
   language?: () => SummaryLanguage
   /** Provider id for the project ('claude' | 'codex' | …). Used to attribute the
    *  failure-path ai_invocations row correctly. Defaults to 'claude'. */
@@ -78,7 +78,7 @@ export interface FileSummaryDeps {
 
 export interface FileSummaryOpts {
   perProjectConcurrency?: number
-  hubConcurrency?: number
+  desktopConcurrency?: number
   perJobCap?: number
   queueTtlMs?: number
   /** Upper bound on distinct jobId counters retained (defensive anti-leak). */
@@ -99,7 +99,7 @@ const SUMMARIES_REL = path.join('.specrails', 'file-summaries')
 // so existing summaries are treated as stale and regenerated on next request.
 const CURRENT_PROMPT_VERSION = 1
 // Defensive bound on the per-job counter map so it cannot grow without limit
-// across a long-lived hub session (the per-job cap is best-effort).
+// across a long-lived app session (the per-job cap is best-effort).
 const MAX_JOB_COUNTERS = 2000
 const TOKEN_CHARS_PER_TOKEN = 4
 const TOKEN_LIMIT = 8000
@@ -155,7 +155,7 @@ export function writeSummary(
   fs.writeFileSync(tmp, JSON.stringify(payload), { encoding: 'utf8', mode: 0o600 })
   fs.renameSync(tmp, final)
   if (firstWrite) {
-    // The hub appends `.specrails/file-summaries/` to the project `.gitignore`
+    // The app appends `.specrails/file-summaries/` to the project `.gitignore`
     // on first write. Idempotent: only appends when the line is absent.
     try { ensureGitignoreLine(projectPath, '.specrails/file-summaries/') } catch { /* non-fatal */ }
   }
@@ -228,34 +228,34 @@ interface WatcherState {
   watcher: FSWatcher
 }
 
-// Hub-wide concurrency is shared across EVERY FileSummaryManager instance.
+// App-wide concurrency is shared across EVERY FileSummaryManager instance.
 // Production constructs one manager per project (each with its own db/broadcast/
 // generate), so a per-instance counter would only ever cap per-project. This
-// module-level state makes the documented "hub-wide 8" ceiling real: all live
+// module-level state makes the documented "app-wide 8" ceiling real: all live
 // managers share one in-flight count, and freeing a slot re-pumps every live
 // manager so a blocked project's queue advances.
-const HUB = {
+const DESKTOP = {
   inFlight: 0,
   managers: new Set<FileSummaryManager>(),
 }
 
-/** Test-only: reset the shared hub-wide counter/registry between unit tests so
+/** Test-only: reset the shared app-wide counter/registry between unit tests so
  *  module-level state never leaks across cases. */
-export function __resetHubSummaryStateForTests(): void {
-  HUB.inFlight = 0
-  HUB.managers.clear()
+export function __resetDesktopSummaryStateForTests(): void {
+  DESKTOP.inFlight = 0
+  DESKTOP.managers.clear()
 }
 
 export class FileSummaryManager {
   private readonly deps: FileSummaryDeps
   private readonly perProjectConcurrency: number
-  private readonly hubConcurrency: number
+  private readonly desktopConcurrency: number
   private readonly perJobCap: number
   private readonly queueTtlMs: number
   private readonly maxJobCounters: number
 
-  // Per-project queue, per-project in-flight count. Hub-wide in-flight lives in
-  // the module-level HUB so it is shared across all per-project instances.
+  // Per-project queue, per-project in-flight count. App-wide in-flight lives in
+  // the module-level DESKTOP so it is shared across all per-project instances.
   private readonly queues = new Map<string, QueueEntry[]>()
   private readonly inFlightPerProject = new Map<string, number>()
   private readonly jobCounter = new Map<string, number>()
@@ -280,11 +280,11 @@ export class FileSummaryManager {
   constructor(deps: FileSummaryDeps, opts: FileSummaryOpts = {}) {
     this.deps = deps
     this.perProjectConcurrency = opts.perProjectConcurrency ?? 2
-    this.hubConcurrency = opts.hubConcurrency ?? 8
+    this.desktopConcurrency = opts.desktopConcurrency ?? 8
     this.perJobCap = opts.perJobCap ?? 50
     this.queueTtlMs = opts.queueTtlMs ?? 5 * 60 * 1000
     this.maxJobCounters = opts.maxJobCounters ?? MAX_JOB_COUNTERS
-    HUB.managers.add(this)
+    DESKTOP.managers.add(this)
   }
 
   // NOT async: returning the in-flight promise verbatim is what makes the dedupe
@@ -324,7 +324,7 @@ export class FileSummaryManager {
 
     // Step 2: hash gate. Skip regeneration only when content, language AND prompt
     // version all match — and never when the caller forced it. Without the
-    // language check a hub language switch (en↔es) would never refresh existing
+    // language check an app language switch (en↔es) would never refresh existing
     // summaries; without `force` an explicit "Regenerate" of an unchanged file
     // would be a silent no-op.
     const currentLang: SummaryLanguage = this.deps.language?.() ?? 'en'
@@ -387,7 +387,7 @@ export class FileSummaryManager {
     if (this._disposed) return
     const queue = this.queues.get(projectId) ?? []
     while (queue.length > 0) {
-      if (HUB.inFlight >= this.hubConcurrency) break
+      if (DESKTOP.inFlight >= this.desktopConcurrency) break
       const perProject = this.inFlightPerProject.get(projectId) ?? 0
       if (perProject >= this.perProjectConcurrency) break
       const entry = queue.shift()!
@@ -428,7 +428,7 @@ export class FileSummaryManager {
         this.jobCounter.set(entry.req.jobId, count + 1)
       }
       this.inFlightPerProject.set(projectId, perProject + 1)
-      HUB.inFlight += 1
+      DESKTOP.inFlight += 1
       const p = this.runOne(entry)
         .catch((err) => entry.reject(err))
         .finally(() => {
@@ -436,11 +436,11 @@ export class FileSummaryManager {
             projectId,
             (this.inFlightPerProject.get(projectId) ?? 1) - 1,
           )
-          HUB.inFlight -= 1
+          DESKTOP.inFlight -= 1
           this.pending.delete(p)
           this.pump(projectId)
-          // A freed hub-wide slot may unblock OTHER projects' managers.
-          for (const m of HUB.managers) if (m !== this) m._drainAll()
+          // A freed app-wide slot may unblock OTHER projects' managers.
+          for (const m of DESKTOP.managers) if (m !== this) m._drainAll()
         })
       this.pending.add(p)
     }
@@ -448,7 +448,7 @@ export class FileSummaryManager {
     else this.queues.set(projectId, queue)
   }
 
-  /** Pump every project queue this manager owns (used when a hub-wide slot frees
+  /** Pump every project queue this manager owns (used when an app-wide slot frees
    *  up in a different manager). */
   private _drainAll(): void {
     for (const pid of [...this.queues.keys()]) this.pump(pid)
@@ -662,13 +662,13 @@ export class FileSummaryManager {
 
   /** Full teardown for a single manager: stop accepting work, abort any in-flight
    *  provider child (so it is not orphaned past project removal), reject queued
-   *  entries, close watchers, and leave the shared hub registry. Call from
+   *  entries, close watchers, and leave the shared app-wide registry. Call from
    *  ProjectRegistry.removeProject (before db.close) and from shutdown(). After
    *  this, runOne's `_disposed` guard skips all DB/disk writes. Idempotent. */
   dispose(): void {
     if (this._disposed) return
     this._disposed = true
-    HUB.managers.delete(this)
+    DESKTOP.managers.delete(this)
     // Abort in-flight generations → generator treeKills the provider child.
     for (const c of this.activeControllers) {
       try { c.abort() } catch { /* best effort */ }

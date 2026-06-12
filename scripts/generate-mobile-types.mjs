@@ -28,10 +28,11 @@ const schema = {
   definitions: {
     QrPayload: {
       type: 'object',
+      // The 'hub' field name is frozen — mobile-app v1 wire compat — do not rename
       required: ['v', 'hub', 'name', 'addrs', 'port', 'fp', 'secret', 'claimId', 'exp'],
       properties: {
         v: { type: 'integer' },
-        hub: { type: 'string' },
+        hub: { type: 'string' }, // mobile-app v1 wire compat — do not rename
         name: { type: 'string' },
         addrs: { type: 'array', items: { type: 'string' } },
         port: { type: 'integer' },

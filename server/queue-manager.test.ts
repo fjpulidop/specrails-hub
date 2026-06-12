@@ -958,7 +958,7 @@ describe('QueueManager', () => {
       expect(row.model).toBe('claude-sonnet-4-5')
     })
 
-    it('emits cost_alert when job cost exceeds hub threshold', async () => {
+    it('emits cost_alert when job cost exceeds app threshold', async () => {
       vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
@@ -1006,15 +1006,15 @@ describe('QueueManager', () => {
       expect(budgetCalls.length).toBeGreaterThan(0)
     })
 
-    it('pauses queue when hub daily budget is exceeded', async () => {
+    it('pauses queue when app daily budget is exceeded', async () => {
       vi.mocked(mockExecSync).mockReturnValue(Buffer.from('/usr/bin/claude'))
       const child = createMockChildProcess()
       vi.mocked(mockSpawn).mockReturnValue(child as any)
-      vi.mocked(mockUuidV4).mockReturnValue('hub-budget-job' as any)
+      vi.mocked(mockUuidV4).mockReturnValue('desktop-budget-job' as any)
 
       const db = initDb(':memory:')
-      const getHubDailyBudget = vi.fn(() => ({ budget: 0.01, totalSpend: 0.05 }))
-      const qmWithDb = new QueueManager(broadcast, db, [], undefined, { getHubDailyBudget })
+      const getDesktopDailyBudget = vi.fn(() => ({ budget: 0.01, totalSpend: 0.05 }))
+      const qmWithDb = new QueueManager(broadcast, db, [], undefined, { getDesktopDailyBudget })
       qmWithDb.enqueue('/implement')
 
       const resultEvent = JSON.stringify({ type: 'result', total_cost_usd: 0.05, usage: {} })
@@ -1024,10 +1024,10 @@ describe('QueueManager', () => {
       await new Promise((r) => setTimeout(r, 50))
 
       expect(qmWithDb.isPaused()).toBe(true)
-      const hubBudgetCalls = broadcast.mock.calls.filter(
-        (args: unknown[]) => (args[0] as WsMessage).type === 'hub_daily_budget_exceeded'
+      const desktopBudgetCalls = broadcast.mock.calls.filter(
+        (args: unknown[]) => (args[0] as WsMessage).type === 'desktop_daily_budget_exceeded'
       )
-      expect(hubBudgetCalls.length).toBeGreaterThan(0)
+      expect(desktopBudgetCalls.length).toBeGreaterThan(0)
     })
 
     it('emits cost_alert for per-project cost threshold', async () => {
@@ -2002,7 +2002,7 @@ describe('QueueManager', () => {
       // Close the DB out from under the manager, then deliver the late 'close'
       // the dying child eventually emits. Pre-fix this threw "database
       // connection is not open" inside the EventEmitter listener and crashed
-      // the hub; the _disposed guard must make it a silent no-op.
+      // the app; the _disposed guard must make it a silent no-op.
       db.close()
       expect(() => child.emit('close', 0)).not.toThrow()
     })

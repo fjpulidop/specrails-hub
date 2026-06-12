@@ -53,7 +53,7 @@ export function BottomPanel({ projectId, provider = 'claude', providers, state, 
     } catch { /* ignore — keep current settings */ }
   }, [projectId])
 
-  // Resolve terminal settings (project override → hub default) for this project,
+  // Resolve terminal settings (project override → desktop default) for this project,
   // so the shortcut buttons use the configured values.
   useEffect(() => {
     let cancelled = false

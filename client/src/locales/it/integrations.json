@@ -5,7 +5,7 @@
     "selectProject": "Seleziona un progetto per gestire le integrazioni.",
     "deprecated": "Deprecato",
     "loadError": "Impossibile caricare i plugin.",
-    "empty": "Nessun plugin incluso in questa build dell'hub."
+    "empty": "Nessun plugin incluso in questa build."
   },
   "card": {
     "statusActive": "Attivo",
@@ -53,7 +53,7 @@
   },
   "docs": {
     "title": "Documentazione",
-    "dialogDescription": "Sfoglia la documentazione di specrails-hub inclusa. Usa la barra laterale per passare da una guida all'altra.",
+    "dialogDescription": "Sfoglia la documentazione di Specrails inclusa. Usa la barra laterale per passare da una guida all'altra.",
     "sidebarEmpty": "Ancora nessun documento",
     "indexEmpty": "Nessun documento disponibile. La documentazione inclusa si trova in docs/ nel repo — aggiungi file Markdown lì o in ~/.specrails/docs/ per estenderla.",
     "categoryEmpty": "Ancora nessun documento in questa categoria.",

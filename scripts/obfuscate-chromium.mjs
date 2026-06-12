@@ -26,7 +26,7 @@ import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 
 // Keep in sync with OBFUSCATION_KEY in server/chromium-resolver.ts.
-const KEY = Buffer.from('specrails-hub-chromium-pack-v1', 'utf8')
+const KEY = Buffer.from('specrails-desktop-chromium-pack-v1', 'utf8')
 
 function xorTransform() {
   let offset = 0

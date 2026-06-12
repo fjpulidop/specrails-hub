@@ -72,7 +72,7 @@ export interface CaptureResult {
   dom: CapturedDom
   /** Inline preview of the screenshot so the client can render a thumbnail
    *  without a second authenticated request (an <img src> to the attachment GET
-   *  endpoint would omit the X-Hub-Token header and 401). */
+   *  endpoint would omit the X-Desktop-Token header and 401). */
   screenshotDataUrl: string
   /** Present only for a multi-breakpoint capture: the same element shot at each
    *  viewport. `screenshot`/`dom` above point at the first (canonical) entry. */

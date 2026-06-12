@@ -1,39 +1,40 @@
-# Using SpecRails Hub with the Codex CLI
+# Using Specrails with the Codex CLI
 
-SpecRails Hub supports **two AI providers**: Anthropic's
+Specrails supports **two AI providers**: Anthropic's
 [Claude Code](https://claude.com/claude-code) and OpenAI's
 [Codex CLI](https://developers.openai.com/codex). You pick one or
-both when you add a project; the rest of the hub behaves identically
+both when you add a project; the rest of the app behaves identically
 across them. (See [Running both providers in one
 project](#running-both-providers-in-one-project) below.)
 
 > The codex path is enabled by default. To temporarily disable it
 > (e.g. as an emergency rollback during a beta window), set
-> `SPECRAILS_HUB_CODEX_BETA=0` in the hub's environment. Unset or set
-> to `1` to re-enable.
+> `SPECRAILS_CODEX_BETA=0` in the app's environment (the legacy
+> `SPECRAILS_HUB_CODEX_BETA` name is still read as a fallback when the
+> new variable is unset). Unset or set to `1` to re-enable.
 
 ## Prerequisites
 
 | What | Why | How |
 |---|---|---|
-| `codex` CLI ≥ 0.128.0 | Earlier versions don't support `exec --json` + `exec resume` semantics the hub relies on | `brew install codex` (macOS) · winget / download from https://developers.openai.com/codex (Windows / Linux) |
+| `codex` CLI ≥ 0.128.0 | Earlier versions don't support `exec --json` + `exec resume` semantics the app relies on | `brew install codex` (macOS) · winget / download from https://developers.openai.com/codex (Windows / Linux) |
 | Authentication | Codex needs OAuth or an API key | `codex login` (ChatGPT OAuth) or set `OPENAI_API_KEY` |
 | `uv` ≥ 0.1.0 (optional) | Required if you want to install the Serena plugin | `brew install uv` · `pipx install uv` · or the curl installer at https://docs.astral.sh/uv |
 | `git`, `node`, `npm`, `npx` | Same as Claude — needed for `specrails-core init` | Use your usual installer |
 
-The hub's `Add Project` dialog runs a live prerequisites check. It
+The app's `Add Project` dialog runs a live prerequisites check. It
 disables the Codex provider checkbox with a "not found" hint when the
 binary isn't on `PATH`; it shows install commands if you click "More info".
 
 ## Adding a codex project
 
-1. Open the hub UI and click **Add Project**.
+1. Open the app UI and click **Add Project**.
 2. Pick the project's path.
 3. In the **AI providers** row, check **Codex** (you can check
    **Claude** too — see [Running both providers in one
    project](#running-both-providers-in-one-project)). The first
    provider you select becomes the project default.
-4. Submit. The hub writes `.specrails/install-config.yaml` (with
+4. Submit. The app writes `.specrails/install-config.yaml` (with
    `provider: codex` and `tier: quick` as YAML keys) and spawns
    `npx specrails-core@latest init --from-config <file>` — the provider
    and tier live in the YAML, not as CLI flags. The install produces:
@@ -47,7 +48,7 @@ binary isn't on `PATH`; it shows install commands if you click "More info".
      updates.
 
    The exact rail and lifecycle skill set is produced by
-   `specrails-core`, not the hub, so the precise file list can vary by
+   `specrails-core`, not the app, so the precise file list can vary by
    core version.
 
 The provider **set** you choose is immutable after creation — you
@@ -59,7 +60,7 @@ in place). Install both up front if you want the choice later.
 
 A single project can install **both** Claude and Codex. In the
 **Add Project** dialog the **AI providers** control is a multi-select —
-check both and the hub runs each provider's install sequentially. The
+check both and the app runs each provider's install sequentially. The
 first provider you select is the **primary/default**; the helper text
 spells this out: *"Both engines will be set up. The first is the
 project default. Cannot be changed after creation."*
@@ -80,7 +81,7 @@ Once both are installed:
   are **hidden** while both providers are installed. Single-provider
   projects are unaffected.
 
-When only one provider is installed the hub behaves byte-identically to
+When only one provider is installed the app behaves byte-identically to
 a single-provider project — no engine pickers, no provider persisted on
 spawns, no overrides.
 
@@ -96,12 +97,12 @@ spawns, no overrides.
 | **Contract Refine** | Claude-only (it `--resume`s the Explore session and runs `/specrails:contract-refine`) | **Skipped** — toggling "Enrich with Contract Layer" on a codex spec is a no-op |
 | **MCP registration** | Surgical merge of `<project>/.mcp.json` | `codex mcp add` against per-project `CODEX_HOME=~/.specrails/projects/<slug>/codex-home/` (isolated) |
 | **Session resume** | `--resume <session_id>` | `exec resume <thread_id>` |
-| **Native cost report** | `result.total_cost_usd` from `--output-format stream-json` | None — cost is **estimated** by the hub from `turn.completed.usage` and the local pricing table at `server/pricing.ts` |
-| **Telemetry** | `OTEL_EXPORTER_OTLP_*` env vars consumed by claude itself | Synthesised by the hub from `codex exec --json` events and POSTed to the same in-process OTLP receiver — telemetry export ZIP works identically |
+| **Native cost report** | `result.total_cost_usd` from `--output-format stream-json` | None — cost is **estimated** by the app from `turn.completed.usage` and the local pricing table at `server/pricing.ts` |
+| **Telemetry** | `OTEL_EXPORTER_OTLP_*` env vars consumed by claude itself | Synthesised by the app from `codex exec --json` events and POSTed to the same in-process OTLP receiver — telemetry export ZIP works identically |
 
 ## Estimated cost
 
-Codex does not report `total_cost_usd` natively. The hub computes an
+Codex does not report `total_cost_usd` natively. The app computes an
 estimate from the captured `usage` (input / output / cached input
 tokens × the local rate-card in `server/pricing.ts`) and stores it in
 `ai_invocations.total_cost_usd` with `total_cost_usd_estimated = 1`.
@@ -124,7 +125,7 @@ ship an out-of-band update to `server/pricing.ts`.
 
 ## Plugins and MCP on codex projects
 
-The **Integrations** (plugins) marketplace is a **Claude-only** capability. The hub
+The **Integrations** (plugins) marketplace is a **Claude-only** capability. The app
 hides the Integrations tab for any project that includes codex — both codex-only and
 dual-provider (Claude + Codex) projects — because the sidebar only shows sections that
 *every* installed provider supports (the capability intersection in
@@ -133,13 +134,13 @@ codex project.
 
 To give a codex project MCP servers, register them with `codex mcp add` from your
 terminal: codex chat / Explore turns spawn with your own environment and read your global
-`~/.codex/config.toml`, so those servers are available natively — no hub plumbing required.
+`~/.codex/config.toml`, so those servers are available natively — no extra plumbing required.
 
 ## Troubleshooting
 
 **"codex binary not found" when adding a project** — install codex CLI
-and restart the hub so PATH refreshes. The hub's
-`/api/hub/setup-prerequisites` endpoint surfaces the absolute path it
+and restart the app so PATH refreshes. The app's
+`/api/setup-prerequisites` endpoint surfaces the absolute path it
 resolved, useful for diagnosing Homebrew-vs-npm install collisions.
 
 **"codex 0.120.0 is older than required 0.128.0"** — upgrade. The
@@ -147,7 +148,7 @@ adapter pins the minimum because earlier versions don't support
 `exec --json` or `exec resume`.
 
 **"codex mcp add serena failed: auth missing"** — run `codex login`
-or set `OPENAI_API_KEY`. The hub doesn't proxy auth.
+or set `OPENAI_API_KEY`. The app doesn't proxy auth.
 
 **Cost shows as `—` for codex jobs even though tokens are non-zero**
 — the spawned model isn't in `server/pricing.ts` (e.g. a brand-new
@@ -168,22 +169,22 @@ spec just commits without a Contract Layer block.
 
 ## Emergency rollback
 
-If you need to disable the codex path, set `SPECRAILS_HUB_CODEX_BETA=0`
-in the hub's environment. For a source checkout that's:
+If you need to disable the codex path, set `SPECRAILS_CODEX_BETA=0`
+in the app's environment. For a source checkout that's:
 
 ```bash
-SPECRAILS_HUB_CODEX_BETA=0 npm run dev
+SPECRAILS_CODEX_BETA=0 npm run dev
 ```
 
-For a packaged/desktop hub, set the variable in the environment the hub
+For the packaged desktop app, set the variable in the environment the app
 process inherits (the `npm run dev` form is for source runs only).
 
-`GET /api/hub/available-providers` will report `codex: false` and
-`POST /api/hub/projects` will refuse new codex projects. Existing
+`GET /api/available-providers` will report `codex: false` and
+`POST /api/projects` will refuse new codex projects. Existing
 codex projects keep functioning — only new-project gating is gated by
 the env var.
 
-## Architecture pointers (for hub developers)
+## Architecture pointers (for specrails-desktop developers)
 
 The codex integration lives in:
 

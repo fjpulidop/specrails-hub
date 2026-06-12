@@ -14,7 +14,7 @@ import {
   printSummary,
   KNOWN_VERBS,
   _internal,
-} from './specrails-hub'
+} from './specrails-desktop'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -84,17 +84,17 @@ describe('parseArgs', () => {
   it('returns jobs mode', () => { expect(parseArgs(['--jobs'])).toEqual({ mode: 'jobs', port: 4200 }) })
   it('parses --port flag', () => { expect(parseArgs(['--port', '5000', '--status'])).toEqual({ mode: 'status', port: 5000 }) })
   it('ignores invalid --port value and uses default', () => { expect(parseArgs(['--port', 'bad', '--status'])).toEqual({ mode: 'status', port: 4200 }) })
-  it('routes "hub" subcommand', () => {
-    expect(parseArgs(['hub', 'start'])).toEqual({ mode: 'hub', subArgs: ['start'], port: 4200 })
-    expect(parseArgs(['hub', 'stop'])).toEqual({ mode: 'hub', subArgs: ['stop'], port: 4200 })
-    expect(parseArgs(['hub', 'list'])).toEqual({ mode: 'hub', subArgs: ['list'], port: 4200 })
+  it('routes "desktop" subcommand', () => {
+    expect(parseArgs(['desktop', 'start'])).toEqual({ mode: 'desktop', subArgs: ['start'], port: 4200 })
+    expect(parseArgs(['desktop', 'stop'])).toEqual({ mode: 'desktop', subArgs: ['stop'], port: 4200 })
+    expect(parseArgs(['desktop', 'list'])).toEqual({ mode: 'desktop', subArgs: ['list'], port: 4200 })
   })
-  it('routes shorthand hub subcommands', () => {
+  it('routes shorthand server-management subcommands', () => {
     for (const cmd of ['start', 'stop', 'add', 'remove', 'list']) {
-      expect(parseArgs([cmd])).toEqual({ mode: 'hub', subArgs: [cmd], port: 4200 })
+      expect(parseArgs([cmd])).toEqual({ mode: 'desktop', subArgs: [cmd], port: 4200 })
     }
   })
-  it('passes extra args through', () => { expect(parseArgs(['add', '/some/path'])).toEqual({ mode: 'hub', subArgs: ['add', '/some/path'], port: 4200 }) })
+  it('passes extra args through', () => { expect(parseArgs(['add', '/some/path'])).toEqual({ mode: 'desktop', subArgs: ['add', '/some/path'], port: 4200 }) })
   it('injects /specrails: prefix for known verbs', () => { expect(parseArgs(['implement', '#42'])).toEqual({ mode: 'command', resolved: '/specrails:implement #42', port: 4200 }) })
   it('injects /specrails: prefix for batch-implement', () => { expect(parseArgs(['batch-implement', '#40', '#41'])).toEqual({ mode: 'command', resolved: '/specrails:batch-implement #40 #41', port: 4200 }) })
   it('passes through slash-prefixed commands as raw', () => { expect(parseArgs(['/specrails:implement', '#42'])).toEqual({ mode: 'raw', resolved: '/specrails:implement #42', port: 4200 }) })
@@ -134,14 +134,14 @@ describe('ANSI helpers', () => {
     expect(_internal.dim('t')).toBe('t'); expect(_internal.red('t')).toBe('t')
     expect(_internal.bold('t')).toBe('t'); expect(_internal.dimCyan('t')).toBe('t')
   })
-  it('cliPrefix returns [specrails-hub]', () => { expect(_internal.cliPrefix()).toContain('[specrails-hub]') })
+  it('cliPrefix returns [specrails-desktop]', () => { expect(_internal.cliPrefix()).toContain('[specrails-desktop]') })
 })
 
-describe('cliLog', () => { it('writes to stdout with prefix', () => { const o = captureStdout(() => _internal.cliLog('msg')); expect(o).toContain('[specrails-hub]'); expect(o).toContain('msg') }) })
+describe('cliLog', () => { it('writes to stdout with prefix', () => { const o = captureStdout(() => _internal.cliLog('msg')); expect(o).toContain('[specrails-desktop]'); expect(o).toContain('msg') }) })
 describe('cliError', () => { it('writes to stderr with error prefix', () => { const o = captureStderr(() => _internal.cliError('bad')); expect(o).toContain('error: bad') }) })
 describe('cliWarn', () => { it('writes to stderr with warning prefix', () => { const o = captureStderr(() => _internal.cliWarn('warn')); expect(o).toContain('warning: warn') }) })
 
-describe('printVersion', () => { it('writes version to stdout', () => { const o = captureStdout(() => _internal.printVersion()); expect(o).toMatch(/specrails-hub v\d+\.\d+\.\d+/) }) })
+describe('printVersion', () => { it('writes version to stdout', () => { const o = captureStdout(() => _internal.printVersion()); expect(o).toMatch(/specrails-desktop v\d+\.\d+\.\d+/) }) })
 
 describe('printHelp', () => {
   it('writes help text', () => {
@@ -212,7 +212,7 @@ describe('detectWebManager', () => {
 })
 
 // ---------------------------------------------------------------------------
-// isPortInUse / readPid / isProcessRunning / hubServerPath
+// isPortInUse / readPid / isProcessRunning / desktopServerPath
 // ---------------------------------------------------------------------------
 
 describe('isPortInUse', () => {
@@ -233,7 +233,7 @@ describe('isProcessRunning', () => {
   it('returns false for non-existent PID', () => { expect(_internal.isProcessRunning(999999)).toBe(false) })
 })
 
-describe('hubServerPath', () => { it('returns a path string', () => { const r = _internal.hubServerPath(); expect(typeof r).toBe('string'); expect(r).toContain('server') }) })
+describe('desktopServerPath', () => { it('returns a path string', () => { const r = _internal.desktopServerPath(); expect(typeof r).toBe('string'); expect(r).toContain('server') }) })
 
 // ---------------------------------------------------------------------------
 // handleStatus
@@ -248,10 +248,10 @@ describe('handleStatus', () => {
     expect(o).toContain('not running')
   })
 
-  it('prints running status for hub mode', async () => {
-    ;({ server, port } = await createMockServer([{ path: '/api/health', status: 200, body: { status: 'ok', version: '1.0.0', mode: 'hub', projects: 3 } }]))
+  it('prints running status for Super mode', async () => {
+    ;({ server, port } = await createMockServer([{ path: '/api/health', status: 200, body: { status: 'ok', version: '1.0.0', mode: 'super', projects: 3 } }]))
     const o = await captureStdoutAsync(async () => { expect(await _internal.handleStatus(port)).toBe(0) })
-    expect(o).toContain('running'); expect(o).toContain('v1.0.0'); expect(o).toContain('hub')
+    expect(o).toContain('running'); expect(o).toContain('v1.0.0'); expect(o).toContain('super')
   })
 
   it('returns 1 when health returns non-200', async () => {
@@ -316,108 +316,108 @@ describe('handleJobs', () => {
 })
 
 // ---------------------------------------------------------------------------
-// handleHub
+// handleDesktop
 // ---------------------------------------------------------------------------
 
-describe('handleHub', () => {
-  it('prints help with no args', async () => { const o = await captureStdoutAsync(async () => { expect(await _internal.handleHub([], 4200)).toBe(0) }); expect(o).toContain('hub management') })
-  it('prints help with --help', async () => { const o = await captureStdoutAsync(async () => { expect(await _internal.handleHub(['--help'], 4200)).toBe(0) }); expect(o).toContain('hub management') })
-  it('prints help with -h', async () => { const o = await captureStdoutAsync(async () => { expect(await _internal.handleHub(['-h'], 4200)).toBe(0) }); expect(o).toContain('hub management') })
-  it('prints help with help subcommand', async () => { const o = await captureStdoutAsync(async () => { expect(await _internal.handleHub(['help'], 4200)).toBe(0) }); expect(o).toContain('hub management') })
-  it('errors for unknown subcommand', async () => { const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.handleHub(['banana'], 4200)).toBe(1) }) }); expect(se).toContain('unknown hub subcommand') })
-  it('errors for add without path', async () => { const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.handleHub(['add'], 4200)).toBe(1) }) }); expect(se).toContain('usage:') })
-  it('errors for remove without id', async () => { const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.handleHub(['remove'], 4200)).toBe(1) }) }); expect(se).toContain('usage:') })
+describe('handleDesktop', () => {
+  it('prints help with no args', async () => { const o = await captureStdoutAsync(async () => { expect(await _internal.handleDesktop([], 4200)).toBe(0) }); expect(o).toContain('server management') })
+  it('prints help with --help', async () => { const o = await captureStdoutAsync(async () => { expect(await _internal.handleDesktop(['--help'], 4200)).toBe(0) }); expect(o).toContain('server management') })
+  it('prints help with -h', async () => { const o = await captureStdoutAsync(async () => { expect(await _internal.handleDesktop(['-h'], 4200)).toBe(0) }); expect(o).toContain('server management') })
+  it('prints help with help subcommand', async () => { const o = await captureStdoutAsync(async () => { expect(await _internal.handleDesktop(['help'], 4200)).toBe(0) }); expect(o).toContain('server management') })
+  it('errors for unknown subcommand', async () => { const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.handleDesktop(['banana'], 4200)).toBe(1) }) }); expect(se).toContain('unknown subcommand') })
+  it('errors for add without path', async () => { const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.handleDesktop(['add'], 4200)).toBe(1) }) }); expect(se).toContain('usage:') })
+  it('errors for remove without id', async () => { const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.handleDesktop(['remove'], 4200)).toBe(1) }) }); expect(se).toContain('usage:') })
 })
 
 // ---------------------------------------------------------------------------
-// hubStatus / hubAdd / hubRemove / hubList / hubStop
+// desktopStatus / desktopAdd / desktopRemove / desktopList / desktopStop
 // ---------------------------------------------------------------------------
 
-describe('hubStatus', () => {
+describe('desktopStatus', () => {
   let server: http.Server; let port: number
   afterEach(async () => { if (server) await closeServer(server) })
-  it('not running', async () => { const o = await captureStdoutAsync(async () => { expect(await _internal.hubStatus(19995)).toBe(1) }); expect(o).toContain('not running') })
-  it('prints hub state', async () => {
-    ;({ server, port } = await createMockServer([{ path: '/api/health', status: 200, body: { status: 'ok' } }, { path: '/api/hub/state', status: 200, body: { projectCount: 2, projects: [{ name: 'a' }, { name: 'b' }] } }]))
-    const o = await captureStdoutAsync(async () => { expect(await _internal.hubStatus(port)).toBe(0) })
+  it('not running', async () => { const o = await captureStdoutAsync(async () => { expect(await _internal.desktopStatus(19995)).toBe(1) }); expect(o).toContain('not running') })
+  it('prints server state', async () => {
+    ;({ server, port } = await createMockServer([{ path: '/api/health', status: 200, body: { status: 'ok' } }, { path: '/api/state', status: 200, body: { projectCount: 2, projects: [{ name: 'a' }, { name: 'b' }] } }]))
+    const o = await captureStdoutAsync(async () => { expect(await _internal.desktopStatus(port)).toBe(0) })
     expect(o).toContain('running'); expect(o).toContain('projects: 2'); expect(o).toContain('a'); expect(o).toContain('b')
   })
 })
 
-describe('hubAdd', () => {
+describe('desktopAdd', () => {
   let server: http.Server; let port: number
   afterEach(async () => { if (server) await closeServer(server) })
-  it('not running', async () => { const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.hubAdd('/p', 19994)).toBe(1) }) }); expect(se).toContain('not running') })
+  it('not running', async () => { const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.desktopAdd('/p', 19994)).toBe(1) }) }); expect(se).toContain('not running') })
   it('adds project', async () => {
-    ;({ server, port } = await createMockServer([{ path: '/api/health', status: 200, body: { status: 'ok' } }, { method: 'POST', path: '/api/hub/projects', status: 201, body: { project: { name: 'tp', id: '1' } } }]))
-    let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => { expect(await _internal.hubAdd('/p', port)).toBe(0) }) })
+    ;({ server, port } = await createMockServer([{ path: '/api/health', status: 200, body: { status: 'ok' } }, { method: 'POST', path: '/api/projects', status: 201, body: { project: { name: 'tp', id: '1' } } }]))
+    let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => { expect(await _internal.desktopAdd('/p', port)).toBe(0) }) })
     expect(so).toContain('added project: tp')
   })
   it('handles 409', async () => {
-    ;({ server, port } = await createMockServer([{ path: '/api/health', status: 200, body: { status: 'ok' } }, { method: 'POST', path: '/api/hub/projects', status: 409, body: {} }]))
-    let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => { expect(await _internal.hubAdd('/p', port)).toBe(0) }) })
+    ;({ server, port } = await createMockServer([{ path: '/api/health', status: 200, body: { status: 'ok' } }, { method: 'POST', path: '/api/projects', status: 409, body: {} }]))
+    let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => { expect(await _internal.desktopAdd('/p', port)).toBe(0) }) })
     expect(so).toContain('already registered')
   })
   it('handles error', async () => {
-    ;({ server, port } = await createMockServer([{ path: '/api/health', status: 200, body: { status: 'ok' } }, { method: 'POST', path: '/api/hub/projects', status: 400, body: { error: 'bad path' } }]))
-    const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.hubAdd('/p', port)).toBe(1) }) })
+    ;({ server, port } = await createMockServer([{ path: '/api/health', status: 200, body: { status: 'ok' } }, { method: 'POST', path: '/api/projects', status: 400, body: { error: 'bad path' } }]))
+    const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.desktopAdd('/p', port)).toBe(1) }) })
     expect(se).toContain('bad path')
   })
 })
 
-describe('hubRemove', () => {
+describe('desktopRemove', () => {
   let server: http.Server
   afterEach(async () => { if (server) await closeServer(server) })
-  it('not running', async () => { const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.hubRemove('id', 19993)).toBe(1) }) }); expect(se).toContain('not running') })
+  it('not running', async () => { const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.desktopRemove('id', 19993)).toBe(1) }) }); expect(se).toContain('not running') })
   it('removes project', async () => {
     server = http.createServer((req, res) => {
       if (req.url === '/api/health') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ status: 'ok' })) }
-      else if (req.url === '/api/hub/projects/id' && req.method === 'DELETE') { res.writeHead(200); res.end('{}') }
+      else if (req.url === '/api/projects/id' && req.method === 'DELETE') { res.writeHead(200); res.end('{}') }
       else { res.writeHead(404); res.end() }
     })
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
     const p = (server.address() as net.AddressInfo).port
-    let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => { expect(await _internal.hubRemove('id', p)).toBe(0) }) })
+    let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => { expect(await _internal.desktopRemove('id', p)).toBe(0) }) })
     expect(so).toContain('project removed')
   })
   it('handles error', async () => {
     server = http.createServer((req, res) => {
       if (req.url === '/api/health') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ status: 'ok' })) }
-      else if (req.url === '/api/hub/projects/id' && req.method === 'DELETE') { res.writeHead(404); res.end('{}') }
+      else if (req.url === '/api/projects/id' && req.method === 'DELETE') { res.writeHead(404); res.end('{}') }
       else { res.writeHead(404); res.end() }
     })
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
     const p = (server.address() as net.AddressInfo).port
-    const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.hubRemove('id', p)).toBe(1) }) })
+    const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.desktopRemove('id', p)).toBe(1) }) })
     expect(se).toContain('failed to remove')
   })
 })
 
-describe('hubList', () => {
+describe('desktopList', () => {
   let server: http.Server; let port: number
   afterEach(async () => { if (server) await closeServer(server) })
-  it('not running', async () => { const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.hubList(19992)).toBe(1) }) }); expect(se).toContain('not running') })
+  it('not running', async () => { const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.desktopList(19992)).toBe(1) }) }); expect(se).toContain('not running') })
   it('no projects', async () => {
-    ;({ server, port } = await createMockServer([{ path: '/api/health', status: 200, body: { status: 'ok' } }, { path: '/api/hub/projects', status: 200, body: { projects: [] } }]))
-    let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => { expect(await _internal.hubList(port)).toBe(0) }) })
+    ;({ server, port } = await createMockServer([{ path: '/api/health', status: 200, body: { status: 'ok' } }, { path: '/api/projects', status: 200, body: { projects: [] } }]))
+    let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => { expect(await _internal.desktopList(port)).toBe(0) }) })
     expect(so).toContain('no projects')
   })
   it('prints table', async () => {
-    ;({ server, port } = await createMockServer([{ path: '/api/health', status: 200, body: { status: 'ok' } }, { path: '/api/hub/projects', status: 200, body: { projects: [{ id: 'u1', name: 'p1', path: '/a' }, { id: 'u2', name: 'p2', path: '/b' }] } }]))
-    const o = await captureStdoutAsync(async () => { expect(await _internal.hubList(port)).toBe(0) })
+    ;({ server, port } = await createMockServer([{ path: '/api/health', status: 200, body: { status: 'ok' } }, { path: '/api/projects', status: 200, body: { projects: [{ id: 'u1', name: 'p1', path: '/a' }, { id: 'u2', name: 'p2', path: '/b' }] } }]))
+    const o = await captureStdoutAsync(async () => { expect(await _internal.desktopList(port)).toBe(0) })
     expect(o).toContain('p1'); expect(o).toContain('p2'); expect(o).toContain('ID')
   })
 })
 
-describe('hubStop', () => {
+describe('desktopStop', () => {
   it('reports not running', async () => {
     // Temporarily hide the real PID file so the test always sees "not running"
-    const pidFile = _internal.HUB_PID_FILE
+    const pidFile = _internal.DESKTOP_PID_FILE
     const bakFile = pidFile + '.test-bak'
     const hadPidFile = fs.existsSync(pidFile)
     if (hadPidFile) fs.renameSync(pidFile, bakFile)
     try {
-      let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => { expect(await _internal.hubStop()).toBe(0) }) })
+      let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => { expect(await _internal.desktopStop()).toBe(0) }) })
       expect(so).toContain('not running')
     } finally {
       if (hadPidFile) fs.renameSync(bakFile, pidFile)
@@ -434,11 +434,11 @@ describe('resolveProjectFromCwd', () => {
   afterEach(async () => { if (server) await closeServer(server) })
   it('returns project when found', async () => {
     const cwd = process.cwd()
-    ;({ server, port } = await createMockServer([{ path: `/api/hub/resolve?path=${encodeURIComponent(cwd)}`, status: 200, body: { project: { id: 'p1', name: 'test', path: cwd } } }]))
+    ;({ server, port } = await createMockServer([{ path: `/api/resolve?path=${encodeURIComponent(cwd)}`, status: 200, body: { project: { id: 'p1', name: 'test', path: cwd } } }]))
     expect(await _internal.resolveProjectFromCwd(`http://127.0.0.1:${port}`)).toEqual({ id: 'p1', name: 'test', path: cwd })
   })
   it('returns null on 404', async () => {
-    ;({ server, port } = await createMockServer([{ path: '/api/hub/resolve', status: 404, body: '' }]))
+    ;({ server, port } = await createMockServer([{ path: '/api/resolve', status: 404, body: '' }]))
     expect(await _internal.resolveProjectFromCwd(`http://127.0.0.1:${port}`)).toBeNull()
   })
   it('returns null on error', async () => { expect(await _internal.resolveProjectFromCwd('http://127.0.0.1:19991')).toBeNull() })
@@ -454,7 +454,7 @@ describe('runViaWebManager', () => {
 
   it('spawns job and streams logs until exit', async () => {
     server = http.createServer((req, res) => {
-      if (req.url === '/api/hub/state') { res.writeHead(404); res.end(); return }
+      if (req.url === '/api/state') { res.writeHead(404); res.end(); return }
       if (req.method === 'POST' && req.url === '/api/spawn') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ jobId: 'j1' })); return }
       if (req.url === '/api/jobs/j1') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ job: { total_cost_usd: 0.01, tokens_in: 100, tokens_out: 50, duration_ms: 2000 } })); return }
       res.writeHead(404); res.end()
@@ -468,20 +468,20 @@ describe('runViaWebManager', () => {
   })
 
   it('handles 409 from spawn', async () => {
-    ;({ server, port } = await createMockServer([{ path: '/api/hub/state', status: 404, body: '' }, { method: 'POST', path: '/api/spawn', status: 409, body: {} }]))
+    ;({ server, port } = await createMockServer([{ path: '/api/state', status: 404, body: '' }, { method: 'POST', path: '/api/spawn', status: 409, body: {} }]))
     const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.runViaWebManager('cmd', `http://127.0.0.1:${port}`)).toBe(1) }) })
     expect(se).toContain('busy')
   })
 
   it('handles generic error from spawn', async () => {
-    ;({ server, port } = await createMockServer([{ path: '/api/hub/state', status: 404, body: '' }, { method: 'POST', path: '/api/spawn', status: 500, body: { error: 'err' } }]))
+    ;({ server, port } = await createMockServer([{ path: '/api/state', status: 404, body: '' }, { method: 'POST', path: '/api/spawn', status: 500, body: { error: 'err' } }]))
     const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.runViaWebManager('cmd', `http://127.0.0.1:${port}`)).toBe(1) }) })
     expect(se).toContain('err')
   })
 
   it('handles invalid JSON from spawn', async () => {
     const srv = http.createServer((req, res) => {
-      if (req.url === '/api/hub/state') { res.writeHead(404); res.end() }
+      if (req.url === '/api/state') { res.writeHead(404); res.end() }
       else if (req.method === 'POST' && req.url === '/api/spawn') { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('bad') }
       else { res.writeHead(404); res.end() }
     })
@@ -492,11 +492,11 @@ describe('runViaWebManager', () => {
     await closeServer(srv)
   })
 
-  it('handles hub mode with project', async () => {
+  it('handles Super mode with project', async () => {
     const cwd = process.cwd()
     server = http.createServer((req, res) => {
-      if (req.url === '/api/hub/state') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ projectCount: 1 })) }
-      else if (req.url?.startsWith('/api/hub/resolve')) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ project: { id: 'p1', name: 'proj', path: cwd } })) }
+      if (req.url === '/api/state') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ projectCount: 1 })) }
+      else if (req.url?.startsWith('/api/resolve')) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ project: { id: 'p1', name: 'proj', path: cwd } })) }
       else if (req.method === 'POST' && req.url === '/api/projects/p1/spawn') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ jobId: 'j2' })) }
       else if (req.url === '/api/projects/p1/jobs/j2') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ job: { total_cost_usd: 0.02, tokens_in: 200, tokens_out: 100 } })) }
       else { res.writeHead(404); res.end() }
@@ -515,10 +515,10 @@ describe('runViaWebManager', () => {
     expect(so).toContain('project: proj'); expect(so).toContain('Work'); expect(se).toContain('dbg')
   })
 
-  it('handles hub mode with no project', async () => {
+  it('handles Super mode with no project', async () => {
     server = http.createServer((req, res) => {
-      if (req.url === '/api/hub/state') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ projectCount: 0 })) }
-      else if (req.url?.startsWith('/api/hub/resolve')) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({})) }
+      if (req.url === '/api/state') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ projectCount: 0 })) }
+      else if (req.url?.startsWith('/api/resolve')) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({})) }
       else { res.writeHead(404); res.end() }
     })
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
@@ -529,7 +529,7 @@ describe('runViaWebManager', () => {
 
   it('handles init message with log buffer', async () => {
     server = http.createServer((req, res) => {
-      if (req.url === '/api/hub/state') { res.writeHead(404); res.end() }
+      if (req.url === '/api/state') { res.writeHead(404); res.end() }
       else if (req.method === 'POST' && req.url === '/api/spawn') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ jobId: 'j3' })) }
       else if (req.url === '/api/jobs/j3') { res.writeHead(404); res.end() }
       else { res.writeHead(404); res.end() }
@@ -547,7 +547,7 @@ describe('runViaWebManager', () => {
 
   it('handles WS close before exit', async () => {
     server = http.createServer((req, res) => {
-      if (req.url === '/api/hub/state') { res.writeHead(404); res.end() }
+      if (req.url === '/api/state') { res.writeHead(404); res.end() }
       else if (req.method === 'POST' && req.url === '/api/spawn') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ jobId: 'jc' })) }
       else { res.writeHead(404); res.end() }
     })
@@ -561,7 +561,7 @@ describe('runViaWebManager', () => {
 
   it('filters other process logs', async () => {
     server = http.createServer((req, res) => {
-      if (req.url === '/api/hub/state') { res.writeHead(404); res.end() }
+      if (req.url === '/api/state') { res.writeHead(404); res.end() }
       else if (req.method === 'POST' && req.url === '/api/spawn') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ jobId: 'mj' })) }
       else { res.writeHead(404); res.end() }
     })
@@ -578,9 +578,9 @@ describe('runViaWebManager', () => {
   })
 
   it('handles spawn connection error', async () => {
-    // Server for hub state check but nothing for spawn
+    // Server for the state check but nothing for spawn
     const srv = http.createServer((req, res) => {
-      if (req.url === '/api/hub/state') { res.writeHead(404); res.end() }
+      if (req.url === '/api/state') { res.writeHead(404); res.end() }
       else { res.destroy() }
     })
     await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r))
@@ -665,11 +665,11 @@ process.exit(0);
 })
 
 // ---------------------------------------------------------------------------
-// hubStart
+// desktopStart
 // ---------------------------------------------------------------------------
 
-describe('hubStart', () => {
-  // hubStart short-circuits with "hub already running" when
+describe('desktopStart', () => {
+  // desktopStart short-circuits with "server already running" when
   // ~/.specrails/manager.pid points at a live PID. Tests must not
   // depend on the developer's machine state — back up + clear the
   // pid file for the duration of each test, restore afterwards.
@@ -677,12 +677,12 @@ describe('hubStart', () => {
 
   beforeEach(() => {
     try {
-      _pidBackup = fs.readFileSync(_internal.HUB_PID_FILE, 'utf-8')
+      _pidBackup = fs.readFileSync(_internal.DESKTOP_PID_FILE, 'utf-8')
     } catch {
       _pidBackup = null
     }
     try {
-      fs.rmSync(_internal.HUB_PID_FILE, { force: true })
+      fs.rmSync(_internal.DESKTOP_PID_FILE, { force: true })
     } catch {
       /* not present — fine */
     }
@@ -691,8 +691,8 @@ describe('hubStart', () => {
   afterEach(() => {
     if (_pidBackup !== null) {
       try {
-        fs.mkdirSync(path.dirname(_internal.HUB_PID_FILE), { recursive: true })
-        fs.writeFileSync(_internal.HUB_PID_FILE, _pidBackup, 'utf-8')
+        fs.mkdirSync(path.dirname(_internal.DESKTOP_PID_FILE), { recursive: true })
+        fs.writeFileSync(_internal.DESKTOP_PID_FILE, _pidBackup, 'utf-8')
       } catch {
         /* best-effort restore */
       }
@@ -703,7 +703,7 @@ describe('hubStart', () => {
     const srv = net.createServer()
     await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r))
     const p = (srv.address() as net.AddressInfo).port
-    const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.hubStart(p)).toBe(1) }) })
+    const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => { expect(await _internal.desktopStart(p)).toBe(1) }) })
     expect(se).toContain('already in use')
     await new Promise<void>((r) => srv.close(() => r()))
   })
@@ -722,7 +722,7 @@ describe('EXIT_PATTERN', () => {
 describe('constants', () => {
   it('DEFAULT_PORT is 4200', () => { expect(_internal.DEFAULT_PORT).toBe(4200) })
   it('DETECTION_TIMEOUT_MS is 500', () => { expect(_internal.DETECTION_TIMEOUT_MS).toBe(500) })
-  it('HUB_PID_FILE and HUB_LOG_FILE paths', () => { expect(_internal.HUB_PID_FILE).toContain('.specrails'); expect(_internal.HUB_LOG_FILE).toContain('.specrails') })
+  it('DESKTOP_PID_FILE and DESKTOP_LOG_FILE paths', () => { expect(_internal.DESKTOP_PID_FILE).toContain('.specrails'); expect(_internal.DESKTOP_LOG_FILE).toContain('.specrails') })
 })
 
 // ---------------------------------------------------------------------------
@@ -747,7 +747,7 @@ describe('runDirect edge cases', () => {
   })
 })
 
-describe('hubStop edge cases', () => {
+describe('desktopStop edge cases', () => {
   it('stops a running process (using current PID file simulation)', async () => {
     // Create a temp pid file pointing to a background process
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pid-test-'))
@@ -778,7 +778,7 @@ describe('runViaWebManager additional edge cases', () => {
 
   it('handles WS non-JSON message gracefully', async () => {
     server = http.createServer((req, res) => {
-      if (req.url === '/api/hub/state') { res.writeHead(404); res.end() }
+      if (req.url === '/api/state') { res.writeHead(404); res.end() }
       else if (req.method === 'POST' && req.url === '/api/spawn') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ jobId: 'jx' })) }
       else { res.writeHead(404); res.end() }
     })
@@ -799,7 +799,7 @@ describe('runViaWebManager additional edge cases', () => {
 
   it('handles missing jobId in spawn response', async () => {
     ;({ server, port } = await createMockServer([
-      { path: '/api/hub/state', status: 404, body: '' },
+      { path: '/api/state', status: 404, body: '' },
       { method: 'POST', path: '/api/spawn', status: 200, body: {} },
     ]))
     const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => {
@@ -810,7 +810,7 @@ describe('runViaWebManager additional edge cases', () => {
 
   it('handles spawn response with processId fallback field', async () => {
     server = http.createServer((req, res) => {
-      if (req.url === '/api/hub/state') { res.writeHead(404); res.end() }
+      if (req.url === '/api/state') { res.writeHead(404); res.end() }
       else if (req.method === 'POST' && req.url === '/api/spawn') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ processId: 'legacy-id' })) }
       else { res.writeHead(404); res.end() }
     })
@@ -830,7 +830,7 @@ describe('runViaWebManager additional edge cases', () => {
 
   it('handles job metadata fetch failure gracefully', async () => {
     server = http.createServer((req, res) => {
-      if (req.url === '/api/hub/state') { res.writeHead(404); res.end() }
+      if (req.url === '/api/state') { res.writeHead(404); res.end() }
       else if (req.method === 'POST' && req.url === '/api/spawn') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ jobId: 'jm' })) }
       else { res.writeHead(404); res.end() }
     })
@@ -888,7 +888,7 @@ describe('handleJobs edge case', () => {
 describe('handleStatus edge case', () => {
   it('prints status without version', async () => {
     const { server: srv, port: p } = await createMockServer([
-      { path: '/api/health', status: 200, body: { status: 'ok', mode: 'hub' } },
+      { path: '/api/health', status: 200, body: { status: 'ok', mode: 'super' } },
     ])
     const o = await captureStdoutAsync(async () => { expect(await _internal.handleStatus(p)).toBe(0) })
     expect(o).toContain('running')
@@ -928,43 +928,43 @@ describe('main', () => {
   }
 
   it('handles --version flag', async () => {
-    process.argv = ['node', 'specrails-hub', '--version']
+    process.argv = ['node', 'specrails-desktop', '--version']
     const so = await captureStdoutAsync(async () => { await runMain() })
-    expect(so).toMatch(/specrails-hub v\d+/)
+    expect(so).toMatch(/specrails-desktop v\d+/)
     expect(exitCode).toBe(0)
   })
 
   it('handles --help flag', async () => {
-    process.argv = ['node', 'specrails-hub', '--help']
+    process.argv = ['node', 'specrails-desktop', '--help']
     const so = await captureStdoutAsync(async () => { await runMain() })
     expect(so).toContain('Usage:')
     expect(exitCode).toBe(0)
   })
 
   it('handles no args (help)', async () => {
-    process.argv = ['node', 'specrails-hub']
+    process.argv = ['node', 'specrails-desktop']
     const so = await captureStdoutAsync(async () => { await runMain() })
     expect(so).toContain('Usage:')
     expect(exitCode).toBe(0)
   })
 
   it('handles --status with no server', async () => {
-    process.argv = ['node', 'specrails-hub', '--status', '--port', '19989']
+    process.argv = ['node', 'specrails-desktop', '--status', '--port', '19989']
     const so = await captureStdoutAsync(async () => { await runMain() })
     expect(so).toContain('not running')
     expect(exitCode).toBe(1)
   })
 
   it('handles --jobs with no server', async () => {
-    process.argv = ['node', 'specrails-hub', '--jobs', '--port', '19988']
+    process.argv = ['node', 'specrails-desktop', '--jobs', '--port', '19988']
     await captureStderrAsync(async () => { await captureStdoutAsync(async () => { await runMain() }) })
     expect(exitCode).toBe(1)
   })
 
-  it('handles hub help subcommand', async () => {
-    process.argv = ['node', 'specrails-hub', 'hub', 'help']
+  it('handles desktop help subcommand', async () => {
+    process.argv = ['node', 'specrails-desktop', 'desktop', 'help']
     const so = await captureStdoutAsync(async () => { await runMain() })
-    expect(so).toContain('hub management')
+    expect(so).toContain('server management')
     expect(exitCode).toBe(0)
   })
 
@@ -981,7 +981,7 @@ describe('runViaWebManager WS error', () => {
 
   it('handles WS error event', async () => {
     server = http.createServer((req, res) => {
-      if (req.url === '/api/hub/state') { res.writeHead(404); res.end() }
+      if (req.url === '/api/state') { res.writeHead(404); res.end() }
       else if (req.method === 'POST' && req.url === '/api/spawn') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ jobId: 'je' })) }
       else { res.writeHead(404); res.end() }
     })
@@ -1002,21 +1002,21 @@ describe('runViaWebManager WS error', () => {
 })
 
 // ---------------------------------------------------------------------------
-// handleHub dispatching start/stop/status/list to real functions
+// handleDesktop dispatching start/stop/status/list to real functions
 // ---------------------------------------------------------------------------
 
-describe('handleHub dispatch', () => {
+describe('handleDesktop dispatch', () => {
   let server: http.Server; let port: number
   afterEach(async () => { if (server) await closeServer(server) })
 
   it('dispatches stop subcommand', async () => {
-    const pidFile = _internal.HUB_PID_FILE
+    const pidFile = _internal.DESKTOP_PID_FILE
     const bakFile = pidFile + '.dispatch-test-bak'
     const hadPidFile = fs.existsSync(pidFile)
     if (hadPidFile) fs.renameSync(pidFile, bakFile)
     try {
       let so = ''; await captureStderrAsync(async () => { so = await captureStdoutAsync(async () => {
-        const code = await _internal.handleHub(['stop'], 4200)
+        const code = await _internal.handleDesktop(['stop'], 4200)
         expect(code).toBe(0)
       }) })
       expect(so).toContain('not running')
@@ -1027,29 +1027,29 @@ describe('handleHub dispatch', () => {
 
   it('dispatches status subcommand', async () => {
     const o = await captureStdoutAsync(async () => {
-      const code = await _internal.handleHub(['status'], 19984)
+      const code = await _internal.handleDesktop(['status'], 19984)
       expect(code).toBe(1)
     })
     expect(o).toContain('not running')
   })
 
-  it('dispatches list subcommand when hub not running', async () => {
+  it('dispatches list subcommand when server not running', async () => {
     const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => {
-      expect(await _internal.handleHub(['list'], 19983)).toBe(1)
+      expect(await _internal.handleDesktop(['list'], 19983)).toBe(1)
     }) })
     expect(se).toContain('not running')
   })
 
-  it('dispatches add subcommand when hub not running', async () => {
+  it('dispatches add subcommand when server not running', async () => {
     const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => {
-      expect(await _internal.handleHub(['add', '/tmp/test'], 19982)).toBe(1)
+      expect(await _internal.handleDesktop(['add', '/tmp/test'], 19982)).toBe(1)
     }) })
     expect(se).toContain('not running')
   })
 
-  it('dispatches remove subcommand when hub not running', async () => {
+  it('dispatches remove subcommand when server not running', async () => {
     const se = await captureStderrAsync(async () => { await captureStdoutAsync(async () => {
-      expect(await _internal.handleHub(['remove', 'some-id'], 19981)).toBe(1)
+      expect(await _internal.handleDesktop(['remove', 'some-id'], 19981)).toBe(1)
     }) })
     expect(se).toContain('not running')
   })

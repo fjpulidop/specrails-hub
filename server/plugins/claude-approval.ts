@@ -36,7 +36,7 @@ interface ClaudeSettings {
  *      Code's plugin-marketplace mechanism. When a user installs an MCP via
  *      the marketplace, Serena (or similar) is available in EVERY project
  *      regardless of `.mcp.json`. The card should reflect that the tool is
- *      loaded, not that our hub-managed `.mcp.json` entry is dormant.
+ *      loaded, not that our app-managed `.mcp.json` entry is dormant.
  *
  * Resolution order:
  *   - explicit disable in (1)            → `disabled`
@@ -139,7 +139,7 @@ export function findInstalledMarketplaceKeys(serverName: string): string[] {
 /**
  * Returns marketplace keys that are physically installed in Claude's plugin
  * cache but NOT enabled (i.e., `enabledPlugins[key] !== true`). These are
- * the ones likely to confuse users — the hub disabled them but the binary +
+ * the ones likely to confuse users — the app disabled them but the binary +
  * shipped `.mcp.json` are still on disk; Claude may still resolve the server.
  */
 export function findInstalledButNotEnabledMarketplaceKeys(serverName: string): string[] {
@@ -160,7 +160,7 @@ export function findInstalledButNotEnabledMarketplaceKeys(serverName: string): s
  * Mutates `~/.claude/settings.json` so the named marketplace plugin is set
  * to `false` (disabling it). Atomic temp+rename. Returns true on success.
  *
- * NOTE: this is the only place the hub touches Claude's per-user config.
+ * NOTE: this is the only place the app touches Claude's per-user config.
  * Surface to the user via an explicit action (button/CLI), never silently.
  */
 export function disableMarketplacePlugin(marketplaceKey: string): { ok: boolean; reason?: string } {

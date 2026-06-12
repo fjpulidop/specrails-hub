@@ -19,7 +19,7 @@ import {
 } from '../types/context-scope'
 
 interface Preset {
-  id: 'minimal' | 'light' | 'standard' | 'rich' | 'max' | 'hub'
+  id: 'minimal' | 'light' | 'standard' | 'rich' | 'max' | 'desktop'
   scope: ContextScope
 }
 
@@ -47,7 +47,7 @@ export const PRESETS: readonly Preset[] = [
     scope: { specrails: true, openspec: true, full: true, mcp: false, contractRefine: true },
   },
   {
-    id: 'hub',
+    id: 'desktop',
     scope: { specrails: true, openspec: true, full: true, mcp: true, contractRefine: true, userMcp: true },
   },
 ] as const
@@ -118,7 +118,7 @@ export function ContextScopeSlider({
   budget = null,
   budgetError = false,
   model = 'sonnet',
-  maxPresetId = 'hub',
+  maxPresetId = 'desktop',
   onPresetChange,
   smashCapable = true,
 }: ContextScopeSliderProps) {

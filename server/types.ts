@@ -7,9 +7,9 @@ export interface PhaseDefinition {
   description: string
 }
 
-// ─── ProjectRow (hub-level) — re-exported from hub-db for WS message use ─────
+// ─── ProjectRow (app-level) — re-exported from desktop-db for WS message use ──
 
-import type { ProjectRow } from './hub-db'
+import type { ProjectRow } from './desktop-db'
 export type { ProjectRow }
 
 // ─── ProposalRow re-export ────────────────────────────────────────────────────
@@ -350,22 +350,22 @@ export interface SpecDraftUpdateMessage {
   projectId?: string
 }
 
-// ─── Hub-level message types ──────────────────────────────────────────────────
+// ─── App-level message types ──────────────────────────────────────────────────
 
-export interface HubProjectsMessage {
-  type: 'hub.projects'
+export interface DesktopProjectsMessage {
+  type: 'desktop.projects'
   projects: ProjectRow[]
   timestamp: string
 }
 
-export interface HubProjectAddedMessage {
-  type: 'hub.project_added'
+export interface DesktopProjectAddedMessage {
+  type: 'desktop.project_added'
   project: ProjectRow
   timestamp: string
 }
 
-export interface HubProjectRemovedMessage {
-  type: 'hub.project_removed'
+export interface DesktopProjectRemovedMessage {
+  type: 'desktop.project_removed'
   projectId: string
   timestamp: string
 }
@@ -591,7 +591,7 @@ export interface LocalTicket {
   updated_at: string
   created_by: string
   source: string
-  /** Hub-managed: a job that had already marked this spec `done` then failed —
+  /** App-managed: a job that had already marked this spec `done` then failed —
    *  the spec stays in Done but the board flags it for review. See ticket-store. */
   needs_review?: boolean
 }
@@ -686,11 +686,11 @@ export interface DailyBudgetExceededMessage {
   queuePaused: boolean
 }
 
-export interface HubDailyBudgetExceededMessage {
-  type: 'hub_daily_budget_exceeded'
+export interface DesktopDailyBudgetExceededMessage {
+  type: 'desktop_daily_budget_exceeded'
   projectId: string
-  hubDailySpend: number
-  hubBudget: number
+  desktopDailySpend: number
+  desktopBudget: number
   queuePaused: boolean
 }
 
@@ -896,7 +896,7 @@ export interface PluginState {
 }
 
 export type PluginCardStatus =
-  | 'installed'           // installed + activated (hub-managed Claude approval)
+  | 'installed'           // installed + activated (app-managed Claude approval)
   | 'deactivated'         // installed but user toggled off → Claude no longer loads
   | 'not-installed'
   | 'orphan'              // state.json entry but no plugin in registry
@@ -917,7 +917,7 @@ export interface PluginCatalogEntry {
   healthReason?: string
   /** Claude marketplace plugin keys (e.g., `serena@claude-plugins-official`)
    *  currently enabled that shadow this plugin's MCP server. When non-empty,
-   *  the user has the plugin globally and the hub's project-scoped install
+   *  the user has the plugin globally and the app's project-scoped install
    *  is redundant; UI surfaces a "Disable global" affordance. */
   marketplaceConflicts?: string[]
   /** Marketplace keys that are physically installed in Claude's plugin cache
@@ -996,14 +996,14 @@ export type WsMessage =
   | ChatStreamMessage | ChatDoneMessage | ChatErrorMessage
   | ChatCommandProposalMessage | ChatTitleUpdateMessage
   | SpecDraftUpdateMessage
-  | HubProjectsMessage | HubProjectAddedMessage | HubProjectRemovedMessage
+  | DesktopProjectsMessage | DesktopProjectAddedMessage | DesktopProjectRemovedMessage
   | SetupLogMessage | SetupCheckpointMessage | SetupChatMessage
   | SetupInstallDoneMessage | SetupCompleteMessage | SetupErrorMessage
   | SetupTurnDoneMessage
   | ProposalStreamMessage | ProposalReadyMessage | ProposalRefinedMessage
   | ProposalIssueCreatedMessage | ProposalErrorMessage
   | SpecLauncherStreamMessage | SpecLauncherDoneMessage | SpecLauncherErrorMessage
-  | CostAlertMessage | DailyBudgetExceededMessage | HubDailyBudgetExceededMessage
+  | CostAlertMessage | DailyBudgetExceededMessage | DesktopDailyBudgetExceededMessage
   | PipelineStatusMessage
   | TicketCreatedMessage | TicketUpdatedMessage | TicketDeletedMessage
   | TicketAiEditStreamMessage | TicketAiEditDoneMessage | TicketAiEditErrorMessage
@@ -1062,7 +1062,7 @@ export interface SpendingInvalidatedMessage {
   projectId: string
 }
 
-// ─── Mobile companion (hub-level, no projectId — desktop UI only) ─────────────
+// ─── Mobile companion (app-level, no projectId — desktop UI only) ─────────────
 // These never reach a phone (the gateway WS bridge drops unknown types); they
 // drive the live desktop pairing UI over the existing /ws.
 

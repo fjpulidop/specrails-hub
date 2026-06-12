@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import { useHub } from '../../hooks/useHub'
+import { useDesktop } from '../../hooks/useDesktop'
 import {
   DEFAULT_TERMINAL_SETTINGS,
   TERMINAL_FONT_SIZE_MAX,
@@ -16,24 +16,24 @@ import {
 import { dispatchTerminalSettingsUpdated } from '../../lib/terminal-settings-events'
 
 interface Props {
-  /** Hub mode edits hub_settings; project mode edits a per-project override layer. */
-  mode: 'hub' | 'project'
+  /** Desktop mode edits desktop_settings; project mode edits a per-project override layer. */
+  mode: 'desktop' | 'project'
 }
 
 interface ProjectResponse {
   resolved: TerminalSettings
   override: PartialTerminalSettings
-  hubDefaults: TerminalSettings
+  desktopDefaults: TerminalSettings
 }
 
 const RENDER_MODES: TerminalRenderMode[] = ['auto', 'canvas', 'webgl']
 
 export function TerminalSettingsSection({ mode }: Props) {
   const { t } = useTranslation('settings')
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
 
   // Saved (last server-confirmed) state.
-  const [hub, setHub] = useState<TerminalSettings>(DEFAULT_TERMINAL_SETTINGS)
+  const [desktop, setDesktop] = useState<TerminalSettings>(DEFAULT_TERMINAL_SETTINGS)
   const [override, setOverride] = useState<PartialTerminalSettings>({})
   const [savedResolved, setSavedResolved] = useState<TerminalSettings>(DEFAULT_TERMINAL_SETTINGS)
 
@@ -54,12 +54,12 @@ export function TerminalSettingsSection({ mode }: Props) {
     }
     void (async () => {
       try {
-        if (mode === 'hub') {
-          const res = await fetch('/api/hub/terminal-settings')
-          if (!res.ok) throw new Error('hub fetch failed')
+        if (mode === 'desktop') {
+          const res = await fetch('/api/terminal-settings')
+          if (!res.ok) throw new Error('desktop settings fetch failed')
           const body = (await res.json()) as TerminalSettings
           if (!cancelled && body && typeof body === 'object' && 'fontSize' in body) {
-            setHub(body); setSavedResolved(body); setDraft(body)
+            setDesktop(body); setSavedResolved(body); setDraft(body)
             setClearedFields(new Set())
           }
           if (!cancelled) setLoading(false)
@@ -67,8 +67,8 @@ export function TerminalSettingsSection({ mode }: Props) {
           const res = await fetch(`/api/projects/${activeProjectId}/terminal-settings`)
           if (!res.ok) throw new Error('project fetch failed')
           const body = (await res.json()) as ProjectResponse
-          if (!cancelled && body && typeof body === 'object' && body.resolved && body.hubDefaults) {
-            setHub(body.hubDefaults); setOverride(body.override ?? {}); setSavedResolved(body.resolved); setDraft(body.resolved)
+          if (!cancelled && body && typeof body === 'object' && body.resolved && body.desktopDefaults) {
+            setDesktop(body.desktopDefaults); setOverride(body.override ?? {}); setSavedResolved(body.resolved); setDraft(body.resolved)
             setClearedFields(new Set())
           }
           if (!cancelled) setLoading(false)
@@ -97,10 +97,10 @@ export function TerminalSettingsSection({ mode }: Props) {
 
   function clearOverride(field: keyof TerminalSettings): void {
     if (mode !== 'project') return
-    // Mark for null-PATCH on save and reset draft to the hub default value
+    // Mark for null-PATCH on save and reset draft to the desktop default value
     // so the user immediately sees what they'll get.
     setClearedFields((prev) => { const next = new Set(prev); next.add(field); return next })
-    setDraft((d) => ({ ...d, [field]: hub[field] }))
+    setDraft((d) => ({ ...d, [field]: desktop[field] }))
   }
 
   function reset(): void {
@@ -122,16 +122,16 @@ export function TerminalSettingsSection({ mode }: Props) {
       }
       if (Object.keys(body).length === 0) { toast(t('terminal.nothingToSave')); setSaving(false); return }
 
-      if (mode === 'hub') {
-        const res = await fetch('/api/hub/terminal-settings', {
+      if (mode === 'desktop') {
+        const res = await fetch('/api/terminal-settings', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         })
         if (!res.ok) throw new Error((await res.text()) || 'patch failed')
         const updated = (await res.json()) as TerminalSettings
-        setHub(updated); setSavedResolved(updated); setDraft(updated); setClearedFields(new Set())
-        dispatchTerminalSettingsUpdated({ mode: 'hub', projectId: null })
+        setDesktop(updated); setSavedResolved(updated); setDraft(updated); setClearedFields(new Set())
+        dispatchTerminalSettingsUpdated({ mode: 'desktop', projectId: null })
         toast.success(t('terminal.saved'))
       } else if (activeProjectId) {
         const res = await fetch(`/api/projects/${activeProjectId}/terminal-settings`, {
@@ -141,7 +141,7 @@ export function TerminalSettingsSection({ mode }: Props) {
         })
         if (!res.ok) throw new Error((await res.text()) || 'patch failed')
         const updated = (await res.json()) as ProjectResponse
-        setHub(updated.hubDefaults); setOverride(updated.override); setSavedResolved(updated.resolved); setDraft(updated.resolved)
+        setDesktop(updated.desktopDefaults); setOverride(updated.override); setSavedResolved(updated.resolved); setDraft(updated.resolved)
         setClearedFields(new Set())
         dispatchTerminalSettingsUpdated({ mode: 'project', projectId: activeProjectId })
         toast.success(t('terminal.saved'))
@@ -166,8 +166,8 @@ export function TerminalSettingsSection({ mode }: Props) {
       <CardHeader>
         <CardTitle>{t('terminal.title')}</CardTitle>
         <CardDescription>
-          {mode === 'hub'
-            ? t('terminal.hubDescription')
+          {mode === 'desktop'
+            ? t('terminal.desktopDescription')
             : t('terminal.projectDescription')}
         </CardDescription>
       </CardHeader>
@@ -277,7 +277,7 @@ export function TerminalSettingsSection({ mode }: Props) {
   )
 }
 
-function Field({ id, label, overridden, onClear, mode, children }: { id?: string; label: string; overridden: boolean; onClear: () => void; mode: 'hub' | 'project'; children: React.ReactNode }) {
+function Field({ id, label, overridden, onClear, mode, children }: { id?: string; label: string; overridden: boolean; onClear: () => void; mode: 'desktop' | 'project'; children: React.ReactNode }) {
   const { t } = useTranslation('settings')
   return (
     <div id={id} data-terminal-settings-anchor={id ? '' : undefined} className={id ? 'scroll-mt-4' : undefined}>
@@ -295,7 +295,7 @@ function Field({ id, label, overridden, onClear, mode, children }: { id?: string
   )
 }
 
-function ToggleField({ label, checked, overridden, onClear, onChange, mode }: { label: string; checked: boolean; overridden: boolean; onClear: () => void; onChange: (v: boolean) => void; mode: 'hub' | 'project' }) {
+function ToggleField({ label, checked, overridden, onClear, onChange, mode }: { label: string; checked: boolean; overridden: boolean; onClear: () => void; onChange: (v: boolean) => void; mode: 'desktop' | 'project' }) {
   const { t } = useTranslation('settings')
   return (
     <div className="flex justify-between items-center">

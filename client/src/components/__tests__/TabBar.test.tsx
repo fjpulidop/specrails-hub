@@ -3,12 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '../../test-utils'
 import userEvent from '@testing-library/user-event'
 import { TabBar } from '../TabBar'
-import type { HubProject } from '../../hooks/useHub'
+import type { DesktopProject } from '../../hooks/useDesktop'
 
 const mockSetActiveProjectId = vi.fn()
 const mockRemoveProject = vi.fn().mockResolvedValue(undefined)
 
-const mockProjects: HubProject[] = [
+const mockProjects: DesktopProject[] = [
   {
     id: 'proj-1',
     slug: 'project-one',
@@ -29,7 +29,7 @@ const mockProjects: HubProject[] = [
   },
 ]
 
-let mockHubValue = {
+let mockDesktopValue = {
   projects: mockProjects,
   activeProjectId: 'proj-1',
   setActiveProjectId: mockSetActiveProjectId,
@@ -41,8 +41,8 @@ let mockHubValue = {
   completeSetupWizard: vi.fn(),
 }
 
-vi.mock('../../hooks/useHub', () => ({
-  useHub: () => mockHubValue,
+vi.mock('../../hooks/useDesktop', () => ({
+  useDesktop: () => mockDesktopValue,
 }))
 
 describe('TabBar', () => {
@@ -51,7 +51,7 @@ describe('TabBar', () => {
     mockRemoveProject.mockClear()
   })
 
-  it('renders project tabs from useHub context', () => {
+  it('renders project tabs from useDesktop context', () => {
     render(<TabBar onAddProject={vi.fn()} />)
     expect(screen.getByText('Project One')).toBeInTheDocument()
     expect(screen.getByText('Project Two')).toBeInTheDocument()

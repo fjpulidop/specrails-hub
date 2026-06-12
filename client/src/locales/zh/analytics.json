@@ -120,8 +120,8 @@
     "noData": "当前筛选条件下无数据",
     "failed": "导出失败"
   },
-  "hub": {
-    "title": "Hub 分析",
+  "desktop": {
+    "title": "Desktop 分析",
     "refreshAria": "刷新分析数据",
     "failedToLoad": "加载分析数据失败：{{error}}",
     "totalCost": "总成本",

@@ -53,11 +53,11 @@
   },
   "errors": {
     "limitReached": "Limite de terminais atingido (máx. {{max}}).",
-    "spawnFailed": "A shell não conseguiu arrancar — o hub pode estar com poucos descritores de ficheiros. Tente reiniciar o hub.",
+    "spawnFailed": "A shell não conseguiu arrancar — a aplicação pode estar com poucos descritores de ficheiros. Tente reiniciar a aplicação.",
     "invalidName": "Nome de terminal inválido.",
     "openFailed": "Falha ao abrir o terminal.",
     "serverUnreachable": "Não foi possível contactar o servidor para abrir um terminal.",
-    "exitedImmediately": "O terminal terminou imediatamente — a shell pode não ter arrancado. Se continuar a acontecer, reinicie o hub."
+    "exitedImmediately": "O terminal terminou imediatamente — a shell pode não ter arrancado. Se continuar a acontecer, reinicie a aplicação."
   },
   "session": {
     "processExited": "[processo terminado]",

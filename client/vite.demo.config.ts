@@ -2,10 +2,10 @@
  * Vite config for the static demo build.
  *
  * Uses demo-entry.tsx as the entry point which patches fetch and WebSocket
- * so the hub UI runs entirely from static fixtures — no backend needed.
+ * so the app UI runs entirely from static fixtures — no backend needed.
  *
  * Output goes to dist-demo/ and is intended to be copied into
- * specrails-web/public/hub-demo/ for iframe embedding.
+ * specrails-web/public/desktop-demo/ for iframe embedding.
  */
 
 import { defineConfig } from 'vite'
@@ -19,7 +19,7 @@ export default defineConfig({
     // Empty WS URL — WebSocket is mocked in demo-entry.tsx
     __WS_URL__: JSON.stringify(''),
   },
-  base: '/hub-demo/',
+  base: '/desktop-demo/',
   build: {
     outDir: 'dist-demo',
     emptyOutDir: true,

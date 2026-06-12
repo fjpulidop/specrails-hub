@@ -7,7 +7,7 @@ simultaneously — useful for batch runs where each feature needs a
 different flavor of pipeline.
 
 Requires **`specrails-core >= 4.1.0`** in the target project. Without
-it, the hub still lets you create/edit profiles but the pipeline runs in
+it, the app still lets you create/edit profiles but the pipeline runs in
 legacy mode (a yellow banner on the Agents page tells you when this is
 the case).
 
@@ -67,7 +67,7 @@ rail exactly as it did pre-4.1.0.
 ### Codex / multi-provider
 
 Agent profiles are a **Claude-only** feature. When a rail's AI engine is
-Codex, the hub force-nulls the profile and runs the rail in legacy mode —
+Codex, the app force-nulls the profile and runs the rail in legacy mode —
 Codex has no agent-profile concept. The profile selector is hidden for
 Codex rails, so a profile picked on one engine never silently applies to
 the other.

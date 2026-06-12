@@ -102,7 +102,7 @@
       "standard": "Standard",
       "rich": "Rich",
       "max": "Max",
-      "hub": "Hub"
+      "desktop": "Desktop"
     },
     "presetCost": {
       "minimal": "1× cost · fastest first-token · no specs loaded",
@@ -110,7 +110,7 @@
       "standard": "1.6× cost · Specrails + OpenSpec specs loaded",
       "rich": "2× cost · full repo read access",
       "max": "4× cost · full read + Contract Layer refinement",
-      "hub": "4–6× cost · all features + project & your approved MCPs"
+      "desktop": "4–6× cost · all features + project & your approved MCPs"
     },
     "smashCapable": "SMASH-capable",
     "smashHint": "Contract Layer is on, so this spec can later be decomposed into Sub-Specs.",

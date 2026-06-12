@@ -13,7 +13,7 @@ import {
 } from './ui/dialog'
 import { Button } from './ui/button'
 import { useProposal } from '../hooks/useProposal'
-import { useHub } from '../hooks/useHub'
+import { useDesktop } from '../hooks/useDesktop'
 
 const MD_CLASSES = `prose prose-invert prose-xs max-w-none
   prose-p:my-1 prose-p:leading-relaxed
@@ -57,7 +57,7 @@ function StreamingIndicator({ toolCount }: { toolCount: number }) {
 
 export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProps) {
   const { t } = useTranslation('addspec')
-  const { activeProjectId } = useHub()
+  const { activeProjectId } = useDesktop()
   const { state, startProposal, sendRefinement, createIssue, cancel, reset } =
     useProposal(activeProjectId)
 

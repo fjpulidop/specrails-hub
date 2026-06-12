@@ -41,16 +41,37 @@ describe('MobileWsBridge', () => {
     expect(s.sent).toHaveLength(1)
   })
 
-  it('always forwards hub-level messages, redacted (path stripped)', () => {
+  it('always forwards app-level messages, redacted and translated to the legacy wire type', () => {
     const bridge = new MobileWsBridge()
     const s = new StubSocket()
     bridge.attach(s, 'dev-1') // no subscription
-    bridge.dispatch({ type: 'hub.projects', projects: [{ id: 'p1', path: '/Users/x/p', slug: 's', name: 'n', db_path: '/d', provider: 'claude', providers: ['claude'], added_at: '', last_seen_at: '' }], timestamp: '' } as WsMessage)
+    bridge.dispatch({ type: 'desktop.projects', projects: [{ id: 'p1', path: '/Users/x/p', slug: 's', name: 'n', db_path: '/d', provider: 'claude', providers: ['claude'], added_at: '', last_seen_at: '' }], timestamp: '' } as WsMessage)
     expect(s.sent).toHaveLength(1)
-    const msg = s.sent[0] as { projects: Array<Record<string, unknown>> }
+    const msg = s.sent[0] as { type: string; projects: Array<Record<string, unknown>> }
+    // mobile-app v1 wire compat — the phone receives the legacy type string.
+    expect(msg.type).toBe('hub.projects')
     expect(msg.projects[0].path).toBeUndefined()
     expect(msg.projects[0].db_path).toBeUndefined()
     expect(msg.projects[0].id).toBe('p1')
+  })
+
+  it('translates desktop_daily_budget_exceeded to the legacy alert wire shape', () => {
+    const bridge = new MobileWsBridge()
+    const s = new StubSocket()
+    bridge.attach(s, 'dev-1')
+    sub(s, ['p1'], ['alerts'])
+    bridge.dispatch({
+      type: 'desktop_daily_budget_exceeded', projectId: 'p1',
+      desktopDailySpend: 12.5, desktopBudget: 10, queuePaused: true,
+    } as unknown as WsMessage)
+    expect(s.sent).toHaveLength(1)
+    const msg = s.sent[0] as Record<string, unknown>
+    // mobile-app v1 wire compat — legacy type and payload field names restored.
+    expect(msg.type).toBe('hub_daily_budget_exceeded')
+    expect(msg.hubDailySpend).toBe(12.5)
+    expect(msg.hubBudget).toBe(10)
+    expect(msg.desktopDailySpend).toBeUndefined()
+    expect(msg.desktopBudget).toBeUndefined()
   })
 
   it('buffers watched-job logs and flushes them as a batch', () => {

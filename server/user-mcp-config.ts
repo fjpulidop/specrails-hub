@@ -1,6 +1,6 @@
 // User-approved MCP injection for Explore Spec turns.
 //
-// When a conversation's ContextScope has `userMcp: true`, the hub makes the
+// When a conversation's ContextScope has `userMcp: true`, the app makes the
 // user's OWN already-approved MCP servers available to the spawned CLI — the
 // ones they registered locally with `claude mcp add` / `codex mcp add`, NOT the
 // project-committed `.mcp.json` (that is the separate `mcp` toggle).
@@ -19,7 +19,7 @@
 //     `~/.codex/config.toml` MCP servers natively — no injection needed.
 //
 // The spawn cwd is intentionally left unchanged (the Explore latency win of the
-// hub-managed `explore-cwd/` is preserved); `--mcp-config` carries an absolute
+// app-managed `explore-cwd/` is preserved); `--mcp-config` carries an absolute
 // path so cwd is irrelevant.
 
 import fs from 'node:fs'
@@ -27,7 +27,7 @@ import path from 'node:path'
 import os from 'node:os'
 
 /** A raw MCP server definition as stored in `~/.claude.json`. Shape is opaque
- *  to the hub — it is passed straight through to the CLI via `--mcp-config`. */
+ *  to the app — it is passed straight through to the CLI via `--mcp-config`. */
 export type McpServerEntry = Record<string, unknown>
 
 interface ClaudeConfigShape {
@@ -82,7 +82,7 @@ export function readUserClaudeMcpServers(
 
 /**
  * Write the merged server map to a `{ "mcpServers": {…} }` file under the
- * project's hub directory and return its absolute path. chmod 600 because
+ * project's data directory and return its absolute path. chmod 600 because
  * server `env` blocks can carry secrets (same trust domain as `~/.claude.json`).
  *
  * @param baseDir override `~/.specrails/projects` (tests)
