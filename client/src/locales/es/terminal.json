@@ -1,0 +1,75 @@
+{
+  "topBar": {
+    "title": "Terminal",
+    "openCliMulti": "Abrir CLI de IA en un terminal nuevo",
+    "openCli": "Abrir {{cli}} en un terminal nuevo",
+    "maxTerminals": "Máximo {{max}} terminales por proyecto",
+    "openInBrowser": "Abrir en el navegador",
+    "pasteScript": "Pegar script rápido en el terminal activo",
+    "pasteScriptNoActive": "No hay terminal activo donde pegar",
+    "newTerminal": "Nuevo terminal",
+    "killActive": "Matar el terminal activo",
+    "restorePanel": "Restaurar panel",
+    "maximizePanel": "Maximizar panel"
+  },
+  "panelChevron": {
+    "collapse": "Contraer panel del terminal",
+    "expand": "Expandir panel del terminal"
+  },
+  "dragHandle": {
+    "resize": "Redimensionar panel del terminal"
+  },
+  "sidebar": {
+    "rename": "Renombrar {{name}}",
+    "close": "Cerrar {{name}}"
+  },
+  "emptyState": {
+    "noTerminals": "Aún no hay terminales en este proyecto.",
+    "newTerminal": "Nuevo terminal"
+  },
+  "search": {
+    "placeholder": "Buscar",
+    "previous": "Anterior (Shift+Enter)",
+    "next": "Siguiente (Enter)",
+    "matchCase": "Coincidir mayúsculas y minúsculas",
+    "regex": "Regex",
+    "wholeWord": "Palabra completa",
+    "close": "Cerrar (Esc)"
+  },
+  "contextMenu": {
+    "paste": "Pegar",
+    "selectAll": "Seleccionar todo",
+    "clear": "Limpiar",
+    "search": "Buscar…",
+    "saveScrollback": "Guardar scrollback en un archivo…",
+    "openPath": "Abrir {{path}}"
+  },
+  "cliMenu": {
+    "open": "Abrir {{name}}"
+  },
+  "shortcutMenu": {
+    "configureBrowserUrl": "Configurar la URL del navegador en ajustes…",
+    "editQuickScript": "Editar el script rápido en ajustes…"
+  },
+  "errors": {
+    "limitReached": "Límite de terminales alcanzado (máx. {{max}}).",
+    "spawnFailed": "El shell no pudo iniciarse — puede que el hub se esté quedando sin descriptores de archivo. Prueba a reiniciar el hub.",
+    "invalidName": "Nombre de terminal no válido.",
+    "openFailed": "No se pudo abrir el terminal.",
+    "serverUnreachable": "No se pudo contactar con el servidor para abrir un terminal.",
+    "exitedImmediately": "El terminal terminó de inmediato — puede que el shell no haya podido iniciarse. Si sigue ocurriendo, reinicia el hub."
+  },
+  "session": {
+    "processExited": "[proceso terminado]",
+    "processExitedWithCode": "[proceso terminado (código {{code}})]"
+  },
+  "notifications": {
+    "commandFinished": "Comando finalizado",
+    "commandFinishedNamed": "{{command}} finalizado",
+    "finishedBody": "exit {{code}} en {{elapsed}}"
+  },
+  "duration": {
+    "seconds": "{{seconds}}s",
+    "minutesSeconds": "{{minutes}}m {{seconds}}s"
+  }
+}

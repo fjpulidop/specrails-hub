@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 import {
   Select,
@@ -64,11 +65,8 @@ interface ModelSelectorProps {
   onOverrideChange: (agentId: string, model: string) => void
 }
 
-const PRESET_LABELS: Record<ModelPreset, { label: string; description: string }> = {
-  balanced: { label: 'Balanced', description: 'Sonnet for all agents (recommended)' },
-  budget: { label: 'Budget', description: 'Haiku for all agents — 3x cheaper, faster' },
-  max: { label: 'Max', description: 'Opus for architect + PM, Sonnet for rest' },
-}
+// Preset labels/descriptions live in the `addspec` i18n namespace under
+// `modelSelector.preset.<preset>.{label,description}`.
 
 export function ModelSelector({
   agents,
@@ -78,6 +76,7 @@ export function ModelSelector({
   onPresetChange,
   onOverrideChange,
 }: ModelSelectorProps) {
+  const { t } = useTranslation('addspec')
   const models = provider === 'claude' ? CLAUDE_MODELS : CODEX_MODELS
 
   function getEffectiveModel(agentId: string): string {
@@ -96,7 +95,7 @@ export function ModelSelector({
     <div className="space-y-4">
       {/* Preset selector */}
       <div>
-        <p className="text-xs font-medium mb-2">Model preset</p>
+        <p className="text-xs font-medium mb-2">{t('modelSelector.presetHeading')}</p>
         <div className="grid grid-cols-3 gap-2">
           {(['balanced', 'budget', 'max'] as ModelPreset[]).map((p) => (
             <button
@@ -114,10 +113,10 @@ export function ModelSelector({
                 'text-xs font-semibold',
                 preset === p ? 'text-accent-primary' : 'text-foreground/80'
               )}>
-                {PRESET_LABELS[p].label}
+                {t(`modelSelector.preset.${p}.label`)}
               </span>
               <span className="text-[9px] text-muted-foreground text-center leading-tight">
-                {PRESET_LABELS[p].description}
+                {t(`modelSelector.preset.${p}.description`)}
               </span>
             </button>
           ))}
@@ -127,9 +126,9 @@ export function ModelSelector({
       {/* Per-agent overrides */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-medium">Per-agent model overrides</p>
+          <p className="text-xs font-medium">{t('modelSelector.overridesHeading')}</p>
           <span className="text-[10px] text-muted-foreground">
-            {Object.keys(overrides).length} overridden
+            {t('modelSelector.overriddenCount', { count: Object.keys(overrides).length })}
           </span>
         </div>
 
@@ -148,7 +147,7 @@ export function ModelSelector({
                     {agent.name}
                   </span>
                   {overridden && (
-                    <span className="ml-1 text-[9px] text-accent-warning">custom</span>
+                    <span className="ml-1 text-[9px] text-accent-warning">{t('modelSelector.customBadge')}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-1">
@@ -171,7 +170,7 @@ export function ModelSelector({
                     <button
                       onClick={() => clearOverride(agent.id)}
                       className="text-[9px] text-muted-foreground hover:text-foreground transition-colors px-1"
-                      title="Reset to preset default"
+                      title={t('modelSelector.resetToDefault')}
                     >
                       ↺
                     </button>

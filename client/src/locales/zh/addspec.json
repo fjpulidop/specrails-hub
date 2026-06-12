@@ -1,0 +1,190 @@
+{
+  "proposeModal": {
+    "title": "添加 Spec",
+    "dialogDescription": "用一句简短想法创建新 spec——可立即生成，也可通过 Explore 模式打磨。",
+    "engineAriaLabel": "此 spec 使用的 AI 引擎",
+    "modeTablistLabel": "Spec 创建模式",
+    "mode": {
+      "quick": "Quick",
+      "explore": "Explore",
+      "raw": "Raw",
+      "exploreHint": "交互式",
+      "rawHint": "无 AI"
+    },
+    "modeDescription": {
+      "quick": "描述功能或改动。可附上原型图、简报或数据以提供更多上下文。",
+      "explore": "描述一个粗略的想法。Claude 会通过对话帮你打磨——由你决定何时提交。",
+      "raw": "你的 prompt 原样保存为 spec 工单。现在不运行 AI；拖到 rail 上即可开始构建。"
+    },
+    "editorPlaceholder": {
+      "quick": "例如：在设置页添加深色模式开关，并持久化用户偏好…",
+      "explore": "例如：深色模式——还不确定开关放在哪里、偏好如何持久化…",
+      "raw": "描述功能、改动或想法。支持 Markdown、图片和文件…"
+    },
+    "ideaAriaLabel": "Spec 想法",
+    "raw": {
+      "titleLabel": "标题",
+      "titlePlaceholder": "将根据你的 prompt 自动填充…",
+      "priorityLabel": "优先级",
+      "labelsLabel": "标签",
+      "removeLabel": "移除标签 {{label}}",
+      "addLabelAria": "添加标签",
+      "labelPlaceholder": "可选…",
+      "bodyAriaLabel": "Raw spec 正文"
+    },
+    "priority": {
+      "critical": "紧急",
+      "high": "高",
+      "medium": "中",
+      "low": "低"
+    },
+    "fromWebsite": "从网站创建",
+    "fromWebsiteTitle": "打开真实网页，框选一块区域，把它变成 spec",
+    "capture": {
+      "responsiveSizes_one": "响应式 · {{count}} 个尺寸",
+      "responsiveSizes_other": "响应式 · {{count}} 个尺寸"
+    },
+    "submit": {
+      "quick": "生成 Spec",
+      "explore": "继续",
+      "raw": "创建",
+      "disabledTitle": "请先输入 prompt"
+    },
+    "toast": {
+      "createFailed": "创建 spec 失败",
+      "rawSavedWithId": "已保存为 #{{id}} · Raw spec 可放入 rail",
+      "rawCreated": "Raw spec 已创建",
+      "exploreNotWired": "此视图未接入 Explore 模式",
+      "generating": "正在生成…",
+      "failedToStart": "{{projectName}} · 启动失败",
+      "unsupportedFileType": "不支持的文件类型：{{name}}",
+      "uploadFailed": "{{name}} 上传失败：{{message}}"
+    }
+  },
+  "featureProposal": {
+    "title": "提议一个功能",
+    "ideaIntro": "用自然语言描述你的想法。Claude 会阅读代码库并将其整理成完整提案。",
+    "ideaAriaLabel": "功能想法",
+    "ideaPlaceholder": "例如：我希望用户可以设置预算提醒，当 API 成本超过阈值时收到通知…",
+    "cmdEnterToSubmit": "Cmd+Enter 提交",
+    "exploreIdea": "探索想法",
+    "exploringTitle": "正在探索你的想法…",
+    "refiningTitle": "正在完善提案…",
+    "reviewTitle": "审阅提案",
+    "readingCodebase_one": "正在阅读代码库…（已浏览 {{count}} 个文件）",
+    "readingCodebase_other": "正在阅读代码库…（已浏览 {{count}} 个文件）",
+    "refinementAriaLabel": "完善反馈",
+    "refinementPlaceholder": "提出修改、添加约束、调整范围…",
+    "sendRefinementTitle": "发送完善意见（Cmd+Enter）",
+    "cmdEnterToSend": "Cmd+Enter 发送",
+    "confirmCreateIssue": "根据此提案创建 GitHub Issue？",
+    "yesCreateIssue": "是，创建 Issue",
+    "createGithubIssue": "创建 GitHub Issue",
+    "startOver": "重新开始",
+    "creatingIssueTitle": "正在创建 GitHub Issue…",
+    "creatingIssueViaCli": "正在通过 GitHub CLI 创建 Issue…",
+    "issueCreated": "Issue 已创建",
+    "proposeAnother": "再提一个",
+    "errorTitle": "出错了",
+    "errorFallback": "发生错误",
+    "tryAgain": "重试",
+    "cancelledTitle": "已取消",
+    "cancelledBody": "提案已取消。"
+  },
+  "contextScope": {
+    "heading": "上下文感知",
+    "custom": "自定义",
+    "customMix": "自定义组合——见下方“微调”",
+    "estimateUnavailable": "{{tier}} · 无法估算",
+    "preset": {
+      "minimal": "极简",
+      "light": "轻量",
+      "standard": "标准",
+      "rich": "丰富",
+      "max": "最大",
+      "hub": "Hub"
+    },
+    "presetCost": {
+      "minimal": "1× 成本 · 首 token 最快 · 不加载 spec",
+      "light": "1.3× 成本 · 加载 Specrails spec",
+      "standard": "1.6× 成本 · 加载 Specrails + OpenSpec spec",
+      "rich": "2× 成本 · 完整仓库读取权限",
+      "max": "4× 成本 · 完整读取 + Contract Layer 增强",
+      "hub": "4–6× 成本 · 全部功能 + 项目及你已批准的 MCP"
+    },
+    "smashCapable": "支持 SMASH",
+    "smashHint": "已启用 Contract Layer，此 spec 之后可以被拆解为子 spec。",
+    "fineTune": "微调",
+    "defaultLabel": "上下文范围",
+    "summaryMinimal": "极简",
+    "tags": {
+      "specrails": "specrails",
+      "openspec": "openspec",
+      "codebase": "codebase",
+      "mcp": "mcp",
+      "myMcp": "my-mcp",
+      "contract": "contract"
+    },
+    "checks": {
+      "specrailsLabel": "specrails 工单",
+      "openspecLabel": "openspec spec",
+      "fullLabel": "完整代码库",
+      "mcpLabel": "项目 MCP",
+      "mcpHint": ".mcp.json 服务器",
+      "userMcpLabel": "我已批准的 MCP",
+      "userMcpHint": "~/.claude · ~/.codex 服务器",
+      "userMcpTooltip": "你在本地批准的 MCP 服务器（claude mcp add / codex mcp add）",
+      "exploreOnly": "仅限 Explore 模式",
+      "contractLabel": "用 Contract Layer 增强",
+      "contractHint": "提交后增强 · 启用 SMASH"
+    }
+  },
+  "aiEngine": {
+    "label": "AI 引擎"
+  },
+  "modelSelector": {
+    "presetHeading": "模型预设",
+    "preset": {
+      "balanced": {
+        "label": "均衡",
+        "description": "所有 Agent 使用 Sonnet（推荐）"
+      },
+      "budget": {
+        "label": "经济",
+        "description": "所有 Agent 使用 Haiku——便宜 3 倍、更快"
+      },
+      "max": {
+        "label": "最强",
+        "description": "架构师 + PM 使用 Opus，其余使用 Sonnet"
+      }
+    },
+    "overridesHeading": "按 Agent 覆写模型",
+    "overriddenCount": "已覆写 {{count}} 个",
+    "customBadge": "自定义",
+    "resetToDefault": "重置为预设默认值"
+  },
+  "modelCombobox": {
+    "alias": "Claude Code 别名：{{alias}}",
+    "tier": {
+      "balanced": "均衡",
+      "mostCapable": "能力最强",
+      "fastest": "最快"
+    }
+  },
+  "costMeter": {
+    "heading": "成本感知",
+    "meterAriaLabel": "成本级别",
+    "estimateUnavailable": "仅显示级别——无法估算"
+  },
+  "commandProposal": {
+    "heading": "建议的命令",
+    "run": "运行",
+    "dismiss": "忽略"
+  },
+  "errors": {
+    "serverError": "服务器错误（{{status}}）",
+    "connectionFailed": "连接失败：{{message}}",
+    "sendRefinementFailed": "发送完善意见失败",
+    "createIssueFailed": "创建 Issue 失败"
+  }
+}

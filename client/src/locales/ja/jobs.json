@@ -1,0 +1,201 @@
+{
+  "statusLabel": {
+    "running": "実行中",
+    "completed": "完了",
+    "done": "完了",
+    "failed": "失敗",
+    "canceled": "キャンセル",
+    "queued": "待機中",
+    "zombie": "ゾンビ",
+    "skipped": "スキップ"
+  },
+  "statusTooltip": {
+    "running": "ジョブは実行中です",
+    "completed": "ジョブは正常に完了しました",
+    "failed": "ジョブは非ゼロの終了コードで終了しました",
+    "canceled": "ジョブは手動でキャンセルされました",
+    "queued": "ジョブはキュー内で待機しています",
+    "queuedToRun": "ジョブは実行待ちです",
+    "zombie": "長時間アクティビティがなかったため、ジョブは自動終了されました",
+    "skipped": "パイプライン内の親ジョブが失敗したため、ジョブはスキップされました"
+  },
+  "statusName": {
+    "running": "実行中",
+    "completed": "完了",
+    "failed": "失敗",
+    "canceled": "キャンセル",
+    "zombie_terminated": "ゾンビ",
+    "queued": "待機中",
+    "skipped": "スキップ"
+  },
+  "page": {
+    "title": "ジョブ",
+    "exportJobs": "ジョブをエクスポート",
+    "proposalDeleted": "提案を削除しました",
+    "proposal": {
+      "title": "提案",
+      "noContent": "提案の内容はまだありません。",
+      "githubIssue": "GitHub Issue:"
+    }
+  },
+  "detail": {
+    "breadcrumbDashboard": "ダッシュボード",
+    "breadcrumbJob": "ジョブ #{{id}}",
+    "notFound": "ジョブが見つかりません",
+    "notFoundDescription": "ジョブ ID「{{id}}」は存在しません",
+    "backToDashboard": "ダッシュボードに戻る",
+    "startedAgo": "{{timeAgo}}に開始",
+    "queuedWaiting": "キュー登録済み — 開始待ち",
+    "exportDiagnostic": "診断をエクスポート",
+    "exportDiagnosticAria": "診断バンドルをエクスポート",
+    "exportDiagnosticTooltip": "このジョブのテレメトリ、ログ、サマリーを含む ZIP をダウンロード",
+    "reExecute": "再実行",
+    "reExecuteTooltip": "同じコマンドで新しいジョブを起動",
+    "cancelJob": "ジョブをキャンセル",
+    "cancelJobTooltip": "実行中のプロセスに SIGTERM を送信します。ジョブはキャンセル済みとしてマークされます。",
+    "toast": {
+      "jobDeleted": "ジョブを削除しました",
+      "cancelSignalSent": "キャンセルシグナルを送信しました",
+      "cancelSignalSentDescription": "ジョブは次の安全なポイントで停止します",
+      "failed": "失敗しました",
+      "networkError": "ネットワークエラー",
+      "exportFailed": "エクスポートに失敗しました",
+      "exportFailedHttp": "エクスポートに失敗しました (HTTP {{status}})",
+      "jobRequeued": "ジョブを再キューしました",
+      "spawnFailed": "ジョブの起動に失敗しました"
+    }
+  },
+  "statusPanel": {
+    "inProgress": "ジョブ実行中",
+    "completed": "ジョブ完了",
+    "failed": "ジョブ失敗",
+    "duration": "実行時間",
+    "cost": "コスト",
+    "turns": "ターン",
+    "tokens": "トークン",
+    "filesCount_one": "{{count}} ファイル",
+    "filesCount_other": "{{count}} ファイル",
+    "pipelineTotal": "パイプライン合計（{{count}} フェーズ）",
+    "totalCost": "合計コスト",
+    "totalTokens": "合計トークン",
+    "filesModified": "変更ファイル"
+  },
+  "ticketHeader": {
+    "showMore": "+ 他 {{count}} 件",
+    "showLess": "折りたたむ",
+    "deletedTicket": "#{{id}}（削除済み）",
+    "deletedTooltip": "チケットはもう存在しません"
+  },
+  "modal": {
+    "openInNewTab": "新しいタブで開く",
+    "notFound": "ジョブが見つかりません",
+    "cancelConfirmTitle": "ジョブをキャンセルしますか？",
+    "cancelConfirmDescription": "ジョブは次の安全なポイントで停止します。この操作は元に戻せません。",
+    "keepRunning": "実行を続ける",
+    "cancelJob": "ジョブをキャンセル",
+    "toast": {
+      "cancelSignalSent": "キャンセルシグナルを送信しました",
+      "cancelSignalSentDescription": "ジョブは次の安全なポイントで停止します",
+      "cancelFailed": "キャンセルに失敗しました",
+      "networkError": "ネットワークエラー"
+    }
+  },
+  "comparison": {
+    "title": "ジョブ比較",
+    "jobN": "ジョブ {{n}}",
+    "loadFailed": "比較の読み込みに失敗しました: {{error}}",
+    "duration": "実行時間",
+    "cost": "コスト",
+    "tokensOut": "出力トークン",
+    "tokensIn": "入力トークン",
+    "cacheRead": "キャッシュ読み取り",
+    "model": "モデル",
+    "phasesDone": "完了フェーズ",
+    "betterValueHint": "緑のハイライトはより良い値を示します"
+  },
+  "recent": {
+    "emptyTitle": "ジョブはまだありません",
+    "emptyDescription": "上でコマンドを実行すると、ここにジョブ履歴が表示されます",
+    "filterAll": "すべて ({{count}})",
+    "filterStatus": "{{status}} ({{count}})",
+    "fromDate": "開始日",
+    "toDate": "終了日",
+    "clear": "クリア",
+    "exitCompareMode": "比較モードを終了",
+    "compareTwoJobs": "ジョブを2件比較",
+    "clearJobs": "ジョブをクリア",
+    "selectTwoToCompare": "比較するジョブを2件選択",
+    "selectOneMore": "あと1件選択してください",
+    "readyToCompare": "準備完了 — 比較をクリック",
+    "compareAction": "比較 →",
+    "colStatus": "ステータス",
+    "colCommand": "コマンド",
+    "colDuration": "実行時間",
+    "colTokens": "トークン",
+    "colCost": "コスト",
+    "colStarted": "開始",
+    "profileTooltip": "プロファイル: {{name}}",
+    "pipelinePart": "パイプラインの一部",
+    "pipelineDependsOn": "（前のステップに依存）",
+    "deleteProposal": "提案を削除",
+    "loadMore": "さらに読み込む（残り {{count}} 件）",
+    "priority": {
+      "critical": "クリティカル",
+      "high": "高",
+      "normal": "通常",
+      "low": "低"
+    },
+    "clearModal": {
+      "title": "ジョブをクリア",
+      "jobsInHistory_one": "履歴に {{count}} 件のジョブ",
+      "jobsInHistory_other": "履歴に {{count}} 件のジョブ",
+      "clearAll_one": "{{count}} 件のジョブをすべてクリア",
+      "clearAll_other": "{{count}} 件のジョブをすべてクリア",
+      "orByRange": "または日付範囲でクリア:",
+      "fromPlaceholder": "開始",
+      "toPlaceholder": "終了",
+      "clearInRange_one": "範囲内の {{count}} 件のジョブをクリア",
+      "clearInRange_other": "範囲内の {{count}} 件のジョブをクリア",
+      "clearRange": "範囲をクリア"
+    },
+    "deleteProposalConfirm": {
+      "title": "提案を削除しますか？",
+      "description": "1件の提案が完全に削除されます。この操作は元に戻せません。"
+    },
+    "toast": {
+      "cleared_one": "{{count}} 件のジョブをクリアしました",
+      "cleared_other": "{{count}} 件のジョブをクリアしました",
+      "clearFailed": "ジョブのクリアに失敗しました",
+      "networkError": "ネットワークエラー"
+    }
+  },
+  "activeJob": {
+    "none": "アクティブなジョブはありません",
+    "noneHint": "下のコマンドを選択してジョブを開始",
+    "exitCode": "exit {{code}}",
+    "cancelTooltip": "実行中の claude プロセスに SIGTERM を送信",
+    "viewLogs": "ログを表示",
+    "toast": {
+      "cancelRequested": "ジョブのキャンセルをリクエストしました",
+      "cancelRequestedDescription": "プロセスに SIGTERM を送信しています",
+      "cancelFailed": "ジョブのキャンセルに失敗しました",
+      "networkError": "ジョブのキャンセル中にネットワークエラーが発生しました"
+    }
+  },
+  "logViewer": {
+    "loading": "ログを読み込み中...",
+    "empty": "ログ出力はまだありません",
+    "filterPlaceholder": "ログをフィルター...",
+    "copySuccess": "ログをクリップボードにコピーしました",
+    "copyFailed": "ログのコピーに失敗しました",
+    "lineCount": "{{filtered}} / {{total}} 行",
+    "jumpToBottom": "最下部へ移動",
+    "phaseLines_one": "{{count}} 行",
+    "phaseLines_other": "{{count}} 行",
+    "noMatchingLines": "一致する行はありません",
+    "noOutput": "出力なし",
+    "completed": "完了",
+    "turns_one": "{{count}} ターン",
+    "turns_other": "{{count}} ターン"
+  }
+}

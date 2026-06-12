@@ -1,0 +1,67 @@
+{
+  "page": {
+    "title": "Integrations",
+    "subtitle": "Per-project plugins. Each project decides which integrations to enable independently.",
+    "selectProject": "Select a project to manage integrations.",
+    "deprecated": "Deprecated",
+    "loadError": "Failed to load plugins.",
+    "empty": "No plugins are bundled with this hub build."
+  },
+  "card": {
+    "statusActive": "Active",
+    "statusDeactivated": "Deactivated",
+    "statusDegraded": "Degraded",
+    "updateAvailable": "Update available",
+    "requires": "Requires: {{list}}",
+    "deactivatedHint": "Installed but deactivated — Claude won't load it next session. Toggle <strong>Active</strong> to re-enable.",
+    "install": "Install",
+    "uninstall": "Uninstall"
+  },
+  "toggle": {
+    "titleActive": "Active — click to deactivate",
+    "titleDeactivated": "Deactivated — click to activate"
+  },
+  "cachedNotice": {
+    "body": "Claude has the marketplace plugin <strong>installed but disabled</strong> in its cache. It may still resolve the server from <code>~/.claude/plugins/cache/...</code> even though the toggle is off. To force project-scoped only, uninstall the marketplace plugin from Claude:",
+    "runInstruction": "Run inside an active Claude session, then restart Claude in this project."
+  },
+  "update": {
+    "body": "The bundled manifest changed since you installed (likely an upstream rename). Re-write <code>.mcp.json</code> with the canonical entry — surgical, only the plugin's owned keys are touched.",
+    "button": "Update <code>.mcp.json</code> entry"
+  },
+  "conflict": {
+    "body": "<strong>{{name}}</strong> is also enabled globally via Claude's plugin marketplace, which shadows this project-scoped install. To make this card go Active, disable the global version below — it can be re-enabled from Claude any time.",
+    "disableButton": "Disable <code>{{key}}</code>"
+  },
+  "orphan": {
+    "badge": "Orphan",
+    "removeButton": "Remove orphan"
+  },
+  "installDialog": {
+    "title": "Install {{name}}",
+    "computingChanges": "Computing changes…",
+    "filesHeading": "Files that will change",
+    "prerequisites": "Prerequisites",
+    "autoInstall": "Auto-install",
+    "progress": "Progress",
+    "installingPrereq": "Installing {{name}}…",
+    "prereqStartFailed": "Failed to start: {{message}}"
+  },
+  "uninstallDialog": {
+    "title": "Uninstall {{name}}?",
+    "body": "This will revert plugin-managed entries in <code>.mcp.json</code> and remove any plugin-created files. Your code, history, and other plugins are not affected."
+  },
+  "docs": {
+    "title": "Documentation",
+    "dialogDescription": "Browse the bundled specrails-hub documentation. Use the sidebar to switch between guides.",
+    "sidebarEmpty": "No docs yet",
+    "indexEmpty": "No documents available. The bundled docs ship under docs/ in the repo — drop Markdown files there or under ~/.specrails/docs/ to extend them.",
+    "categoryEmpty": "No documents in this category yet.",
+    "documentCount_one": "{{count}} document",
+    "documentCount_other": "{{count}} documents",
+    "categoryCount_one": "{{count}} category",
+    "categoryCount_other": "{{count}} categories",
+    "summary": "{{documents}} across {{categories}}.",
+    "loadError": "Failed to load document"
+  }
+}

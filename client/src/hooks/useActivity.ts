@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
+import i18n from '../lib/i18n'
 import { getApiBase } from '../lib/api'
 import { useSharedWebSocket } from './useSharedWebSocket'
 
@@ -141,7 +142,7 @@ export function useActivity({ activeProjectId, limit = 50 }: UseActivityOpts): U
         id: `phase:${msg.phase}:${msg.state}:${msg.timestamp}`,
         type: 'job_started', // phases always map to "started" visual
         jobId: `phase-${msg.phase}`,
-        jobCommand: `Phase: ${msg.phase} → ${msg.state}`,
+        jobCommand: i18n.t('activity:feed.phaseCommand', { phase: msg.phase, state: msg.state }),
         timestamp: msg.timestamp,
         summary: `Phase ${msg.phase} is ${msg.state}`,
         costUsd: null,

@@ -1,3 +1,4 @@
+import { useTranslation, Trans } from 'react-i18next'
 import { SHORTCUTS, type Shortcut } from '../hooks/useKeyboardShortcuts'
 import {
   Dialog,
@@ -12,10 +13,10 @@ interface KeyboardShortcutsCheatsheetProps {
   onOpenChange: (open: boolean) => void
 }
 
-const CATEGORY_LABELS: Record<Shortcut['category'], string> = {
-  general: 'General',
-  navigation: 'Navigation',
-  actions: 'Actions',
+const CATEGORY_LABEL_KEYS: Record<Shortcut['category'], string> = {
+  general: 'shortcuts.categories.general',
+  navigation: 'shortcuts.categories.navigation',
+  actions: 'shortcuts.categories.actions',
 }
 
 const CATEGORY_ORDER: Shortcut['category'][] = ['general', 'navigation', 'actions']
@@ -29,10 +30,11 @@ function Kbd({ children }: { children: string }) {
 }
 
 function ShortcutRow({ shortcut }: { shortcut: Shortcut }) {
+  const { t } = useTranslation('commands')
   const keys = shortcut.keys.split(' ')
   return (
     <div className="flex items-center justify-between py-1.5">
-      <span className="text-sm text-muted-foreground">{shortcut.description}</span>
+      <span className="text-sm text-muted-foreground">{t(shortcut.descriptionKey)}</span>
       <div className="flex items-center gap-1 ml-4 shrink-0">
         {keys.map((k, i) => (
           <Kbd key={i}>{k}</Kbd>
@@ -43,9 +45,10 @@ function ShortcutRow({ shortcut }: { shortcut: Shortcut }) {
 }
 
 export function KeyboardShortcutsCheatsheet({ open, onOpenChange }: KeyboardShortcutsCheatsheetProps) {
+  const { t } = useTranslation('commands')
   const grouped = CATEGORY_ORDER.map((cat) => ({
     category: cat,
-    label: CATEGORY_LABELS[cat],
+    label: t(CATEGORY_LABEL_KEYS[cat]),
     shortcuts: SHORTCUTS.filter((s) => s.category === cat),
   })).filter((g) => g.shortcuts.length > 0)
 
@@ -53,9 +56,11 @@ export function KeyboardShortcutsCheatsheet({ open, onOpenChange }: KeyboardShor
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md" data-testid="shortcuts-cheatsheet">
         <DialogHeader>
-          <DialogTitle>Keyboard Shortcuts</DialogTitle>
+          <DialogTitle>{t('shortcuts.title')}</DialogTitle>
           <DialogDescription>
-            Press <Kbd>?</Kbd> anywhere to toggle this panel
+            <Trans i18nKey="shortcuts.subtitle" ns="commands">
+              Press <Kbd>?</Kbd> anywhere to toggle this panel
+            </Trans>
           </DialogDescription>
         </DialogHeader>
 

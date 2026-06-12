@@ -1,0 +1,110 @@
+{
+  "priority": {
+    "critical": "Kritisch",
+    "high": "Hoch",
+    "medium": "Mittel",
+    "low": "Niedrig"
+  },
+  "ticketStatus": {
+    "todo": "To-do",
+    "inProgress": "In Arbeit",
+    "done": "Fertig",
+    "cancelled": "Abgebrochen"
+  },
+  "source": {
+    "manual": "Manuell erstellt",
+    "productBacklog": "Aus dem Product-Backlog",
+    "proposeSpec": "Aus einem Spec-Vorschlag",
+    "getBacklogSpecs": "Aus Backlog-Specs",
+    "freePrompt": "Aus Raw-Prompt"
+  },
+  "fields": {
+    "title": "Titel",
+    "description": "Beschreibung",
+    "status": "Status",
+    "priority": "Priorität",
+    "labels": "Labels",
+    "markdownPlaceholder": "Markdown-Beschreibung…",
+    "supportsMarkdown": "Unterstützt Markdown"
+  },
+  "meta": {
+    "createdAgo": "Erstellt {{time}}",
+    "updatedAgo": "Aktualisiert {{time}}"
+  },
+  "untitled": "Unbenannt",
+  "deleteDialog": {
+    "title": "Ticket löschen",
+    "body": "Möchtest du <strong>#{{id}} {{title}}</strong> wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+  },
+  "detailModal": {
+    "toast": {
+      "updated": "Ticket aktualisiert",
+      "updateFailed": "Ticket konnte nicht aktualisiert werden"
+    },
+    "compare": "Vergleichen",
+    "compareTooltip": "Mit einer anderen Spec vergleichen",
+    "doneEditing": "Bearbeitung abschließen",
+    "addDescription": "Beschreibung hinzufügen…",
+    "prerequisites": "Voraussetzungen",
+    "addLabel": "Label hinzufügen",
+    "addLabelPlaceholder": "Label hinzufügen…",
+    "effort": "Aufwand",
+    "assignee": "Zugewiesen an",
+    "continueEditing": "Weiter bearbeiten",
+    "ticketFallbackLabel": "Ticket #{{id}}"
+  },
+  "contractLayer": {
+    "title": "Contract Layer",
+    "populated": "{{n}}/5 befüllt"
+  },
+  "rail": {
+    "moveToRail": "Auf Rail verschieben",
+    "removeFromRail": "Von Rail entfernen",
+    "currentlyOn": "Aktuell auf {{rail}}",
+    "popoverTitle": "Auf Rail verschieben",
+    "noRails": "Keine Rails verfügbar."
+  },
+  "contextMenu": {
+    "ariaLabel": "Ticket-Aktionen",
+    "deleteTicket": "Ticket löschen",
+    "changeStatus": "Status ändern",
+    "statusOptions": "Statusoptionen",
+    "setPriority": "Priorität festlegen",
+    "priorityOptions": "Prioritätsoptionen"
+  },
+  "viewMode": {
+    "list": "Listenansicht",
+    "grid": "Rasteransicht (Kanban)",
+    "postit": "Post-it-Ansicht"
+  },
+  "createModal": {
+    "title": "Ticket erstellen",
+    "titlePlaceholder": "Ticket-Titel…",
+    "labelsPlaceholder": "Tippen, um Labels hinzuzufügen…",
+    "create": "Erstellen",
+    "creating": "Wird erstellt…",
+    "toast": {
+      "created": "Ticket erstellt",
+      "createFailed": "Ticket konnte nicht erstellt werden"
+    }
+  },
+  "comparePicker": {
+    "title": "Vergleichen mit…",
+    "todoCount": "({{n}} To-do)",
+    "searchPlaceholder": "To-do-Specs durchsuchen…",
+    "noMatches": "Keine passenden To-do-Specs",
+    "empty": "Keine anderen To-do-Specs zum Vergleichen"
+  },
+  "spendingLine": {
+    "ariaLabel": "Ticket-Ausgaben in Analytics anzeigen",
+    "turns_one": "{{count}} Turn",
+    "turns_other": "{{count}} Turns",
+    "active": "{{duration}} aktiv",
+    "breakdownItem": "{{n}} {{label}}"
+  },
+  "toasts": {
+    "newTicket": "Neues Ticket: {{title}}",
+    "newTicketsAdded_one": "{{count}} neues Ticket aus der Produkt-Discovery hinzugefügt",
+    "newTicketsAdded_other": "{{count}} neue Tickets aus der Produkt-Discovery hinzugefügt"
+  }
+}

@@ -1,0 +1,186 @@
+{
+  "palette": {
+    "label": "Command palette",
+    "searchPlaceholder": "Search projects, commands, jobs...",
+    "noResults": "No results found.",
+    "activeBadge": "active",
+    "groups": {
+      "projects": "Projects",
+      "spec": "Spec",
+      "jobs": "Jobs",
+      "navigation": "Navigation"
+    },
+    "nav": {
+      "dashboard": "Dashboard",
+      "hubAnalytics": "Hub Analytics",
+      "projectAnalytics": "Project Analytics",
+      "activityFeed": "Activity Feed",
+      "hubSettings": "Hub Settings",
+      "docs": "Docs"
+    },
+    "sidebar": {
+      "collapseLeftKeepPinned": "Collapse left sidebar (keep pinned)",
+      "unpinLeft": "Unpin left sidebar",
+      "pinLeftOpen": "Pin left sidebar open",
+      "collapseRightKeepPinned": "Collapse right sidebar (keep pinned)",
+      "unpinRight": "Unpin right sidebar",
+      "pinRightOpen": "Pin right sidebar open"
+    },
+    "footer": {
+      "navigate": "navigate",
+      "select": "select",
+      "close": "close"
+    }
+  },
+  "toasts": {
+    "queued": "{{name}} queued",
+    "queuing": "Queuing {{name}}..."
+  },
+  "errors": {
+    "spawnFailed": "Failed to spawn command"
+  },
+  "grid": {
+    "sections": {
+      "discovery": "Discovery",
+      "discoverySubtitle": "Explore & define your product",
+      "delivery": "Delivery",
+      "deliverySubtitle": "Build & ship features",
+      "others": "Others"
+    },
+    "displayNames": {
+      "proposeSpec": "Custom-Propose",
+      "updateBacklog": "Auto-propose",
+      "productBacklog": "Auto-Select Specs"
+    },
+    "emptyState": {
+      "title": "No commands installed",
+      "hint": "Run <1>/setup</1> in Claude Code to install specrails commands"
+    },
+    "runs_one": "{{count}} run",
+    "runs_other": "{{count}} runs",
+    "tooltip": {
+      "opensWizard": "Opens guided wizard"
+    }
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "subtitle": "Press <1>?</1> anywhere to toggle this panel",
+    "categories": {
+      "general": "General",
+      "navigation": "Navigation",
+      "actions": "Actions"
+    },
+    "items": {
+      "showCheatsheet": "Show keyboard shortcuts",
+      "closeModal": "Close modal / sidebar",
+      "toggleRightSidebar": "Toggle right sidebar",
+      "toggleLeftSidebar": "Toggle left sidebar",
+      "toggleTerminal": "Toggle terminal panel",
+      "navigateProjectPageWithAgents": "Navigate to project page (Dashboard/Jobs/Analytics/Agents/Settings)",
+      "navigateProjectPage": "Navigate to project page (Dashboard/Jobs/Analytics/Settings)",
+      "switchProject": "Switch to project by position",
+      "goDashboard": "Go to Dashboard",
+      "goActivity": "Go to Activity / Jobs",
+      "goAnalytics": "Go to Analytics",
+      "goSettings": "Go to Settings",
+      "nextItem": "Next item in list",
+      "prevItem": "Previous item in list"
+    }
+  },
+  "update": {
+    "title": {
+      "available": "Update available",
+      "downloading": "Downloading update",
+      "installing": "Installing update",
+      "ready": "Update ready",
+      "error": "Update failed"
+    },
+    "desc": {
+      "available": "A new version of SpecRails Hub is ready to install.",
+      "fetching": "Fetching {{size}}…",
+      "progress": "{{percent}}% · {{downloaded}} of {{total}}",
+      "installing": "Verifying signature and finishing up…",
+      "ready": "Restart to launch version {{version}}.",
+      "errorFallback": "Couldn’t complete the update. Please try again."
+    },
+    "pill": {
+      "downloading": "Downloading",
+      "installing": "Installing",
+      "ready": "Ready"
+    },
+    "actions": {
+      "restart": "Restart",
+      "later": "Later",
+      "update": "Update",
+      "installing": "Installing…",
+      "tryAgain": "Try again",
+      "dismiss": "Dismiss"
+    },
+    "mockReady": "Mock update ready — restart skipped",
+    "errors": {
+      "installFailed": "Could not install update"
+    },
+    "units": {
+      "kb": "{{value}} KB",
+      "mb": "{{value}} MB"
+    }
+  },
+  "notifications": {
+    "jobCompleted": "Job completed",
+    "jobFailed": "Job failed",
+    "unknownCommand": "Unknown command"
+  },
+  "templates": {
+    "emptyState": {
+      "title": "No templates yet.",
+      "hint": "Save command sequences to run them with one click."
+    },
+    "createButton": "Create template",
+    "newButton": "New template",
+    "steps_one": "{{count}} step",
+    "steps_other": "{{count}} steps",
+    "moreCommands_one": "+{{count}} more",
+    "moreCommands_other": "+{{count}} more",
+    "run": "Run",
+    "queuing": "Queuing…",
+    "aria": {
+      "edit": "Edit template",
+      "delete": "Delete template"
+    },
+    "confirmDelete": "Delete template \"{{name}}\"?",
+    "toasts": {
+      "queuedJobs_one": "Queued {{count}} job from \"{{name}}\"",
+      "queuedJobs_other": "Queued {{count}} jobs from \"{{name}}\"",
+      "deleted": "Template \"{{name}}\" deleted"
+    },
+    "errors": {
+      "runFailed": "Failed to run template",
+      "deleteFailed": "Failed to delete template"
+    }
+  },
+  "templateDialog": {
+    "editTitle": "Edit Template",
+    "newTitle": "New Template",
+    "nameLabel": "Name",
+    "namePlaceholder": "e.g. Full pipeline",
+    "descriptionLabel": "Description (optional)",
+    "descriptionPlaceholder": "What does this rail do?",
+    "stepsLabel": "Steps (commands or free prompts)",
+    "stepPlaceholder": "Select a command or type a free prompt...",
+    "aria": {
+      "moveUp": "Move up",
+      "removeStep": "Remove step"
+    },
+    "update": "Update",
+    "create": "Create",
+    "errors": {
+      "nameRequired": "Name is required",
+      "stepRequired": "At least one step is required",
+      "saveFailed": "Failed to save template"
+    },
+    "toasts": {
+      "updated": "Template updated",
+      "created": "Template created"
+    }
+  }
+}

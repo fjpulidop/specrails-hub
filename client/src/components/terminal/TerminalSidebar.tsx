@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Pencil, Terminal as TerminalIcon, X } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import type { TerminalRef } from '../../context/TerminalsContext'
@@ -44,6 +45,7 @@ interface SidebarItemProps {
 }
 
 function SidebarItem({ session, active, onActivate, onRename, onKill }: SidebarItemProps) {
+  const { t } = useTranslation('terminal')
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(session.name)
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -117,8 +119,8 @@ function SidebarItem({ session, active, onActivate, onRename, onKill }: SidebarI
         {!editing && (
           <button
             type="button"
-            aria-label={`Rename ${session.name}`}
-            title={`Rename ${session.name}`}
+            aria-label={t('sidebar.rename', { name: session.name })}
+            title={t('sidebar.rename', { name: session.name })}
             onClick={(e) => { e.stopPropagation(); startEditing() }}
             className={cn(
               'inline-flex items-center justify-center h-4 w-4 rounded',
@@ -133,8 +135,8 @@ function SidebarItem({ session, active, onActivate, onRename, onKill }: SidebarI
         )}
         <button
           type="button"
-          aria-label={`Close ${session.name}`}
-          title={`Close ${session.name}`}
+          aria-label={t('sidebar.close', { name: session.name })}
+          title={t('sidebar.close', { name: session.name })}
           onClick={(e) => { e.stopPropagation(); onKill() }}
           className={cn(
             'inline-flex items-center justify-center h-4 w-4 rounded',

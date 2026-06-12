@@ -1,0 +1,186 @@
+{
+  "palette": {
+    "label": "命令面板",
+    "searchPlaceholder": "搜索项目、命令、任务...",
+    "noResults": "未找到结果。",
+    "activeBadge": "当前",
+    "groups": {
+      "projects": "项目",
+      "spec": "Spec",
+      "jobs": "任务",
+      "navigation": "导航"
+    },
+    "nav": {
+      "dashboard": "仪表盘",
+      "hubAnalytics": "Hub 分析",
+      "projectAnalytics": "项目分析",
+      "activityFeed": "活动流",
+      "hubSettings": "Hub 设置",
+      "docs": "文档"
+    },
+    "sidebar": {
+      "collapseLeftKeepPinned": "收起左侧边栏（保持固定）",
+      "unpinLeft": "取消固定左侧边栏",
+      "pinLeftOpen": "固定并展开左侧边栏",
+      "collapseRightKeepPinned": "收起右侧边栏（保持固定）",
+      "unpinRight": "取消固定右侧边栏",
+      "pinRightOpen": "固定并展开右侧边栏"
+    },
+    "footer": {
+      "navigate": "导航",
+      "select": "选择",
+      "close": "关闭"
+    }
+  },
+  "toasts": {
+    "queued": "{{name}} 已加入队列",
+    "queuing": "正在将 {{name}} 加入队列..."
+  },
+  "errors": {
+    "spawnFailed": "启动命令失败"
+  },
+  "grid": {
+    "sections": {
+      "discovery": "探索",
+      "discoverySubtitle": "探索并定义你的产品",
+      "delivery": "交付",
+      "deliverySubtitle": "构建并交付功能",
+      "others": "其他"
+    },
+    "displayNames": {
+      "proposeSpec": "自定义提案",
+      "updateBacklog": "自动提案",
+      "productBacklog": "自动选择 Spec"
+    },
+    "emptyState": {
+      "title": "未安装命令",
+      "hint": "在 Claude Code 中运行 <1>/setup</1> 以安装 specrails 命令"
+    },
+    "runs_one": "{{count}} 次运行",
+    "runs_other": "{{count}} 次运行",
+    "tooltip": {
+      "opensWizard": "打开引导向导"
+    }
+  },
+  "shortcuts": {
+    "title": "键盘快捷键",
+    "subtitle": "在任意位置按 <1>?</1> 切换此面板",
+    "categories": {
+      "general": "通用",
+      "navigation": "导航",
+      "actions": "操作"
+    },
+    "items": {
+      "showCheatsheet": "显示键盘快捷键",
+      "closeModal": "关闭弹窗 / 侧边栏",
+      "toggleRightSidebar": "切换右侧边栏",
+      "toggleLeftSidebar": "切换左侧边栏",
+      "toggleTerminal": "切换终端面板",
+      "navigateProjectPageWithAgents": "导航到项目页面（仪表盘/任务/分析/Agent/设置）",
+      "navigateProjectPage": "导航到项目页面（仪表盘/任务/分析/设置）",
+      "switchProject": "按位置切换项目",
+      "goDashboard": "前往仪表盘",
+      "goActivity": "前往活动 / 任务",
+      "goAnalytics": "前往分析",
+      "goSettings": "前往设置",
+      "nextItem": "列表中的下一项",
+      "prevItem": "列表中的上一项"
+    }
+  },
+  "update": {
+    "title": {
+      "available": "有可用更新",
+      "downloading": "正在下载更新",
+      "installing": "正在安装更新",
+      "ready": "更新已就绪",
+      "error": "更新失败"
+    },
+    "desc": {
+      "available": "SpecRails Hub 新版本已可安装。",
+      "fetching": "正在获取 {{size}}…",
+      "progress": "{{percent}}% · {{downloaded}} / {{total}}",
+      "installing": "正在验证签名并完成…",
+      "ready": "重启以启动版本 {{version}}。",
+      "errorFallback": "无法完成更新。请重试。"
+    },
+    "pill": {
+      "downloading": "下载中",
+      "installing": "安装中",
+      "ready": "已就绪"
+    },
+    "actions": {
+      "restart": "重启",
+      "later": "稍后",
+      "update": "更新",
+      "installing": "安装中…",
+      "tryAgain": "重试",
+      "dismiss": "忽略"
+    },
+    "mockReady": "模拟更新已就绪 — 已跳过重启",
+    "errors": {
+      "installFailed": "无法安装更新"
+    },
+    "units": {
+      "kb": "{{value}} KB",
+      "mb": "{{value}} MB"
+    }
+  },
+  "notifications": {
+    "jobCompleted": "任务已完成",
+    "jobFailed": "任务失败",
+    "unknownCommand": "未知命令"
+  },
+  "templates": {
+    "emptyState": {
+      "title": "暂无模板。",
+      "hint": "保存命令序列，一键运行。"
+    },
+    "createButton": "创建模板",
+    "newButton": "新建模板",
+    "steps_one": "{{count}} 个步骤",
+    "steps_other": "{{count}} 个步骤",
+    "moreCommands_one": "+{{count}} 更多",
+    "moreCommands_other": "+{{count}} 更多",
+    "run": "运行",
+    "queuing": "加入队列中…",
+    "aria": {
+      "edit": "编辑模板",
+      "delete": "删除模板"
+    },
+    "confirmDelete": "删除模板“{{name}}”？",
+    "toasts": {
+      "queuedJobs_one": "已从“{{name}}”将 {{count}} 个任务加入队列",
+      "queuedJobs_other": "已从“{{name}}”将 {{count}} 个任务加入队列",
+      "deleted": "模板“{{name}}”已删除"
+    },
+    "errors": {
+      "runFailed": "运行模板失败",
+      "deleteFailed": "删除模板失败"
+    }
+  },
+  "templateDialog": {
+    "editTitle": "编辑模板",
+    "newTitle": "新建模板",
+    "nameLabel": "名称",
+    "namePlaceholder": "例如：完整流水线",
+    "descriptionLabel": "描述（可选）",
+    "descriptionPlaceholder": "这个 Rail 做什么？",
+    "stepsLabel": "步骤（命令或自由提示词）",
+    "stepPlaceholder": "选择命令或输入自由提示词...",
+    "aria": {
+      "moveUp": "上移",
+      "removeStep": "移除步骤"
+    },
+    "update": "更新",
+    "create": "创建",
+    "errors": {
+      "nameRequired": "名称为必填项",
+      "stepRequired": "至少需要一个步骤",
+      "saveFailed": "保存模板失败"
+    },
+    "toasts": {
+      "updated": "模板已更新",
+      "created": "模板已创建"
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import { useReducer, useEffect, useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSharedWebSocket } from './useSharedWebSocket'
 import { getApiBase } from '../lib/api'
 
@@ -56,6 +57,7 @@ export function useSpecLauncher(activeProjectId: string | null): {
   cancel: () => Promise<void>
   reset: () => void
 } {
+  const { t } = useTranslation('addspec')
   const [state, dispatch] = useReducer(reducer, initialState)
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
 
@@ -113,7 +115,7 @@ export function useSpecLauncher(activeProjectId: string | null): {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { error?: string }
-        dispatch({ type: 'ERROR', error: data.error ?? `Server error (${res.status})` })
+        dispatch({ type: 'ERROR', error: data.error ?? t('errors.serverError', { status: res.status }) })
         return
       }
       const data = await res.json() as { launchId: string }
@@ -121,9 +123,9 @@ export function useSpecLauncher(activeProjectId: string | null): {
       launchIdRef.current = data.launchId
       dispatch({ type: 'START', launchId: data.launchId })
     } catch (err) {
-      dispatch({ type: 'ERROR', error: `Connection failed: ${(err as Error).message}` })
+      dispatch({ type: 'ERROR', error: t('errors.connectionFailed', { message: (err as Error).message }) })
     }
-  }, [])
+  }, [t])
 
   const cancel = useCallback(async (): Promise<void> => {
     const currentLaunchId = launchIdRef.current

@@ -1,0 +1,110 @@
+{
+  "priority": {
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  },
+  "ticketStatus": {
+    "todo": "Todo",
+    "inProgress": "In Progress",
+    "done": "Done",
+    "cancelled": "Cancelled"
+  },
+  "source": {
+    "manual": "Created manually",
+    "productBacklog": "From product backlog",
+    "proposeSpec": "From spec proposal",
+    "getBacklogSpecs": "From backlog specs",
+    "freePrompt": "From Raw prompt"
+  },
+  "fields": {
+    "title": "Title",
+    "description": "Description",
+    "status": "Status",
+    "priority": "Priority",
+    "labels": "Labels",
+    "markdownPlaceholder": "Markdown description...",
+    "supportsMarkdown": "Supports markdown"
+  },
+  "meta": {
+    "createdAgo": "Created {{time}}",
+    "updatedAgo": "Updated {{time}}"
+  },
+  "untitled": "Untitled",
+  "deleteDialog": {
+    "title": "Delete ticket",
+    "body": "Are you sure you want to delete <strong>#{{id}} {{title}}</strong>? This action cannot be undone."
+  },
+  "detailModal": {
+    "toast": {
+      "updated": "Ticket updated",
+      "updateFailed": "Failed to update ticket"
+    },
+    "compare": "Compare",
+    "compareTooltip": "Compare with another spec",
+    "doneEditing": "Done editing",
+    "addDescription": "Add a description...",
+    "prerequisites": "Prerequisites",
+    "addLabel": "Add label",
+    "addLabelPlaceholder": "Add label...",
+    "effort": "Effort",
+    "assignee": "Assignee",
+    "continueEditing": "Continue Editing",
+    "ticketFallbackLabel": "Ticket #{{id}}"
+  },
+  "contractLayer": {
+    "title": "Contract Layer",
+    "populated": "{{n}}/5 populated"
+  },
+  "rail": {
+    "moveToRail": "Move to Rail",
+    "removeFromRail": "Remove from Rail",
+    "currentlyOn": "Currently on {{rail}}",
+    "popoverTitle": "Move to rail",
+    "noRails": "No rails available."
+  },
+  "contextMenu": {
+    "ariaLabel": "Ticket actions",
+    "deleteTicket": "Delete ticket",
+    "changeStatus": "Change status",
+    "statusOptions": "Status options",
+    "setPriority": "Set priority",
+    "priorityOptions": "Priority options"
+  },
+  "viewMode": {
+    "list": "List view",
+    "grid": "Grid view (Kanban)",
+    "postit": "Post-it view"
+  },
+  "createModal": {
+    "title": "Create Ticket",
+    "titlePlaceholder": "Ticket title...",
+    "labelsPlaceholder": "Type to add labels...",
+    "create": "Create",
+    "creating": "Creating...",
+    "toast": {
+      "created": "Ticket created",
+      "createFailed": "Failed to create ticket"
+    }
+  },
+  "comparePicker": {
+    "title": "Compare with…",
+    "todoCount": "({{n}} todo)",
+    "searchPlaceholder": "Search todo specs…",
+    "noMatches": "No matching todo specs",
+    "empty": "No other todo specs to compare"
+  },
+  "spendingLine": {
+    "ariaLabel": "View ticket spending in Analytics",
+    "turns_one": "{{count}} turn",
+    "turns_other": "{{count}} turns",
+    "active": "{{duration}} active",
+    "breakdownItem": "{{n}} {{label}}"
+  },
+  "toasts": {
+    "newTicket": "New ticket: {{title}}",
+    "newTicketsAdded_one": "{{count}} new ticket added from product discovery",
+    "newTicketsAdded_other": "{{count}} new tickets added from product discovery"
+  }
+}

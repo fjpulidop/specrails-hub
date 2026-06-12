@@ -12,6 +12,7 @@
  * See openspec/changes/add-spec-context-slider.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   estimateCostUsd, estimateInputTokens, tierFromScope, timeHintForTier,
   type ContextBudget, type ContextScope,
@@ -19,47 +20,35 @@ import {
 
 interface Preset {
   id: 'minimal' | 'light' | 'standard' | 'rich' | 'max' | 'hub'
-  label: string
   scope: ContextScope
-  costSummary: string
 }
 
+// Labels and cost summaries live in the `addspec` i18n namespace under
+// `contextScope.preset.<id>` / `contextScope.presetCost.<id>`.
 export const PRESETS: readonly Preset[] = [
   {
     id: 'minimal',
-    label: 'Minimal',
     scope: { specrails: false, openspec: false, full: false, mcp: false, contractRefine: false },
-    costSummary: '1× cost · fastest first-token · no specs loaded',
   },
   {
     id: 'light',
-    label: 'Light',
     scope: { specrails: true, openspec: false, full: false, mcp: false, contractRefine: false },
-    costSummary: '1.3× cost · Specrails specs loaded',
   },
   {
     id: 'standard',
-    label: 'Standard',
     scope: { specrails: true, openspec: true, full: false, mcp: false, contractRefine: false },
-    costSummary: '1.6× cost · Specrails + OpenSpec specs loaded',
   },
   {
     id: 'rich',
-    label: 'Rich',
     scope: { specrails: true, openspec: true, full: true, mcp: false, contractRefine: false },
-    costSummary: '2× cost · full repo read access',
   },
   {
     id: 'max',
-    label: 'Max',
     scope: { specrails: true, openspec: true, full: true, mcp: false, contractRefine: true },
-    costSummary: '4× cost · full read + Contract Layer refinement',
   },
   {
     id: 'hub',
-    label: 'Hub',
     scope: { specrails: true, openspec: true, full: true, mcp: true, contractRefine: true, userMcp: true },
-    costSummary: '4–6× cost · all features + project & your approved MCPs',
   },
 ] as const
 
@@ -133,6 +122,7 @@ export function ContextScopeSlider({
   onPresetChange,
   smashCapable = true,
 }: ContextScopeSliderProps) {
+  const { t } = useTranslation('addspec')
   const railRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState(false)
   const [dragPos, setDragPos] = useState<number | null>(null)
@@ -210,11 +200,11 @@ export function ContextScopeSlider({
   }, [dragging, dragPos, maxPresetIndex, thumbRank])
 
   const costLine = isCustom
-    ? 'Custom mix — see Fine-tune below'
-    : (activePreset?.costSummary ?? '')
+    ? t('contextScope.customMix')
+    : (activePreset ? t(`contextScope.presetCost.${activePreset.id}`) : '')
   const tier = tierFromScope(value)
   const numericLine = budgetError || !budget
-    ? `${tier} · estimate unavailable`
+    ? t('contextScope.estimateUnavailable', { tier })
     : `${tier} · ${formatTokens(estimateInputTokens(value, budget))} · ${formatCost(estimateCostUsd(value, budget, model))} · ${timeHintForTier(tier)}`
 
   return (
@@ -222,14 +212,14 @@ export function ContextScopeSlider({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-            Context Awareness
+            {t('contextScope.heading')}
           </span>
           {isCustom ? (
             <span
               className="rounded-full bg-accent-warning/15 px-2 py-0.5 text-[10px] font-semibold text-accent-warning"
               data-testid="scope-custom-pill"
             >
-              Custom
+              {t('contextScope.custom')}
             </span>
           ) : null}
         </div>
@@ -246,7 +236,7 @@ export function ContextScopeSlider({
             }`}
             data-testid={`scope-stop-${p.id}`}
           >
-            {p.label}
+            {t(`contextScope.preset.${p.id}`)}
           </button>
         ))}
       </div>
@@ -256,7 +246,7 @@ export function ContextScopeSlider({
         aria-valuemin={0}
         aria-valuemax={maxPresetIndex}
         aria-valuenow={activeIndex < 0 ? Math.round(thumbRank) : activeIndex}
-        aria-valuetext={isCustom ? 'Custom' : (activePreset?.label ?? '')}
+        aria-valuetext={isCustom ? t('contextScope.custom') : (activePreset ? t(`contextScope.preset.${activePreset.id}`) : '')}
         tabIndex={0}
         onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
@@ -296,8 +286,7 @@ export function ContextScopeSlider({
         >
           <span aria-hidden className="text-accent-highlight">⊢→</span>
           <span>
-            <strong className="text-accent-highlight">SMASH-capable</strong> · Contract Layer is on,
-            so this spec can later be decomposed into Sub-Specs.
+            <strong className="text-accent-highlight">{t('contextScope.smashCapable')}</strong> · {t('contextScope.smashHint')}
           </span>
         </div>
       )}

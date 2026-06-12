@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Bot } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import type { ProfileListEntry } from './types'
@@ -16,6 +17,7 @@ const LEGACY_VALUE = '__legacy__'
  * in the project (rails default to legacy then). Auto-refreshes on mount.
  */
 export function RailProfileSelector({ value, onChange }: Props) {
+  const { t } = useTranslation('agents')
   const [profiles, setProfiles] = useState<ProfileListEntry[]>([])
   const [loaded, setLoaded] = useState(false)
 
@@ -45,7 +47,7 @@ export function RailProfileSelector({ value, onChange }: Props) {
   return (
     <div
       className="inline-flex items-center"
-      title="Agent profile for this rail"
+      title={t('railSelectors.profileTitle')}
       // stop click from bubbling to the rail header's onMouseDown / long-press
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
@@ -64,7 +66,7 @@ export function RailProfileSelector({ value, onChange }: Props) {
             {p.name}
           </option>
         ))}
-        <option value={LEGACY_VALUE}>No profile</option>
+        <option value={LEGACY_VALUE}>{t('railSelectors.noProfile')}</option>
       </select>
     </div>
   )

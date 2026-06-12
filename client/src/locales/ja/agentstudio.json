@@ -1,0 +1,412 @@
+{
+  "studio": {
+    "loadingAgent": "エージェントを読み込み中…",
+    "modeCreate": "新規カスタムエージェント",
+    "modeEdit": "カスタムエージェントを編集",
+    "create": "作成",
+    "unsaved": "● 未保存",
+    "resumeAiEdit": "AI編集を再開",
+    "resumeAiEditTitle": "このドラフトをAI編集オーバーレイに戻す",
+    "loadingAiDraft": "AIドラフトを読み込み中…",
+    "testButton": "テスト",
+    "testButtonTitle": "サンプルタスクでこのエージェントをテスト",
+    "historyButton": "履歴",
+    "historyButtonTitle": "バージョン履歴",
+    "deleteConfirm": {
+      "title": "エージェント「{{agentId}}」を削除しますか？",
+      "description": "ディスクから .md を削除します。バージョン履歴は DB に残ります — 後で本文を復元したい場合は新しいカスタムエージェントを作成してください。"
+    },
+    "errors": {
+      "loadDraftFailed": "ドラフトの読み込みに失敗しました: {{status}}",
+      "loadFailed": "読み込みに失敗しました: {{status}}",
+      "saveFailed": "保存に失敗しました: {{status}}",
+      "deleteFailed": "削除に失敗しました: {{status}}",
+      "testFailed": "テストに失敗しました: {{status}}"
+    },
+    "toasts": {
+      "agentCreated": "エージェントを作成しました",
+      "agentSaved": "エージェントを保存しました",
+      "agentDeleted": "エージェントを削除しました",
+      "createFailed": "エージェントの作成に失敗しました",
+      "saveFailed": "エージェントの保存に失敗しました",
+      "deleteFailed": "エージェントの削除に失敗しました"
+    },
+    "validation": {
+      "namePattern": "名前は <code>custom-</code> で始まり、小文字・数字・ハイフンのみ使用できます。",
+      "missingFrontmatter": "YAML フロントマターがありません（1行目に <code>---</code> が必要です）。"
+    },
+    "sampleTasks": {
+      "pick": "— サンプルタスクを選択 —",
+      "terraform": "Terraform: 公開 S3 バケット",
+      "sqlInjection": "コードレビュー: SQL インジェクション",
+      "accessibility": "フロントエンド: アクセシビリティ",
+      "schemaChange": "データ: スキーマ変更",
+      "slowQuery": "パフォーマンス: 遅いクエリ"
+    },
+    "testPane": {
+      "header": "エージェントをテスト",
+      "sampleTaskLabel": "サンプルタスク",
+      "placeholder": "エージェントに実行させたい内容を記述するか、上のサンプルを選択してください。",
+      "run": "実行",
+      "running": "実行中…",
+      "sandboxNote": "サンドボックス実行。ファイルへの書き込みはありません。",
+      "tokens_one": "<mono>{{count}}</mono> トークン",
+      "tokens_other": "<mono>{{count}}</mono> トークン",
+      "emptyHint": "現在のドラフトに対してサンプルタスクを実行します。出力はここに表示されます。"
+    },
+    "versions": {
+      "header": "バージョン履歴",
+      "empty": "このエージェントの過去のバージョンはありません。",
+      "restoreHint": "バージョンをクリックすると本文がエディタに復元されます（保存は別途必要です）。"
+    }
+  },
+  "refine": {
+    "eyebrow": "AI編集",
+    "headline": "エージェントを改良",
+    "streamingHeadline": "エージェントを改良中…",
+    "placeholderInitial": "このエージェントをどう改良するか記述してください…",
+    "placeholderFollowUp": "追加の改良指示を送信…",
+    "viewCurrentBody": "現在のエージェント本文を表示",
+    "appliedAsVersion": "バージョン {{version}} として適用しました。",
+    "openInStudio": "Studio でドラフトを開いて手動編集",
+    "chips": {
+      "tightenTools": "ツールリストを絞り込む",
+      "stricterPersonality": "パーソナリティをより厳格に",
+      "workflowSection": "ワークフロープロトコルのセクションを追加",
+      "sharpenDescription": "説明を短く鋭く",
+      "matchDeveloperStyle": "sr-developer のスタイルに合わせる"
+    }
+  },
+  "profileEditor": {
+    "validation": {
+      "missingBaseline": "必須のベースラインエージェントがありません: {{agent}}",
+      "multipleDefaultRules": "ルーティングのデフォルトルールは1つまでです（{{found}} 件見つかりました）",
+      "defaultRuleNotLast": "デフォルトのルーティングルールは最後に配置する必要があります",
+      "unknownRoutingAgent": "ルーティングがチェーンにないエージェントを参照しています: {{agent}}",
+      "invalidTags": "ルーティングルール {{agent}} に不正なタグがあります: {{tags}}（小文字のケバブケースを使用してください）"
+    },
+    "validationSummary_one": "{{count}} 件の検証の問題",
+    "validationSummary_other": "{{count}} 件の検証の問題",
+    "nameLabel": "名前",
+    "descriptionLabel": "説明",
+    "descriptionPlaceholder": "このプロファイルの用途は？",
+    "orchestrator": {
+      "heading": "オーケストレーター",
+      "description": "両コマンドの最上位モデルです。batch-implement はフィーチャーごとに implement に委譲するため、起動されるすべてのレールがこのプロファイルのエージェントチェーンを継承します。"
+    },
+    "agentChain": {
+      "heading": "エージェントチェーン（{{n}}）",
+      "addTitle": "カタログからエージェントを追加",
+      "addDisabledTitle": "カタログの全エージェントが既にチェーンに含まれています",
+      "pickFromCatalog": "カタログから選択（{{n}} 件利用可能）",
+      "emptyCatalog": "カタログに追加できるエージェントがありません。エージェントカタログタブからカスタムエージェントを追加してください。",
+      "kind": {
+        "upstream": "アップストリーム",
+        "custom": "カスタム"
+      }
+    },
+    "routing": {
+      "heading": "ルーティング（{{n}}）",
+      "addDefault": "デフォルトを追加",
+      "addRule": "ルールを追加",
+      "needAgentsTitle": "ルーティングルールを作成する前にエージェントを1つ以上追加してください",
+      "explainer": "最初に一致したルールが適用されます。ルールは編集・削除でき、デフォルトのキャッチオールは存在する場合は常に最後に配置されます。ルーティングが空の場合、パイプラインはチェーン内の最初の developer 系エージェントにフォールバックします。",
+      "untargetedTitle": "チェーン内の未割り当てエージェント",
+      "untargetedDetail": "どのルーティングルールも <mono>{{agents}}</mono> を指していません。実行させたい場合はタグルールを追加するか、デフォルトルールのターゲットを変更してください。"
+    },
+    "agentRow": {
+      "dragTitle": "ドラッグして並べ替え",
+      "dragHandleAria": "ドラッグハンドル",
+      "pinnedFirst": "先頭",
+      "pinnedFirstTitle": "先頭に固定 — パイプラインは常に sr-architect から開始します",
+      "pinnedLast": "末尾",
+      "pinnedLastTitle": "末尾に固定 — マージフェーズは常に最後に実行されます",
+      "required": "必須",
+      "requiredRemoveTitle": "必須のベースラインエージェント — パイプラインはこの行に依存しています"
+    },
+    "routingRow": {
+      "everythingElse": "その他すべて",
+      "defaultTargetAria": "デフォルトのルーティングターゲット（コア、読み取り専用）",
+      "defaultTargetTitle": "コアのフォールバック — 編集不可",
+      "targetAria": "ルール {{ordinal}} のルーティングターゲット",
+      "editTitle": "ルールを編集",
+      "editAria": "ルール {{ordinal}} を編集",
+      "moveDown": "下へ移動",
+      "moveUp": "上へ移動",
+      "coreDefaultBadge": "コア · デフォルト",
+      "coreDefaultTitle": "コアのフォールバック — パイプラインの最終手段のルールで、sr-developer に固定されています"
+    }
+  },
+  "agentSelector": {
+    "selectedCount": "{{selected}} / {{total}} エージェントを選択中",
+    "selectAll": "すべて選択",
+    "coreBadge": "コア",
+    "categories": {
+      "architecture": "アーキテクチャ",
+      "development": "開発",
+      "review": "レビュー",
+      "product": "プロダクト",
+      "utilities": "ユーティリティ"
+    },
+    "agents": {
+      "sr-architect": {
+        "name": "アーキテクト",
+        "description": "アーキテクチャ設計、変更スペック、実装計画"
+      },
+      "sr-developer": {
+        "name": "デベロッパー",
+        "description": "全レイヤーにわたるフルスタック実装"
+      },
+      "sr-frontend-developer": {
+        "name": "フロントエンド開発",
+        "description": "フロントエンド実装（React、Vue、Angular など）"
+      },
+      "sr-backend-developer": {
+        "name": "バックエンド開発",
+        "description": "バックエンド特化（API、データベース、サービス）"
+      },
+      "sr-reviewer": {
+        "name": "レビュアー",
+        "description": "一般的なコードレビュー — 最終品質ゲート"
+      },
+      "sr-frontend-reviewer": {
+        "name": "フロントエンドレビュアー",
+        "description": "フロントエンドレビュー（UI、アクセシビリティ、パフォーマンス）"
+      },
+      "sr-backend-reviewer": {
+        "name": "バックエンドレビュアー",
+        "description": "バックエンドレビュー（API、セキュリティ、スケーラビリティ）"
+      },
+      "sr-security-reviewer": {
+        "name": "セキュリティレビュアー",
+        "description": "セキュリティ分析 — OWASP、脆弱性、ハードニング"
+      },
+      "sr-performance-reviewer": {
+        "name": "パフォーマンスレビュアー",
+        "description": "パフォーマンス分析 — プロファイリング、ボトルネック、最適化"
+      },
+      "sr-product-manager": {
+        "name": "プロダクトマネージャー",
+        "description": "プロダクト発見、VPC ペルソナ、バックログ管理"
+      },
+      "sr-product-analyst": {
+        "name": "プロダクトアナリスト",
+        "description": "バックログ分析、スペックギャップ分析、レポーティング"
+      },
+      "sr-test-writer": {
+        "name": "テストライター",
+        "description": "包括的なテスト生成（ユニット、統合、E2E）"
+      },
+      "sr-doc-sync": {
+        "name": "ドキュメント同期",
+        "description": "ドキュメント同期 — ドキュメントをコードと整合させます"
+      },
+      "sr-merge-resolver": {
+        "name": "マージリゾルバー",
+        "description": "コンテキストを考慮したマージコンフリクトの解決"
+      }
+    }
+  },
+  "templates": {
+    "security-reviewer": {
+      "label": "セキュリティレビュアー",
+      "blurb": "リリース前の diff から認証、インジェクション、データ漏洩のバグを発見します。"
+    },
+    "performance-profiler": {
+      "label": "パフォーマンスプロファイラー",
+      "blurb": "ホットパス、N+1 クエリ、上限のないループ、バンドル肥大化を発見します。"
+    },
+    "data-engineer": {
+      "label": "データエンジニア",
+      "blurb": "スキーママイグレーション、ETL パイプライン、データ変換。"
+    },
+    "ui-ux-polisher": {
+      "label": "UI / UX ポリッシャー",
+      "blurb": "アクセシビリティ、スペーシング、空状態、エラーハンドリング。"
+    },
+    "api-designer": {
+      "label": "API デザイナー",
+      "blurb": "バージョニング、ページネーション、エラー形式、後方互換性。"
+    },
+    "database-architect": {
+      "label": "データベースアーキテクト",
+      "blurb": "インデックス、正規化 vs 非正規化、クエリ形状。"
+    },
+    "devops-sre": {
+      "label": "DevOps / SRE",
+      "blurb": "CI/CD、可観測性、インシデント対応準備、ランブック。"
+    },
+    "mobile-engineer": {
+      "label": "モバイルエンジニア",
+      "blurb": "iOS + Android のパターン、オフラインファースト、バッテリー配慮。"
+    },
+    "ml-engineer": {
+      "label": "ML エンジニア",
+      "blurb": "パイプライン、評価、再現性、ドリフト監視。"
+    },
+    "accessibility-auditor": {
+      "label": "アクセシビリティ監査者",
+      "blurb": "WCAG 2.2 レビュー: コントラスト、フォーカス、ARIA、キーボード。"
+    },
+    "qa-test-strategist": {
+      "label": "QA テストストラテジスト",
+      "blurb": "テスト計画: ユニット / 統合 / E2E の配分、カバレッジの欠落。"
+    },
+    "load-tester": {
+      "label": "負荷 / ストレステスター",
+      "blurb": "キャパシティプランニング、k6 / Locust シナリオ、ボトルネック探索。"
+    },
+    "integration-tester": {
+      "label": "統合テスター",
+      "blurb": "サービス間コントラクト、フィクスチャ、フレーキーテストの削減。"
+    },
+    "regression-hunter": {
+      "label": "リグレッションハンター",
+      "blurb": "バイセクトと再現を行い、まず失敗するテストを書きます。"
+    },
+    "data-analyst": {
+      "label": "データアナリスト",
+      "blurb": "曖昧な質問をクエリと読みやすい知見に変換します。"
+    },
+    "etl-reviewer": {
+      "label": "ETL パイプラインレビュアー",
+      "blurb": "冪等性、バックフィル、遅延到着データ。"
+    },
+    "dashboard-designer": {
+      "label": "ダッシュボードデザイナー",
+      "blurb": "一目で分かるダッシュボード、正直な軸、チャートごとのアクション。"
+    },
+    "iac-reviewer": {
+      "label": "IaC / クラウドレビュアー",
+      "blurb": "Terraform / CloudFormation: IAM、公開露出、コスト。"
+    },
+    "compliance-reviewer": {
+      "label": "コンプライアンスレビュアー",
+      "blurb": "データフローに対する GDPR / SOC2 / HIPAA 関連のチェック。"
+    },
+    "threat-modeler": {
+      "label": "脅威モデラー",
+      "blurb": "アーキテクチャ図に対する STRIDE / LINDDUN。"
+    },
+    "product-manager": {
+      "label": "プロダクトマネージャー",
+      "blurb": "課題設定、PRD、優先順位付け。"
+    },
+    "ux-researcher": {
+      "label": "UX リサーチャー",
+      "blurb": "インタビュースクリプト、ユーザビリティテスト計画、結果の統合。"
+    },
+    "technical-writer": {
+      "label": "テクニカルライター",
+      "blurb": "実際に読まれるドキュメント — チュートリアル、リファレンス、変更履歴。"
+    },
+    "design-reviewer": {
+      "label": "デザインシステムレビュアー",
+      "blurb": "トークンのドリフト、コンポーネントの誤用、フロー間の一貫性。"
+    },
+    "financial-analyst": {
+      "label": "ファイナンシャルアナリスト",
+      "blurb": "ユニットエコノミクス、コホートモデル、シナリオ分析。"
+    },
+    "pricing-strategist": {
+      "label": "プライシングストラテジスト",
+      "blurb": "ティアリング、パッケージング、支払い意欲調査。"
+    },
+    "market-researcher": {
+      "label": "マーケットリサーチャー",
+      "blurb": "TAM/SAM/SOM、競合マップ、顧客セグメント。"
+    },
+    "ops-optimizer": {
+      "label": "オペレーション最適化担当",
+      "blurb": "サイクルタイム、ボトルネック発見、自動化候補。"
+    },
+    "seo-auditor": {
+      "label": "SEO 監査者",
+      "blurb": "テクニカル + コンテンツ SEO: インデックス可能性、情報設計、検索意図の一致。"
+    },
+    "growth-hacker": {
+      "label": "グロース実験担当",
+      "blurb": "ファネル診断、リフト実験、アクティベーションループ。"
+    },
+    "social-strategist": {
+      "label": "ソーシャルメディアストラテジスト",
+      "blurb": "チャネルに合ったコンテンツ、編集カレンダー、ボイスの一貫性。"
+    },
+    "literature-reviewer": {
+      "label": "文献レビュアー",
+      "blurb": "システマティックレビューの要約、引用グラフ、相反の検出。"
+    },
+    "experiment-designer": {
+      "label": "実験デザイナー",
+      "blurb": "仮説、対照群、サンプルサイズ、事前登録。"
+    },
+    "statistical-analyst": {
+      "label": "統計アナリスト",
+      "blurb": "適切な検定を選び、p 値だけでなく効果量を報告します。"
+    },
+    "scientific-writer": {
+      "label": "サイエンティフィックライター",
+      "blurb": "IMRaD 構成、誠実な限界の記述、読みやすい要旨。"
+    },
+    "curriculum-designer": {
+      "label": "カリキュラムデザイナー",
+      "blurb": "学習成果 → アクティビティ → 評価。"
+    },
+    "assessment-author": {
+      "label": "評価項目作成者",
+      "blurb": "暗記ではなく理解を測る設問。"
+    },
+    "tutor-explainer": {
+      "label": "チューター / 解説者",
+      "blurb": "ファインマン流のシンプルな説明と例題。"
+    },
+    "clinical-guideline-reviewer": {
+      "label": "臨床ガイドラインレビュアー",
+      "blurb": "最新のエビデンスに基づくガイドラインと診療を照合します。"
+    },
+    "medical-summarizer": {
+      "label": "医学文献要約者",
+      "blurb": "臨床医向けの要約: 何が変わったか、エビデンスの質。"
+    },
+    "protocol-designer": {
+      "label": "プロトコルデザイナー",
+      "blurb": "臨床プロトコル: エンドポイント、選択基準、安全性。"
+    },
+    "contract-reviewer": {
+      "label": "契約レビュアー",
+      "blurb": "リスクの高い条項にフラグを立て、実際の意味を説明します。"
+    },
+    "privacy-counsel": {
+      "label": "プライバシーカウンセル",
+      "blurb": "具体的なフローに適用する GDPR / CCPA / LGPD。"
+    },
+    "copy-editor": {
+      "label": "コピーエディター",
+      "blurb": "行単位の編集: ボイス、リズム、意味を保ったまま 30% 削減。"
+    },
+    "brand-voice-guardian": {
+      "label": "ブランドボイスガーディアン",
+      "blurb": "ボイスルールを徹底し、ブランドから外れた表現を検出します。"
+    },
+    "creative-brainstormer": {
+      "label": "クリエイティブブレインストーマー",
+      "blurb": "発散してから収束。聖域も丁寧に切り捨てます。"
+    },
+    "hiring-interviewer": {
+      "label": "採用面接官",
+      "blurb": "構造化面接、シグナル重視、バイアスに配慮。"
+    },
+    "strategic-planner": {
+      "label": "戦略プランナー",
+      "blurb": "目標 → 賭け → 指標。お気に入りプロジェクトを剪定します。"
+    },
+    "coach-1on1": {
+      "label": "1:1 コーチ",
+      "blurb": "フィードバック、キャリア成長、難しい対話の組み立てを支援します。"
+    },
+    "meeting-facilitator": {
+      "label": "ミーティングファシリテーター",
+      "blurb": "報告ではなく意思決定を生むアジェンダ。"
+    }
+  }
+}

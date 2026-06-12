@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { Minus, Search, Square, X } from 'lucide-react'
 import { useHub } from '../hooks/useHub'
@@ -63,6 +64,7 @@ function WinButton({
 // ─── macOS search pill ────────────────────────────────────────────────────────
 
 function SearchPill({ projectName }: { projectName: string | null }) {
+  const { t } = useTranslation('nav')
   const [hovered, setHovered] = useState(false)
 
   function handleClick() {
@@ -76,7 +78,7 @@ function SearchPill({ projectName }: { projectName: string | null }) {
       onClick={handleClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      aria-label="Search (⌘K)"
+      aria-label={t('titleBar.searchShortcut')}
       style={{
         position: 'absolute',
         left: '50%',
@@ -120,7 +122,7 @@ function SearchPill({ projectName }: { projectName: string | null }) {
           whiteSpace: 'nowrap',
         }}
       >
-        {projectName ?? 'Search\u2026'}
+        {projectName ?? t('titleBar.searchPlaceholder')}
       </span>
     </button>
   )
@@ -176,6 +178,7 @@ function MacTitleBar() {
 }
 
 function DefaultTitleBar() {
+  const { t } = useTranslation('nav')
   const { projects, activeProjectId } = useHub()
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? null
   const appWindow = getCurrentWindow()
@@ -227,19 +230,19 @@ function DefaultTitleBar() {
         <WinButton
           onClick={handleMinimize}
           icon={<Minus size={14} strokeWidth={1.8} />}
-          ariaLabel="Minimize window"
+          ariaLabel={t('titleBar.minimizeWindow')}
         />
         <WinButton
           onClick={handleMaximize}
           icon={<Square size={12} strokeWidth={1.8} />}
-          ariaLabel="Maximize window"
+          ariaLabel={t('titleBar.maximizeWindow')}
         />
         <WinButton
           onClick={handleClose}
           icon={<X size={15} strokeWidth={1.8} />}
           hoverColor="var(--color-destructive)"
           hoverTextColor="var(--color-destructive-foreground)"
-          ariaLabel="Close window"
+          ariaLabel={t('titleBar.closeWindow')}
         />
       </div>
     </div>

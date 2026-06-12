@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
+import { useTranslation, Trans } from 'react-i18next'
 import { TerminalSettingsSection } from '../components/settings/TerminalSettingsSection'
 import { AppearanceSection } from '../components/settings/AppearanceSection'
+import { LanguageSection } from '../components/settings/LanguageSection'
 import { CodeSectionSettings } from '../components/settings/CodeSectionSettings'
 import { MobileAccessSection } from '../components/settings/MobileAccessSection'
 import { Settings, Trash2, Zap, Plus, Bell, GraduationCap } from 'lucide-react'
@@ -24,10 +26,10 @@ import {
 
 type WebhookEvent = 'job.completed' | 'job.failed' | 'daily_budget_exceeded'
 
-const WEBHOOK_EVENTS: { value: WebhookEvent; label: string }[] = [
-  { value: 'job.completed', label: 'Job completed' },
-  { value: 'job.failed', label: 'Job failed' },
-  { value: 'daily_budget_exceeded', label: 'Daily budget exceeded' },
+const WEBHOOK_EVENTS: { value: WebhookEvent; labelKey: string }[] = [
+  { value: 'job.completed', labelKey: 'webhooks.eventJobCompleted' },
+  { value: 'job.failed', labelKey: 'webhooks.eventJobFailed' },
+  { value: 'daily_budget_exceeded', labelKey: 'webhooks.eventDailyBudgetExceeded' },
 ]
 
 interface WebhookRow {
@@ -59,6 +61,7 @@ function ProjectListItem({
   project: HubProject
   onRemove: (id: string) => void
 }) {
+  const { t } = useTranslation('settings')
   return (
     <div className="flex items-center gap-3 p-2.5 rounded-md border border-border">
       <div className="flex-1 min-w-0">
@@ -71,13 +74,14 @@ function ProjectListItem({
         className="h-6 px-2 text-[10px] text-muted-foreground hover:text-destructive shrink-0"
         onClick={() => onRemove(project.id)}
       >
-        Remove
+        {t('common:actions.remove')}
       </Button>
     </div>
   )
 }
 
 export default function SettingsDialog({ open, onClose, onOpenOnboarding }: SettingsDialogProps) {
+  const { t } = useTranslation('settings')
   const { projects, removeProject } = useHub()
   const [hubSettings, setHubSettings] = useState<HubSettings | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -102,7 +106,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
   function handleToggleNotifications(enabled: boolean) {
     setNotifEnabled(enabled)
     setOsNotificationPrefs({ enabled, filter: notifFilter })
-    toast.success(enabled ? 'OS notifications enabled' : 'OS notifications disabled')
+    toast.success(enabled ? t('notifications.enabledToast') : t('notifications.disabledToast'))
   }
 
   function handleNotifFilterChange(filter: OsNotificationFilter) {
@@ -163,12 +167,12 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
         body: JSON.stringify({ specrailsTechUrl: specrailsTechUrl.trim() }),
       })
       if (res.ok) {
-        toast.success('specrails-tech URL saved')
+        toast.success(t('hub.techUrlSaved'))
       } else {
-        toast.error('Failed to save URL')
+        toast.error(t('hub.techUrlSaveFailed'))
       }
     } catch {
-      toast.error('Failed to save URL')
+      toast.error(t('hub.techUrlSaveFailed'))
     } finally {
       setIsSavingUrl(false)
     }
@@ -179,7 +183,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
     try {
       const parsed = costAlertThreshold.trim() === '' ? null : parseFloat(costAlertThreshold)
       if (parsed !== null && (isNaN(parsed) || parsed <= 0)) {
-        toast.error('Enter a positive number or leave blank to disable')
+        toast.error(t('budget.invalidNumber'))
         return
       }
       const res = await fetch('/api/hub/settings', {
@@ -188,12 +192,12 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
         body: JSON.stringify({ costAlertThresholdUsd: parsed }),
       })
       if (res.ok) {
-        toast.success(parsed == null ? 'Cost alerts disabled' : `Alert set for jobs over $${parsed}`)
+        toast.success(parsed == null ? t('hub.costAlertsDisabled') : t('budget.alertSet', { amount: parsed }))
       } else {
-        toast.error('Failed to save threshold')
+        toast.error(t('budget.saveThresholdFailed'))
       }
     } catch {
-      toast.error('Failed to save threshold')
+      toast.error(t('budget.saveThresholdFailed'))
     } finally {
       setIsSavingThreshold(false)
     }
@@ -204,7 +208,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
     try {
       const val = hubDailyBudget.trim() === '' ? null : parseFloat(hubDailyBudget)
       if (val !== null && (isNaN(val) || val <= 0)) {
-        toast.error('Enter a positive number or leave blank to disable')
+        toast.error(t('budget.invalidNumber'))
         return
       }
       const res = await fetch('/api/hub/budget', {
@@ -213,12 +217,12 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
         body: JSON.stringify({ hubDailyBudgetUsd: val }),
       })
       if (res.ok) {
-        toast.success(val == null ? 'Hub daily budget removed' : `Hub daily budget set to $${val}`)
+        toast.success(val == null ? t('hub.dailyBudgetRemoved') : t('hub.dailyBudgetSet', { amount: val }))
       } else {
-        toast.error('Failed to save hub daily budget')
+        toast.error(t('hub.dailyBudgetSaveFailed'))
       }
     } catch {
-      toast.error('Failed to save hub daily budget')
+      toast.error(t('hub.dailyBudgetSaveFailed'))
     } finally {
       setIsSavingHubBudget(false)
     }
@@ -227,19 +231,19 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
   async function handleRemoveProject(id: string) {
     try {
       await removeProject(id)
-      toast.success('Project removed')
+      toast.success(t('hub.projectRemoved'))
     } catch (err) {
-      toast.error('Failed to remove project', { description: (err as Error).message })
+      toast.error(t('hub.projectRemoveFailed'), { description: (err as Error).message })
     }
   }
 
   async function handleAddWebhook() {
     if (!newWebhookUrl.trim()) {
-      toast.error('URL is required')
+      toast.error(t('webhooks.urlRequired'))
       return
     }
     if (newWebhookEvents.length === 0) {
-      toast.error('Select at least one event')
+      toast.error(t('webhooks.selectEvent'))
       return
     }
     setIsAddingWebhook(true)
@@ -250,17 +254,17 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
         body: JSON.stringify({ url: newWebhookUrl.trim(), secret: newWebhookSecret.trim(), events: newWebhookEvents }),
       })
       if (res.ok) {
-        toast.success('Webhook added')
+        toast.success(t('webhooks.added'))
         setNewWebhookUrl('')
         setNewWebhookSecret('')
         setNewWebhookEvents(['job.completed', 'job.failed'])
         await loadWebhooks()
       } else {
         const err = await res.json() as { error?: string }
-        toast.error(err.error ?? 'Failed to add webhook')
+        toast.error(err.error ?? t('webhooks.addFailed'))
       }
     } catch {
-      toast.error('Failed to add webhook')
+      toast.error(t('webhooks.addFailed'))
     } finally {
       setIsAddingWebhook(false)
     }
@@ -275,7 +279,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
       })
       await loadWebhooks()
     } catch {
-      toast.error('Failed to update webhook')
+      toast.error(t('webhooks.updateFailed'))
     }
   }
 
@@ -283,11 +287,11 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
     try {
       const res = await fetch(`/api/hub/webhooks/${id}`, { method: 'DELETE' })
       if (res.ok) {
-        toast.success('Webhook removed')
+        toast.success(t('webhooks.removed'))
         await loadWebhooks()
       }
     } catch {
-      toast.error('Failed to remove webhook')
+      toast.error(t('webhooks.removeFailed'))
     }
   }
 
@@ -295,10 +299,10 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
     try {
       const res = await fetch(`/api/hub/webhooks/${id}/test`, { method: 'POST' })
       if (res.ok) {
-        toast.success('Test ping sent')
+        toast.success(t('webhooks.testPingSent'))
       }
     } catch {
-      toast.error('Failed to send test ping')
+      toast.error(t('webhooks.testPingFailed'))
     }
   }
 
@@ -314,10 +318,10 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
-            Hub Settings
+            {t('hub.title')}
           </DialogTitle>
           <DialogDescription>
-            Manage registered projects and view hub information.
+            {t('hub.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -330,6 +334,8 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
           <div className="space-y-5 py-2">
             <AppearanceSection />
 
+            <LanguageSection />
+
             <CodeSectionSettings />
 
             <MobileAccessSection />
@@ -337,11 +343,11 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
             {/* Projects section */}
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Registered Projects
+                {t('hub.registeredProjects')}
               </h3>
               {projects.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border p-4 text-center">
-                  <p className="text-xs text-muted-foreground">No projects registered yet</p>
+                  <p className="text-xs text-muted-foreground">{t('hub.noProjects')}</p>
                 </div>
               ) : (
                 <div className="space-y-1.5">
@@ -363,7 +369,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
               </h3>
               <div className="rounded-md border border-border p-3 space-y-2">
                 <p className="text-[10px] text-muted-foreground">
-                  Base URL for the specrails-tech API (default: http://localhost:3000)
+                  {t('hub.techUrlDescription')}
                 </p>
                 <div className="flex gap-2">
                   <Input
@@ -379,7 +385,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                     disabled={isSavingUrl}
                     onClick={handleSaveSpecrailsTechUrl}
                   >
-                    Save
+                    {t('common:actions.save')}
                   </Button>
                 </div>
               </div>
@@ -388,14 +394,14 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
             {/* Budget & Alerts */}
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Budget &amp; Alerts
+                {t('hub.budgetAlertsHeading')}
               </h3>
               <div className="rounded-md border border-border p-3 space-y-4">
                 {/* Hub daily budget */}
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium">Hub daily budget (USD)</p>
+                  <p className="text-xs font-medium">{t('hub.dailyBudgetLabel')}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    Global daily spend limit across all projects. Queues auto-pause when exceeded.
+                    {t('hub.dailyBudgetHelper')}
                   </p>
                   <div className="flex gap-2">
                     <Input
@@ -404,7 +410,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                       step="0.01"
                       value={hubDailyBudget}
                       onChange={(e) => setHubDailyBudget(e.target.value)}
-                      placeholder="e.g. 10.00"
+                      placeholder={t('hub.dailyBudgetPlaceholder')}
                       className="h-7 text-xs font-mono"
                     />
                     <Button
@@ -414,16 +420,16 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                       disabled={isSavingHubBudget}
                       onClick={() => void handleSaveHubDailyBudget()}
                     >
-                      Save
+                      {t('common:actions.save')}
                     </Button>
                   </div>
                 </div>
 
                 {/* Per-job cost alert threshold */}
                 <div className="space-y-1.5 border-t border-border pt-3">
-                  <p className="text-xs font-medium">Per-job cost alert (USD)</p>
+                  <p className="text-xs font-medium">{t('budget.perJobLabel')}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    Alert when a single job exceeds this amount. Leave blank to disable.
+                    {t('hub.perJobHelper')}
                   </p>
                   <div className="flex gap-2">
                     <Input
@@ -432,7 +438,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                       step="0.01"
                       value={costAlertThreshold}
                       onChange={(e) => setCostAlertThreshold(e.target.value)}
-                      placeholder="e.g. 0.50"
+                      placeholder={t('budget.perJobPlaceholder')}
                       className="h-7 text-xs font-mono"
                     />
                     <Button
@@ -442,7 +448,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                       disabled={isSavingThreshold}
                       onClick={handleSaveCostAlertThreshold}
                     >
-                      Save
+                      {t('common:actions.save')}
                     </Button>
                   </div>
                 </div>
@@ -452,11 +458,11 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
             {/* OS Notifications */}
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                OS Notifications
+                {t('notifications.heading')}
               </h3>
               <div className="rounded-md border border-border p-3 space-y-3">
                 <p className="text-[10px] text-muted-foreground">
-                  Show native desktop notifications when jobs complete or fail. Notifications only appear when the tab is not focused.
+                  {t('notifications.description')}
                 </p>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -467,16 +473,16 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                     data-testid="notif-toggle"
                   />
                   <Bell className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span className="text-xs">Enable OS Notifications</span>
+                  <span className="text-xs">{t('notifications.enableLabel')}</span>
                 </label>
                 {notifEnabled && (
                   <div className="space-y-1.5 pl-6">
-                    <p className="text-[10px] text-muted-foreground">Notify on:</p>
+                    <p className="text-[10px] text-muted-foreground">{t('notifications.notifyOn')}</p>
                     <div className="flex flex-wrap gap-3">
                       {([
-                        { value: 'all' as const, label: 'All (completed & failed)' },
-                        { value: 'completed' as const, label: 'Completed only' },
-                        { value: 'failed' as const, label: 'Failed only' },
+                        { value: 'all' as const, label: t('notifications.filterAll') },
+                        { value: 'completed' as const, label: t('notifications.filterCompleted') },
+                        { value: 'failed' as const, label: t('notifications.filterFailed') },
                       ]).map(({ value, label }) => (
                         <label key={value} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
                           <input
@@ -498,11 +504,15 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
             {/* Webhooks */}
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Outbound Webhooks
+                {t('webhooks.heading')}
               </h3>
               <div className="rounded-md border border-border p-3 space-y-3">
                 <p className="text-[10px] text-muted-foreground">
-                  Notify external tools (Slack, Zapier, CI/CD) on hub events. Requests are signed via <code className="font-mono">X-Specrails-Signature</code> when a secret is set.
+                  <Trans
+                    ns="settings"
+                    i18nKey="webhooks.description"
+                    components={{ code: <code className="font-mono" /> }}
+                  />
                 </p>
 
                 {webhooks.length > 0 && (
@@ -519,21 +529,21 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                             <button
                               onClick={() => void handleToggleWebhook(wh.id, !wh.enabled)}
                               className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${wh.enabled ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-muted text-muted-foreground'}`}
-                              title={wh.enabled ? 'Disable' : 'Enable'}
+                              title={wh.enabled ? t('webhooks.disable') : t('webhooks.enable')}
                             >
-                              {wh.enabled ? 'on' : 'off'}
+                              {wh.enabled ? t('webhooks.statusOn') : t('webhooks.statusOff')}
                             </button>
                             <button
                               onClick={() => void handleTestWebhook(wh.id)}
                               className="text-muted-foreground hover:text-foreground p-0.5"
-                              title="Send test ping"
+                              title={t('webhooks.sendTestPing')}
                             >
                               <Zap className="w-3 h-3" />
                             </button>
                             <button
                               onClick={() => void handleDeleteWebhook(wh.id)}
                               className="text-muted-foreground hover:text-destructive p-0.5"
-                              title="Remove"
+                              title={t('common:actions.remove')}
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -545,7 +555,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                 )}
 
                 <div className="space-y-2 border-t border-border pt-2">
-                  <p className="text-[10px] font-medium text-muted-foreground">Add webhook</p>
+                  <p className="text-[10px] font-medium text-muted-foreground">{t('webhooks.addHeading')}</p>
                   <Input
                     value={newWebhookUrl}
                     onChange={(e) => setNewWebhookUrl(e.target.value)}
@@ -555,11 +565,11 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                   <Input
                     value={newWebhookSecret}
                     onChange={(e) => setNewWebhookSecret(e.target.value)}
-                    placeholder="Signing secret (optional)"
+                    placeholder={t('webhooks.secretPlaceholder')}
                     className="h-7 text-xs font-mono"
                   />
                   <div className="flex flex-wrap gap-3">
-                    {WEBHOOK_EVENTS.map(({ value, label }) => (
+                    {WEBHOOK_EVENTS.map(({ value, labelKey }) => (
                       <label key={value} className="flex items-center gap-1.5 text-[10px] cursor-pointer">
                         <input
                           type="checkbox"
@@ -567,7 +577,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                           onChange={() => toggleNewEvent(value)}
                           className="w-3 h-3"
                         />
-                        {label}
+                        {t(labelKey)}
                       </label>
                     ))}
                   </div>
@@ -579,7 +589,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                     onClick={() => void handleAddWebhook()}
                   >
                     <Plus className="w-3 h-3 mr-1" />
-                    Add Webhook
+                    {t('webhooks.addButton')}
                   </Button>
                 </div>
               </div>
@@ -589,14 +599,14 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
             {onOpenOnboarding && (
               <div className="space-y-2">
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Onboarding
+                  {t('hub.onboardingHeading')}
                 </h3>
                 <div className="rounded-md border border-border p-3">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <p className="text-xs font-medium">Platform Tour</p>
+                      <p className="text-xs font-medium">{t('hub.platformTour')}</p>
                       <p className="text-[10px] text-muted-foreground">
-                        Replay the welcome wizard to review key features.
+                        {t('hub.platformTourDescription')}
                       </p>
                     </div>
                     <Button
@@ -607,7 +617,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                       data-testid="replay-onboarding"
                     >
                       <GraduationCap className="w-3 h-3 mr-1" />
-                      Replay Tour
+                      {t('hub.replayTour')}
                     </Button>
                   </div>
                 </div>
@@ -617,7 +627,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
             {/* Terminal panel */}
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Terminal Panel
+                {t('hub.terminalPanelHeading')}
               </h3>
               <TerminalSettingsSection mode="hub" />
             </div>
@@ -625,19 +635,19 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
             {/* Hub info */}
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Hub Information
+                {t('hub.infoHeading')}
               </h3>
               <div className="rounded-md border border-border p-3 space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Port</span>
+                  <span className="text-muted-foreground">{t('hub.infoPort')}</span>
                   <span className="font-mono">{hubSettings?.port ?? 4200}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Projects</span>
+                  <span className="text-muted-foreground">{t('hub.infoProjects')}</span>
                   <span className="font-mono">{projects.length}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Hub DB</span>
+                  <span className="text-muted-foreground">{t('hub.infoDb')}</span>
                   <span className="font-mono text-[10px] text-muted-foreground">~/.specrails/hub.sqlite</span>
                 </div>
               </div>

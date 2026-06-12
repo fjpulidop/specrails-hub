@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { formatDistanceToNow } from 'date-fns'
+import { useTranslation } from 'react-i18next'
 import { getApiBase } from '../lib/api'
+import { getDateFnsLocale } from '../lib/i18n'
 import { toast } from 'sonner'
 import { X, ExternalLink } from 'lucide-react'
 import { Badge } from './ui/badge'
@@ -29,13 +31,13 @@ function formatWallClock(startedAt: string, finishedAt: string): string {
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'running' | 'queued' | 'failed' | 'canceled'
 
-const STATUS_BADGE: Record<string, { variant: BadgeVariant; label: string; tooltip: string }> = {
-  running: { variant: 'running', label: 'running', tooltip: 'Job is actively executing' },
-  completed: { variant: 'success', label: 'completed', tooltip: 'Job completed successfully' },
-  failed: { variant: 'failed', label: 'failed', tooltip: 'Job exited with a non-zero exit code' },
-  canceled: { variant: 'canceled', label: 'canceled', tooltip: 'Job was manually canceled' },
-  queued: { variant: 'queued', label: 'queued', tooltip: 'Job is waiting in the queue' },
-  zombie_terminated: { variant: 'failed', label: 'zombie', tooltip: 'Job was auto-terminated after prolonged inactivity' },
+const STATUS_BADGE: Record<string, { variant: BadgeVariant; labelKey: string; tooltipKey: string }> = {
+  running: { variant: 'running', labelKey: 'statusLabel.running', tooltipKey: 'statusTooltip.running' },
+  completed: { variant: 'success', labelKey: 'statusLabel.completed', tooltipKey: 'statusTooltip.completed' },
+  failed: { variant: 'failed', labelKey: 'statusLabel.failed', tooltipKey: 'statusTooltip.failed' },
+  canceled: { variant: 'canceled', labelKey: 'statusLabel.canceled', tooltipKey: 'statusTooltip.canceled' },
+  queued: { variant: 'queued', labelKey: 'statusLabel.queued', tooltipKey: 'statusTooltip.queued' },
+  zombie_terminated: { variant: 'failed', labelKey: 'statusLabel.zombie', tooltipKey: 'statusTooltip.zombie' },
 }
 
 interface JobDetailModalProps {
@@ -44,6 +46,7 @@ interface JobDetailModalProps {
 }
 
 export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
+  const { t } = useTranslation('jobs')
   const [job, setJob] = useState<JobSummary | null>(null)
   const [events, setEvents] = useState<EventRow[]>([])
   const [phaseDefinitions, setPhaseDefinitions] = useState<PhaseDefinition[]>([])
@@ -156,13 +159,13 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
     try {
       const res = await fetch(`${getApiBase()}/jobs/${jobId}`, { method: 'DELETE' })
       if (res.ok) {
-        toast.success('Cancel signal sent', { description: 'Job will stop at the next safe point' })
+        toast.success(t('modal.toast.cancelSignalSent'), { description: t('modal.toast.cancelSignalSentDescription') })
       } else {
         const data = await res.json() as { error?: string }
-        toast.error('Failed to cancel', { description: data.error })
+        toast.error(t('modal.toast.cancelFailed'), { description: data.error })
       }
     } catch {
-      toast.error('Network error')
+      toast.error(t('modal.toast.networkError'))
     }
   }
 
@@ -187,14 +190,14 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div>
-                      <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+                      <Badge variant={statusInfo.variant}>{t(statusInfo.labelKey)}</Badge>
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent>{statusInfo.tooltip}</TooltipContent>
+                  <TooltipContent>{t(statusInfo.tooltipKey)}</TooltipContent>
                 </Tooltip>
                 <code className="text-xs font-mono text-foreground/80 truncate">{job.command}</code>
                 <span className="text-[10px] text-muted-foreground">
-                  {formatDistanceToNow(new Date(job.started_at), { addSuffix: true })}
+                  {formatDistanceToNow(new Date(job.started_at), { addSuffix: true, locale: getDateFnsLocale() })}
                 </span>
                 {job.total_cost_usd != null && job.total_cost_usd > 0 && (
                   <span className="text-[10px] text-muted-foreground">${job.total_cost_usd.toFixed(4)}</span>
@@ -204,7 +207,7 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
                 )}
               </>
             )}
-            {isLoading && <span className="text-xs text-muted-foreground">Loading...</span>}
+            {isLoading && <span className="text-xs text-muted-foreground">{t('common:states.loading')}</span>}
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
@@ -222,7 +225,7 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
                 onClick={() => setShowCancelConfirm(true)}
                 className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
               >
-                Cancel
+                {t('common:actions.cancel')}
               </Button>
             )}
 
@@ -237,7 +240,7 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </TooltipTrigger>
-              <TooltipContent>Open in new tab</TooltipContent>
+              <TooltipContent>{t('modal.openInNewTab')}</TooltipContent>
             </Tooltip>
 
             <button
@@ -253,7 +256,7 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
         <div className="flex-1 overflow-hidden relative">
           {notFound ? (
             <div className="flex items-center justify-center h-full">
-              <p className="text-sm text-muted-foreground">Job not found</p>
+              <p className="text-sm text-muted-foreground">{t('modal.notFound')}</p>
             </div>
           ) : (
             <LogViewer events={events} isLoading={isLoading} />
@@ -265,21 +268,21 @@ export function JobDetailModal({ jobId, onClose }: JobDetailModalProps) {
       <Dialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Cancel job?</DialogTitle>
+            <DialogTitle>{t('modal.cancelConfirmTitle')}</DialogTitle>
             <DialogDescription>
-              The job will stop at the next safe point. This action cannot be undone.
+              {t('modal.cancelConfirmDescription')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setShowCancelConfirm(false)}>
-              Keep running
+              {t('modal.keepRunning')}
             </Button>
             <Button
               variant="destructive"
               size="sm"
               onClick={() => { setShowCancelConfirm(false); handleCancel() }}
             >
-              Cancel job
+              {t('modal.cancelJob')}
             </Button>
           </DialogFooter>
         </DialogContent>

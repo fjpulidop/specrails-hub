@@ -1,0 +1,57 @@
+{
+  "panel": {
+    "openChat": "Ouvrir le chat",
+    "dragToResize": "Glisser pour redimensionner",
+    "tabTitle": "Chat {{n}}",
+    "startConversation": "Démarrez une conversation sur ce projet",
+    "noConversations": "Aucune conversation pour l'instant",
+    "newConversation": "Nouvelle conversation",
+    "suggestions": {
+      "projectStatus": "Quel est l'état du projet ?",
+      "recentFailures": "Afficher les échecs de jobs récents",
+      "commands": "Quelles commandes dois-je lancer ?",
+      "explainCodebase": "Explique la base de code"
+    }
+  },
+  "header": {
+    "fallbackTitle": "Chat",
+    "newConversation": "Nouvelle conversation",
+    "deleteConversation": "Supprimer la conversation",
+    "restorePanel": "Restaurer le panneau de chat",
+    "maximizePanel": "Agrandir le panneau de chat",
+    "closeChat": "Fermer le chat"
+  },
+  "input": {
+    "placeholder": "Message...",
+    "send": "Envoyer",
+    "stop": "Arrêter",
+    "modelLocked": "Impossible de changer de modèle pendant une conversation active"
+  },
+  "messageList": {
+    "contextLoaded": "Contexte chargé — prêt à aider",
+    "noMessages": "Aucun message pour l'instant",
+    "askAnything": "Posez n'importe quelle question à Claude sur votre projet",
+    "suggestions": {
+      "currentStatus": "Quel est l'état actuel du projet ?",
+      "recentFailures": "Montre-moi les échecs de jobs récents",
+      "testsToRun": "Quels tests dois-je lancer ?",
+      "mainArchitecture": "Explique l'architecture principale"
+    }
+  },
+  "errors": {
+    "sendFailed": "Échec de l'envoi du message"
+  },
+  "dock": {
+    "minimizedSessions_one": "{{count}} session réduite",
+    "minimizedSessions_other": "{{count}} sessions réduites",
+    "minimizedCount": "{{count}} en veille",
+    "unknownProject": "Projet inconnu"
+  },
+  "chip": {
+    "restore": "Restaurer {{label}}",
+    "close": "Fermer {{label}}",
+    "continueEditing": "Continuer l'édition · {{projectName}}",
+    "kindAiEdit": "AI Edit",
+    "kindExploreSpec": "Explore Spec"
+  }
+}

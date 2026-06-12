@@ -1,4 +1,5 @@
 import { useReducer, useEffect, useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSharedWebSocket } from './useSharedWebSocket'
 import { getApiBase } from '../lib/api'
 
@@ -101,6 +102,7 @@ export function useProposal(projectId: string | null): {
   cancel: () => Promise<void>
   reset: () => void
 } {
+  const { t } = useTranslation('addspec')
   const [state, dispatch] = useReducer(proposalReducer, initialState)
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
 
@@ -165,7 +167,7 @@ export function useProposal(projectId: string | null): {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { error?: string }
-        dispatch({ type: 'ERROR', errorMessage: data.error ?? `Server error (${res.status})` })
+        dispatch({ type: 'ERROR', errorMessage: data.error ?? t('errors.serverError', { status: res.status }) })
         return
       }
       const data = await res.json() as { proposalId: string }
@@ -173,9 +175,9 @@ export function useProposal(projectId: string | null): {
       proposalIdRef.current = data.proposalId
       dispatch({ type: 'START_EXPLORING', proposalId: data.proposalId })
     } catch (err) {
-      dispatch({ type: 'ERROR', errorMessage: `Connection failed: ${(err as Error).message}` })
+      dispatch({ type: 'ERROR', errorMessage: t('errors.connectionFailed', { message: (err as Error).message }) })
     }
-  }, [])
+  }, [t])
 
   const sendRefinement = useCallback(async (feedback: string): Promise<void> => {
     if (!state.proposalId) return
@@ -188,13 +190,13 @@ export function useProposal(projectId: string | null): {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { error?: string }
-        dispatch({ type: 'ERROR', errorMessage: data.error ?? 'Failed to send refinement' })
+        dispatch({ type: 'ERROR', errorMessage: data.error ?? t('errors.sendRefinementFailed') })
       }
       // Success transitions via WS: proposal_refined -> review
     } catch (err) {
-      dispatch({ type: 'ERROR', errorMessage: `Connection failed: ${(err as Error).message}` })
+      dispatch({ type: 'ERROR', errorMessage: t('errors.connectionFailed', { message: (err as Error).message }) })
     }
-  }, [state.proposalId])
+  }, [state.proposalId, t])
 
   const createIssue = useCallback(async (): Promise<void> => {
     if (!state.proposalId) return
@@ -206,13 +208,13 @@ export function useProposal(projectId: string | null): {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { error?: string }
-        dispatch({ type: 'ERROR', errorMessage: data.error ?? 'Failed to create issue' })
+        dispatch({ type: 'ERROR', errorMessage: data.error ?? t('errors.createIssueFailed') })
       }
       // Success transitions via WS: proposal_issue_created
     } catch (err) {
-      dispatch({ type: 'ERROR', errorMessage: `Connection failed: ${(err as Error).message}` })
+      dispatch({ type: 'ERROR', errorMessage: t('errors.connectionFailed', { message: (err as Error).message }) })
     }
-  }, [state.proposalId])
+  }, [state.proposalId, t])
 
   const cancel = useCallback(async (): Promise<void> => {
     if (!state.proposalId) return

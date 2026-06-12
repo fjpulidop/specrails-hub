@@ -1,0 +1,67 @@
+{
+  "page": {
+    "title": "Integrações",
+    "subtitle": "Plugins por projeto. Cada projeto decide de forma independente que integrações ativar.",
+    "selectProject": "Selecione um projeto para gerir integrações.",
+    "deprecated": "Descontinuado",
+    "loadError": "Falha ao carregar os plugins.",
+    "empty": "Esta build do hub não inclui nenhum plugin."
+  },
+  "card": {
+    "statusActive": "Ativo",
+    "statusDeactivated": "Desativado",
+    "statusDegraded": "Degradado",
+    "updateAvailable": "Atualização disponível",
+    "requires": "Requer: {{list}}",
+    "deactivatedHint": "Instalado mas desativado — o Claude não o vai carregar na próxima sessão. Alterne <strong>Ativo</strong> para reativar.",
+    "install": "Instalar",
+    "uninstall": "Desinstalar"
+  },
+  "toggle": {
+    "titleActive": "Ativo — clique para desativar",
+    "titleDeactivated": "Desativado — clique para ativar"
+  },
+  "cachedNotice": {
+    "body": "O Claude tem o plugin do marketplace <strong>instalado mas desativado</strong> na cache. Pode ainda resolver o servidor a partir de <code>~/.claude/plugins/cache/...</code> mesmo com o toggle desligado. Para forçar apenas o âmbito do projeto, desinstale o plugin do marketplace no Claude:",
+    "runInstruction": "Execute numa sessão ativa do Claude e depois reinicie o Claude neste projeto."
+  },
+  "update": {
+    "body": "O manifesto incluído mudou desde a instalação (provavelmente um rename a montante). Reescreva o <code>.mcp.json</code> com a entrada canónica — de forma cirúrgica, só as chaves do plugin são tocadas.",
+    "button": "Atualizar entrada no <code>.mcp.json</code>"
+  },
+  "conflict": {
+    "body": "<strong>{{name}}</strong> também está ativado globalmente via marketplace de plugins do Claude, o que sobrepõe esta instalação no âmbito do projeto. Para este cartão ficar Ativo, desative a versão global abaixo — pode ser reativada no Claude a qualquer momento.",
+    "disableButton": "Desativar <code>{{key}}</code>"
+  },
+  "orphan": {
+    "badge": "Órfão",
+    "removeButton": "Remover órfão"
+  },
+  "installDialog": {
+    "title": "Instalar {{name}}",
+    "computingChanges": "A calcular alterações…",
+    "filesHeading": "Ficheiros que vão mudar",
+    "prerequisites": "Pré-requisitos",
+    "autoInstall": "Instalação automática",
+    "progress": "Progresso",
+    "installingPrereq": "A instalar {{name}}…",
+    "prereqStartFailed": "Falha ao iniciar: {{message}}"
+  },
+  "uninstallDialog": {
+    "title": "Desinstalar {{name}}?",
+    "body": "Isto vai reverter as entradas geridas pelo plugin no <code>.mcp.json</code> e remover quaisquer ficheiros criados pelo plugin. O seu código, histórico e outros plugins não são afetados."
+  },
+  "docs": {
+    "title": "Documentação",
+    "dialogDescription": "Consulte a documentação incluída do specrails-hub. Use a barra lateral para alternar entre guias.",
+    "sidebarEmpty": "Ainda não há docs",
+    "indexEmpty": "Sem documentos disponíveis. Os docs incluídos vivem em docs/ no repositório — adicione aí ficheiros Markdown, ou em ~/.specrails/docs/ para os estender.",
+    "categoryEmpty": "Ainda não há documentos nesta categoria.",
+    "documentCount_one": "{{count}} documento",
+    "documentCount_other": "{{count}} documentos",
+    "categoryCount_one": "{{count}} categoria",
+    "categoryCount_other": "{{count}} categorias",
+    "summary": "{{documents}} em {{categories}}.",
+    "loadError": "Falha ao carregar o documento"
+  }
+}

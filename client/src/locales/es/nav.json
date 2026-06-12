@@ -1,0 +1,104 @@
+{
+  "sidebarPin": {
+    "withShortcut": "{{label}} ({{shortcut}})",
+    "left": {
+      "pinnedOpen": "Contraer barra lateral izquierda (mantener anclada)",
+      "pinnedCollapsed": "Desanclar barra lateral izquierda",
+      "unpinned": "Anclar barra lateral izquierda abierta"
+    },
+    "right": {
+      "pinnedOpen": "Contraer barra lateral derecha (mantener anclada)",
+      "pinnedCollapsed": "Desanclar barra lateral derecha",
+      "unpinned": "Anclar barra lateral derecha abierta"
+    }
+  },
+  "projects": {
+    "addProject": "Añadir proyecto",
+    "remove": "Eliminar {{name}}",
+    "confirmRemove": "Confirmar eliminación de {{name}}",
+    "confirmShort": "¿confirmar?",
+    "added": "Proyecto añadido: {{name}}",
+    "removed": "Proyecto eliminado"
+  },
+  "arcSidebar": {
+    "hubTitle": "Hub",
+    "docs": "Docs",
+    "analytics": "Analíticas",
+    "settings": "Ajustes"
+  },
+  "rightSidebar": {
+    "projectTitle": "Proyecto",
+    "dashboard": "Dashboard",
+    "jobs": "Jobs",
+    "analytics": "Analíticas",
+    "agents": "Agentes",
+    "code": "Código",
+    "integrations": "Integraciones",
+    "settings": "Ajustes"
+  },
+  "navbar": {
+    "home": "Inicio",
+    "analytics": "Analíticas",
+    "docs": "Docs",
+    "settings": "Ajustes",
+    "noCli": "Sin CLI de IA",
+    "noCliTooltip": "No se ha detectado ningún CLI de IA. Instala Claude Code o Codex CLI.",
+    "activeCli": "CLI activo: {{label}}"
+  },
+  "statusBar": {
+    "connected": "conectado",
+    "syncing": "sincronizando...",
+    "reconnecting": "reconectando...",
+    "disconnected": "desconectado",
+    "connectionRestored": "Conexión restablecida"
+  },
+  "titleBar": {
+    "searchShortcut": "Buscar (⌘K)",
+    "searchPlaceholder": "Buscar…",
+    "minimizeWindow": "Minimizar ventana",
+    "maximizeWindow": "Maximizar ventana",
+    "closeWindow": "Cerrar ventana"
+  },
+  "costAlerts": {
+    "costAlertTitle": "Alerta de coste",
+    "costAlertDescription": "El job ha costado ${{cost}} — el umbral es ${{threshold}}",
+    "dailyBudgetTitle": "Presupuesto diario superado",
+    "dailyBudgetDescription": "Gastados ${{spent}} de ${{budget}} hoy. Cola pausada.",
+    "hubBudgetTitle": "Presupuesto diario del hub superado",
+    "hubBudgetDescription": "Gasto total del hub: ${{spent}} de ${{budget}}. Cola pausada.",
+    "bannerMessage": "Presupuesto diario superado — gastados ${{spent}} de ${{budget}}. La cola está pausada.",
+    "dismiss": "Descartar"
+  },
+  "errorBoundary": {
+    "title": "Algo ha salido mal",
+    "occurredIn": "Se ha producido un error en <strong>{{name}}</strong>"
+  },
+  "healthWidget": {
+    "healthLabel": "salud",
+    "notAvailable": "n/d",
+    "factorCoverageAvailable": "Cobertura disponible",
+    "factorCoverageGood": "Cobertura ≥ 70%",
+    "factorPipelineGreen": "Último pipeline en verde",
+    "factorActiveWeek": "Activo esta semana",
+    "noJobsYet": "Aún no hay jobs",
+    "recurringFailures": "Fallos recurrentes detectados",
+    "failurePattern": "<cmd>{{command}}</cmd> ha fallado <times>{{count}}×</times> esta semana — posible problema del proyecto.",
+    "coverage": "Cobertura",
+    "lines": "Líneas",
+    "functions": "Funciones",
+    "branches": "Ramas",
+    "lastPipeline": "Último pipeline",
+    "recentCommits": "Commits recientes",
+    "noGitHistory": "No se ha encontrado historial de git",
+    "minutesAgo": "hace {{count}}m",
+    "hoursAgo": "hace {{count}}h",
+    "daysAgo": "hace {{count}}d"
+  },
+  "collapsibleSection": {
+    "dragToReorder": "Arrastra para reordenar",
+    "unpinAria": "Desanclar sección (se contraerá por defecto)",
+    "pinAria": "Anclar sección (permanecerá expandida)",
+    "unpinTooltip": "Desanclar (contraída por defecto)",
+    "pinTooltip": "Anclar abierta (permanece expandida)"
+  }
+}

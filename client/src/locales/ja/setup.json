@@ -1,0 +1,281 @@
+{
+  "wizard": {
+    "configureAgents": "{{provider}} エージェントを設定",
+    "configureSubtitle": "インストールするエージェントと実行方法を選択してください。",
+    "tabs": {
+      "agents": "エージェント",
+      "models": "モデル"
+    },
+    "skipForNow": "今はスキップ",
+    "install": "インストール",
+    "nextProvider": "次へ: {{provider}}",
+    "installingProvider": "{{provider}} をインストール中…",
+    "installingSpecrails": "specrails をインストール中…",
+    "installingFromTemplates": "テンプレートからエージェントをインストール中",
+    "waitingForOutput": "出力を待機中…",
+    "checkpoints": {
+      "baseInstall": "ベースインストール",
+      "agentSelection": "エージェント選択",
+      "agentGeneration": "エージェント生成"
+    },
+    "steps": {
+      "configure": "設定"
+    },
+    "summary": {
+      "agents": "エージェント",
+      "agentSkills": "エージェントスキル",
+      "skills": "スキル",
+      "openspecSkills": "OpenSpec スキル",
+      "legacyRemoved_one": "レガシーの <code>/specrails:*</code> コマンドを {{count}} 件削除しました",
+      "legacyRemoved_other": "レガシーの <code>/specrails:*</code> コマンドを {{count}} 件削除しました"
+    },
+    "complete": {
+      "welcome": "<spec>spec</spec><rails>rails</rails> へようこそ",
+      "configured": "<strong>{{projectName}}</strong> に AI 駆動の開発ワークフローが設定されました。専用のエージェントとコマンドが利用できます。",
+      "installedForEngines_one": "{{count}} 個のエンジンにインストールしました",
+      "installedForEngines_other": "{{count}} 個のエンジンにインストールしました",
+      "learnMore": "specrails を最大限に活用する方法:",
+      "continueToProject": "プロジェクトへ進む"
+    },
+    "error": {
+      "title": "セットアップに失敗しました",
+      "skipSetup": "セットアップをスキップ",
+      "prereqMissing": "SpecRails のセットアップには、PATH 上で利用可能な Node.js、npm、npx、Git が必要です。",
+      "prereqRetryHint": "不足しているツールをインストールし、SpecRails Hub を再起動してからセットアップを再試行してください。"
+    }
+  },
+  "addProject": {
+    "title": "プロジェクトを追加",
+    "description": "プロジェクトディレクトリを登録してハブから管理します。",
+    "noProviderDetected": "AI CLI が見つかりません。まず Claude Code または Codex CLI をインストールしてください。",
+    "pathLabel": "プロジェクトパス",
+    "pathPlaceholder": "/Users/me/my-project",
+    "pathHint": "プロジェクトルートへの絶対パス",
+    "browseForFolder": "フォルダを参照",
+    "selectProjectFolder": "プロジェクトフォルダを選択",
+    "nameLabel": "表示名",
+    "optional": "（任意）",
+    "namePlaceholder": "マイプロジェクト",
+    "nameHint": "デフォルトはディレクトリ名",
+    "providersLabel": "AI プロバイダー",
+    "notFound": "見つかりません",
+    "multiProviderHint": "両方のエンジンがセットアップされます。最初のものがプロジェクトのデフォルトです。作成後は変更できません。",
+    "singleProviderHint": "プロジェクト作成後は変更できません。",
+    "adding": "追加中…",
+    "submit": "プロジェクトを追加",
+    "toolsRequired_one": "プロジェクトの追加には {{tools}} が必要です",
+    "toolsRequired_other": "プロジェクトの追加には {{tools}} が必要です",
+    "errors": {
+      "pathRequired": "プロジェクトパスは必須です",
+      "selectProvider": "AI プロバイダーを1つ以上選択してください",
+      "addFailed": "プロジェクトの追加に失敗しました"
+    },
+    "toasts": {
+      "registered": "プロジェクト「{{name}}」を登録しました"
+    }
+  },
+  "prerequisites": {
+    "corruptedBundle": "バンドル破損 — アプリを再インストールしてください",
+    "notInstalled": "未インストール",
+    "failedToExecute": "見つかりましたが実行できませんでした",
+    "failedToExecuteAt": "{{path}} に見つかりましたが実行できませんでした",
+    "failedToExecuteWithError": "見つかりましたが実行できませんでした（{{error}}）",
+    "failedToExecuteAtWithError": "{{path}} に見つかりましたが実行できませんでした（{{error}}）",
+    "needsMinimum": "{{version}} が見つかりました — {{minVersion}} 以上が必要です",
+    "unknownVersion": "不明",
+    "installedLabel": "インストール済み",
+    "verifyError": "開発者ツールをローカルで検証できませんでした — インストール時に検証されます。",
+    "allDetected": "必要なツールはすべて検出されました",
+    "bundleCorruptedTitle": "アプリバンドルが破損しています",
+    "toolsRequired_one": "{{count}} 個の開発者ツールが必要です",
+    "toolsRequired_other": "{{count}} 個の開発者ツールが必要です",
+    "reinstallHint": "SpecRails Hub アプリを再インストールしてバンドルツールを復元してください。",
+    "installMissingHint": "続行するには不足しているツールをインストールしてください。",
+    "moreInfo": "詳細",
+    "bundledBadge": "バンドル"
+  },
+  "instructions": {
+    "title": "開発者ツールをインストール",
+    "description": "SpecRails には PATH 上の Node.js、npm、npx、Git が必要です。お使いの OS のスニペットを選んで実行し、「インストールしました。再チェック」をクリックしてください。",
+    "darwin": {
+      "intro": "Homebrew なら1行で両方のツールをインストールできます。brew がない場合は公式ダウンロードを利用してください。",
+      "installNodeGit": "Homebrew で Node.js と Git をインストール"
+    },
+    "win32": {
+      "intro": "Winget は Windows 11 および最近の Windows 10 に同梱されています。PowerShell またはターミナルを開いて実行してください:",
+      "installNode": "Node.js LTS をインストール",
+      "installGit": "Git をインストール",
+      "note": "インストール後、Windows が PATH を更新するように SpecRails Hub を再起動してください。"
+    },
+    "linux": {
+      "intro": "ディストリビューションのパッケージマネージャーを使用してください:",
+      "debian": "Debian / Ubuntu",
+      "fedora": "Fedora / RHEL"
+    },
+    "links": {
+      "nodeOfficial": "Node.js（公式）",
+      "gitOfficial": "Git（公式）",
+      "gitWindows": "Git for Windows（公式）"
+    },
+    "showOtherPlatforms": "他のプラットフォームを表示",
+    "hideOtherPlatforms": "他のプラットフォームを非表示",
+    "recheck": "インストールしました。再チェック",
+    "diagnostics": {
+      "copy": "診断情報をコピー",
+      "copied": "診断情報をコピーしました",
+      "failed": "コピーに失敗しました"
+    },
+    "corrupted": {
+      "title": "アプリバンドルが破損しています",
+      "description": "バンドルされたツール（Node.js、Git）の一部を検証できませんでした。",
+      "body": "このツールは SpecRails Hub アプリにバンドルされており、個別にインストールできません。このメッセージが表示される場合、アプリバンドルが破損している可能性があります。SpecRails Hub を再インストールしてください。"
+    }
+  },
+  "checkpoints": {
+    "title": "セットアップの進行状況",
+    "progress": "{{done}} / {{total}} 完了",
+    "rawLog_one": "生ログ（{{count}} 行）",
+    "rawLog_other": "生ログ（{{count}} 行）"
+  },
+  "setupChat": {
+    "title": "セットアップアシスタント",
+    "subtitle": "プロンプトに応答してプロジェクトを設定します",
+    "settingUp": "プロジェクトをセットアップ中…",
+    "placeholder": "返信を入力…",
+    "keyboardHint": "Enter で送信、Shift+Enter で改行"
+  },
+  "welcome": {
+    "title": "<spec>spec</spec><rails>rails</rails> hub へようこそ",
+    "description": "ハブは複数のプロジェクトを単一のインターフェースで管理します。最初のプロジェクトを追加して始めましょう。",
+    "addFirstProject": "最初のプロジェクトを追加"
+  },
+  "onboarding": {
+    "productTour": "プロダクトツアー",
+    "stepCount": "ステップ {{current}} / {{total}}",
+    "goToStep": "ステップ {{step}} へ移動: {{label}}",
+    "stepLabel": "ステップ {{step}}",
+    "dontShowAgain": "今後表示しない",
+    "skipTour": "ツアーをスキップ",
+    "getStarted": "始める",
+    "flow": {
+      "addSpec": "スペックを追加",
+      "dropInRail": "レールにドロップ",
+      "hitPlay": "再生を押す",
+      "ship": "Ship",
+      "architect": "アーキテクト",
+      "developer": "デベロッパー",
+      "reviewer": "レビュアー"
+    },
+    "welcome": {
+      "nav": "ようこそ",
+      "title": "specrails-hub へようこそ",
+      "subtitle": "AI エージェントでソフトウェアを出荷するためのローカルコックピット",
+      "intro": "specrails-hub はアイデアを出荷済みのコードに変えます — そのすべてのステップを<b>見て、操り、信頼</b>できます。AI と対話してスペックを下書きし、実行レールにドロップして再生を押すだけ。パイプラインがアーキテクチャ、実装、レビュー、プルリクエストまで処理し、その作業をライブでストリーミングします。",
+      "coreLoopLabel": "コアループ",
+      "flowCaption": "各スペックは <b>アーキテクト → デベロッパー → レビュアー → Ship</b> を自動で流れます。",
+      "localNote": "<b>100% ローカル · シングルユーザー · アカウント不要。</b>すべてあなたのマシン上で動作します。<i>あなた</i>がエージェントを起動しない限り、コードがラップトップの外に出ることはありません。",
+      "tourNote": "このクイックツアーではハブの全機能を紹介します — 所要時間は約1分です。"
+    },
+    "authorSpecs": {
+      "nav": "スペック作成",
+      "title": "アイデアをスペックに変える",
+      "subtitle": "作りたいものを正確に捉える6つの方法",
+      "intro": "<b>スペック</b>とは、実行してほしい作業の記述です。短い一文から AI との本格的な対話まで、その時々に合った方法で作成できます。",
+      "exploreLabel": "Explore — 対話する",
+      "exploreBody": "作りたいものをチャットで説明すると、ライブドラフトがターンごとに再構築されます。プリセットスライダーで AI に見せるプロジェクトコンテキストの量を調整できます — メッセージのみから、コードベース全体 + MCP サーバーまで。",
+      "quickLabel": "Quick — 一発生成",
+      "quickBody": "作りたいものが明確なら、1ターンで完全なスペックを生成できます。オプションで Contract Layer によるエンリッチも可能: 正確な名前、データ形状、不変条件、変更ファイルリストにより、エージェントが車輪の再発明をしません。",
+      "websiteLabel": "ウェブサイトから",
+      "websiteBody": "埋め込みブラウザが開きます。要素をホバー選択するか矩形をドラッグすると、スクリーンショット、DOM、適用された CSS が添付ファイルになります。デスクトップ版は独自の Chromium を同梱しているのでオフラインでも動作します。",
+      "smashLabel": "大きなエピックを SMASH",
+      "smashBody": "大きなスペックをワンクリックで小さなサブスペック群に分解します — 各子スペックのカードには短い要約が付きます。",
+      "draftsLabel": "下書きと編集の再開",
+      "draftsBody": "進行中の探索を下書きチケットとして保存し、後で再開できます。どのスペックも Explore で開き直して改良を続けられます。",
+      "compareLabel": "並べて比較",
+      "compareBody": "スペックを画面の端にドラッグすると、他のスペックのピッカーがスライドインします — タブレット風に2つを並べてレビューできます。"
+    },
+    "rails": {
+      "nav": "レールで実行",
+      "title": "パイプラインをレールで実行",
+      "subtitle": "スペックをレーンに整理してエージェントを起動",
+      "intro": "ダッシュボードの右側が<b>レール</b> — 実行レーンです。スペックカードをレールにドラッグして <play>▶ 再生</play> を押すと、実装ジョブが起動します。",
+      "jobLabel": "各ジョブの実行内容",
+      "flowCaption": "各フェーズは作業中のログをライブでストリーミングします。",
+      "modeLabel": "レールの実行方法を選択",
+      "modeBody": "各レールはモードを選べます: <b>Implement</b>（完全な構造化パイプライン）、<b>Batch</b>（複数スペックを順次実行）、<b>Ultracode</b>（Claude が固定パイプラインなしで自律的に作業）。",
+      "profilesLabel": "エージェントプロファイル",
+      "profilesBody": "どのエージェントを実行し、それぞれどのモデルを使うかを決めるプロジェクトごとの宣言的カタログ — レールごとに選択され、ジョブごとにスナップショットされるため並行作業が分離されます。",
+      "jobDetailLabel": "ライブジョブ詳細",
+      "jobDetailBody": "各ジョブにはチケット識別ヘッダー、ライブの経過時間ティッカー、進行中のターン/トークン数が表示され、確定コストは終了時に解決されます。",
+      "isolationLabel": "複数プロジェクト、完全分離",
+      "isolationBody": "各プロジェクトは独自のデータベースとジョブキューを持ちます。複数のプロジェクトを同時に実行し、左サイドバーから切り替えられます — 位置はプロジェクトごとに記憶されます。"
+    },
+    "providers": {
+      "nav": "あなたのエージェント",
+      "title": "自分のエージェントを持ち込む",
+      "subtitle": "Claude Code と Codex をファーストクラスのエンジンとして",
+      "intro": "ハブは <b>Claude Code</b> と <b>Codex CLI</b> を、単一のコントラクトの背後で交換可能なエンジンとして扱います。プロジェクトには片方または両方をインストールでき、選択はインストール時に行います。",
+      "table": {
+        "capability": "機能",
+        "streamingResume": "ストリーミングとセッション再開",
+        "native": "ネイティブ",
+        "costReporting": "コストレポート",
+        "providerBilled": "プロバイダー請求額",
+        "estimated": "推定（~）",
+        "telemetry": "テレメトリ（OTEL）",
+        "synthesized": "合成",
+        "agentProfiles": "エージェントプロファイル"
+      },
+      "calloutLabel": "両方インストールされている場合",
+      "calloutBody": "<b>スペックごと、レールごと、ターミナル起動ごと</b>にエンジンを選べます。ハブはプロジェクトごとに最後の選択を記憶します。Codex のコストはローカルのレートカードからの推定で、常に <mono>~</mono> が付きます。"
+    },
+    "cost": {
+      "nav": "コスト追跡",
+      "title": "1セント単位で追跡",
+      "subtitle": "課金対象のすべての呼び出しを記録・可視化",
+      "intro": "レール、Quick、Explore、AI 編集、SMASH、ファイル要約にわたるすべての AI 呼び出しが <b>Claude と Codex の両方</b>で記録されます。エージェントのコストを推測する必要はもうありません。",
+      "analyticsLabel": "分析ページ",
+      "analyticsBody": "バーンレートのヒーロー表示、日次タイムライン、トップチケット、モデル別内訳、コスト対ターン数の散布図。期間（7日 / 30日 / 90日 / 全期間）とサーフェスでフィルタできます。",
+      "perTicketLabel": "チケット別の支出",
+      "perTicketBody": "各スペックの詳細にはコストと所要ターン数が表示され、そのチケットでフィルタした分析ページへディープリンクします。",
+      "honestLabel": "正直な数字",
+      "honestBody": "Claude のコストはプロバイダー請求額そのもの。Codex は推定で <mono>~</mono> が付きます。トークン合計にはキャッシュ階層が含まれるため、数字がきちんと一致します。",
+      "budgetsLabel": "予算とアラート",
+      "budgetsBody": "日次予算とジョブ単位のコストアラートを設定でき、上限を超えるとハブが自動でキューを一時停止します。すべて CSV または JSON にエクスポートできます。"
+    },
+    "workspace": {
+      "nav": "ワークスペース",
+      "title": "あなたのワークスペースに",
+      "subtitle": "ウィンドウを離れずに必要なすべてを",
+      "terminalLabel": "ターミナルパネル",
+      "terminalBody": "画面下部の本格的な VS Code スタイルのターミナル（<mod></mod> <j></j>）— WebGL レンダリング、検索、インライン画像、パスのドラッグ&ドロップ、シェル統合。プロジェクトごとに最大10セッション。",
+      "codeLabel": "コードエクスプローラー",
+      "codeBody": "読み取り専用のファイルツリーと Monaco ビューアに、平易な AI 要約と「AI が変更」の来歴チップが付き、誰でも何がなぜ変わったかを追えます。",
+      "integrationsLabel": "インテグレーション",
+      "integrationsBody": "プロジェクトごとの MCP インテグレーションのマーケットプレイス — Serena のセマンティックコードナビゲーションを同梱。インストールは加算式で、追加しても他に影響しません。",
+      "themesLabel": "テーマ",
+      "themesBody": "5つの組み込みテーマ — specrails（デフォルト）、dracula、aurora-light、obsidian-dark、matrix — を UI の描画前に適用するため、フラッシュがありません。設定 → 外観で変更できます。",
+      "chatsLabel": "最小化できるチャット",
+      "chatsBody": "Explore や AI 編集のセッションをドックのチップに格納して後で再開 — リフレッシュやプロジェクト切り替えで失われることはありません。",
+      "desktopLabel": "デスクトップまたはブラウザ",
+      "desktopBody": "ブラウザでハブを実行するか、サーバーとランタイムを同梱した署名済みデスクトップアプリ（macOS と Windows）を入手できます。"
+    },
+    "moveFast": {
+      "nav": "高速操作",
+      "title": "思考のスピードで動く",
+      "subtitle": "どこでもキーボードファースト",
+      "paletteLabel": "コマンドパレット",
+      "paletteShortcut": "<f>どこでも</f> <mod></mod> <m>+</m> <k></k> <m>を押す</m>",
+      "paletteBody": "プロジェクトの切り替え、スペックコマンドの実行、任意のページへのジャンプ、最近のジョブの検索 — すべてあいまい検索で。",
+      "terminalLabel": "ターミナルパネル",
+      "terminalBody": "<mod></mod> <j></j> で切り替え。",
+      "shortcutsLabel": "全ショートカット",
+      "shortcutsBody": "<q></q> を押すと完全なチートシートが表示されます。",
+      "chatLabel": "チャットサイドバー",
+      "chatBody": "<mod></mod> <bkey></bkey> で右サイドバーを切り替え。",
+      "projectsLabel": "プロジェクトサイドバー",
+      "projectsBody": "<alt></alt> <mod></mod> <bkey></bkey> で左の Arc サイドバーを切り替え。",
+      "outro": "<b>ツアーは以上です。</b>左サイドバーからプロジェクトを追加して、最初のスペックを出荷しましょう。このウォークスルーは設定からいつでも再表示できます。"
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 
 interface TerminalDragHandleProps {
@@ -14,6 +15,7 @@ interface TerminalDragHandleProps {
 }
 
 export function TerminalDragHandle({ height, maxHeight, onHeightCommit, onHeightPreview, minHeight = 120 }: TerminalDragHandleProps) {
+  const { t } = useTranslation('terminal')
   const draggingRef = useRef(false)
   const startPointerYRef = useRef(0)
   const startHeightRef = useRef(height)
@@ -75,7 +77,7 @@ export function TerminalDragHandle({ height, maxHeight, onHeightCommit, onHeight
     <div
       role="separator"
       aria-orientation="horizontal"
-      aria-label="Resize terminal panel"
+      aria-label={t('dragHandle.resize')}
       onPointerDown={onPointerDown}
       className={cn(
         'absolute top-0 left-0 right-0 h-1',

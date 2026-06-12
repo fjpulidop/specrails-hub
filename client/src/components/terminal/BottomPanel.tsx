@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 import {
   useTerminals,
@@ -33,6 +34,7 @@ interface BottomPanelProps {
 
 export function BottomPanel({ projectId, provider = 'claude', providers, state, viewportHeight, statusBarHeight }: BottomPanelProps) {
   const t = useTerminals()
+  const { t: translate } = useTranslation('terminal')
   const navigate = useNavigate()
   const panelRef = useRef<HTMLDivElement | null>(null)
   const [livePreviewHeight, setLivePreviewHeight] = useState<number | null>(null)
@@ -215,7 +217,7 @@ export function BottomPanel({ projectId, provider = 'claude', providers, state, 
         <ShortcutContextMenu
           x={shortcutMenu.x}
           y={shortcutMenu.y}
-          label={shortcutMenu.kind === 'browser' ? 'Configure browser URL in settings…' : 'Edit quick script in settings…'}
+          label={shortcutMenu.kind === 'browser' ? translate('shortcutMenu.configureBrowserUrl') : translate('shortcutMenu.editQuickScript')}
           onSelect={() => handleNavigateToSetting(shortcutMenu.kind)}
           onClose={() => setShortcutMenu(null)}
         />

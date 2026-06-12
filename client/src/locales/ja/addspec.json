@@ -1,0 +1,190 @@
+{
+  "proposeModal": {
+    "title": "スペックを追加",
+    "dialogDescription": "短いアイデアから、即時または Explore モードで新しいスペックを作成します。",
+    "engineAriaLabel": "このスペックの AI エンジン",
+    "modeTablistLabel": "スペック作成モード",
+    "mode": {
+      "quick": "クイック",
+      "explore": "Explore",
+      "raw": "Raw",
+      "exploreHint": "対話型",
+      "rawHint": "AIなし"
+    },
+    "modeDescription": {
+      "quick": "機能や変更内容を記述してください。モックアップ、ブリーフ、データを添付するとコンテキストが充実します。",
+      "explore": "大まかなアイデアを記述してください。Claude が対話を通じて形にするのを手伝います — コミットのタイミングはあなたが決めます。",
+      "raw": "プロンプトをそのままスペックチケットとして保存します。今は AI を実行しません。レールにドラッグするとビルドされます。"
+    },
+    "editorPlaceholder": {
+      "quick": "例: 設定ページにダークモードの切り替えを追加し、ユーザーの設定を永続化する...",
+      "explore": "例: ダークモード — トグルの配置や永続化の方法はまだ未定…",
+      "raw": "機能、変更、アイデアを記述してください。Markdown、画像、ファイルに対応…"
+    },
+    "ideaAriaLabel": "スペックのアイデア",
+    "raw": {
+      "titleLabel": "タイトル",
+      "titlePlaceholder": "プロンプトから自動入力…",
+      "priorityLabel": "優先度",
+      "labelsLabel": "ラベル",
+      "removeLabel": "ラベル {{label}} を削除",
+      "addLabelAria": "ラベルを追加",
+      "labelPlaceholder": "任意…",
+      "bodyAriaLabel": "Raw スペック本文"
+    },
+    "priority": {
+      "critical": "クリティカル",
+      "high": "高",
+      "medium": "中",
+      "low": "低"
+    },
+    "fromWebsite": "ウェブサイトから",
+    "fromWebsiteTitle": "実際のウェブページを開き、範囲を選択してスペックに変換",
+    "capture": {
+      "responsiveSizes_one": "レスポンシブ · {{count}} サイズ",
+      "responsiveSizes_other": "レスポンシブ · {{count}} サイズ"
+    },
+    "submit": {
+      "quick": "スペックを生成",
+      "explore": "続行",
+      "raw": "作成",
+      "disabledTitle": "先にプロンプトを入力してください"
+    },
+    "toast": {
+      "createFailed": "スペックの作成に失敗しました",
+      "rawSavedWithId": "#{{id}} として保存 · Raw スペックはレールで使用可能",
+      "rawCreated": "Raw スペックを作成しました",
+      "exploreNotWired": "このビューでは Explore モードは利用できません",
+      "generating": "生成中...",
+      "failedToStart": "{{projectName}} · 開始に失敗しました",
+      "unsupportedFileType": "未対応のファイル形式: {{name}}",
+      "uploadFailed": "{{name}} のアップロードに失敗しました: {{message}}"
+    }
+  },
+  "featureProposal": {
+    "title": "機能を提案",
+    "ideaIntro": "アイデアを平易な言葉で記述してください。Claude がコードベースを読み取り、完全な提案として構造化します。",
+    "ideaAriaLabel": "機能のアイデア",
+    "ideaPlaceholder": "例: API コストがしきい値を超えたときに通知される予算アラートをユーザーが設定できるようにしたい...",
+    "cmdEnterToSubmit": "Cmd+Enter で送信",
+    "exploreIdea": "アイデアを探索",
+    "exploringTitle": "アイデアを探索中...",
+    "refiningTitle": "提案を改良中...",
+    "reviewTitle": "提案をレビュー",
+    "readingCodebase_one": "コードベースを読み取り中...（{{count}} ファイル探索済み）",
+    "readingCodebase_other": "コードベースを読み取り中...（{{count}} ファイル探索済み）",
+    "refinementAriaLabel": "改良フィードバック",
+    "refinementPlaceholder": "変更を依頼、制約を追加、スコープを調整...",
+    "sendRefinementTitle": "改良を送信 (Cmd+Enter)",
+    "cmdEnterToSend": "Cmd+Enter で送信",
+    "confirmCreateIssue": "この提案から GitHub Issue を作成しますか？",
+    "yesCreateIssue": "はい、作成します",
+    "createGithubIssue": "GitHub Issue を作成",
+    "startOver": "最初からやり直す",
+    "creatingIssueTitle": "GitHub Issue を作成中...",
+    "creatingIssueViaCli": "GitHub CLI で Issue を作成中...",
+    "issueCreated": "Issue を作成しました",
+    "proposeAnother": "別の提案をする",
+    "errorTitle": "問題が発生しました",
+    "errorFallback": "エラーが発生しました",
+    "tryAgain": "再試行",
+    "cancelledTitle": "キャンセルされました",
+    "cancelledBody": "提案はキャンセルされました。"
+  },
+  "contextScope": {
+    "heading": "コンテキスト認識",
+    "custom": "カスタム",
+    "customMix": "カスタム構成 — 下の「微調整」を参照",
+    "estimateUnavailable": "{{tier}} · 見積もり不可",
+    "preset": {
+      "minimal": "最小",
+      "light": "ライト",
+      "standard": "標準",
+      "rich": "リッチ",
+      "max": "最大",
+      "hub": "Hub"
+    },
+    "presetCost": {
+      "minimal": "1× コスト · 最速の初回トークン · スペック読み込みなし",
+      "light": "1.3× コスト · Specrails スペックを読み込み",
+      "standard": "1.6× コスト · Specrails + OpenSpec スペックを読み込み",
+      "rich": "2× コスト · リポジトリ全体の読み取りアクセス",
+      "max": "4× コスト · 全読み取り + Contract Layer 改良",
+      "hub": "4–6× コスト · 全機能 + プロジェクトおよび承認済み MCP"
+    },
+    "smashCapable": "SMASH 対応",
+    "smashHint": "Contract Layer が有効なため、このスペックは後で Sub-Spec に分解できます。",
+    "fineTune": "微調整",
+    "defaultLabel": "コンテキストスコープ",
+    "summaryMinimal": "最小",
+    "tags": {
+      "specrails": "specrails",
+      "openspec": "openspec",
+      "codebase": "codebase",
+      "mcp": "mcp",
+      "myMcp": "my-mcp",
+      "contract": "contract"
+    },
+    "checks": {
+      "specrailsLabel": "specrails チケット",
+      "openspecLabel": "openspec スペック",
+      "fullLabel": "コードベース全体",
+      "mcpLabel": "プロジェクト MCP",
+      "mcpHint": ".mcp.json のサーバー",
+      "userMcpLabel": "承認済みの MCP",
+      "userMcpHint": "~/.claude · ~/.codex のサーバー",
+      "userMcpTooltip": "ローカルで承認済みの MCP サーバー（claude mcp add / codex mcp add）",
+      "exploreOnly": "Explore モードのみ",
+      "contractLabel": "Contract Layer で強化",
+      "contractHint": "コミット後の改良 · SMASH を有効化"
+    }
+  },
+  "aiEngine": {
+    "label": "AI エンジン"
+  },
+  "modelSelector": {
+    "presetHeading": "モデルプリセット",
+    "preset": {
+      "balanced": {
+        "label": "バランス",
+        "description": "全エージェントに Sonnet（推奨）"
+      },
+      "budget": {
+        "label": "節約",
+        "description": "全エージェントに Haiku — 3倍安く、高速"
+      },
+      "max": {
+        "label": "最大",
+        "description": "アーキテクトと PM に Opus、その他に Sonnet"
+      }
+    },
+    "overridesHeading": "エージェント別モデルオーバーライド",
+    "overriddenCount": "{{count}} 件オーバーライド",
+    "customBadge": "カスタム",
+    "resetToDefault": "プリセットのデフォルトに戻す"
+  },
+  "modelCombobox": {
+    "alias": "Claude Code エイリアス: {{alias}}",
+    "tier": {
+      "balanced": "バランス",
+      "mostCapable": "最高性能",
+      "fastest": "最速"
+    }
+  },
+  "costMeter": {
+    "heading": "コスト認識",
+    "meterAriaLabel": "コストティア",
+    "estimateUnavailable": "ティアのみ — 見積もり不可"
+  },
+  "commandProposal": {
+    "heading": "推奨コマンド",
+    "run": "実行",
+    "dismiss": "閉じる"
+  },
+  "errors": {
+    "serverError": "サーバーエラー ({{status}})",
+    "connectionFailed": "接続に失敗しました: {{message}}",
+    "sendRefinementFailed": "改良の送信に失敗しました",
+    "createIssueFailed": "Issue の作成に失敗しました"
+  }
+}

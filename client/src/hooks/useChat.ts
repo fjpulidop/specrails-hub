@@ -4,6 +4,7 @@ import type { ChatConversationSummary, ChatMessage } from '../types'
 import { getApiBase } from '../lib/api'
 import { useHub } from './useHub'
 import { toast } from 'sonner'
+import i18n from '../lib/i18n'
 
 const PANEL_OPEN_KEY = 'specrails.chatPanelOpen'
 
@@ -295,7 +296,7 @@ export function useChat(): UseChatReturn {
             : c
         )
       )
-      toast.error('Failed to send message')
+      toast.error(i18n.t('chat:errors.sendFailed'))
     }
   }, [])
 

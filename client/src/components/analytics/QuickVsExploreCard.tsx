@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next'
 import type { SpendingResponse, ByModeEntry } from '../../types/spending'
 
 interface Props {
@@ -37,6 +38,7 @@ function Sparkline({ values }: { values: number[] }) {
 }
 
 function ModeColumn({ mode, label, accentClass }: { mode: ByModeEntry; label: string; accentClass: string }) {
+  const { t } = useTranslation('analytics')
   const sparseExplore = mode.mode === 'explore' && mode.totalRuns < 5
   return (
     <div className="flex-1 p-4 first:pr-2 last:pl-2">
@@ -46,9 +48,9 @@ function ModeColumn({ mode, label, accentClass }: { mode: ByModeEntry; label: st
       </div>
       {sparseExplore ? (
         <div className="py-3">
-          <p className="text-sm text-foreground">Try Explore for richer specs</p>
+          <p className="text-sm text-foreground">{t('quickVsExplore.sparseCta')}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            {mode.totalRuns} run{mode.totalRuns === 1 ? '' : 's'} so far
+            {t('quickVsExplore.runsSoFar', { count: mode.totalRuns })}
           </p>
         </div>
       ) : (
@@ -56,11 +58,18 @@ function ModeColumn({ mode, label, accentClass }: { mode: ByModeEntry; label: st
           <div className="text-3xl font-semibold tabular-nums tracking-tight">
             {fmtUsd(mode.avgCostPerSpec)}
           </div>
-          <div className="text-[11px] text-muted-foreground mt-0.5">per spec</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">{t('quickVsExplore.perSpec')}</div>
           <div className="mt-3"><Sparkline values={mode.sparkline.length > 0 ? mode.sparkline : [0]} /></div>
           <div className="mt-3 space-y-0.5 text-xs tabular-nums text-muted-foreground">
-            <div><span className="text-foreground font-medium">{mode.ticketsCreated}</span> created · {mode.totalRuns} runs</div>
-            <div>{fmtDur(mode.avgDurationMs)} avg</div>
+            <div>
+              <Trans
+                ns="analytics"
+                i18nKey="quickVsExplore.createdRuns"
+                values={{ created: mode.ticketsCreated, runs: mode.totalRuns }}
+                components={{ strong: <span className="text-foreground font-medium" /> }}
+              />
+            </div>
+            <div>{t('quickVsExplore.avgDuration', { duration: fmtDur(mode.avgDurationMs) })}</div>
             <div className="truncate">{mode.dominantModel ?? '—'}</div>
           </div>
         </>
@@ -70,6 +79,7 @@ function ModeColumn({ mode, label, accentClass }: { mode: ByModeEntry; label: st
 }
 
 export function QuickVsExploreCard({ data, loading }: Props) {
+  const { t } = useTranslation('analytics')
   if (loading && !data) {
     return <div className="h-[220px] rounded-xl border border-border/40 bg-card/40 animate-pulse" />
   }
@@ -87,16 +97,16 @@ export function QuickVsExploreCard({ data, loading }: Props) {
   return (
     <div className="rounded-xl border border-border/50 bg-card/40">
       <div className="px-4 pt-3 pb-1">
-        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Quick vs Explore</h2>
+        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('quickVsExplore.title')}</h2>
       </div>
       <div className="flex divide-x divide-border/40">
-        <ModeColumn mode={quick} label="Quick" accentClass="bg-accent-secondary" />
-        <ModeColumn mode={explore} label="Explore" accentClass="bg-accent-highlight" />
+        <ModeColumn mode={quick} label={t('quickVsExplore.quick')} accentClass="bg-accent-secondary" />
+        <ModeColumn mode={explore} label={t('quickVsExplore.explore')} accentClass="bg-accent-highlight" />
       </div>
       {showRatio && (
         <div className="px-4 pb-3 -mt-1">
           <div className="text-center text-[11px] text-muted-foreground tabular-nums">
-            <span className="px-2">━━━━━━ {ratio!.toFixed(1)}× more per spec ━━━━━━</span>
+            <span className="px-2">━━━━━━ {t('quickVsExplore.ratio', { ratio: ratio!.toFixed(1) })} ━━━━━━</span>
           </div>
         </div>
       )}

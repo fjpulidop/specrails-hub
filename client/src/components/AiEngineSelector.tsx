@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import {
   Select,
   SelectContent,
@@ -31,6 +32,7 @@ export function AiEngineSelector({
   ariaLabel,
   className,
 }: AiEngineSelectorProps) {
+  const { t } = useTranslation('addspec')
   if (!providers || providers.length <= 1) return null
   return (
     <Select
@@ -40,10 +42,10 @@ export function AiEngineSelector({
     >
       <SelectTrigger
         className={className ?? 'h-8 w-[130px] text-xs gap-1.5'}
-        aria-label={ariaLabel ?? 'AI engine'}
+        aria-label={ariaLabel ?? t('aiEngine.label')}
         data-testid="ai-engine-selector"
       >
-        <SelectValue placeholder="AI engine" />
+        <SelectValue placeholder={t('aiEngine.label')} />
       </SelectTrigger>
       <SelectContent>
         {providers.map((p) => (

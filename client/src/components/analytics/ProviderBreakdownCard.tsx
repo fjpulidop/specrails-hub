@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next'
 import type { ByProviderEntry, SpendingResponse } from '../../types/spending'
 
 interface Props {
@@ -31,6 +32,7 @@ function providerAccent(id: string): string {
 }
 
 export function ProviderBreakdownCard({ data, loading }: Props) {
+  const { t } = useTranslation('analytics')
   if (loading && !data) {
     return <div className="h-32 rounded-xl border border-border/40 bg-card/40 animate-pulse" />
   }
@@ -53,20 +55,21 @@ export function ProviderBreakdownCard({ data, loading }: Props) {
       <div className="flex items-baseline justify-between mb-3">
         <div>
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            By provider
+            {t('providerCard.title')}
           </div>
           <div className="text-xs text-muted-foreground/70 mt-0.5">
-            How cost splits across the AI CLIs in this project. The{' '}
-            <span className="font-medium">~</span> prefix marks rows where
-            cost is estimated from the local pricing table (the provider
-            does not report it natively).
+            <Trans
+              ns="analytics"
+              i18nKey="providerCard.description"
+              components={{ tilde: <span className="font-medium" /> }}
+            />
           </div>
         </div>
       </div>
 
       {total === 0 ? (
         <div className="text-xs text-muted-foreground italic">
-          No cost recorded yet in this window.
+          {t('providerCard.noCost')}
         </div>
       ) : (
         <>
@@ -80,7 +83,7 @@ export function ProviderBreakdownCard({ data, loading }: Props) {
                   key={p.provider}
                   className={`h-full ${providerAccent(p.provider)}`}
                   style={{ width: `${pct}%` }}
-                  title={`${providerLabel(p.provider)}: ${fmtUsd(sum)} (${p.count})`}
+                  title={t('providerCard.segmentTitle', { label: providerLabel(p.provider), value: fmtUsd(sum), count: p.count })}
                 />
               )
             })}
@@ -97,6 +100,7 @@ export function ProviderBreakdownCard({ data, loading }: Props) {
 }
 
 function ProviderRow({ entry }: { entry: ByProviderEntry }) {
+  const { t } = useTranslation('analytics')
   const sum = entry.costUsd + entry.estimatedCostUsd
   const allEstimated = entry.costUsd === 0 && entry.estimatedCostUsd > 0
   return (
@@ -104,7 +108,7 @@ function ProviderRow({ entry }: { entry: ByProviderEntry }) {
       <span className={`w-2 h-2 rounded-full shrink-0 ${providerAccent(entry.provider)}`} />
       <span className="text-xs font-medium">{providerLabel(entry.provider)}</span>
       <span className="text-[10px] text-muted-foreground tabular-nums">
-        {entry.count} run{entry.count === 1 ? '' : 's'}
+        {t('runs', { count: entry.count })}
       </span>
       <span className="ml-auto text-xs font-medium tabular-nums">
         {allEstimated ? '~' : ''}{fmtUsd(sum)}

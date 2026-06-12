@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSharedWebSocket } from './useSharedWebSocket'
 import { getApiBase } from '../lib/api'
 
@@ -193,6 +194,7 @@ export function useAgentRefine(projectId: string | null): {
   close: () => void
 } {
   const [state, dispatch] = useReducer(reducer, initialState)
+  const { t } = useTranslation('aiedit')
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
 
   const refineIdRef = useRef<string | null>(null)
@@ -268,7 +270,7 @@ export function useAgentRefine(projectId: string | null): {
       )
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { error?: string }
-        dispatch({ type: 'ERROR', refineId: null, message: data.error ?? `Server error (${res.status})` })
+        dispatch({ type: 'ERROR', refineId: null, message: data.error ?? t('refine.serverError', { status: res.status }) })
         return
       }
       const data = await res.json() as { refineId: string }
@@ -280,9 +282,9 @@ export function useAgentRefine(projectId: string | null): {
         userTurn: { role: 'user', content: instruction, timestamp: Date.now() },
       })
     } catch (err) {
-      dispatch({ type: 'ERROR', refineId: null, message: `Connection failed: ${(err as Error).message}` })
+      dispatch({ type: 'ERROR', refineId: null, message: t('refine.connectionFailed', { message: (err as Error).message }) })
     }
-  }, [state.autoTest])
+  }, [state.autoTest, t])
 
   const sendTurn = useCallback(async (instruction: string) => {
     const refineId = refineIdRef.current
@@ -304,12 +306,12 @@ export function useAgentRefine(projectId: string | null): {
       )
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { error?: string }
-        dispatch({ type: 'ERROR', refineId, message: data.error ?? `Server error (${res.status})` })
+        dispatch({ type: 'ERROR', refineId, message: data.error ?? t('refine.serverError', { status: res.status }) })
       }
     } catch (err) {
-      dispatch({ type: 'ERROR', refineId, message: `Connection failed: ${(err as Error).message}` })
+      dispatch({ type: 'ERROR', refineId, message: t('refine.connectionFailed', { message: (err as Error).message }) })
     }
-  }, [])
+  }, [t])
 
   const cancel = useCallback(async () => {
     const refineId = refineIdRef.current
@@ -345,15 +347,15 @@ export function useAgentRefine(projectId: string | null): {
       }
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { error?: string }
-        dispatch({ type: 'ERROR', refineId, message: data.error ?? `Apply failed (${res.status})` })
+        dispatch({ type: 'ERROR', refineId, message: data.error ?? t('refine.applyFailed', { status: res.status }) })
         return
       }
       const data = await res.json() as { version: number }
       dispatch({ type: 'APPLIED', refineId, version: data.version })
     } catch (err) {
-      dispatch({ type: 'ERROR', refineId, message: `Connection failed: ${(err as Error).message}` })
+      dispatch({ type: 'ERROR', refineId, message: t('refine.connectionFailed', { message: (err as Error).message }) })
     }
-  }, [])
+  }, [t])
 
   const toggleAutoTest = useCallback(async (enabled: boolean) => {
     const refineId = refineIdRef.current
@@ -376,12 +378,12 @@ export function useAgentRefine(projectId: string | null): {
     try {
       // Load base body fresh from disk before pulling the refine session.
       const bodyRes = await fetch(`${getApiBase()}/profiles/catalog/${encodeURIComponent(agentId)}`)
-      if (!bodyRes.ok) throw new Error(`load agent failed: ${bodyRes.status}`)
+      if (!bodyRes.ok) throw new Error(t('refine.loadAgentFailed', { status: bodyRes.status }))
       const bodyData = await bodyRes.json() as { body: string }
       const sessRes = await fetch(
         `${getApiBase()}/profiles/catalog/${encodeURIComponent(agentId)}/refine/${refineId}`,
       )
-      if (!sessRes.ok) throw new Error(`load session failed: ${sessRes.status}`)
+      if (!sessRes.ok) throw new Error(t('refine.loadSessionFailed', { status: sessRes.status }))
       const session = await sessRes.json() as ApiSession
       refineIdRef.current = refineId
       agentIdRef.current = agentId
@@ -400,9 +402,9 @@ export function useAgentRefine(projectId: string | null): {
         },
       })
     } catch (err) {
-      dispatch({ type: 'ERROR', refineId: null, message: `Rehydrate failed: ${(err as Error).message}` })
+      dispatch({ type: 'ERROR', refineId: null, message: t('refine.rehydrateFailed', { message: (err as Error).message }) })
     }
-  }, [])
+  }, [t])
 
   return { state, open, start, sendTurn, cancel, apply, toggleAutoTest, rehydrate, close }
 }

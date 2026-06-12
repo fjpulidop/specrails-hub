@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ZAxis } from 'recharts'
 import type { SpendingResponse, ScatterPoint } from '../../types/spending'
 import { SURFACE_LABEL } from '../../types/spending'
@@ -27,6 +28,7 @@ const COLOR: Record<string, string> = {
 }
 
 export function CostScatter({ data, loading, onSelectPoint }: Props) {
+  const { t } = useTranslation('analytics')
   if (loading && !data) {
     return <div className="h-[260px] rounded-xl border border-border/40 bg-card/40 animate-pulse" />
   }
@@ -52,7 +54,7 @@ export function CostScatter({ data, loading, onSelectPoint }: Props) {
   return (
     <div className="rounded-xl border border-border/50 bg-card/40 p-4">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Cost vs Turns</h2>
+        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('scatter.title')}</h2>
         <div className="flex flex-wrap items-center gap-2 text-[10px]">
           {surfaces.map((s) => (
             <span key={s} className="inline-flex items-center gap-1">
@@ -64,7 +66,7 @@ export function CostScatter({ data, loading, onSelectPoint }: Props) {
       </div>
       {isEmpty ? (
         <div className="h-40 flex items-center justify-center text-xs text-muted-foreground/70">
-          No invocations to plot.
+          {t('scatter.empty')}
         </div>
       ) : (
         <div className="h-[260px]">
@@ -74,7 +76,7 @@ export function CostScatter({ data, loading, onSelectPoint }: Props) {
               <XAxis
                 type="number" dataKey="x" name="turns"
                 tick={{ fontSize: 10 }} stroke="currentColor" className="text-muted-foreground"
-                label={{ value: 'turns', position: 'insideBottomRight', offset: -2, fontSize: 10, fill: 'currentColor' }}
+                label={{ value: t('scatter.turnsLabel'), position: 'insideBottomRight', offset: -2, fontSize: 10, fill: 'currentColor' }}
               />
               <YAxis
                 type="number" dataKey="y" name="cost"
@@ -87,8 +89,8 @@ export function CostScatter({ data, loading, onSelectPoint }: Props) {
                 contentStyle={{ backgroundColor: 'var(--popover)', border: '1px solid var(--border)', fontSize: 11, borderRadius: 6 }}
                 formatter={(value: unknown, name: unknown) => {
                   const n = String(name)
-                  if (n === 'cost' && typeof value === 'number') return [`$${value.toFixed(3)}`, 'cost']
-                  return [String(value), n]
+                  if (n === 'cost' && typeof value === 'number') return [`$${value.toFixed(3)}`, t('scatter.costLabel')]
+                  return [String(value), n === 'turns' ? t('scatter.turnsLabel') : n]
                 }}
               />
               {datasets.map((d) => (

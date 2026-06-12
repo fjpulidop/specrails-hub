@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { X, CheckCircle2, XCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { getApiBase } from '../lib/api'
 import type { JobCompareEntry, JobCompareResponse } from '../types'
 
@@ -52,6 +53,7 @@ function pickBetter(aVal: number | null, bVal: number | null, lowerIsBetter = tr
 }
 
 export function JobComparisonModal({ jobIds, onClose }: JobComparisonModalProps) {
+  const { t } = useTranslation('jobs')
   const [data, setData] = useState<JobCompareResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -75,7 +77,7 @@ export function JobComparisonModal({ jobIds, onClose }: JobComparisonModalProps)
   function header(job: JobCompareEntry, idx: number) {
     return (
       <div className="text-center space-y-1">
-        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Job {idx + 1}</p>
+        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{t('comparison.jobN', { n: idx + 1 })}</p>
         <code className="text-[10px] text-foreground/70 block truncate max-w-[160px] mx-auto">
           {job.command}
         </code>
@@ -84,7 +86,7 @@ export function JobComparisonModal({ jobIds, onClose }: JobComparisonModalProps)
             ? <CheckCircle2 className="w-3 h-3 text-emerald-400" />
             : <XCircle className="w-3 h-3 text-rose-400" />
           }
-          <span className="capitalize text-muted-foreground">{job.status}</span>
+          <span className="capitalize text-muted-foreground">{t(`statusLabel.${job.status}`, { defaultValue: job.status })}</span>
         </div>
         <p className="text-[10px] text-muted-foreground font-mono">{job.id.slice(0, 8)}</p>
       </div>
@@ -102,7 +104,7 @@ export function JobComparisonModal({ jobIds, onClose }: JobComparisonModalProps)
       >
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Job Comparison</h2>
+          <h2 className="text-sm font-semibold">{t('comparison.title')}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -121,7 +123,7 @@ export function JobComparisonModal({ jobIds, onClose }: JobComparisonModalProps)
         )}
 
         {error && (
-          <p className="text-xs text-red-400">Failed to load comparison: {error}</p>
+          <p className="text-xs text-red-400">{t('comparison.loadFailed', { error })}</p>
         )}
 
         {data && (() => {
@@ -146,43 +148,43 @@ export function JobComparisonModal({ jobIds, onClose }: JobComparisonModalProps)
 
               {/* Metrics */}
               <CompareRow
-                label="Duration"
+                label={t('comparison.duration')}
                 a={formatDuration(a.durationMs)}
                 b={formatDuration(b.durationMs)}
                 highlight={durationHighlight}
               />
               <CompareRow
-                label="Cost"
+                label={t('comparison.cost')}
                 a={formatCost(a.totalCostUsd)}
                 b={formatCost(b.totalCostUsd)}
                 highlight={costHighlight}
               />
               <CompareRow
-                label="Tokens out"
+                label={t('comparison.tokensOut')}
                 a={formatTokens(a.tokensOut)}
                 b={formatTokens(b.tokensOut)}
                 highlight={tokensHighlight}
               />
               <CompareRow
-                label="Tokens in"
+                label={t('comparison.tokensIn')}
                 a={formatTokens(a.tokensIn)}
                 b={formatTokens(b.tokensIn)}
                 highlight={null}
               />
               <CompareRow
-                label="Cache read"
+                label={t('comparison.cacheRead')}
                 a={formatTokens(a.tokensCacheRead)}
                 b={formatTokens(b.tokensCacheRead)}
                 highlight={null}
               />
               <CompareRow
-                label="Model"
+                label={t('comparison.model')}
                 a={a.model ?? '—'}
                 b={b.model ?? '—'}
                 highlight={null}
               />
               <CompareRow
-                label="Phases done"
+                label={t('comparison.phasesDone')}
                 a={a.phasesCompleted.length > 0 ? a.phasesCompleted.join(', ') : '—'}
                 b={b.phasesCompleted.length > 0 ? b.phasesCompleted.join(', ') : '—'}
                 highlight={null}
@@ -193,7 +195,7 @@ export function JobComparisonModal({ jobIds, onClose }: JobComparisonModalProps)
 
         {data && (
           <p className="text-[10px] text-muted-foreground/60 text-center">
-            Green highlights indicate better value
+            {t('comparison.betterValueHint')}
           </p>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { Play, Square, AlertTriangle, ScrollText } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Button } from './ui/button'
 
 export type RailMode = 'implement' | 'batch-implement' | 'ultracode'
@@ -18,6 +19,7 @@ interface RailControlsProps {
 }
 
 export function RailControls({ mode, status, activeJobId, ticketCount, ultracodeAvailable, onModeChange, onToggle }: RailControlsProps) {
+  const { t } = useTranslation('dashboard')
   const navigate = useNavigate()
   const canPlay = ticketCount > 0
   return (
@@ -29,10 +31,10 @@ export function RailControls({ mode, status, activeJobId, ticketCount, ultracode
           variant="ghost"
           className="group h-6 px-2 gap-1 rounded-md border border-accent-info/20 bg-accent-info/5 text-[10px] font-semibold text-accent-info transition-all duration-200 hover:-translate-y-px hover:border-accent-info/50 hover:bg-accent-info/15 hover:text-accent-info hover:shadow-[0_0_14px_hsl(191_97%_77%/0.22)] active:translate-y-0 active:scale-[0.98]"
           onClick={() => navigate(`/jobs/${activeJobId}`)}
-          title="View job log"
+          title={t('railControls.viewJobLog')}
         >
           <ScrollText className="w-3 h-3 transition-transform duration-200 group-hover:scale-110" />
-          <span>Log</span>
+          <span>{t('railControls.log')}</span>
         </Button>
       )}
 
@@ -47,7 +49,7 @@ export function RailControls({ mode, status, activeJobId, ticketCount, ultracode
           }`}
           onClick={() => onModeChange('implement')}
         >
-          Implement
+          {t('railControls.implement')}
         </button>
         <div className="w-px h-3 bg-border/40 shrink-0" />
         <button
@@ -59,7 +61,7 @@ export function RailControls({ mode, status, activeJobId, ticketCount, ultracode
           }`}
           onClick={() => onModeChange('batch-implement')}
         >
-          Batch
+          {t('railControls.batch')}
         </button>
         {ultracodeAvailable && (
           <>
@@ -72,9 +74,9 @@ export function RailControls({ mode, status, activeJobId, ticketCount, ultracode
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
               }`}
               onClick={() => onModeChange('ultracode')}
-              title="Ultracode — Claude implements the spec autonomously, no pipeline"
+              title={t('railControls.ultraTitle')}
             >
-              Ultra
+              {t('railControls.ultra')}
             </button>
           </>
         )}
@@ -96,9 +98,9 @@ export function RailControls({ mode, status, activeJobId, ticketCount, ultracode
         onClick={onToggle}
         disabled={!canPlay && status !== 'running'}
         title={
-          status === 'running' ? 'Stop' :
-          status === 'failed' ? 'Job failed — click to retry' :
-          canPlay ? 'Play' : 'Add specs to this rail first'
+          status === 'running' ? t('railControls.stop') :
+          status === 'failed' ? t('railControls.failedRetry') :
+          canPlay ? t('railControls.play') : t('railControls.addSpecsFirst')
         }
       >
         {status === 'running' ? (

@@ -1,0 +1,177 @@
+{
+  "page": {
+    "title": "Agents",
+    "subtitle": "Agent-Profile und den Katalog (Upstream + Custom) für dieses Projekt verwalten.",
+    "tabs": {
+      "profiles": "Profile",
+      "usage": "Nutzung",
+      "catalog": "Katalog"
+    },
+    "banner": {
+      "title": "Profilgestützte Pipeline erfordert specrails-core {{required}}+",
+      "body": "Dieses Projekt hat <code>{{version}}</code>. Führe <code>{{command}}</code> im Projekt aus, um den Profilmodus freizuschalten. Hier erstellte Profile werden trotzdem gespeichert; sie wirken sich nur erst nach dem Core-Update auf die Pipeline aus.",
+      "unknownVersion": "unbekannt"
+    }
+  },
+  "catalog": {
+    "loading": "Katalog wird geladen…",
+    "aiEditChipLabel": "AI Edit · {{agentId}}",
+    "errors": {
+      "loadFailed": "Katalog konnte nicht geladen werden: {{status}}",
+      "bodyLoadFailed": "Agent-Inhalt konnte nicht geladen werden: {{status}}",
+      "generateFailed": "Generierung fehlgeschlagen: {{status}}",
+      "agentLoadFailed": "Laden fehlgeschlagen: {{status}}"
+    },
+    "templates": {
+      "title": "Agent-Vorlagenbibliothek",
+      "countOf": "{{shown}} von {{total}}",
+      "description": "Starte mit einer kuratierten Vorlage aus Engineering, Produkt, Wissenschaft, Gesundheit, Recht und mehr. Wähle eine aus und öffne sie im Studio, um sie vor dem Speichern zu prüfen und zu bearbeiten.",
+      "searchPlaceholder": "Nach Name, Beschreibung, Tag oder Kategorie suchen…",
+      "allCategories": "Alle",
+      "tagFilter": "Tag-Filter:",
+      "noMatch": "Keine Vorlagen entsprechen deinen Filtern.",
+      "clearFilters": "Filter zurücksetzen",
+      "openInStudio": "Im Studio öffnen →",
+      "tip": "Tipp: Klicke auf einen Tag-Chip auf einer Karte, um nach diesem Tag zu filtern."
+    },
+    "generate": {
+      "title": "Custom-Agent generieren",
+      "agentIdLabel": "Agent-ID",
+      "agentIdHint": "Muss mit <code>custom-</code> beginnen.",
+      "descriptionLabel": "Beschreibe, was dieser Agent tun soll",
+      "descriptionPlaceholder": "z. B. Terraform-/IaC-Änderungen reviewen und Sicherheits-Fehlkonfigurationen, übermäßige IAM-Berechtigungen und öffentliche S3-Buckets vor dem Merge markieren. Konservativ und knapp.",
+      "note": "Claude entwirft einen vollständigen <code>.md</code>-Inhalt. Du prüfst ihn im Studio und kannst ihn vor dem Speichern bearbeiten. Dabei wird ein einmaliger claude-Aufruf gestartet, der bis zu 90 Sekunden dauern kann.",
+      "generating": "Wird generiert…",
+      "generateButton": "Generieren"
+    },
+    "empty": {
+      "title": "Keine Agents installiert",
+      "body": "Führe <code>{{command}}</code> in diesem Projekt aus, um die Upstream-Agents zu installieren, oder erstelle jetzt einen Custom-Agent."
+    },
+    "actions": {
+      "template": "Vorlage",
+      "templateTitle": "Mit einer Vorlage starten",
+      "generate": "Generieren",
+      "generateWithClaude": "Mit Claude generieren",
+      "blank": "Leer",
+      "blankTitle": "Mit einer leeren Vorlage starten"
+    },
+    "sidebar": {
+      "title": "Katalog",
+      "createLabel": "Custom-Agent erstellen:"
+    },
+    "sections": {
+      "upstream": "Upstream ({{count}})",
+      "upstreamDescription": "Wird von specrails-core mitgeliefert; schreibgeschützt.",
+      "custom": "Custom ({{count}})",
+      "customDescription": "Die custom-*.md-Dateien deines Projekts. Nutze Vorlage / Generieren / Leer oben, um einen zu erstellen.",
+      "noCustomAgents": "Noch keine Custom-Agents."
+    },
+    "detail": {
+      "defaultModel": "Standardmodell: {{model}}",
+      "aiEdit": "AI Edit",
+      "aiEditTitle": "Diesen Agent iterativ mit KI verfeinern",
+      "readOnly": "schreibgeschützt",
+      "editableHint": "bearbeitbar – nutze Bearbeiten oben"
+    },
+    "kind": {
+      "upstream": "upstream",
+      "custom": "custom"
+    }
+  },
+  "profiles": {
+    "loading": "Profile werden geladen…",
+    "selectPrompt": "Wähle ein Profil zum Bearbeiten",
+    "errors": {
+      "listFailed": "Auflisten fehlgeschlagen: {{status}}",
+      "loadFailed": "Laden fehlgeschlagen: {{status}}",
+      "migrationFailed": "Migration fehlgeschlagen: {{status}}",
+      "createFailed": "Erstellen fehlgeschlagen: {{status}}",
+      "duplicateFailed": "Duplizieren fehlgeschlagen: {{status}}",
+      "deleteFailed": "Löschen fehlgeschlagen: {{status}}",
+      "saveFailed": "Speichern fehlgeschlagen: {{status}}"
+    },
+    "toasts": {
+      "migrated": "Profil migriert",
+      "migratedDescription": "default-Profil aus deinen aktuellen Agents erstellt",
+      "migrationFailed": "Migration fehlgeschlagen",
+      "created": "Profil erstellt",
+      "createFailed": "Profil konnte nicht erstellt werden",
+      "duplicated": "Profil dupliziert",
+      "duplicatedDescription": "{{from}} → {{to}}",
+      "duplicateFailed": "Profil konnte nicht dupliziert werden",
+      "deleted": "Profil gelöscht",
+      "deleteFailed": "Profil konnte nicht gelöscht werden",
+      "saved": "Profil gespeichert",
+      "saveFailed": "Profil konnte nicht gespeichert werden",
+      "savedWithUntargeted": "Profil mit nicht angesteuerten Agents gespeichert",
+      "savedWithUntargetedDescription": "Keine Routing-Regel zeigt auf: {{agents}}. Füge eine Tag-Regel hinzu oder ändere das Ziel der Default-Regel, wenn sie laufen sollen."
+    },
+    "createDialog": {
+      "title": "Neues Profil",
+      "description": "Wähle einen Namen in Kleinbuchstaben im kebab-case (Buchstaben, Ziffern und Bindestriche).",
+      "confirmLabel": "Erstellen",
+      "invalidHint": "Muss mit einem Buchstaben oder einer Ziffer beginnen und darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten."
+    },
+    "duplicateDialog": {
+      "title": "„{{name}}“ duplizieren",
+      "description": "Name für das neue Profil.",
+      "invalidHint": "Nur Kleinbuchstaben im kebab-case."
+    },
+    "deleteDialog": {
+      "title": "Profil „{{name}}“ löschen?",
+      "description": "Dies kann nicht rückgängig gemacht werden. Bereits mit diesem Profil gestartete Jobs behalten ihren Snapshot; künftige Starts fallen auf die Auflösungsreihenfolge zurück."
+    },
+    "empty": {
+      "title": "Noch keine Profile",
+      "body": "Mit Profilen speicherst du Kombinationen aus Orchestrator + Agents + Routing und wählst pro Rail eines aus.",
+      "migrateButton": "Aus aktuellen Agents migrieren",
+      "blankButton": "Leeres Profil",
+      "migrateExplainer": "„Migrieren“ liest die Frontmatter-Modelle deiner bestehenden <code>.claude/agents/</code>-Dateien und erstellt ein <code>default</code>-Profil, das das heutige Verhalten verlustfrei abbildet."
+    },
+    "sidebar": {
+      "title": "Profile",
+      "teamDefault": "(Team-Standard)"
+    },
+    "editorFooter": {
+      "fixValidationIssues": "Behebe Validierungsprobleme vor dem Speichern",
+      "issuesToResolve_one": "{{count}} Problem zu beheben",
+      "issuesToResolve_other": "{{count}} Probleme zu beheben"
+    }
+  },
+  "usage": {
+    "title": "Profilnutzung",
+    "windowLabel": "{{days}}d",
+    "subtitleEmpty": "Gestartete Jobs pro Profil im gewählten Zeitraum.",
+    "subtitle": "Gestartete Jobs pro Profil in den letzten {{count}} Tagen.",
+    "empty": "Noch keine profilgebundenen Jobs.",
+    "jobsTooltip": "Jobs",
+    "jobsLabel_one": "Job",
+    "jobsLabel_other": "Jobs",
+    "successRateTooltip": "Erfolgsquote",
+    "okSuffix": "ok",
+    "avgDurationTooltip": "Ø Dauer",
+    "avgTokensTooltip": "Ø Tokens",
+    "tokensSuffix": "tok"
+  },
+  "routingRule": {
+    "addTitle": "Routing-Regel hinzufügen",
+    "editTitle": "Routing-Regel bearbeiten",
+    "addDescription": "Füge eine Tag-basierte Routing-Regel mit kebab-case-Tags in Kleinbuchstaben hinzu.",
+    "editDescription": "Aktualisiere die Tags oder den Ziel-Agent dieser Regel.",
+    "tagsLabel": "Tags",
+    "tagsHint": "Kommagetrennt. Verwende kebab-case in Kleinbuchstaben wie <code>frontend</code> oder <code>api-design</code>.",
+    "invalidTags_one": "Ungültiger Tag: {{tags}}. Tags dürfen nur Kleinbuchstaben, Ziffern und Bindestriche enthalten.",
+    "invalidTags_other": "Ungültige Tags: {{tags}}. Tags dürfen nur Kleinbuchstaben, Ziffern und Bindestriche enthalten.",
+    "routeToLabel": "Weiterleiten an",
+    "routeToHint": "Nur Agents in der Kette dieses Profils können Routing-Ziele sein.",
+    "addRule": "Regel hinzufügen",
+    "saveChanges": "Änderungen speichern"
+  },
+  "railSelectors": {
+    "profileTitle": "Agent-Profil für diese Rail",
+    "noProfile": "Kein Profil",
+    "modelTitle": "Modell für diese ultracode-Rail",
+    "engineTitle": "KI-Engine für diese Rail"
+  }
+}

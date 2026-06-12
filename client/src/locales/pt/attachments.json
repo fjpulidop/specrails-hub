@@ -1,0 +1,41 @@
+{
+  "removeFile": "Remover {{name}}",
+  "errors": {
+    "uploadFailed": "Falha no upload ({{status}})",
+    "uploadFailedFile": "Falha no upload: {{name}}",
+    "deleteFailed": "Falha ao eliminar ({{status}})",
+    "bulkDeleteFailed": "Falha na eliminação em massa ({{status}})",
+    "listFailed": "Falha ao listar ({{status}})",
+    "fetchFailed": "Falha ao obter ({{status}})",
+    "removeFailed": "Falha ao remover o anexo",
+    "loadFailed": "Falha ao carregar o anexo"
+  },
+  "chip": {
+    "uploading": "A enviar…",
+    "genericFile": "ficheiro"
+  },
+  "editor": {
+    "attachFiles": "Anexar ficheiros",
+    "uploadingFiles_one": "A enviar {{count}} ficheiro…",
+    "uploadingFiles_other": "A enviar {{count}} ficheiros…",
+    "dropToAddContext": "Largue para adicionar contexto"
+  },
+  "section": {
+    "ariaLabel": "Anexos",
+    "title": "Recursos",
+    "fileCount_one": "{{count}} ficheiro",
+    "fileCount_other": "{{count}} ficheiros"
+  },
+  "lightbox": {
+    "preview": "Pré-visualizar {{name}}",
+    "backToHub": "Voltar ao hub",
+    "download": "Transferir",
+    "downloadFile": "Transferir {{name}}",
+    "loading": "A carregar anexo...",
+    "loadError": "Não foi possível carregar o anexo: {{error}}",
+    "previewUnavailable": "Pré-visualização indisponível para este tipo de ficheiro."
+  },
+  "sessionBar": {
+    "empty": "Sem recursos afixados — largue ficheiros ou clique em Adicionar"
+  }
+}

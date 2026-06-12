@@ -1,4 +1,5 @@
 import { Check, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 import type { TicketStatus } from '../types'
 
@@ -8,7 +9,8 @@ interface StatusConfig {
   dotClass: string
   textClass: string
   borderClass: string
-  label: string
+  /** i18n key (resolved with the `specs` namespace as default). */
+  labelKey: string
   pulsing: boolean
 }
 
@@ -17,35 +19,35 @@ const STATUS_CONFIG: Record<TicketStatus, StatusConfig> = {
     dotClass: 'bg-accent-secondary/60',
     textClass: 'text-accent-secondary',
     borderClass: 'border-l-[3px] border-dashed border-accent-secondary/50 pl-3',
-    label: 'Draft',
+    labelKey: 'common:status.draft',
     pulsing: false,
   },
   todo: {
     dotClass: 'bg-slate-500/70',
     textClass: 'text-muted-foreground',
     borderClass: 'border-l-[3px] border-dashed border-slate-500/40 pl-3',
-    label: 'Todo',
+    labelKey: 'status.todo',
     pulsing: false,
   },
   in_progress: {
     dotClass: 'bg-blue-400',
     textClass: 'text-foreground font-semibold',
     borderClass: 'border-l-[3px] border-solid border-blue-500 pl-3',
-    label: 'In Progress',
+    labelKey: 'status.inProgress',
     pulsing: true,
   },
   done: {
     dotClass: 'text-emerald-400',
     textClass: 'text-emerald-400/80',
     borderClass: 'border-l-[3px] border-solid border-emerald-500 pl-3',
-    label: 'Done',
+    labelKey: 'status.done',
     pulsing: false,
   },
   cancelled: {
     dotClass: 'text-red-400/60',
     textClass: 'text-muted-foreground/50',
     borderClass: 'pl-3',
-    label: 'Cancelled',
+    labelKey: 'status.cancelled',
     pulsing: false,
   },
 }
@@ -62,13 +64,14 @@ export interface TicketStatusDotProps {
 }
 
 export function TicketStatusDot({ status, className }: TicketStatusDotProps) {
+  const { t } = useTranslation('specs')
   const cfg = STATUS_CONFIG[status]
 
   if (status === 'done') {
     return (
       <Check
         className={cn('w-3.5 h-3.5 shrink-0', cfg.dotClass, className)}
-        aria-label="Done"
+        aria-label={t('status.done')}
       />
     )
   }
@@ -77,7 +80,7 @@ export function TicketStatusDot({ status, className }: TicketStatusDotProps) {
     return (
       <X
         className={cn('w-3.5 h-3.5 shrink-0', cfg.dotClass, className)}
-        aria-label="Cancelled"
+        aria-label={t('status.cancelled')}
       />
     )
   }
@@ -86,7 +89,7 @@ export function TicketStatusDot({ status, className }: TicketStatusDotProps) {
     return (
       <span
         className={cn('relative flex shrink-0 h-2.5 w-2.5', className)}
-        aria-label="In Progress"
+        aria-label={t('status.inProgress')}
       >
         <span
           className={cn(
@@ -107,7 +110,7 @@ export function TicketStatusDot({ status, className }: TicketStatusDotProps) {
   return (
     <span
       className={cn('inline-flex rounded-full h-2.5 w-2.5 shrink-0', cfg.dotClass, className)}
-      aria-label="Todo"
+      aria-label={t('status.todo')}
     />
   )
 }
@@ -124,6 +127,7 @@ export interface TicketStatusBadgeProps {
 }
 
 export function TicketStatusBadge({ status, className }: TicketStatusBadgeProps) {
+  const { t } = useTranslation('specs')
   const cfg = STATUS_CONFIG[status]
 
   return (
@@ -138,7 +142,7 @@ export function TicketStatusBadge({ status, className }: TicketStatusBadgeProps)
       )}
     >
       <TicketStatusDot status={status} />
-      {cfg.label}
+      {t(cfg.labelKey)}
     </span>
   )
 }

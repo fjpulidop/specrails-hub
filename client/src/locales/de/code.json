@@ -1,0 +1,113 @@
+{
+  "page": {
+    "resizeFileTree": "Größe des Dateibaums ändern",
+    "selectFile": "Wähle eine Datei für die Vorschau."
+  },
+  "resizer": {
+    "hint": "Zum Ändern der Größe ziehen. Doppelklick zum Zurücksetzen."
+  },
+  "toolbar": {
+    "scope": "Bereich",
+    "allAi": "Alle KI",
+    "spec": "Spec",
+    "ticketIdPlaceholder": "id",
+    "copyFilePath": "Dateipfad kopieren",
+    "generateSummary": "Zusammenfassung generieren",
+    "regenerateSummary": "Zusammenfassung neu generieren",
+    "generating": "Wird generiert…",
+    "regenerating": "Wird neu generiert…",
+    "summaryUnavailable": "Zusammenfassung nicht verfügbar: {{reason}}",
+    "jobContext": "Job-Kontext",
+    "clear": "Zurücksetzen"
+  },
+  "provenancePanel": {
+    "jobTitle": "Job {{jobId}}",
+    "specTitle": "Spec #{{ticketId}}",
+    "touchedFiles_one": "{{count}} bearbeitete Datei",
+    "touchedFiles_other": "{{count}} bearbeitete Dateien",
+    "log": "Log"
+  },
+  "kind": {
+    "created": "erstellt",
+    "modified": "geändert",
+    "deleted": "gelöscht"
+  },
+  "action": {
+    "added": "hinzugefügt",
+    "changed": "geändert",
+    "deleted": "gelöscht"
+  },
+  "viewer": {
+    "loadingFile": "Datei wird geladen…",
+    "showSummary": "Zusammenfassung anzeigen",
+    "markdownViewMode": "Markdown-Ansichtsmodus",
+    "preview": "Vorschau",
+    "raw": "Quelltext",
+    "missingFile": "Diese Datei wurde von einem KI-Job bearbeitet, existiert aber nicht mehr im Arbeitsverzeichnis.",
+    "binaryFile": "Binärdatei.",
+    "tooLarge": "Datei zu groß für die Vorschau ({{size}} MB).",
+    "noContent": "Kein Inhalt verfügbar.",
+    "pathCopied": "Pfad kopiert",
+    "copyPathFailed": "Pfad konnte nicht kopiert werden",
+    "budgetPrompt": "Budgetgrenze außer Kraft setzen?"
+  },
+  "summary": {
+    "generationFailed": "Generierung der Zusammenfassung fehlgeschlagen",
+    "skipped": "Zusammenfassung übersprungen: {{reason}}",
+    "unavailable": "Zusammenfassung nicht verfügbar: {{reason}}.",
+    "empty": "Noch keine Zusammenfassung für diese Datei.",
+    "stale": "Veraltet",
+    "hide": "Ausblenden",
+    "reason": {
+      "missing": "Datei fehlt",
+      "binary": "Binärdatei",
+      "tooLarge": "Datei zu groß"
+    }
+  },
+  "history": {
+    "resize": "Größe des KI-Bearbeitungsverlaufs ändern",
+    "title_one": "KI-Bearbeitungsverlauf · {{count}} Änderung",
+    "title_other": "KI-Bearbeitungsverlauf · {{count}} Änderungen",
+    "show": "Anzeigen",
+    "hide": "Ausblenden",
+    "unknownJob": "unbekannter Job",
+    "filterByJob": "Code nach Job {{jobId}} filtern",
+    "diff": "Diff",
+    "openSpec": "Spec #{{ticketId}} öffnen",
+    "specChip": "Spec #{{ticketId}}",
+    "loadingDiff": "Diff wird geladen...",
+    "diffUnavailable": "Für diese frühere Bearbeitung ist kein Diff verfügbar. Neue Jobs speichern Patches automatisch.",
+    "diffTruncated": "[Diff gekürzt]"
+  },
+  "tree": {
+    "jobFiles": "Job-Dateien",
+    "specFiles": "Spec-Dateien",
+    "touchedByAi": "Von KI bearbeitet",
+    "allFiles": "Alle Dateien",
+    "collapseAll": "Alle Ordner einklappen",
+    "expandAll": "Alle Ordner ausklappen",
+    "touchedCount_one": "{{count}} von KI bearbeitete Datei",
+    "touchedCount_other": "{{count}} von KI bearbeitete Dateien",
+    "loadingFiles": "Dateien werden geladen…",
+    "emptyTouched": "Noch keine von KI bearbeiteten Dateien. Starte einen Job oder wechsle zu „Alle Dateien“.",
+    "showAllFiles": "Alle Dateien anzeigen",
+    "noFiles": "Keine Dateien.",
+    "folderTouched_one": "{{count}} von KI bearbeitete Datei unterhalb dieses Ordners",
+    "folderTouched_other": "{{count}} von KI bearbeitete Dateien unterhalb dieses Ordners",
+    "jobTitle": "Job {{jobId}}",
+    "createdBySpec": "Bei der Implementierung von Spec #{{id}} erstellt",
+    "modifiedBySpec": "Bei der Implementierung von Spec #{{id}} geändert",
+    "latestTitleCreated": "Der letzte KI-Job hat diese Datei hinzugefügt",
+    "latestTitleModified": "Der letzte KI-Job hat diese Datei geändert",
+    "latestTitleDeleted": "Der letzte KI-Job hat diese Datei gelöscht"
+  },
+  "monaco": {
+    "loadFailed": "Code-Viewer konnte nicht geladen werden.",
+    "reload": "Neu laden",
+    "loadingEditor": "Editor wird geladen…"
+  },
+  "ticketFiles": {
+    "title": "Von diesem Ticket bearbeitete Dateien",
+    "jobTitle": "Job {{jobId}}"
+  }
+}

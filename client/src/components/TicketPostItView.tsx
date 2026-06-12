@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Ticket, AlertTriangle, ArrowUp, ChevronUp, Plus } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { TicketContextMenu } from './TicketContextMenu'
@@ -105,6 +106,7 @@ export function TicketPostItView({
   onPriorityChange,
   onCreateClick,
 }: TicketPostItViewProps) {
+  const { t } = useTranslation('specs')
   const sorted = useMemo(() => {
     const order: Record<TicketStatus, number> = { in_progress: 0, draft: 1, todo: 2, done: 3, cancelled: 4 }
     return [...tickets].sort((a, b) => order[a.status] - order[b.status])
@@ -127,7 +129,7 @@ export function TicketPostItView({
     return (
       <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center space-y-1.5">
         <AlertTriangle className="w-6 h-6 text-red-400 mx-auto" />
-        <p className="text-sm font-medium text-red-400">Failed to load tickets</p>
+        <p className="text-sm font-medium text-red-400">{t('errors.loadFailed')}</p>
         <p className="text-xs text-red-400/70">{error}</p>
       </div>
     )
@@ -138,9 +140,9 @@ export function TicketPostItView({
       <div className="rounded-lg border border-dashed border-border/40 bg-card/50 p-8 text-center space-y-3">
         <Ticket className="w-8 h-8 text-muted-foreground/30 mx-auto" />
         <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">No tickets yet</p>
+          <p className="text-sm font-medium text-muted-foreground">{t('emptyState.noTickets')}</p>
           <p className="text-xs text-muted-foreground/60">
-            Create your first ticket or run a product backlog command to populate tickets
+            {t('emptyState.noTicketsHint')}
           </p>
         </div>
         {onCreateClick && (
@@ -150,7 +152,7 @@ export function TicketPostItView({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-accent/60 text-foreground hover:bg-accent transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            Create your first ticket
+            {t('emptyState.createFirst')}
           </button>
         )}
       </div>
@@ -185,6 +187,7 @@ interface PostItCardProps {
 }
 
 function PostItCard({ ticket, onClick }: PostItCardProps) {
+  const { t } = useTranslation('specs')
   const palette = STATUS_PALETTE[ticket.status]
   const priority = ticket.priority ? PRIORITY_INDICATOR[ticket.priority] : null
   const rotation = getRotation(ticket.id)
@@ -223,7 +226,7 @@ function PostItCard({ ticket, onClick }: PostItCardProps) {
       {/* Priority indicator (or Draft pill) */}
       {ticket.status === 'draft' ? (
         <div className="absolute top-1.5 left-2 inline-flex items-center rounded px-1 py-0.5 text-[8px] font-semibold border border-accent-secondary/60 text-accent-secondary bg-accent-secondary/10">
-          Draft
+          {t('common:status.draft')}
         </div>
       ) : priority?.icon ? (
         <div className="absolute top-1.5 left-2">

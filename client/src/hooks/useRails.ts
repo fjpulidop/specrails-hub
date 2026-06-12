@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
+import i18n from '../lib/i18n'
 import { getApiBase } from '../lib/api'
 import { useSharedWebSocket } from './useSharedWebSocket'
 import { useHub } from './useHub'
@@ -49,7 +50,7 @@ export function useRails() {
   const fetchRails = useCallback(async (signal?: AbortSignal): Promise<RailState[]> => {
     const base = getApiBase()
     const res = await fetch(`${base}/rails`, { signal })
-    if (!res.ok) throw new Error(`Failed to fetch rails: ${res.status}`)
+    if (!res.ok) throw new Error(i18n.t('dashboard:useRails.fetchFailed', { status: res.status }))
     const data = (await res.json()) as { rails: RailState[] }
     return data.rails
   }, [])

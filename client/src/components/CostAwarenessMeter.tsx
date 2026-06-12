@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import {
   tierFromScope, estimateInputTokens, estimateCostUsd, timeHintForTier,
   type ContextScope, type ContextBudget, type Tier,
@@ -30,6 +31,7 @@ function formatCost(n: number): string {
 }
 
 export function CostAwarenessMeter({ scope, budget, budgetError, model }: Props) {
+  const { t } = useTranslation('addspec')
   const tier = tierFromScope(scope)
   const activeIdx = TIERS.indexOf(tier)
 
@@ -37,11 +39,11 @@ export function CostAwarenessMeter({ scope, budget, budgetError, model }: Props)
     <div className="flex flex-col gap-1.5" data-testid="cost-awareness-meter">
       <div className="flex items-center justify-between gap-3">
         <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-          Cost awareness
+          {t('costMeter.heading')}
         </span>
         <span className="text-[11px] font-medium text-foreground" data-testid="meter-tier">{tier}</span>
       </div>
-      <div className="flex items-center gap-1" role="meter" aria-label="cost tier" aria-valuetext={tier}>
+      <div className="flex items-center gap-1" role="meter" aria-label={t('costMeter.meterAriaLabel')} aria-valuetext={tier}>
         {TIERS.map((t, i) => (
           <div
             key={t}
@@ -54,7 +56,7 @@ export function CostAwarenessMeter({ scope, budget, budgetError, model }: Props)
       </div>
       <div className="text-[11px] text-muted-foreground" data-testid="meter-numeric">
         {budgetError || !budget ? (
-          <span>tier-only — estimate unavailable</span>
+          <span>{t('costMeter.estimateUnavailable')}</span>
         ) : (
           <span>
             {formatTokens(estimateInputTokens(scope, budget))} tok ·{' '}

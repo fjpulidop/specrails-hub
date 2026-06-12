@@ -4,9 +4,11 @@ import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { Search, ChevronDown, ChevronRight, Copy } from 'lucide-react'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 import { Input } from './ui/input'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
+import i18n from '../lib/i18n'
 import type { EventRow } from '../types'
 import { hasMarkdownSyntax } from '../lib/markdown-detect'
 
@@ -88,10 +90,10 @@ function parseEvent(event: EventRow, idx: number): FormattedLine | null {
       const parts: string[] = []
       if (result.duration_ms) parts.push(`${(result.duration_ms / 1000).toFixed(1)}s`)
       if (result.total_cost_usd) parts.push(`$${result.total_cost_usd.toFixed(4)}`)
-      if (result.num_turns) parts.push(`${result.num_turns} turns`)
+      if (result.num_turns) parts.push(i18n.t('jobs:logViewer.turns', { count: result.num_turns }))
       return {
         id,
-        content: `▸ Completed${parts.length ? ` — ${parts.join(' · ')}` : ''}`,
+        content: `▸ ${i18n.t('jobs:logViewer.completed')}${parts.length ? ` — ${parts.join(' · ')}` : ''}`,
         type: 'result',
         timestamp,
       }
@@ -167,6 +169,7 @@ interface LogViewerProps {
 }
 
 export function LogViewer({ events, isLoading }: LogViewerProps) {
+  const { t, i18n: i18nInstance } = useTranslation('jobs')
   const [filter, setFilter] = useState('')
   const [autoScroll, setAutoScroll] = useState(true)
   const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
@@ -191,7 +194,10 @@ export function LogViewer({ events, isLoading }: LogViewerProps) {
 
     const processed = applyDiffDetection(merged)
     return { processedLines: processed, groups: groupByPhase(processed), totalLines: processed.length }
-  }, [events])
+    // i18nInstance.language: parseEvent localises the result summary line, so
+    // recompute when the UI language changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, i18nInstance.language])
 
   // Filter count (memoized — only recomputes when filter or lines change)
   const filteredCount = useMemo(() => {
@@ -228,7 +234,7 @@ export function LogViewer({ events, isLoading }: LogViewerProps) {
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-xs text-muted-foreground">Loading logs...</p>
+        <p className="text-xs text-muted-foreground">{t('logViewer.loading')}</p>
       </div>
     )
   }
@@ -236,7 +242,7 @@ export function LogViewer({ events, isLoading }: LogViewerProps) {
   if (totalLines === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-xs text-muted-foreground">No log output yet</p>
+        <p className="text-xs text-muted-foreground">{t('logViewer.empty')}</p>
       </div>
     )
   }
@@ -248,7 +254,7 @@ export function LogViewer({ events, isLoading }: LogViewerProps) {
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
           <Input
-            placeholder="Filter logs..."
+            placeholder={t('logViewer.filterPlaceholder')}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="pl-7 h-7"
@@ -261,16 +267,16 @@ export function LogViewer({ events, isLoading }: LogViewerProps) {
           onClick={() => {
             const text = processedLines.map((l) => l.content).join('\n')
             navigator.clipboard.writeText(text).then(() => {
-              toast.success('Log copied to clipboard')
+              toast.success(t('logViewer.copySuccess'))
             }).catch(() => {
-              toast.error('Failed to copy log')
+              toast.error(t('logViewer.copyFailed'))
             })
           }}
         >
           <Copy className="w-3.5 h-3.5" />
         </Button>
         <span className="text-[10px] text-muted-foreground">
-          {filteredCount} / {totalLines} lines
+          {t('logViewer.lineCount', { filtered: filteredCount, total: totalLines })}
         </span>
       </div>
 
@@ -301,7 +307,7 @@ export function LogViewer({ events, isLoading }: LogViewerProps) {
           className="absolute bottom-16 right-6 h-7 gap-1 shadow-lg"
         >
           <ChevronDown className="w-3 h-3" />
-          Jump to bottom
+          {t('logViewer.jumpToBottom')}
         </Button>
       )}
     </div>
@@ -323,6 +329,7 @@ const PhaseGroupSection = memo(function PhaseGroupSection({
   collapsed,
   onToggle,
 }: PhaseGroupSectionProps) {
+  const { t } = useTranslation('jobs')
   const visibleLines = filter
     ? group.lines.filter((l) => l.content.toLowerCase().includes(filter.toLowerCase()))
     : group.lines
@@ -373,7 +380,7 @@ const PhaseGroupSection = memo(function PhaseGroupSection({
           </span>
         )}
         <span className="text-[10px] text-muted-foreground/40 shrink-0">
-          {group.lines.length} lines
+          {t('logViewer.phaseLines', { count: group.lines.length })}
         </span>
       </button>
 
@@ -382,7 +389,7 @@ const PhaseGroupSection = memo(function PhaseGroupSection({
         <div className="bg-muted/5">
           {visibleLines.length === 0 ? (
             <p className="px-4 py-2 text-[10px] text-muted-foreground/40 italic">
-              {filter ? 'No matching lines' : 'No output'}
+              {filter ? t('logViewer.noMatchingLines') : t('logViewer.noOutput')}
             </p>
           ) : (
             visibleLines.map((line, idx) => (

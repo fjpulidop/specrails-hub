@@ -1,0 +1,144 @@
+{
+  "surfaces": {
+    "job": "Jobs",
+    "quickSpec": "Quick",
+    "exploreSpec": "Explore",
+    "aiEdit": "Refine",
+    "smash": "SMASH",
+    "fileSummary": "File summaries"
+  },
+  "periods": {
+    "d7": "7d",
+    "d30": "30d",
+    "d90": "90d",
+    "all": "All",
+    "custom": "Custom",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "to": "to"
+  },
+  "runs_one": "{{count}} run",
+  "runs_other": "{{count}} runs",
+  "page": {
+    "title": "Analytics",
+    "all": "All",
+    "engine": "Engine",
+    "ticketChip": "ticket #{{id}} ·  ✕",
+    "failedToLoad": "Failed to load: {{error}}"
+  },
+  "hero": {
+    "spending": "Spending",
+    "vsPrev": "{{pct}}% vs prev",
+    "invocations_one": "{{count}} invocation",
+    "invocations_other": "{{count}} invocations",
+    "tokens": "· {{tokens}} tokens",
+    "tokensTooltip": "Total tokens = fresh input + output + cache-read + cache-create across all invocations in this window.",
+    "includesEstimated": "· includes ~{{amount}} estimated",
+    "includesEstimatedTooltip": "Includes {{amount}} of estimated cost from providers without a native cost field (e.g. codex via the local pricing table).",
+    "trackingStarted": "Tracking started {{date}}",
+    "trackingStartedFallback": "Tracking started on first invocation",
+    "emptyState": "No invocations yet for this filter window.",
+    "segmentTitle": "{{label}}: {{value}}"
+  },
+  "providerCard": {
+    "title": "By provider",
+    "description": "How cost splits across the AI CLIs in this project. The <tilde>~</tilde> prefix marks rows where cost is estimated from the local pricing table (the provider does not report it natively).",
+    "noCost": "No cost recorded yet in this window.",
+    "segmentTitle": "{{label}}: {{value}} ({{count}})"
+  },
+  "timeline": {
+    "title": "Daily timeline",
+    "subtitle": "stacked by surface",
+    "empty": "No spend in this period."
+  },
+  "quickVsExplore": {
+    "title": "Quick vs Explore",
+    "quick": "Quick",
+    "explore": "Explore",
+    "sparseCta": "Try Explore for richer specs",
+    "runsSoFar_one": "{{count}} run so far",
+    "runsSoFar_other": "{{count}} runs so far",
+    "perSpec": "per spec",
+    "createdRuns": "<strong>{{created}}</strong> created · {{runs}} runs",
+    "avgDuration": "{{duration}} avg",
+    "ratio": "{{ratio}}× more per spec"
+  },
+  "models": {
+    "title": "Models",
+    "empty": "No models recorded."
+  },
+  "scatter": {
+    "title": "Cost vs Turns",
+    "empty": "No invocations to plot.",
+    "turnsLabel": "turns",
+    "costLabel": "cost"
+  },
+  "topTickets": {
+    "title": "Top tickets",
+    "empty": "No ticket activity in this period.",
+    "breakdownItem": "{{n}} {{label}}",
+    "unattributed": "Unattributed",
+    "deletedTicket": "deleted ticket #{{id}}"
+  },
+  "table": {
+    "title": "All invocations",
+    "statusFilterAria": "Status filter",
+    "minCostFilterAria": "Minimum cost filter",
+    "minCostPlaceholder": "≥ $0.00",
+    "allStatus": "All status",
+    "success": "Success",
+    "failed": "Failed",
+    "aborted": "Aborted",
+    "empty": "No invocations match the current filters.",
+    "colSurface": "Surface",
+    "colTicket": "Ticket",
+    "colCost": "Cost",
+    "colTurns": "Turns",
+    "colTokens": "Tokens",
+    "colModel": "Model",
+    "colStatus": "Status",
+    "colStarted": "Started",
+    "contractLayer": "Contract Layer",
+    "contractLayerRefinement": "Contract Layer refinement",
+    "deleted": "(deleted)",
+    "provisionalTitleTooltip": "Provisional Explore title — not yet committed",
+    "estimatedCostTooltip": "Estimated from local pricing table — this provider does not report cost natively.",
+    "inferred": "inferred",
+    "statusValue": {
+      "success": "success",
+      "failed": "failed",
+      "aborted": "aborted"
+    },
+    "truncated": "Showing first {{shown}} of {{total}} matching rows."
+  },
+  "export": {
+    "summaryCsv": "Summary CSV",
+    "rawCsv": "Raw CSV",
+    "summaryJson": "Summary JSON",
+    "rawJson": "Raw JSON",
+    "downloading": "Downloading…",
+    "noData": "No data for current filters",
+    "failed": "Export failed"
+  },
+  "hub": {
+    "title": "Hub Analytics",
+    "refreshAria": "Refresh analytics",
+    "failedToLoad": "Failed to load analytics: {{error}}",
+    "totalCost": "Total Cost",
+    "costToday": "{{value}} today",
+    "totalJobs": "Total Jobs",
+    "jobsToday": "{{n}} today",
+    "successRate": "Success Rate",
+    "acrossAllProjects": "across all projects",
+    "avgCostPerJob": "Avg Cost / Job",
+    "periodAverage": "period average",
+    "costOverTime": "Cross-Project Cost Over Time",
+    "noCostData": "No cost data for this period",
+    "projectComparison": "Project Comparison",
+    "noProjects": "No projects registered.",
+    "jobsCount_one": "{{count}} job",
+    "jobsCount_other": "{{count}} jobs",
+    "successPct": "{{pct}}% success",
+    "costByProject": "Cost by Project"
+  }
+}

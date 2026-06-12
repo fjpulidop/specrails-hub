@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Check, Copy, RefreshCw, ExternalLink, ClipboardList } from 'lucide-react'
 import { API_ORIGIN } from '../lib/origin'
 import {
@@ -28,44 +30,48 @@ interface PlatformInstructions {
   note?: string
 }
 
-const INSTRUCTIONS: Record<Platform, PlatformInstructions> = {
-  darwin: {
-    title: 'macOS',
-    intro: 'Homebrew gets you both tools in one line. If you do not have brew, use the official downloads.',
-    commands: [
-      { label: 'Install Node.js and Git via Homebrew', command: 'brew install node git' },
-    ],
-    links: [
-      { label: 'Node.js (official)', url: 'https://nodejs.org/en/download' },
-      { label: 'Git (official)', url: 'https://git-scm.com/downloads' },
-      { label: 'Homebrew', url: 'https://brew.sh' },
-    ],
-  },
-  win32: {
-    title: 'Windows',
-    intro: 'Winget ships with Windows 11 and recent Windows 10. Open PowerShell or Terminal and run:',
-    commands: [
-      { label: 'Install Node.js LTS', command: 'winget install OpenJS.NodeJS.LTS' },
-      { label: 'Install Git', command: 'winget install Git.Git' },
-    ],
-    links: [
-      { label: 'Node.js (official)', url: 'https://nodejs.org/en/download' },
-      { label: 'Git for Windows (official)', url: 'https://git-scm.com/download/win' },
-    ],
-    note: 'After install, restart SpecRails Hub so Windows refreshes PATH.',
-  },
-  linux: {
-    title: 'Linux',
-    intro: 'Use your distro package manager:',
-    commands: [
-      { label: 'Debian / Ubuntu', command: 'sudo apt install -y nodejs npm git' },
-      { label: 'Fedora / RHEL', command: 'sudo dnf install -y nodejs npm git' },
-    ],
-    links: [
-      { label: 'Node.js (official)', url: 'https://nodejs.org/en/download' },
-      { label: 'Git (official)', url: 'https://git-scm.com/downloads' },
-    ],
-  },
+// Built per-render from the active language. OS titles ("macOS", "Windows",
+// "Linux") are proper names and intentionally untranslated.
+function getInstructions(t: TFunction): Record<Platform, PlatformInstructions> {
+  return {
+    darwin: {
+      title: 'macOS',
+      intro: t('setup:instructions.darwin.intro'),
+      commands: [
+        { label: t('setup:instructions.darwin.installNodeGit'), command: 'brew install node git' },
+      ],
+      links: [
+        { label: t('setup:instructions.links.nodeOfficial'), url: 'https://nodejs.org/en/download' },
+        { label: t('setup:instructions.links.gitOfficial'), url: 'https://git-scm.com/downloads' },
+        { label: 'Homebrew', url: 'https://brew.sh' },
+      ],
+    },
+    win32: {
+      title: 'Windows',
+      intro: t('setup:instructions.win32.intro'),
+      commands: [
+        { label: t('setup:instructions.win32.installNode'), command: 'winget install OpenJS.NodeJS.LTS' },
+        { label: t('setup:instructions.win32.installGit'), command: 'winget install Git.Git' },
+      ],
+      links: [
+        { label: t('setup:instructions.links.nodeOfficial'), url: 'https://nodejs.org/en/download' },
+        { label: t('setup:instructions.links.gitWindows'), url: 'https://git-scm.com/download/win' },
+      ],
+      note: t('setup:instructions.win32.note'),
+    },
+    linux: {
+      title: 'Linux',
+      intro: t('setup:instructions.linux.intro'),
+      commands: [
+        { label: t('setup:instructions.linux.debian'), command: 'sudo apt install -y nodejs npm git' },
+        { label: t('setup:instructions.linux.fedora'), command: 'sudo dnf install -y nodejs npm git' },
+      ],
+      links: [
+        { label: t('setup:instructions.links.nodeOfficial'), url: 'https://nodejs.org/en/download' },
+        { label: t('setup:instructions.links.gitOfficial'), url: 'https://git-scm.com/downloads' },
+      ],
+    },
+  }
 }
 
 const ALL_PLATFORMS: Platform[] = ['darwin', 'win32', 'linux']
@@ -96,6 +102,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
 }
 
 function CopyButton({ command }: { command: string }) {
+  const { t } = useTranslation('setup')
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
@@ -118,12 +125,12 @@ function CopyButton({ command }: { command: string }) {
       {copied ? (
         <>
           <Check className="w-3 h-3" />
-          Copied
+          {t('common:actions.copied')}
         </>
       ) : (
         <>
           <Copy className="w-3 h-3" />
-          Copy
+          {t('common:actions.copy')}
         </>
       )}
     </Button>
@@ -131,7 +138,8 @@ function CopyButton({ command }: { command: string }) {
 }
 
 function PlatformSection({ platform, primary }: { platform: Platform; primary: boolean }) {
-  const instr = INSTRUCTIONS[platform]
+  const { t } = useTranslation('setup')
+  const instr = getInstructions(t)[platform]
   return (
     <section
       data-testid={`install-section-${platform}`}
@@ -180,6 +188,7 @@ function PlatformSection({ platform, primary }: { platform: Platform; primary: b
 }
 
 function CopyDiagnosticsButton() {
+  const { t } = useTranslation('setup')
   const [state, setState] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle')
 
   const onClick = async () => {
@@ -213,15 +222,16 @@ function CopyDiagnosticsButton() {
         <ClipboardList className="w-3 h-3" />
       )}
       {state === 'copied'
-        ? 'Diagnostics copied'
+        ? t('instructions.diagnostics.copied')
         : state === 'error'
-          ? 'Copy failed'
-          : 'Copy diagnostics'}
+          ? t('instructions.diagnostics.failed')
+          : t('instructions.diagnostics.copy')}
     </Button>
   )
 }
 
 export function InstallInstructionsModal({ open, onClose, status, onRecheck, isRechecking }: Props) {
+  const { t } = useTranslation('setup')
   const [showOthers, setShowOthers] = useState(false)
   const platform: Platform = status?.platform ?? 'darwin'
   const others = ALL_PLATFORMS.filter((p) => p !== platform)
@@ -238,18 +248,17 @@ export function InstallInstructionsModal({ open, onClose, status, onRecheck, isR
       <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
         <DialogContent className="max-w-xl" data-testid="install-modal-corrupted-bundle">
           <DialogHeader>
-            <DialogTitle>App bundle corrupted</DialogTitle>
+            <DialogTitle>{t('instructions.corrupted.title')}</DialogTitle>
             <DialogDescription>
-              One or more bundled tools (Node.js, Git) could not be verified.
+              {t('instructions.corrupted.description')}
             </DialogDescription>
           </DialogHeader>
           <p className="text-sm text-foreground">
-            This tool is bundled with the SpecRails Hub app and cannot be installed separately.
-            If you see this message, the app bundle may be corrupted. Please reinstall SpecRails Hub.
+            {t('instructions.corrupted.body')}
           </p>
           <div className="flex justify-end mt-2">
             <Button type="button" variant="ghost" size="sm" onClick={onClose} data-testid="install-corrupted-close-button">
-              Close
+              {t('common:actions.close')}
             </Button>
           </div>
         </DialogContent>
@@ -261,10 +270,9 @@ export function InstallInstructionsModal({ open, onClose, status, onRecheck, isR
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Install developer tools</DialogTitle>
+          <DialogTitle>{t('instructions.title')}</DialogTitle>
           <DialogDescription>
-            SpecRails needs Node.js, npm, npx, and Git on PATH. Pick the snippet for your OS, run it,
-            then click "I installed it, recheck".
+            {t('instructions.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -277,7 +285,7 @@ export function InstallInstructionsModal({ open, onClose, status, onRecheck, isR
             className="text-[11px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
             data-testid="install-toggle-others"
           >
-            {showOthers ? 'Hide other platforms' : 'Show other platforms'}
+            {showOthers ? t('instructions.hideOtherPlatforms') : t('instructions.showOtherPlatforms')}
           </button>
 
           {showOthers && (
@@ -293,7 +301,7 @@ export function InstallInstructionsModal({ open, onClose, status, onRecheck, isR
           <CopyDiagnosticsButton />
           <div className="flex items-center gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={onClose}>
-              Close
+              {t('common:actions.close')}
             </Button>
             <Button
               type="button"
@@ -305,7 +313,7 @@ export function InstallInstructionsModal({ open, onClose, status, onRecheck, isR
               data-testid="install-recheck-button"
             >
               <RefreshCw className={cn('w-3 h-3', isRechecking && 'animate-spin')} />
-              I installed it, recheck
+              {t('instructions.recheck')}
             </Button>
           </div>
         </div>

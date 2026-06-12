@@ -1,4 +1,5 @@
 import { isTauri, _tauriDynImport as dynImport } from './tauri-shell'
+import i18n from './i18n'
 
 interface NotifyArgs {
   command: string | null
@@ -20,8 +21,13 @@ export async function notifyCommandFinished(sessionId: string, args: NotifyArgs)
   if (now - last < DEBOUNCE_WINDOW_MS) return
   debounce.set(key, now)
 
-  const title = args.command ? `${truncate(args.command, 50)} finished` : 'Command finished'
-  const body = `exit ${args.exitCode ?? '?'} in ${formatElapsed(args.elapsedMs)}`
+  const title = args.command
+    ? i18n.t('terminal:notifications.commandFinishedNamed', { command: truncate(args.command, 50) })
+    : i18n.t('terminal:notifications.commandFinished')
+  const body = i18n.t('terminal:notifications.finishedBody', {
+    code: args.exitCode ?? '?',
+    elapsed: formatElapsed(args.elapsedMs),
+  })
 
   if (isTauri()) {
     try {
@@ -59,8 +65,8 @@ function truncate(s: string, n: number): string {
 }
 
 function formatElapsed(ms: number): string {
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
+  if (ms < 60_000) return i18n.t('terminal:duration.seconds', { seconds: (ms / 1000).toFixed(1) })
   const m = Math.floor(ms / 60_000)
   const s = Math.floor((ms % 60_000) / 1000)
-  return `${m}m ${s}s`
+  return i18n.t('terminal:duration.minutesSeconds', { minutes: m, seconds: s })
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MessageSquare } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { ChatHeader } from './ChatHeader'
@@ -17,6 +18,7 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
+  const { t } = useTranslation('chat')
   const {
     conversations,
     activeTabIndex,
@@ -76,7 +78,7 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
       <div
         className="flex w-10 shrink-0 cursor-pointer flex-col items-center border-l border-border/30 bg-background/80 backdrop-blur-sm pt-6"
         onClick={togglePanel}
-        title="Open chat"
+        title={t('panel.openChat')}
       >
         <div className="relative">
           <MessageSquare className="w-4 h-4 text-accent-primary" />
@@ -123,7 +125,7 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
               onClick={() => setActiveTabIndex(i)}
             >
               <span className="truncate max-w-[70px]">
-                {conv.title ?? `Chat ${i + 1}`}
+                {conv.title ?? t('panel.tabTitle', { n: i + 1 })}
               </span>
               {conv.isStreaming && (
                 <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-accent-primary" />
@@ -174,26 +176,29 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
             </div>
           )}
           <p className="text-xs text-muted-foreground/70">
-            {project ? 'Start a conversation about this project' : 'No conversations yet'}
+            {project ? t('panel.startConversation') : t('panel.noConversations')}
           </p>
           {project && (
             <div className="flex flex-col gap-1.5 w-full">
-              {['What\'s the project status?', 'Show recent job failures', 'What commands should I run?', 'Explain the codebase'].map((suggestion) => (
-                <button
-                  key={suggestion}
-                  className="rounded-md border border-border/30 px-2.5 py-1.5 text-left text-[11px] text-muted-foreground hover:border-accent-primary/40 hover:text-foreground transition-colors"
-                  onClick={() => startWithMessage(suggestion)}
-                >
-                  {suggestion}
-                </button>
-              ))}
+              {(['projectStatus', 'recentFailures', 'commands', 'explainCodebase'] as const).map((key) => {
+                const suggestion = t(`panel.suggestions.${key}`)
+                return (
+                  <button
+                    key={key}
+                    className="rounded-md border border-border/30 px-2.5 py-1.5 text-left text-[11px] text-muted-foreground hover:border-accent-primary/40 hover:text-foreground transition-colors"
+                    onClick={() => startWithMessage(suggestion)}
+                  >
+                    {suggestion}
+                  </button>
+                )
+              })}
             </div>
           )}
           <button
             className="mt-1 rounded-md bg-accent-primary/20 px-3 py-1.5 text-xs text-accent-primary hover:bg-accent-primary/30 transition-colors"
             onClick={() => createConversation()}
           >
-            New conversation
+            {t('panel.newConversation')}
           </button>
         </div>
       )}
@@ -219,7 +224,7 @@ export function ChatPanel({ chat, project = undefined }: ChatPanelProps) {
       <div
         className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-10 hover:bg-accent-primary/30 transition-colors"
         onMouseDown={handleDragStart}
-        title="Drag to resize"
+        title={t('panel.dragToResize')}
         role="separator"
         aria-orientation="vertical"
       />

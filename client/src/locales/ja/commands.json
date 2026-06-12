@@ -1,0 +1,186 @@
+{
+  "palette": {
+    "label": "コマンドパレット",
+    "searchPlaceholder": "プロジェクト、コマンド、ジョブを検索...",
+    "noResults": "結果が見つかりません。",
+    "activeBadge": "アクティブ",
+    "groups": {
+      "projects": "プロジェクト",
+      "spec": "スペック",
+      "jobs": "ジョブ",
+      "navigation": "ナビゲーション"
+    },
+    "nav": {
+      "dashboard": "ダッシュボード",
+      "hubAnalytics": "ハブ分析",
+      "projectAnalytics": "プロジェクト分析",
+      "activityFeed": "アクティビティフィード",
+      "hubSettings": "ハブ設定",
+      "docs": "ドキュメント"
+    },
+    "sidebar": {
+      "collapseLeftKeepPinned": "左サイドバーを折りたたむ (ピン留めは維持)",
+      "unpinLeft": "左サイドバーのピン留めを解除",
+      "pinLeftOpen": "左サイドバーを開いた状態でピン留め",
+      "collapseRightKeepPinned": "右サイドバーを折りたたむ (ピン留めは維持)",
+      "unpinRight": "右サイドバーのピン留めを解除",
+      "pinRightOpen": "右サイドバーを開いた状態でピン留め"
+    },
+    "footer": {
+      "navigate": "移動",
+      "select": "選択",
+      "close": "閉じる"
+    }
+  },
+  "toasts": {
+    "queued": "{{name}} をキューに追加しました",
+    "queuing": "{{name}} をキューに追加中..."
+  },
+  "errors": {
+    "spawnFailed": "コマンドの起動に失敗しました"
+  },
+  "grid": {
+    "sections": {
+      "discovery": "ディスカバリー",
+      "discoverySubtitle": "プロダクトを探索して定義",
+      "delivery": "デリバリー",
+      "deliverySubtitle": "機能を構築してリリース",
+      "others": "その他"
+    },
+    "displayNames": {
+      "proposeSpec": "カスタム提案",
+      "updateBacklog": "自動提案",
+      "productBacklog": "スペック自動選択"
+    },
+    "emptyState": {
+      "title": "コマンドがインストールされていません",
+      "hint": "Claude Code で <1>/setup</1> を実行して specrails コマンドをインストールしてください"
+    },
+    "runs_one": "{{count}} 回実行",
+    "runs_other": "{{count}} 回実行",
+    "tooltip": {
+      "opensWizard": "ガイド付きウィザードを開きます"
+    }
+  },
+  "shortcuts": {
+    "title": "キーボードショートカット",
+    "subtitle": "どこでも <1>?</1> を押すとこのパネルを切り替えられます",
+    "categories": {
+      "general": "一般",
+      "navigation": "ナビゲーション",
+      "actions": "アクション"
+    },
+    "items": {
+      "showCheatsheet": "キーボードショートカットを表示",
+      "closeModal": "モーダル / サイドバーを閉じる",
+      "toggleRightSidebar": "右サイドバーの表示を切り替え",
+      "toggleLeftSidebar": "左サイドバーの表示を切り替え",
+      "toggleTerminal": "ターミナルパネルの表示を切り替え",
+      "navigateProjectPageWithAgents": "プロジェクトページへ移動 (ダッシュボード/ジョブ/分析/エージェント/設定)",
+      "navigateProjectPage": "プロジェクトページへ移動 (ダッシュボード/ジョブ/分析/設定)",
+      "switchProject": "位置でプロジェクトを切り替え",
+      "goDashboard": "ダッシュボードへ移動",
+      "goActivity": "アクティビティ / ジョブへ移動",
+      "goAnalytics": "分析へ移動",
+      "goSettings": "設定へ移動",
+      "nextItem": "リストの次の項目",
+      "prevItem": "リストの前の項目"
+    }
+  },
+  "update": {
+    "title": {
+      "available": "アップデートがあります",
+      "downloading": "アップデートをダウンロード中",
+      "installing": "アップデートをインストール中",
+      "ready": "アップデート準備完了",
+      "error": "アップデートに失敗しました"
+    },
+    "desc": {
+      "available": "SpecRails Hub の新しいバージョンをインストールできます。",
+      "fetching": "{{size}} を取得中…",
+      "progress": "{{percent}}% · {{total}} 中 {{downloaded}}",
+      "installing": "署名を検証して仕上げています…",
+      "ready": "再起動するとバージョン {{version}} が起動します。",
+      "errorFallback": "アップデートを完了できませんでした。もう一度お試しください。"
+    },
+    "pill": {
+      "downloading": "ダウンロード中",
+      "installing": "インストール中",
+      "ready": "準備完了"
+    },
+    "actions": {
+      "restart": "再起動",
+      "later": "後で",
+      "update": "アップデート",
+      "installing": "インストール中…",
+      "tryAgain": "再試行",
+      "dismiss": "閉じる"
+    },
+    "mockReady": "モックアップデート準備完了 — 再起動はスキップされました",
+    "errors": {
+      "installFailed": "アップデートをインストールできませんでした"
+    },
+    "units": {
+      "kb": "{{value}} KB",
+      "mb": "{{value}} MB"
+    }
+  },
+  "notifications": {
+    "jobCompleted": "ジョブが完了しました",
+    "jobFailed": "ジョブが失敗しました",
+    "unknownCommand": "不明なコマンド"
+  },
+  "templates": {
+    "emptyState": {
+      "title": "テンプレートはまだありません。",
+      "hint": "コマンドの並びを保存してワンクリックで実行できます。"
+    },
+    "createButton": "テンプレートを作成",
+    "newButton": "新しいテンプレート",
+    "steps_one": "{{count}} ステップ",
+    "steps_other": "{{count}} ステップ",
+    "moreCommands_one": "+{{count}} 件",
+    "moreCommands_other": "+{{count}} 件",
+    "run": "実行",
+    "queuing": "キューに追加中…",
+    "aria": {
+      "edit": "テンプレートを編集",
+      "delete": "テンプレートを削除"
+    },
+    "confirmDelete": "テンプレート「{{name}}」を削除しますか？",
+    "toasts": {
+      "queuedJobs_one": "「{{name}}」から {{count}} 件のジョブをキューに追加しました",
+      "queuedJobs_other": "「{{name}}」から {{count}} 件のジョブをキューに追加しました",
+      "deleted": "テンプレート「{{name}}」を削除しました"
+    },
+    "errors": {
+      "runFailed": "テンプレートの実行に失敗しました",
+      "deleteFailed": "テンプレートの削除に失敗しました"
+    }
+  },
+  "templateDialog": {
+    "editTitle": "テンプレートを編集",
+    "newTitle": "新しいテンプレート",
+    "nameLabel": "名前",
+    "namePlaceholder": "例: フルパイプライン",
+    "descriptionLabel": "説明 (任意)",
+    "descriptionPlaceholder": "このレールは何をしますか？",
+    "stepsLabel": "ステップ (コマンドまたは自由なプロンプト)",
+    "stepPlaceholder": "コマンドを選択するか、自由なプロンプトを入力...",
+    "aria": {
+      "moveUp": "上へ移動",
+      "removeStep": "ステップを削除"
+    },
+    "update": "更新",
+    "create": "作成",
+    "errors": {
+      "nameRequired": "名前は必須です",
+      "stepRequired": "少なくとも 1 つのステップが必要です",
+      "saveFailed": "テンプレートの保存に失敗しました"
+    },
+    "toasts": {
+      "updated": "テンプレートを更新しました",
+      "created": "テンプレートを作成しました"
+    }
+  }
+}

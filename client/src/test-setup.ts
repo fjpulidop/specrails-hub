@@ -2,6 +2,9 @@ import '@testing-library/jest-dom/vitest'
 import { vi, afterEach, beforeEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import { setActiveProjectId } from './lib/api'
+// Initialize the i18next singleton (English, synchronous in-memory init) so
+// `useTranslation` consumers render real strings without provider wrapping.
+import './lib/i18n'
 
 // Cleanup after each test
 afterEach(() => {

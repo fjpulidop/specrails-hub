@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { getApiBase } from '../lib/api'
 import { Loader2, CheckCircle2, XCircle, Clock, DollarSign } from 'lucide-react'
 import { toast } from 'sonner'
@@ -27,6 +28,7 @@ function formatDuration(startedAt: string): string {
 }
 
 export function ActiveJobCard({ activeJob, phases, phaseDefinitions }: ActiveJobCardProps) {
+  const { t } = useTranslation('jobs')
   const [elapsed, setElapsed] = useState<string>('')
   const { activeProjectId, projects } = useHub()
   const activeProvider = projects.find((p) => p.id === activeProjectId)?.provider
@@ -44,15 +46,15 @@ export function ActiveJobCard({ activeJob, phases, phaseDefinitions }: ActiveJob
     try {
       const res = await fetch(`${getApiBase()}/jobs/${activeJob.id}`, { method: 'DELETE' })
       if (res.ok) {
-        toast.success('Job cancellation requested', {
-          description: 'Sending SIGTERM to the process',
+        toast.success(t('activeJob.toast.cancelRequested'), {
+          description: t('activeJob.toast.cancelRequestedDescription'),
         })
       } else {
         const data = await res.json() as { error?: string }
-        toast.error('Failed to cancel job', { description: data.error })
+        toast.error(t('activeJob.toast.cancelFailed'), { description: data.error })
       }
     } catch {
-      toast.error('Network error canceling job')
+      toast.error(t('activeJob.toast.networkError'))
     }
   }
 
@@ -63,9 +65,9 @@ export function ActiveJobCard({ activeJob, phases, phaseDefinitions }: ActiveJob
           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
             <Clock className="w-4 h-4 text-muted-foreground" />
           </div>
-          <p className="text-sm text-muted-foreground">No active job</p>
+          <p className="text-sm text-muted-foreground">{t('activeJob.none')}</p>
           <p className="text-xs text-muted-foreground/60">
-            Select a command below to start a job
+            {t('activeJob.noneHint')}
           </p>
         </CardContent>
       </Card>
@@ -81,7 +83,7 @@ export function ActiveJobCard({ activeJob, phases, phaseDefinitions }: ActiveJob
             <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
             <code className="text-xs font-mono text-foreground truncate">{formatCommandForProvider(activeJob.command, activeProvider)}</code>
           </div>
-          <Badge variant="running" className="shrink-0">running</Badge>
+          <Badge variant="running" className="shrink-0">{t('statusLabel.running')}</Badge>
         </div>
 
         {/* Pipeline phases */}
@@ -137,7 +139,7 @@ export function ActiveJobCard({ activeJob, phases, phaseDefinitions }: ActiveJob
             {activeJob.exitCode !== null && (
               <div className="flex items-center gap-1">
                 <DollarSign className="w-3 h-3" />
-                <span>exit {activeJob.exitCode}</span>
+                <span>{t('activeJob.exitCode', { code: activeJob.exitCode })}</span>
               </div>
             )}
           </div>
@@ -151,16 +153,16 @@ export function ActiveJobCard({ activeJob, phases, phaseDefinitions }: ActiveJob
                   onClick={handleCancel}
                   className="h-6 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
                 >
-                  Cancel
+                  {t('common:actions.cancel')}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                Send SIGTERM to the running claude process
+                {t('activeJob.cancelTooltip')}
               </TooltipContent>
             </Tooltip>
 
             <Button variant="outline" size="sm" asChild className="h-6 px-2">
-              <Link to={`/jobs/${activeJob.id}`}>View Logs</Link>
+              <Link to={`/jobs/${activeJob.id}`}>{t('activeJob.viewLogs')}</Link>
             </Button>
           </div>
         </div>

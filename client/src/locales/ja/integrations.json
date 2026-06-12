@@ -1,0 +1,67 @@
+{
+  "page": {
+    "title": "インテグレーション",
+    "subtitle": "プロジェクトごとのプラグイン。どのインテグレーションを有効にするかは各プロジェクトが独立して決定します。",
+    "selectProject": "インテグレーションを管理するプロジェクトを選択してください。",
+    "deprecated": "非推奨",
+    "loadError": "プラグインの読み込みに失敗しました。",
+    "empty": "このハブビルドにはプラグインが同梱されていません。"
+  },
+  "card": {
+    "statusActive": "有効",
+    "statusDeactivated": "無効",
+    "statusDegraded": "劣化",
+    "updateAvailable": "アップデートあり",
+    "requires": "必要条件: {{list}}",
+    "deactivatedHint": "インストール済みですが無効です — 次のセッションで Claude は読み込みません。再有効化するには<strong>有効</strong>に切り替えてください。",
+    "install": "インストール",
+    "uninstall": "アンインストール"
+  },
+  "toggle": {
+    "titleActive": "有効 — クリックで無効化",
+    "titleDeactivated": "無効 — クリックで有効化"
+  },
+  "cachedNotice": {
+    "body": "Claude のキャッシュにはマーケットプレイス版プラグインが<strong>インストール済みかつ無効</strong>の状態で残っています。トグルがオフでも <code>~/.claude/plugins/cache/...</code> からサーバーを解決する可能性があります。プロジェクトスコープのみに限定するには、Claude からマーケットプレイス版プラグインをアンインストールしてください:",
+    "runInstruction": "アクティブな Claude セッション内で実行し、その後このプロジェクトで Claude を再起動してください。"
+  },
+  "update": {
+    "body": "インストール後に同梱マニフェストが変更されました (おそらく上流での名前変更)。<code>.mcp.json</code> を正規のエントリで書き直します — 外科的な変更で、プラグインが所有するキーのみが対象です。",
+    "button": "<code>.mcp.json</code> エントリを更新"
+  },
+  "conflict": {
+    "body": "<strong>{{name}}</strong> は Claude のプラグインマーケットプレイス経由でグローバルにも有効になっており、このプロジェクトスコープのインストールを覆い隠しています。このカードを有効にするには、下のグローバル版を無効にしてください — Claude からいつでも再有効化できます。",
+    "disableButton": "<code>{{key}}</code> を無効化"
+  },
+  "orphan": {
+    "badge": "孤立",
+    "removeButton": "孤立エントリを削除"
+  },
+  "installDialog": {
+    "title": "{{name}} をインストール",
+    "computingChanges": "変更内容を計算中…",
+    "filesHeading": "変更されるファイル",
+    "prerequisites": "前提条件",
+    "autoInstall": "自動インストール",
+    "progress": "進行状況",
+    "installingPrereq": "{{name}} をインストール中…",
+    "prereqStartFailed": "開始に失敗しました: {{message}}"
+  },
+  "uninstallDialog": {
+    "title": "{{name}} をアンインストールしますか？",
+    "body": "<code>.mcp.json</code> 内のプラグイン管理エントリを元に戻し、プラグインが作成したファイルを削除します。コード、履歴、他のプラグインには影響しません。"
+  },
+  "docs": {
+    "title": "ドキュメント",
+    "dialogDescription": "同梱の specrails-hub ドキュメントを閲覧できます。サイドバーでガイドを切り替えてください。",
+    "sidebarEmpty": "ドキュメントはまだありません",
+    "indexEmpty": "利用可能なドキュメントがありません。同梱ドキュメントはリポジトリの docs/ 以下にあります — Markdown ファイルをそこか ~/.specrails/docs/ 以下に置くと拡張できます。",
+    "categoryEmpty": "このカテゴリにはまだドキュメントがありません。",
+    "documentCount_one": "{{count}} 件のドキュメント",
+    "documentCount_other": "{{count}} 件のドキュメント",
+    "categoryCount_one": "{{count}} カテゴリ",
+    "categoryCount_other": "{{count}} カテゴリ",
+    "summary": "{{categories}}にわたって{{documents}}。",
+    "loadError": "ドキュメントの読み込みに失敗しました"
+  }
+}

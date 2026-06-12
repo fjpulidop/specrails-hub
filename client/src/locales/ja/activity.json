@@ -1,0 +1,108 @@
+{
+  "feed": {
+    "title": "アクティビティ",
+    "emptyTitle": "アクティビティはまだありません",
+    "emptyHint": "ジョブが実行されるとイベントがここに表示されます",
+    "allLoaded": "すべてのアクティビティを読み込みました",
+    "typeStarted": "開始",
+    "phaseCommand": "フェーズ: {{phase}} → {{state}}",
+    "relativeTime": {
+      "seconds": "{{value}}秒前",
+      "minutes": "{{value}}分前",
+      "hours": "{{value}}時間前",
+      "days": "{{value}}日前"
+    }
+  },
+  "specGen": {
+    "generating": "生成中... {{elapsed}}",
+    "generatedIn": "{{elapsed}} で生成完了",
+    "specCreated": "スペックを作成しました",
+    "view": "表示",
+    "errorGenerating": "スペックの生成中にエラーが発生しました",
+    "couldNotFind": "生成されたスペックが見つかりませんでした",
+    "couldNotConfirm": "スペックの作成を確認できませんでした"
+  },
+  "contractRefine": {
+    "refining": "コントラクトをリファイン中…",
+    "retryRejected": "再試行が拒否されました",
+    "retryRejectedWithError": "再試行が拒否されました: {{error}}",
+    "retryFailed": "再試行に失敗しました: {{message}}",
+    "skipped": "Contract Layer をスキップしました — チケットはそれなしで保存されました",
+    "reason": "理由: {{reason}}",
+    "added": "Contract Layer を追加しました · {{title}}"
+  },
+  "smash": {
+    "stage": {
+      "analyzing": "スペックを分析中…",
+      "identifying": "サブタスクを特定中…",
+      "ordering": "実行順を決定中…"
+    },
+    "onTitled": "「{{title}}」に SMASH",
+    "onThisSpec": "このスペックに SMASH",
+    "split_one": "スペックを {{count}} 件のサブスペックに分割しました",
+    "split_other": "スペックを {{count}} 件のサブスペックに分割しました",
+    "undoAction": "元に戻す",
+    "undone": "SMASH を元に戻しました",
+    "undoFailed": "元に戻せませんでした",
+    "undoFailedWithReason": "元に戻せませんでした: {{reason}}",
+    "retrying": "SMASH を再試行中…",
+    "couldNotRetry": "再試行できませんでした",
+    "couldNotRetryWithReason": "再試行できませんでした: {{reason}}",
+    "retryFailed": "再試行に失敗しました: {{message}}",
+    "couldNotComplete": "SMASH を完了できませんでした",
+    "failReason": {
+      "invalidOutput": "エージェントが無効な出力を返しました",
+      "timeout": "エージェントの処理に時間がかかりすぎました",
+      "modelError": "モデルがエラーを返しました",
+      "crashed": "エージェントプロセスがクラッシュしました",
+      "generic": "理由: {{reason}}"
+    },
+    "couldNotStart": "SMASH を開始できませんでした",
+    "couldNotStartWithReason": "SMASH を開始できませんでした: {{reason}}",
+    "smashFailed": "SMASH に失敗しました: {{message}}",
+    "couldNotDeleteChildren": "現在のサブスペックを削除できませんでした",
+    "deleteFailed": "削除に失敗しました: {{message}}",
+    "smashButton": "スペックをサブスペックに SMASH",
+    "reSmashButton": "再 SMASH"
+  },
+  "smashModal": {
+    "title": "スペックをサブスペックに SMASH",
+    "modePickerLabel": "分割モード",
+    "reSmashWarning_one": "⚠️ 現在の <strong>{{count}}</strong> 件のサブスペックを削除し、新しく作成します。",
+    "reSmashWarning_other": "⚠️ 現在の <strong>{{count}}</strong> 件のサブスペックを削除し、新しく作成します。",
+    "modes": {
+      "simple": {
+        "title": "シンプル",
+        "eta": "~10-30秒",
+        "bullet1": "スペックのタイトルと説明のみに基づくワンショット分割。",
+        "bullet2": "コードベースへのアクセスなし — 高速かつ決定的。",
+        "bullet3": "強力な Contract Layer を持つクリーンなスペックに最適。"
+      },
+      "full": {
+        "title": "フル",
+        "eta": "~3-10分",
+        "bullet1": "読み取り専用のコードベースアクセスを伴う多ターンの徹底的な分割 — 積極的に読み込みます。",
+        "bullet2": "各サブスペックはスーパースペック: 背景、計画、ファイル、エッジケース、対象外、テスト。",
+        "bullet3": "サブスペックごとに 4〜10 件の受け入れ基準を、実在するファイルパスに基づいて作成。",
+        "bullet4": "トークンは惜しまず使用 — 速度より品質。"
+      }
+    },
+    "starting": "開始中…",
+    "confirmReSmash": "再 SMASH を確認",
+    "smash": "SMASH"
+  },
+  "family": {
+    "subSpecsHeader": "サブスペック ({{count}})",
+    "emptySubSpecs": "サブスペックがありません。再 SMASH で再生成してください。",
+    "familyHeader_one": "ファミリー (サブスペック {{count}} 件)",
+    "familyHeader_other": "ファミリー (サブスペック {{count}} 件)",
+    "noSiblings": "兄弟スペックはありません。",
+    "openParentEpic": "親エピック {{title}} を開く",
+    "openSubSpec": "サブスペック {{title}} を開く"
+  },
+  "epicChildren": {
+    "header": "サブスペック ({{count}})",
+    "empty": "サブスペックがありません。このエピックは空になりました — 再 SMASH で再生成してください。",
+    "step": "· ステップ {{order}} / {{total}}"
+  }
+}

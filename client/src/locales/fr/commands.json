@@ -1,0 +1,186 @@
+{
+  "palette": {
+    "label": "Palette de commandes",
+    "searchPlaceholder": "Rechercher projets, commandes, jobs...",
+    "noResults": "Aucun résultat.",
+    "activeBadge": "actif",
+    "groups": {
+      "projects": "Projets",
+      "spec": "Spec",
+      "jobs": "Jobs",
+      "navigation": "Navigation"
+    },
+    "nav": {
+      "dashboard": "Tableau de bord",
+      "hubAnalytics": "Analytics du hub",
+      "projectAnalytics": "Analytics du projet",
+      "activityFeed": "Fil d'activité",
+      "hubSettings": "Paramètres du hub",
+      "docs": "Docs"
+    },
+    "sidebar": {
+      "collapseLeftKeepPinned": "Replier la barre latérale gauche (garder épinglée)",
+      "unpinLeft": "Désépingler la barre latérale gauche",
+      "pinLeftOpen": "Épingler la barre latérale gauche ouverte",
+      "collapseRightKeepPinned": "Replier la barre latérale droite (garder épinglée)",
+      "unpinRight": "Désépingler la barre latérale droite",
+      "pinRightOpen": "Épingler la barre latérale droite ouverte"
+    },
+    "footer": {
+      "navigate": "naviguer",
+      "select": "sélectionner",
+      "close": "fermer"
+    }
+  },
+  "toasts": {
+    "queued": "{{name}} ajouté à la file",
+    "queuing": "Mise en file de {{name}}..."
+  },
+  "errors": {
+    "spawnFailed": "Échec du lancement de la commande"
+  },
+  "grid": {
+    "sections": {
+      "discovery": "Découverte",
+      "discoverySubtitle": "Explorez et définissez votre produit",
+      "delivery": "Livraison",
+      "deliverySubtitle": "Construisez et livrez des fonctionnalités",
+      "others": "Autres"
+    },
+    "displayNames": {
+      "proposeSpec": "Proposition personnalisée",
+      "updateBacklog": "Proposition auto",
+      "productBacklog": "Sélection auto de specs"
+    },
+    "emptyState": {
+      "title": "Aucune commande installée",
+      "hint": "Exécutez <1>/setup</1> dans Claude Code pour installer les commandes specrails"
+    },
+    "runs_one": "{{count}} exécution",
+    "runs_other": "{{count}} exécutions",
+    "tooltip": {
+      "opensWizard": "Ouvre l'assistant guidé"
+    }
+  },
+  "shortcuts": {
+    "title": "Raccourcis clavier",
+    "subtitle": "Appuyez sur <1>?</1> n'importe où pour afficher ou masquer ce panneau",
+    "categories": {
+      "general": "Général",
+      "navigation": "Navigation",
+      "actions": "Actions"
+    },
+    "items": {
+      "showCheatsheet": "Afficher les raccourcis clavier",
+      "closeModal": "Fermer la modale / barre latérale",
+      "toggleRightSidebar": "Afficher/masquer la barre latérale droite",
+      "toggleLeftSidebar": "Afficher/masquer la barre latérale gauche",
+      "toggleTerminal": "Afficher/masquer le panneau du terminal",
+      "navigateProjectPageWithAgents": "Aller à une page du projet (Tableau de bord/Jobs/Analytics/Agents/Paramètres)",
+      "navigateProjectPage": "Aller à une page du projet (Tableau de bord/Jobs/Analytics/Paramètres)",
+      "switchProject": "Changer de projet par position",
+      "goDashboard": "Aller au tableau de bord",
+      "goActivity": "Aller à Activité / Jobs",
+      "goAnalytics": "Aller à Analytics",
+      "goSettings": "Aller aux paramètres",
+      "nextItem": "Élément suivant dans la liste",
+      "prevItem": "Élément précédent dans la liste"
+    }
+  },
+  "update": {
+    "title": {
+      "available": "Mise à jour disponible",
+      "downloading": "Téléchargement de la mise à jour",
+      "installing": "Installation de la mise à jour",
+      "ready": "Mise à jour prête",
+      "error": "Échec de la mise à jour"
+    },
+    "desc": {
+      "available": "Une nouvelle version de SpecRails Hub est prête à être installée.",
+      "fetching": "Récupération de {{size}}…",
+      "progress": "{{percent}} % · {{downloaded}} sur {{total}}",
+      "installing": "Vérification de la signature et finalisation…",
+      "ready": "Redémarrez pour lancer la version {{version}}.",
+      "errorFallback": "Impossible de terminer la mise à jour. Veuillez réessayer."
+    },
+    "pill": {
+      "downloading": "Téléchargement",
+      "installing": "Installation",
+      "ready": "Prête"
+    },
+    "actions": {
+      "restart": "Redémarrer",
+      "later": "Plus tard",
+      "update": "Mettre à jour",
+      "installing": "Installation…",
+      "tryAgain": "Réessayer",
+      "dismiss": "Ignorer"
+    },
+    "mockReady": "Mise à jour factice prête — redémarrage ignoré",
+    "errors": {
+      "installFailed": "Impossible d'installer la mise à jour"
+    },
+    "units": {
+      "kb": "{{value}} KB",
+      "mb": "{{value}} MB"
+    }
+  },
+  "notifications": {
+    "jobCompleted": "Job terminé",
+    "jobFailed": "Job en échec",
+    "unknownCommand": "Commande inconnue"
+  },
+  "templates": {
+    "emptyState": {
+      "title": "Aucun template pour l'instant.",
+      "hint": "Enregistrez des séquences de commandes pour les lancer en un clic."
+    },
+    "createButton": "Créer un template",
+    "newButton": "Nouveau template",
+    "steps_one": "{{count}} étape",
+    "steps_other": "{{count}} étapes",
+    "moreCommands_one": "+{{count}} de plus",
+    "moreCommands_other": "+{{count}} de plus",
+    "run": "Lancer",
+    "queuing": "Mise en file…",
+    "aria": {
+      "edit": "Modifier le template",
+      "delete": "Supprimer le template"
+    },
+    "confirmDelete": "Supprimer le template « {{name}} » ?",
+    "toasts": {
+      "queuedJobs_one": "{{count}} job mis en file depuis « {{name}} »",
+      "queuedJobs_other": "{{count}} jobs mis en file depuis « {{name}} »",
+      "deleted": "Template « {{name}} » supprimé"
+    },
+    "errors": {
+      "runFailed": "Échec du lancement du template",
+      "deleteFailed": "Échec de la suppression du template"
+    }
+  },
+  "templateDialog": {
+    "editTitle": "Modifier le template",
+    "newTitle": "Nouveau template",
+    "nameLabel": "Nom",
+    "namePlaceholder": "ex. Pipeline complet",
+    "descriptionLabel": "Description (facultatif)",
+    "descriptionPlaceholder": "Que fait ce rail ?",
+    "stepsLabel": "Étapes (commandes ou prompts libres)",
+    "stepPlaceholder": "Sélectionnez une commande ou saisissez un prompt libre...",
+    "aria": {
+      "moveUp": "Monter",
+      "removeStep": "Supprimer l'étape"
+    },
+    "update": "Mettre à jour",
+    "create": "Créer",
+    "errors": {
+      "nameRequired": "Le nom est requis",
+      "stepRequired": "Au moins une étape est requise",
+      "saveFailed": "Échec de l'enregistrement du template"
+    },
+    "toasts": {
+      "updated": "Template mis à jour",
+      "created": "Template créé"
+    }
+  }
+}

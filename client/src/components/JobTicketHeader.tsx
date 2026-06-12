@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 
 // Clicking a (non-deleted) ticket chip opens the existing TicketDetailModal
@@ -18,6 +19,7 @@ interface JobTicketHeaderProps {
 const COMPACT_THRESHOLD = 4
 
 export function JobTicketHeader({ tickets, onTicketClick }: JobTicketHeaderProps) {
+  const { t } = useTranslation('jobs')
   const [expanded, setExpanded] = useState(false)
 
   if (tickets.length === 0) return null
@@ -38,7 +40,7 @@ export function JobTicketHeader({ tickets, onTicketClick }: JobTicketHeaderProps
           onClick={() => setExpanded(true)}
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          + {hiddenCount} more
+          {t('ticketHeader.showMore', { count: hiddenCount })}
           <ChevronDown className="w-3 h-3" />
         </button>
       )}
@@ -49,7 +51,7 @@ export function JobTicketHeader({ tickets, onTicketClick }: JobTicketHeaderProps
           onClick={() => setExpanded(false)}
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          Show less
+          {t('ticketHeader.showLess')}
           <ChevronUp className="w-3 h-3" />
         </button>
       )}
@@ -58,6 +60,7 @@ export function JobTicketHeader({ tickets, onTicketClick }: JobTicketHeaderProps
 }
 
 function TicketRow({ ticket, onClick }: { ticket: TicketRef; onClick: () => void }) {
+  const { t } = useTranslation('jobs')
   const isDeleted = ticket.title == null
   const chipBase =
     'inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-mono tabular-nums shrink-0'
@@ -67,9 +70,9 @@ function TicketRow({ ticket, onClick }: { ticket: TicketRef; onClick: () => void
       <div className="flex items-center gap-2 min-w-0">
         <span
           className={cn(chipBase, 'text-muted-foreground bg-muted/20 select-none')}
-          title="Ticket no longer exists"
+          title={t('ticketHeader.deletedTooltip')}
         >
-          #{ticket.id} (deleted)
+          {t('ticketHeader.deletedTicket', { id: ticket.id })}
         </span>
       </div>
     )

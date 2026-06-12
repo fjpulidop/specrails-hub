@@ -1,0 +1,57 @@
+{
+  "panel": {
+    "openChat": "Abrir chat",
+    "dragToResize": "Arraste para redimensionar",
+    "tabTitle": "Chat {{n}}",
+    "startConversation": "Inicie uma conversa sobre este projeto",
+    "noConversations": "Ainda não há conversas",
+    "newConversation": "Nova conversa",
+    "suggestions": {
+      "projectStatus": "Qual é o estado do projeto?",
+      "recentFailures": "Mostrar falhas recentes de jobs",
+      "commands": "Que comandos devo executar?",
+      "explainCodebase": "Explica a codebase"
+    }
+  },
+  "header": {
+    "fallbackTitle": "Chat",
+    "newConversation": "Nova conversa",
+    "deleteConversation": "Eliminar conversa",
+    "restorePanel": "Restaurar painel de chat",
+    "maximizePanel": "Maximizar painel de chat",
+    "closeChat": "Fechar chat"
+  },
+  "input": {
+    "placeholder": "Mensagem...",
+    "send": "Enviar",
+    "stop": "Parar",
+    "modelLocked": "Não é possível mudar de modelo durante uma conversa ativa"
+  },
+  "messageList": {
+    "contextLoaded": "Contexto carregado — pronto para ajudar",
+    "noMessages": "Ainda não há mensagens",
+    "askAnything": "Pergunte ao Claude o que quiser sobre o seu projeto",
+    "suggestions": {
+      "currentStatus": "Qual é o estado atual do projeto?",
+      "recentFailures": "Mostra-me falhas recentes de jobs",
+      "testsToRun": "Que testes devo executar?",
+      "mainArchitecture": "Explica a arquitetura principal"
+    }
+  },
+  "errors": {
+    "sendFailed": "Falha ao enviar a mensagem"
+  },
+  "dock": {
+    "minimizedSessions_one": "{{count}} sessão minimizada",
+    "minimizedSessions_other": "{{count}} sessões minimizadas",
+    "minimizedCount": "{{count}} minimizadas",
+    "unknownProject": "Projeto desconhecido"
+  },
+  "chip": {
+    "restore": "Restaurar {{label}}",
+    "close": "Fechar {{label}}",
+    "continueEditing": "Continuar a editar · {{projectName}}",
+    "kindAiEdit": "Edição com IA",
+    "kindExploreSpec": "Explore Spec"
+  }
+}

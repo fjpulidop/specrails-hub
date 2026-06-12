@@ -1,0 +1,144 @@
+{
+  "surfaces": {
+    "job": "Jobs",
+    "quickSpec": "Quick",
+    "exploreSpec": "Explore",
+    "aiEdit": "Affinage",
+    "smash": "SMASH",
+    "fileSummary": "Résumés de fichiers"
+  },
+  "periods": {
+    "d7": "7j",
+    "d30": "30j",
+    "d90": "90j",
+    "all": "Tout",
+    "custom": "Personnalisé",
+    "startDate": "Date de début",
+    "endDate": "Date de fin",
+    "to": "au"
+  },
+  "runs_one": "{{count}} exécution",
+  "runs_other": "{{count}} exécutions",
+  "page": {
+    "title": "Analytics",
+    "all": "Tout",
+    "engine": "Moteur",
+    "ticketChip": "ticket #{{id}} ·  ✕",
+    "failedToLoad": "Échec du chargement : {{error}}"
+  },
+  "hero": {
+    "spending": "Dépenses",
+    "vsPrev": "{{pct}} % vs préc.",
+    "invocations_one": "{{count}} invocation",
+    "invocations_other": "{{count}} invocations",
+    "tokens": "· {{tokens}} tokens",
+    "tokensTooltip": "Total des tokens = entrée fraîche + sortie + lecture cache + création cache, sur toutes les invocations de cette période.",
+    "includesEstimated": "· inclut ~{{amount}} estimés",
+    "includesEstimatedTooltip": "Inclut {{amount}} de coût estimé pour les fournisseurs sans champ de coût natif (ex. codex via la table de tarifs locale).",
+    "trackingStarted": "Suivi démarré le {{date}}",
+    "trackingStartedFallback": "Le suivi démarre à la première invocation",
+    "emptyState": "Aucune invocation pour cette période de filtrage.",
+    "segmentTitle": "{{label}} : {{value}}"
+  },
+  "providerCard": {
+    "title": "Par fournisseur",
+    "description": "Répartition du coût entre les CLI IA de ce projet. Le préfixe <tilde>~</tilde> marque les lignes dont le coût est estimé à partir de la table de tarifs locale (le fournisseur ne le rapporte pas nativement).",
+    "noCost": "Aucun coût enregistré sur cette période.",
+    "segmentTitle": "{{label}} : {{value}} ({{count}})"
+  },
+  "timeline": {
+    "title": "Chronologie quotidienne",
+    "subtitle": "empilée par surface",
+    "empty": "Aucune dépense sur cette période."
+  },
+  "quickVsExplore": {
+    "title": "Quick vs Explore",
+    "quick": "Quick",
+    "explore": "Explore",
+    "sparseCta": "Essayez Explore pour des specs plus riches",
+    "runsSoFar_one": "{{count}} exécution pour l'instant",
+    "runsSoFar_other": "{{count}} exécutions pour l'instant",
+    "perSpec": "par spec",
+    "createdRuns": "<strong>{{created}}</strong> créées · {{runs}} exécutions",
+    "avgDuration": "{{duration}} en moyenne",
+    "ratio": "{{ratio}}× de plus par spec"
+  },
+  "models": {
+    "title": "Modèles",
+    "empty": "Aucun modèle enregistré."
+  },
+  "scatter": {
+    "title": "Coût vs tours",
+    "empty": "Aucune invocation à tracer.",
+    "turnsLabel": "tours",
+    "costLabel": "coût"
+  },
+  "topTickets": {
+    "title": "Top tickets",
+    "empty": "Aucune activité de ticket sur cette période.",
+    "breakdownItem": "{{n}} {{label}}",
+    "unattributed": "Non attribué",
+    "deletedTicket": "ticket supprimé #{{id}}"
+  },
+  "table": {
+    "title": "Toutes les invocations",
+    "statusFilterAria": "Filtre de statut",
+    "minCostFilterAria": "Filtre de coût minimum",
+    "minCostPlaceholder": "≥ $0.00",
+    "allStatus": "Tous les statuts",
+    "success": "Succès",
+    "failed": "Échec",
+    "aborted": "Interrompu",
+    "empty": "Aucune invocation ne correspond aux filtres actuels.",
+    "colSurface": "Surface",
+    "colTicket": "Ticket",
+    "colCost": "Coût",
+    "colTurns": "Tours",
+    "colTokens": "Tokens",
+    "colModel": "Modèle",
+    "colStatus": "Statut",
+    "colStarted": "Démarré",
+    "contractLayer": "Contract Layer",
+    "contractLayerRefinement": "Affinage Contract Layer",
+    "deleted": "(supprimé)",
+    "provisionalTitleTooltip": "Titre Explore provisoire — pas encore validé",
+    "estimatedCostTooltip": "Estimé à partir de la table de tarifs locale — ce fournisseur ne rapporte pas le coût nativement.",
+    "inferred": "inféré",
+    "statusValue": {
+      "success": "succès",
+      "failed": "échec",
+      "aborted": "interrompu"
+    },
+    "truncated": "Affichage des {{shown}} premières lignes sur {{total}} correspondantes."
+  },
+  "export": {
+    "summaryCsv": "CSV résumé",
+    "rawCsv": "CSV brut",
+    "summaryJson": "JSON résumé",
+    "rawJson": "JSON brut",
+    "downloading": "Téléchargement…",
+    "noData": "Aucune donnée pour les filtres actuels",
+    "failed": "Échec de l'export"
+  },
+  "hub": {
+    "title": "Analytics du Hub",
+    "refreshAria": "Actualiser les analytics",
+    "failedToLoad": "Échec du chargement des analytics : {{error}}",
+    "totalCost": "Coût total",
+    "costToday": "{{value}} aujourd'hui",
+    "totalJobs": "Total des jobs",
+    "jobsToday": "{{n}} aujourd'hui",
+    "successRate": "Taux de réussite",
+    "acrossAllProjects": "sur tous les projets",
+    "avgCostPerJob": "Coût moyen / job",
+    "periodAverage": "moyenne de la période",
+    "costOverTime": "Coût inter-projets dans le temps",
+    "noCostData": "Aucune donnée de coût pour cette période",
+    "projectComparison": "Comparaison des projets",
+    "noProjects": "Aucun projet enregistré.",
+    "jobsCount_one": "{{count}} job",
+    "jobsCount_other": "{{count}} jobs",
+    "successPct": "{{pct}} % de réussite",
+    "costByProject": "Coût par projet"
+  }
+}

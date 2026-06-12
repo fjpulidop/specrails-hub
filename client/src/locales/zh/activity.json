@@ -1,0 +1,108 @@
+{
+  "feed": {
+    "title": "活动",
+    "emptyTitle": "暂无活动",
+    "emptyHint": "任务运行时，事件会显示在这里",
+    "allLoaded": "已加载全部活动",
+    "typeStarted": "已开始",
+    "phaseCommand": "阶段：{{phase}} → {{state}}",
+    "relativeTime": {
+      "seconds": "{{value}} 秒前",
+      "minutes": "{{value}} 分钟前",
+      "hours": "{{value}} 小时前",
+      "days": "{{value}} 天前"
+    }
+  },
+  "specGen": {
+    "generating": "生成中... {{elapsed}}",
+    "generatedIn": "生成耗时 {{elapsed}}",
+    "specCreated": "Spec 已创建",
+    "view": "查看",
+    "errorGenerating": "生成 Spec 出错",
+    "couldNotFind": "未找到生成的 Spec",
+    "couldNotConfirm": "无法确认 Spec 已创建"
+  },
+  "contractRefine": {
+    "refining": "正在完善契约…",
+    "retryRejected": "重试被拒绝",
+    "retryRejectedWithError": "重试被拒绝：{{error}}",
+    "retryFailed": "重试失败：{{message}}",
+    "skipped": "已跳过契约层 — 工单已保存（不含契约层）",
+    "reason": "原因：{{reason}}",
+    "added": "已添加契约层 · {{title}}"
+  },
+  "smash": {
+    "stage": {
+      "analyzing": "正在分析 Spec…",
+      "identifying": "正在识别子任务…",
+      "ordering": "正在编排执行顺序…"
+    },
+    "onTitled": "对“{{title}}”执行 SMASH",
+    "onThisSpec": "对此 Spec 执行 SMASH",
+    "split_one": "Spec 已拆分为 {{count}} 个子 Spec",
+    "split_other": "Spec 已拆分为 {{count}} 个子 Spec",
+    "undoAction": "撤销",
+    "undone": "SMASH 已撤销",
+    "undoFailed": "撤销失败",
+    "undoFailedWithReason": "撤销失败：{{reason}}",
+    "retrying": "正在重试 SMASH…",
+    "couldNotRetry": "无法重试",
+    "couldNotRetryWithReason": "无法重试：{{reason}}",
+    "retryFailed": "重试失败：{{message}}",
+    "couldNotComplete": "SMASH 未能完成",
+    "failReason": {
+      "invalidOutput": "Agent 返回了无效输出",
+      "timeout": "Agent 耗时过长",
+      "modelError": "模型返回错误",
+      "crashed": "Agent 进程崩溃",
+      "generic": "原因：{{reason}}"
+    },
+    "couldNotStart": "无法启动 SMASH",
+    "couldNotStartWithReason": "无法启动 SMASH：{{reason}}",
+    "smashFailed": "SMASH 失败：{{message}}",
+    "couldNotDeleteChildren": "无法删除当前子 Spec",
+    "deleteFailed": "删除失败：{{message}}",
+    "smashButton": "将 Spec SMASH 为子 Spec",
+    "reSmashButton": "重新 SMASH"
+  },
+  "smashModal": {
+    "title": "将 Spec SMASH 为子 Spec",
+    "modePickerLabel": "拆分模式",
+    "reSmashWarning_one": "⚠️ 这将删除当前的 <strong>{{count}}</strong> 个子 Spec 并创建新的。",
+    "reSmashWarning_other": "⚠️ 这将删除当前的 <strong>{{count}}</strong> 个子 Spec 并创建新的。",
+    "modes": {
+      "simple": {
+        "title": "简单",
+        "eta": "~10-30s",
+        "bullet1": "仅基于 Spec 的标题和描述进行一次性拆分。",
+        "bullet2": "不访问代码库 — 快速且结果确定。",
+        "bullet3": "最适合带有完善契约层的整洁 Spec。"
+      },
+      "full": {
+        "title": "完整",
+        "eta": "~3-10 min",
+        "bullet1": "深度多轮拆分，可只读访问代码库 — 会大量阅读代码。",
+        "bullet2": "每个子 Spec 都是超级 Spec：背景、计划、文件、边界情况、范围外、测试。",
+        "bullet3": "每个子 Spec 含 4-10 条验收标准，基于真实文件路径。",
+        "bullet4": "不吝惜 token — 质量优先于速度。"
+      }
+    },
+    "starting": "正在启动…",
+    "confirmReSmash": "确认重新 SMASH",
+    "smash": "SMASH"
+  },
+  "family": {
+    "subSpecsHeader": "子 Spec（{{count}}）",
+    "emptySubSpecs": "没有子 Spec。使用“重新 SMASH”重新生成。",
+    "familyHeader_one": "家族（{{count}} 个子 Spec）",
+    "familyHeader_other": "家族（{{count}} 个子 Spec）",
+    "noSiblings": "没有同级。",
+    "openParentEpic": "打开父级 Epic {{title}}",
+    "openSubSpec": "打开子 Spec {{title}}"
+  },
+  "epicChildren": {
+    "header": "子 Spec（{{count}}）",
+    "empty": "没有子 Spec。此 Epic 已被清空 — 使用“重新 SMASH”重新生成。",
+    "step": "· 第 {{order}}/{{total}} 步"
+  }
+}

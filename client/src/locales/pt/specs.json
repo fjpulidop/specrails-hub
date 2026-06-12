@@ -1,0 +1,114 @@
+{
+  "board": {
+    "title": "Spec",
+    "dropHere": "Largar aqui",
+    "emptyNoSpecs": "Ainda não há specs",
+    "emptyNoLabelMatch": "Nenhuma spec corresponde às etiquetas ativas",
+    "emptyNoActiveSpecs": "Sem specs ativas",
+    "emptyHint": "Clique em \"+ Adicionar\" para começar",
+    "dropToMarkDone": "Largue para marcar como concluída",
+    "emptyNoDoneLabelMatch": "Nenhuma spec concluída corresponde às etiquetas ativas",
+    "emptyNoCompleted": "Ainda não há specs concluídas",
+    "untitledSpec": "Spec sem título"
+  },
+  "status": {
+    "todo": "Por fazer",
+    "inProgress": "Em curso",
+    "done": "Concluído",
+    "cancelled": "Cancelado"
+  },
+  "priority": {
+    "critical": "crítica",
+    "high": "alta",
+    "medium": "média",
+    "low": "baixa"
+  },
+  "badges": {
+    "epic": "Épico",
+    "epicWithCount": "Épico · {{count}}",
+    "subSpec": "↑ Sub-Spec",
+    "review": "Revisão",
+    "needsReviewTitle": "Esta spec foi marcada como concluída mas o job terminou em falha — reveja-a",
+    "raw": "Raw",
+    "rawTitle": "Spec Raw — sem geração por IA na criação",
+    "contract": "Contract",
+    "openParentEpicTitle": "Abrir o Épico pai #{{id}} · {{title}}"
+  },
+  "card": {
+    "deleteSpec": "Eliminar spec #{{id}}",
+    "deleteTicket": "Eliminar ticket #{{id}}",
+    "ticketFallbackLabel": "Ticket #{{id}}",
+    "dependsOn": "Depende de {{count}}",
+    "continueEditing": "Continuar a editar",
+    "continueEditingTitle": "Continuar a editar esta spec",
+    "moveToRail": "Mover para um rail"
+  },
+  "emptyState": {
+    "noTickets": "Ainda não há tickets",
+    "noTicketsHint": "Crie o seu primeiro ticket ou execute um comando de product backlog para preencher os tickets",
+    "createFirst": "Criar o seu primeiro ticket"
+  },
+  "errors": {
+    "loadFailed": "Falha ao carregar os tickets"
+  },
+  "listView": {
+    "status": {
+      "draft": "rascunho",
+      "todo": "por fazer",
+      "inProgress": "em curso",
+      "done": "concluído",
+      "cancelled": "cancelado"
+    },
+    "filterAll": "Todos ({{count}})",
+    "statusWithCount": "{{status}} ({{count}})",
+    "allLabels": "Todas as etiquetas",
+    "searchPlaceholder": "Pesquisar...",
+    "columns": {
+      "status": "Estado",
+      "title": "Título",
+      "priority": "Prioridade",
+      "labels": "Etiquetas",
+      "updated": "Atualizado"
+    },
+    "noMatch": "Nenhum ticket corresponde aos seus filtros",
+    "clearFilters": "Limpar filtros",
+    "loadMore": "Carregar mais ({{count}} restantes)"
+  },
+  "gridView": {
+    "emptyTodo": "Sem tickets por fazer",
+    "emptyInProgress": "Nada em curso",
+    "emptyDone": "Sem tickets concluídos",
+    "cancelledSection": "Cancelados ({{count}})"
+  },
+  "statusFilter": {
+    "ariaLabel": "Filtrar por estado",
+    "all": "Todos",
+    "todo": "Por fazer",
+    "done": "Concluído"
+  },
+  "sortControl": {
+    "modeAriaLabel": "Modo de ordenação",
+    "tooltip": "Ordenar: {{mode}}",
+    "toggleDirAriaLabel": "Inverter a direção da ordenação",
+    "ascending": "Ascendente",
+    "descending": "Descendente",
+    "modes": {
+      "default": "Predefinida",
+      "ticketId": "Ticket #",
+      "priority": "Prioridade"
+    }
+  },
+  "viewTier": {
+    "ariaLabel": "Vista de specs",
+    "listView": "Vista de lista",
+    "postitView": "Vista de post-its"
+  },
+  "labelFilter": {
+    "ariaLabel": "Filtrar por etiquetas",
+    "all": "Todas",
+    "empty": "Não há etiquetas neste projeto.",
+    "selected_one": "{{count}} etiqueta",
+    "selected_other": "{{count}} etiquetas",
+    "clear": "limpar"
+  }
+}

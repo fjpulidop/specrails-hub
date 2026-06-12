@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { Trans, useTranslation } from 'react-i18next'
 import { Trash2, ChevronRight, Circle, CheckCircle2, AlertCircle, Flag, ArrowUp, ArrowRight, ArrowDown } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
@@ -8,43 +9,43 @@ import type { TicketStatus, TicketPriority, LocalTicket } from '../types'
 
 // ─── Status and Priority display maps ─────────────────────────────────────────
 
-const STATUS_ITEMS: { value: TicketStatus; label: string; icon: React.ReactNode; className: string }[] = [
+const STATUS_ITEMS: { value: TicketStatus; labelKey: string; icon: React.ReactNode; className: string }[] = [
   {
     value: 'todo',
-    label: 'Todo',
+    labelKey: 'ticketStatus.todo',
     icon: <Circle className="w-3.5 h-3.5 text-slate-400" />,
     className: 'text-slate-400',
   },
   {
     value: 'done',
-    label: 'Done',
+    labelKey: 'ticketStatus.done',
     icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />,
     className: 'text-emerald-400',
   },
 ]
 
-const PRIORITY_ITEMS: { value: TicketPriority; label: string; icon: React.ReactNode; className: string }[] = [
+const PRIORITY_ITEMS: { value: TicketPriority; labelKey: string; icon: React.ReactNode; className: string }[] = [
   {
     value: 'critical',
-    label: 'Critical',
+    labelKey: 'priority.critical',
     icon: <AlertCircle className="w-3.5 h-3.5 text-red-400" />,
     className: 'text-red-400',
   },
   {
     value: 'high',
-    label: 'High',
+    labelKey: 'priority.high',
     icon: <ArrowUp className="w-3.5 h-3.5 text-orange-400" />,
     className: 'text-orange-400',
   },
   {
     value: 'medium',
-    label: 'Medium',
+    labelKey: 'priority.medium',
     icon: <ArrowRight className="w-3.5 h-3.5 text-yellow-400" />,
     className: 'text-yellow-400',
   },
   {
     value: 'low',
-    label: 'Low',
+    labelKey: 'priority.low',
     icon: <ArrowDown className="w-3.5 h-3.5 text-slate-400" />,
     className: 'text-slate-400',
   },
@@ -91,6 +92,7 @@ function ContextMenuPortal({
   onDeleteRequest,
   onClose,
 }: ContextMenuPortalProps) {
+  const { t } = useTranslation('tickets')
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Constrain to viewport
@@ -115,7 +117,7 @@ function ContextMenuPortal({
     <div
       ref={menuRef}
       role="menu"
-      aria-label="Ticket actions"
+      aria-label={t('contextMenu.ariaLabel')}
       style={{ left: adjustedPos.x, top: adjustedPos.y }}
       className="fixed z-[200] min-w-[180px] rounded-lg border border-border/50 bg-popover shadow-xl text-xs py-1"
     >
@@ -127,7 +129,7 @@ function ContextMenuPortal({
         className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-400 hover:bg-red-500/10 transition-colors"
       >
         <Trash2 className="w-3.5 h-3.5 shrink-0" />
-        Delete ticket
+        {t('contextMenu.deleteTicket')}
       </button>
 
       <div className="my-1 h-px bg-border/40" role="separator" />
@@ -150,14 +152,14 @@ function ContextMenuPortal({
       >
         <span className="flex items-center gap-2">
           <Circle className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-          Change status
+          {t('contextMenu.changeStatus')}
         </span>
         <ChevronRight className="w-3 h-3 text-muted-foreground" />
 
         {activeSubmenu === 'status' && (
           <div
             role="menu"
-            aria-label="Status options"
+            aria-label={t('contextMenu.statusOptions')}
             className="absolute left-full top-0 ml-1 min-w-[150px] rounded-lg border border-border/50 bg-popover shadow-xl py-1 z-[201]"
           >
             {STATUS_ITEMS.map((item) => (
@@ -173,7 +175,7 @@ function ContextMenuPortal({
                 )}
               >
                 {item.icon}
-                {item.label}
+                {t(item.labelKey)}
               </button>
             ))}
           </div>
@@ -198,14 +200,14 @@ function ContextMenuPortal({
       >
         <span className="flex items-center gap-2">
           <Flag className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-          Set priority
+          {t('contextMenu.setPriority')}
         </span>
         <ChevronRight className="w-3 h-3 text-muted-foreground" />
 
         {activeSubmenu === 'priority' && (
           <div
             role="menu"
-            aria-label="Priority options"
+            aria-label={t('contextMenu.priorityOptions')}
             className="absolute left-full top-0 ml-1 min-w-[140px] rounded-lg border border-border/50 bg-popover shadow-xl py-1 z-[201]"
           >
             {PRIORITY_ITEMS.map((item) => (
@@ -221,7 +223,7 @@ function ContextMenuPortal({
                 )}
               >
                 {item.icon}
-                {item.label}
+                {t(item.labelKey)}
               </button>
             ))}
           </div>
@@ -255,6 +257,7 @@ export function TicketContextMenu({
   children,
   className,
 }: TicketContextMenuProps) {
+  const { t } = useTranslation('tickets')
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState<MenuPosition>({ x: 0, y: 0 })
   const [activeSubmenu, setActiveSubmenu] = useState<ActiveSubmenu>(null)
@@ -323,11 +326,14 @@ export function TicketContextMenu({
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete ticket</DialogTitle>
+            <DialogTitle>{t('deleteDialog.title')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete{' '}
-              <span className="font-semibold text-foreground">#{ticket.id} {ticket.title}</span>?
-              This action cannot be undone.
+              <Trans
+                t={t}
+                i18nKey="deleteDialog.body"
+                values={{ id: ticket.id, title: ticket.title }}
+                components={{ strong: <span className="font-semibold text-foreground" /> }}
+              />
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -336,7 +342,7 @@ export function TicketContextMenu({
               size="sm"
               onClick={() => setShowDeleteConfirm(false)}
             >
-              Cancel
+              {t('common:actions.cancel')}
             </Button>
             <Button
               variant="destructive"
@@ -344,7 +350,7 @@ export function TicketContextMenu({
               onClick={handleDeleteConfirmed}
             >
               <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-              Delete
+              {t('common:actions.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

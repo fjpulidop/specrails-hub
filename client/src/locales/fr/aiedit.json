@@ -1,0 +1,55 @@
+{
+  "shell": {
+    "backAriaLabel": "Retour (Échap)",
+    "apply": "Appliquer",
+    "somethingWentWrong": "Une erreur est survenue",
+    "quickPrompts": "Prompts rapides",
+    "workingOnRefinement": "Préparation de votre amélioration…",
+    "history": "Historique",
+    "viewCurrentContent": "Voir le contenu actuel",
+    "conversation": "Conversation",
+    "applied": "Appliqué.",
+    "you": "Vous",
+    "autoTestResult": "Résultat du test automatique",
+    "ai": "IA",
+    "refinementReady": "Amélioration prête — vérifiez le diff à droite.",
+    "diffPreview": "Aperçu du diff",
+    "proposedChanges": "Modifications proposées",
+    "wordLevelDiff": "diff au niveau des mots",
+    "forceApply": "Forcer l'application",
+    "conflict": {
+      "diskChanged": "Le fichier a changé sur le disque pendant votre édition. L'application a été bloquée.",
+      "nameChanged": "L'IA a modifié le nom de l'agent. Le renommage est une action explicite distincte — ajustez le brouillon ou renommez dans le Studio."
+    },
+    "discardDialog": {
+      "ariaLabel": "Abandonner les modifications ?",
+      "title": "Abandonner l'amélioration ?",
+      "body": "Le brouillon actuel sera annulé et ne sera pas appliqué.",
+      "keepEditing": "Continuer l'édition"
+    },
+    "composer": {
+      "sendAriaLabel": "Envoyer (⌘⏎)",
+      "kbdSubmit": "envoyer",
+      "kbdCancel": "annuler"
+    }
+  },
+  "composer": {
+    "title": "AI Edit",
+    "placeholder": "Décrivez les modifications souhaitées…",
+    "submit": "Envoyer",
+    "unsupportedFileType": "Type de fichier non pris en charge : {{name}}",
+    "uploadFailed": "Échec de l'envoi de {{name}} : {{message}}"
+  },
+  "diffView": {
+    "inserted": "inséré",
+    "removed": "supprimé"
+  },
+  "refine": {
+    "serverError": "Erreur serveur ({{status}})",
+    "connectionFailed": "Échec de la connexion : {{message}}",
+    "applyFailed": "Échec de l'application ({{status}})",
+    "loadAgentFailed": "Échec du chargement de l'agent ({{status}})",
+    "loadSessionFailed": "Échec du chargement de la session ({{status}})",
+    "rehydrateFailed": "Échec de la restauration de la session : {{message}}"
+  }
+}

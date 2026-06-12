@@ -1,0 +1,105 @@
+{
+  "modal": {
+    "dialogLabel": "Cattura dal browser",
+    "nav": {
+      "forward": "Avanti",
+      "reload": "Ricarica"
+    },
+    "address": {
+      "placeholder": "Inserisci un URL e premi Vai…",
+      "label": "Barra degli indirizzi",
+      "go": "Vai"
+    },
+    "viewport": {
+      "groupLabel": "Dimensione viewport",
+      "presetLabel": "Viewport {{preset}}",
+      "presetTitle": "Viewport: {{preset}}",
+      "fit": "adatta",
+      "desktop": "desktop",
+      "tablet": "tablet",
+      "mobile": "mobile"
+    },
+    "network": {
+      "ariaLabel": "Cattura le richieste di rete",
+      "titleOn": "Cattura delle richieste di rete della pagina in corso (clicca per disattivare)",
+      "titleOff": "Cattura di rete disattivata (clicca per attivare)",
+      "button": "Rete"
+    },
+    "allSizes": {
+      "ariaLabel": "Cattura a tutte le dimensioni di schermo",
+      "titleOn": "Catturerà questo elemento su desktop, tablet e mobile (clicca per disattivare)",
+      "titleOff": "Cattura a tutte le dimensioni: desktop, tablet e mobile",
+      "button": "Tutte le dimensioni"
+    },
+    "select": {
+      "active": "Clicca un elemento o trascina…",
+      "start": "Seleziona per creare una spec",
+      "hint": "Clicca un elemento evidenziato per catturarlo, oppure trascina un rettangolo personalizzato. Usa il breadcrumb (o ↑/↓) per affinare. Premi Esc per annullare."
+    },
+    "closeBrowser": "Chiudi browser",
+    "status": {
+      "connecting": "Connessione al browser…",
+      "unavailable": "Browser non disponibile",
+      "opening": "Apertura browser…",
+      "capturing": "Cattura in corso…"
+    },
+    "error": {
+      "unavailable": "Il browser non è disponibile.",
+      "devHint": "In dev, esegui una volta <cmd>npx playwright install chromium</cmd>. Nell'app desktop Chromium è incluso."
+    },
+    "breadcrumb": {
+      "hint": "↑ genitore · ↓ figlio"
+    },
+    "toast": {
+      "captured": "Selezione della pagina catturata",
+      "captureFailed": "Cattura non riuscita"
+    }
+  },
+  "editor": {
+    "tools": {
+      "arrow": "Freccia (A)",
+      "box": "Riquadro (R)",
+      "text": "Testo (T)",
+      "blur": "Sfoca / oscura (B)",
+      "step": "Numero di passaggio (N)"
+    },
+    "notePrompt": "Testo della nota:",
+    "colorLabel": "Colore {{color}}",
+    "undo": "Annulla",
+    "undoTitle": "Annulla (⌘Z)",
+    "redo": "Ripeti",
+    "redoTitle": "Ripeti (⌘⇧Z)",
+    "capturedAlt": "Selezione catturata",
+    "discardConfirm": "Scartare le annotazioni?",
+    "reselect": "Riseleziona",
+    "createSpec": "Crea spec",
+    "skipContinue": "Salta e continua"
+  },
+  "domPanel": {
+    "header": "Pagina catturata · {{title}}",
+    "badge": {
+      "elements_one": "{{count}} elemento",
+      "elements_other": "{{count}} elementi",
+      "tokens": "token",
+      "requests": "{{count}} req",
+      "truncated": "troncato"
+    },
+    "removeLabel": "Rimuovi il contesto della pagina catturata",
+    "noMarkup": "(nessun markup catturato)",
+    "appliedCss": "CSS applicato",
+    "appliedCssTruncated": "CSS applicato (troncato)",
+    "designTokens": "Design token",
+    "fonts": "Font:",
+    "copyJson": "Copia come JSON",
+    "copied": "Copiato!",
+    "network_one": "Rete · {{count}} richiesta",
+    "network_other": "Rete · {{count}} richieste"
+  },
+  "session": {
+    "connectionError": "Errore di connessione",
+    "lostConnection": "Connessione al browser persa. Chiudi e riapri “Da un sito web”.",
+    "tooManySessions": "Troppe sessioni browser aperte. Chiudine una e riprova.",
+    "launchFailed": "Avvio del browser sul server non riuscito.",
+    "openFailed": "Impossibile aprire il browser."
+  }
+}

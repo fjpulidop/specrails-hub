@@ -1,0 +1,104 @@
+{
+  "sidebarPin": {
+    "withShortcut": "{{label}} ({{shortcut}})",
+    "left": {
+      "pinnedOpen": "Comprimi barra laterale sinistra (mantieni fissata)",
+      "pinnedCollapsed": "Sblocca barra laterale sinistra",
+      "unpinned": "Fissa aperta la barra laterale sinistra"
+    },
+    "right": {
+      "pinnedOpen": "Comprimi barra laterale destra (mantieni fissata)",
+      "pinnedCollapsed": "Sblocca barra laterale destra",
+      "unpinned": "Fissa aperta la barra laterale destra"
+    }
+  },
+  "projects": {
+    "addProject": "Aggiungi progetto",
+    "remove": "Rimuovi {{name}}",
+    "confirmRemove": "Conferma rimozione di {{name}}",
+    "confirmShort": "confermare?",
+    "added": "Progetto aggiunto: {{name}}",
+    "removed": "Progetto rimosso"
+  },
+  "arcSidebar": {
+    "hubTitle": "Hub",
+    "docs": "Docs",
+    "analytics": "Analytics",
+    "settings": "Impostazioni"
+  },
+  "rightSidebar": {
+    "projectTitle": "Progetto",
+    "dashboard": "Dashboard",
+    "jobs": "Job",
+    "analytics": "Analytics",
+    "agents": "Agenti",
+    "code": "Codice",
+    "integrations": "Integrazioni",
+    "settings": "Impostazioni"
+  },
+  "navbar": {
+    "home": "Home",
+    "analytics": "Analytics",
+    "docs": "Docs",
+    "settings": "Impostazioni",
+    "noCli": "Nessuna CLI AI",
+    "noCliTooltip": "Nessuna CLI AI rilevata. Installa Claude Code o Codex CLI.",
+    "activeCli": "CLI attiva: {{label}}"
+  },
+  "statusBar": {
+    "connected": "connesso",
+    "syncing": "sincronizzazione...",
+    "reconnecting": "riconnessione...",
+    "disconnected": "disconnesso",
+    "connectionRestored": "Connessione ripristinata"
+  },
+  "titleBar": {
+    "searchShortcut": "Cerca (⌘K)",
+    "searchPlaceholder": "Cerca…",
+    "minimizeWindow": "Riduci a icona",
+    "maximizeWindow": "Ingrandisci finestra",
+    "closeWindow": "Chiudi finestra"
+  },
+  "costAlerts": {
+    "costAlertTitle": "Avviso di costo",
+    "costAlertDescription": "Costo del job ${{cost}} — la soglia è ${{threshold}}",
+    "dailyBudgetTitle": "Budget giornaliero superato",
+    "dailyBudgetDescription": "Spesi ${{spent}} su ${{budget}} oggi. Coda in pausa.",
+    "hubBudgetTitle": "Budget giornaliero dell'hub superato",
+    "hubBudgetDescription": "Spesa totale dell'hub ${{spent}} su ${{budget}}. Coda in pausa.",
+    "bannerMessage": "Budget giornaliero superato — spesi ${{spent}} su ${{budget}}. La coda è in pausa.",
+    "dismiss": "Ignora"
+  },
+  "errorBoundary": {
+    "title": "Qualcosa è andato storto",
+    "occurredIn": "Si è verificato un errore in <strong>{{name}}</strong>"
+  },
+  "healthWidget": {
+    "healthLabel": "salute",
+    "notAvailable": "n/d",
+    "factorCoverageAvailable": "Copertura disponibile",
+    "factorCoverageGood": "Copertura ≥ 70%",
+    "factorPipelineGreen": "Ultima pipeline verde",
+    "factorActiveWeek": "Attivo questa settimana",
+    "noJobsYet": "Ancora nessun job",
+    "recurringFailures": "Rilevati errori ricorrenti",
+    "failurePattern": "<cmd>{{command}}</cmd> è fallito <times>{{count}}×</times> questa settimana — possibile problema del progetto.",
+    "coverage": "Copertura",
+    "lines": "Righe",
+    "functions": "Funzioni",
+    "branches": "Branch",
+    "lastPipeline": "Ultima pipeline",
+    "recentCommits": "Commit recenti",
+    "noGitHistory": "Nessuna cronologia git trovata",
+    "minutesAgo": "{{count}}m fa",
+    "hoursAgo": "{{count}}h fa",
+    "daysAgo": "{{count}}g fa"
+  },
+  "collapsibleSection": {
+    "dragToReorder": "Trascina per riordinare",
+    "unpinAria": "Sblocca sezione (compressa per impostazione predefinita)",
+    "pinAria": "Fissa sezione (resterà espansa)",
+    "unpinTooltip": "Sblocca (compressa per impostazione predefinita)",
+    "pinTooltip": "Fissa aperta (resta espansa)"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "panel": {
+    "openChat": "Apri chat",
+    "dragToResize": "Trascina per ridimensionare",
+    "tabTitle": "Chat {{n}}",
+    "startConversation": "Avvia una conversazione su questo progetto",
+    "noConversations": "Ancora nessuna conversazione",
+    "newConversation": "Nuova conversazione",
+    "suggestions": {
+      "projectStatus": "Qual è lo stato del progetto?",
+      "recentFailures": "Mostra i job non riusciti di recente",
+      "commands": "Quali comandi dovrei eseguire?",
+      "explainCodebase": "Spiega la codebase"
+    }
+  },
+  "header": {
+    "fallbackTitle": "Chat",
+    "newConversation": "Nuova conversazione",
+    "deleteConversation": "Elimina conversazione",
+    "restorePanel": "Ripristina pannello chat",
+    "maximizePanel": "Massimizza pannello chat",
+    "closeChat": "Chiudi chat"
+  },
+  "input": {
+    "placeholder": "Messaggio...",
+    "send": "Invia",
+    "stop": "Stop",
+    "modelLocked": "Impossibile cambiare modello durante una conversazione attiva"
+  },
+  "messageList": {
+    "contextLoaded": "Contesto caricato — pronto ad aiutarti",
+    "noMessages": "Ancora nessun messaggio",
+    "askAnything": "Chiedi a Claude qualsiasi cosa sul tuo progetto",
+    "suggestions": {
+      "currentStatus": "Qual è lo stato attuale del progetto?",
+      "recentFailures": "Mostrami i job non riusciti di recente",
+      "testsToRun": "Quali test dovrei eseguire?",
+      "mainArchitecture": "Spiega l'architettura principale"
+    }
+  },
+  "errors": {
+    "sendFailed": "Impossibile inviare il messaggio"
+  },
+  "dock": {
+    "minimizedSessions_one": "{{count}} sessione minimizzata",
+    "minimizedSessions_other": "{{count}} sessioni minimizzate",
+    "minimizedCount": "{{count}} minimizzate",
+    "unknownProject": "Progetto sconosciuto"
+  },
+  "chip": {
+    "restore": "Ripristina {{label}}",
+    "close": "Chiudi {{label}}",
+    "continueEditing": "Continua a modificare · {{projectName}}",
+    "kindAiEdit": "AI Edit",
+    "kindExploreSpec": "Explore Spec"
+  }
+}

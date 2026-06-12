@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Plus, Trash2, GripVertical } from 'lucide-react'
 import { getApiBase } from '../lib/api'
@@ -22,6 +23,7 @@ interface CreateTemplateDialogProps {
 }
 
 export function CreateTemplateDialog({ open, template, commands = [], onClose, onSaved }: CreateTemplateDialogProps) {
+  const { t } = useTranslation('commands')
   const isEditing = template != null
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -63,9 +65,9 @@ export function CreateTemplateDialog({ open, template, commands = [], onClose, o
 
   async function handleSubmit() {
     const trimmedName = name.trim()
-    if (!trimmedName) { toast.error('Name is required'); return }
+    if (!trimmedName) { toast.error(t('templateDialog.errors.nameRequired')); return }
     const filtered = steps.map((c) => c.trim()).filter(Boolean)
-    if (filtered.length === 0) { toast.error('At least one step is required'); return }
+    if (filtered.length === 0) { toast.error(t('templateDialog.errors.stepRequired')); return }
 
     setSubmitting(true)
     try {
@@ -83,8 +85,8 @@ export function CreateTemplateDialog({ open, template, commands = [], onClose, o
         }),
       })
       const data = await res.json() as { template?: JobTemplate; error?: string }
-      if (!res.ok) throw new Error(data.error ?? 'Failed to save template')
-      toast.success(isEditing ? 'Template updated' : 'Template created')
+      if (!res.ok) throw new Error(data.error ?? t('templateDialog.errors.saveFailed'))
+      toast.success(isEditing ? t('templateDialog.toasts.updated') : t('templateDialog.toasts.created'))
       onSaved(data.template!)
       onClose()
     } catch (err) {
@@ -98,14 +100,14 @@ export function CreateTemplateDialog({ open, template, commands = [], onClose, o
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="max-w-lg glass-card">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Template' : 'New Template'}</DialogTitle>
+          <DialogTitle>{isEditing ? t('templateDialog.editTitle') : t('templateDialog.newTitle')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Name</label>
+            <label className="text-xs font-medium text-muted-foreground">{t('templateDialog.nameLabel')}</label>
             <Input
-              placeholder="e.g. Full pipeline"
+              placeholder={t('templateDialog.namePlaceholder')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={submitting}
@@ -113,9 +115,9 @@ export function CreateTemplateDialog({ open, template, commands = [], onClose, o
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Description (optional)</label>
+            <label className="text-xs font-medium text-muted-foreground">{t('templateDialog.descriptionLabel')}</label>
             <Input
-              placeholder="What does this rail do?"
+              placeholder={t('templateDialog.descriptionPlaceholder')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               disabled={submitting}
@@ -124,10 +126,10 @@ export function CreateTemplateDialog({ open, template, commands = [], onClose, o
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-muted-foreground">Steps (commands or free prompts)</label>
+              <label className="text-xs font-medium text-muted-foreground">{t('templateDialog.stepsLabel')}</label>
               <Button variant="ghost" size="sm" onClick={addStep} disabled={submitting} className="h-6 text-xs gap-1 px-2">
                 <Plus className="h-3 w-3" />
-                Add
+                {t('common:actions.add')}
               </Button>
             </div>
             {commands.length > 0 && (
@@ -143,7 +145,7 @@ export function CreateTemplateDialog({ open, template, commands = [], onClose, o
                   <div className="flex flex-col gap-0.5">
                     <button
                       type="button"
-                      aria-label="Move up"
+                      aria-label={t('templateDialog.aria.moveUp')}
                       onClick={() => moveStep(i, 'up')}
                       disabled={i === 0 || submitting}
                       className="p-0.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
@@ -154,7 +156,7 @@ export function CreateTemplateDialog({ open, template, commands = [], onClose, o
                   <span className="text-xs text-muted-foreground w-4 shrink-0 text-right">{i + 1}.</span>
                   <Input
                     list="sr-commands-list"
-                    placeholder="Select a command or type a free prompt..."
+                    placeholder={t('templateDialog.stepPlaceholder')}
                     value={step}
                     onChange={(e) => setStep(i, e.target.value)}
                     disabled={submitting}
@@ -162,7 +164,7 @@ export function CreateTemplateDialog({ open, template, commands = [], onClose, o
                   />
                   <button
                     type="button"
-                    aria-label="Remove step"
+                    aria-label={t('templateDialog.aria.removeStep')}
                     onClick={() => removeStep(i)}
                     disabled={steps.length <= 1 || submitting}
                     className="p-1 rounded text-muted-foreground hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed"
@@ -177,10 +179,10 @@ export function CreateTemplateDialog({ open, template, commands = [], onClose, o
 
         <DialogFooter>
           <Button variant="ghost" size="sm" onClick={handleClose} disabled={submitting}>
-            Cancel
+            {t('common:actions.cancel')}
           </Button>
           <Button size="sm" onClick={handleSubmit} disabled={submitting}>
-            {submitting ? 'Saving…' : isEditing ? 'Update' : 'Create'}
+            {submitting ? t('common:states.saving') : isEditing ? t('templateDialog.update') : t('templateDialog.create')}
           </Button>
         </DialogFooter>
       </DialogContent>

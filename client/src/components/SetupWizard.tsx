@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect, memo } from 'react'
+import { useTranslation, Trans } from 'react-i18next'
 import { Check, ArrowRight, Package, Bot, ChevronLeft, Settings2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import i18n from '../lib/i18n'
 import { Button } from './ui/button'
 import { type CheckpointState } from './CheckpointTracker'
 import { AgentSelector, ALL_AGENTS, CORE_AGENTS, DEFAULT_SELECTED } from './AgentSelector'
@@ -84,10 +86,10 @@ function buildDefaultConfig(): InstallConfig {
 
 // ─── Initial checkpoint states ────────────────────────────────────────────────
 
-const INSTALL_CHECKPOINTS: CheckpointState[] = [
-  { key: 'base_install', name: 'Base installation', status: 'pending' },
-  { key: 'agent_selection', name: 'Agent selection', status: 'pending' },
-  { key: 'agent_generation', name: 'Agent generation', status: 'pending' },
+const installCheckpoints = (): CheckpointState[] => [
+  { key: 'base_install', name: i18n.t('setup:wizard.checkpoints.baseInstall'), status: 'pending' },
+  { key: 'agent_selection', name: i18n.t('setup:wizard.checkpoints.agentSelection'), status: 'pending' },
+  { key: 'agent_generation', name: i18n.t('setup:wizard.checkpoints.agentGeneration'), status: 'pending' },
 ]
 
 // ─── Per-project wizard state cache (survives unmount on tab switch) ─────────
@@ -136,7 +138,7 @@ function AgentSelectionStep({
   onInstall,
   onSkip,
   provider,
-  ctaLabel = 'Install',
+  ctaLabel,
   lastStep = true,
   prerequisites,
   prerequisitesLoading,
@@ -157,6 +159,7 @@ function AgentSelectionStep({
   prerequisitesError: Error | null
   onRefreshPrerequisites: () => void
 }) {
+  const { t } = useTranslation('setup')
   const [activeTab, setActiveTab] = useState<AgentSelectionTab>('agents')
   const selectedAgents = ALL_AGENTS.filter((a) => config.selectedAgents.includes(a.id))
   // Treat null/loading as ok (don't block install on a slow fetch); only block on a definitive negative
@@ -173,9 +176,9 @@ function AgentSelectionStep({
             <Bot className="w-5 h-5 text-accent-primary" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold">Configure {providerLabel(provider)} agents</h2>
+            <h2 className="text-sm font-semibold">{t('wizard.configureAgents', { provider: providerLabel(provider) })}</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Choose which agents to install and how to run them.
+              {t('wizard.configureSubtitle')}
             </p>
           </div>
         </div>
@@ -203,12 +206,12 @@ function AgentSelectionStep({
               {tab === 'agents' ? (
                 <>
                   <Bot className="w-3 h-3" />
-                  Agents
+                  {t('wizard.tabs.agents')}
                 </>
               ) : (
                 <>
                   <Settings2 className="w-3 h-3" />
-                  Models
+                  {t('wizard.tabs.models')}
                 </>
               )}
             </button>
@@ -249,7 +252,7 @@ function AgentSelectionStep({
           onClick={onSkip}
           className="absolute left-6 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          Skip for now
+          {t('wizard.skipForNow')}
         </button>
         <div data-testid="install-cta-wrapper" className="mx-auto">
           <Button
@@ -259,7 +262,7 @@ function AgentSelectionStep({
             disabled={installDisabled}
           >
             {lastStep ? <Package className="w-3.5 h-3.5" /> : <ArrowRight className="w-3.5 h-3.5" />}
-            {ctaLabel}
+            {ctaLabel ?? t('wizard.install')}
           </Button>
         </div>
       </div>
@@ -278,6 +281,7 @@ function InstallingStep({
   onBack: () => void
   providerLabelText?: string
 }) {
+  const { t } = useTranslation('setup')
   return (
     <div className="flex flex-col h-full max-w-lg mx-auto px-6 py-8 gap-4">
       <div className="flex items-center justify-between">
@@ -287,20 +291,20 @@ function InstallingStep({
           </div>
           <div>
             <h2 className="text-sm font-semibold">
-              {providerLabelText ? `Installing ${providerLabelText}…` : 'Installing specrails...'}
+              {providerLabelText ? t('wizard.installingProvider', { provider: providerLabelText }) : t('wizard.installingSpecrails')}
             </h2>
-            <p className="text-xs text-muted-foreground">Installing agents from templates</p>
+            <p className="text-xs text-muted-foreground">{t('wizard.installingFromTemplates')}</p>
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={onBack} className="h-7 gap-1.5 text-xs">
           <ChevronLeft className="w-3.5 h-3.5" />
-          Back
+          {t('common:actions.back')}
         </Button>
       </div>
 
       <div className="flex-1 rounded-lg border border-border/30 bg-muted/10 overflow-auto p-3 text-[11px] text-muted-foreground space-y-0.5">
         {logLines.length === 0 ? (
-          <p className="text-center text-muted-foreground mt-4">Waiting for output...</p>
+          <p className="text-center text-muted-foreground mt-4">{t('wizard.waitingForOutput')}</p>
         ) : (
           <SetupLogLines lines={logLines.slice(-300)} />
         )}
@@ -312,6 +316,7 @@ function InstallingStep({
 // ─── Step 3: Complete ─────────────────────────────────────────────────────────
 
 function SummaryCard({ summary }: { summary: SetupSummary }) {
+  const { t } = useTranslation('setup')
   const isCodex = summary.provider === 'codex'
   return (
     <div className="w-full rounded-lg border border-border/50 bg-muted/20 p-4">
@@ -319,20 +324,25 @@ function SummaryCard({ summary }: { summary: SetupSummary }) {
       <div className="grid grid-cols-3 gap-4 text-center">
         <div>
           <div className="text-2xl font-bold text-accent-primary">{summary.agents}</div>
-          <div className="text-[10px] text-muted-foreground">{isCodex ? 'Agent skills' : 'Agents'}</div>
+          <div className="text-[10px] text-muted-foreground">{isCodex ? t('wizard.summary.agentSkills') : t('wizard.summary.agents')}</div>
         </div>
         <div>
           <div className="text-2xl font-bold text-accent-success">{summary.specrailsCommands}</div>
-          <div className="text-[10px] text-muted-foreground">{isCodex ? 'Skills' : '/specrails:*'}</div>
+          <div className="text-[10px] text-muted-foreground">{isCodex ? t('wizard.summary.skills') : '/specrails:*'}</div>
         </div>
         <div>
           <div className="text-2xl font-bold text-accent-info">{summary.opsxCommands}</div>
-          <div className="text-[10px] text-muted-foreground">{isCodex ? 'OpenSpec skills' : '/opsx:*'}</div>
+          <div className="text-[10px] text-muted-foreground">{isCodex ? t('wizard.summary.openspecSkills') : '/opsx:*'}</div>
         </div>
       </div>
       {summary.legacySrRemoved > 0 && (
         <p className="mt-3 text-xs text-muted-foreground text-center">
-          Removed {summary.legacySrRemoved} legacy <code className="text-xs">/specrails:*</code> command{summary.legacySrRemoved === 1 ? '' : 's'}
+          <Trans
+            t={t}
+            i18nKey="wizard.summary.legacyRemoved"
+            count={summary.legacySrRemoved}
+            components={{ code: <code className="text-xs" /> }}
+          />
         </p>
       )}
     </div>
@@ -348,6 +358,7 @@ function CompleteStep({
   summaries: SetupSummary[]
   onGoToProject: () => void
 }) {
+  const { t } = useTranslation('setup')
   const list = summaries.length > 0 ? summaries : [{ ...EMPTY_SUMMARY }]
   return (
     <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto px-6 gap-6 overflow-auto py-8">
@@ -357,16 +368,24 @@ function CompleteStep({
 
       <div className="text-center space-y-3">
         <h2 className="text-lg font-semibold">
-          Welcome to <span className="text-accent-primary">spec</span><span className="text-accent-secondary">rails</span>
+          <Trans
+            t={t}
+            i18nKey="wizard.complete.welcome"
+            components={{ spec: <span className="text-accent-primary" />, rails: <span className="text-accent-secondary" /> }}
+          />
         </h2>
         <p className="text-sm text-muted-foreground max-w-sm">
-          <strong className="text-foreground">{projectName}</strong> is now configured with
-          AI-powered development workflows. Your specialized agents and commands are ready to use.
+          <Trans
+            t={t}
+            i18nKey="wizard.complete.configured"
+            values={{ projectName }}
+            components={{ strong: <strong className="text-foreground" /> }}
+          />
         </p>
       </div>
 
       {list.length > 1 && (
-        <p className="text-[11px] text-muted-foreground">Installed for {list.length} engines</p>
+        <p className="text-[11px] text-muted-foreground">{t('wizard.complete.installedForEngines', { count: list.length })}</p>
       )}
       {list.map((s, i) => (
         <SummaryCard key={s.provider ?? i} summary={s} />
@@ -374,7 +393,7 @@ function CompleteStep({
 
       <div className="text-center space-y-1">
         <p className="text-xs text-muted-foreground">
-          Learn how to get the most out of specrails:
+          {t('wizard.complete.learnMore')}
         </p>
         <a
           href="https://specrails.dev/docs"
@@ -387,7 +406,7 @@ function CompleteStep({
       </div>
 
       <Button size="sm" className="gap-2" onClick={onGoToProject}>
-        Continue to project
+        {t('wizard.complete.continueToProject')}
         <ArrowRight className="w-3.5 h-3.5" />
       </Button>
     </div>
@@ -407,20 +426,21 @@ function ErrorStep({
   onRetry: () => void
   onSkip: () => void
 }) {
+  const { t } = useTranslation('setup')
   return (
     <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto px-6 gap-6">
       <div className="text-center space-y-2">
-        <h2 className="text-base font-semibold text-destructive">Setup failed</h2>
+        <h2 className="text-base font-semibold text-destructive">{t('wizard.error.title')}</h2>
         <p className="text-sm text-muted-foreground">{message}</p>
       </div>
 
       <div className="flex gap-3">
         <Button variant="outline" size="sm" onClick={onSkip}>
-          Skip setup
+          {t('wizard.error.skipSetup')}
         </Button>
         <Button size="sm" className="gap-2" onClick={onRetry}>
           <RotateCcw className="w-3.5 h-3.5" />
-          Retry
+          {t('common:actions.retry')}
         </Button>
       </div>
     </div>
@@ -430,13 +450,14 @@ function ErrorStep({
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
 function StepIndicator({ wizardStep, providers }: { wizardStep: WizardStep; providers: readonly string[] }) {
+  const { t } = useTranslation('setup')
   // One "Configure" step per provider (labelled by provider when >1), then a
   // single Install step and a Done step.
   const multi = providers.length > 1
   const configureSteps = multi
     ? providers.map((p) => ({ label: providerLabel(p) }))
-    : [{ label: 'Configure' }]
-  const steps = [...configureSteps, { label: 'Install' }, { label: 'Done' }]
+    : [{ label: t('wizard.steps.configure') }]
+  const steps = [...configureSteps, { label: t('wizard.install') }, { label: t('common:actions.done') }]
 
   const installIdx = configureSteps.length
   const doneIdx = installIdx + 1
@@ -491,6 +512,7 @@ interface SetupWizardProps {
 }
 
 export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnSkip }: SetupWizardProps) {
+  const { t } = useTranslation('setup')
   const onComplete = useCallback(() => { wizardCache.delete(project.id); rawOnComplete() }, [project.id, rawOnComplete])
   const onSkip = useCallback(() => { wizardCache.delete(project.id); rawOnSkip() }, [project.id, rawOnSkip])
 
@@ -507,7 +529,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
     for (const p of providers) init[p] = buildDefaultConfig()
     return init
   })
-  const [checkpoints, setCheckpoints] = useState<CheckpointState[]>(cached?.checkpoints ?? INSTALL_CHECKPOINTS)
+  const [checkpoints, setCheckpoints] = useState<CheckpointState[]>(cached?.checkpoints ?? installCheckpoints())
   const [logLines, setLogLines] = useState<string[]>(cached?.logLines ?? [])
   const {
     status: setupPrerequisites,
@@ -682,7 +704,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
       if (modelId) shortOverrides[agentId] = toShortModelName(modelId)
     }
 
-    setCheckpoints(INSTALL_CHECKPOINTS)
+    setCheckpoints(installCheckpoints())
     setLogLines([])
     setWizardStep({ step: 'installing', providerIndex: index })
 
@@ -730,8 +752,8 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
         retryStep: 'installing',
         providerIndex: 0,
         message: [
-          'SpecRails setup needs Node.js, npm, npx and Git available on PATH before it can install this project.',
-          'Install the missing tools, restart SpecRails Hub, then retry setup.',
+          t('wizard.error.prereqMissing'),
+          t('wizard.error.prereqRetryHint'),
         ].join('\n\n'),
       })
       return
@@ -739,7 +761,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
     installSummariesRef.current = []
     installIndexRef.current = 0
     installProvider(0)
-  }, [setupPrerequisites, installProvider])
+  }, [setupPrerequisites, installProvider, t])
 
   // Configure-step primary action: advance to the next provider, or — on the
   // last (or only) provider — begin the install sequence.
@@ -762,7 +784,9 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
 
   const configProviderIndex = wizardStep.step === 'agent-selection' ? wizardStep.providerIndex : 0
   const isLastProvider = configProviderIndex >= providers.length - 1
-  const ctaLabel = isLastProvider ? 'Install' : `Next: ${providerLabel(providers[configProviderIndex + 1])}`
+  const ctaLabel = isLastProvider
+    ? t('wizard.install')
+    : t('wizard.nextProvider', { provider: providerLabel(providers[configProviderIndex + 1]) })
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-background">

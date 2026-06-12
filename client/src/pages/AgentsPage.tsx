@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { AlertTriangle } from 'lucide-react'
 import { getApiBase } from '../lib/api'
 import { ProfilesTab } from '../components/agents/ProfilesTab'
@@ -28,6 +29,7 @@ function readTabMemory(): Tab {
 }
 
 export default function AgentsPage() {
+  const { t } = useTranslation('agents')
   const [tab, setTabState] = useState<Tab>(() => readTabMemory())
   const setTab = (next: Tab) => {
     setTabState(next)
@@ -81,19 +83,18 @@ export default function AgentsPage() {
           <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
           <div className="text-xs">
             <div className="font-medium text-yellow-500">
-              Profile-aware pipeline requires specrails-core {coreStatus!.required}+
+              {t('page.banner.title', { required: coreStatus!.required })}
             </div>
             <div className="text-yellow-500/80 mt-0.5">
-              This project has{' '}
-              <code className="px-1 rounded bg-yellow-500/20">
-                {coreStatus!.version ?? 'unknown'}
-              </code>
-              . Run{' '}
-              <code className="px-1 rounded bg-yellow-500/20">
-                npx specrails-core@latest update
-              </code>{' '}
-              inside the project to unlock profile mode. Profiles you create here will still save;
-              they just won't affect the pipeline until core is updated.
+              <Trans
+                t={t}
+                i18nKey="page.banner.body"
+                values={{
+                  version: coreStatus!.version ?? t('page.banner.unknownVersion'),
+                  command: 'npx specrails-core@latest update',
+                }}
+                components={{ code: <code className="px-1 rounded bg-yellow-500/20" /> }}
+              />
             </div>
           </div>
         </div>
@@ -102,20 +103,20 @@ export default function AgentsPage() {
       {/* Header */}
       <div className="flex-shrink-0 border-b border-border">
         <div className="px-6 pt-4">
-          <h1 className="text-lg font-semibold">Agents</h1>
+          <h1 className="text-lg font-semibold">{t('page.title')}</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Manage agent profiles and the catalog (upstream + custom) for this project.
+            {t('page.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-1 px-4 pt-3">
           <TabButton active={tab === 'profiles'} onClick={() => setTab('profiles')}>
-            Profiles
+            {t('page.tabs.profiles')}
           </TabButton>
           <TabButton active={tab === 'usage'} onClick={() => setTab('usage')}>
-            Usage
+            {t('page.tabs.usage')}
           </TabButton>
           <TabButton active={tab === 'catalog'} onClick={() => setTab('catalog')}>
-            Catalog
+            {t('page.tabs.catalog')}
           </TabButton>
         </div>
       </div>

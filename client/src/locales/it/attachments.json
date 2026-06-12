@@ -1,0 +1,41 @@
+{
+  "removeFile": "Rimuovi {{name}}",
+  "errors": {
+    "uploadFailed": "Caricamento non riuscito ({{status}})",
+    "uploadFailedFile": "Caricamento non riuscito: {{name}}",
+    "deleteFailed": "Eliminazione non riuscita ({{status}})",
+    "bulkDeleteFailed": "Eliminazione multipla non riuscita ({{status}})",
+    "listFailed": "Recupero dell'elenco non riuscito ({{status}})",
+    "fetchFailed": "Recupero non riuscito ({{status}})",
+    "removeFailed": "Impossibile rimuovere l'allegato",
+    "loadFailed": "Impossibile caricare l'allegato"
+  },
+  "chip": {
+    "uploading": "Caricamento…",
+    "genericFile": "file"
+  },
+  "editor": {
+    "attachFiles": "Allega file",
+    "uploadingFiles_one": "Caricamento di {{count}} file…",
+    "uploadingFiles_other": "Caricamento di {{count}} file…",
+    "dropToAddContext": "Rilascia per aggiungere contesto"
+  },
+  "section": {
+    "ariaLabel": "Allegati",
+    "title": "Risorse",
+    "fileCount_one": "{{count}} file",
+    "fileCount_other": "{{count}} file"
+  },
+  "lightbox": {
+    "preview": "Anteprima di {{name}}",
+    "backToHub": "Torna all'hub",
+    "download": "Scarica",
+    "downloadFile": "Scarica {{name}}",
+    "loading": "Caricamento allegato...",
+    "loadError": "Impossibile caricare l'allegato: {{error}}",
+    "previewUnavailable": "Anteprima non disponibile per questo tipo di file."
+  },
+  "sessionBar": {
+    "empty": "Nessuna risorsa fissata — trascina file o clicca Aggiungi"
+  }
+}

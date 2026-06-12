@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { FolderOpen } from 'lucide-react'
 import { Button } from './ui/button'
@@ -40,6 +41,7 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
   const [availableProviders, setAvailableProviders] = useState<{ claude: boolean; codex: boolean }>({ claude: true, codex: false })
   const [installModalOpen, setInstallModalOpen] = useState(false)
 
+  const { t } = useTranslation('setup')
   const { addProject, startSetupWizard, setActiveProjectId } = useHub()
   const { status: prereqStatus, isLoading: prereqLoading, error: prereqError, recheck: prereqRecheck } = usePrerequisites()
 
@@ -47,9 +49,8 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
     if (!prereqStatus || prereqStatus.ok) return null
     const labels = prereqStatus.missingRequired.map((item) => item.label)
     if (labels.length === 0) return null
-    if (labels.length === 1) return `${labels[0]} is required to add a project`
-    return `${labels.join(', ')} are required to add a project`
-  }, [prereqStatus])
+    return t('addProject.toolsRequired', { tools: labels.join(', '), count: labels.length })
+  }, [prereqStatus, t])
 
   // Soft block: only enforce gating when we have a definitive negative answer.
   // If the fetch errored we let the user proceed and rely on the server install guard.
@@ -97,12 +98,12 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
   async function handleAdd() {
     const trimmedPath = projectPath.trim()
     if (!trimmedPath) {
-      toast.error('Project path is required')
+      toast.error(t('addProject.errors.pathRequired'))
       return
     }
 
     if (orderedSelected.length === 0) {
-      toast.error('Select at least one AI provider')
+      toast.error(t('addProject.errors.selectProvider'))
       return
     }
 
@@ -117,11 +118,11 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
         setActiveProjectId(project.id)
         startSetupWizard(project.id)
       } else {
-        toast.success(`Project "${project.name}" registered`)
+        toast.success(t('addProject.toasts.registered', { name: project.name }))
         resetAndClose()
       }
     } catch (err) {
-      toast.error('Failed to add project', { description: (err as Error).message })
+      toast.error(t('addProject.errors.addFailed'), { description: (err as Error).message })
     } finally {
       setIsAdding(false)
     }
@@ -145,16 +146,16 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FolderOpen className="w-4 h-4" />
-            Add Project
+            {t('addProject.title')}
           </DialogTitle>
           <DialogDescription>
-            Register a project directory to manage it from the hub.
+            {t('addProject.description')}
           </DialogDescription>
         </DialogHeader>
 
         {noProviderAvailable && (
           <p className="text-xs text-destructive bg-destructive/10 rounded-md p-2">
-            No AI CLI detected. Install Claude Code or Codex CLI first.
+            {t('addProject.noProviderDetected')}
           </p>
         )}
 
@@ -169,11 +170,11 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
             <label className="text-xs font-medium">
-              Project path <span className="text-destructive">*</span>
+              {t('addProject.pathLabel')} <span className="text-destructive">*</span>
             </label>
             <div className="flex gap-2">
               <Input
-                placeholder="/Users/me/my-project"
+                placeholder={t('addProject.pathPlaceholder')}
                 value={projectPath}
                 onChange={(e) => setProjectPath(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) handleAdd() }}
@@ -186,11 +187,11 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
                   variant="outline"
                   size="icon"
                   className="shrink-0"
-                  title="Browse for folder"
+                  title={t('addProject.browseForFolder')}
                   onClick={async () => {
                     try {
                       const { open } = await import('@tauri-apps/plugin-dialog')
-                      const selected = await open({ directory: true, multiple: false, title: 'Select project folder' })
+                      const selected = await open({ directory: true, multiple: false, title: t('addProject.selectProjectFolder') })
                       if (typeof selected === 'string' && selected) {
                         setProjectPath(selected)
                         if (!projectName) {
@@ -207,28 +208,28 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
               )}
             </div>
             <p className="text-[10px] text-muted-foreground">
-              Absolute path to the project root
+              {t('addProject.pathHint')}
             </p>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-medium">
-              Display name <span className="text-muted-foreground">(optional)</span>
+              {t('addProject.nameLabel')} <span className="text-muted-foreground">{t('addProject.optional')}</span>
             </label>
             <Input
-              placeholder="My Project"
+              placeholder={t('addProject.namePlaceholder')}
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) handleAdd() }}
             />
             <p className="text-[10px] text-muted-foreground">
-              Defaults to the directory name
+              {t('addProject.nameHint')}
             </p>
           </div>
 
           {/* Provider selector — multi-select. Pick one or both. */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">AI providers</label>
+            <label className="text-xs font-medium text-muted-foreground">{t('addProject.providersLabel')}</label>
             <div className="flex gap-2">
               {([
                 { id: 'claude' as Provider, icon: '🤖', label: 'Claude' },
@@ -264,7 +265,7 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
                     <span>{icon}</span>
                     <span className="font-medium">{label}</span>
                     {!avail && (
-                      <span className="text-[9px] text-muted-foreground/60">not found</span>
+                      <span className="text-[9px] text-muted-foreground/60">{t('addProject.notFound')}</span>
                     )}
                   </button>
                 )
@@ -272,15 +273,15 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
             </div>
             <p className="text-[9px] text-muted-foreground/70">
               {orderedSelected.length > 1
-                ? 'Both engines will be set up. The first is the project default. Cannot be changed after creation.'
-                : 'Cannot be changed after the project is created.'}
+                ? t('addProject.multiProviderHint')
+                : t('addProject.singleProviderHint')}
             </p>
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose} disabled={isAdding}>
-            Cancel
+            {t('common:actions.cancel')}
           </Button>
           <Button
             size="sm"
@@ -289,7 +290,7 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
             title={prereqsBlock ? missingToolsLabel ?? undefined : undefined}
             data-testid="add-project-submit"
           >
-            {isAdding ? 'Adding...' : 'Add Project'}
+            {isAdding ? t('addProject.adding') : t('addProject.submit')}
           </Button>
         </DialogFooter>
 

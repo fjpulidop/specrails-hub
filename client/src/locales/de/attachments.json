@@ -1,0 +1,41 @@
+{
+  "removeFile": "{{name}} entfernen",
+  "errors": {
+    "uploadFailed": "Upload fehlgeschlagen ({{status}})",
+    "uploadFailedFile": "Upload fehlgeschlagen: {{name}}",
+    "deleteFailed": "Löschen fehlgeschlagen ({{status}})",
+    "bulkDeleteFailed": "Massenlöschen fehlgeschlagen ({{status}})",
+    "listFailed": "Auflisten fehlgeschlagen ({{status}})",
+    "fetchFailed": "Abruf fehlgeschlagen ({{status}})",
+    "removeFailed": "Anhang konnte nicht entfernt werden",
+    "loadFailed": "Anhang konnte nicht geladen werden"
+  },
+  "chip": {
+    "uploading": "Wird hochgeladen…",
+    "genericFile": "Datei"
+  },
+  "editor": {
+    "attachFiles": "Dateien anhängen",
+    "uploadingFiles_one": "{{count}} Datei wird hochgeladen…",
+    "uploadingFiles_other": "{{count}} Dateien werden hochgeladen…",
+    "dropToAddContext": "Loslassen, um Kontext hinzuzufügen"
+  },
+  "section": {
+    "ariaLabel": "Anhänge",
+    "title": "Ressourcen",
+    "fileCount_one": "{{count}} Datei",
+    "fileCount_other": "{{count}} Dateien"
+  },
+  "lightbox": {
+    "preview": "Vorschau von {{name}}",
+    "backToHub": "Zurück zum Hub",
+    "download": "Herunterladen",
+    "downloadFile": "{{name}} herunterladen",
+    "loading": "Anhang wird geladen...",
+    "loadError": "Anhang konnte nicht geladen werden: {{error}}",
+    "previewUnavailable": "Für diesen Dateityp ist keine Vorschau verfügbar."
+  },
+  "sessionBar": {
+    "empty": "Keine angepinnten Ressourcen – Dateien hierher ziehen oder auf „Hinzufügen“ klicken"
+  }
+}

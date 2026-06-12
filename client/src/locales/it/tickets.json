@@ -1,0 +1,110 @@
+{
+  "priority": {
+    "critical": "Critica",
+    "high": "Alta",
+    "medium": "Media",
+    "low": "Bassa"
+  },
+  "ticketStatus": {
+    "todo": "Da fare",
+    "inProgress": "In corso",
+    "done": "Completato",
+    "cancelled": "Annullato"
+  },
+  "source": {
+    "manual": "Creato manualmente",
+    "productBacklog": "Dal product backlog",
+    "proposeSpec": "Da proposta di spec",
+    "getBacklogSpecs": "Dalle spec del backlog",
+    "freePrompt": "Da prompt Raw"
+  },
+  "fields": {
+    "title": "Titolo",
+    "description": "Descrizione",
+    "status": "Stato",
+    "priority": "Priorità",
+    "labels": "Etichette",
+    "markdownPlaceholder": "Descrizione in Markdown...",
+    "supportsMarkdown": "Supporta Markdown"
+  },
+  "meta": {
+    "createdAgo": "Creato {{time}}",
+    "updatedAgo": "Aggiornato {{time}}"
+  },
+  "untitled": "Senza titolo",
+  "deleteDialog": {
+    "title": "Elimina ticket",
+    "body": "Vuoi davvero eliminare <strong>#{{id}} {{title}}</strong>? Questa azione è irreversibile."
+  },
+  "detailModal": {
+    "toast": {
+      "updated": "Ticket aggiornato",
+      "updateFailed": "Impossibile aggiornare il ticket"
+    },
+    "compare": "Confronta",
+    "compareTooltip": "Confronta con un'altra spec",
+    "doneEditing": "Fine modifica",
+    "addDescription": "Aggiungi una descrizione...",
+    "prerequisites": "Prerequisiti",
+    "addLabel": "Aggiungi etichetta",
+    "addLabelPlaceholder": "Aggiungi etichetta...",
+    "effort": "Effort",
+    "assignee": "Assegnatario",
+    "continueEditing": "Continua a modificare",
+    "ticketFallbackLabel": "Ticket #{{id}}"
+  },
+  "contractLayer": {
+    "title": "Contract Layer",
+    "populated": "{{n}}/5 compilate"
+  },
+  "rail": {
+    "moveToRail": "Sposta su un rail",
+    "removeFromRail": "Rimuovi dal rail",
+    "currentlyOn": "Attualmente su {{rail}}",
+    "popoverTitle": "Sposta su un rail",
+    "noRails": "Nessun rail disponibile."
+  },
+  "contextMenu": {
+    "ariaLabel": "Azioni ticket",
+    "deleteTicket": "Elimina ticket",
+    "changeStatus": "Cambia stato",
+    "statusOptions": "Opzioni di stato",
+    "setPriority": "Imposta priorità",
+    "priorityOptions": "Opzioni di priorità"
+  },
+  "viewMode": {
+    "list": "Vista elenco",
+    "grid": "Vista griglia (Kanban)",
+    "postit": "Vista post-it"
+  },
+  "createModal": {
+    "title": "Crea ticket",
+    "titlePlaceholder": "Titolo del ticket...",
+    "labelsPlaceholder": "Digita per aggiungere etichette...",
+    "create": "Crea",
+    "creating": "Creazione...",
+    "toast": {
+      "created": "Ticket creato",
+      "createFailed": "Impossibile creare il ticket"
+    }
+  },
+  "comparePicker": {
+    "title": "Confronta con…",
+    "todoCount": "({{n}} da fare)",
+    "searchPlaceholder": "Cerca tra le spec da fare…",
+    "noMatches": "Nessuna spec da fare corrispondente",
+    "empty": "Nessun'altra spec da fare da confrontare"
+  },
+  "spendingLine": {
+    "ariaLabel": "Vedi la spesa del ticket in Analytics",
+    "turns_one": "{{count}} turno",
+    "turns_other": "{{count}} turni",
+    "active": "{{duration}} di attività",
+    "breakdownItem": "{{n}} {{label}}"
+  },
+  "toasts": {
+    "newTicket": "Nuovo ticket: {{title}}",
+    "newTicketsAdded_one": "{{count}} nuovo ticket aggiunto dalla product discovery",
+    "newTicketsAdded_other": "{{count}} nuovi ticket aggiunti dalla product discovery"
+  }
+}

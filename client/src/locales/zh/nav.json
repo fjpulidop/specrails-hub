@@ -1,0 +1,104 @@
+{
+  "sidebarPin": {
+    "withShortcut": "{{label}}（{{shortcut}}）",
+    "left": {
+      "pinnedOpen": "收起左侧边栏（保持固定）",
+      "pinnedCollapsed": "取消固定左侧边栏",
+      "unpinned": "固定并展开左侧边栏"
+    },
+    "right": {
+      "pinnedOpen": "收起右侧边栏（保持固定）",
+      "pinnedCollapsed": "取消固定右侧边栏",
+      "unpinned": "固定并展开右侧边栏"
+    }
+  },
+  "projects": {
+    "addProject": "添加项目",
+    "remove": "移除 {{name}}",
+    "confirmRemove": "确认移除 {{name}}",
+    "confirmShort": "确认？",
+    "added": "已添加项目：{{name}}",
+    "removed": "项目已移除"
+  },
+  "arcSidebar": {
+    "hubTitle": "Hub",
+    "docs": "文档",
+    "analytics": "分析",
+    "settings": "设置"
+  },
+  "rightSidebar": {
+    "projectTitle": "项目",
+    "dashboard": "仪表盘",
+    "jobs": "任务",
+    "analytics": "分析",
+    "agents": "Agent",
+    "code": "代码",
+    "integrations": "集成",
+    "settings": "设置"
+  },
+  "navbar": {
+    "home": "首页",
+    "analytics": "分析",
+    "docs": "文档",
+    "settings": "设置",
+    "noCli": "无 AI CLI",
+    "noCliTooltip": "未检测到 AI CLI。请安装 Claude Code 或 Codex CLI。",
+    "activeCli": "当前 CLI：{{label}}"
+  },
+  "statusBar": {
+    "connected": "已连接",
+    "syncing": "同步中...",
+    "reconnecting": "重新连接中...",
+    "disconnected": "已断开",
+    "connectionRestored": "连接已恢复"
+  },
+  "titleBar": {
+    "searchShortcut": "搜索 (⌘K)",
+    "searchPlaceholder": "搜索…",
+    "minimizeWindow": "最小化窗口",
+    "maximizeWindow": "最大化窗口",
+    "closeWindow": "关闭窗口"
+  },
+  "costAlerts": {
+    "costAlertTitle": "成本警报",
+    "costAlertDescription": "任务成本 ${{cost}} — 阈值为 ${{threshold}}",
+    "dailyBudgetTitle": "已超出每日预算",
+    "dailyBudgetDescription": "今日已花费 ${{spent}}，预算 ${{budget}}。队列已暂停。",
+    "hubBudgetTitle": "已超出 Hub 每日预算",
+    "hubBudgetDescription": "Hub 总花费 ${{spent}}，预算 ${{budget}}。队列已暂停。",
+    "bannerMessage": "已超出每日预算 — 已花费 ${{spent}}，预算 ${{budget}}。队列已暂停。",
+    "dismiss": "忽略"
+  },
+  "errorBoundary": {
+    "title": "出错了",
+    "occurredIn": "<strong>{{name}}</strong> 中发生了错误"
+  },
+  "healthWidget": {
+    "healthLabel": "健康度",
+    "notAvailable": "无",
+    "factorCoverageAvailable": "有覆盖率数据",
+    "factorCoverageGood": "覆盖率 ≥ 70%",
+    "factorPipelineGreen": "最近一次流水线通过",
+    "factorActiveWeek": "本周活跃",
+    "noJobsYet": "暂无任务",
+    "recurringFailures": "检测到反复失败",
+    "failurePattern": "<cmd>{{command}}</cmd> 本周已失败 <times>{{count}}×</times> — 可能存在项目问题。",
+    "coverage": "覆盖率",
+    "lines": "行",
+    "functions": "函数",
+    "branches": "分支",
+    "lastPipeline": "最近流水线",
+    "recentCommits": "最近提交",
+    "noGitHistory": "未找到 git 历史",
+    "minutesAgo": "{{count}} 分钟前",
+    "hoursAgo": "{{count}} 小时前",
+    "daysAgo": "{{count}} 天前"
+  },
+  "collapsibleSection": {
+    "dragToReorder": "拖动以重新排序",
+    "unpinAria": "取消固定该区块（默认折叠）",
+    "pinAria": "固定该区块（保持展开）",
+    "unpinTooltip": "取消固定（默认折叠）",
+    "pinTooltip": "固定展开（保持展开）"
+  }
+}

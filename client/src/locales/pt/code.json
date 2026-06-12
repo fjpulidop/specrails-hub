@@ -1,0 +1,113 @@
+{
+  "page": {
+    "resizeFileTree": "Redimensionar árvore de ficheiros",
+    "selectFile": "Selecione um ficheiro para pré-visualizar."
+  },
+  "resizer": {
+    "hint": "Arraste para redimensionar. Duplo clique para repor."
+  },
+  "toolbar": {
+    "scope": "Âmbito",
+    "allAi": "Toda a IA",
+    "spec": "Spec",
+    "ticketIdPlaceholder": "id",
+    "copyFilePath": "Copiar caminho do ficheiro",
+    "generateSummary": "Gerar resumo",
+    "regenerateSummary": "Regenerar resumo",
+    "generating": "A gerar…",
+    "regenerating": "A regenerar…",
+    "summaryUnavailable": "Resumo indisponível: {{reason}}",
+    "jobContext": "Contexto do job",
+    "clear": "Limpar"
+  },
+  "provenancePanel": {
+    "jobTitle": "Job {{jobId}}",
+    "specTitle": "Spec #{{ticketId}}",
+    "touchedFiles_one": "{{count}} ficheiro alterado",
+    "touchedFiles_other": "{{count}} ficheiros alterados",
+    "log": "Log"
+  },
+  "kind": {
+    "created": "criado",
+    "modified": "modificado",
+    "deleted": "eliminado"
+  },
+  "action": {
+    "added": "adicionado",
+    "changed": "alterado",
+    "deleted": "eliminado"
+  },
+  "viewer": {
+    "loadingFile": "A carregar ficheiro…",
+    "showSummary": "Mostrar resumo",
+    "markdownViewMode": "Modo de visualização de Markdown",
+    "preview": "Pré-visualização",
+    "raw": "Original",
+    "missingFile": "Este ficheiro foi alterado por um job de IA mas já não existe na árvore de trabalho.",
+    "binaryFile": "Ficheiro binário.",
+    "tooLarge": "Ficheiro demasiado grande para pré-visualizar ({{size}} MB).",
+    "noContent": "Sem conteúdo disponível.",
+    "pathCopied": "Caminho copiado",
+    "copyPathFailed": "Não foi possível copiar o caminho",
+    "budgetPrompt": "Ultrapassar o limite de orçamento?"
+  },
+  "summary": {
+    "generationFailed": "Falha na geração do resumo",
+    "skipped": "Resumo ignorado: {{reason}}",
+    "unavailable": "Resumo indisponível: {{reason}}.",
+    "empty": "Ainda não há resumo para este ficheiro.",
+    "stale": "Desatualizado",
+    "hide": "Ocultar",
+    "reason": {
+      "missing": "ficheiro em falta",
+      "binary": "ficheiro binário",
+      "tooLarge": "ficheiro demasiado grande"
+    }
+  },
+  "history": {
+    "resize": "Redimensionar histórico de alterações por IA",
+    "title_one": "Histórico de alterações por IA · {{count}} alteração",
+    "title_other": "Histórico de alterações por IA · {{count}} alterações",
+    "show": "Mostrar",
+    "hide": "Ocultar",
+    "unknownJob": "job desconhecido",
+    "filterByJob": "Filtrar Código pelo job {{jobId}}",
+    "diff": "Diff",
+    "openSpec": "Abrir spec #{{ticketId}}",
+    "specChip": "spec #{{ticketId}}",
+    "loadingDiff": "A carregar diff...",
+    "diffUnavailable": "Diff indisponível para esta alteração histórica. Os novos jobs guardarão patches automaticamente.",
+    "diffTruncated": "[diff truncado]"
+  },
+  "tree": {
+    "jobFiles": "Ficheiros do job",
+    "specFiles": "Ficheiros da spec",
+    "touchedByAi": "Alterados por IA",
+    "allFiles": "Todos os ficheiros",
+    "collapseAll": "Recolher todas as pastas",
+    "expandAll": "Expandir todas as pastas",
+    "touchedCount_one": "{{count}} ficheiro alterado por IA",
+    "touchedCount_other": "{{count}} ficheiros alterados por IA",
+    "loadingFiles": "A carregar ficheiros…",
+    "emptyTouched": "Ainda não há ficheiros alterados por IA. Execute um job ou mude para Todos os ficheiros.",
+    "showAllFiles": "Mostrar todos os ficheiros",
+    "noFiles": "Sem ficheiros.",
+    "folderTouched_one": "{{count}} ficheiro alterado por IA nesta pasta",
+    "folderTouched_other": "{{count}} ficheiros alterados por IA nesta pasta",
+    "jobTitle": "Job {{jobId}}",
+    "createdBySpec": "Criado durante a implementação da spec #{{id}}",
+    "modifiedBySpec": "Modificado durante a implementação da spec #{{id}}",
+    "latestTitleCreated": "O último job de IA adicionou este ficheiro",
+    "latestTitleModified": "O último job de IA alterou este ficheiro",
+    "latestTitleDeleted": "O último job de IA eliminou este ficheiro"
+  },
+  "monaco": {
+    "loadFailed": "Falha ao carregar o visualizador de código.",
+    "reload": "Recarregar",
+    "loadingEditor": "A carregar editor…"
+  },
+  "ticketFiles": {
+    "title": "Ficheiros alterados por este ticket",
+    "jobTitle": "Job {{jobId}}"
+  }
+}

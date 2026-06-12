@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Sparkles, Send, Zap, MessagesSquare, Globe, Ratio, PenLine } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
@@ -49,9 +50,6 @@ const RAW_PRIORITY_CLASS: Record<TicketPriority, string> = {
   medium: 'bg-accent-info/15 text-accent-info',
   low: 'bg-muted text-muted-foreground',
 }
-const RAW_PRIORITY_LABEL: Record<TicketPriority, string> = {
-  critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low',
-}
 const RAW_PRIORITY_ORDER: readonly TicketPriority[] = ['critical', 'high', 'medium', 'low']
 
 export interface ExploreLaunchPayload {
@@ -90,6 +88,7 @@ function genPendingId(): string {
 }
 
 export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: ProposeSpecModalProps) {
+  const { t } = useTranslation('addspec')
   const { activeProjectId, projects } = useHub()
   const tracker = useSpecGenTracker()
   const [mode, setMode] = useState<SpecMode>('quick')
@@ -291,17 +290,17 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
         })
         if (!res.ok) {
           submittedRef.current = false
-          toast.error('Failed to create spec')
+          toast.error(t('proposeModal.toast.createFailed'))
           return
         }
         const data = await res.json().catch(() => ({})) as { ticket?: { id?: number } }
         const newId = data.ticket?.id
-        toast.success(newId ? `Saved as #${newId} · Raw spec ready for rails` : 'Raw spec created')
+        toast.success(newId ? t('proposeModal.toast.rawSavedWithId', { id: newId }) : t('proposeModal.toast.rawCreated'))
         onClose()
       } catch (err) {
         submittedRef.current = false
         console.error('[ProposeSpec] from-prompt failed:', err)
-        toast.error('Failed to create spec')
+        toast.error(t('proposeModal.toast.createFailed'))
       } finally {
         setIsSubmitting(false)
       }
@@ -314,7 +313,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     // and folded into Claude's context for the first turn.
     if (mode === 'explore') {
       if (!onExploreLaunch) {
-        toast.error('Explore mode is not wired in this view')
+        toast.error(t('proposeModal.toast.exploreNotWired'))
         return
       }
       submittedRef.current = true // suppress attachment cleanup on close
@@ -338,7 +337,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     const knownTicketIds = new Set(tickets.map(t => t.id))
     const startTime = Date.now()
 
-    toast.loading(`${projectName} · ${truncated}`, { id: toastId, description: 'Generating...' })
+    toast.loading(`${projectName} · ${truncated}`, { id: toastId, description: t('proposeModal.toast.generating') })
 
     submittedRef.current = true
     void quickRefine.persist(scope.contractRefine)
@@ -371,11 +370,11 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
         })
       } catch (err) {
         console.error('[ProposeSpec] generate-spec fetch threw:', err)
-        toast.error(`${projectName} · Failed to start`, { id: toastId })
+        toast.error(t('proposeModal.toast.failedToStart', { projectName }), { id: toastId })
         return
       }
       if (!res.ok) {
-        toast.error(`${projectName} · Failed to start`, { id: toastId })
+        toast.error(t('proposeModal.toast.failedToStart', { projectName }), { id: toastId })
         return
       }
       const data = await res.json() as { requestId: string }
@@ -383,7 +382,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
     } finally {
       setIsSubmitting(false)
     }
-  }, [mode, tickets, tracker, pendingSpecId, onClose, onExploreLaunch, model, quickRefine, scope, effectiveProvider, captures, title, priority, labels])
+  }, [mode, tickets, tracker, pendingSpecId, onClose, onExploreLaunch, model, quickRefine, scope, effectiveProvider, captures, title, priority, labels, t])
 
   return (
     <>
@@ -398,10 +397,10 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
           <DialogHeader className="px-5 py-4 border-b border-border/40 shrink-0">
             <DialogTitle className="text-sm flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-primary/70" />
-              Add Spec
+              {t('proposeModal.title')}
             </DialogTitle>
             <DialogDescription className="sr-only">
-              Create a new spec from a short idea, either immediately or through Explore mode.
+              {t('proposeModal.dialogDescription')}
             </DialogDescription>
           </DialogHeader>
 
@@ -415,7 +414,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                     providers={providers}
                     onChange={handleEngineChange}
                     disabled={modelLoading}
-                    ariaLabel="AI engine for this spec"
+                    ariaLabel={t('proposeModal.engineAriaLabel')}
                   />
                   <SpecModelPicker
                     value={model}
@@ -438,7 +437,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                   maxPresetId={mode === 'quick' ? 'max' : 'hub'}
                   smashCapable={smashCapable}
                 />
-                <ContextScopeChecks scope={scope} mode={mode} onChange={handleScopeChange} label="Fine-tune" showSummary={false} />
+                <ContextScopeChecks scope={scope} mode={mode} onChange={handleScopeChange} label={t('contextScope.fineTune')} showSummary={false} />
               </div>
             )}
 
@@ -447,7 +446,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                 {/* Title — auto-derived from the first line of the body, editable. */}
                 <div className="flex items-center gap-3">
                   <label htmlFor="raw-spec-title" className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-                    Title
+                    {t('proposeModal.raw.titleLabel')}
                   </label>
                   <input
                     id="raw-spec-title"
@@ -460,7 +459,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                       titleTouchedRef.current = true
                       setTitle(e.target.value)
                     }}
-                    placeholder="Auto-filled from your prompt…"
+                    placeholder={t('proposeModal.raw.titlePlaceholder')}
                     data-testid="raw-title-input"
                     className="flex-1 h-8 px-2.5 rounded-md bg-card/40 border border-border/40 text-sm text-foreground placeholder-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-info/40 focus-visible:border-accent-info/60 transition-colors"
                   />
@@ -469,10 +468,10 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                 {/* Priority pills + optional labels. */}
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-muted-foreground">Priority</span>
+                    <span className="text-xs font-medium text-muted-foreground">{t('proposeModal.raw.priorityLabel')}</span>
                     <div
                       role="radiogroup"
-                      aria-label="Priority"
+                      aria-label={t('proposeModal.raw.priorityLabel')}
                       data-testid="raw-priority-group"
                       className="inline-flex items-center gap-1 p-1 rounded-lg border border-border/50 bg-card/40"
                     >
@@ -498,14 +497,14 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                             priority === p ? RAW_PRIORITY_CLASS[p] : 'text-muted-foreground hover:text-foreground hover:bg-card/60'
                           }`}
                         >
-                          {RAW_PRIORITY_LABEL[p]}
+                          {t(`proposeModal.priority.${p}`)}
                         </button>
                       ))}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 flex-1 min-w-[12rem]">
-                    <span className="text-xs font-medium text-muted-foreground">Labels</span>
+                    <span className="text-xs font-medium text-muted-foreground">{t('proposeModal.raw.labelsLabel')}</span>
                     <div className="flex-1 flex items-center flex-wrap gap-1 px-2 py-1 rounded-md border border-border/40 bg-card/40">
                       {labels.map((label) => (
                         <span
@@ -515,7 +514,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                           {label}
                           <button
                             type="button"
-                            aria-label={`Remove label ${label}`}
+                            aria-label={t('proposeModal.raw.removeLabel', { label })}
                             onClick={() => setLabels((ls) => ls.filter((l) => l !== label))}
                             className="text-accent-info/60 hover:text-accent-info"
                           >
@@ -525,9 +524,9 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                       ))}
                       <input
                         type="text"
-                        aria-label="Add label"
+                        aria-label={t('proposeModal.raw.addLabelAria')}
                         data-testid="raw-label-input"
-                        placeholder={labels.length ? '' : 'optional…'}
+                        placeholder={labels.length ? '' : t('proposeModal.raw.labelPlaceholder')}
                         className="flex-1 min-w-[4rem] bg-transparent text-xs text-foreground placeholder-muted-foreground/50 focus-visible:outline-none"
                         onKeyDown={(e) => {
                           const el = e.target as HTMLInputElement
@@ -549,22 +548,22 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
 
             <p className="text-sm text-muted-foreground">
               {mode === 'quick'
-                ? 'Describe the feature or change. Attach mockups, briefs, or data for more context.'
+                ? t('proposeModal.modeDescription.quick')
                 : mode === 'explore'
-                  ? 'Describe a rough idea. Claude will help you shape it through conversation — you decide when to commit.'
-                  : 'Your prompt, as-is — saved as a spec ticket. No AI runs now; drag it to a rail to build it.'}
+                  ? t('proposeModal.modeDescription.explore')
+                  : t('proposeModal.modeDescription.raw')}
             </p>
             <RichAttachmentEditor
               ref={editorRef}
               ticketKey={pendingSpecId}
               placeholder={mode === 'quick'
-                ? "e.g. Add a dark mode toggle to the settings page that persists the user's preference..."
+                ? t('proposeModal.editorPlaceholder.quick')
                 : mode === 'explore'
-                  ? "e.g. dark mode — not sure where the toggle should live or how to persist it…"
-                  : 'Describe the feature, change, or idea. Markdown, images, and files supported…'}
+                  ? t('proposeModal.editorPlaceholder.explore')
+                  : t('proposeModal.editorPlaceholder.raw')}
               minHeight={mode === 'free' ? 220 : 160}
               autoFocus
-              ariaLabel={mode === 'free' ? 'Raw spec body' : 'Spec idea'}
+              ariaLabel={mode === 'free' ? t('proposeModal.raw.bodyAriaLabel') : t('proposeModal.ideaAriaLabel')}
               onChange={() => {
                 const text = editorRef.current?.getPlainText() ?? ''
                 setHasText(text.trim().length > 0)
@@ -580,19 +579,19 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                 setAttachmentCount((c) => Math.max(0, c - 1))
                 fetch(`${API_ORIGIN}/api/projects/${activeProjectIdRef.current}/tickets/${pendingSpecId}/attachments/${a.id}`, { method: 'DELETE' }).catch(() => {})
               }}
-              onUnsupportedFile={(f) => toast.error(`Unsupported file type: ${f.name}`)}
-              onUploadError={(err, f) => toast.error(`Upload failed for ${f.name}: ${err.message}`)}
+              onUnsupportedFile={(f) => toast.error(t('proposeModal.toast.unsupportedFileType', { name: f.name }))}
+              onUploadError={(err, f) => toast.error(t('proposeModal.toast.uploadFailed', { name: f.name, message: err.message }))}
               onSubmit={handleSubmit}
               footerExtra={mode !== 'free' && browserCaptureEnabled && activeProjectId ? (
                 <button
                   type="button"
                   onClick={() => setBrowserOpen(true)}
                   data-testid="from-browser-btn"
-                  title="Open a real web page, select an area, and turn it into a spec"
+                  title={t('proposeModal.fromWebsiteTitle')}
                   className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-accent-info/50 text-accent-info hover:bg-accent-info/10 transition-colors font-medium"
                 >
                   <Globe className="w-3.5 h-3.5" />
-                  <span>From a website</span>
+                  <span>{t('proposeModal.fromWebsite')}</span>
                 </button>
               ) : undefined}
             />
@@ -605,7 +604,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                         <div className="space-y-1.5" data-testid="capture-breakpoints">
                           <div className="flex items-center gap-1 text-[10px] font-medium text-accent-highlight">
                             <Ratio className="w-3 h-3 shrink-0" />
-                            Responsive · {c.breakpoints.length} sizes
+                            {t('proposeModal.capture.responsiveSizes', { count: c.breakpoints.length })}
                           </div>
                           <div className="flex items-end justify-center gap-2 flex-wrap">
                             {c.breakpoints.map((b) => (
@@ -644,12 +643,12 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                 size="sm"
                 onClick={handleSubmit}
                 disabled={!canSubmit}
-                title={!canSubmit ? 'Write a prompt first' : undefined}
+                title={!canSubmit ? t('proposeModal.submit.disabledTitle') : undefined}
                 className={`gap-1.5 ${mode === 'free' ? 'bg-accent-info text-white hover:bg-accent-info/90' : submitAccentForTier(tier)}`}
                 data-testid="propose-submit"
               >
                 {mode === 'free' ? <PenLine className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
-                {mode === 'quick' ? 'Generate Spec' : mode === 'explore' ? 'Continue' : 'Create'}
+                {mode === 'quick' ? t('proposeModal.submit.quick') : mode === 'explore' ? t('proposeModal.submit.explore') : t('proposeModal.submit.raw')}
               </Button>
             </div>
           </div>
@@ -672,27 +671,28 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
 function ModeSegmented({
   value, onChange, fullCodebase,
 }: { value: SpecMode; onChange: (v: SpecMode) => void; fullCodebase: boolean }) {
+  const { t } = useTranslation('addspec')
   return (
-    <div role="tablist" aria-label="Spec creation mode" className="inline-flex items-center gap-1 p-1 rounded-lg border border-border/50 bg-card/40 self-start">
+    <div role="tablist" aria-label={t('proposeModal.modeTablistLabel')} className="inline-flex items-center gap-1 p-1 rounded-lg border border-border/50 bg-card/40 self-start">
       <ModeOption
         active={value === 'quick'}
         icon={<Zap className="w-3.5 h-3.5" />}
-        label="Quick"
+        label={t('proposeModal.mode.quick')}
         hint={quickHintForScope({ specrails: false, openspec: false, full: fullCodebase, mcp: false, contractRefine: false })}
         onClick={() => onChange('quick')}
       />
       <ModeOption
         active={value === 'explore'}
         icon={<MessagesSquare className="w-3.5 h-3.5" />}
-        label="Explore"
-        hint="interactive"
+        label={t('proposeModal.mode.explore')}
+        hint={t('proposeModal.mode.exploreHint')}
         onClick={() => onChange('explore')}
       />
       <ModeOption
         active={value === 'free'}
         icon={<PenLine className="w-3.5 h-3.5" />}
-        label="Raw"
-        hint="no AI"
+        label={t('proposeModal.mode.raw')}
+        hint={t('proposeModal.mode.rawHint')}
         onClick={() => onChange('free')}
       />
     </div>

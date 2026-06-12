@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { API_ORIGIN } from '../lib/origin'
 import { toast } from 'sonner'
+import i18n from '../lib/i18n'
 import { useSharedWebSocket } from './useSharedWebSocket'
 import { setActiveProjectId as setApiActiveProjectId } from '../lib/api'
 
@@ -147,12 +148,12 @@ export function HubProvider({ children }: { children: ReactNode }) {
         if (prev.find((p) => p.id === project.id)) return prev
         return [...prev, project]
       })
-      toast.success(`Project added: ${project.name}`)
+      toast.success(i18n.t('nav:projects.added', { name: project.name }))
       // Activate the newly added project
       setActiveProjectId(project.id)
     } else if (msg.type === 'hub.project_removed') {
       const projectId = msg.projectId as string
-      toast.success('Project removed')
+      toast.success(i18n.t('nav:projects.removed'))
       setProjects((prev) => prev.filter((p) => p.id !== projectId))
       setActiveProjectIdRaw((prev) => {
         if (prev !== projectId) return prev

@@ -1,0 +1,57 @@
+{
+  "panel": {
+    "openChat": "Chat öffnen",
+    "dragToResize": "Zum Ändern der Größe ziehen",
+    "tabTitle": "Chat {{n}}",
+    "startConversation": "Starte eine Unterhaltung über dieses Projekt",
+    "noConversations": "Noch keine Unterhaltungen",
+    "newConversation": "Neue Unterhaltung",
+    "suggestions": {
+      "projectStatus": "Wie ist der Projektstatus?",
+      "recentFailures": "Zeig die letzten fehlgeschlagenen Jobs",
+      "commands": "Welche Befehle sollte ich ausführen?",
+      "explainCodebase": "Erkläre die Codebase"
+    }
+  },
+  "header": {
+    "fallbackTitle": "Chat",
+    "newConversation": "Neue Unterhaltung",
+    "deleteConversation": "Unterhaltung löschen",
+    "restorePanel": "Chat-Panel wiederherstellen",
+    "maximizePanel": "Chat-Panel maximieren",
+    "closeChat": "Chat schließen"
+  },
+  "input": {
+    "placeholder": "Nachricht...",
+    "send": "Senden",
+    "stop": "Stopp",
+    "modelLocked": "Modell kann während einer aktiven Unterhaltung nicht gewechselt werden"
+  },
+  "messageList": {
+    "contextLoaded": "Kontext geladen – bereit zu helfen",
+    "noMessages": "Noch keine Nachrichten",
+    "askAnything": "Frag Claude alles über dein Projekt",
+    "suggestions": {
+      "currentStatus": "Wie ist der aktuelle Projektstatus?",
+      "recentFailures": "Zeig mir die letzten fehlgeschlagenen Jobs",
+      "testsToRun": "Welche Tests sollte ich ausführen?",
+      "mainArchitecture": "Erkläre die Hauptarchitektur"
+    }
+  },
+  "errors": {
+    "sendFailed": "Nachricht konnte nicht gesendet werden"
+  },
+  "dock": {
+    "minimizedSessions_one": "{{count}} minimierte Session",
+    "minimizedSessions_other": "{{count}} minimierte Sessions",
+    "minimizedCount": "{{count}} minimiert",
+    "unknownProject": "Unbekanntes Projekt"
+  },
+  "chip": {
+    "restore": "{{label}} wiederherstellen",
+    "close": "{{label}} schließen",
+    "continueEditing": "Weiter bearbeiten · {{projectName}}",
+    "kindAiEdit": "AI Edit",
+    "kindExploreSpec": "Explore Spec"
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "page": {
+    "title": "集成",
+    "subtitle": "按项目管理的插件。每个项目独立决定启用哪些集成。",
+    "selectProject": "选择一个项目以管理集成。",
+    "deprecated": "已弃用",
+    "loadError": "加载插件失败。",
+    "empty": "此 Hub 构建未捆绑任何插件。"
+  },
+  "card": {
+    "statusActive": "已启用",
+    "statusDeactivated": "已停用",
+    "statusDegraded": "已降级",
+    "updateAvailable": "有可用更新",
+    "requires": "需要：{{list}}",
+    "deactivatedHint": "已安装但已停用 — Claude 下次会话不会加载它。切换<strong>启用</strong>以重新启用。",
+    "install": "安装",
+    "uninstall": "卸载"
+  },
+  "toggle": {
+    "titleActive": "已启用 — 点击停用",
+    "titleDeactivated": "已停用 — 点击启用"
+  },
+  "cachedNotice": {
+    "body": "Claude 的缓存中<strong>已安装但已禁用</strong>该 marketplace 插件。即使开关已关闭，它仍可能从 <code>~/.claude/plugins/cache/...</code> 解析该服务器。如需强制仅项目范围，请从 Claude 卸载该 marketplace 插件：",
+    "runInstruction": "在活动的 Claude 会话中运行，然后在此项目中重启 Claude。"
+  },
+  "update": {
+    "body": "自你安装以来，捆绑的 manifest 已发生变化（可能是上游重命名）。用规范条目重写 <code>.mcp.json</code> — 精准操作，仅改动插件所拥有的键。",
+    "button": "更新 <code>.mcp.json</code> 条目"
+  },
+  "conflict": {
+    "body": "<strong>{{name}}</strong> 也已通过 Claude 的插件 marketplace 全局启用，这会遮蔽此项目范围的安装。要使此卡片变为“已启用”，请在下方禁用全局版本 — 随时可从 Claude 重新启用。",
+    "disableButton": "禁用 <code>{{key}}</code>"
+  },
+  "orphan": {
+    "badge": "孤立",
+    "removeButton": "移除孤立项"
+  },
+  "installDialog": {
+    "title": "安装 {{name}}",
+    "computingChanges": "正在计算变更…",
+    "filesHeading": "将更改的文件",
+    "prerequisites": "前置条件",
+    "autoInstall": "自动安装",
+    "progress": "进度",
+    "installingPrereq": "正在安装 {{name}}…",
+    "prereqStartFailed": "启动失败：{{message}}"
+  },
+  "uninstallDialog": {
+    "title": "卸载 {{name}}？",
+    "body": "这将还原 <code>.mcp.json</code> 中由插件管理的条目，并删除插件创建的文件。你的代码、历史记录和其他插件不受影响。"
+  },
+  "docs": {
+    "title": "文档",
+    "dialogDescription": "浏览捆绑的 specrails-hub 文档。使用侧边栏在指南间切换。",
+    "sidebarEmpty": "暂无文档",
+    "indexEmpty": "没有可用文档。捆绑文档位于仓库的 docs/ 目录下 — 将 Markdown 文件放在那里或 ~/.specrails/docs/ 下即可扩展。",
+    "categoryEmpty": "此分类下暂无文档。",
+    "documentCount_one": "{{count}} 篇文档",
+    "documentCount_other": "{{count}} 篇文档",
+    "categoryCount_one": "{{count}} 个分类",
+    "categoryCount_other": "{{count}} 个分类",
+    "summary": "共 {{documents}}，分布在 {{categories}}中。",
+    "loadError": "加载文档失败"
+  }
+}

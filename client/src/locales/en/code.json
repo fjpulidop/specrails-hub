@@ -1,0 +1,113 @@
+{
+  "page": {
+    "resizeFileTree": "Resize file tree",
+    "selectFile": "Select a file to preview."
+  },
+  "resizer": {
+    "hint": "Drag to resize. Double-click to reset."
+  },
+  "toolbar": {
+    "scope": "Scope",
+    "allAi": "All AI",
+    "spec": "Spec",
+    "ticketIdPlaceholder": "id",
+    "copyFilePath": "Copy file path",
+    "generateSummary": "Generate summary",
+    "regenerateSummary": "Regenerate summary",
+    "generating": "Generating…",
+    "regenerating": "Regenerating…",
+    "summaryUnavailable": "Summary unavailable: {{reason}}",
+    "jobContext": "Job context",
+    "clear": "Clear"
+  },
+  "provenancePanel": {
+    "jobTitle": "Job {{jobId}}",
+    "specTitle": "Spec #{{ticketId}}",
+    "touchedFiles_one": "{{count}} touched file",
+    "touchedFiles_other": "{{count}} touched files",
+    "log": "Log"
+  },
+  "kind": {
+    "created": "created",
+    "modified": "modified",
+    "deleted": "deleted"
+  },
+  "action": {
+    "added": "added",
+    "changed": "changed",
+    "deleted": "deleted"
+  },
+  "viewer": {
+    "loadingFile": "Loading file…",
+    "showSummary": "Show summary",
+    "markdownViewMode": "Markdown view mode",
+    "preview": "Preview",
+    "raw": "Raw",
+    "missingFile": "This file was touched by an AI job but no longer exists in the working tree.",
+    "binaryFile": "Binary file.",
+    "tooLarge": "File too large to preview ({{size}} MB).",
+    "noContent": "No content available.",
+    "pathCopied": "Path copied",
+    "copyPathFailed": "Could not copy path",
+    "budgetPrompt": "Override the budget cap?"
+  },
+  "summary": {
+    "generationFailed": "Summary generation failed",
+    "skipped": "Summary skipped: {{reason}}",
+    "unavailable": "Summary unavailable: {{reason}}.",
+    "empty": "No summary for this file yet.",
+    "stale": "Stale",
+    "hide": "Hide",
+    "reason": {
+      "missing": "file missing",
+      "binary": "binary file",
+      "tooLarge": "file too large"
+    }
+  },
+  "history": {
+    "resize": "Resize AI touch history",
+    "title_one": "AI touch history · {{count}} change",
+    "title_other": "AI touch history · {{count}} changes",
+    "show": "Show",
+    "hide": "Hide",
+    "unknownJob": "unknown job",
+    "filterByJob": "Filter Code by job {{jobId}}",
+    "diff": "Diff",
+    "openSpec": "Open spec #{{ticketId}}",
+    "specChip": "spec #{{ticketId}}",
+    "loadingDiff": "Loading diff...",
+    "diffUnavailable": "Diff unavailable for this historical touch. New jobs will store patches automatically.",
+    "diffTruncated": "[diff truncated]"
+  },
+  "tree": {
+    "jobFiles": "Job files",
+    "specFiles": "Spec files",
+    "touchedByAi": "Touched by AI",
+    "allFiles": "All files",
+    "collapseAll": "Collapse all folders",
+    "expandAll": "Expand all folders",
+    "touchedCount_one": "{{count}} AI-touched file",
+    "touchedCount_other": "{{count}} AI-touched files",
+    "loadingFiles": "Loading files…",
+    "emptyTouched": "No AI-touched files yet. Run a job, or switch to All files.",
+    "showAllFiles": "Show all files",
+    "noFiles": "No files.",
+    "folderTouched_one": "{{count}} AI-touched file below this folder",
+    "folderTouched_other": "{{count}} AI-touched files below this folder",
+    "jobTitle": "Job {{jobId}}",
+    "createdBySpec": "Created while implementing spec #{{id}}",
+    "modifiedBySpec": "Modified while implementing spec #{{id}}",
+    "latestTitleCreated": "Latest AI job added this file",
+    "latestTitleModified": "Latest AI job changed this file",
+    "latestTitleDeleted": "Latest AI job deleted this file"
+  },
+  "monaco": {
+    "loadFailed": "Failed to load the code viewer.",
+    "reload": "Reload",
+    "loadingEditor": "Loading editor…"
+  },
+  "ticketFiles": {
+    "title": "Files touched by this ticket",
+    "jobTitle": "Job {{jobId}}"
+  }
+}

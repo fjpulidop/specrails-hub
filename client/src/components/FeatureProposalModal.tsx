@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CheckCircle, Send } from 'lucide-react'
@@ -35,6 +36,7 @@ interface FeatureProposalModalProps {
 // ─── Streaming indicator ─────────────────────────────────────────────────────
 
 function StreamingIndicator({ toolCount }: { toolCount: number }) {
+  const { t } = useTranslation('addspec')
   return (
     <div className="rounded-lg px-3 py-2 bg-muted/40 space-y-1.5">
       <div className="flex items-center gap-1.5">
@@ -44,7 +46,7 @@ function StreamingIndicator({ toolCount }: { toolCount: number }) {
       </div>
       {toolCount > 0 && (
         <p className="text-[10px] text-muted-foreground animate-pulse">
-          Reading codebase... ({toolCount} {toolCount === 1 ? 'file' : 'files'} explored)
+          {t('featureProposal.readingCodebase', { count: toolCount })}
         </p>
       )}
     </div>
@@ -54,6 +56,7 @@ function StreamingIndicator({ toolCount }: { toolCount: number }) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProps) {
+  const { t } = useTranslation('addspec')
   const { activeProjectId } = useHub()
   const { state, startProposal, sendRefinement, createIssue, cancel, reset } =
     useProposal(activeProjectId)
@@ -124,34 +127,34 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
         {state.status === 'idle' && (
           <>
             <DialogHeader>
-              <DialogTitle>Propose a Feature</DialogTitle>
+              <DialogTitle>{t('featureProposal.title')}</DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                Describe your idea in plain language. Claude will read the codebase and structure it into a full proposal.
+                {t('featureProposal.ideaIntro')}
               </p>
               <textarea
                 autoFocus
-                aria-label="Feature idea"
+                aria-label={t('featureProposal.ideaAriaLabel')}
                 className={cn(
                   'w-full resize-none rounded-md border border-border/50 bg-background/50',
                   'px-3 py-2 text-sm placeholder:text-muted-foreground',
                   'focus:outline-none focus:ring-1 focus:ring-accent-primary/50',
                   'min-h-[120px] max-h-64'
                 )}
-                placeholder="e.g. I want users to be able to set a budget alert so they get notified when API costs exceed a threshold..."
+                placeholder={t('featureProposal.ideaPlaceholder')}
                 value={idea}
                 onChange={(e) => setIdea(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && e.metaKey) { e.preventDefault(); handleExplore() }
                 }}
               />
-              <p className="text-[10px] text-muted-foreground">Cmd+Enter to submit</p>
+              <p className="text-[10px] text-muted-foreground">{t('featureProposal.cmdEnterToSubmit')}</p>
             </div>
             <DialogFooter>
-              <Button variant="ghost" size="sm" onClick={handleClose}>Cancel</Button>
+              <Button variant="ghost" size="sm" onClick={handleClose}>{t('common:actions.cancel')}</Button>
               <Button size="sm" onClick={handleExplore} disabled={!idea.trim()}>
-                Explore Idea
+                {t('featureProposal.exploreIdea')}
               </Button>
             </DialogFooter>
           </>
@@ -162,9 +165,9 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
           <>
             <DialogHeader>
               <DialogTitle>
-                {state.status === 'exploring' ? 'Exploring your idea...'
-                  : state.status === 'refining' ? 'Refining proposal...'
-                  : 'Review Proposal'}
+                {state.status === 'exploring' ? t('featureProposal.exploringTitle')
+                  : state.status === 'refining' ? t('featureProposal.refiningTitle')
+                  : t('featureProposal.reviewTitle')}
               </DialogTitle>
             </DialogHeader>
 
@@ -217,14 +220,14 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
                 <div className="flex gap-2 items-end">
                   <textarea
                     ref={textareaRef}
-                    aria-label="Refinement feedback"
+                    aria-label={t('featureProposal.refinementAriaLabel')}
                     className={cn(
                       'flex-1 resize-none rounded-md border border-border/50 bg-background/50',
                       'px-3 py-2 text-xs placeholder:text-muted-foreground',
                       'focus:outline-none focus:ring-1 focus:ring-accent-primary/50',
                       'min-h-[48px] max-h-24'
                     )}
-                    placeholder="Ask for changes, add constraints, refine scope..."
+                    placeholder={t('featureProposal.refinementPlaceholder')}
                     value={refinementInput}
                     onChange={(e) => setRefinementInput(e.target.value)}
                     onKeyDown={(e) => {
@@ -237,39 +240,39 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
                     className="h-8 w-8 p-0 shrink-0"
                     onClick={handleRefine}
                     disabled={!refinementInput.trim()}
-                    title="Send refinement (Cmd+Enter)"
+                    title={t('featureProposal.sendRefinementTitle')}
                   >
                     <Send className="w-3.5 h-3.5" />
                   </Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-1">Cmd+Enter to send</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{t('featureProposal.cmdEnterToSend')}</p>
               </div>
             )}
 
             <DialogFooter>
               {confirmCreate ? (
                 <>
-                  <p className="text-xs text-muted-foreground mr-auto">Create a GitHub Issue from this proposal?</p>
-                  <Button variant="ghost" size="sm" onClick={() => setConfirmCreate(false)}>No</Button>
+                  <p className="text-xs text-muted-foreground mr-auto">{t('featureProposal.confirmCreateIssue')}</p>
+                  <Button variant="ghost" size="sm" onClick={() => setConfirmCreate(false)}>{t('common:states.no')}</Button>
                   <Button
                     size="sm"
                     className="bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => { setConfirmCreate(false); createIssue() }}
                   >
-                    Yes, create issue
+                    {t('featureProposal.yesCreateIssue')}
                   </Button>
                 </>
               ) : (
                 <>
-                  <Button variant="ghost" size="sm" onClick={handleStartOver}>Start Over</Button>
-                  <Button variant="ghost" size="sm" onClick={handleClose}>Cancel</Button>
+                  <Button variant="ghost" size="sm" onClick={handleStartOver}>{t('featureProposal.startOver')}</Button>
+                  <Button variant="ghost" size="sm" onClick={handleClose}>{t('common:actions.cancel')}</Button>
                   {state.status === 'review' && (
                     <Button
                       size="sm"
                       className="bg-green-600 hover:bg-green-700 text-white"
                       onClick={() => setConfirmCreate(true)}
                     >
-                      Create GitHub Issue
+                      {t('featureProposal.createGithubIssue')}
                     </Button>
                   )}
                 </>
@@ -282,7 +285,7 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
         {state.status === 'creating_issue' && (
           <>
             <DialogHeader>
-              <DialogTitle>Creating GitHub Issue...</DialogTitle>
+              <DialogTitle>{t('featureProposal.creatingIssueTitle')}</DialogTitle>
             </DialogHeader>
             <div className="py-6 flex flex-col items-center gap-3">
               <div className="flex items-center gap-1.5">
@@ -291,11 +294,11 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-bounce [animation-delay:300ms]" />
               </div>
               <p className="text-xs text-muted-foreground animate-pulse">
-                Creating issue via GitHub CLI...
+                {t('featureProposal.creatingIssueViaCli')}
               </p>
             </div>
             <DialogFooter>
-              <Button variant="ghost" size="sm" onClick={handleClose}>Cancel</Button>
+              <Button variant="ghost" size="sm" onClick={handleClose}>{t('common:actions.cancel')}</Button>
             </DialogFooter>
           </>
         )}
@@ -304,13 +307,13 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
         {state.status === 'created' && (
           <>
             <DialogHeader>
-              <DialogTitle>Issue Created</DialogTitle>
+              <DialogTitle>{t('featureProposal.issueCreated')}</DialogTitle>
             </DialogHeader>
             <div className="py-6 text-center space-y-3">
               <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mx-auto">
                 <CheckCircle className="w-6 h-6 text-green-500" />
               </div>
-              <h3 className="text-sm font-semibold">Issue Created</h3>
+              <h3 className="text-sm font-semibold">{t('featureProposal.issueCreated')}</h3>
               {state.issueUrl && (
                 <a
                   href={state.issueUrl}
@@ -323,8 +326,8 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
               )}
             </div>
             <DialogFooter>
-              <Button variant="ghost" size="sm" onClick={() => { reset(); setIdea(''); setRefinementInput(''); setConfirmCreate(false) }}>Propose Another</Button>
-              <Button size="sm" onClick={handleClose}>Done</Button>
+              <Button variant="ghost" size="sm" onClick={() => { reset(); setIdea(''); setRefinementInput(''); setConfirmCreate(false) }}>{t('featureProposal.proposeAnother')}</Button>
+              <Button size="sm" onClick={handleClose}>{t('common:actions.done')}</Button>
             </DialogFooter>
           </>
         )}
@@ -333,14 +336,14 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
         {state.status === 'error' && (
           <>
             <DialogHeader>
-              <DialogTitle>Something went wrong</DialogTitle>
+              <DialogTitle>{t('featureProposal.errorTitle')}</DialogTitle>
             </DialogHeader>
             <div className="py-4 space-y-2">
-              <p className="text-xs text-red-400">{state.errorMessage ?? 'An error occurred'}</p>
+              <p className="text-xs text-red-400">{state.errorMessage ?? t('featureProposal.errorFallback')}</p>
             </div>
             <DialogFooter>
-              <Button variant="ghost" size="sm" onClick={() => { reset(); setIdea(''); setRefinementInput('') }}>Try Again</Button>
-              <Button variant="ghost" size="sm" onClick={handleClose}>Close</Button>
+              <Button variant="ghost" size="sm" onClick={() => { reset(); setIdea(''); setRefinementInput('') }}>{t('featureProposal.tryAgain')}</Button>
+              <Button variant="ghost" size="sm" onClick={handleClose}>{t('common:actions.close')}</Button>
             </DialogFooter>
           </>
         )}
@@ -349,14 +352,14 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
         {state.status === 'cancelled' && (
           <>
             <DialogHeader>
-              <DialogTitle>Cancelled</DialogTitle>
+              <DialogTitle>{t('featureProposal.cancelledTitle')}</DialogTitle>
             </DialogHeader>
             <div className="py-4 space-y-2">
-              <p className="text-xs text-muted-foreground">The proposal was cancelled.</p>
+              <p className="text-xs text-muted-foreground">{t('featureProposal.cancelledBody')}</p>
             </div>
             <DialogFooter>
-              <Button variant="ghost" size="sm" onClick={() => { reset(); setIdea(''); setRefinementInput('') }}>Start Over</Button>
-              <Button variant="ghost" size="sm" onClick={handleClose}>Close</Button>
+              <Button variant="ghost" size="sm" onClick={() => { reset(); setIdea(''); setRefinementInput('') }}>{t('featureProposal.startOver')}</Button>
+              <Button variant="ghost" size="sm" onClick={handleClose}>{t('common:actions.close')}</Button>
             </DialogFooter>
           </>
         )}

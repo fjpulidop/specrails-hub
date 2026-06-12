@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import type { SpendingResponse, Surface } from '../../types/spending'
 import { SURFACE_LABEL, SURFACE_ACCENT } from '../../types/spending'
@@ -29,6 +30,7 @@ function fmtTokens(v: number): string {
 const SURFACES: Surface[] = ['job', 'explore-spec', 'quick-spec', 'ai-edit', 'smash']
 
 export function SpendingHero({ data, loading }: Props) {
+  const { t } = useTranslation('analytics')
   const [displayedTotal, setDisplayedTotal] = useState(0)
   const lastValueRef = useRef(0)
 
@@ -78,7 +80,7 @@ export function SpendingHero({ data, loading }: Props) {
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <div>
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
-            Spending
+            {t('hero.spending')}
           </div>
           <div className="flex items-baseline gap-3">
             <div className="text-5xl font-semibold tabular-nums tracking-tight">
@@ -89,33 +91,33 @@ export function SpendingHero({ data, loading }: Props) {
                 delta >= 0 ? 'text-accent-warning' : 'text-accent-success'
               }`}>
                 {delta >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                {Math.abs(delta).toFixed(0)}% vs prev
+                {t('hero.vsPrev', { pct: Math.abs(delta).toFixed(0) })}
               </span>
             )}
           </div>
           <div className="text-xs text-muted-foreground mt-1 tabular-nums flex items-center gap-2">
-            <span>{totalRuns} invocation{totalRuns === 1 ? '' : 's'}</span>
+            <span>{t('hero.invocations', { count: totalRuns })}</span>
             {totalTokens > 0 && (
               <span
                 className="text-muted-foreground/80"
-                title="Total tokens = fresh input + output + cache-read + cache-create across all invocations in this window."
+                title={t('hero.tokensTooltip')}
               >
-                · {fmtTokens(totalTokens)} tokens
+                {t('hero.tokens', { tokens: fmtTokens(totalTokens) })}
               </span>
             )}
             {hasEstimatedCost && (
               <span
                 className="text-[10px] text-muted-foreground/70 italic"
-                title={`Includes ${fmtUsd(totalEstimated)} of estimated cost from providers without a native cost field (e.g. codex via the local pricing table).`}
+                title={t('hero.includesEstimatedTooltip', { amount: fmtUsd(totalEstimated) })}
               >
-                · includes ~{fmtUsd(totalEstimated)} estimated
+                {t('hero.includesEstimated', { amount: fmtUsd(totalEstimated) })}
               </span>
             )}
           </div>
         </div>
         {totalRuns === 0 && trackingStartedAt && (
           <div className="text-xs text-muted-foreground">
-            Tracking started {trackingStartedAt.slice(0, 10)}
+            {t('hero.trackingStarted', { date: trackingStartedAt.slice(0, 10) })}
           </div>
         )}
       </div>
@@ -123,10 +125,12 @@ export function SpendingHero({ data, loading }: Props) {
       {totalRuns === 0 ? (
         <div className="rounded-lg border border-dashed border-border/40 p-6 text-center">
           <p className="text-sm text-muted-foreground">
-            No invocations yet for this filter window.
+            {t('hero.emptyState')}
           </p>
           <p className="text-xs text-muted-foreground/70 mt-1">
-            Tracking started {trackingStartedAt ? trackingStartedAt.slice(0, 10) : 'on first invocation'}
+            {trackingStartedAt
+              ? t('hero.trackingStarted', { date: trackingStartedAt.slice(0, 10) })
+              : t('hero.trackingStartedFallback')}
           </p>
         </div>
       ) : (
@@ -140,7 +144,7 @@ export function SpendingHero({ data, loading }: Props) {
                   key={seg.surface}
                   className={`h-full ${SURFACE_ACCENT[seg.surface].dot}`}
                   style={{ width: `${pct}%` }}
-                  title={`${SURFACE_LABEL[seg.surface]}: ${fmtUsd(seg.costUsd)}`}
+                  title={t('hero.segmentTitle', { label: SURFACE_LABEL[seg.surface], value: fmtUsd(seg.costUsd) })}
                 />
               )
             })}

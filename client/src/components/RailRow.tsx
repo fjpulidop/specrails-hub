@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 import { useDroppable, useDndContext } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { GripVertical, Trash2, ArrowLeft } from 'lucide-react'
@@ -60,6 +61,7 @@ export function RailRow({
   onModeChange, onProfileChange, onEngineChange, onUltracodeModelChange, onToggle, onTicketClick, onDelete, onLongPress, onRename,
   onTicketMoveToSpecs,
 }: RailRowProps) {
+  const { t } = useTranslation('dashboard')
   // Codex has no agent profiles — hide the profile selector when this rail's
   // engine is codex (the engine selector is shown only on multi-provider projects).
   const profileApplies = (aiEngine ?? providers?.[0]) !== 'codex'
@@ -368,7 +370,7 @@ export function RailRow({
               className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs text-accent-warning hover:bg-accent-warning/10 transition-colors"
             >
               <ArrowLeft className="w-3 h-3" aria-hidden />
-              Move to Specs
+              {t('railRow.moveToSpecs')}
             </button>
           </div>,
           document.body
@@ -402,7 +404,7 @@ export function RailRow({
             type="button"
             onClick={handleDeleteClick}
             className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm hover:opacity-90 transition-opacity"
-            aria-label={`Delete ${label}`}
+            aria-label={t('railRow.deleteRail', { label })}
           >
             <Trash2 className="w-3 h-3" />
           </button>
@@ -431,7 +433,7 @@ export function RailRow({
             className="flex flex-col items-center gap-1 text-white"
           >
             <Trash2 className="w-5 h-5" />
-            <span className="text-[9px] font-medium">Delete</span>
+            <span className="text-[9px] font-medium">{t('common:actions.delete')}</span>
           </button>
         </div>
       )}
@@ -579,7 +581,7 @@ export function RailRow({
                     : 'border-border/25 text-muted-foreground/30'
               }`}
             >
-              <span className="text-[10px] select-none">{isOver ? 'Drop here' : ticketDragActive ? 'Drop on this rail' : 'Drag specs here'}</span>
+              <span className="text-[10px] select-none">{isOver ? t('railRow.dropHere') : ticketDragActive ? t('railRow.dropOnThisRail') : t('railRow.dragSpecsHere')}</span>
             </div>
           ) : (
             <SortableContext items={tickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
@@ -631,7 +633,7 @@ export function RailRow({
               className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs text-accent-warning hover:bg-accent-warning/10 transition-colors"
             >
               <ArrowLeft className="w-3 h-3" aria-hidden />
-              Move to Specs
+              {t('railRow.moveToSpecs')}
             </button>
           </div>,
           document.body

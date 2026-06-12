@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Sparkles,
   ArrowLeft,
@@ -249,6 +250,7 @@ function Header({
   onDiscard: () => void
   onMinimize?: () => void
 }) {
+  const { t } = useTranslation('aiedit')
   // On Mac (Tauri overlay titlebar), traffic lights occupy ~80px at the
   // top-left. Pad the header so the back-arrow doesn't collide with them.
   const macPadLeft = isMacTauriOverlay() ? 'pl-[88px]' : 'pl-4'
@@ -260,7 +262,7 @@ function Header({
         type="button"
         onClick={onDiscard}
         className="flex items-center gap-2 group p-1 -ml-1 rounded hover:bg-accent focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none max-w-[60vw]"
-        aria-label="Back (Esc)"
+        aria-label={t('shell.backAriaLabel')}
       >
         <ArrowLeft className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
         <div className="text-left min-w-0">
@@ -284,7 +286,7 @@ function Header({
             variant="ghost"
             size="sm"
             onClick={onMinimize}
-            aria-label="Minimize"
+            aria-label={t('common:actions.minimize')}
             data-testid="ai-edit-minimize"
           >
             <Minus className="w-4 h-4" />
@@ -292,12 +294,12 @@ function Header({
         )}
         {showDiscard && (
           <Button variant="ghost" size="sm" onClick={onDiscard}>
-            Discard
+            {t('common:actions.discard')}
           </Button>
         )}
         {showApply && (
           <Button size="sm" onClick={onApply} className="gap-1.5">
-            <Check className="w-3.5 h-3.5" /> Apply
+            <Check className="w-3.5 h-3.5" /> {t('shell.apply')}
             <span className="text-[10px] opacity-70 ml-1">⌘⏎</span>
           </Button>
         )}
@@ -335,6 +337,7 @@ function FocusedColumn({
   baseBodyDisclosureLabel?: string
   errorMessage?: string | null
 }) {
+  const { t } = useTranslation('aiedit')
   const showChips =
     uiPhase === 'composing' && (chips?.length ?? 0) > 0 && history.length === 0
   const isError = uiPhase === 'error'
@@ -360,7 +363,7 @@ function FocusedColumn({
             )}
           </div>
           <h1 className="text-xl font-semibold tracking-tight">
-            {isError ? 'Something went wrong' : headline}
+            {isError ? t('shell.somethingWentWrong') : headline}
           </h1>
           {isError && errorMessage && (
             <p className="text-sm text-muted-foreground max-w-md mx-auto font-mono break-words">
@@ -394,7 +397,7 @@ function FocusedColumn({
         {baseBody && (
           <CurrentBodyDisclosure
             body={baseBody}
-            label={baseBodyDisclosureLabel ?? 'View current content'}
+            label={baseBodyDisclosureLabel ?? t('shell.viewCurrentContent')}
           />
         )}
       </div>
@@ -409,10 +412,11 @@ function SuggestionChips({
   chips: string[]
   onPick: (text: string) => void
 }) {
+  const { t } = useTranslation('aiedit')
   return (
     <div className="space-y-2">
       <div className="text-[11px] uppercase tracking-wider text-muted-foreground/70">
-        Quick prompts
+        {t('shell.quickPrompts')}
       </div>
       <div className="flex flex-wrap gap-1.5">
         {chips.map((chip) => (
@@ -431,6 +435,7 @@ function SuggestionChips({
 }
 
 function StreamingPanel({ streamingText }: { streamingText?: string }) {
+  const { t } = useTranslation('aiedit')
   return (
     <div className="rounded-xl border border-accent-primary/30 bg-accent-primary/5 p-4">
       {streamingText ? (
@@ -441,7 +446,7 @@ function StreamingPanel({ streamingText }: { streamingText?: string }) {
       ) : (
         <div className="text-xs text-muted-foreground italic flex items-center gap-1.5">
           <Loader2 className="w-3 h-3 animate-spin" />
-          Working on your refinement…
+          {t('shell.workingOnRefinement')}
         </div>
       )}
     </div>
@@ -449,11 +454,12 @@ function StreamingPanel({ streamingText }: { streamingText?: string }) {
 }
 
 function ConversationHistory({ history }: { history: AiEditHistoryTurn[] }) {
+  const { t } = useTranslation('aiedit')
   if (history.length === 0) return null
   return (
     <div className="space-y-2">
       <div className="text-[11px] uppercase tracking-wider text-muted-foreground/70">
-        History
+        {t('shell.history')}
       </div>
       <div className="space-y-2">
         {history.map((turn, i) => (
@@ -529,9 +535,10 @@ function ChatColumn({
   appliedNotice?: ReactNode
   uiPhase: AiEditUiPhase
 }) {
+  const { t } = useTranslation('aiedit')
   return (
     <section
-      aria-label="Conversation"
+      aria-label={t('shell.conversation')}
       className="flex flex-col min-h-0 border-r border-border bg-card/20"
     >
       <div className="flex-1 overflow-y-auto p-4 pb-32 space-y-3" aria-live="polite">
@@ -560,19 +567,21 @@ function ChatColumn({
 }
 
 function DefaultAppliedNotice() {
+  const { t } = useTranslation('aiedit')
   return (
     <div className="rounded-md border border-green-500/40 bg-green-500/10 p-3 text-xs text-green-300 flex items-center gap-2">
       <Check className="w-3.5 h-3.5" />
-      Applied.
+      {t('shell.applied')}
     </div>
   )
 }
 
 function ChatTurn({ turn }: { turn: AiEditHistoryTurn }) {
+  const { t } = useTranslation('aiedit')
   if (turn.role === 'user') {
     return (
       <div className="flex flex-col items-end">
-        <div className="text-[10px] text-muted-foreground mb-1">You</div>
+        <div className="text-[10px] text-muted-foreground mb-1">{t('shell.you')}</div>
         <div className="max-w-[90%] rounded-2xl rounded-br-sm bg-accent-primary/15 text-foreground text-sm px-3 py-2 whitespace-pre-wrap break-words">
           {turn.content}
         </div>
@@ -583,7 +592,7 @@ function ChatTurn({ turn }: { turn: AiEditHistoryTurn }) {
     return (
       <div className="rounded-md border border-accent-info/30 bg-accent-info/5 p-3 text-xs">
         <div className="flex items-center gap-1.5 font-medium mb-1 text-accent-info">
-          <Sparkles className="w-3 h-3" /> Auto-test result
+          <Sparkles className="w-3 h-3" /> {t('shell.autoTestResult')}
         </div>
         <pre className="text-[11px] font-mono whitespace-pre-wrap break-words text-foreground/80 max-h-48 overflow-y-auto">
           {turn.content}
@@ -594,10 +603,10 @@ function ChatTurn({ turn }: { turn: AiEditHistoryTurn }) {
   return (
     <div className="flex flex-col items-start">
       <div className="text-[10px] text-muted-foreground mb-1 inline-flex items-center gap-1">
-        <Sparkles className="w-3 h-3 text-accent-primary" /> AI
+        <Sparkles className="w-3 h-3 text-accent-primary" /> {t('shell.ai')}
       </div>
       <div className="max-w-[90%] rounded-2xl rounded-bl-sm border border-border bg-muted/30 text-xs px-3 py-2 text-muted-foreground italic">
-        Refinement ready — review the diff on the right.
+        {t('shell.refinementReady')}
       </div>
     </div>
   )
@@ -614,13 +623,14 @@ function DiffPane({
   applyConflict: 'disk_changed' | 'name_changed' | null
   onForceApply?: () => void
 }) {
+  const { t } = useTranslation('aiedit')
   return (
-    <section aria-label="Diff preview" className="flex flex-col min-h-0">
+    <section aria-label={t('shell.diffPreview')} className="flex flex-col min-h-0">
       <div className="flex-shrink-0 flex items-center justify-between px-4 h-9 border-b border-border bg-card/40">
         <span className="text-xs font-mono text-muted-foreground truncate">
-          {label ?? 'Proposed changes'}
+          {label ?? t('shell.proposedChanges')}
         </span>
-        <span className="text-[10px] text-muted-foreground">word-level diff</span>
+        <span className="text-[10px] text-muted-foreground">{t('shell.wordLevelDiff')}</span>
       </div>
       {applyConflict === 'disk_changed' && (
         <ConflictBanner
@@ -628,7 +638,7 @@ function DiffPane({
           action={
             onForceApply && (
               <Button variant="ghost" size="sm" onClick={onForceApply}>
-                <RefreshCw className="w-3 h-3 mr-1" /> Force apply
+                <RefreshCw className="w-3 h-3 mr-1" /> {t('shell.forceApply')}
               </Button>
             )
           }
@@ -647,10 +657,11 @@ function ConflictBanner({
   kind: 'disk_changed' | 'name_changed'
   action?: ReactNode
 }) {
+  const { t } = useTranslation('aiedit')
   const message =
     kind === 'disk_changed'
-      ? 'The file changed on disk while you were editing. Apply was blocked.'
-      : 'The AI changed the agent name. Renaming is a separate explicit action — adjust the draft or rename in Studio.'
+      ? t('shell.conflict.diskChanged')
+      : t('shell.conflict.nameChanged')
   return (
     <div
       role="alert"
@@ -672,27 +683,28 @@ function ConfirmDiscardDialog({
   onCancel: () => void
   onConfirm: () => void
 }) {
+  const { t } = useTranslation('aiedit')
   return (
     <div
       role="alertdialog"
       aria-modal="true"
-      aria-label="Discard changes?"
+      aria-label={t('shell.discardDialog.ariaLabel')}
       className="absolute inset-0 z-10 flex items-center justify-center bg-black/40"
     >
       <div className="rounded-lg border border-border bg-card p-5 max-w-sm shadow-xl">
         <div className="flex items-center gap-2 mb-2">
           <AlertTriangle className="w-4 h-4 text-yellow-400" />
-          <h2 className="text-sm font-medium">Discard refinement?</h2>
+          <h2 className="text-sm font-medium">{t('shell.discardDialog.title')}</h2>
         </div>
         <p className="text-xs text-muted-foreground mb-4">
-          The current draft will be cancelled and not applied.
+          {t('shell.discardDialog.body')}
         </p>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={onCancel}>
-            Keep editing
+            {t('shell.discardDialog.keepEditing')}
           </Button>
           <Button size="sm" onClick={onConfirm}>
-            Discard
+            {t('common:actions.discard')}
           </Button>
         </div>
       </div>
@@ -850,6 +862,7 @@ export function PlainComposer({
   autoFocus,
   inputRef,
 }: PlainComposerProps) {
+  const { t } = useTranslation('aiedit')
   return (
     <div className="space-y-2">
       <div className="relative rounded-xl border border-border bg-card/40 focus-within:border-accent-primary/40 focus-within:ring-2 focus-within:ring-accent-primary/20 transition-all">
@@ -873,7 +886,7 @@ export function PlainComposer({
           type="button"
           onClick={onSubmit}
           disabled={!value.trim() || disabled}
-          aria-label="Send (⌘⏎)"
+          aria-label={t('shell.composer.sendAriaLabel')}
           className="absolute bottom-2.5 right-2.5 p-2 rounded-md bg-accent-primary text-white hover:bg-accent-primary/90 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none transition-opacity"
         >
           {disabled ? (
@@ -885,9 +898,9 @@ export function PlainComposer({
       </div>
       <div className="flex items-center justify-end text-[11px] text-muted-foreground/70">
         <span>
-          <kbd className="px-1.5 py-0.5 rounded bg-muted/60 text-[10px] font-mono">⌘⏎</kbd> submit
+          <kbd className="px-1.5 py-0.5 rounded bg-muted/60 text-[10px] font-mono">⌘⏎</kbd> {t('shell.composer.kbdSubmit')}
           <span className="mx-1.5">·</span>
-          <kbd className="px-1.5 py-0.5 rounded bg-muted/60 text-[10px] font-mono">Esc</kbd> cancel
+          <kbd className="px-1.5 py-0.5 rounded bg-muted/60 text-[10px] font-mono">Esc</kbd> {t('shell.composer.kbdCancel')}
         </span>
       </div>
     </div>

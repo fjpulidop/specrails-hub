@@ -1,0 +1,57 @@
+{
+  "panel": {
+    "openChat": "Open chat",
+    "dragToResize": "Drag to resize",
+    "tabTitle": "Chat {{n}}",
+    "startConversation": "Start a conversation about this project",
+    "noConversations": "No conversations yet",
+    "newConversation": "New conversation",
+    "suggestions": {
+      "projectStatus": "What's the project status?",
+      "recentFailures": "Show recent job failures",
+      "commands": "What commands should I run?",
+      "explainCodebase": "Explain the codebase"
+    }
+  },
+  "header": {
+    "fallbackTitle": "Chat",
+    "newConversation": "New conversation",
+    "deleteConversation": "Delete conversation",
+    "restorePanel": "Restore chat panel",
+    "maximizePanel": "Maximize chat panel",
+    "closeChat": "Close chat"
+  },
+  "input": {
+    "placeholder": "Message...",
+    "send": "Send",
+    "stop": "Stop",
+    "modelLocked": "Cannot change model during an active conversation"
+  },
+  "messageList": {
+    "contextLoaded": "Context loaded — ready to help",
+    "noMessages": "No messages yet",
+    "askAnything": "Ask Claude anything about your project",
+    "suggestions": {
+      "currentStatus": "What's the current project status?",
+      "recentFailures": "Show me recent job failures",
+      "testsToRun": "What tests should I run?",
+      "mainArchitecture": "Explain the main architecture"
+    }
+  },
+  "errors": {
+    "sendFailed": "Failed to send message"
+  },
+  "dock": {
+    "minimizedSessions_one": "{{count}} minimized session",
+    "minimizedSessions_other": "{{count}} minimized sessions",
+    "minimizedCount": "{{count}} minimized",
+    "unknownProject": "Unknown project"
+  },
+  "chip": {
+    "restore": "Restore {{label}}",
+    "close": "Close {{label}}",
+    "continueEditing": "Continue editing · {{projectName}}",
+    "kindAiEdit": "AI Edit",
+    "kindExploreSpec": "Explore Spec"
+  }
+}

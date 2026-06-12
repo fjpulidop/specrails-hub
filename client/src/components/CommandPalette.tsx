@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Command } from 'cmdk'
 import { toast } from 'sonner'
 import {
@@ -29,21 +30,22 @@ interface CommandPaletteProps {
 }
 
 export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: CommandPaletteProps) {
+  const { t } = useTranslation('commands')
   const [open, setOpen] = useState(false)
   const [commands, setCommands] = useState<CommandInfo[]>([])
   const [recentJobs, setRecentJobs] = useState<JobSummary[]>([])
   const { projects, activeProjectId, setActiveProjectId } = useHub()
   const { leftMode, rightMode, cycleLeftMode, cycleRightMode } = useSidebarPin()
   const leftLabel = leftMode === 'pinned-open'
-    ? 'Collapse left sidebar (keep pinned)'
+    ? t('palette.sidebar.collapseLeftKeepPinned')
     : leftMode === 'pinned-collapsed'
-      ? 'Unpin left sidebar'
-      : 'Pin left sidebar open'
+      ? t('palette.sidebar.unpinLeft')
+      : t('palette.sidebar.pinLeftOpen')
   const rightLabel = rightMode === 'pinned-open'
-    ? 'Collapse right sidebar (keep pinned)'
+    ? t('palette.sidebar.collapseRightKeepPinned')
     : rightMode === 'pinned-collapsed'
-      ? 'Unpin right sidebar'
-      : 'Pin right sidebar open'
+      ? t('palette.sidebar.unpinRight')
+      : t('palette.sidebar.pinRightOpen')
   const navigate = useNavigate()
   const fetchedRef = useRef(false)
 
@@ -103,13 +105,13 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
         body: JSON.stringify({ command: `/specrails:${slug}` }),
       })
       const data = await res.json() as { jobId?: string; error?: string }
-      if (!res.ok) throw new Error(data.error ?? 'Failed to spawn command')
-      toast.success(`${slug} queued`)
+      if (!res.ok) throw new Error(data.error ?? t('errors.spawnFailed'))
+      toast.success(t('toasts.queued', { name: slug }))
       navigate(`/jobs/${data.jobId}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to spawn command')
+      toast.error(err instanceof Error ? err.message : t('errors.spawnFailed'))
     }
-  }, [navigate])
+  }, [navigate, t])
 
   const handleSelectJob = useCallback((jobId: string) => {
     setOpen(false)
@@ -133,20 +135,20 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
     <Command.Dialog
       open={open}
       onOpenChange={setOpen}
-      label="Command palette"
+      label={t('palette.label')}
       className={cn(
         'fixed left-[50%] top-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%]',
         'border border-border/30 bg-popover shadow-2xl backdrop-blur-md rounded-xl overflow-hidden',
       )}
     >
       {/* Visually hidden title for accessibility */}
-      <span className="sr-only">Command palette</span>
+      <span className="sr-only">{t('palette.label')}</span>
 
       {/* Search input */}
       <div className="flex items-center gap-2 px-3 border-b border-border/30">
         <Search className="w-4 h-4 text-muted-foreground shrink-0" />
         <Command.Input
-          placeholder="Search projects, commands, jobs..."
+          placeholder={t('palette.searchPlaceholder')}
           className="flex-1 h-11 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
         />
         <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-border/50 bg-muted/30 px-1.5 py-0.5 text-[10px] text-muted-foreground font-mono">
@@ -157,12 +159,12 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
       {/* Results list */}
       <Command.List className="max-h-80 overflow-y-auto p-2">
         <Command.Empty className="py-8 text-center text-sm text-muted-foreground">
-          No results found.
+          {t('palette.noResults')}
         </Command.Empty>
 
         {/* Projects */}
         {projects.length > 0 && (
-          <Command.Group heading="Projects">
+          <Command.Group heading={t('palette.groups.projects')}>
             {projects.map((project) => (
               <Command.Item
                 key={project.id}
@@ -174,7 +176,7 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
                 <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
                 <span className="flex-1 truncate">{project.name}</span>
                 {project.id === activeProjectId && (
-                  <span className="text-[10px] text-accent-primary font-medium">active</span>
+                  <span className="text-[10px] text-accent-primary font-medium">{t('palette.activeBadge')}</span>
                 )}
               </Command.Item>
             ))}
@@ -183,7 +185,7 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
 
         {/* Spec */}
         {commands.length > 0 && (
-          <Command.Group heading="Spec">
+          <Command.Group heading={t('palette.groups.spec')}>
             {commands.map((cmd) => (
               <Command.Item
                 key={cmd.id}
@@ -206,7 +208,7 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
 
         {/* Jobs */}
         {recentJobs.length > 0 && (
-          <Command.Group heading="Jobs">
+          <Command.Group heading={t('palette.groups.jobs')}>
             {recentJobs.map((job) => (
               <Command.Item
                 key={job.id}
@@ -224,7 +226,7 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
                   job.status === 'running' && 'text-accent-info',
                   job.status === 'queued' && 'text-muted-foreground',
                 )}>
-                  {job.status}
+                  {t(`common:status.${job.status}`, { defaultValue: job.status })}
                 </span>
               </Command.Item>
             ))}
@@ -232,32 +234,32 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
         )}
 
         {/* Navigation */}
-        <Command.Group heading="Navigation">
-          <Command.Item value="Dashboard" keywords={['home']} onSelect={() => handleNavigate('/')} className={navItemClass}>
+        <Command.Group heading={t('palette.groups.navigation')}>
+          <Command.Item value={t('palette.nav.dashboard')} keywords={['home']} onSelect={() => handleNavigate('/')} className={navItemClass}>
             <LayoutDashboard className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Dashboard</span>
+            <span>{t('palette.nav.dashboard')}</span>
           </Command.Item>
           {onOpenAnalytics && (
-            <Command.Item value="Hub Analytics" keywords={['cross-project', 'hub']} onSelect={() => handleHubAction(onOpenAnalytics)} className={navItemClass}>
+            <Command.Item value={t('palette.nav.hubAnalytics')} keywords={['cross-project', 'hub']} onSelect={() => handleHubAction(onOpenAnalytics)} className={navItemClass}>
               <PieChart className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span>Hub Analytics</span>
+              <span>{t('palette.nav.hubAnalytics')}</span>
             </Command.Item>
           )}
-          <Command.Item value="Project Analytics" keywords={['metrics']} onSelect={() => handleNavigate('/analytics')} className={navItemClass}>
+          <Command.Item value={t('palette.nav.projectAnalytics')} keywords={['metrics']} onSelect={() => handleNavigate('/analytics')} className={navItemClass}>
             <BarChart3 className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Project Analytics</span>
+            <span>{t('palette.nav.projectAnalytics')}</span>
           </Command.Item>
-          <Command.Item value="Activity Feed" keywords={['log']} onSelect={() => handleNavigate('/activity')} className={navItemClass}>
+          <Command.Item value={t('palette.nav.activityFeed')} keywords={['log']} onSelect={() => handleNavigate('/activity')} className={navItemClass}>
             <Activity className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Activity Feed</span>
+            <span>{t('palette.nav.activityFeed')}</span>
           </Command.Item>
-          <Command.Item value="Hub Settings" keywords={['configuration']} onSelect={() => onOpenSettings ? handleHubAction(onOpenSettings) : handleNavigate('/settings')} className={navItemClass}>
+          <Command.Item value={t('palette.nav.hubSettings')} keywords={['configuration']} onSelect={() => onOpenSettings ? handleHubAction(onOpenSettings) : handleNavigate('/settings')} className={navItemClass}>
             <Settings className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Hub Settings</span>
+            <span>{t('palette.nav.hubSettings')}</span>
           </Command.Item>
-          <Command.Item value="Docs" keywords={['documentation']} onSelect={() => onOpenDocs ? handleHubAction(onOpenDocs) : handleNavigate('/docs')} className={navItemClass}>
+          <Command.Item value={t('palette.nav.docs')} keywords={['documentation']} onSelect={() => onOpenDocs ? handleHubAction(onOpenDocs) : handleNavigate('/docs')} className={navItemClass}>
             <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Docs</span>
+            <span>{t('palette.nav.docs')}</span>
           </Command.Item>
           <Command.Item
             value={leftLabel}
@@ -283,9 +285,9 @@ export function CommandPalette({ onOpenSettings, onOpenAnalytics, onOpenDocs }: 
       {/* Footer */}
       <div className="flex items-center justify-between px-3 py-2 border-t border-border/30 text-[10px] text-muted-foreground/50">
         <div className="flex items-center gap-3">
-          <span><kbd className="font-mono">↑↓</kbd> navigate</span>
-          <span><kbd className="font-mono">↵</kbd> select</span>
-          <span><kbd className="font-mono">esc</kbd> close</span>
+          <span><kbd className="font-mono">↑↓</kbd> {t('palette.footer.navigate')}</span>
+          <span><kbd className="font-mono">↵</kbd> {t('palette.footer.select')}</span>
+          <span><kbd className="font-mono">esc</kbd> {t('palette.footer.close')}</span>
         </div>
       </div>
     </Command.Dialog>

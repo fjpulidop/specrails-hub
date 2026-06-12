@@ -1,4 +1,5 @@
 import { ArrowUp, ArrowDown, ArrowDownUp } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   Select,
   SelectTrigger,
@@ -17,13 +18,15 @@ interface SpecSortControlProps {
   className?: string
 }
 
-const MODE_LABELS: Record<SpecSortMode, string> = {
-  'default': 'Default',
-  'ticket-id': 'Ticket #',
-  'priority': 'Priority',
+/** i18n keys (specs namespace) per sort mode. */
+const MODE_LABEL_KEYS: Record<SpecSortMode, string> = {
+  'default': 'sortControl.modes.default',
+  'ticket-id': 'sortControl.modes.ticketId',
+  'priority': 'sortControl.modes.priority',
 }
 
 export function SpecSortControl({ mode, dir, onChange, className }: SpecSortControlProps) {
+  const { t } = useTranslation('specs')
   const showArrow = mode !== 'default'
 
   return (
@@ -37,21 +40,21 @@ export function SpecSortControl({ mode, dir, onChange, className }: SpecSortCont
                 onValueChange={(v) => onChange(v as SpecSortMode, dir)}
               >
                 <SelectTrigger
-                  aria-label="Sort mode"
+                  aria-label={t('sortControl.modeAriaLabel')}
                   className="h-7 w-auto gap-1.5 px-2 text-xs bg-accent-secondary/10 border-accent-secondary/30 hover:bg-accent-secondary/20"
                 >
                   <ArrowDownUp className="w-3 h-3 text-muted-foreground" />
-                  <SelectValue>{MODE_LABELS[mode]}</SelectValue>
+                  <SelectValue>{t(MODE_LABEL_KEYS[mode])}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="default">Default</SelectItem>
-                  <SelectItem value="ticket-id">Ticket #</SelectItem>
-                  <SelectItem value="priority">Priority</SelectItem>
+                  <SelectItem value="default">{t('sortControl.modes.default')}</SelectItem>
+                  <SelectItem value="ticket-id">{t('sortControl.modes.ticketId')}</SelectItem>
+                  <SelectItem value="priority">{t('sortControl.modes.priority')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </TooltipTrigger>
-          <TooltipContent>Sort: {MODE_LABELS[mode]}</TooltipContent>
+          <TooltipContent>{t('sortControl.tooltip', { mode: t(MODE_LABEL_KEYS[mode]) })}</TooltipContent>
         </Tooltip>
 
         {showArrow && (
@@ -59,14 +62,14 @@ export function SpecSortControl({ mode, dir, onChange, className }: SpecSortCont
             <TooltipTrigger asChild>
               <button
                 type="button"
-                aria-label="Toggle sort direction"
+                aria-label={t('sortControl.toggleDirAriaLabel')}
                 onClick={() => onChange(mode, dir === 'asc' ? 'desc' : 'asc')}
                 className="inline-flex items-center justify-center h-7 w-7 rounded-md border border-accent-secondary/30 bg-accent-secondary/10 hover:bg-accent-secondary/20 text-muted-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               >
                 {dir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
               </button>
             </TooltipTrigger>
-            <TooltipContent>{dir === 'asc' ? 'Ascending' : 'Descending'}</TooltipContent>
+            <TooltipContent>{dir === 'asc' ? t('sortControl.ascending') : t('sortControl.descending')}</TooltipContent>
           </Tooltip>
         )}
       </div>

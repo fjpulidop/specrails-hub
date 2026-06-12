@@ -1,0 +1,75 @@
+{
+  "topBar": {
+    "title": "Terminal",
+    "openCliMulti": "Open AI CLI in new terminal",
+    "openCli": "Open {{cli}} in new terminal",
+    "maxTerminals": "Max {{max}} terminals per project",
+    "openInBrowser": "Open in browser",
+    "pasteScript": "Paste quick script into active terminal",
+    "pasteScriptNoActive": "No active terminal to paste into",
+    "newTerminal": "New terminal",
+    "killActive": "Kill active terminal",
+    "restorePanel": "Restore panel",
+    "maximizePanel": "Maximize panel"
+  },
+  "panelChevron": {
+    "collapse": "Collapse terminal panel",
+    "expand": "Expand terminal panel"
+  },
+  "dragHandle": {
+    "resize": "Resize terminal panel"
+  },
+  "sidebar": {
+    "rename": "Rename {{name}}",
+    "close": "Close {{name}}"
+  },
+  "emptyState": {
+    "noTerminals": "No terminals yet for this project.",
+    "newTerminal": "New terminal"
+  },
+  "search": {
+    "placeholder": "Find",
+    "previous": "Previous (Shift+Enter)",
+    "next": "Next (Enter)",
+    "matchCase": "Match case",
+    "regex": "Regex",
+    "wholeWord": "Whole word",
+    "close": "Close (Esc)"
+  },
+  "contextMenu": {
+    "paste": "Paste",
+    "selectAll": "Select All",
+    "clear": "Clear",
+    "search": "Search…",
+    "saveScrollback": "Save scrollback to file…",
+    "openPath": "Open {{path}}"
+  },
+  "cliMenu": {
+    "open": "Open {{name}}"
+  },
+  "shortcutMenu": {
+    "configureBrowserUrl": "Configure browser URL in settings…",
+    "editQuickScript": "Edit quick script in settings…"
+  },
+  "errors": {
+    "limitReached": "Terminal limit reached (max {{max}}).",
+    "spawnFailed": "The shell failed to start — the hub may be low on file descriptors. Try restarting the hub.",
+    "invalidName": "Invalid terminal name.",
+    "openFailed": "Failed to open terminal.",
+    "serverUnreachable": "Could not reach the server to open a terminal.",
+    "exitedImmediately": "Terminal exited immediately — the shell may have failed to start. If this keeps happening, restart the hub."
+  },
+  "session": {
+    "processExited": "[process exited]",
+    "processExitedWithCode": "[process exited (code {{code}})]"
+  },
+  "notifications": {
+    "commandFinished": "Command finished",
+    "commandFinishedNamed": "{{command}} finished",
+    "finishedBody": "exit {{code}} in {{elapsed}}"
+  },
+  "duration": {
+    "seconds": "{{seconds}}s",
+    "minutesSeconds": "{{minutes}}m {{seconds}}s"
+  }
+}

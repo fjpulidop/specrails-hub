@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Layers, Plus } from 'lucide-react'
@@ -96,6 +97,7 @@ function SortableRailWrapper({ railId, children }: { railId: string; children: (
 export const RAILS_COMPACT_THRESHOLD_PX = 320
 
 export function RailsBoard({ rails, ticketMap, providers, onModeChange, onProfileChange, onEngineChange, onUltracodeModelChange, onToggle, onTicketClick, onAddRail, onDeleteRail, onRenameRail, onTicketMoveToSpecs }: RailsBoardProps) {
+  const { t } = useTranslation('dashboard')
   const activeRails = rails.filter((r) => r.status === 'running').length
   const [jiggleMode, setJiggleMode] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -138,10 +140,10 @@ export function RailsBoard({ rails, ticketMap, providers, onModeChange, onProfil
       <div className="flex items-center justify-between px-4 h-12 border-b border-border/40 shrink-0">
         <div className="flex items-center gap-2">
           <Layers className="w-4 h-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-accent-secondary">Rails</h2>
+          <h2 className="text-sm font-semibold text-accent-secondary">{t('railsBoard.title')}</h2>
           {activeRails > 0 && (
             <span className="text-[10px] text-emerald-400 bg-emerald-400/10 rounded-full px-1.5 py-0.5 font-medium whitespace-nowrap">
-              {activeRails} running
+              {t('railsBoard.runningCount', { count: activeRails })}
             </span>
           )}
         </div>
@@ -151,7 +153,7 @@ export function RailsBoard({ rails, ticketMap, providers, onModeChange, onProfil
           className="flex items-center gap-1 h-7 px-2.5 text-xs font-medium rounded-md border border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
-          Add
+          {t('common:actions.add')}
         </button>
       </div>
 

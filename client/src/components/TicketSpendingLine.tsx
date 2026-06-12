@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getApiBase } from '../lib/api'
@@ -24,6 +25,7 @@ function fmtDur(ms: number): string {
 }
 
 export function TicketSpendingLine({ ticketId }: Props) {
+  const { t } = useTranslation('tickets')
   const [summary, setSummary] = useState<TicketSpendingSummary | null>(null)
   const navigate = useNavigate()
   const { activeProjectId } = useHub()
@@ -45,7 +47,7 @@ export function TicketSpendingLine({ ticketId }: Props) {
 
   const breakdown = (Object.entries(summary.bySurface) as Array<[Surface, { count: number; costUsd: number }]>)
     .filter(([, v]) => v.count > 0)
-    .map(([s, v]) => `${v.count} ${SURFACE_LABEL[s].toLowerCase()}`)
+    .map(([s, v]) => t('spendingLine.breakdownItem', { n: v.count, label: SURFACE_LABEL[s].toLowerCase() }))
     .join(' + ')
 
   return (
@@ -57,13 +59,13 @@ export function TicketSpendingLine({ ticketId }: Props) {
         navigate(`/analytics?ticketId=${ticketId}`)
       }}
       className="mt-1.5 group inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-      aria-label="View ticket spending in Analytics"
+      aria-label={t('spendingLine.ariaLabel')}
     >
       <span className="tabular-nums font-medium text-foreground">{fmtCost(summary.totalCostUsd)}</span>
       <span className="text-muted-foreground/60">·</span>
-      <span className="tabular-nums">{summary.totalTurns} turn{summary.totalTurns === 1 ? '' : 's'}</span>
+      <span className="tabular-nums">{t('spendingLine.turns', { count: summary.totalTurns })}</span>
       <span className="text-muted-foreground/60">·</span>
-      <span className="tabular-nums">{fmtDur(summary.activeDurationMs)} active</span>
+      <span className="tabular-nums">{t('spendingLine.active', { duration: fmtDur(summary.activeDurationMs) })}</span>
       {breakdown && (
         <>
           <span className="text-muted-foreground/60">·</span>

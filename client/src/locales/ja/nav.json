@@ -1,0 +1,104 @@
+{
+  "sidebarPin": {
+    "withShortcut": "{{label}} ({{shortcut}})",
+    "left": {
+      "pinnedOpen": "左サイドバーを折りたたむ (ピン留めは維持)",
+      "pinnedCollapsed": "左サイドバーのピン留めを解除",
+      "unpinned": "左サイドバーを開いた状態でピン留め"
+    },
+    "right": {
+      "pinnedOpen": "右サイドバーを折りたたむ (ピン留めは維持)",
+      "pinnedCollapsed": "右サイドバーのピン留めを解除",
+      "unpinned": "右サイドバーを開いた状態でピン留め"
+    }
+  },
+  "projects": {
+    "addProject": "プロジェクトを追加",
+    "remove": "{{name}} を削除",
+    "confirmRemove": "{{name}} の削除を確認",
+    "confirmShort": "削除しますか？",
+    "added": "プロジェクトを追加しました: {{name}}",
+    "removed": "プロジェクトを削除しました"
+  },
+  "arcSidebar": {
+    "hubTitle": "ハブ",
+    "docs": "ドキュメント",
+    "analytics": "分析",
+    "settings": "設定"
+  },
+  "rightSidebar": {
+    "projectTitle": "プロジェクト",
+    "dashboard": "ダッシュボード",
+    "jobs": "ジョブ",
+    "analytics": "分析",
+    "agents": "エージェント",
+    "code": "コード",
+    "integrations": "インテグレーション",
+    "settings": "設定"
+  },
+  "navbar": {
+    "home": "ホーム",
+    "analytics": "分析",
+    "docs": "ドキュメント",
+    "settings": "設定",
+    "noCli": "AI CLI なし",
+    "noCliTooltip": "AI CLI が見つかりません。Claude Code または Codex CLI をインストールしてください。",
+    "activeCli": "使用中の CLI: {{label}}"
+  },
+  "statusBar": {
+    "connected": "接続済み",
+    "syncing": "同期中...",
+    "reconnecting": "再接続中...",
+    "disconnected": "切断",
+    "connectionRestored": "接続が回復しました"
+  },
+  "titleBar": {
+    "searchShortcut": "検索 (⌘K)",
+    "searchPlaceholder": "検索…",
+    "minimizeWindow": "ウィンドウを最小化",
+    "maximizeWindow": "ウィンドウを最大化",
+    "closeWindow": "ウィンドウを閉じる"
+  },
+  "costAlerts": {
+    "costAlertTitle": "コストアラート",
+    "costAlertDescription": "ジョブのコストが ${{cost}} — しきい値は ${{threshold}} です",
+    "dailyBudgetTitle": "1 日の予算を超過しました",
+    "dailyBudgetDescription": "本日 ${{budget}} のうち ${{spent}} を消費しました。キューを一時停止しました。",
+    "hubBudgetTitle": "ハブの 1 日の予算を超過しました",
+    "hubBudgetDescription": "ハブ全体で ${{budget}} のうち ${{spent}} を消費。キューを一時停止しました。",
+    "bannerMessage": "1 日の予算を超過しました — ${{budget}} のうち ${{spent}} を消費。キューは一時停止中です。",
+    "dismiss": "閉じる"
+  },
+  "errorBoundary": {
+    "title": "問題が発生しました",
+    "occurredIn": "<strong>{{name}}</strong> でエラーが発生しました"
+  },
+  "healthWidget": {
+    "healthLabel": "ヘルス",
+    "notAvailable": "n/a",
+    "factorCoverageAvailable": "カバレッジあり",
+    "factorCoverageGood": "カバレッジ ≥ 70%",
+    "factorPipelineGreen": "直近のパイプラインが成功",
+    "factorActiveWeek": "今週アクティブ",
+    "noJobsYet": "ジョブはまだありません",
+    "recurringFailures": "繰り返し発生する失敗を検出しました",
+    "failurePattern": "<cmd>{{command}}</cmd> が今週 <times>{{count}}×</times> 失敗しました — プロジェクト側の問題の可能性があります。",
+    "coverage": "カバレッジ",
+    "lines": "行",
+    "functions": "関数",
+    "branches": "分岐",
+    "lastPipeline": "直近のパイプライン",
+    "recentCommits": "最近のコミット",
+    "noGitHistory": "git 履歴が見つかりません",
+    "minutesAgo": "{{count}}分前",
+    "hoursAgo": "{{count}}時間前",
+    "daysAgo": "{{count}}日前"
+  },
+  "collapsibleSection": {
+    "dragToReorder": "ドラッグで並べ替え",
+    "unpinAria": "セクションのピン留めを解除 (デフォルトで折りたたみ)",
+    "pinAria": "セクションをピン留め (常に展開)",
+    "unpinTooltip": "ピン留め解除 (デフォルトで折りたたみ)",
+    "pinTooltip": "ピン留めして開く (常に展開)"
+  }
+}

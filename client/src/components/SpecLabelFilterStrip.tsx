@@ -1,4 +1,5 @@
 import { useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import type { LocalTicket } from '../types'
 
@@ -91,6 +92,7 @@ interface SpecLabelFilterStripProps {
 }
 
 export function SpecLabelFilterStrip({ tickets, active, onToggle, onClear }: SpecLabelFilterStripProps) {
+  const { t } = useTranslation('specs')
   const entries = useMemo(() => {
     const counts = new Map<string, number>()
     for (const t of tickets) {
@@ -141,7 +143,7 @@ export function SpecLabelFilterStrip({ tickets, active, onToggle, onClear }: Spe
           <X className="w-2.5 h-2.5" />
           <span>{active.size}</span>
           <span className="opacity-60">·</span>
-          <span>clear</span>
+          <span>{t('labelFilter.clear')}</span>
         </button>
       )}
       {entries.map(([label, count]) => {

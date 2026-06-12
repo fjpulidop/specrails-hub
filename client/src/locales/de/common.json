@@ -1,0 +1,52 @@
+{
+  "actions": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "delete": "Löschen",
+    "confirm": "Bestätigen",
+    "retry": "Wiederholen",
+    "search": "Suchen",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "back": "Zurück",
+    "next": "Weiter",
+    "done": "Fertig",
+    "open": "Öffnen",
+    "add": "Hinzufügen",
+    "remove": "Entfernen",
+    "edit": "Bearbeiten",
+    "rename": "Umbenennen",
+    "duplicate": "Duplizieren",
+    "refresh": "Aktualisieren",
+    "export": "Exportieren",
+    "discard": "Verwerfen",
+    "minimize": "Minimieren",
+    "expand": "Ausklappen",
+    "collapse": "Einklappen",
+    "viewAll": "Alle anzeigen",
+    "learnMore": "Mehr erfahren"
+  },
+  "states": {
+    "loading": "Wird geladen…",
+    "saving": "Wird gespeichert…",
+    "error": "Fehler",
+    "empty": "Keine Daten",
+    "none": "Keine",
+    "unknown": "Unbekannt",
+    "yes": "Ja",
+    "no": "Nein",
+    "on": "Ein",
+    "off": "Aus",
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert"
+  },
+  "status": {
+    "queued": "In Warteschlange",
+    "running": "Läuft",
+    "completed": "Abgeschlossen",
+    "failed": "Fehlgeschlagen",
+    "canceled": "Abgebrochen",
+    "draft": "Entwurf"
+  }
+}

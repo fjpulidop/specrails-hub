@@ -1,0 +1,105 @@
+{
+  "modal": {
+    "dialogLabel": "Captura do browser",
+    "nav": {
+      "forward": "Avançar",
+      "reload": "Recarregar"
+    },
+    "address": {
+      "placeholder": "Introduza um URL e prima Ir…",
+      "label": "Barra de endereço",
+      "go": "Ir"
+    },
+    "viewport": {
+      "groupLabel": "Tamanho do viewport",
+      "presetLabel": "Viewport {{preset}}",
+      "presetTitle": "Viewport: {{preset}}",
+      "fit": "ajustar",
+      "desktop": "desktop",
+      "tablet": "tablet",
+      "mobile": "móvel"
+    },
+    "network": {
+      "ariaLabel": "Capturar pedidos de rede",
+      "titleOn": "A capturar os pedidos de rede da página (clique para desativar)",
+      "titleOff": "Captura de rede desativada (clique para ativar)",
+      "button": "Rede"
+    },
+    "allSizes": {
+      "ariaLabel": "Capturar em todos os tamanhos de ecrã",
+      "titleOn": "Vai capturar este elemento em desktop, tablet e móvel (clique para desativar)",
+      "titleOff": "Capturar em todos os tamanhos: desktop, tablet e móvel",
+      "button": "Todos os tamanhos"
+    },
+    "select": {
+      "active": "Clique num elemento ou arraste…",
+      "start": "Selecionar para criar spec",
+      "hint": "Clique num elemento destacado para o capturar, ou arraste um retângulo personalizado. Use o breadcrumb (ou ↑/↓) para refinar. Prima Esc para cancelar."
+    },
+    "closeBrowser": "Fechar browser",
+    "status": {
+      "connecting": "A ligar ao browser…",
+      "unavailable": "Browser indisponível",
+      "opening": "A abrir o browser…",
+      "capturing": "A capturar…"
+    },
+    "error": {
+      "unavailable": "O browser está indisponível.",
+      "devHint": "Em dev, execute <cmd>npx playwright install chromium</cmd> uma vez. Na app desktop, o Chromium vem incluído."
+    },
+    "breadcrumb": {
+      "hint": "↑ pai · ↓ filho"
+    },
+    "toast": {
+      "captured": "Seleção da página capturada",
+      "captureFailed": "Falha na captura"
+    }
+  },
+  "editor": {
+    "tools": {
+      "arrow": "Seta (A)",
+      "box": "Caixa (R)",
+      "text": "Texto (T)",
+      "blur": "Desfocar / ocultar (B)",
+      "step": "Número de passo (N)"
+    },
+    "notePrompt": "Texto da nota:",
+    "colorLabel": "Cor {{color}}",
+    "undo": "Anular",
+    "undoTitle": "Anular (⌘Z)",
+    "redo": "Refazer",
+    "redoTitle": "Refazer (⌘⇧Z)",
+    "capturedAlt": "Seleção capturada",
+    "discardConfirm": "Descartar anotações?",
+    "reselect": "Selecionar novamente",
+    "createSpec": "Criar spec",
+    "skipContinue": "Ignorar e continuar"
+  },
+  "domPanel": {
+    "header": "Página capturada · {{title}}",
+    "badge": {
+      "elements_one": "{{count}} elemento",
+      "elements_other": "{{count}} elementos",
+      "tokens": "tokens",
+      "requests": "{{count}} ped.",
+      "truncated": "truncado"
+    },
+    "removeLabel": "Remover contexto da página capturada",
+    "noMarkup": "(nenhum markup capturado)",
+    "appliedCss": "CSS aplicado",
+    "appliedCssTruncated": "CSS aplicado (truncado)",
+    "designTokens": "Design tokens",
+    "fonts": "Fontes:",
+    "copyJson": "Copiar como JSON",
+    "copied": "Copiado!",
+    "network_one": "Rede · {{count}} pedido",
+    "network_other": "Rede · {{count}} pedidos"
+  },
+  "session": {
+    "connectionError": "Erro de ligação",
+    "lostConnection": "Perdeu-se a ligação ao browser. Feche e reabra «A partir de um website».",
+    "tooManySessions": "Demasiadas sessões de browser abertas. Feche uma e tente novamente.",
+    "launchFailed": "O browser não conseguiu arrancar no servidor.",
+    "openFailed": "Não foi possível abrir o browser."
+  }
+}

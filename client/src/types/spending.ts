@@ -1,3 +1,5 @@
+import i18n from '../lib/i18n'
+
 export type Surface = 'job' | 'quick-spec' | 'explore-spec' | 'ai-edit' | 'smash' | 'file-summary'
 export type SurfaceFilter = Surface | 'all'
 export type Period = '7d' | '30d' | '90d' | 'all' | 'custom'
@@ -138,14 +140,28 @@ export interface TicketSpendingSummary {
   totalRuns: number
 }
 
-export const SURFACE_LABEL: Record<Surface, string> = {
-  job: 'Jobs',
-  'quick-spec': 'Quick',
-  'explore-spec': 'Explore',
-  'ai-edit': 'Refine',
-  smash: 'SMASH',
-  'file-summary': 'File summaries',
+const SURFACE_LABEL_KEYS: Record<Surface, string> = {
+  job: 'analytics:surfaces.job',
+  'quick-spec': 'analytics:surfaces.quickSpec',
+  'explore-spec': 'analytics:surfaces.exploreSpec',
+  'ai-edit': 'analytics:surfaces.aiEdit',
+  smash: 'analytics:surfaces.smash',
+  'file-summary': 'analytics:surfaces.fileSummary',
 }
+
+/** Live-translated surface labels. Property getters resolve through i18next at
+ *  access time, so consumers that re-render on language change (anything
+ *  calling `useTranslation`) always read the active language — no signature
+ *  change required for existing `SURFACE_LABEL[s]` call sites. */
+export const SURFACE_LABEL: Record<Surface, string> = Object.defineProperties(
+  {} as Record<Surface, string>,
+  Object.fromEntries(
+    (Object.keys(SURFACE_LABEL_KEYS) as Surface[]).map((s) => [
+      s,
+      { get: () => i18n.t(SURFACE_LABEL_KEYS[s]), enumerable: true },
+    ])
+  ) as PropertyDescriptorMap
+)
 
 /** Surface → semantic accent token (Tailwind class name) used across the dashboard. */
 export const SURFACE_ACCENT: Record<Surface, { bg: string; text: string; ring: string; dot: string }> = {

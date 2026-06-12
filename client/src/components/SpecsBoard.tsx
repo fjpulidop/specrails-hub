@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { FileText, Plus, CheckCircle2 } from 'lucide-react'
@@ -19,6 +20,7 @@ import { ProposeSpecModal, type ExploreLaunchPayload } from './ProposeSpecModal'
 import { ExploreSpecShell } from './explore-spec/ExploreSpecShell'
 import { useMinimizedChats, usePendingRestore } from '../context/MinimizedChatsContext'
 import { useHub } from '../hooks/useHub'
+import i18n from '../lib/i18n'
 import { deleteAllAttachments } from '../lib/attachments'
 import {
   loadActiveExploreSpec,
@@ -190,7 +192,7 @@ function deriveExploreLabel(
   if (seed) return seed
   const idea = ideaText.trim()
   if (idea) return idea.length > 60 ? idea.slice(0, 57) + '…' : idea
-  return 'Untitled spec'
+  return i18n.t('specs:board.untitledSpec')
 }
 
 export function SpecsBoard({
@@ -212,6 +214,7 @@ export function SpecsBoard({
   onTicketStatusChange,
   onTicketPriorityChange,
 }: SpecsBoardProps) {
+  const { t } = useTranslation('specs')
   const [jiggleMode, setJiggleMode] = useState(false)
   // Exit jiggle mode when clicking outside any card or pressing Escape.
   useEffect(() => {
@@ -474,7 +477,7 @@ export function SpecsBoard({
       <div className="flex items-center px-4 h-12 border-b border-border/40 shrink-0 gap-2">
         <div className="flex items-center gap-2 shrink-0">
           <FileText className="w-4 h-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-accent-primary">Spec</h2>
+          <h2 className="text-sm font-semibold text-accent-primary">{t('board.title')}</h2>
           {tickets.length + doneTickets.length > 0 && (
             <span className="text-[10px] text-muted-foreground bg-muted/30 rounded-full px-1.5 py-0.5">
               {activeLabels.size > 0
@@ -510,7 +513,7 @@ export function SpecsBoard({
           data-tour="add-spec-btn"
         >
           <Plus className="w-3.5 h-3.5" />
-          Add
+          {t('common:actions.add')}
         </Button>
       </div>
 
@@ -540,15 +543,15 @@ export function SpecsBoard({
                 <FileText className="w-8 h-8 mb-3 opacity-20" />
                 <p className="text-sm">
                   {isOver
-                    ? 'Drop here'
+                    ? t('board.dropHere')
                     : tickets.length === 0
-                      ? 'No specs yet'
+                      ? t('board.emptyNoSpecs')
                       : activeLabels.size > 0
-                        ? 'No specs match the active labels'
-                        : 'No active specs'}
+                        ? t('board.emptyNoLabelMatch')
+                        : t('board.emptyNoActiveSpecs')}
                 </p>
                 {!isOver && tickets.length === 0 && (
-                  <p className="text-xs mt-1 opacity-60">Click "+ Add" to get started</p>
+                  <p className="text-xs mt-1 opacity-60">{t('board.emptyHint')}</p>
                 )}
               </div>
             ) : viewTier === 'postit' && onMoveToRail ? (
@@ -628,7 +631,7 @@ export function SpecsBoard({
           >
             <div className="flex items-center gap-2 py-1.5">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400/70" />
-              <span className="text-[11px] font-medium text-muted-foreground">Done</span>
+              <span className="text-[11px] font-medium text-muted-foreground">{t('status.done')}</span>
               <span className="text-[10px] text-muted-foreground/60 bg-muted/20 rounded-full px-1.5 py-0.5">
                 {activeLabels.size > 0
                   ? `${visibleDoneTickets.length}/${doneTickets.length}`
@@ -650,10 +653,10 @@ export function SpecsBoard({
                 <CheckCircle2 className="w-6 h-6 mb-2 opacity-15" />
                 <p className="text-xs opacity-60">
                   {isDoneOver
-                    ? 'Drop to mark as done'
+                    ? t('board.dropToMarkDone')
                     : activeLabels.size > 0 && doneTickets.length > 0
-                      ? 'No done specs match the active labels'
-                      : 'No completed specs yet'}
+                      ? t('board.emptyNoDoneLabelMatch')
+                      : t('board.emptyNoCompleted')}
                 </p>
               </div>
             ) : doneViewTier === 'postit' && onMoveToRail ? (

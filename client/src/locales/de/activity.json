@@ -1,0 +1,108 @@
+{
+  "feed": {
+    "title": "Aktivität",
+    "emptyTitle": "Noch keine Aktivität",
+    "emptyHint": "Job-Ereignisse erscheinen hier, sobald Jobs laufen",
+    "allLoaded": "Gesamte Aktivität geladen",
+    "typeStarted": "Gestartet",
+    "phaseCommand": "Phase: {{phase}} → {{state}}",
+    "relativeTime": {
+      "seconds": "vor {{value}}s",
+      "minutes": "vor {{value}}m",
+      "hours": "vor {{value}}h",
+      "days": "vor {{value}}d"
+    }
+  },
+  "specGen": {
+    "generating": "Wird generiert... {{elapsed}}",
+    "generatedIn": "Generiert in {{elapsed}}",
+    "specCreated": "Spec erstellt",
+    "view": "Anzeigen",
+    "errorGenerating": "Fehler beim Generieren der Spec",
+    "couldNotFind": "Generierte Spec wurde nicht gefunden",
+    "couldNotConfirm": "Erstellung der Spec konnte nicht bestätigt werden"
+  },
+  "contractRefine": {
+    "refining": "Contract wird verfeinert…",
+    "retryRejected": "Wiederholung abgelehnt",
+    "retryRejectedWithError": "Wiederholung abgelehnt: {{error}}",
+    "retryFailed": "Wiederholung fehlgeschlagen: {{message}}",
+    "skipped": "Contract Layer übersprungen – Ticket ohne ihn gespeichert",
+    "reason": "Grund: {{reason}}",
+    "added": "Contract Layer hinzugefügt · {{title}}"
+  },
+  "smash": {
+    "stage": {
+      "analyzing": "Spec wird analysiert…",
+      "identifying": "Teilaufgaben werden identifiziert…",
+      "ordering": "Ausführung wird geordnet…"
+    },
+    "onTitled": "SMASH auf „{{title}}“",
+    "onThisSpec": "SMASH auf dieser Spec",
+    "split_one": "Spec in {{count}} Sub-Spec aufgeteilt",
+    "split_other": "Spec in {{count}} Sub-Specs aufgeteilt",
+    "undoAction": "Rückgängig",
+    "undone": "SMASH rückgängig gemacht",
+    "undoFailed": "Rückgängig machen fehlgeschlagen",
+    "undoFailedWithReason": "Rückgängig machen fehlgeschlagen: {{reason}}",
+    "retrying": "SMASH wird wiederholt…",
+    "couldNotRetry": "Wiederholung nicht möglich",
+    "couldNotRetryWithReason": "Wiederholung nicht möglich: {{reason}}",
+    "retryFailed": "Wiederholung fehlgeschlagen: {{message}}",
+    "couldNotComplete": "SMASH konnte nicht abgeschlossen werden",
+    "failReason": {
+      "invalidOutput": "Der Agent hat eine ungültige Ausgabe geliefert",
+      "timeout": "Der Agent hat zu lange gebraucht",
+      "modelError": "Das Modell hat einen Fehler zurückgegeben",
+      "crashed": "Der Agent-Prozess ist abgestürzt",
+      "generic": "Grund: {{reason}}"
+    },
+    "couldNotStart": "SMASH konnte nicht gestartet werden",
+    "couldNotStartWithReason": "SMASH konnte nicht gestartet werden: {{reason}}",
+    "smashFailed": "SMASH fehlgeschlagen: {{message}}",
+    "couldNotDeleteChildren": "Aktuelle Sub-Specs konnten nicht gelöscht werden",
+    "deleteFailed": "Löschen fehlgeschlagen: {{message}}",
+    "smashButton": "Spec per SMASH in Sub-Specs aufteilen",
+    "reSmashButton": "Re-SMASH"
+  },
+  "smashModal": {
+    "title": "Spec per SMASH in Sub-Specs aufteilen",
+    "modePickerLabel": "Zerlegungsmodus",
+    "reSmashWarning_one": "⚠️ Dies löscht die <strong>{{count}}</strong> aktuelle Sub-Spec und erstellt neue.",
+    "reSmashWarning_other": "⚠️ Dies löscht die <strong>{{count}}</strong> aktuellen Sub-Specs und erstellt neue.",
+    "modes": {
+      "simple": {
+        "title": "Einfach",
+        "eta": "~10-30s",
+        "bullet1": "One-Shot-Zerlegung allein auf Basis von Titel und Beschreibung der Spec.",
+        "bullet2": "Kein Codebase-Zugriff – schnell und deterministisch.",
+        "bullet3": "Am besten für saubere Specs mit starkem Contract Layer."
+      },
+      "full": {
+        "title": "Vollständig",
+        "eta": "~3-10 min",
+        "bullet1": "Tiefe Multi-Turn-Zerlegung mit Lesezugriff auf die Codebase – liest aggressiv.",
+        "bullet2": "Jede Sub-Spec ist eine Super-Spec: Hintergrund, Plan, Dateien, Edge Cases, Out-of-Scope, Tests.",
+        "bullet3": "4–10 Akzeptanzkriterien pro Sub-Spec, verankert in echten Dateipfaden.",
+        "bullet4": "Tokens werden großzügig eingesetzt – Qualität vor Geschwindigkeit."
+      }
+    },
+    "starting": "Wird gestartet…",
+    "confirmReSmash": "Re-SMASH bestätigen",
+    "smash": "SMASH"
+  },
+  "family": {
+    "subSpecsHeader": "Sub-Specs ({{count}})",
+    "emptySubSpecs": "Keine Sub-Specs. Nutze Re-SMASH zum Neugenerieren.",
+    "familyHeader_one": "Familie ({{count}} Sub-Spec)",
+    "familyHeader_other": "Familie ({{count}} Sub-Specs)",
+    "noSiblings": "Keine Geschwister.",
+    "openParentEpic": "Übergeordnetes Epic {{title}} öffnen",
+    "openSubSpec": "Sub-Spec {{title}} öffnen"
+  },
+  "epicChildren": {
+    "header": "Sub-Specs ({{count}})",
+    "empty": "Keine Sub-Specs. Dieses Epic wurde geleert – nutze Re-SMASH zum Neugenerieren.",
+    "step": "· Schritt {{order}} von {{total}}"
+  }
+}

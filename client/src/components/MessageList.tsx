@@ -1,15 +1,16 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MessageSquare } from 'lucide-react'
 import { MessageBubble } from './MessageBubble'
 import type { ChatMessage } from '../types'
 import type { HubProject } from '../hooks/useHub'
 
-const SUGGESTIONS = [
-  'What\'s the current project status?',
-  'Show me recent job failures',
-  'What tests should I run?',
-  'Explain the main architecture',
-]
+const SUGGESTION_KEYS = [
+  'currentStatus',
+  'recentFailures',
+  'testsToRun',
+  'mainArchitecture',
+] as const
 
 interface MessageListProps {
   messages: ChatMessage[]
@@ -30,6 +31,7 @@ export function MessageList({
   onDismissCommand,
   onSuggestion,
 }: MessageListProps) {
+  const { t } = useTranslation('chat')
   const sentinelRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const userScrolledRef = useRef(false)
@@ -61,25 +63,28 @@ export function MessageList({
             <>
               <div className="flex flex-col gap-0.5">
                 <p className="text-xs font-medium text-foreground">{project.name}</p>
-                <p className="text-[10px] text-muted-foreground/50">Context loaded — ready to help</p>
+                <p className="text-[10px] text-muted-foreground/50">{t('messageList.contextLoaded')}</p>
               </div>
               <div className="flex flex-col gap-1.5 w-full">
-                {SUGGESTIONS.map((s) => (
-                  <button
-                    key={s}
-                    className="rounded border border-border/30 px-2.5 py-1.5 text-left text-[11px] text-muted-foreground hover:border-accent-primary/40 hover:text-foreground transition-colors"
-                    onClick={() => onSuggestion?.(s)}
-                  >
-                    {s}
-                  </button>
-                ))}
+                {SUGGESTION_KEYS.map((key) => {
+                  const s = t(`messageList.suggestions.${key}`)
+                  return (
+                    <button
+                      key={key}
+                      className="rounded border border-border/30 px-2.5 py-1.5 text-left text-[11px] text-muted-foreground hover:border-accent-primary/40 hover:text-foreground transition-colors"
+                      onClick={() => onSuggestion?.(s)}
+                    >
+                      {s}
+                    </button>
+                  )
+                })}
               </div>
             </>
           ) : (
             <>
-              <p className="text-xs font-medium text-muted-foreground">No messages yet</p>
+              <p className="text-xs font-medium text-muted-foreground">{t('messageList.noMessages')}</p>
               <p className="text-[11px] text-muted-foreground/60 max-w-[180px]">
-                Ask Claude anything about your project
+                {t('messageList.askAnything')}
               </p>
             </>
           )}

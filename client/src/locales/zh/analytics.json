@@ -1,0 +1,144 @@
+{
+  "surfaces": {
+    "job": "任务",
+    "quickSpec": "Quick",
+    "exploreSpec": "Explore",
+    "aiEdit": "AI 编辑",
+    "smash": "SMASH",
+    "fileSummary": "文件摘要"
+  },
+  "periods": {
+    "d7": "7天",
+    "d30": "30天",
+    "d90": "90天",
+    "all": "全部",
+    "custom": "自定义",
+    "startDate": "开始日期",
+    "endDate": "结束日期",
+    "to": "至"
+  },
+  "runs_one": "{{count}} 次运行",
+  "runs_other": "{{count}} 次运行",
+  "page": {
+    "title": "分析",
+    "all": "全部",
+    "engine": "引擎",
+    "ticketChip": "工单 #{{id}} ·  ✕",
+    "failedToLoad": "加载失败：{{error}}"
+  },
+  "hero": {
+    "spending": "支出",
+    "vsPrev": "较上期 {{pct}}%",
+    "invocations_one": "{{count}} 次调用",
+    "invocations_other": "{{count}} 次调用",
+    "tokens": "· {{tokens}} token",
+    "tokensTooltip": "总 token 数 = 此时间窗口内所有调用的新输入 + 输出 + 缓存读取 + 缓存创建之和。",
+    "includesEstimated": "· 含约 {{amount}} 估算值",
+    "includesEstimatedTooltip": "包含 {{amount}} 的估算成本，来自不原生上报成本的提供方（例如 codex，按本地价格表估算）。",
+    "trackingStarted": "追踪始于 {{date}}",
+    "trackingStartedFallback": "首次调用后开始追踪",
+    "emptyState": "当前筛选窗口内暂无调用。",
+    "segmentTitle": "{{label}}：{{value}}"
+  },
+  "providerCard": {
+    "title": "按提供方",
+    "description": "此项目中各 AI CLI 的成本分布。<tilde>~</tilde> 前缀表示该行成本由本地价格表估算（提供方不原生上报）。",
+    "noCost": "此时间窗口内暂无成本记录。",
+    "segmentTitle": "{{label}}：{{value}}（{{count}}）"
+  },
+  "timeline": {
+    "title": "每日时间线",
+    "subtitle": "按来源堆叠",
+    "empty": "此期间没有支出。"
+  },
+  "quickVsExplore": {
+    "title": "Quick vs Explore",
+    "quick": "Quick",
+    "explore": "Explore",
+    "sparseCta": "试试 Explore，获得更丰富的 spec",
+    "runsSoFar_one": "目前 {{count}} 次运行",
+    "runsSoFar_other": "目前 {{count}} 次运行",
+    "perSpec": "每个 spec",
+    "createdRuns": "已创建 <strong>{{created}}</strong> · {{runs}} 次运行",
+    "avgDuration": "平均 {{duration}}",
+    "ratio": "每个 spec 多 {{ratio}}×"
+  },
+  "models": {
+    "title": "模型",
+    "empty": "暂无模型记录。"
+  },
+  "scatter": {
+    "title": "成本 vs 轮次",
+    "empty": "暂无可绘制的调用。",
+    "turnsLabel": "轮次",
+    "costLabel": "成本"
+  },
+  "topTickets": {
+    "title": "热门工单",
+    "empty": "此期间没有工单活动。",
+    "breakdownItem": "{{n}} {{label}}",
+    "unattributed": "未归属",
+    "deletedTicket": "已删除工单 #{{id}}"
+  },
+  "table": {
+    "title": "全部调用",
+    "statusFilterAria": "状态筛选",
+    "minCostFilterAria": "最低成本筛选",
+    "minCostPlaceholder": "≥ $0.00",
+    "allStatus": "全部状态",
+    "success": "成功",
+    "failed": "失败",
+    "aborted": "已中止",
+    "empty": "没有符合当前筛选条件的调用。",
+    "colSurface": "来源",
+    "colTicket": "工单",
+    "colCost": "成本",
+    "colTurns": "轮次",
+    "colTokens": "Token",
+    "colModel": "模型",
+    "colStatus": "状态",
+    "colStarted": "开始时间",
+    "contractLayer": "Contract Layer",
+    "contractLayerRefinement": "Contract Layer 增强",
+    "deleted": "（已删除）",
+    "provisionalTitleTooltip": "Explore 临时标题——尚未提交",
+    "estimatedCostTooltip": "按本地价格表估算——此提供方不原生上报成本。",
+    "inferred": "推断",
+    "statusValue": {
+      "success": "成功",
+      "failed": "失败",
+      "aborted": "已中止"
+    },
+    "truncated": "显示前 {{shown}} 条，共 {{total}} 条匹配记录。"
+  },
+  "export": {
+    "summaryCsv": "摘要 CSV",
+    "rawCsv": "原始 CSV",
+    "summaryJson": "摘要 JSON",
+    "rawJson": "原始 JSON",
+    "downloading": "正在下载…",
+    "noData": "当前筛选条件下无数据",
+    "failed": "导出失败"
+  },
+  "hub": {
+    "title": "Hub 分析",
+    "refreshAria": "刷新分析数据",
+    "failedToLoad": "加载分析数据失败：{{error}}",
+    "totalCost": "总成本",
+    "costToday": "今日 {{value}}",
+    "totalJobs": "任务总数",
+    "jobsToday": "今日 {{n}} 个",
+    "successRate": "成功率",
+    "acrossAllProjects": "所有项目汇总",
+    "avgCostPerJob": "平均成本 / 任务",
+    "periodAverage": "期间平均",
+    "costOverTime": "跨项目成本走势",
+    "noCostData": "此期间无成本数据",
+    "projectComparison": "项目对比",
+    "noProjects": "尚未注册任何项目。",
+    "jobsCount_one": "{{count}} 个任务",
+    "jobsCount_other": "{{count}} 个任务",
+    "successPct": "成功率 {{pct}}%",
+    "costByProject": "按项目统计成本"
+  }
+}

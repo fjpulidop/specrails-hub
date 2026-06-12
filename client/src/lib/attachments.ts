@@ -1,4 +1,5 @@
 import { getApiBase } from './api'
+import i18n from './i18n'
 import type { Attachment } from '../types'
 
 export async function uploadAttachment(
@@ -15,7 +16,7 @@ export async function uploadAttachment(
   })
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string }
-    throw new Error(body.error ?? `Upload failed (${res.status})`)
+    throw new Error(body.error ?? i18n.t('attachments:errors.uploadFailed', { status: res.status }))
   }
   const data = (await res.json()) as { attachment: Attachment }
   return data.attachment
@@ -24,20 +25,20 @@ export async function uploadAttachment(
 export async function deleteAttachment(ticketKey: string | number, attachmentId: string): Promise<void> {
   const res = await fetch(`${getApiBase()}/tickets/${ticketKey}/attachments/${attachmentId}`, { method: 'DELETE' })
   if (!res.ok && res.status !== 404) {
-    throw new Error(`Delete failed (${res.status})`)
+    throw new Error(i18n.t('attachments:errors.deleteFailed', { status: res.status }))
   }
 }
 
 export async function deleteAllAttachments(ticketKey: string | number): Promise<void> {
   const res = await fetch(`${getApiBase()}/tickets/${ticketKey}/attachments`, { method: 'DELETE' })
   if (!res.ok && res.status !== 404) {
-    throw new Error(`Bulk delete failed (${res.status})`)
+    throw new Error(i18n.t('attachments:errors.bulkDeleteFailed', { status: res.status }))
   }
 }
 
 export async function listAttachments(ticketKey: string | number): Promise<Attachment[]> {
   const res = await fetch(`${getApiBase()}/tickets/${ticketKey}/attachments`)
-  if (!res.ok) throw new Error(`List failed (${res.status})`)
+  if (!res.ok) throw new Error(i18n.t('attachments:errors.listFailed', { status: res.status }))
   const data = (await res.json()) as { attachments: Attachment[] }
   return data.attachments
 }
@@ -48,7 +49,7 @@ export function attachmentFileUrl(ticketKey: string | number, attachmentId: stri
 
 export async function fetchAttachmentBlob(ticketKey: string | number, attachmentId: string): Promise<Blob> {
   const res = await fetch(attachmentFileUrl(ticketKey, attachmentId))
-  if (!res.ok) throw new Error(`Fetch failed (${res.status})`)
+  if (!res.ok) throw new Error(i18n.t('attachments:errors.fetchFailed', { status: res.status }))
   return res.blob()
 }
 

@@ -1,0 +1,113 @@
+{
+  "page": {
+    "resizeFileTree": "Redimensionner l'arborescence de fichiers",
+    "selectFile": "Sélectionnez un fichier pour l'afficher."
+  },
+  "resizer": {
+    "hint": "Glissez pour redimensionner. Double-cliquez pour réinitialiser."
+  },
+  "toolbar": {
+    "scope": "Portée",
+    "allAi": "Toute l'IA",
+    "spec": "Spec",
+    "ticketIdPlaceholder": "id",
+    "copyFilePath": "Copier le chemin du fichier",
+    "generateSummary": "Générer le résumé",
+    "regenerateSummary": "Régénérer le résumé",
+    "generating": "Génération…",
+    "regenerating": "Régénération…",
+    "summaryUnavailable": "Résumé indisponible : {{reason}}",
+    "jobContext": "Contexte du job",
+    "clear": "Effacer"
+  },
+  "provenancePanel": {
+    "jobTitle": "Job {{jobId}}",
+    "specTitle": "Spec #{{ticketId}}",
+    "touchedFiles_one": "{{count}} fichier touché",
+    "touchedFiles_other": "{{count}} fichiers touchés",
+    "log": "Log"
+  },
+  "kind": {
+    "created": "créé",
+    "modified": "modifié",
+    "deleted": "supprimé"
+  },
+  "action": {
+    "added": "ajouté",
+    "changed": "modifié",
+    "deleted": "supprimé"
+  },
+  "viewer": {
+    "loadingFile": "Chargement du fichier…",
+    "showSummary": "Afficher le résumé",
+    "markdownViewMode": "Mode d'affichage Markdown",
+    "preview": "Aperçu",
+    "raw": "Brut",
+    "missingFile": "Ce fichier a été touché par un job IA mais n'existe plus dans l'arbre de travail.",
+    "binaryFile": "Fichier binaire.",
+    "tooLarge": "Fichier trop volumineux pour l'aperçu ({{size}} MB).",
+    "noContent": "Aucun contenu disponible.",
+    "pathCopied": "Chemin copié",
+    "copyPathFailed": "Impossible de copier le chemin",
+    "budgetPrompt": "Outrepasser le plafond de budget ?"
+  },
+  "summary": {
+    "generationFailed": "Échec de la génération du résumé",
+    "skipped": "Résumé ignoré : {{reason}}",
+    "unavailable": "Résumé indisponible : {{reason}}.",
+    "empty": "Pas encore de résumé pour ce fichier.",
+    "stale": "Obsolète",
+    "hide": "Masquer",
+    "reason": {
+      "missing": "fichier manquant",
+      "binary": "fichier binaire",
+      "tooLarge": "fichier trop volumineux"
+    }
+  },
+  "history": {
+    "resize": "Redimensionner l'historique des modifications IA",
+    "title_one": "Historique des modifications IA · {{count}} changement",
+    "title_other": "Historique des modifications IA · {{count}} changements",
+    "show": "Afficher",
+    "hide": "Masquer",
+    "unknownJob": "job inconnu",
+    "filterByJob": "Filtrer Code par le job {{jobId}}",
+    "diff": "Diff",
+    "openSpec": "Ouvrir la spec #{{ticketId}}",
+    "specChip": "spec #{{ticketId}}",
+    "loadingDiff": "Chargement du diff...",
+    "diffUnavailable": "Diff indisponible pour cette modification historique. Les nouveaux jobs enregistreront les patchs automatiquement.",
+    "diffTruncated": "[diff tronqué]"
+  },
+  "tree": {
+    "jobFiles": "Fichiers du job",
+    "specFiles": "Fichiers de la spec",
+    "touchedByAi": "Touchés par l'IA",
+    "allFiles": "Tous les fichiers",
+    "collapseAll": "Replier tous les dossiers",
+    "expandAll": "Déplier tous les dossiers",
+    "touchedCount_one": "{{count}} fichier touché par l'IA",
+    "touchedCount_other": "{{count}} fichiers touchés par l'IA",
+    "loadingFiles": "Chargement des fichiers…",
+    "emptyTouched": "Aucun fichier touché par l'IA pour l'instant. Lancez un job ou passez à Tous les fichiers.",
+    "showAllFiles": "Afficher tous les fichiers",
+    "noFiles": "Aucun fichier.",
+    "folderTouched_one": "{{count}} fichier touché par l'IA sous ce dossier",
+    "folderTouched_other": "{{count}} fichiers touchés par l'IA sous ce dossier",
+    "jobTitle": "Job {{jobId}}",
+    "createdBySpec": "Créé lors de l'implémentation de la spec #{{id}}",
+    "modifiedBySpec": "Modifié lors de l'implémentation de la spec #{{id}}",
+    "latestTitleCreated": "Le dernier job IA a ajouté ce fichier",
+    "latestTitleModified": "Le dernier job IA a modifié ce fichier",
+    "latestTitleDeleted": "Le dernier job IA a supprimé ce fichier"
+  },
+  "monaco": {
+    "loadFailed": "Échec du chargement de l'afficheur de code.",
+    "reload": "Recharger",
+    "loadingEditor": "Chargement de l'éditeur…"
+  },
+  "ticketFiles": {
+    "title": "Fichiers touchés par ce ticket",
+    "jobTitle": "Job {{jobId}}"
+  }
+}

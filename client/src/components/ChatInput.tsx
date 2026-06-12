@@ -1,4 +1,5 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from './ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { cn } from '../lib/utils'
@@ -37,6 +38,7 @@ export function ChatInput({
   onAbort,
   onModelChange,
 }: ChatInputProps) {
+  const { t } = useTranslation('chat')
   const MODEL_OPTIONS = provider === 'codex' ? CODEX_MODEL_OPTIONS : CLAUDE_MODEL_OPTIONS
   const [text, setText] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -94,7 +96,7 @@ export function ChatInput({
           </TooltipTrigger>
           {hasMessages && (
             <TooltipContent side="top">
-              Cannot change model during an active conversation
+              {t('input.modelLocked')}
             </TooltipContent>
           )}
         </Tooltip>
@@ -105,7 +107,7 @@ export function ChatInput({
             className="h-5 px-1.5 text-[10px] text-destructive hover:text-destructive"
             onClick={() => onAbort(conversationId)}
           >
-            Stop
+            {t('input.stop')}
           </Button>
         )}
       </div>
@@ -117,7 +119,7 @@ export function ChatInput({
           rows={1}
           value={text}
           disabled={isStreaming}
-          placeholder="Message..."
+          placeholder={t('input.placeholder')}
           className={cn(
             'flex-1 resize-none rounded-md border border-border/30 bg-background/60',
             'px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground',
@@ -136,7 +138,7 @@ export function ChatInput({
           className="h-7 shrink-0 px-2.5 text-xs"
           onClick={handleSend}
         >
-          Send
+          {t('input.send')}
         </Button>
       </div>
     </div>

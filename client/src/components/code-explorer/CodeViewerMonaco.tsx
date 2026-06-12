@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useActiveTheme } from '../../context/ThemeContext'
 import { ensureMonacoEnvironment, defineMonacoThemeFor } from '../../lib/monaco-setup'
 
@@ -8,6 +9,7 @@ interface InnerProps {
 }
 
 function InnerEditor({ content, language }: InnerProps) {
+  const { t } = useTranslation('code')
   const theme = useActiveTheme()
   const hostRef = useRef<HTMLDivElement | null>(null)
   const editorRef = useRef<unknown>(null)
@@ -83,13 +85,13 @@ function InnerEditor({ content, language }: InnerProps) {
   if (loadError) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-sm text-muted-foreground" data-testid="monaco-load-error">
-        <span>Failed to load the code viewer.</span>
+        <span>{t('monaco.loadFailed')}</span>
         <button
           type="button"
           onClick={() => window.location.reload()}
           className="rounded-md bg-accent-primary/15 px-3 py-1 text-xs text-accent-primary hover:bg-accent-primary/25"
         >
-          Reload
+          {t('monaco.reload')}
         </button>
       </div>
     )
@@ -105,11 +107,12 @@ export interface CodeViewerMonacoProps {
 }
 
 export function CodeViewerMonaco({ content, language }: CodeViewerMonacoProps) {
+  const { t } = useTranslation('code')
   return (
     <Suspense
       fallback={
         <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground animate-pulse">
-          Loading editor…
+          {t('monaco.loadingEditor')}
         </div>
       }
     >

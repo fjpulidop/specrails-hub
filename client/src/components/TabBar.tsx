@@ -1,5 +1,6 @@
 import { Plus, X, FolderOpen } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 import { useHub } from '../hooks/useHub'
 import type { HubProject } from '../hooks/useHub'
@@ -19,6 +20,7 @@ function ProjectTab({
   onSelect: () => void
   onRemove: () => void
 }) {
+  const { t } = useTranslation('nav')
   const [confirming, setConfirming] = useState(false)
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -80,15 +82,16 @@ function ProjectTab({
             ? 'opacity-50 hover:opacity-100 hover:bg-muted'
             : 'opacity-50 md:opacity-0 md:group-hover:opacity-50 hover:!opacity-100 hover:bg-muted')
         )}
-        aria-label={confirming ? `Confirm remove ${project.name}` : `Remove ${project.name}`}
+        aria-label={confirming ? t('projects.confirmRemove', { name: project.name }) : t('projects.remove', { name: project.name })}
       >
-        {confirming ? 'confirm?' : <X className="w-2.5 h-2.5" />}
+        {confirming ? t('projects.confirmShort') : <X className="w-2.5 h-2.5" />}
       </button>
     </div>
   )
 }
 
 export function TabBar({ onAddProject }: TabBarProps) {
+  const { t } = useTranslation('nav')
   const { projects, activeProjectId, setActiveProjectId, removeProject } = useHub()
 
   async function handleRemove(project: HubProject) {
@@ -115,10 +118,10 @@ export function TabBar({ onAddProject }: TabBarProps) {
         type="button"
         onClick={onAddProject}
         className="h-8 px-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-t-md transition-colors"
-        aria-label="Add project"
+        aria-label={t('projects.addProject')}
       >
         <Plus className="w-3.5 h-3.5" />
-        <span>Add project</span>
+        <span>{t('projects.addProject')}</span>
       </button>
     </div>
   )

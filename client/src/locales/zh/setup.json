@@ -1,0 +1,281 @@
+{
+  "wizard": {
+    "configureAgents": "配置 {{provider}} Agent",
+    "configureSubtitle": "选择要安装的 Agent 及其运行方式。",
+    "tabs": {
+      "agents": "Agent",
+      "models": "模型"
+    },
+    "skipForNow": "暂时跳过",
+    "install": "安装",
+    "nextProvider": "下一个：{{provider}}",
+    "installingProvider": "正在安装 {{provider}}…",
+    "installingSpecrails": "正在安装 specrails…",
+    "installingFromTemplates": "正在从模板安装 Agent",
+    "waitingForOutput": "等待输出…",
+    "checkpoints": {
+      "baseInstall": "基础安装",
+      "agentSelection": "Agent 选择",
+      "agentGeneration": "Agent 生成"
+    },
+    "steps": {
+      "configure": "配置"
+    },
+    "summary": {
+      "agents": "Agent",
+      "agentSkills": "Agent 技能",
+      "skills": "技能",
+      "openspecSkills": "OpenSpec 技能",
+      "legacyRemoved_one": "已移除 {{count}} 个旧版 <code>/specrails:*</code> 命令",
+      "legacyRemoved_other": "已移除 {{count}} 个旧版 <code>/specrails:*</code> 命令"
+    },
+    "complete": {
+      "welcome": "欢迎使用 <spec>spec</spec><rails>rails</rails>",
+      "configured": "<strong>{{projectName}}</strong> 现已配置好 AI 驱动的开发工作流。你的专属 Agent 和命令已就绪。",
+      "installedForEngines_one": "已为 {{count}} 个引擎安装",
+      "installedForEngines_other": "已为 {{count}} 个引擎安装",
+      "learnMore": "了解如何充分利用 specrails：",
+      "continueToProject": "进入项目"
+    },
+    "error": {
+      "title": "设置失败",
+      "skipSetup": "跳过设置",
+      "prereqMissing": "SpecRails 设置需要 Node.js、npm、npx 和 Git 在 PATH 上可用后才能安装此项目。",
+      "prereqRetryHint": "安装缺失的工具，重启 SpecRails Hub，然后重试设置。"
+    }
+  },
+  "addProject": {
+    "title": "添加项目",
+    "description": "注册一个项目目录，以便从 Hub 中管理。",
+    "noProviderDetected": "未检测到 AI CLI。请先安装 Claude Code 或 Codex CLI。",
+    "pathLabel": "项目路径",
+    "pathPlaceholder": "/Users/me/my-project",
+    "pathHint": "项目根目录的绝对路径",
+    "browseForFolder": "浏览文件夹",
+    "selectProjectFolder": "选择项目文件夹",
+    "nameLabel": "显示名称",
+    "optional": "（可选）",
+    "namePlaceholder": "我的项目",
+    "nameHint": "默认为目录名",
+    "providersLabel": "AI 提供商",
+    "notFound": "未找到",
+    "multiProviderHint": "两个引擎都将被安装。第一个为项目默认引擎。创建后不可更改。",
+    "singleProviderHint": "项目创建后不可更改。",
+    "adding": "添加中…",
+    "submit": "添加项目",
+    "toolsRequired_one": "添加项目需要 {{tools}}",
+    "toolsRequired_other": "添加项目需要 {{tools}}",
+    "errors": {
+      "pathRequired": "请输入项目路径",
+      "selectProvider": "请至少选择一个 AI 提供商",
+      "addFailed": "添加项目失败"
+    },
+    "toasts": {
+      "registered": "项目“{{name}}”已注册"
+    }
+  },
+  "prerequisites": {
+    "corruptedBundle": "应用包已损坏——请重新安装应用",
+    "notInstalled": "未安装",
+    "failedToExecute": "已找到但无法执行",
+    "failedToExecuteAt": "在 {{path}} 找到但无法执行",
+    "failedToExecuteWithError": "已找到但无法执行（{{error}}）",
+    "failedToExecuteAtWithError": "在 {{path}} 找到但无法执行（{{error}}）",
+    "needsMinimum": "已找到 {{version}}——需要 {{minVersion}}+",
+    "unknownVersion": "未知",
+    "installedLabel": "已安装",
+    "verifyError": "无法在本地验证开发工具——安装时将再次校验。",
+    "allDetected": "已检测到全部所需工具",
+    "bundleCorruptedTitle": "应用包已损坏",
+    "toolsRequired_one": "需要 {{count}} 个开发工具",
+    "toolsRequired_other": "需要 {{count}} 个开发工具",
+    "reinstallHint": "请重新安装 SpecRails Hub 应用以恢复内置工具。",
+    "installMissingHint": "请安装缺失的工具以继续。",
+    "moreInfo": "更多信息",
+    "bundledBadge": "内置"
+  },
+  "instructions": {
+    "title": "安装开发工具",
+    "description": "SpecRails 需要 PATH 上的 Node.js、npm、npx 和 Git。选择适合你操作系统的命令片段并运行，然后点击“我已安装，重新检测”。",
+    "darwin": {
+      "intro": "用 Homebrew 一行命令即可装好两个工具。如果没有 brew，请使用官方下载。",
+      "installNodeGit": "通过 Homebrew 安装 Node.js 和 Git"
+    },
+    "win32": {
+      "intro": "Winget 随 Windows 11 及较新的 Windows 10 提供。打开 PowerShell 或终端并运行：",
+      "installNode": "安装 Node.js LTS",
+      "installGit": "安装 Git",
+      "note": "安装后请重启 SpecRails Hub，以便 Windows 刷新 PATH。"
+    },
+    "linux": {
+      "intro": "使用你发行版的包管理器：",
+      "debian": "Debian / Ubuntu",
+      "fedora": "Fedora / RHEL"
+    },
+    "links": {
+      "nodeOfficial": "Node.js（官方）",
+      "gitOfficial": "Git（官方）",
+      "gitWindows": "Git for Windows（官方）"
+    },
+    "showOtherPlatforms": "显示其他平台",
+    "hideOtherPlatforms": "隐藏其他平台",
+    "recheck": "我已安装，重新检测",
+    "diagnostics": {
+      "copy": "复制诊断信息",
+      "copied": "诊断信息已复制",
+      "failed": "复制失败"
+    },
+    "corrupted": {
+      "title": "应用包已损坏",
+      "description": "一个或多个内置工具（Node.js、Git）无法通过验证。",
+      "body": "此工具随 SpecRails Hub 应用内置，无法单独安装。如果你看到此消息，说明应用包可能已损坏，请重新安装 SpecRails Hub。"
+    }
+  },
+  "checkpoints": {
+    "title": "设置进度",
+    "progress": "已完成 {{done}} / {{total}}",
+    "rawLog_one": "原始日志（{{count}} 行）",
+    "rawLog_other": "原始日志（{{count}} 行）"
+  },
+  "setupChat": {
+    "title": "设置助手",
+    "subtitle": "回应提示以完成项目配置",
+    "settingUp": "正在设置你的项目…",
+    "placeholder": "输入回复…",
+    "keyboardHint": "Enter 发送，Shift+Enter 换行"
+  },
+  "welcome": {
+    "title": "欢迎使用 <spec>spec</spec><rails>rails</rails> hub",
+    "description": "Hub 让你在一个界面中管理多个项目。添加第一个项目即可开始。",
+    "addFirstProject": "添加你的第一个项目"
+  },
+  "onboarding": {
+    "productTour": "产品导览",
+    "stepCount": "第 {{current}} 步，共 {{total}} 步",
+    "goToStep": "前往第 {{step}} 步：{{label}}",
+    "stepLabel": "第 {{step}} 步",
+    "dontShowAgain": "不再显示",
+    "skipTour": "跳过导览",
+    "getStarted": "开始使用",
+    "flow": {
+      "addSpec": "添加 Spec",
+      "dropInRail": "放入 Rail",
+      "hitPlay": "点击播放",
+      "ship": "交付",
+      "architect": "架构师",
+      "developer": "开发者",
+      "reviewer": "评审员"
+    },
+    "welcome": {
+      "nav": "欢迎",
+      "title": "欢迎使用 specrails-hub",
+      "subtitle": "用 AI Agent 交付软件的本地驾驶舱",
+      "intro": "specrails-hub 把想法变成已交付的代码——并让你<b>看见、掌控、信任</b>每一步。与 AI 对话起草 spec，把它放到执行 rail 上，点击播放。流水线会自动处理架构、实现、评审与 pull request，全程实时直播它的工作。",
+      "coreLoopLabel": "核心循环",
+      "flowCaption": "每个 spec 都会自动流经<b>架构师 → 开发者 → 评审员 → 交付</b>。",
+      "localNote": "<b>100% 本地 · 单用户 · 无需账号。</b>一切都在你的机器上运行。除非<i>你</i>主动对代码启动 Agent，否则代码绝不离开你的电脑。",
+      "tourNote": "这个快速导览会带你了解 Hub 的全部能力——大约一分钟。"
+    },
+    "authorSpecs": {
+      "nav": "撰写 spec",
+      "title": "把想法变成 spec",
+      "subtitle": "六种方式，精准描述你想构建的内容",
+      "intro": "<b>spec</b> 是对你想完成的工作的描述。怎么顺手怎么写——从一句话速记到与 AI 的完整对话。",
+      "exploreLabel": "Explore——对话式",
+      "exploreBody": "在聊天中描述你的需求；实时草稿每轮自动重建。预设滑块控制 AI 能看到多少项目上下文——从仅你的消息，到完整代码库加上你的 MCP 服务器。",
+      "quickLabel": "Quick——一步到位",
+      "quickBody": "已经想清楚了？一轮即可生成完整 spec。可选启用 Contract Layer 增强：精确的命名、数据结构、不变量和文件改动清单，让 Agent 不再重复造轮子。",
+      "websiteLabel": "从网站创建",
+      "websiteBody": "打开内嵌浏览器。悬停选中元素或拖出矩形框，截图、DOM 和应用的 CSS 都会成为附件。桌面版自带 Chromium，可离线使用。",
+      "smashLabel": "SMASH 拆解大型 epic",
+      "smashBody": "一键把大型 spec 拆解为一组更小的子 spec——每个子项的卡片上都带有简短摘要。",
+      "draftsLabel": "草稿与继续编辑",
+      "draftsBody": "把进行中的探索保存为草稿工单，稍后继续；任何 spec 都可以在 Explore 中重新打开，继续打磨。",
+      "compareLabel": "并排对比",
+      "compareBody": "把一个 spec 拖到屏幕边缘，其余 spec 的选择器会滑入——像平板一样并排查看两个 spec。"
+    },
+    "rails": {
+      "nav": "在 rail 上运行",
+      "title": "让流水线在 rail 上运行",
+      "subtitle": "把 spec 整理进泳道，然后启动 Agent",
+      "intro": "Dashboard 右侧是你的 <b>Rails</b>——执行泳道。把 spec 卡片拖到 rail 上，按 <play>▶ 播放</play> 启动一次实现任务。",
+      "jobLabel": "每个任务运行什么",
+      "flowCaption": "每个阶段的日志都会实时流式展示。",
+      "modeLabel": "选择 rail 的运行模式",
+      "modeBody": "每条 rail 可选模式：<b>Implement</b>（完整的结构化流水线）、<b>Batch</b>（顺序执行多个 spec），或 <b>Ultracode</b>（Claude 自主工作，无固定流水线）。",
+      "profilesLabel": "Agent Profile",
+      "profilesBody": "项目级的声明式目录，决定运行哪些 Agent 以及各自使用的模型——按 rail 选择、按任务快照，并发工作互不干扰。",
+      "jobDetailLabel": "实时任务详情",
+      "jobDetailBody": "每个任务都显示工单标识头、实时计时器和持续累计的轮次 / token 数，最终成本在任务结束时确定。",
+      "isolationLabel": "多项目，相互隔离",
+      "isolationBody": "每个项目都有独立的数据库和任务队列。可以同时运行多个项目，并从左侧边栏切换——每个项目的位置都会被记住。"
+    },
+    "providers": {
+      "nav": "你的 Agent",
+      "title": "自带 Agent",
+      "subtitle": "Claude Code 和 Codex，均为一等公民引擎",
+      "intro": "Hub 将 <b>Claude Code</b> 和 <b>Codex CLI</b> 视为同一契约下可互换的引擎。项目可以安装其中之一或两者——在安装时选择。",
+      "table": {
+        "capability": "能力",
+        "streamingResume": "流式输出与会话恢复",
+        "native": "原生",
+        "costReporting": "成本报告",
+        "providerBilled": "提供商实际计费",
+        "estimated": "估算（~）",
+        "telemetry": "遥测（OTEL）",
+        "synthesized": "合成",
+        "agentProfiles": "Agent Profile"
+      },
+      "calloutLabel": "两者都安装时",
+      "calloutBody": "可<b>按 spec、按 rail 或按终端启动</b>选择引擎。Hub 会记住每个项目的上次选择。Codex 成本基于本地费率表估算，并始终以 <mono>~</mono> 标注。"
+    },
+    "cost": {
+      "nav": "成本追踪",
+      "title": "每一分钱都有迹可循",
+      "subtitle": "每次计费调用都被记录并可视化",
+      "intro": "每次 AI 调用——包括 rail、Quick、Explore、AI 编辑、SMASH 和文件摘要——<b>Claude 和 Codex</b> 都会被记录。再也不用猜 Agent 花了多少钱。",
+      "analyticsLabel": "分析页面",
+      "analyticsBody": "消耗速率概览、每日时间线、热门工单、模型分布，以及成本-轮次散点图。可按周期（7 天 / 30 天 / 90 天 / 全部）和来源筛选。",
+      "perTicketLabel": "按工单统计支出",
+      "perTicketBody": "每个 spec 的详情会显示其成本和轮次，并可深链到按该工单筛选的分析页面。",
+      "honestLabel": "诚实的数字",
+      "honestBody": "Claude 成本为提供商实际计费；Codex 为估算值并以 <mono>~</mono> 标注。Token 总数包含各缓存层级，数字真正对得上账。",
+      "budgetsLabel": "预算与告警",
+      "budgetsBody": "设置每日预算和单任务成本告警；超限时 Hub 会自动暂停队列。任何数据都可导出为 CSV 或 JSON。"
+    },
+    "workspace": {
+      "nav": "工作区",
+      "title": "打造你的工作区",
+      "subtitle": "无需离开窗口即可完成一切",
+      "terminalLabel": "终端面板",
+      "terminalBody": "底部一个真正的 VS Code 风格终端（<mod></mod> <j></j>）——WebGL 渲染、搜索、内联图片、拖放路径和 shell 集成。每个项目最多 10 个会话。",
+      "codeLabel": "代码浏览器",
+      "codeBody": "只读文件树和 Monaco 查看器，配有通俗易懂的 AI 摘要和“由 AI 修改”的溯源标签，任何人都能看懂改了什么、为什么改。",
+      "integrationsLabel": "集成",
+      "integrationsBody": "每个项目独立的 MCP 集成市场——内置 Serena 语义代码导航。安装是增量式的：装一个绝不影响另一个。",
+      "themesLabel": "主题",
+      "themesBody": "五个内置主题——specrails（默认）、dracula、aurora-light、obsidian-dark 和 matrix——在 UI 绘制前应用，不会闪屏。可在设置 → 外观中切换。",
+      "chatsLabel": "可最小化的聊天",
+      "chatsBody": "把 Explore 或 AI 编辑会话停靠为底部芯片，稍后继续——刷新或切换项目都不会丢失。",
+      "desktopLabel": "桌面或浏览器",
+      "desktopBody": "在浏览器中运行 Hub，或下载已签名的桌面应用（macOS 和 Windows），它自带服务器与运行时。"
+    },
+    "moveFast": {
+      "nav": "高效操作",
+      "title": "以思维的速度移动",
+      "subtitle": "键盘优先，无处不在",
+      "paletteLabel": "命令面板",
+      "paletteShortcut": "<f>按下</f> <mod></mod> <m>+</m> <k></k> <m>随时随地</m>",
+      "paletteBody": "切换项目、运行 spec 命令、跳转任意页面、查找最近任务——全部支持模糊搜索。",
+      "terminalLabel": "终端面板",
+      "terminalBody": "用 <mod></mod> <j></j> 切换。",
+      "shortcutsLabel": "全部快捷键",
+      "shortcutsBody": "按 <q></q> 查看完整速查表。",
+      "chatLabel": "聊天侧边栏",
+      "chatBody": "用 <mod></mod> <bkey></bkey> 切换右侧边栏。",
+      "projectsLabel": "项目侧边栏",
+      "projectsBody": "用 <alt></alt> <mod></mod> <bkey></bkey> 切换左侧 Arc 侧边栏。",
+      "outro": "<b>导览到此结束。</b>从左侧边栏添加一个项目，交付你的第一个 spec。你随时可以在设置中重新打开本导览。"
+    }
+  }
+}

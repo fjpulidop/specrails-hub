@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import {
   Select,
@@ -33,20 +34,21 @@ interface SpecModelPickerProps {
 }
 
 export function SpecModelPicker({ value, allowed, loading, onChange, ariaLabel }: SpecModelPickerProps) {
+  const { t } = useTranslation('explore')
   return (
     <Select value={value ?? ''} onValueChange={onChange} disabled={loading || allowed.length === 0}>
       <SelectTrigger
         className="h-8 w-[160px] text-xs gap-1.5"
-        aria-label={ariaLabel ?? 'Spec generation model'}
+        aria-label={ariaLabel ?? t('modelPicker.ariaLabel')}
         data-testid="spec-model-picker"
       >
         {loading ? (
           <span className="inline-flex items-center gap-1.5 text-muted-foreground">
             <Loader2 className="w-3 h-3 animate-spin" />
-            Loading…
+            {t('common:states.loading')}
           </span>
         ) : (
-          <SelectValue placeholder="Pick a model" />
+          <SelectValue placeholder={t('modelPicker.placeholder')} />
         )}
       </SelectTrigger>
       <SelectContent>

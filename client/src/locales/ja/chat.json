@@ -1,0 +1,57 @@
+{
+  "panel": {
+    "openChat": "チャットを開く",
+    "dragToResize": "ドラッグしてサイズ変更",
+    "tabTitle": "チャット {{n}}",
+    "startConversation": "このプロジェクトについて会話を始める",
+    "noConversations": "会話はまだありません",
+    "newConversation": "新しい会話",
+    "suggestions": {
+      "projectStatus": "プロジェクトの状況は？",
+      "recentFailures": "最近失敗したジョブを表示",
+      "commands": "どのコマンドを実行すべき？",
+      "explainCodebase": "コードベースを説明して"
+    }
+  },
+  "header": {
+    "fallbackTitle": "チャット",
+    "newConversation": "新しい会話",
+    "deleteConversation": "会話を削除",
+    "restorePanel": "チャットパネルを復元",
+    "maximizePanel": "チャットパネルを最大化",
+    "closeChat": "チャットを閉じる"
+  },
+  "input": {
+    "placeholder": "メッセージ...",
+    "send": "送信",
+    "stop": "停止",
+    "modelLocked": "進行中の会話ではモデルを変更できません"
+  },
+  "messageList": {
+    "contextLoaded": "コンテキスト読み込み完了 — いつでもどうぞ",
+    "noMessages": "メッセージはまだありません",
+    "askAnything": "プロジェクトについて Claude に何でも質問できます",
+    "suggestions": {
+      "currentStatus": "現在のプロジェクト状況は？",
+      "recentFailures": "最近失敗したジョブを見せて",
+      "testsToRun": "どのテストを実行すべき？",
+      "mainArchitecture": "主要なアーキテクチャを説明して"
+    }
+  },
+  "errors": {
+    "sendFailed": "メッセージの送信に失敗しました"
+  },
+  "dock": {
+    "minimizedSessions_one": "{{count}} 件の最小化されたセッション",
+    "minimizedSessions_other": "{{count}} 件の最小化されたセッション",
+    "minimizedCount": "{{count}} 件最小化",
+    "unknownProject": "不明なプロジェクト"
+  },
+  "chip": {
+    "restore": "{{label}} を復元",
+    "close": "{{label}} を閉じる",
+    "continueEditing": "編集を続行 · {{projectName}}",
+    "kindAiEdit": "AI Edit",
+    "kindExploreSpec": "Explore Spec"
+  }
+}

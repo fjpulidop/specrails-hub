@@ -4,10 +4,13 @@ import { BrowserRouter } from 'react-router-dom'
 import './globals.css'
 import App from './App'
 import { initAuth, installFetchInterceptor } from './lib/auth'
+import { initI18n } from './lib/i18n'
 
 async function bootstrap() {
   await initAuth()
   installFetchInterceptor()
+  // Apply persisted (or OS-detected) UI language before first paint.
+  await initI18n()
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>

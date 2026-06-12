@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Split } from 'lucide-react'
 
@@ -32,6 +33,7 @@ export interface SmashActionsProps {
  * single ticket inside `TicketDetailModal`.
  */
 export function SmashActions({ ticket, projectId, featureFlagOn, childrenCount }: SmashActionsProps) {
+  const { t } = useTranslation('activity')
   const inflight = useSmashInflight(ticket.id)
   const [modalOpen, setModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -52,18 +54,22 @@ export function SmashActions({ ticket, projectId, featureFlagOn, childrenCount }
         })
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string; reason?: string }
-          toast.error(`Could not start SMASH${body.reason ? `: ${body.reason}` : ''}`)
+          toast.error(
+            body.reason
+              ? t('smash.couldNotStartWithReason', { reason: body.reason })
+              : t('smash.couldNotStart'),
+          )
           return
         }
         // Toast lifecycle is driven by SmashTrackerContext from WS events.
         setModalOpen(false)
       } catch (err) {
-        toast.error(`SMASH failed: ${(err as Error).message}`)
+        toast.error(t('smash.smashFailed', { message: (err as Error).message }))
       } finally {
         setSubmitting(false)
       }
     },
-    [projectId, ticket.id],
+    [projectId, ticket.id, t],
   )
 
   const handleConfirm = useCallback(
@@ -76,19 +82,19 @@ export function SmashActions({ ticket, projectId, featureFlagOn, childrenCount }
             method: 'DELETE',
           })
           if (!delRes.ok) {
-            toast.error('Could not delete current Sub-Specs')
+            toast.error(t('smash.couldNotDeleteChildren'))
             setSubmitting(false)
             return
           }
         } catch (err) {
-          toast.error(`Delete failed: ${(err as Error).message}`)
+          toast.error(t('smash.deleteFailed', { message: (err as Error).message }))
           setSubmitting(false)
           return
         }
       }
       await fireSmash(mode)
     },
-    [isReSmash, fireSmash, projectId, ticket.id],
+    [isReSmash, fireSmash, projectId, ticket.id, t],
   )
 
   if (!showInitial && !showReSmash) return null
@@ -112,7 +118,7 @@ export function SmashActions({ ticket, projectId, featureFlagOn, childrenCount }
         data-testid={showReSmash ? 'resmash-button' : 'smash-button'}
       >
         <Split className="w-3.5 h-3.5 mr-1.5" />
-        {showReSmash ? 'Re-SMASH' : 'SMASH Spec into Sub-Specs'}
+        {showReSmash ? t('smash.reSmashButton') : t('smash.smashButton')}
       </Button>
       <SmashConfirmModal
         open={modalOpen}

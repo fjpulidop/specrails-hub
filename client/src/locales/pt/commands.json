@@ -1,0 +1,186 @@
+{
+  "palette": {
+    "label": "Paleta de comandos",
+    "searchPlaceholder": "Pesquisar projetos, comandos, jobs...",
+    "noResults": "Nenhum resultado encontrado.",
+    "activeBadge": "ativo",
+    "groups": {
+      "projects": "Projetos",
+      "spec": "Spec",
+      "jobs": "Jobs",
+      "navigation": "Navegação"
+    },
+    "nav": {
+      "dashboard": "Dashboard",
+      "hubAnalytics": "Análises do Hub",
+      "projectAnalytics": "Análises do projeto",
+      "activityFeed": "Feed de atividade",
+      "hubSettings": "Definições do Hub",
+      "docs": "Docs"
+    },
+    "sidebar": {
+      "collapseLeftKeepPinned": "Recolher barra lateral esquerda (manter afixada)",
+      "unpinLeft": "Desafixar barra lateral esquerda",
+      "pinLeftOpen": "Afixar barra lateral esquerda aberta",
+      "collapseRightKeepPinned": "Recolher barra lateral direita (manter afixada)",
+      "unpinRight": "Desafixar barra lateral direita",
+      "pinRightOpen": "Afixar barra lateral direita aberta"
+    },
+    "footer": {
+      "navigate": "navegar",
+      "select": "selecionar",
+      "close": "fechar"
+    }
+  },
+  "toasts": {
+    "queued": "{{name}} em fila",
+    "queuing": "A colocar {{name}} em fila..."
+  },
+  "errors": {
+    "spawnFailed": "Falha ao iniciar o comando"
+  },
+  "grid": {
+    "sections": {
+      "discovery": "Descoberta",
+      "discoverySubtitle": "Explore e defina o seu produto",
+      "delivery": "Entrega",
+      "deliverySubtitle": "Construa e lance funcionalidades",
+      "others": "Outros"
+    },
+    "displayNames": {
+      "proposeSpec": "Propor personalizada",
+      "updateBacklog": "Propor automaticamente",
+      "productBacklog": "Seleção automática de Specs"
+    },
+    "emptyState": {
+      "title": "Nenhum comando instalado",
+      "hint": "Execute <1>/setup</1> no Claude Code para instalar os comandos specrails"
+    },
+    "runs_one": "{{count}} execução",
+    "runs_other": "{{count}} execuções",
+    "tooltip": {
+      "opensWizard": "Abre o assistente guiado"
+    }
+  },
+  "shortcuts": {
+    "title": "Atalhos de teclado",
+    "subtitle": "Prima <1>?</1> em qualquer lugar para alternar este painel",
+    "categories": {
+      "general": "Geral",
+      "navigation": "Navegação",
+      "actions": "Ações"
+    },
+    "items": {
+      "showCheatsheet": "Mostrar atalhos de teclado",
+      "closeModal": "Fechar modal / barra lateral",
+      "toggleRightSidebar": "Alternar barra lateral direita",
+      "toggleLeftSidebar": "Alternar barra lateral esquerda",
+      "toggleTerminal": "Alternar painel do terminal",
+      "navigateProjectPageWithAgents": "Navegar para página do projeto (Dashboard/Jobs/Análises/Agentes/Definições)",
+      "navigateProjectPage": "Navegar para página do projeto (Dashboard/Jobs/Análises/Definições)",
+      "switchProject": "Mudar de projeto por posição",
+      "goDashboard": "Ir para o Dashboard",
+      "goActivity": "Ir para Atividade / Jobs",
+      "goAnalytics": "Ir para Análises",
+      "goSettings": "Ir para Definições",
+      "nextItem": "Item seguinte na lista",
+      "prevItem": "Item anterior na lista"
+    }
+  },
+  "update": {
+    "title": {
+      "available": "Atualização disponível",
+      "downloading": "A transferir atualização",
+      "installing": "A instalar atualização",
+      "ready": "Atualização pronta",
+      "error": "Falha na atualização"
+    },
+    "desc": {
+      "available": "Está pronta a instalar uma nova versão do SpecRails Hub.",
+      "fetching": "A obter {{size}}…",
+      "progress": "{{percent}}% · {{downloaded}} de {{total}}",
+      "installing": "A verificar a assinatura e a concluir…",
+      "ready": "Reinicie para abrir a versão {{version}}.",
+      "errorFallback": "Não foi possível concluir a atualização. Tente novamente."
+    },
+    "pill": {
+      "downloading": "A transferir",
+      "installing": "A instalar",
+      "ready": "Pronta"
+    },
+    "actions": {
+      "restart": "Reiniciar",
+      "later": "Mais tarde",
+      "update": "Atualizar",
+      "installing": "A instalar…",
+      "tryAgain": "Tentar novamente",
+      "dismiss": "Dispensar"
+    },
+    "mockReady": "Atualização simulada pronta — reinício ignorado",
+    "errors": {
+      "installFailed": "Não foi possível instalar a atualização"
+    },
+    "units": {
+      "kb": "{{value}} KB",
+      "mb": "{{value}} MB"
+    }
+  },
+  "notifications": {
+    "jobCompleted": "Job concluído",
+    "jobFailed": "Job falhou",
+    "unknownCommand": "Comando desconhecido"
+  },
+  "templates": {
+    "emptyState": {
+      "title": "Ainda não há templates.",
+      "hint": "Guarde sequências de comandos para as executar com um clique."
+    },
+    "createButton": "Criar template",
+    "newButton": "Novo template",
+    "steps_one": "{{count}} passo",
+    "steps_other": "{{count}} passos",
+    "moreCommands_one": "+{{count}} mais",
+    "moreCommands_other": "+{{count}} mais",
+    "run": "Executar",
+    "queuing": "A colocar em fila…",
+    "aria": {
+      "edit": "Editar template",
+      "delete": "Eliminar template"
+    },
+    "confirmDelete": "Eliminar o template \"{{name}}\"?",
+    "toasts": {
+      "queuedJobs_one": "{{count}} job em fila a partir de \"{{name}}\"",
+      "queuedJobs_other": "{{count}} jobs em fila a partir de \"{{name}}\"",
+      "deleted": "Template \"{{name}}\" eliminado"
+    },
+    "errors": {
+      "runFailed": "Falha ao executar o template",
+      "deleteFailed": "Falha ao eliminar o template"
+    }
+  },
+  "templateDialog": {
+    "editTitle": "Editar template",
+    "newTitle": "Novo template",
+    "nameLabel": "Nome",
+    "namePlaceholder": "ex.: Pipeline completa",
+    "descriptionLabel": "Descrição (opcional)",
+    "descriptionPlaceholder": "O que faz este rail?",
+    "stepsLabel": "Passos (comandos ou prompts livres)",
+    "stepPlaceholder": "Selecione um comando ou escreva um prompt livre...",
+    "aria": {
+      "moveUp": "Mover para cima",
+      "removeStep": "Remover passo"
+    },
+    "update": "Atualizar",
+    "create": "Criar",
+    "errors": {
+      "nameRequired": "O nome é obrigatório",
+      "stepRequired": "É necessário pelo menos um passo",
+      "saveFailed": "Falha ao guardar o template"
+    },
+    "toasts": {
+      "updated": "Template atualizado",
+      "created": "Template criado"
+    }
+  }
+}

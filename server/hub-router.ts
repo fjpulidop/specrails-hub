@@ -29,6 +29,10 @@ function slugify(name: string): string {
 // kept duplicated to avoid pulling client code into the server bundle.
 const THEME_ID_ALLOWLIST = new Set<string>(['dracula', 'aurora-light', 'obsidian-dark', 'matrix', 'specrails'])
 
+// Language allow-list. Mirror of LANGUAGE_IDS in `client/src/lib/i18n.ts` —
+// kept duplicated to avoid pulling client code into the server bundle.
+const LANGUAGE_ID_ALLOWLIST = new Set<string>(['en', 'es', 'fr', 'de', 'pt', 'it', 'zh', 'ja'])
+
 // LOW-04: Deny registration of system-critical directory paths.
 const DENIED_PATH_PREFIXES = [
   '/etc', '/usr', '/bin', '/sbin', '/lib', '/lib64',
@@ -708,6 +712,30 @@ export function createHubRouter(
     }
     setHubSetting(registry.hubDb, 'ui_theme', next)
     res.json({ theme: next })
+  })
+
+  // ─── Language (hub-wide UI language) ──────────────────────────────────────
+  // Allow-list synchronized with `client/src/lib/i18n.ts LANGUAGE_IDS`.
+  // Persisted under hub_settings key `ui_language`. No default is seeded:
+  // `language: null` means "user never chose" and the client keeps following
+  // the OS/browser language until an explicit choice is PATCHed.
+  router.get('/language', (_req, res) => {
+    const stored = getHubSetting(registry.hubDb, 'ui_language')
+    const language = stored && LANGUAGE_ID_ALLOWLIST.has(stored) ? stored : null
+    res.json({ language })
+  })
+
+  router.patch('/language', (req, res) => {
+    const next = (req.body as { language?: unknown } | undefined)?.language
+    if (typeof next !== 'string' || !LANGUAGE_ID_ALLOWLIST.has(next)) {
+      res.status(400).json({
+        error: 'invalid_language',
+        message: `language must be one of: ${[...LANGUAGE_ID_ALLOWLIST].join(', ')}`,
+      })
+      return
+    }
+    setHubSetting(registry.hubDb, 'ui_language', next)
+    res.json({ language: next })
   })
 
   // ─── Code Explorer settings (summary language + monthly budget) ───────────

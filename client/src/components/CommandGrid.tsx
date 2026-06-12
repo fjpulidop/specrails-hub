@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation, Trans } from 'react-i18next'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { getApiBase } from '../lib/api'
+import i18n, { getDateFnsLocale } from '../lib/i18n'
 import {
   Rocket,
   Layers,
@@ -91,10 +93,11 @@ const DISCOVERY_ORDER = ['propose-spec', 'update-product-driven-backlog', 'produ
 const DELIVERY_ORDER  = ['implement', 'batch-implement'] as const
 const DISCOVERY_SET   = new Set<string>(DISCOVERY_ORDER)
 const DELIVERY_SET    = new Set<string>(DELIVERY_ORDER)
-const DISPLAY_NAMES: Record<string, string> = {
-  'propose-spec': 'Custom-Propose',
-  'update-product-driven-backlog': 'Auto-propose',
-  'product-backlog': 'Auto-Select Specs',
+// Values are i18n keys in the `commands` namespace, resolved at render time.
+const DISPLAY_NAME_KEYS: Record<string, string> = {
+  'propose-spec': 'grid.displayNames.proposeSpec',
+  'update-product-driven-backlog': 'grid.displayNames.updateBacklog',
+  'product-backlog': 'grid.displayNames.productBacklog',
 }
 const HIDDEN_SLUGS = new Set(['propose-feature'])
 
@@ -163,10 +166,11 @@ interface CommandCardProps {
 }
 
 function CommandCard({ cmd, onClick }: CommandCardProps) {
+  const { t } = useTranslation('commands')
   const isWizard = WIZARD_COMMANDS.has(cmd.slug)
   const meta = COMMAND_META[cmd.slug] ?? FALLBACK_META
   const Icon = meta.icon
-  const displayName = DISPLAY_NAMES[cmd.slug] ?? cmd.name
+  const displayName = DISPLAY_NAME_KEYS[cmd.slug] ? t(DISPLAY_NAME_KEYS[cmd.slug]) : cmd.name
 
   return (
     <Tooltip>
@@ -201,7 +205,7 @@ function CommandCard({ cmd, onClick }: CommandCardProps) {
               <div className="flex items-center gap-1.5 mt-1">
                 {cmd.totalRuns !== undefined && cmd.totalRuns > 0 && (
                   <span className="text-[10px] text-muted-foreground/40 tabular-nums">
-                    {cmd.totalRuns} run{cmd.totalRuns !== 1 ? 's' : ''}
+                    {t('grid.runs', { count: cmd.totalRuns })}
                   </span>
                 )}
                 {cmd.totalRuns !== undefined && cmd.totalRuns > 0 && cmd.lastRunAt && (
@@ -209,7 +213,7 @@ function CommandCard({ cmd, onClick }: CommandCardProps) {
                 )}
                 {cmd.lastRunAt && (
                   <span className="text-[10px] text-muted-foreground/40">
-                    {formatDistanceToNow(new Date(cmd.lastRunAt), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(cmd.lastRunAt), { addSuffix: true, locale: getDateFnsLocale() })}
                   </span>
                 )}
               </div>
@@ -230,7 +234,7 @@ function CommandCard({ cmd, onClick }: CommandCardProps) {
           <p className="text-muted-foreground mt-0.5">{cmd.description}</p>
         )}
         {isWizard && (
-          <p className="text-accent-primary mt-1 text-[10px]">Opens guided wizard</p>
+          <p className="text-accent-primary mt-1 text-[10px]">{t('grid.tooltip.opensWizard')}</p>
         )}
       </TooltipContent>
     </Tooltip>
@@ -251,11 +255,12 @@ async function spawnCommand(command: string, priority?: string): Promise<string>
     body: JSON.stringify(body),
   })
   const data = await res.json() as { jobId?: string; error?: string }
-  if (!res.ok) throw new Error(data.error ?? 'Failed to spawn command')
+  if (!res.ok) throw new Error(data.error ?? i18n.t('commands:errors.spawnFailed'))
   return data.jobId!
 }
 
 export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
+  const { t } = useTranslation('commands')
   const [othersOpen, setOthersOpen] = useState(false)
   const navigate = useNavigate()
 
@@ -263,24 +268,26 @@ export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
     return (
       <div className="rounded-xl border border-dashed border-border/30 p-10 text-center space-y-3">
         <Terminal className="w-9 h-9 text-muted-foreground/20 mx-auto" />
-        <p className="text-sm font-medium text-muted-foreground">No commands installed</p>
+        <p className="text-sm font-medium text-muted-foreground">{t('grid.emptyState.title')}</p>
         <p className="text-xs text-muted-foreground/50">
-          Run <code className="font-mono">/setup</code> in Claude Code to install specrails commands
+          <Trans i18nKey="grid.emptyState.hint" ns="commands">
+            Run <code className="font-mono">/setup</code> in Claude Code to install specrails commands
+          </Trans>
         </p>
       </div>
     )
   }
 
   async function handleCommandClick(cmd: CommandInfo) {
-    const displayName = DISPLAY_NAMES[cmd.slug] ?? cmd.name
+    const displayName = DISPLAY_NAME_KEYS[cmd.slug] ? t(DISPLAY_NAME_KEYS[cmd.slug]) : cmd.name
     if (WIZARD_COMMANDS.has(cmd.slug)) {
       onOpenWizard(cmd.slug)
       return
     }
     const promise = spawnCommand(cmd.slug)
     toast.promise(promise, {
-      loading: `Queuing ${displayName}...`,
-      success: `${displayName} queued`,
+      loading: t('toasts.queuing', { name: displayName }),
+      success: t('toasts.queued', { name: displayName }),
       error: (err: Error) => err.message,
     })
     try {
@@ -312,8 +319,8 @@ export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
           {discovery.length > 0 && (
             <div>
               <SectionHeader
-                label="Discovery"
-                subtitle="Explore & define your product"
+                label={t('grid.sections.discovery')}
+                subtitle={t('grid.sections.discoverySubtitle')}
                 accent="cyan"
               />
               <div className="space-y-2">
@@ -328,8 +335,8 @@ export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
           {delivery.length > 0 && (
             <div>
               <SectionHeader
-                label="Delivery"
-                subtitle="Build & ship features"
+                label={t('grid.sections.delivery')}
+                subtitle={t('grid.sections.deliverySubtitle')}
                 accent="purple"
               />
               <div className="space-y-2">
@@ -346,7 +353,7 @@ export function CommandGrid({ commands, onOpenWizard }: CommandGridProps) {
       {others.length > 0 && (
         <section>
           <SectionHeader
-            label="Others"
+            label={t('grid.sections.others')}
             accent="muted"
             collapsible
             open={othersOpen}

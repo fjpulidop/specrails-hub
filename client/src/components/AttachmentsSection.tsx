@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { Attachment } from '../types'
 import { deleteAttachment, listAttachments } from '../lib/attachments'
 import { cn } from '../lib/utils'
@@ -47,6 +48,7 @@ function formatDate(iso: string): string {
 }
 
 export function AttachmentsSection({ ticketKey, attachments, onChange, className }: Props) {
+  const { t } = useTranslation('attachments')
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [previewing, setPreviewing] = useState<Attachment | null>(null)
@@ -84,7 +86,7 @@ export function AttachmentsSection({ ticketKey, attachments, onChange, className
       await new Promise((r) => setTimeout(r, 160))
       onChange?.(attachments.filter((x) => x.id !== a.id))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove attachment')
+      setError(err instanceof Error ? err.message : t('errors.removeFailed'))
       setRemovingIds((prev) => {
         const next = new Set(prev)
         next.delete(a.id)
@@ -94,10 +96,10 @@ export function AttachmentsSection({ ticketKey, attachments, onChange, className
   }
 
   return (
-    <section className={cn('mt-4', className)} aria-label="Attachments">
+    <section className={cn('mt-4', className)} aria-label={t('section.ariaLabel')}>
       <header className="flex items-center justify-between mb-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Resources</h3>
-        <span className="text-[10px] text-muted-foreground">{sorted.length} file{sorted.length > 1 ? 's' : ''}</span>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('section.title')}</h3>
+        <span className="text-[10px] text-muted-foreground">{t('section.fileCount', { count: sorted.length })}</span>
       </header>
       <ul className="flex flex-col gap-1">
         {sorted.map((a) => {
@@ -126,12 +128,12 @@ export function AttachmentsSection({ ticketKey, attachments, onChange, className
                 onClick={() => setPreviewing(a)}
                 className="text-[11px] text-primary hover:underline shrink-0"
               >
-                Open
+                {t('common:actions.open')}
               </button>
               <button
                 type="button"
                 onClick={() => handleRemove(a)}
-                aria-label={`Remove ${a.filename}`}
+                aria-label={t('removeFile', { name: a.filename })}
                 disabled={leaving}
                 className="w-6 h-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
               >

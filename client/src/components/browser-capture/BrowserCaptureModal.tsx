@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Trans, useTranslation } from 'react-i18next'
 import { ArrowLeft, ArrowRight, RotateCw, X, Crop, Loader2, Globe, AlertTriangle, Monitor, Tablet, Smartphone, Maximize2, Network, Ratio, ChevronRight, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
@@ -59,6 +60,7 @@ const PRESET_DIMS: Record<Exclude<ViewportPreset, 'fit'>, { w: number; h: number
  * Add Spec. Excluded from coverage (canvas + WS + pointer drag is not jsdom-able).
  */
 export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, onCaptured }: BrowserCaptureModalProps) {
+  const { t } = useTranslation('browser')
   const session = useBrowserCaptureSession({ projectId, open })
   const { canvasRef, viewport, status, errorMsg, url, title, hoverRect, hoverSelector, hoverPath } = session
 
@@ -258,7 +260,7 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
         const anchorPoint = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
         const result = await session.captureBreakpoints(rect, anchorPoint, pendingSpecId, BREAKPOINT_DIMS)
         onCaptured(result)
-        toast.success('Captured page selection')
+        toast.success(t('modal.toast.captured'))
         onClose()
       } else {
         // Freeze the single capture and hand it to the in-place markup editor.
@@ -266,7 +268,7 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
         setMarkup(result)
       }
     } catch {
-      toast.error('Capture failed')
+      toast.error(t('modal.toast.captureFailed'))
     } finally {
       setCapturing(false)
       setSelecting(false)
@@ -274,7 +276,7 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
       setLocked(null)
       session.clearHover()
     }
-  }, [session, pendingSpecId, captureNetwork, captureAllSizes, onCaptured, onClose])
+  }, [session, pendingSpecId, captureNetwork, captureAllSizes, onCaptured, onClose, t])
 
   const onBreadcrumbClick = useCallback((segment: BreadcrumbSegment) => {
     void session.navigateElement(segment.selector, 'self').then((probe) => { if (probe) setLocked(probe) })
@@ -372,7 +374,7 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
         className="absolute inset-2 flex flex-col border border-border rounded-lg bg-background-deep overflow-hidden"
         role="dialog"
         aria-modal="true"
-        aria-label="Browser capture"
+        aria-label={t('modal.dialogLabel')}
         onClick={(e) => e.stopPropagation()}
       >
       {markup ? (
@@ -392,9 +394,9 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
             this drag-region gutter reserves their space and keeps the window movable. */}
         {macOverlay && <div data-tauri-drag-region className="w-20 self-stretch shrink-0" aria-hidden />}
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Back" onClick={() => session.navigate('back')}><ArrowLeft className="w-4 h-4" /></Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Forward" onClick={() => session.navigate('forward')}><ArrowRight className="w-4 h-4" /></Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Reload" onClick={() => session.navigate('reload')}><RotateCw className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={t('common:actions.back')} onClick={() => session.navigate('back')}><ArrowLeft className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={t('modal.nav.forward')} onClick={() => session.navigate('forward')}><ArrowRight className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={t('modal.nav.reload')} onClick={() => session.navigate('reload')}><RotateCw className="w-4 h-4" /></Button>
         </div>
         <form
           className="flex-1 flex items-center gap-2 min-w-0"
@@ -406,21 +408,21 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
               value={addressValue}
               onChange={(e) => setAddressValue(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); go() } }}
-              placeholder="Enter a URL and press Go…"
-              aria-label="Address bar"
+              placeholder={t('modal.address.placeholder')}
+              aria-label={t('modal.address.label')}
               className="flex-1 min-w-0 bg-transparent outline-none text-sm"
             />
           </div>
-          <Button type="submit" size="sm" variant="secondary" className="shrink-0" disabled={status === 'error'}>Go</Button>
+          <Button type="submit" size="sm" variant="secondary" className="shrink-0" disabled={status === 'error'}>{t('modal.address.go')}</Button>
         </form>
-        <div className="hidden md:flex items-center gap-0.5 rounded-md border border-border/50 p-0.5 shrink-0" role="group" aria-label="Viewport size">
+        <div className="hidden md:flex items-center gap-0.5 rounded-md border border-border/50 p-0.5 shrink-0" role="group" aria-label={t('modal.viewport.groupLabel')}>
           {([['fit', Maximize2], ['desktop', Monitor], ['tablet', Tablet], ['mobile', Smartphone]] as const).map(([p, Icon]) => (
             <button
               key={p}
               type="button"
-              aria-label={`Viewport ${p}`}
+              aria-label={t('modal.viewport.presetLabel', { preset: t(`modal.viewport.${p}`) })}
               aria-pressed={preset === p}
-              title={`Viewport: ${p}`}
+              title={t('modal.viewport.presetTitle', { preset: t(`modal.viewport.${p}`) })}
               onClick={() => applyPreset(p)}
               className={`h-7 w-7 inline-flex items-center justify-center rounded transition-colors ${preset === p ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-card/60'}`}
             >
@@ -430,25 +432,25 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
         </div>
         <button
           type="button"
-          aria-label="Capture network requests"
+          aria-label={t('modal.network.ariaLabel')}
           aria-pressed={captureNetwork}
-          title={captureNetwork ? 'Capturing the page’s network requests (click to disable)' : 'Network capture off (click to enable)'}
+          title={captureNetwork ? t('modal.network.titleOn') : t('modal.network.titleOff')}
           onClick={() => setCaptureNetwork((v) => !v)}
           className={`hidden md:inline-flex items-center gap-1 h-7 px-2 rounded-md border text-[11px] shrink-0 transition-colors ${captureNetwork ? 'border-accent-info/40 bg-accent-info/10 text-accent-info' : 'border-border/50 text-muted-foreground hover:text-foreground hover:bg-card/60'}`}
         >
           <Network className="w-3.5 h-3.5" />
-          Network
+          {t('modal.network.button')}
         </button>
         <button
           type="button"
-          aria-label="Capture at all screen sizes"
+          aria-label={t('modal.allSizes.ariaLabel')}
           aria-pressed={captureAllSizes}
-          title={captureAllSizes ? 'Will capture this element at desktop, tablet and mobile (click to disable)' : 'Capture at all sizes: desktop, tablet and mobile'}
+          title={captureAllSizes ? t('modal.allSizes.titleOn') : t('modal.allSizes.titleOff')}
           onClick={() => setCaptureAllSizes((v) => !v)}
           className={`hidden md:inline-flex items-center gap-1 h-7 px-2 rounded-md border text-[11px] shrink-0 transition-colors ${captureAllSizes ? 'border-accent-highlight/40 bg-accent-highlight/10 text-accent-highlight' : 'border-border/50 text-muted-foreground hover:text-foreground hover:bg-card/60'}`}
         >
           <Ratio className="w-3.5 h-3.5" />
-          All sizes
+          {t('modal.allSizes.button')}
         </button>
         <Button
           size="sm"
@@ -459,9 +461,9 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
           data-testid="browser-select-toggle"
         >
           <Crop className="w-3.5 h-3.5" />
-          {selecting ? 'Click an element or drag…' : 'Select to create spec'}
+          {selecting ? t('modal.select.active') : t('modal.select.start')}
         </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Close browser" onClick={onClose}><X className="w-4 h-4" /></Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={t('modal.closeBrowser')} onClick={onClose}><X className="w-4 h-4" /></Button>
       </div>
 
       <div className="px-3 py-1 text-[11px] text-muted-foreground truncate shrink-0 flex items-center gap-2">
@@ -470,7 +472,7 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
           aria-hidden
         />
         <span className="truncate">
-          {status === 'connecting' ? 'Conectando navegador…' : status === 'error' ? (errorMsg ?? 'Browser unavailable') : (title || '')}
+          {status === 'connecting' ? t('modal.status.connecting') : status === 'error' ? (errorMsg ?? t('modal.status.unavailable')) : (title || '')}
         </span>
       </div>
 
@@ -488,8 +490,8 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
         {status === 'error' ? (
           <div className="flex flex-col items-center gap-2 text-center max-w-md px-6">
             <AlertTriangle className="w-8 h-8 text-accent-warning" />
-            <p className="text-sm text-foreground/90">{errorMsg ?? 'The browser is unavailable.'}</p>
-            <p className="text-xs text-muted-foreground">In dev, run <code className="font-mono">npx playwright install chromium</code> once. In the desktop app, Chromium is bundled.</p>
+            <p className="text-sm text-foreground/90">{errorMsg ?? t('modal.error.unavailable')}</p>
+            <p className="text-xs text-muted-foreground"><Trans i18nKey="modal.error.devHint" t={t} components={{ cmd: <code className="font-mono" /> }} /></p>
           </div>
         ) : (
           <>
@@ -518,12 +520,12 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
 
             {status === 'connecting' && (
               <div className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" /> Opening browser…
+                <Loader2 className="w-4 h-4 animate-spin" /> {t('modal.status.opening')}
               </div>
             )}
             {capturing && (
               <div className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-foreground bg-background-deep/40">
-                <Loader2 className="w-4 h-4 animate-spin" /> Capturing…
+                <Loader2 className="w-4 h-4 animate-spin" /> {t('modal.status.capturing')}
               </div>
             )}
           </>
@@ -562,13 +564,13 @@ export function BrowserCaptureModal({ open, onClose, projectId, pendingSpecId, o
               </button>
             </Fragment>
           ))}
-          <span className="text-muted-foreground/60 shrink-0 ml-auto pl-2 hidden md:inline">↑ parent · ↓ child</span>
+          <span className="text-muted-foreground/60 shrink-0 ml-auto pl-2 hidden md:inline">{t('modal.breadcrumb.hint')}</span>
         </div>
       )}
 
       {selecting && (
         <div className="px-3 py-1.5 text-center text-[11px] text-muted-foreground border-t border-border/40 shrink-0">
-          Click a highlighted element to capture it, or drag a custom rectangle. Use the breadcrumb (or ↑/↓) to refine. Press Esc to cancel.
+          {t('modal.select.hint')}
         </div>
       )}
       </>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { SearchAddon } from '@xterm/addon-search'
 import { ChevronUp, ChevronDown, X } from 'lucide-react'
 
@@ -14,6 +15,7 @@ interface Props {
  * Visual: anchored top-right of the terminal viewport. Closes on Escape or X.
  */
 export function TerminalSearchOverlay({ search, onClose }: Props) {
+  const { t } = useTranslation('terminal')
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [query, setQuery] = useState('')
   const [caseSensitive, setCaseSensitive] = useState(false)
@@ -88,7 +90,7 @@ export function TerminalSearchOverlay({ search, onClose }: Props) {
         onKeyDown={(e) => {
           if (e.key === 'Enter') { e.preventDefault(); if (e.shiftKey) findPrev(); else findNext() }
         }}
-        placeholder="Find"
+        placeholder={t('search.placeholder')}
         className="bg-transparent text-sm outline-none text-[#f8f8f2] placeholder:text-[#6272a4] w-48"
       />
       {matchInfo && (
@@ -98,7 +100,7 @@ export function TerminalSearchOverlay({ search, onClose }: Props) {
       )}
       <button
         type="button"
-        title="Previous (Shift+Enter)"
+        title={t('search.previous')}
         onClick={findPrev}
         className="text-[#f8f8f2] hover:text-white p-1"
       >
@@ -106,18 +108,18 @@ export function TerminalSearchOverlay({ search, onClose }: Props) {
       </button>
       <button
         type="button"
-        title="Next (Enter)"
+        title={t('search.next')}
         onClick={findNext}
         className="text-[#f8f8f2] hover:text-white p-1"
       >
         <ChevronDown size={14} />
       </button>
-      <ToggleButton label="Aa" title="Match case" active={caseSensitive} onToggle={() => setCaseSensitive((v) => !v)} />
-      <ToggleButton label=".*" title="Regex" active={regex} onToggle={() => setRegex((v) => !v)} />
-      <ToggleButton label="W" title="Whole word" active={wholeWord} onToggle={() => setWholeWord((v) => !v)} />
+      <ToggleButton label="Aa" title={t('search.matchCase')} active={caseSensitive} onToggle={() => setCaseSensitive((v) => !v)} />
+      <ToggleButton label=".*" title={t('search.regex')} active={regex} onToggle={() => setRegex((v) => !v)} />
+      <ToggleButton label="W" title={t('search.wholeWord')} active={wholeWord} onToggle={() => setWholeWord((v) => !v)} />
       <button
         type="button"
-        title="Close (Esc)"
+        title={t('search.close')}
         onClick={onClose}
         className="text-[#f8f8f2] hover:text-white p-1"
       >

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 
 /**
@@ -37,10 +38,10 @@ interface ExploreStatusPillsProps {
   minDisplayMs?: number
 }
 
-const STAGE_LABEL: Record<Exclude<ExploreStage, 'streaming'>, string> = {
-  connecting: 'Connecting…',
-  thinking: 'Thinking…',
-  tool: 'Reading code…',
+const STAGE_LABEL_KEY: Record<Exclude<ExploreStage, 'streaming'>, string> = {
+  connecting: 'statusPills.connecting',
+  thinking: 'statusPills.thinking',
+  tool: 'statusPills.tool',
 }
 
 export function ExploreStatusPills({
@@ -50,6 +51,7 @@ export function ExploreStatusPills({
   hasText,
   minDisplayMs = MIN_DISPLAY_MS,
 }: ExploreStatusPillsProps) {
+  const { t } = useTranslation('explore')
   const [displayedStage, setDisplayedStage] = useState<ExploreStage>('connecting')
   const lastChangeRef = useRef<number>(Date.now())
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -82,7 +84,7 @@ export function ExploreStatusPills({
   if (!active) return null
   if (displayedStage === 'streaming') return null
 
-  const label = STAGE_LABEL[displayedStage]
+  const label = t(STAGE_LABEL_KEY[displayedStage])
   return (
     <div
       className="inline-flex items-center gap-2 rounded-full bg-accent-info/10 text-accent-info px-3 py-1 text-[11px] font-medium"

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import i18n from '../../lib/i18n'
 import {
   createBrowserSession,
   openBrowserWs,
@@ -144,18 +145,18 @@ export function useBrowserCaptureSession(opts: {
           void drawFrame(ev.data as ArrayBuffer)
         }
         ws.onopen = () => { if (!cancelled) setState((s) => ({ ...s, status: 'ready' })) }
-        ws.onerror = () => { if (!cancelled) setState((s) => ({ ...s, status: 'error', errorMsg: 'Connection error' })) }
+        ws.onerror = () => { if (!cancelled) setState((s) => ({ ...s, status: 'error', errorMsg: i18n.t('browser:session.connectionError') })) }
         ws.onclose = () => {
           // Unexpected drop (server restarted, session ended) — surface it so the
           // user knows to reopen instead of capturing against a dead session.
-          if (!cancelled) setState((s) => (s.status === 'ready' ? { ...s, status: 'error', errorMsg: 'Lost connection to the browser. Close and reopen “From a website”.' } : s))
+          if (!cancelled) setState((s) => (s.status === 'ready' ? { ...s, status: 'error', errorMsg: i18n.t('browser:session.lostConnection') } : s))
         }
       } catch (err) {
         if (cancelled) return
         const msg =
-          err instanceof BrowserSessionLimitError ? 'Too many open browser sessions. Close one and retry.'
-            : err instanceof BrowserLaunchFailedError ? 'The browser failed to launch on the server.'
-              : 'Could not open the browser.'
+          err instanceof BrowserSessionLimitError ? i18n.t('browser:session.tooManySessions')
+            : err instanceof BrowserLaunchFailedError ? i18n.t('browser:session.launchFailed')
+              : i18n.t('browser:session.openFailed')
         setState((s) => ({ ...s, status: 'error', errorMsg: msg }))
       }
     })()

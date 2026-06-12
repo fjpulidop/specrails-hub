@@ -1,0 +1,281 @@
+{
+  "wizard": {
+    "configureAgents": "Configure {{provider}} agents",
+    "configureSubtitle": "Choose which agents to install and how to run them.",
+    "tabs": {
+      "agents": "Agents",
+      "models": "Models"
+    },
+    "skipForNow": "Skip for now",
+    "install": "Install",
+    "nextProvider": "Next: {{provider}}",
+    "installingProvider": "Installing {{provider}}…",
+    "installingSpecrails": "Installing specrails...",
+    "installingFromTemplates": "Installing agents from templates",
+    "waitingForOutput": "Waiting for output...",
+    "checkpoints": {
+      "baseInstall": "Base installation",
+      "agentSelection": "Agent selection",
+      "agentGeneration": "Agent generation"
+    },
+    "steps": {
+      "configure": "Configure"
+    },
+    "summary": {
+      "agents": "Agents",
+      "agentSkills": "Agent skills",
+      "skills": "Skills",
+      "openspecSkills": "OpenSpec skills",
+      "legacyRemoved_one": "Removed {{count}} legacy <code>/specrails:*</code> command",
+      "legacyRemoved_other": "Removed {{count}} legacy <code>/specrails:*</code> commands"
+    },
+    "complete": {
+      "welcome": "Welcome to <spec>spec</spec><rails>rails</rails>",
+      "configured": "<strong>{{projectName}}</strong> is now configured with AI-powered development workflows. Your specialized agents and commands are ready to use.",
+      "installedForEngines_one": "Installed for {{count}} engine",
+      "installedForEngines_other": "Installed for {{count}} engines",
+      "learnMore": "Learn how to get the most out of specrails:",
+      "continueToProject": "Continue to project"
+    },
+    "error": {
+      "title": "Setup failed",
+      "skipSetup": "Skip setup",
+      "prereqMissing": "SpecRails setup needs Node.js, npm, npx and Git available on PATH before it can install this project.",
+      "prereqRetryHint": "Install the missing tools, restart SpecRails Hub, then retry setup."
+    }
+  },
+  "addProject": {
+    "title": "Add Project",
+    "description": "Register a project directory to manage it from the hub.",
+    "noProviderDetected": "No AI CLI detected. Install Claude Code or Codex CLI first.",
+    "pathLabel": "Project path",
+    "pathPlaceholder": "/Users/me/my-project",
+    "pathHint": "Absolute path to the project root",
+    "browseForFolder": "Browse for folder",
+    "selectProjectFolder": "Select project folder",
+    "nameLabel": "Display name",
+    "optional": "(optional)",
+    "namePlaceholder": "My Project",
+    "nameHint": "Defaults to the directory name",
+    "providersLabel": "AI providers",
+    "notFound": "not found",
+    "multiProviderHint": "Both engines will be set up. The first is the project default. Cannot be changed after creation.",
+    "singleProviderHint": "Cannot be changed after the project is created.",
+    "adding": "Adding...",
+    "submit": "Add Project",
+    "toolsRequired_one": "{{tools}} is required to add a project",
+    "toolsRequired_other": "{{tools}} are required to add a project",
+    "errors": {
+      "pathRequired": "Project path is required",
+      "selectProvider": "Select at least one AI provider",
+      "addFailed": "Failed to add project"
+    },
+    "toasts": {
+      "registered": "Project \"{{name}}\" registered"
+    }
+  },
+  "prerequisites": {
+    "corruptedBundle": "bundle corrupted — reinstall app",
+    "notInstalled": "not installed",
+    "failedToExecute": "found but failed to execute",
+    "failedToExecuteAt": "found at {{path}} but failed to execute",
+    "failedToExecuteWithError": "found but failed to execute ({{error}})",
+    "failedToExecuteAtWithError": "found at {{path}} but failed to execute ({{error}})",
+    "needsMinimum": "{{version}} found — needs {{minVersion}}+",
+    "unknownVersion": "unknown",
+    "installedLabel": "installed",
+    "verifyError": "Could not verify developer tools locally — install will validate.",
+    "allDetected": "All required tools detected",
+    "bundleCorruptedTitle": "App bundle corrupted",
+    "toolsRequired_one": "{{count}} developer tool required",
+    "toolsRequired_other": "{{count}} developer tools required",
+    "reinstallHint": "Reinstall the SpecRails Hub app to restore bundled tools.",
+    "installMissingHint": "Install the missing tools to continue.",
+    "moreInfo": "More info",
+    "bundledBadge": "bundled"
+  },
+  "instructions": {
+    "title": "Install developer tools",
+    "description": "SpecRails needs Node.js, npm, npx, and Git on PATH. Pick the snippet for your OS, run it, then click \"I installed it, recheck\".",
+    "darwin": {
+      "intro": "Homebrew gets you both tools in one line. If you do not have brew, use the official downloads.",
+      "installNodeGit": "Install Node.js and Git via Homebrew"
+    },
+    "win32": {
+      "intro": "Winget ships with Windows 11 and recent Windows 10. Open PowerShell or Terminal and run:",
+      "installNode": "Install Node.js LTS",
+      "installGit": "Install Git",
+      "note": "After install, restart SpecRails Hub so Windows refreshes PATH."
+    },
+    "linux": {
+      "intro": "Use your distro package manager:",
+      "debian": "Debian / Ubuntu",
+      "fedora": "Fedora / RHEL"
+    },
+    "links": {
+      "nodeOfficial": "Node.js (official)",
+      "gitOfficial": "Git (official)",
+      "gitWindows": "Git for Windows (official)"
+    },
+    "showOtherPlatforms": "Show other platforms",
+    "hideOtherPlatforms": "Hide other platforms",
+    "recheck": "I installed it, recheck",
+    "diagnostics": {
+      "copy": "Copy diagnostics",
+      "copied": "Diagnostics copied",
+      "failed": "Copy failed"
+    },
+    "corrupted": {
+      "title": "App bundle corrupted",
+      "description": "One or more bundled tools (Node.js, Git) could not be verified.",
+      "body": "This tool is bundled with the SpecRails Hub app and cannot be installed separately. If you see this message, the app bundle may be corrupted. Please reinstall SpecRails Hub."
+    }
+  },
+  "checkpoints": {
+    "title": "Setup progress",
+    "progress": "{{done}} of {{total}} complete",
+    "rawLog_one": "Raw log ({{count}} line)",
+    "rawLog_other": "Raw log ({{count}} lines)"
+  },
+  "setupChat": {
+    "title": "Setup assistant",
+    "subtitle": "Respond to prompts to configure your project",
+    "settingUp": "Setting up your project...",
+    "placeholder": "Type a response...",
+    "keyboardHint": "Enter to send, Shift+Enter for new line"
+  },
+  "welcome": {
+    "title": "Welcome to <spec>spec</spec><rails>rails</rails> hub",
+    "description": "The hub manages multiple projects from a single interface. Add your first project to get started.",
+    "addFirstProject": "Add your first project"
+  },
+  "onboarding": {
+    "productTour": "Product tour",
+    "stepCount": "Step {{current}} of {{total}}",
+    "goToStep": "Go to step {{step}}: {{label}}",
+    "stepLabel": "Step {{step}}",
+    "dontShowAgain": "Don't show this again",
+    "skipTour": "Skip tour",
+    "getStarted": "Get Started",
+    "flow": {
+      "addSpec": "Add Spec",
+      "dropInRail": "Drop in a Rail",
+      "hitPlay": "Hit Play",
+      "ship": "Ship",
+      "architect": "Architect",
+      "developer": "Developer",
+      "reviewer": "Reviewer"
+    },
+    "welcome": {
+      "nav": "Welcome",
+      "title": "Welcome to specrails-hub",
+      "subtitle": "Your local cockpit for shipping software with AI agents",
+      "intro": "specrails-hub turns an idea into shipped code — and lets you <b>see, steer, and trust</b> every step. Draft a spec by talking to an AI, drop it on an execution rail, and hit Play. The pipeline handles architecture, implementation, review and the pull request, streaming its work live the whole way.",
+      "coreLoopLabel": "The core loop",
+      "flowCaption": "Each spec flows through <b>Architect → Developer → Reviewer → Ship</b> automatically.",
+      "localNote": "<b>100% local · single user · no accounts.</b> Everything runs on your machine. Your code never leaves the laptop unless <i>you</i> spawn an agent against it.",
+      "tourNote": "This quick tour walks through everything the hub can do — about a minute."
+    },
+    "authorSpecs": {
+      "nav": "Author specs",
+      "title": "Turn ideas into specs",
+      "subtitle": "Six ways to capture exactly what you want built",
+      "intro": "A <b>spec</b> is a description of work you want done. Author one however suits the moment — from a quick one-liner to a full conversation with the AI.",
+      "exploreLabel": "Explore — converse",
+      "exploreBody": "Describe what you want in a chat; a live draft rebuilds itself every turn. A preset slider tunes how much project context the AI sees — from your message only, up to the full codebase plus your MCP servers.",
+      "quickLabel": "Quick — one shot",
+      "quickBody": "Already know what you want? Generate a complete spec in a single turn. Optionally enrich it with a Contract Layer: exact names, data shapes, invariants and a file-touch list so the agents don't reinvent anything.",
+      "websiteLabel": "From a website",
+      "websiteBody": "Opens an embedded browser. Hover-select an element or drag a rectangle, and the screenshot, DOM and applied CSS become attachments. The desktop build ships its own Chromium, so it works offline.",
+      "smashLabel": "SMASH a big epic",
+      "smashBody": "Explode a large spec into a family of smaller sub-specs in one click — each child carries a short summary on its card.",
+      "draftsLabel": "Drafts & Continue Editing",
+      "draftsBody": "Park an in-progress exploration as a draft ticket and resume it later; reopen any spec back in Explore to keep refining it.",
+      "compareLabel": "Compare side by side",
+      "compareBody": "Drag a spec to the screen edge and a picker of your other specs slides in — review two of them together, tablet-style."
+    },
+    "rails": {
+      "nav": "Run on rails",
+      "title": "Run the pipeline on rails",
+      "subtitle": "Organize specs into lanes, then launch the agents",
+      "intro": "The right side of the Dashboard is your <b>Rails</b> — execution lanes. Drag a spec card onto a rail and press <play>▶ Play</play> to launch an implementation job.",
+      "jobLabel": "What each job runs",
+      "flowCaption": "Every phase streams its logs live as it works.",
+      "modeLabel": "Pick how a rail runs",
+      "modeBody": "Each rail chooses a mode: <b>Implement</b> (the full structured pipeline), <b>Batch</b> (several specs in sequence), or <b>Ultracode</b> (Claude works autonomously, no fixed pipeline).",
+      "profilesLabel": "Agent profiles",
+      "profilesBody": "A per-project, declarative catalog that decides which agents run and which model each one uses — picked per rail and snapshotted per job so concurrent work stays isolated.",
+      "jobDetailLabel": "Live job detail",
+      "jobDetailBody": "Every job shows a ticket-identity header, a live duration ticker and running turn/token counts, with the authoritative cost resolved on exit.",
+      "isolationLabel": "Many projects, isolated",
+      "isolationBody": "Each project has its own database and job queue. Run different projects at the same time and switch between them from the left sidebar — your place is remembered per project."
+    },
+    "providers": {
+      "nav": "Your agent",
+      "title": "Bring your own agent",
+      "subtitle": "Claude Code and Codex, as first-class engines",
+      "intro": "The hub treats <b>Claude Code</b> and <b>Codex CLI</b> as interchangeable engines behind one contract. A project can install one or both — the choice is made at install time.",
+      "table": {
+        "capability": "Capability",
+        "streamingResume": "Streaming & session resume",
+        "native": "Native",
+        "costReporting": "Cost reporting",
+        "providerBilled": "Provider-billed",
+        "estimated": "Estimated (~)",
+        "telemetry": "Telemetry (OTEL)",
+        "synthesized": "Synthesized",
+        "agentProfiles": "Agent profiles"
+      },
+      "calloutLabel": "When both are installed",
+      "calloutBody": "Pick the engine <b>per spec, per rail, or per terminal launch</b>. The hub remembers your last choice per project. Codex cost is estimated from a local rate-card and always flagged with a <mono>~</mono>."
+    },
+    "cost": {
+      "nav": "Track cost",
+      "title": "Track every cent",
+      "subtitle": "Every billable invocation, recorded and visualized",
+      "intro": "Every AI invocation — across rails, Quick, Explore, AI edits, SMASH and file summaries — is recorded for <b>both Claude and Codex</b>. No more guessing what the agents cost.",
+      "analyticsLabel": "Analytics page",
+      "analyticsBody": "A burn-rate hero, daily timeline, top tickets, model breakdown and a cost-vs-turns scatter. Filter by period (7d / 30d / 90d / All) and by surface.",
+      "perTicketLabel": "Per-ticket spending",
+      "perTicketBody": "Each spec's detail shows what it cost and how many turns it took, deep-linking into Analytics filtered to that ticket.",
+      "honestLabel": "Honest numbers",
+      "honestBody": "Claude cost is the provider-billed figure; Codex is estimated and flagged with <mono>~</mono>. Token totals include the cache tiers, so the figures actually reconcile.",
+      "budgetsLabel": "Budgets & alerts",
+      "budgetsBody": "Set a daily budget and a per-job cost alert; the hub auto-pauses the queue when you cross the line. Export anything to CSV or JSON."
+    },
+    "workspace": {
+      "nav": "Workspace",
+      "title": "Make it your workspace",
+      "subtitle": "Everything you need without leaving the window",
+      "terminalLabel": "Terminal panel",
+      "terminalBody": "A real VS-Code-style terminal at the bottom (<mod></mod> <j></j>) — WebGL rendering, search, inline images, drag-drop paths and shell integration. Up to 10 sessions per project.",
+      "codeLabel": "Code explorer",
+      "codeBody": "A read-only file tree and Monaco viewer with plain-language AI summaries and “touched by AI” provenance chips, so anyone can follow what changed and why.",
+      "integrationsLabel": "Integrations",
+      "integrationsBody": "A per-project marketplace of MCP integrations — Serena semantic code-navigation is bundled. Installs are additive: adding one never disturbs another.",
+      "themesLabel": "Themes",
+      "themesBody": "Five built-in themes — specrails (default), dracula, aurora-light, obsidian-dark and matrix — applied before the UI paints, so there's no flash. Change them in Settings → Appearance.",
+      "chatsLabel": "Minimizable chats",
+      "chatsBody": "Park an Explore or AI-Edit session into a dock chip and pick it back up later — never lost across refreshes or project switches.",
+      "desktopLabel": "Desktop or browser",
+      "desktopBody": "Run the hub in your browser, or grab the signed desktop app (macOS & Windows) that bundles its own server and runtimes."
+    },
+    "moveFast": {
+      "nav": "Move fast",
+      "title": "Move at the speed of thought",
+      "subtitle": "Keyboard-first, everywhere",
+      "paletteLabel": "Command palette",
+      "paletteShortcut": "<f>Press</f> <mod></mod> <m>+</m> <k></k> <m>anywhere</m>",
+      "paletteBody": "Switch projects, run spec commands, jump to any page and find recent jobs — all with fuzzy search.",
+      "terminalLabel": "Terminal panel",
+      "terminalBody": "Toggle with <mod></mod> <j></j>.",
+      "shortcutsLabel": "All shortcuts",
+      "shortcutsBody": "Press <q></q> to see the full cheat-sheet.",
+      "chatLabel": "Chat sidebar",
+      "chatBody": "Toggle the right sidebar with <mod></mod> <bkey></bkey>.",
+      "projectsLabel": "Projects sidebar",
+      "projectsBody": "Toggle the left Arc sidebar with <alt></alt> <mod></mod> <bkey></bkey>.",
+      "outro": "<b>That's the tour.</b> Add a project from the left sidebar and ship your first spec. You can reopen this walkthrough anytime from Settings."
+    }
+  }
+}

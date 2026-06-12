@@ -1,0 +1,67 @@
+{
+  "page": {
+    "title": "Integrationen",
+    "subtitle": "Plugins pro Projekt. Jedes Projekt entscheidet unabhängig, welche Integrationen aktiviert werden.",
+    "selectProject": "Wähle ein Projekt, um Integrationen zu verwalten.",
+    "deprecated": "Veraltet",
+    "loadError": "Plugins konnten nicht geladen werden.",
+    "empty": "In diesem Hub-Build sind keine Plugins gebündelt."
+  },
+  "card": {
+    "statusActive": "Aktiv",
+    "statusDeactivated": "Deaktiviert",
+    "statusDegraded": "Beeinträchtigt",
+    "updateAvailable": "Update verfügbar",
+    "requires": "Erfordert: {{list}}",
+    "deactivatedHint": "Installiert, aber deaktiviert – Claude lädt es in der nächsten Session nicht. Schalte auf <strong>Aktiv</strong>, um es wieder zu aktivieren.",
+    "install": "Installieren",
+    "uninstall": "Deinstallieren"
+  },
+  "toggle": {
+    "titleActive": "Aktiv – zum Deaktivieren klicken",
+    "titleDeactivated": "Deaktiviert – zum Aktivieren klicken"
+  },
+  "cachedNotice": {
+    "body": "Claude hat das Marketplace-Plugin im Cache <strong>installiert, aber deaktiviert</strong>. Es kann den Server weiterhin über <code>~/.claude/plugins/cache/...</code> auflösen, obwohl der Schalter aus ist. Um ausschließlich die projektbezogene Variante zu erzwingen, deinstalliere das Marketplace-Plugin aus Claude:",
+    "runInstruction": "In einer aktiven Claude-Session ausführen, dann Claude in diesem Projekt neu starten."
+  },
+  "update": {
+    "body": "Das gebündelte Manifest hat sich seit der Installation geändert (vermutlich eine Upstream-Umbenennung). Schreibe <code>.mcp.json</code> mit dem kanonischen Eintrag neu – chirurgisch, nur die vom Plugin verwalteten Schlüssel werden angefasst.",
+    "button": "<code>.mcp.json</code>-Eintrag aktualisieren"
+  },
+  "conflict": {
+    "body": "<strong>{{name}}</strong> ist zusätzlich global über Claudes Plugin-Marketplace aktiviert, was diese projektbezogene Installation überlagert. Damit diese Karte „Aktiv“ wird, deaktiviere unten die globale Version – sie kann jederzeit wieder über Claude aktiviert werden.",
+    "disableButton": "<code>{{key}}</code> deaktivieren"
+  },
+  "orphan": {
+    "badge": "Verwaist",
+    "removeButton": "Verwaisten Eintrag entfernen"
+  },
+  "installDialog": {
+    "title": "{{name}} installieren",
+    "computingChanges": "Änderungen werden berechnet…",
+    "filesHeading": "Dateien, die geändert werden",
+    "prerequisites": "Voraussetzungen",
+    "autoInstall": "Automatisch installieren",
+    "progress": "Fortschritt",
+    "installingPrereq": "{{name}} wird installiert…",
+    "prereqStartFailed": "Start fehlgeschlagen: {{message}}"
+  },
+  "uninstallDialog": {
+    "title": "{{name}} deinstallieren?",
+    "body": "Dies setzt die vom Plugin verwalteten Einträge in <code>.mcp.json</code> zurück und entfernt alle vom Plugin erstellten Dateien. Dein Code, deine Historie und andere Plugins sind nicht betroffen."
+  },
+  "docs": {
+    "title": "Dokumentation",
+    "dialogDescription": "Durchstöbere die mitgelieferte specrails-hub-Dokumentation. Wechsle über die Seitenleiste zwischen den Guides.",
+    "sidebarEmpty": "Noch keine Doku",
+    "indexEmpty": "Keine Dokumente verfügbar. Die mitgelieferte Doku liegt im Repo unter docs/ – lege dort oder unter ~/.specrails/docs/ Markdown-Dateien ab, um sie zu erweitern.",
+    "categoryEmpty": "Noch keine Dokumente in dieser Kategorie.",
+    "documentCount_one": "{{count}} Dokument",
+    "documentCount_other": "{{count}} Dokumente",
+    "categoryCount_one": "{{count}} Kategorie",
+    "categoryCount_other": "{{count}} Kategorien",
+    "summary": "{{documents}} in {{categories}}.",
+    "loadError": "Dokument konnte nicht geladen werden"
+  }
+}

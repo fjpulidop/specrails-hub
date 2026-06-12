@@ -1,5 +1,6 @@
 import { Check } from 'lucide-react'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 import { useThemeOptional } from '../../context/ThemeContext'
 import { THEME_IDS, THEMES, type ThemeId } from '../../lib/themes'
 
@@ -11,6 +12,7 @@ import { THEME_IDS, THEMES, type ThemeId } from '../../lib/themes'
  * decision — see openspec/changes/add-hub-theme-system/design.md D7).
  */
 export function AppearanceSection() {
+  const { t: tr } = useTranslation('settings')
   const ctx = useThemeOptional()
   // No provider mounted — graceful no-op (only happens in unit tests that
   // exercise GlobalSettingsPage in isolation without ThemeProvider).
@@ -22,7 +24,7 @@ export function AppearanceSection() {
     try {
       await setTheme(id)
     } catch (err) {
-      toast.error('Failed to update theme', {
+      toast.error(tr('appearance.updateFailed'), {
         description: err instanceof Error ? err.message : undefined,
       })
     }
@@ -31,12 +33,12 @@ export function AppearanceSection() {
   return (
     <div className="space-y-2">
       <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-        Appearance
+        {tr('appearance.heading')}
       </h3>
       <div
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2"
         role="radiogroup"
-        aria-label="Theme"
+        aria-label={tr('appearance.themeGroupLabel')}
       >
         {THEME_IDS.map((id) => {
           const t = THEMES[id]
@@ -84,7 +86,7 @@ export function AppearanceSection() {
                   {selected && (
                     <Check
                       className="w-3.5 h-3.5 text-accent-primary shrink-0"
-                      aria-label="Currently active"
+                      aria-label={tr('appearance.currentlyActive')}
                     />
                   )}
                 </div>

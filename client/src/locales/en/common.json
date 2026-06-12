@@ -1,0 +1,52 @@
+{
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "retry": "Retry",
+    "search": "Search",
+    "copy": "Copy",
+    "copied": "Copied",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done",
+    "open": "Open",
+    "add": "Add",
+    "remove": "Remove",
+    "edit": "Edit",
+    "rename": "Rename",
+    "duplicate": "Duplicate",
+    "refresh": "Refresh",
+    "export": "Export",
+    "discard": "Discard",
+    "minimize": "Minimize",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "viewAll": "View all",
+    "learnMore": "Learn more"
+  },
+  "states": {
+    "loading": "Loading…",
+    "saving": "Saving…",
+    "error": "Error",
+    "empty": "No data",
+    "none": "None",
+    "unknown": "Unknown",
+    "yes": "Yes",
+    "no": "No",
+    "on": "On",
+    "off": "Off",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  },
+  "status": {
+    "queued": "Queued",
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed",
+    "canceled": "Canceled",
+    "draft": "Draft"
+  }
+}

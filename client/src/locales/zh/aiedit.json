@@ -1,0 +1,55 @@
+{
+  "shell": {
+    "backAriaLabel": "返回 (Esc)",
+    "apply": "应用",
+    "somethingWentWrong": "出错了",
+    "quickPrompts": "快捷提示词",
+    "workingOnRefinement": "正在处理你的改进…",
+    "history": "历史",
+    "viewCurrentContent": "查看当前内容",
+    "conversation": "对话",
+    "applied": "已应用。",
+    "you": "你",
+    "autoTestResult": "自动测试结果",
+    "ai": "AI",
+    "refinementReady": "改进已就绪 — 请在右侧查看 diff。",
+    "diffPreview": "Diff 预览",
+    "proposedChanges": "建议的更改",
+    "wordLevelDiff": "词级 diff",
+    "forceApply": "强制应用",
+    "conflict": {
+      "diskChanged": "编辑期间文件在磁盘上发生了变化。应用已被阻止。",
+      "nameChanged": "AI 修改了 Agent 名称。重命名是独立的显式操作 — 请调整草稿或在 Studio 中重命名。"
+    },
+    "discardDialog": {
+      "ariaLabel": "丢弃更改？",
+      "title": "丢弃改进？",
+      "body": "当前草稿将被取消且不会应用。",
+      "keepEditing": "继续编辑"
+    },
+    "composer": {
+      "sendAriaLabel": "发送 (⌘⏎)",
+      "kbdSubmit": "提交",
+      "kbdCancel": "取消"
+    }
+  },
+  "composer": {
+    "title": "AI 编辑",
+    "placeholder": "描述你想要的更改…",
+    "submit": "提交",
+    "unsupportedFileType": "不支持的文件类型：{{name}}",
+    "uploadFailed": "{{name}} 上传失败：{{message}}"
+  },
+  "diffView": {
+    "inserted": "插入",
+    "removed": "删除"
+  },
+  "refine": {
+    "serverError": "服务器错误（{{status}}）",
+    "connectionFailed": "连接失败：{{message}}",
+    "applyFailed": "应用失败（{{status}}）",
+    "loadAgentFailed": "加载 Agent 失败（{{status}}）",
+    "loadSessionFailed": "加载会话失败（{{status}}）",
+    "rehydrateFailed": "恢复会话失败：{{message}}"
+  }
+}

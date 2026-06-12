@@ -1,0 +1,105 @@
+{
+  "modal": {
+    "dialogLabel": "Browser capture",
+    "nav": {
+      "forward": "Forward",
+      "reload": "Reload"
+    },
+    "address": {
+      "placeholder": "Enter a URL and press Go…",
+      "label": "Address bar",
+      "go": "Go"
+    },
+    "viewport": {
+      "groupLabel": "Viewport size",
+      "presetLabel": "Viewport {{preset}}",
+      "presetTitle": "Viewport: {{preset}}",
+      "fit": "fit",
+      "desktop": "desktop",
+      "tablet": "tablet",
+      "mobile": "mobile"
+    },
+    "network": {
+      "ariaLabel": "Capture network requests",
+      "titleOn": "Capturing the page’s network requests (click to disable)",
+      "titleOff": "Network capture off (click to enable)",
+      "button": "Network"
+    },
+    "allSizes": {
+      "ariaLabel": "Capture at all screen sizes",
+      "titleOn": "Will capture this element at desktop, tablet and mobile (click to disable)",
+      "titleOff": "Capture at all sizes: desktop, tablet and mobile",
+      "button": "All sizes"
+    },
+    "select": {
+      "active": "Click an element or drag…",
+      "start": "Select to create spec",
+      "hint": "Click a highlighted element to capture it, or drag a custom rectangle. Use the breadcrumb (or ↑/↓) to refine. Press Esc to cancel."
+    },
+    "closeBrowser": "Close browser",
+    "status": {
+      "connecting": "Connecting browser…",
+      "unavailable": "Browser unavailable",
+      "opening": "Opening browser…",
+      "capturing": "Capturing…"
+    },
+    "error": {
+      "unavailable": "The browser is unavailable.",
+      "devHint": "In dev, run <cmd>npx playwright install chromium</cmd> once. In the desktop app, Chromium is bundled."
+    },
+    "breadcrumb": {
+      "hint": "↑ parent · ↓ child"
+    },
+    "toast": {
+      "captured": "Captured page selection",
+      "captureFailed": "Capture failed"
+    }
+  },
+  "editor": {
+    "tools": {
+      "arrow": "Arrow (A)",
+      "box": "Box (R)",
+      "text": "Text (T)",
+      "blur": "Blur / redact (B)",
+      "step": "Step number (N)"
+    },
+    "notePrompt": "Note text:",
+    "colorLabel": "Colour {{color}}",
+    "undo": "Undo",
+    "undoTitle": "Undo (⌘Z)",
+    "redo": "Redo",
+    "redoTitle": "Redo (⌘⇧Z)",
+    "capturedAlt": "Captured selection",
+    "discardConfirm": "Discard annotations?",
+    "reselect": "Reselect",
+    "createSpec": "Create spec",
+    "skipContinue": "Skip & continue"
+  },
+  "domPanel": {
+    "header": "Captured page · {{title}}",
+    "badge": {
+      "elements_one": "{{count}} element",
+      "elements_other": "{{count}} elements",
+      "tokens": "tokens",
+      "requests": "{{count}} req",
+      "truncated": "truncated"
+    },
+    "removeLabel": "Remove captured page context",
+    "noMarkup": "(no markup captured)",
+    "appliedCss": "Applied CSS",
+    "appliedCssTruncated": "Applied CSS (truncated)",
+    "designTokens": "Design tokens",
+    "fonts": "Fonts:",
+    "copyJson": "Copy as JSON",
+    "copied": "Copied!",
+    "network_one": "Network · {{count}} request",
+    "network_other": "Network · {{count}} requests"
+  },
+  "session": {
+    "connectionError": "Connection error",
+    "lostConnection": "Lost connection to the browser. Close and reopen “From a website”.",
+    "tooManySessions": "Too many open browser sessions. Close one and retry.",
+    "launchFailed": "The browser failed to launch on the server.",
+    "openFailed": "Could not open the browser."
+  }
+}

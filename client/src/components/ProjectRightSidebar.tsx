@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { LayoutDashboard, Briefcase, BarChart3, Bot, Code2, Puzzle, Settings, PanelRight } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useSidebarPin } from '../context/SidebarPinContext'
@@ -7,19 +8,20 @@ import { useHub, projectProviders } from '../hooks/useHub'
 import { FEATURE_AGENTS_SECTION, FEATURE_CODE_EXPLORER } from '../lib/feature-flags'
 import { sectionVisibleForProviders } from '../lib/provider-capabilities'
 
-const RIGHT_PIN_LABEL: Record<'pinned-open' | 'pinned-collapsed' | 'unpinned', string> = {
-  'pinned-open': 'Collapse right sidebar (keep pinned)',
-  'pinned-collapsed': 'Unpin right sidebar',
-  'unpinned': 'Pin right sidebar open',
+const RIGHT_PIN_LABEL_KEY: Record<'pinned-open' | 'pinned-collapsed' | 'unpinned', string> = {
+  'pinned-open': 'sidebarPin.right.pinnedOpen',
+  'pinned-collapsed': 'sidebarPin.right.pinnedCollapsed',
+  'unpinned': 'sidebarPin.right.unpinned',
 }
 
 export function ProjectRightSidebar() {
+  const { t } = useTranslation('nav')
   const { rightMode, cycleRightMode } = useSidebarPin()
   const { projects, activeProjectId } = useHub()
   const [hovered, setHovered] = useState(false)
   const expanded = rightMode === 'pinned-open' || (rightMode === 'unpinned' && hovered)
   const lit = rightMode !== 'unpinned'
-  const pinLabel = RIGHT_PIN_LABEL[rightMode]
+  const pinLabel = t(RIGHT_PIN_LABEL_KEY[rightMode])
 
   // Agents (agent-profile catalogue, per-agent model overrides) and
   // Integrations (plugins / MCP via `.mcp.json`) are Claude-only mechanics with
@@ -34,19 +36,19 @@ export function ProjectRightSidebar() {
   const showIntegrationsTab = sectionVisibleForProviders('integrations', providers)
 
   const navItems = [
-    { to: '/', end: true, icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/jobs', end: false, icon: Briefcase, label: 'Jobs' },
-    { to: '/analytics', end: false, icon: BarChart3, label: 'Analytics' },
+    { to: '/', end: true, icon: LayoutDashboard, label: t('rightSidebar.dashboard') },
+    { to: '/jobs', end: false, icon: Briefcase, label: t('rightSidebar.jobs') },
+    { to: '/analytics', end: false, icon: BarChart3, label: t('rightSidebar.analytics') },
     ...(showAgentsTab
-      ? [{ to: '/agents', end: false, icon: Bot, label: 'Agents' }]
+      ? [{ to: '/agents', end: false, icon: Bot, label: t('rightSidebar.agents') }]
       : []),
     ...(FEATURE_CODE_EXPLORER
-      ? [{ to: '/code', end: false, icon: Code2, label: 'Code' }]
+      ? [{ to: '/code', end: false, icon: Code2, label: t('rightSidebar.code') }]
       : []),
     ...(showIntegrationsTab
-      ? [{ to: '/integrations', end: false, icon: Puzzle, label: 'Integrations' }]
+      ? [{ to: '/integrations', end: false, icon: Puzzle, label: t('rightSidebar.integrations') }]
       : []),
-    { to: '/settings', end: false, icon: Settings, label: 'Settings' },
+    { to: '/settings', end: false, icon: Settings, label: t('rightSidebar.settings') },
   ]
 
   return (
@@ -66,7 +68,7 @@ export function ProjectRightSidebar() {
       )}>
         {expanded && (
           <span className="font-mono text-sm font-bold whitespace-nowrap overflow-hidden text-accent-secondary">
-            Project
+            {t('rightSidebar.projectTitle')}
           </span>
         )}
         <button
@@ -79,7 +81,7 @@ export function ProjectRightSidebar() {
               : 'text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50'
           )}
           aria-label={pinLabel}
-          title={`${pinLabel} (⌘B)`}
+          title={t('sidebarPin.withShortcut', { label: pinLabel, shortcut: '⌘B' })}
         >
           <PanelRight className="w-4 h-4" />
         </button>

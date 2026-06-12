@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 
 import type { SmashStage } from '../../context/SmashTrackerContext'
@@ -17,10 +18,10 @@ const STAGE_ORDER: Record<SmashStage, number> = {
   ordering: 2,
 }
 
-const STAGE_LABEL: Record<SmashStage, string> = {
-  analyzing: 'Analyzing spec…',
-  identifying: 'Identifying subtasks…',
-  ordering: 'Ordering execution…',
+const STAGE_LABEL_KEY: Record<SmashStage, string> = {
+  analyzing: 'smash.stage.analyzing',
+  identifying: 'smash.stage.identifying',
+  ordering: 'smash.stage.ordering',
 }
 
 export interface SmashStatusPillsProps {
@@ -31,6 +32,7 @@ export interface SmashStatusPillsProps {
 }
 
 export function SmashStatusPills({ stage, minDisplayMs = MIN_DISPLAY_MS }: SmashStatusPillsProps) {
+  const { t } = useTranslation('activity')
   const [displayed, setDisplayed] = useState<SmashStage | null>(stage)
   const lastChangeRef = useRef<number>(Date.now())
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -78,7 +80,7 @@ export function SmashStatusPills({ stage, minDisplayMs = MIN_DISPLAY_MS }: Smash
           )
         })}
       </div>
-      <span className="font-medium">{STAGE_LABEL[displayed]}</span>
+      <span className="font-medium">{t(STAGE_LABEL_KEY[displayed])}</span>
     </div>
   )
 }

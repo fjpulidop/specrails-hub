@@ -1,0 +1,108 @@
+{
+  "feed": {
+    "title": "Activité",
+    "emptyTitle": "Aucune activité pour l'instant",
+    "emptyHint": "Les événements des jobs apparaîtront ici quand des jobs s'exécuteront",
+    "allLoaded": "Toute l'activité est chargée",
+    "typeStarted": "Démarré",
+    "phaseCommand": "Phase : {{phase}} → {{state}}",
+    "relativeTime": {
+      "seconds": "il y a {{value}} s",
+      "minutes": "il y a {{value}} min",
+      "hours": "il y a {{value}} h",
+      "days": "il y a {{value}} j"
+    }
+  },
+  "specGen": {
+    "generating": "Génération... {{elapsed}}",
+    "generatedIn": "Générée en {{elapsed}}",
+    "specCreated": "Spec créée",
+    "view": "Voir",
+    "errorGenerating": "Erreur lors de la génération de la spec",
+    "couldNotFind": "Impossible de trouver la spec générée",
+    "couldNotConfirm": "Impossible de confirmer la création de la spec"
+  },
+  "contractRefine": {
+    "refining": "Affinage du contrat…",
+    "retryRejected": "Nouvelle tentative rejetée",
+    "retryRejectedWithError": "Nouvelle tentative rejetée : {{error}}",
+    "retryFailed": "Échec de la nouvelle tentative : {{message}}",
+    "skipped": "Couche de contrat ignorée — ticket enregistré sans elle",
+    "reason": "Raison : {{reason}}",
+    "added": "Couche de contrat ajoutée · {{title}}"
+  },
+  "smash": {
+    "stage": {
+      "analyzing": "Analyse de la spec…",
+      "identifying": "Identification des sous-tâches…",
+      "ordering": "Ordonnancement de l'exécution…"
+    },
+    "onTitled": "SMASH sur « {{title}} »",
+    "onThisSpec": "SMASH sur cette spec",
+    "split_one": "Spec divisée en {{count}} Sous-Spec",
+    "split_other": "Spec divisée en {{count}} Sous-Specs",
+    "undoAction": "Annuler",
+    "undone": "SMASH annulé",
+    "undoFailed": "Échec de l'annulation",
+    "undoFailedWithReason": "Échec de l'annulation : {{reason}}",
+    "retrying": "Nouvelle tentative de SMASH…",
+    "couldNotRetry": "Impossible de réessayer",
+    "couldNotRetryWithReason": "Impossible de réessayer : {{reason}}",
+    "retryFailed": "Échec de la nouvelle tentative : {{message}}",
+    "couldNotComplete": "SMASH n'a pas pu aboutir",
+    "failReason": {
+      "invalidOutput": "L'agent a renvoyé une sortie invalide",
+      "timeout": "L'agent a mis trop de temps",
+      "modelError": "Le modèle a renvoyé une erreur",
+      "crashed": "Le processus de l'agent a planté",
+      "generic": "Raison : {{reason}}"
+    },
+    "couldNotStart": "Impossible de démarrer SMASH",
+    "couldNotStartWithReason": "Impossible de démarrer SMASH : {{reason}}",
+    "smashFailed": "Échec de SMASH : {{message}}",
+    "couldNotDeleteChildren": "Impossible de supprimer les Sous-Specs actuelles",
+    "deleteFailed": "Échec de la suppression : {{message}}",
+    "smashButton": "SMASH : diviser la spec en Sous-Specs",
+    "reSmashButton": "Re-SMASH"
+  },
+  "smashModal": {
+    "title": "SMASH : diviser la spec en Sous-Specs",
+    "modePickerLabel": "Mode de décomposition",
+    "reSmashWarning_one": "⚠️ Cela supprimera la <strong>{{count}}</strong> Sous-Spec actuelle et en créera de nouvelles.",
+    "reSmashWarning_other": "⚠️ Cela supprimera les <strong>{{count}}</strong> Sous-Specs actuelles et en créera de nouvelles.",
+    "modes": {
+      "simple": {
+        "title": "Simple",
+        "eta": "~10-30s",
+        "bullet1": "Décomposition en un seul passage, basée uniquement sur le titre et la description de la spec.",
+        "bullet2": "Aucun accès à la base de code — rapide et déterministe.",
+        "bullet3": "Idéal pour des specs propres avec une couche de contrat solide."
+      },
+      "full": {
+        "title": "Complet",
+        "eta": "~3-10 min",
+        "bullet1": "Décomposition approfondie multi-tours avec accès en lecture seule à la base de code — lit de manière intensive.",
+        "bullet2": "Chaque Sous-Spec est une super-spec : contexte, plan, fichiers, cas limites, hors périmètre, tests.",
+        "bullet3": "4 à 10 critères d'acceptation par Sous-Spec, ancrés dans de vrais chemins de fichiers.",
+        "bullet4": "Les tokens sont dépensés sans compter — la qualité avant la vitesse."
+      }
+    },
+    "starting": "Démarrage…",
+    "confirmReSmash": "Confirmer le Re-SMASH",
+    "smash": "SMASH"
+  },
+  "family": {
+    "subSpecsHeader": "Sous-Specs ({{count}})",
+    "emptySubSpecs": "Aucune Sous-Spec. Utilisez Re-SMASH pour régénérer.",
+    "familyHeader_one": "Famille ({{count}} Sous-Spec)",
+    "familyHeader_other": "Famille ({{count}} Sous-Specs)",
+    "noSiblings": "Aucune spec sœur.",
+    "openParentEpic": "Ouvrir l'Epic parent {{title}}",
+    "openSubSpec": "Ouvrir la Sous-Spec {{title}}"
+  },
+  "epicChildren": {
+    "header": "Sous-Specs ({{count}})",
+    "empty": "Aucune Sous-Spec. Cet Epic a été vidé — utilisez Re-SMASH pour régénérer.",
+    "step": "· étape {{order}} sur {{total}}"
+  }
+}

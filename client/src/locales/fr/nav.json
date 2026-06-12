@@ -1,0 +1,104 @@
+{
+  "sidebarPin": {
+    "withShortcut": "{{label}} ({{shortcut}})",
+    "left": {
+      "pinnedOpen": "Replier la barre latérale gauche (garder épinglée)",
+      "pinnedCollapsed": "Désépingler la barre latérale gauche",
+      "unpinned": "Épingler la barre latérale gauche ouverte"
+    },
+    "right": {
+      "pinnedOpen": "Replier la barre latérale droite (garder épinglée)",
+      "pinnedCollapsed": "Désépingler la barre latérale droite",
+      "unpinned": "Épingler la barre latérale droite ouverte"
+    }
+  },
+  "projects": {
+    "addProject": "Ajouter un projet",
+    "remove": "Supprimer {{name}}",
+    "confirmRemove": "Confirmer la suppression de {{name}}",
+    "confirmShort": "confirmer ?",
+    "added": "Projet ajouté : {{name}}",
+    "removed": "Projet supprimé"
+  },
+  "arcSidebar": {
+    "hubTitle": "Hub",
+    "docs": "Docs",
+    "analytics": "Analytics",
+    "settings": "Paramètres"
+  },
+  "rightSidebar": {
+    "projectTitle": "Projet",
+    "dashboard": "Tableau de bord",
+    "jobs": "Jobs",
+    "analytics": "Analytics",
+    "agents": "Agents",
+    "code": "Code",
+    "integrations": "Intégrations",
+    "settings": "Paramètres"
+  },
+  "navbar": {
+    "home": "Accueil",
+    "analytics": "Analytics",
+    "docs": "Docs",
+    "settings": "Paramètres",
+    "noCli": "Aucune CLI IA",
+    "noCliTooltip": "Aucune CLI IA détectée. Installez Claude Code ou Codex CLI.",
+    "activeCli": "CLI active : {{label}}"
+  },
+  "statusBar": {
+    "connected": "connecté",
+    "syncing": "synchronisation...",
+    "reconnecting": "reconnexion...",
+    "disconnected": "déconnecté",
+    "connectionRestored": "Connexion rétablie"
+  },
+  "titleBar": {
+    "searchShortcut": "Rechercher (⌘K)",
+    "searchPlaceholder": "Rechercher…",
+    "minimizeWindow": "Réduire la fenêtre",
+    "maximizeWindow": "Agrandir la fenêtre",
+    "closeWindow": "Fermer la fenêtre"
+  },
+  "costAlerts": {
+    "costAlertTitle": "Alerte de coût",
+    "costAlertDescription": "Coût du job : {{cost}} $ — le seuil est de {{threshold}} $",
+    "dailyBudgetTitle": "Budget quotidien dépassé",
+    "dailyBudgetDescription": "{{spent}} $ dépensés sur {{budget}} $ aujourd'hui. File d'attente en pause.",
+    "hubBudgetTitle": "Budget quotidien du hub dépassé",
+    "hubBudgetDescription": "Dépense totale du hub : {{spent}} $ sur {{budget}} $. File d'attente en pause.",
+    "bannerMessage": "Budget quotidien dépassé — {{spent}} $ dépensés sur {{budget}} $. La file d'attente est en pause.",
+    "dismiss": "Ignorer"
+  },
+  "errorBoundary": {
+    "title": "Une erreur est survenue",
+    "occurredIn": "Une erreur s'est produite dans <strong>{{name}}</strong>"
+  },
+  "healthWidget": {
+    "healthLabel": "santé",
+    "notAvailable": "n/d",
+    "factorCoverageAvailable": "Couverture disponible",
+    "factorCoverageGood": "Couverture ≥ 70 %",
+    "factorPipelineGreen": "Dernier pipeline au vert",
+    "factorActiveWeek": "Actif cette semaine",
+    "noJobsYet": "Aucun job pour l'instant",
+    "recurringFailures": "Échecs récurrents détectés",
+    "failurePattern": "<cmd>{{command}}</cmd> a échoué <times>{{count}}×</times> cette semaine — possible problème du projet.",
+    "coverage": "Couverture",
+    "lines": "Lignes",
+    "functions": "Fonctions",
+    "branches": "Branches",
+    "lastPipeline": "Dernier pipeline",
+    "recentCommits": "Commits récents",
+    "noGitHistory": "Aucun historique git trouvé",
+    "minutesAgo": "il y a {{count}} min",
+    "hoursAgo": "il y a {{count}} h",
+    "daysAgo": "il y a {{count}} j"
+  },
+  "collapsibleSection": {
+    "dragToReorder": "Glisser pour réorganiser",
+    "unpinAria": "Désépingler la section (repliée par défaut)",
+    "pinAria": "Épingler la section (restera dépliée)",
+    "unpinTooltip": "Désépingler (repliée par défaut)",
+    "pinTooltip": "Épingler ouverte (rester dépliée)"
+  }
+}

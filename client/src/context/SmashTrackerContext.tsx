@@ -22,15 +22,16 @@ import {
 } from 'react'
 import { toast } from 'sonner'
 
+import i18n from '../lib/i18n'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import { API_ORIGIN } from '../lib/origin'
 
 export type SmashStage = 'analyzing' | 'identifying' | 'ordering'
 
-const STAGE_LABEL: Record<SmashStage, string> = {
-  analyzing: 'Analyzing spec…',
-  identifying: 'Identifying subtasks…',
-  ordering: 'Ordering execution…',
+const STAGE_LABEL_KEY: Record<SmashStage, string> = {
+  analyzing: 'activity:smash.stage.analyzing',
+  identifying: 'activity:smash.stage.identifying',
+  ordering: 'activity:smash.stage.ordering',
 }
 
 export interface SmashInflight {
@@ -57,13 +58,18 @@ async function fireRetry(projectId: string, ticketId: number): Promise<void> {
       method: 'POST',
     })
     if (res.ok) {
-      toast.loading('Retrying SMASH…', { id: toastIdFor(ticketId) })
+      toast.loading(i18n.t('activity:smash.retrying'), { id: toastIdFor(ticketId) })
     } else {
       const body = await res.json().catch(() => ({})) as { error?: string; reason?: string }
-      toast.error(`Could not retry${body.reason ? `: ${body.reason}` : ''}`, { id: toastIdFor(ticketId) })
+      toast.error(
+        body.reason
+          ? i18n.t('activity:smash.couldNotRetryWithReason', { reason: body.reason })
+          : i18n.t('activity:smash.couldNotRetry'),
+        { id: toastIdFor(ticketId) },
+      )
     }
   } catch (err) {
-    toast.error(`Retry failed: ${(err as Error).message}`, { id: toastIdFor(ticketId) })
+    toast.error(i18n.t('activity:smash.retryFailed', { message: (err as Error).message }), { id: toastIdFor(ticketId) })
   }
 }
 
@@ -79,13 +85,18 @@ async function fireUndo(
       body: JSON.stringify({ smashedAt }),
     })
     if (res.ok) {
-      toast.success('SMASH undone', { id: toastIdFor(ticketId), duration: 3000 })
+      toast.success(i18n.t('activity:smash.undone'), { id: toastIdFor(ticketId), duration: 3000 })
     } else {
       const body = await res.json().catch(() => ({})) as { error?: string; reason?: string }
-      toast.error(`Undo failed${body.reason ? `: ${body.reason}` : ''}`, { id: toastIdFor(ticketId) })
+      toast.error(
+        body.reason
+          ? i18n.t('activity:smash.undoFailedWithReason', { reason: body.reason })
+          : i18n.t('activity:smash.undoFailed'),
+        { id: toastIdFor(ticketId) },
+      )
     }
   } catch (err) {
-    toast.error(`Undo failed: ${(err as Error).message}`, { id: toastIdFor(ticketId) })
+    toast.error(i18n.t('activity:smash.undoFailedWithReason', { reason: (err as Error).message }), { id: toastIdFor(ticketId) })
   }
 }
 
@@ -109,9 +120,11 @@ export function SmashTrackerProvider({ children }: { children: ReactNode }) {
       ...s,
       [ticketId]: { ticketId, runId, stage: 'analyzing', startedAt: ts ?? new Date().toISOString(), ticketTitle },
     }))
-    toast.loading(STAGE_LABEL.analyzing, {
+    toast.loading(i18n.t(STAGE_LABEL_KEY.analyzing), {
       id: toastIdFor(ticketId),
-      description: ticketTitle ? `SMASH on “${ticketTitle}”` : 'SMASH on this spec',
+      description: ticketTitle
+        ? i18n.t('activity:smash.onTitled', { title: ticketTitle })
+        : i18n.t('activity:smash.onThisSpec'),
     })
   }, [])
 
@@ -128,9 +141,11 @@ export function SmashTrackerProvider({ children }: { children: ReactNode }) {
       title = cur.ticketTitle
       return { ...s, [ticketId]: { ...cur, stage } }
     })
-    toast.loading(STAGE_LABEL[stage], {
+    toast.loading(i18n.t(STAGE_LABEL_KEY[stage]), {
       id: toastIdFor(ticketId),
-      description: title ? `SMASH on “${title}”` : 'SMASH on this spec',
+      description: title
+        ? i18n.t('activity:smash.onTitled', { title })
+        : i18n.t('activity:smash.onThisSpec'),
     })
   }, [])
 
@@ -149,11 +164,11 @@ export function SmashTrackerProvider({ children }: { children: ReactNode }) {
       delete next[ticketId]
       return next
     })
-    toast.success(`Spec split into ${childrenIds.length} Sub-Specs`, {
+    toast.success(i18n.t('activity:smash.split', { count: childrenIds.length }), {
       id: toastIdFor(ticketId),
       duration: 10_000,
       action: {
-        label: 'Undo',
+        label: i18n.t('activity:smash.undoAction'),
         onClick: () => void fireUndo(projectId, ticketId, smashedAt),
       },
     })
@@ -173,16 +188,16 @@ export function SmashTrackerProvider({ children }: { children: ReactNode }) {
       return next
     })
     const human =
-      reason === 'invalid-output' ? 'The agent returned invalid output' :
-      reason === 'timeout' ? 'The agent took too long' :
-      reason === 'model_error' ? 'The model returned an error' :
-      reason === 'crashed' ? 'The agent process crashed' :
-      `Reason: ${reason}`
-    toast.error('SMASH could not complete', {
+      reason === 'invalid-output' ? i18n.t('activity:smash.failReason.invalidOutput') :
+      reason === 'timeout' ? i18n.t('activity:smash.failReason.timeout') :
+      reason === 'model_error' ? i18n.t('activity:smash.failReason.modelError') :
+      reason === 'crashed' ? i18n.t('activity:smash.failReason.crashed') :
+      i18n.t('activity:smash.failReason.generic', { reason })
+    toast.error(i18n.t('activity:smash.couldNotComplete'), {
       id: toastIdFor(ticketId),
       description: human,
       action: {
-        label: 'Retry',
+        label: i18n.t('common:actions.retry'),
         onClick: () => void fireRetry(projectId, ticketId),
       },
       duration: 15_000,
@@ -195,7 +210,7 @@ export function SmashTrackerProvider({ children }: { children: ReactNode }) {
     const ticketId = m.ticketId as number | undefined
     if (typeof ticketId !== 'number') return
     toast.dismiss(toastIdFor(ticketId))
-    toast.success('SMASH undone', { id: toastIdFor(ticketId), duration: 3000 })
+    toast.success(i18n.t('activity:smash.undone'), { id: toastIdFor(ticketId), duration: 3000 })
   }, [])
 
   useLayoutEffect(() => {

@@ -1,0 +1,75 @@
+{
+  "topBar": {
+    "title": "Terminal",
+    "openCliMulti": "AI-CLI in neuem Terminal öffnen",
+    "openCli": "{{cli}} in neuem Terminal öffnen",
+    "maxTerminals": "Max. {{max}} Terminals pro Projekt",
+    "openInBrowser": "Im Browser öffnen",
+    "pasteScript": "Schnell-Skript ins aktive Terminal einfügen",
+    "pasteScriptNoActive": "Kein aktives Terminal zum Einfügen",
+    "newTerminal": "Neues Terminal",
+    "killActive": "Aktives Terminal beenden",
+    "restorePanel": "Panel wiederherstellen",
+    "maximizePanel": "Panel maximieren"
+  },
+  "panelChevron": {
+    "collapse": "Terminal-Panel einklappen",
+    "expand": "Terminal-Panel ausklappen"
+  },
+  "dragHandle": {
+    "resize": "Größe des Terminal-Panels ändern"
+  },
+  "sidebar": {
+    "rename": "{{name}} umbenennen",
+    "close": "{{name}} schließen"
+  },
+  "emptyState": {
+    "noTerminals": "Noch keine Terminals für dieses Projekt.",
+    "newTerminal": "Neues Terminal"
+  },
+  "search": {
+    "placeholder": "Suchen",
+    "previous": "Vorheriger Treffer (Shift+Enter)",
+    "next": "Nächster Treffer (Enter)",
+    "matchCase": "Groß-/Kleinschreibung beachten",
+    "regex": "Regex",
+    "wholeWord": "Ganzes Wort",
+    "close": "Schließen (Esc)"
+  },
+  "contextMenu": {
+    "paste": "Einfügen",
+    "selectAll": "Alles auswählen",
+    "clear": "Leeren",
+    "search": "Suchen…",
+    "saveScrollback": "Scrollback in Datei speichern…",
+    "openPath": "{{path}} öffnen"
+  },
+  "cliMenu": {
+    "open": "{{name}} öffnen"
+  },
+  "shortcutMenu": {
+    "configureBrowserUrl": "Browser-URL in den Einstellungen konfigurieren…",
+    "editQuickScript": "Schnell-Skript in den Einstellungen bearbeiten…"
+  },
+  "errors": {
+    "limitReached": "Terminal-Limit erreicht (max. {{max}}).",
+    "spawnFailed": "Die Shell konnte nicht gestartet werden – dem Hub fehlen womöglich File-Deskriptoren. Versuche, den Hub neu zu starten.",
+    "invalidName": "Ungültiger Terminal-Name.",
+    "openFailed": "Terminal konnte nicht geöffnet werden.",
+    "serverUnreachable": "Server zum Öffnen eines Terminals nicht erreichbar.",
+    "exitedImmediately": "Terminal wurde sofort beendet – die Shell konnte womöglich nicht starten. Wenn das wiederholt passiert, starte den Hub neu."
+  },
+  "session": {
+    "processExited": "[Prozess beendet]",
+    "processExitedWithCode": "[Prozess beendet (Code {{code}})]"
+  },
+  "notifications": {
+    "commandFinished": "Befehl abgeschlossen",
+    "commandFinishedNamed": "{{command}} abgeschlossen",
+    "finishedBody": "Exit {{code}} in {{elapsed}}"
+  },
+  "duration": {
+    "seconds": "{{seconds}}s",
+    "minutesSeconds": "{{minutes}}m {{seconds}}s"
+  }
+}

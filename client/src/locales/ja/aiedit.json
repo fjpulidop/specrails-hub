@@ -1,0 +1,55 @@
+{
+  "shell": {
+    "backAriaLabel": "戻る (Esc)",
+    "apply": "適用",
+    "somethingWentWrong": "問題が発生しました",
+    "quickPrompts": "クイックプロンプト",
+    "workingOnRefinement": "リファインを作成中…",
+    "history": "履歴",
+    "viewCurrentContent": "現在の内容を表示",
+    "conversation": "会話",
+    "applied": "適用しました。",
+    "you": "あなた",
+    "autoTestResult": "自動テスト結果",
+    "ai": "AI",
+    "refinementReady": "リファインが完了しました — 右側の差分を確認してください。",
+    "diffPreview": "差分プレビュー",
+    "proposedChanges": "提案された変更",
+    "wordLevelDiff": "単語レベルの差分",
+    "forceApply": "強制適用",
+    "conflict": {
+      "diskChanged": "編集中にディスク上のファイルが変更されたため、適用をブロックしました。",
+      "nameChanged": "AI がエージェント名を変更しました。名前の変更は別の明示的な操作です — 下書きを調整するか、Studio で名前を変更してください。"
+    },
+    "discardDialog": {
+      "ariaLabel": "変更を破棄しますか？",
+      "title": "リファインを破棄しますか？",
+      "body": "現在の下書きはキャンセルされ、適用されません。",
+      "keepEditing": "編集を続ける"
+    },
+    "composer": {
+      "sendAriaLabel": "送信 (⌘⏎)",
+      "kbdSubmit": "送信",
+      "kbdCancel": "キャンセル"
+    }
+  },
+  "composer": {
+    "title": "AI Edit",
+    "placeholder": "希望する変更を記述してください…",
+    "submit": "送信",
+    "unsupportedFileType": "未対応のファイル形式: {{name}}",
+    "uploadFailed": "{{name}} のアップロードに失敗しました: {{message}}"
+  },
+  "diffView": {
+    "inserted": "挿入",
+    "removed": "削除"
+  },
+  "refine": {
+    "serverError": "サーバーエラー ({{status}})",
+    "connectionFailed": "接続に失敗しました: {{message}}",
+    "applyFailed": "適用に失敗しました ({{status}})",
+    "loadAgentFailed": "エージェントの読み込みに失敗しました ({{status}})",
+    "loadSessionFailed": "セッションの読み込みに失敗しました ({{status}})",
+    "rehydrateFailed": "セッションの復元に失敗しました: {{message}}"
+  }
+}

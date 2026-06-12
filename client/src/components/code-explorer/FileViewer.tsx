@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ChevronDown, ChevronUp, FileMinus2, FilePlus2, FileText, GitCommitHorizontal } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
@@ -119,6 +120,7 @@ function clampHistoryHeight(height: number, containerHeight: number): number {
 }
 
 export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopyPathActionChange }: FileViewerProps) {
+  const { t } = useTranslation('code')
   const { activeProjectId } = useHub()
   const { openTicketDetail } = useTicketDetailModal()
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
@@ -234,15 +236,15 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
         setRegenerating(false)
         fetchFile()
       } else if (msg.type === 'file.summary_failed' && msg.path === relPathRef.current) {
-        toast.error(msg.reason ?? 'Summary generation failed')
+        toast.error(msg.reason ?? t('summary.generationFailed'))
         setRegenerating(false)
       } else if (msg.type === 'file.summary_skipped' && msg.path === relPathRef.current) {
-        if (msg.reason) toast(`Summary skipped: ${msg.reason}`)
+        if (msg.reason) toast(t('summary.skipped', { reason: msg.reason }))
         setRegenerating(false)
       }
     })
     return () => unregisterHandler(id)
-  }, [activeProjectId, registerHandler, unregisterHandler, fetchFile])
+  }, [activeProjectId, registerHandler, unregisterHandler, fetchFile, t])
 
   const handleRegenerate = useCallback(async (overrideBudget: boolean) => {
     setRegenerating(true)
@@ -259,7 +261,7 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
       if (!res.ok) {
         setRegenerating(false)
         const skipped = typeof json.skipped === 'string' ? json.skipped : null
-        toast.error(skipped ? `Summary skipped: ${skipped}` : 'Summary generation failed')
+        toast.error(skipped ? t('summary.skipped', { reason: skipped }) : t('summary.generationFailed'))
         return
       }
       if (json.skipped === 'budget') {
@@ -271,16 +273,16 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
       // tell the user it was dropped instead of silently clearing the spinner.
       if (json.skipped) {
         setRegenerating(false)
-        toast(`Summary skipped: ${json.skipped}`)
+        toast(t('summary.skipped', { reason: json.skipped }))
         return
       }
       await fetchFile()
       setRegenerating(false)
     } catch {
       setRegenerating(false)
-      toast.error('Summary generation failed')
+      toast.error(t('summary.generationFailed'))
     }
-  }, [fetchFile, relPath])
+  }, [fetchFile, relPath, t])
 
   const copyAbsolutePath = useCallback(async () => {
     const abs = file?.absolutePath ?? relPath
@@ -289,11 +291,11 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
       // await so a failure doesn't leak an unhandled rejection AND so the success
       // toast only fires when the clipboard actually received the path.
       await navigator.clipboard?.writeText(abs)
-      toast.success('Path copied')
+      toast.success(t('viewer.pathCopied'))
     } catch {
-      toast.error('Could not copy path')
+      toast.error(t('viewer.copyPathFailed'))
     }
-  }, [file, relPath])
+  }, [file, relPath, t])
 
   // Hook order must be stable across renders — declare BEFORE any early return.
   const markdown = useMemo(() => isMarkdown(relPath, file?.language), [relPath, file?.language])
@@ -304,11 +306,11 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
   const provenance = file?.provenance ?? []
   const missing = file?.reason === 'not-found'
   const summaryDisabledReason = missing
-    ? 'file missing'
+    ? t('summary.reason.missing')
     : file?.binary
-      ? 'binary file'
+      ? t('summary.reason.binary')
       : file?.tooLarge
-        ? 'file too large'
+        ? t('summary.reason.tooLarge')
         : null
 
   useEffect(() => {
@@ -339,7 +341,7 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
   if (loading && !file) {
     return (
       <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground animate-pulse">
-        Loading file…
+        {t('viewer.loadingFile')}
       </div>
     )
   }
@@ -355,7 +357,7 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted/50 hover:text-foreground"
           >
             <ChevronDown className="h-3.5 w-3.5" />
-            Show summary
+            {t('viewer.showSummary')}
           </button>
         </div>
       ) : (
@@ -371,7 +373,7 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
       <div className="px-4 py-1 border-b border-border flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           {markdown && file?.content !== undefined && !file.binary && !file.tooLarge && (
-            <div className="flex items-center gap-1 text-[11px]" role="group" aria-label="Markdown view mode">
+            <div className="flex items-center gap-1 text-[11px]" role="group" aria-label={t('viewer.markdownViewMode')}>
               <button
                 type="button"
                 onClick={() => setMarkdownMode('preview')}
@@ -382,7 +384,7 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
                     : 'px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 }
               >
-                Preview
+                {t('viewer.preview')}
               </button>
               <button
                 type="button"
@@ -394,7 +396,7 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
                     : 'px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 }
               >
-                Raw
+                {t('viewer.raw')}
               </button>
             </div>
           )}
@@ -404,15 +406,15 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
       <div className="flex-1 overflow-hidden">
         {missing ? (
           <div className="h-full flex items-center justify-center text-sm text-muted-foreground" data-testid="file-missing">
-            This file was touched by an AI job but no longer exists in the working tree.
+            {t('viewer.missingFile')}
           </div>
         ) : file?.binary ? (
           <div className="h-full flex items-center justify-center text-sm text-muted-foreground" data-testid="file-binary">
-            Binary file.
+            {t('viewer.binaryFile')}
           </div>
         ) : file?.tooLarge ? (
           <div className="h-full flex items-center justify-center text-sm text-muted-foreground" data-testid="file-too-large">
-            File too large to preview ({Math.round((file.sizeBytes ?? 0) / 1024 / 1024)} MB).
+            {t('viewer.tooLarge', { size: Math.round((file.sizeBytes ?? 0) / 1024 / 1024) })}
           </div>
         ) : file?.content !== undefined ? (
           markdown && markdownMode === 'preview' ? (
@@ -427,7 +429,7 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
           )
         ) : (
           <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-            No content available.
+            {t('viewer.noContent')}
           </div>
         )}
       </div>
@@ -436,7 +438,7 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
           <div
             role="separator"
             aria-orientation="horizontal"
-            aria-label="Resize AI touch history"
+            aria-label={t('history.resize')}
             onPointerDown={historyCollapsed ? undefined : beginHistoryResize}
             onDoubleClick={historyCollapsed ? undefined : resetHistoryHeight}
             className={
@@ -444,11 +446,11 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
                 ? 'flex h-8 shrink-0 items-center justify-between border-t border-border bg-card/35 px-4'
                 : 'flex h-8 shrink-0 cursor-row-resize items-center justify-between border-y border-border/40 bg-card/35 px-4 hover:bg-accent-primary/10'
             }
-            title={historyCollapsed ? undefined : 'Drag to resize. Double-click to reset.'}
+            title={historyCollapsed ? undefined : t('resizer.hint')}
             data-testid="code-history-resizer"
           >
             <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              AI touch history · {provenance.length} {provenance.length === 1 ? 'change' : 'changes'}
+              {t('history.title', { count: provenance.length })}
             </span>
             <button
               type="button"
@@ -457,7 +459,7 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
               className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted/50 hover:text-foreground"
             >
               {historyCollapsed ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              {historyCollapsed ? 'Show' : 'Hide'}
+              {historyCollapsed ? t('history.show') : t('history.hide')}
             </button>
           </div>
           {!historyCollapsed && (
@@ -479,21 +481,21 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
           data-testid="budget-prompt"
         >
           <div className="bg-card border border-border rounded-lg p-4 w-80 flex flex-col gap-3">
-            <p className="text-sm text-foreground">Override the budget cap?</p>
+            <p className="text-sm text-foreground">{t('viewer.budgetPrompt')}</p>
             <div className="flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setBudgetPromptOpen(false)}
                 className="text-xs px-3 py-1.5 rounded-md text-muted-foreground hover:text-foreground"
               >
-                Cancel
+                {t('common:actions.cancel')}
               </button>
               <button
                 type="button"
                 onClick={() => { setBudgetPromptOpen(false); handleRegenerate(true) }}
                 className="text-xs px-3 py-1.5 rounded-md bg-accent-primary text-white"
               >
-                Confirm
+                {t('common:actions.confirm')}
               </button>
             </div>
           </div>
@@ -514,6 +516,7 @@ function ProvenanceTimeline({
   onFilterJob?: (jobId: string) => void
   height: number
 }) {
+  const { t } = useTranslation('code')
   const [openDiffKey, setOpenDiffKey] = useState<string | null>(null)
   const [diffs, setDiffs] = useState<Record<string, { patch: string; truncated: boolean } | 'missing' | 'loading'>>({})
   if (rows.length === 0) return null
@@ -550,7 +553,7 @@ function ProvenanceTimeline({
       <div className="h-full overflow-auto space-y-1">
         {rows.map((row, index) => {
           const Icon = row.kind === 'created' ? FilePlus2 : row.kind === 'deleted' ? FileMinus2 : FileText
-          const job = row.jobId ? (row.jobId.length > 12 ? row.jobId.slice(0, 12) : row.jobId) : 'unknown job'
+          const job = row.jobId ? (row.jobId.length > 12 ? row.jobId.slice(0, 12) : row.jobId) : t('history.unknownJob')
           const diffKey = `${row.jobId ?? 'job'}:${row.path}:${row.at}:${index}`
           const diffState = diffs[diffKey]
           return (
@@ -558,7 +561,7 @@ function ProvenanceTimeline({
               <div className="grid grid-cols-[minmax(72px,auto)_minmax(0,1fr)_auto] items-center gap-2 text-xs px-2 py-1.5">
                 <span className="inline-flex items-center gap-1.5 min-w-0">
                   <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span className="capitalize">{row.kind}</span>
+                  <span className="capitalize">{t(`kind.${row.kind}`)}</span>
                 </span>
                 <span className="inline-flex items-center gap-1.5 min-w-0 text-muted-foreground">
                   <GitCommitHorizontal className="h-3.5 w-3.5 shrink-0" />
@@ -567,7 +570,7 @@ function ProvenanceTimeline({
                       type="button"
                       onClick={() => onFilterJob(row.jobId!)}
                       className="font-mono truncate hover:text-foreground"
-                      title={`Filter Code by job ${row.jobId}`}
+                      title={t('history.filterByJob', { jobId: row.jobId })}
                     >
                       {job}
                     </button>
@@ -580,7 +583,7 @@ function ProvenanceTimeline({
                       onClick={() => toggleDiff(row, diffKey)}
                       className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
                     >
-                      Diff
+                      {t('history.diff')}
                     </button>
                   )}
                   {typeof row.ticketId === 'number' && (
@@ -588,9 +591,9 @@ function ProvenanceTimeline({
                       type="button"
                       onClick={() => onOpenTicket(row.ticketId!)}
                       className="shrink-0 rounded bg-accent-primary/15 px-1.5 py-0.5 text-[10px] text-accent-primary hover:bg-accent-primary/25"
-                      title={`Open spec #${row.ticketId}`}
+                      title={t('history.openSpec', { ticketId: row.ticketId })}
                     >
-                      spec #{row.ticketId}
+                      {t('history.specChip', { ticketId: row.ticketId })}
                     </button>
                   )}
                 </span>
@@ -601,15 +604,15 @@ function ProvenanceTimeline({
               {openDiffKey === diffKey && (
                 <div className="px-2 pb-2">
                   {diffState === 'loading' ? (
-                    <div className="rounded-md bg-muted/35 px-2 py-2 text-[11px] text-muted-foreground">Loading diff...</div>
+                    <div className="rounded-md bg-muted/35 px-2 py-2 text-[11px] text-muted-foreground">{t('history.loadingDiff')}</div>
                   ) : diffState === 'missing' || !diffState ? (
                     <div className="rounded-md bg-muted/35 px-2 py-2 text-[11px] text-muted-foreground">
-                      Diff unavailable for this historical touch. New jobs will store patches automatically.
+                      {t('history.diffUnavailable')}
                     </div>
                   ) : (
                     <pre className="max-h-72 overflow-auto rounded-md bg-muted/50 px-2 py-2 font-mono text-[11px] leading-relaxed text-foreground/85">
                       {diffState.patch}
-                      {diffState.truncated ? '\n[diff truncated]' : ''}
+                      {diffState.truncated ? `\n${t('history.diffTruncated')}` : ''}
                     </pre>
                   )}
                 </div>

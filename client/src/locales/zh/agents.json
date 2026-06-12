@@ -1,0 +1,177 @@
+{
+  "page": {
+    "title": "Agents",
+    "subtitle": "管理此项目的 Agent Profile 和目录（上游 + 自定义）。",
+    "tabs": {
+      "profiles": "Profile",
+      "usage": "用量",
+      "catalog": "目录"
+    },
+    "banner": {
+      "title": "Profile 感知流水线需要 specrails-core {{required}}+",
+      "body": "此项目当前为 <code>{{version}}</code>。在项目内运行 <code>{{command}}</code> 以解锁 Profile 模式。在此创建的 Profile 仍会保存，只是在 core 更新前不会影响流水线。",
+      "unknownVersion": "未知"
+    }
+  },
+  "catalog": {
+    "loading": "正在加载目录…",
+    "aiEditChipLabel": "AI 编辑 · {{agentId}}",
+    "errors": {
+      "loadFailed": "目录加载失败：{{status}}",
+      "bodyLoadFailed": "Agent 正文加载失败：{{status}}",
+      "generateFailed": "生成失败：{{status}}",
+      "agentLoadFailed": "加载失败：{{status}}"
+    },
+    "templates": {
+      "title": "Agent 模板库",
+      "countOf": "{{shown}} / {{total}}",
+      "description": "从精选模板开始，覆盖工程、产品、科学、健康、法律等领域。挑选一个并在 Studio 中打开，审阅和编辑后再保存。",
+      "searchPlaceholder": "按名称、描述、标签或分类搜索…",
+      "allCategories": "全部",
+      "tagFilter": "标签筛选：",
+      "noMatch": "没有符合筛选条件的模板。",
+      "clearFilters": "清除筛选",
+      "openInStudio": "在 Studio 中打开 →",
+      "tip": "提示：点击任意卡片上的标签即可按该标签筛选。"
+    },
+    "generate": {
+      "title": "生成自定义 Agent",
+      "agentIdLabel": "Agent ID",
+      "agentIdHint": "必须以 <code>custom-</code> 开头。",
+      "descriptionLabel": "描述此 Agent 的职责",
+      "descriptionPlaceholder": "例如：审查 Terraform/IaC 变更，在合并前标记安全配置错误、过度的 IAM 权限和公开的 S3 存储桶。风格保守、简洁。",
+      "note": "Claude 会起草完整的 <code>.md</code> 正文。你将在 Studio 中审阅，并可在保存前编辑。此操作会启动一次性的 claude 调用，最长可能需要 90 秒。",
+      "generating": "正在生成…",
+      "generateButton": "生成"
+    },
+    "empty": {
+      "title": "尚未安装任何 Agent",
+      "body": "在此项目中运行 <code>{{command}}</code> 安装上游 Agent，或立即创建一个自定义 Agent。"
+    },
+    "actions": {
+      "template": "模板",
+      "templateTitle": "从模板开始",
+      "generate": "生成",
+      "generateWithClaude": "用 Claude 生成",
+      "blank": "空白",
+      "blankTitle": "从空白模板开始"
+    },
+    "sidebar": {
+      "title": "目录",
+      "createLabel": "创建自定义 Agent："
+    },
+    "sections": {
+      "upstream": "上游（{{count}}）",
+      "upstreamDescription": "由 specrails-core 提供；只读。",
+      "custom": "自定义（{{count}}）",
+      "customDescription": "项目中的 custom-*.md 文件。使用上方的模板 / 生成 / 空白来创建。",
+      "noCustomAgents": "暂无自定义 Agent。"
+    },
+    "detail": {
+      "defaultModel": "默认模型：{{model}}",
+      "aiEdit": "AI 编辑",
+      "aiEditTitle": "用 AI 迭代优化此 Agent",
+      "readOnly": "只读",
+      "editableHint": "可编辑——使用上方的“编辑”"
+    },
+    "kind": {
+      "upstream": "上游",
+      "custom": "自定义"
+    }
+  },
+  "profiles": {
+    "loading": "正在加载 Profile…",
+    "selectPrompt": "选择要编辑的 Profile",
+    "errors": {
+      "listFailed": "列表加载失败：{{status}}",
+      "loadFailed": "加载失败：{{status}}",
+      "migrationFailed": "迁移失败：{{status}}",
+      "createFailed": "创建失败：{{status}}",
+      "duplicateFailed": "复制失败：{{status}}",
+      "deleteFailed": "删除失败：{{status}}",
+      "saveFailed": "保存失败：{{status}}"
+    },
+    "toasts": {
+      "migrated": "Profile 已迁移",
+      "migratedDescription": "已根据当前 Agent 创建 default Profile",
+      "migrationFailed": "迁移失败",
+      "created": "Profile 已创建",
+      "createFailed": "创建 Profile 失败",
+      "duplicated": "Profile 已复制",
+      "duplicatedDescription": "{{from}} → {{to}}",
+      "duplicateFailed": "复制 Profile 失败",
+      "deleted": "Profile 已删除",
+      "deleteFailed": "删除 Profile 失败",
+      "saved": "Profile 已保存",
+      "saveFailed": "保存 Profile 失败",
+      "savedWithUntargeted": "Profile 已保存，但存在未被路由的 Agent",
+      "savedWithUntargetedDescription": "没有路由规则指向：{{agents}}。如需让它们运行，请添加标签规则或调整默认规则的目标。"
+    },
+    "createDialog": {
+      "title": "新建 Profile",
+      "description": "请使用小写 kebab-case 名称（字母、数字和连字符）。",
+      "confirmLabel": "创建",
+      "invalidHint": "必须以字母或数字开头，且只能包含小写字母、数字和连字符。"
+    },
+    "duplicateDialog": {
+      "title": "复制“{{name}}”",
+      "description": "新 Profile 的名称。",
+      "invalidHint": "仅限小写 kebab-case。"
+    },
+    "deleteDialog": {
+      "title": "删除 Profile“{{name}}”？",
+      "description": "此操作无法撤销。已使用此 Profile 启动的任务会保留其快照；之后的启动将回退到解析顺序。"
+    },
+    "empty": {
+      "title": "暂无 Profile",
+      "body": "Profile 可保存编排器 + Agent + 路由的组合，并为每条 rail 单独选用。",
+      "migrateButton": "从当前 Agent 迁移",
+      "blankButton": "空白 Profile",
+      "migrateExplainer": "“迁移”会读取现有 <code>.claude/agents/</code> frontmatter 中的模型，并创建一个 <code>default</code> Profile，完整复刻当前行为——零损失。"
+    },
+    "sidebar": {
+      "title": "Profile",
+      "teamDefault": "（团队默认）"
+    },
+    "editorFooter": {
+      "fixValidationIssues": "保存前请先修复校验问题",
+      "issuesToResolve_one": "{{count}} 个待解决问题",
+      "issuesToResolve_other": "{{count}} 个待解决问题"
+    }
+  },
+  "usage": {
+    "title": "Profile 用量",
+    "windowLabel": "{{days}}天",
+    "subtitleEmpty": "所选时间窗口内各 Profile 启动的任务数。",
+    "subtitle": "最近 {{count}} 天内各 Profile 启动的任务数。",
+    "empty": "暂无使用 Profile 的任务。",
+    "jobsTooltip": "任务",
+    "jobsLabel_one": "个任务",
+    "jobsLabel_other": "个任务",
+    "successRateTooltip": "成功率",
+    "okSuffix": "成功",
+    "avgDurationTooltip": "平均时长",
+    "avgTokensTooltip": "平均 token 数",
+    "tokensSuffix": "tok"
+  },
+  "routingRule": {
+    "addTitle": "添加路由规则",
+    "editTitle": "编辑路由规则",
+    "addDescription": "添加按标签匹配的路由规则，标签使用小写 kebab-case。",
+    "editDescription": "更新此规则的标签或目标 Agent。",
+    "tagsLabel": "标签",
+    "tagsHint": "以逗号分隔。使用小写 kebab-case，如 <code>frontend</code> 或 <code>api-design</code>。",
+    "invalidTags_one": "无效标签：{{tags}}。标签只能使用小写字母、数字和连字符。",
+    "invalidTags_other": "无效标签：{{tags}}。标签只能使用小写字母、数字和连字符。",
+    "routeToLabel": "路由到",
+    "routeToHint": "只有此 Profile 链中的 Agent 才能作为路由目标。",
+    "addRule": "添加规则",
+    "saveChanges": "保存更改"
+  },
+  "railSelectors": {
+    "profileTitle": "此 rail 使用的 Agent Profile",
+    "noProfile": "无 Profile",
+    "modelTitle": "此 Ultracode rail 使用的模型",
+    "engineTitle": "此 rail 使用的 AI 引擎"
+  }
+}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Download } from 'lucide-react'
 import type { Attachment } from '../types'
 import { fetchAttachmentBlob } from '../lib/attachments'
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function AttachmentPreviewLightbox({ ticketKey, attachment, onClose }: Props) {
+  const { t } = useTranslation('attachments')
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -45,7 +47,7 @@ export function AttachmentPreviewLightbox({ ticketKey, attachment, onClose }: Pr
       })
       .catch((err) => {
         if (disposed) return
-        setLoadError(err instanceof Error ? err.message : 'Failed to load attachment')
+        setLoadError(err instanceof Error ? err.message : t('errors.loadFailed'))
       })
 
     return () => {
@@ -68,7 +70,7 @@ export function AttachmentPreviewLightbox({ ticketKey, attachment, onClose }: Pr
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`Preview ${attachment.filename}`}
+      aria-label={t('lightbox.preview', { name: attachment.filename })}
       className="fixed inset-0 z-[100] flex flex-col bg-black/85 backdrop-blur-sm animate-in fade-in-0 duration-200"
       onClick={onClose}
     >
@@ -80,11 +82,11 @@ export function AttachmentPreviewLightbox({ ticketKey, attachment, onClose }: Pr
         <button
           type="button"
           onClick={onClose}
-          aria-label="Back to hub"
+          aria-label={t('lightbox.backToHub')}
           className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-white/85 hover:bg-white/10 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back
+          {t('common:actions.back')}
         </button>
         <div className="flex-1 text-center min-w-0 px-4">
           <div className="text-sm font-medium text-white/95 truncate">{attachment.filename}</div>
@@ -98,10 +100,10 @@ export function AttachmentPreviewLightbox({ ticketKey, attachment, onClose }: Pr
             if (!objectUrl) e.preventDefault()
           }}
           className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-white/85 hover:bg-white/10 hover:text-white transition-colors"
-          aria-label="Download"
+          aria-label={t('lightbox.download')}
         >
           <Download className="w-4 h-4" />
-          Download
+          {t('lightbox.download')}
         </a>
       </div>
 
@@ -115,14 +117,14 @@ export function AttachmentPreviewLightbox({ ticketKey, attachment, onClose }: Pr
             onClick={(e) => e.stopPropagation()}
             className="text-center text-white/80 px-8 py-10 rounded-lg bg-white/5 border border-white/10"
           >
-            <p className="text-sm">Could not load attachment: {loadError}</p>
+            <p className="text-sm">{t('lightbox.loadError', { error: loadError })}</p>
           </div>
         ) : !objectUrl ? (
           <div
             onClick={(e) => e.stopPropagation()}
             className="text-center text-white/70 px-8 py-10 rounded-lg bg-white/5 border border-white/10"
           >
-            <p className="text-sm">Loading attachment...</p>
+            <p className="text-sm">{t('lightbox.loading')}</p>
           </div>
         ) : isImage ? (
           <img
@@ -143,14 +145,14 @@ export function AttachmentPreviewLightbox({ ticketKey, attachment, onClose }: Pr
             onClick={(e) => e.stopPropagation()}
             className="text-center text-white/80 px-8 py-10 rounded-lg bg-white/5 border border-white/10"
           >
-            <p className="text-sm mb-3">Preview not available for this file type.</p>
+            <p className="text-sm mb-3">{t('lightbox.previewUnavailable')}</p>
             <a
               href={objectUrl}
               download={attachment.filename}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors"
             >
               <Download className="w-4 h-4" />
-              Download {attachment.filename}
+              {t('lightbox.downloadFile', { name: attachment.filename })}
             </a>
           </div>
         )}
