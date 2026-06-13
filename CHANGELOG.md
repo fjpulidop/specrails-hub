@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/fjpulidop/specrails-desktop/compare/v2.0.0...v2.1.0) (2026-06-13)
+
+
+### Features
+
+* **onboarding:** add language, theme & companion steps to welcome wizard ([#378](https://github.com/fjpulidop/specrails-desktop/issues/378)) ([4e6f2ec](https://github.com/fjpulidop/specrails-desktop/commit/4e6f2ecf81a81b12ca7f1089838c3fc38b97f643))
+
 ## [2.0.0](https://github.com/fjpulidop/specrails-desktop/compare/v1.67.0...v2.0.0) (2026-06-12)
 
 
