@@ -82,10 +82,29 @@ function firstToken(c: unknown): string {
   return clip(c.trim().split(/\s+/)[0] ?? '')
 }
 
+/** Codex `function_call`/`local_shell_call` carry their command in the
+ *  `item.arguments` JSON string (NOT `item.command`). Extract the first token
+ *  of the command for the activity label. Never throws. */
+function codexCallCommand(args: unknown): string {
+  if (typeof args !== 'string') return ''
+  try {
+    const parsed = JSON.parse(args) as { command?: unknown }
+    const cmd = parsed?.command
+    if (Array.isArray(cmd)) return firstToken(cmd.filter((x) => typeof x === 'string').join(' '))
+    if (typeof cmd === 'string') return firstToken(cmd)
+  } catch {
+    // arguments not JSON — no command to surface
+  }
+  return ''
+}
+
 interface FrameActivity {
   step: boolean
   actionKey?: string
   actionArg?: string
+  /** Number of concrete steps this frame represents (default 1). A single
+   *  claude assistant frame can carry several parallel tool_use blocks. */
+  stepCount?: number
 }
 
 function mapTool(name: unknown, input: Record<string, unknown> | undefined): FrameActivity {
@@ -116,11 +135,15 @@ function mapTool(name: unknown, input: Record<string, unknown> | undefined): Fra
 
 function deriveFrameActivity(ev: EventRow): FrameActivity {
   const t = ev.event_type
+  // Coerce to a safe empty object for null / arrays / primitives — JSON.parse
+  // does NOT throw on the literal `null`/`42`/`"x"`, so a bare catch isn't
+  // enough to keep the property reads below from dereferencing a non-object.
   let parsed: Record<string, unknown> = {}
   try {
-    parsed = JSON.parse(ev.payload) as Record<string, unknown>
+    const j = JSON.parse(ev.payload)
+    if (j && typeof j === 'object' && !Array.isArray(j)) parsed = j as Record<string, unknown>
   } catch {
-    parsed = {}
+    // unparseable payload — parsed stays {}
   }
 
   // ── Claude stream-json ──
@@ -128,8 +151,13 @@ function deriveFrameActivity(ev: EventRow): FrameActivity {
     const message = parsed.message as { content?: Array<Record<string, unknown>> } | undefined
     const content = message?.content
     if (Array.isArray(content)) {
-      const tool = [...content].reverse().find((c) => c?.type === 'tool_use')
-      if (tool) return mapTool(tool.name, tool.input as Record<string, unknown> | undefined)
+      // A single assistant frame can carry several parallel tool_use blocks;
+      // count them all as steps, label from the last.
+      const toolUses = content.filter((c) => c?.type === 'tool_use')
+      if (toolUses.length > 0) {
+        const last = toolUses[toolUses.length - 1]
+        return { ...mapTool(last.name, last.input as Record<string, unknown> | undefined), stepCount: toolUses.length }
+      }
       if (content.some((c) => c?.type === 'text')) return { step: true, actionKey: 'thinking' }
     }
     return { step: true }
@@ -145,7 +173,10 @@ function deriveFrameActivity(ev: EventRow): FrameActivity {
     if (it === 'agent_message') return { step: true, actionKey: 'thinking' }
     if (it === 'agent_reasoning') return { step: true, actionKey: 'reasoning' }
     if (it === 'function_call' || it === 'local_shell_call' || it === 'command_execution') {
-      const arg = firstToken(item?.command) || (typeof item?.name === 'string' ? clip(item.name) : '') ||
+      // function_call/local_shell_call carry the command in item.arguments (a
+      // JSON string), command_execution in item.command — read both.
+      const arg = firstToken(item?.command) || codexCallCommand(item?.arguments) ||
+        (typeof item?.name === 'string' ? clip(item.name) : '') ||
         (it === 'local_shell_call' ? 'shell' : '')
       return { step: true, actionKey: 'running', actionArg: arg }
     }
@@ -170,11 +201,17 @@ function activityReducer(state: ActivityState, action: ActivityAction): Activity
   if (action.type === 'reset') return INITIAL_ACTIVITY
   if (action.type === 'consume') {
     const { events } = action
-    if (events.length <= state.lastSeenIdx) return state
+    // Re-anchor when JobDetailPage front-truncates events[] (the 10000→8000
+    // cap reindexes the array). A stale absolute lastSeenIdx would otherwise
+    // permanently freeze the steps counter and the action label.
+    const start = state.lastSeenIdx > events.length ? events.length : state.lastSeenIdx
+    if (events.length <= start) {
+      return start === state.lastSeenIdx ? state : { ...state, lastSeenIdx: start }
+    }
     let { steps, actionKey, actionArg } = state
-    for (let i = state.lastSeenIdx; i < events.length; i++) {
+    for (let i = start; i < events.length; i++) {
       const d = deriveFrameActivity(events[i])
-      if (d.step) steps += 1
+      if (d.step) steps += d.stepCount ?? 1
       if (d.actionKey) {
         actionKey = d.actionKey
         actionArg = d.actionArg ?? ''
@@ -257,9 +294,13 @@ export function JobStatusPanel({
 
   const effectiveActionKey =
     isRunning && activity.steps === 0 ? 'connecting' : activity.actionKey || 'thinking'
-  const actionLabel = ARG_ACTIONS.has(effectiveActionKey)
-    ? t(`statusPanel.activity.${effectiveActionKey}`, { arg: activity.actionArg })
-    : t(`statusPanel.activity.${effectiveActionKey}`)
+  // An ARG action with an empty arg (e.g. Bash with no command) would render a
+  // dangling "Running: " / "Searching “”"; fall back to the no-arg "working".
+  const hasArg = ARG_ACTIONS.has(effectiveActionKey) && activity.actionArg !== ''
+  const labelKey = ARG_ACTIONS.has(effectiveActionKey) && !hasArg ? 'working' : effectiveActionKey
+  const actionLabel = hasArg
+    ? t(`statusPanel.activity.${labelKey}`, { arg: activity.actionArg })
+    : t(`statusPanel.activity.${labelKey}`)
   const pillLabel =
     runningPhaseLabel ?? (isRunning && activity.steps === 0 ? t('statusPanel.activity.starting') : null)
   const stepsLabel = activity.steps > 0 ? t('statusPanel.steps', { count: activity.steps }) : null
