@@ -267,6 +267,59 @@ describe('JobStatusPanel', () => {
       expect(screen.getByText('Working…')).toBeInTheDocument()
     })
 
+    // ── Audit regression fixes ────────────────────────────────────────────────
+
+    it('does not throw on a bare `null` / primitive JSON payload (null-deref guard)', () => {
+      const events: EventRow[] = [
+        { id: 1, job_id: 'job-running', seq: 1, event_type: 'assistant', payload: 'null', timestamp: '' },
+        { id: 2, job_id: 'job-running', seq: 2, event_type: 'item.completed', payload: '42', timestamp: '' },
+        { id: 3, job_id: 'job-running', seq: 3, event_type: 'tool_use', payload: '"a string"', timestamp: '' },
+      ]
+      // Must not throw; each non-skipped frame still counts as a step.
+      render(<JobStatusPanel job={runningJob} events={events} />)
+      expect(screen.getByText('Job in progress')).toBeInTheDocument()
+    })
+
+    it('counts every parallel tool_use block in one assistant frame as a step', () => {
+      const multi: EventRow = {
+        id: 1, job_id: 'job-running', seq: 1, event_type: 'assistant',
+        payload: JSON.stringify({ message: { content: [
+          { type: 'tool_use', name: 'Read', input: { file_path: 'a.ts' } },
+          { type: 'tool_use', name: 'Read', input: { file_path: 'b.ts' } },
+          { type: 'tool_use', name: 'Read', input: { file_path: 'c.ts' } },
+        ] } }),
+        timestamp: '',
+      }
+      render(<JobStatusPanel job={runningJob} events={[multi]} />)
+      expect(screen.getByText('3 steps')).toBeInTheDocument()
+      expect(screen.getByText('Reading c.ts')).toBeInTheDocument()
+    })
+
+    it('falls back to Working (no dangling arg) when a tool command is empty', () => {
+      render(<JobStatusPanel job={runningJob} events={[assistantTool(1, 'Bash', { command: '' })]} />)
+      expect(screen.getByText('Working…')).toBeInTheDocument()
+      expect(screen.queryByText(/Running:\s*$/)).not.toBeInTheDocument()
+    })
+
+    it('surfaces the codex function_call command from item.arguments', () => {
+      const events = [
+        codexItem(1, { type: 'function_call', name: 'shell', arguments: JSON.stringify({ command: ['cargo', 'test'] }) }),
+      ]
+      render(<JobStatusPanel job={runningJob} events={events} />)
+      expect(screen.getByText('Running: cargo')).toBeInTheDocument()
+    })
+
+    it('does not freeze the steps counter after the events array is front-truncated', () => {
+      // Simulate JobDetailPage's 10000→8000 slice: the array shrinks, then grows.
+      const { rerender } = render(<JobStatusPanel job={runningJob} events={[assistantText(1), assistantText(2), assistantText(3)]} />)
+      expect(screen.getByText('3 steps')).toBeInTheDocument()
+      // Front-truncate (drop the oldest) — reducer must re-anchor, not freeze.
+      rerender(<JobStatusPanel job={runningJob} events={[assistantText(2), assistantText(3)]} />)
+      // Grow again with a new frame: counting must resume (would stay "3 steps" if frozen).
+      rerender(<JobStatusPanel job={runningJob} events={[assistantText(2), assistantText(3), assistantText(4)]} />)
+      expect(screen.getByText('4 steps')).toBeInTheDocument()
+    })
+
     it('derives activity from codex item.completed frames', () => {
       const events = [
         codexItem(1, { type: 'agent_reasoning' }),

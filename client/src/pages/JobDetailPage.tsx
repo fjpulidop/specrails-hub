@@ -112,6 +112,15 @@ export default function JobDetailPage() {
     })
   }, [])
 
+  // Queue an event for the next rAF flush. Caps the pending queue at push time:
+  // while the surface is hidden (rAF paused) it would otherwise grow unbounded.
+  const enqueuePending = useCallback((ev: EventRow) => {
+    const q = pendingEventsRef.current
+    q.push(ev)
+    if (q.length > 10000) pendingEventsRef.current = q.slice(-8000)
+    if (!rafIdRef.current) rafIdRef.current = requestAnimationFrame(flushEvents)
+  }, [flushEvents])
+
   useEffect(() => () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current) }, [])
 
   const handleMessage = useCallback((data: unknown) => {
@@ -144,8 +153,7 @@ export default function JobDetailPage() {
         payload: msg.payload as string,
         timestamp: msg.timestamp as string,
       }
-      pendingEventsRef.current.push(eventRow)
-      if (!rafIdRef.current) rafIdRef.current = requestAnimationFrame(flushEvents)
+      enqueuePending(eventRow)
     } else if (msg.type === 'log' && msg.processId === id) {
       const syntheticEvent: EventRow = {
         id: Date.now(),
@@ -156,8 +164,7 @@ export default function JobDetailPage() {
         payload: JSON.stringify({ line: msg.line }),
         timestamp: msg.timestamp as string,
       }
-      pendingEventsRef.current.push(syntheticEvent)
-      if (!rafIdRef.current) rafIdRef.current = requestAnimationFrame(flushEvents)
+      enqueuePending(syntheticEvent)
     } else if (msg.type === 'phase') {
       const phaseName = msg.phase as string
       const phaseState = msg.state as PhaseState
@@ -176,7 +183,7 @@ export default function JobDetailPage() {
         }
       }
     }
-  }, [id, flushEvents])
+  }, [id, enqueuePending])
 
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
   useEffect(() => {
