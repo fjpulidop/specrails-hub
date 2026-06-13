@@ -59,7 +59,6 @@ function CheckRow({ id, label, hint, checked, disabled, tooltip, onChange }: Che
 
 export function ContextScopeChecks({
   scope,
-  mode,
   onChange,
   defaultOpen = false,
   label,
@@ -67,8 +66,12 @@ export function ContextScopeChecks({
 }: Props) {
   const { t } = useTranslation('addspec')
   const effectiveLabel = label ?? t('contextScope.defaultLabel')
-  const mcpDisabled = mode === 'quick'
-  const userMcpDisabled = mode === 'quick'
+  // MCP toggles are available in both Quick and Explore. Project `.mcp.json`
+  // (mcp) is discovered natively in both; "My approved MCPs" (userMcp) loads
+  // the developer's user-scope/plugin/connector servers via the server's
+  // loadUserEnv path.
+  const mcpDisabled = false
+  const userMcpDisabled = false
   const [open, setOpen] = useState(defaultOpen)
   const activeScopes = [
     scope.specrails && t('contextScope.tags.specrails'),

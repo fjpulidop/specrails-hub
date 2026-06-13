@@ -613,6 +613,10 @@ export class ChatManager {
       sessionId: conversation.session_id ?? undefined,
       maxTurns: options?.maxTurns,
       extraArgs: scopeFlags,
+      // "My approved MCPs" (scope.userMcp) loads the developer's user-scope,
+      // plugin, and connector MCP servers — which require the `user` setting
+      // source. Claude-only (codex reads ~/.codex natively, ignores this).
+      loadUserEnv: adapter.id === 'claude' && !!conversationScope?.userMcp,
     })
     if (conversationScope) {
       console.log(`[chat-manager] scope=${JSON.stringify(conversationScope)} flags=${scopeFlags.join(' ')} promptBytes=${Buffer.byteLength(systemPrompt)}`)

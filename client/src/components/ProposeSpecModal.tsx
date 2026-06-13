@@ -363,6 +363,7 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
               openspec: scope.openspec,
               full: scope.full,
               mcp: scope.mcp,
+              userMcp: scope.userMcp,
               contractRefine: scope.contractRefine,
             },
             contractRefine: scope.contractRefine,

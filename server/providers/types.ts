@@ -30,6 +30,16 @@ export interface SpawnOptions {
   attachmentTextBlocks?: string[]
   /** Additional argv to forward verbatim (provider-specific extras). */
   extraArgs?: string[]
+  /**
+   * Load the user's full Claude environment for this spawn (claude only).
+   * When true the claude adapter emits `--setting-sources user,project,local`
+   * instead of the isolated `project,local`, so the developer's user-scope,
+   * plugin-bundled, and connector MCP servers (the ones `claude mcp add` /
+   * plugins register) are discovered. Gated behind the Add Spec "My approved
+   * MCPs" toggle — it also re-loads user CLAUDE.md memory + hooks, which the
+   * isolated default intentionally excludes.
+   */
+  loadUserEnv?: boolean
 }
 
 export type AdapterEvent =

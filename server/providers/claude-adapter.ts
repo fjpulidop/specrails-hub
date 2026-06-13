@@ -47,30 +47,49 @@ function normaliseModel(model: string | null | undefined): string {
   }
 }
 
-/** Default arg block every claude spawn shares. */
+/** Default arg block every claude spawn shares. `--setting-sources` is appended
+ *  separately per-spawn (see `commonFlagsFor`) because its value depends on
+ *  whether the caller opted into loading the user's full Claude environment. */
 const COMMON_FLAGS = [
   '--dangerously-skip-permissions',
   '--tools', 'default',
   '--output-format', 'stream-json',
   '--verbose',
-  // Isolate app-spawned claude from the *user's* global Claude config. Without
-  // this, the child loads ~/.claude (user CLAUDE.md memory, plugins like
-  // claude-mem, SessionStart hooks). That bled cross-project memory into
-  // Explore turns (e.g. an unrelated "fighting game" surfaced for a fresh
-  // project) and inflated spec-gen tool usage past --max-turns. `project,local`
-  // still loads the target repo's own .claude settings + CLAUDE.md, which is
-  // exactly the context an app run should see.
-  '--setting-sources', 'project,local',
 ] as const
+
+/**
+ * COMMON_FLAGS + the `--setting-sources` value for this spawn.
+ *
+ * Default (`project,local`) isolates app-spawned claude from the *user's*
+ * global Claude config. Without this, the child loads ~/.claude (user CLAUDE.md
+ * memory, plugins like claude-mem, SessionStart hooks). That bled cross-project
+ * memory into Explore turns (e.g. an unrelated "fighting game" surfaced for a
+ * fresh project) and inflated spec-gen tool usage past --max-turns.
+ *
+ * When `opts.loadUserEnv` is set (the Add Spec "My approved MCPs" toggle), we
+ * switch to `user,project,local` so the developer's user-scope, plugin-bundled,
+ * and connector MCP servers are discovered. This is the ONLY way those MCP
+ * servers load (verified empirically against claude 2.1.177 — plugin MCP
+ * servers are gated by the `user` setting source); it also re-loads user
+ * CLAUDE.md + hooks, which is the user's explicit opt-in via the toggle.
+ */
+function commonFlagsFor(opts: SpawnOptions): string[] {
+  return [
+    ...COMMON_FLAGS,
+    '--setting-sources',
+    opts.loadUserEnv ? 'user,project,local' : 'project,local',
+  ]
+}
 
 function buildClaudeArgs(action: SpawnAction, opts: SpawnOptions): string[] {
   const args: string[] = []
   const model = normaliseModel(opts.model)
+  const commonFlags = commonFlagsFor(opts)
 
   switch (action) {
     case 'chat-turn': {
       args.push('--model', model)
-      args.push(...COMMON_FLAGS)
+      args.push(...commonFlags)
       if (opts.systemPrompt) args.push('--system-prompt', opts.systemPrompt)
       args.push('-p', opts.prompt)
       if (opts.maxTurns != null) args.push('--max-turns', String(opts.maxTurns))
@@ -82,7 +101,7 @@ function buildClaudeArgs(action: SpawnAction, opts: SpawnOptions): string[] {
         throw new Error('chat-resume requires sessionId')
       }
       args.push('--model', model)
-      args.push(...COMMON_FLAGS)
+      args.push(...commonFlags)
       if (opts.systemPrompt) args.push('--system-prompt', opts.systemPrompt)
       args.push('--resume', opts.sessionId)
       args.push('-p', opts.prompt)
@@ -94,7 +113,7 @@ function buildClaudeArgs(action: SpawnAction, opts: SpawnOptions): string[] {
       // QueueManager spawns with `--append-system-prompt` (not `--system-prompt`)
       // because the slash command in the prompt brings its own system prompt;
       // we ADD to it rather than overwrite.
-      args.push(...COMMON_FLAGS)
+      args.push(...commonFlags)
       args.push('--model', model)
       if (opts.systemPrompt) args.push('--append-system-prompt', opts.systemPrompt)
       args.push('-p', opts.prompt)
@@ -102,7 +121,7 @@ function buildClaudeArgs(action: SpawnAction, opts: SpawnOptions): string[] {
       return args
     }
     case 'spec-gen': {
-      args.push(...COMMON_FLAGS)
+      args.push(...commonFlags)
       args.push('--model', model)
       if (opts.maxTurns != null) args.push('--max-turns', String(opts.maxTurns))
       // Caller passes --tools override via extraArgs when scoped; otherwise
@@ -113,7 +132,7 @@ function buildClaudeArgs(action: SpawnAction, opts: SpawnOptions): string[] {
       return args
     }
     case 'agent-refine': {
-      args.push(...COMMON_FLAGS)
+      args.push(...commonFlags)
       if (opts.sessionId) args.push('--resume', opts.sessionId)
       args.push('-p', opts.prompt)
       if (opts.extraArgs) args.push(...opts.extraArgs)
@@ -121,7 +140,7 @@ function buildClaudeArgs(action: SpawnAction, opts: SpawnOptions): string[] {
     }
     case 'setup-enrich': {
       args.push('-p', opts.prompt)
-      args.push(...COMMON_FLAGS)
+      args.push(...commonFlags)
       if (opts.extraArgs) args.push(...opts.extraArgs)
       return args
     }
@@ -130,13 +149,13 @@ function buildClaudeArgs(action: SpawnAction, opts: SpawnOptions): string[] {
         throw new Error('setup-enrich-resume requires sessionId')
       }
       args.push('--resume', opts.sessionId)
-      args.push(...COMMON_FLAGS)
+      args.push(...commonFlags)
       args.push('-p', opts.prompt)
       if (opts.extraArgs) args.push(...opts.extraArgs)
       return args
     }
     case 'auto-title': {
-      args.push(...COMMON_FLAGS)
+      args.push(...commonFlags)
       args.push('-p', opts.prompt)
       return args
     }

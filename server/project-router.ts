@@ -1855,10 +1855,13 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       specrails: typeof rawScope?.specrails === 'boolean' ? rawScope.specrails : false,
       openspec: typeof rawScope?.openspec === 'boolean' ? rawScope.openspec : false,
       full: typeof rawScope?.full === 'boolean' ? rawScope.full : false,
-      mcp: false,
+      // Quick spawns from project.path, so project `.mcp.json` (the `mcp`
+      // toggle) is discovered natively. `userMcp` additionally loads the
+      // developer's user-scope/plugin/connector MCP servers via the claude
+      // adapter's `loadUserEnv` (see below).
+      mcp: typeof rawScope?.mcp === 'boolean' ? rawScope.mcp : false,
       contractRefine: quickContractRefine,
-      // Quick mode never injects MCPs (user MCP is an Explore-only toggle).
-      userMcp: false,
+      userMcp: typeof rawScope?.userMcp === 'boolean' ? rawScope.userMcp : false,
     }
     // Persist Quick mode Contract Refine choice (per-project last value).
     setQuickContractRefineLast(ctx(req).db, quickContractRefine)
@@ -1930,6 +1933,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
       model: resolvedModel,
       maxTurns: provider === 'claude' ? claudeMaxTurns : undefined,
       extraArgs: provider === 'claude' ? [...toolFlags.args, ...imageFlags] : undefined,
+      // "My approved MCPs" (scope.userMcp) loads the developer's user-scope,
+      // plugin, and connector MCP servers (claude-only). Quick already spawns
+      // from project.path so project `.mcp.json` is discovered without a flag.
+      loadUserEnv: provider === 'claude' && quickScope.userMcp,
     })
     const binary = adapter.binary
 
