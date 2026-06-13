@@ -32,9 +32,18 @@ import {
   ArrowRight,
   ArrowLeft,
   Check,
+  Languages,
+  Smartphone,
+  Apple,
+  QrCode,
+  ExternalLink,
 } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { cn } from '../lib/utils'
 import { Button } from './ui/button'
+import { LanguagePickerGrid } from './pickers/LanguagePickerGrid'
+import { ThemePickerGrid } from './pickers/ThemePickerGrid'
+import { COMPANION_IOS_URL, COMPANION_ANDROID_URL } from '../lib/companion'
 
 const ONBOARDING_KEY = 'specrails-desktop:onboarding-dismissed'
 
@@ -192,6 +201,109 @@ function FlowStrip({ steps }: { steps: { label: string; cls: string }[] }) {
   )
 }
 
+// ─── Interactive step bodies ─────────────────────────────────────────────────
+// These need hooks (theme/language context), so they are components rather
+// than static JSX inside buildSteps. Without a provider mounted the grids
+// degrade to null and only the step copy renders.
+
+function LanguageStepBody() {
+  const { t } = useTranslation('setup')
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        {t('onboarding.language.intro')}
+      </p>
+      <LanguagePickerGrid />
+      <p className="text-xs text-muted-foreground italic">{t('onboarding.language.note')}</p>
+    </div>
+  )
+}
+
+function ThemeStepBody() {
+  const { t } = useTranslation('setup')
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        {t('onboarding.theme.intro')}
+      </p>
+      <ThemePickerGrid />
+      <p className="text-xs text-muted-foreground italic">{t('onboarding.theme.note')}</p>
+    </div>
+  )
+}
+
+function CompanionDownloadCard({
+  icon,
+  url,
+  label,
+  testId,
+}: {
+  icon: React.ReactNode
+  url: string
+  label: string
+  testId: string
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border/40 bg-card/40 p-3">
+      <div className="shrink-0 rounded-md bg-white p-1.5" aria-hidden="true">
+        <QRCodeSVG value={url} size={72} />
+      </div>
+      <div className="min-w-0 space-y-1">
+        <p className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground leading-tight">
+          {icon}
+          {label}
+        </p>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid={testId}
+          aria-label={label}
+          className="inline-flex items-center gap-1 text-xs text-accent-info hover:underline break-all"
+        >
+          {url.replace('https://', '')}
+          <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
+        </a>
+      </div>
+    </div>
+  )
+}
+
+function CompanionStepBody() {
+  const { t } = useTranslation('setup')
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        <Trans t={t} i18nKey="onboarding.companion.intro" components={{ b: <span className="text-foreground font-medium" /> }} />
+      </p>
+      <Callout accent={ACCENTS.success} label={t('onboarding.companion.localLabel')}>
+        {t('onboarding.companion.localBody')}
+      </Callout>
+      <div className="space-y-2">
+        <p className="text-[13px] font-semibold text-foreground">{t('onboarding.companion.downloadLabel')}</p>
+        <p className="text-xs text-muted-foreground">{t('onboarding.companion.downloadHint')}</p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <CompanionDownloadCard
+            icon={<Apple className="w-4 h-4 shrink-0" aria-hidden="true" />}
+            url={COMPANION_IOS_URL}
+            label={t('onboarding.companion.ios')}
+            testId="companion-ios-link"
+          />
+          <CompanionDownloadCard
+            icon={<Smartphone className="w-4 h-4 shrink-0" aria-hidden="true" />}
+            url={COMPANION_ANDROID_URL}
+            label={t('onboarding.companion.android')}
+            testId="companion-android-link"
+          />
+        </div>
+      </div>
+      <Feature icon={<QrCode className="w-4 h-4" />} label={t('onboarding.companion.pairLabel')} accent={ACCENTS.success}>
+        {t('onboarding.companion.pairBody')}
+      </Feature>
+    </div>
+  )
+}
+
 // ─── Step definitions ───────────────────────────────────────────────────────
 
 interface StepConfig {
@@ -205,7 +317,27 @@ interface StepConfig {
 
 function buildSteps(t: TFunction): StepConfig[] {
   return [
-    // 1 — Welcome
+    // 1 — Language (hot-switches the rest of the tour immediately)
+    {
+      navLabel: t('onboarding.language.nav'),
+      icon: <Languages className="w-6 h-6" />,
+      accent: ACCENTS.info,
+      title: t('onboarding.language.title'),
+      subtitle: t('onboarding.language.subtitle'),
+      content: <LanguageStepBody />,
+    },
+
+    // 2 — Theme (applies live behind the dialog)
+    {
+      navLabel: t('onboarding.theme.nav'),
+      icon: <Palette className="w-6 h-6" />,
+      accent: ACCENTS.highlight,
+      title: t('onboarding.theme.title'),
+      subtitle: t('onboarding.theme.subtitle'),
+      content: <ThemeStepBody />,
+    },
+
+    // 3 — Welcome
     {
       navLabel: t('onboarding.welcome.nav'),
       icon: <Sparkles className="w-6 h-6" />,
@@ -245,7 +377,7 @@ function buildSteps(t: TFunction): StepConfig[] {
       ),
     },
 
-    // 2 — Author specs
+    // 4 — Author specs
     {
       navLabel: t('onboarding.authorSpecs.nav'),
       icon: <MessageSquare className="w-6 h-6" />,
@@ -281,7 +413,7 @@ function buildSteps(t: TFunction): StepConfig[] {
       ),
     },
 
-    // 3 — Run the pipeline (rails)
+    // 5 — Run the pipeline (rails)
     {
       navLabel: t('onboarding.rails.nav'),
       icon: <Workflow className="w-6 h-6" />,
@@ -329,7 +461,7 @@ function buildSteps(t: TFunction): StepConfig[] {
       ),
     },
 
-    // 4 — Providers
+    // 6 — Providers
     {
       navLabel: t('onboarding.providers.nav'),
       icon: <Bot className="w-6 h-6" />,
@@ -371,7 +503,7 @@ function buildSteps(t: TFunction): StepConfig[] {
       ),
     },
 
-    // 5 — Cost
+    // 7 — Cost
     {
       navLabel: t('onboarding.cost.nav'),
       icon: <Coins className="w-6 h-6" />,
@@ -401,7 +533,7 @@ function buildSteps(t: TFunction): StepConfig[] {
       ),
     },
 
-    // 6 — Workspace
+    // 8 — Workspace
     {
       navLabel: t('onboarding.workspace.nav'),
       icon: <Boxes className="w-6 h-6" />,
@@ -415,6 +547,7 @@ function buildSteps(t: TFunction): StepConfig[] {
               <Trans
                 t={t}
                 i18nKey="onboarding.workspace.terminalBody"
+                values={{ mod: MOD }}
                 components={{ mod: <Kbd>{MOD}</Kbd>, j: <Kbd>J</Kbd> }}
               />
             </Feature>
@@ -438,7 +571,17 @@ function buildSteps(t: TFunction): StepConfig[] {
       ),
     },
 
-    // 7 — Move fast / get started
+    // 9 — Companion mobile app
+    {
+      navLabel: t('onboarding.companion.nav'),
+      icon: <Smartphone className="w-6 h-6" />,
+      accent: ACCENTS.success,
+      title: t('onboarding.companion.title'),
+      subtitle: t('onboarding.companion.subtitle'),
+      content: <CompanionStepBody />,
+    },
+
+    // 10 — Move fast / get started
     {
       navLabel: t('onboarding.moveFast.nav'),
       icon: <Command className="w-6 h-6" />,
@@ -452,6 +595,7 @@ function buildSteps(t: TFunction): StepConfig[] {
               <Trans
                 t={t}
                 i18nKey="onboarding.moveFast.paletteShortcut"
+                values={{ mod: MOD }}
                 components={{
                   f: <span className="text-foreground" />,
                   m: <span className="text-muted-foreground" />,
@@ -467,6 +611,7 @@ function buildSteps(t: TFunction): StepConfig[] {
               <Trans
                 t={t}
                 i18nKey="onboarding.moveFast.terminalBody"
+                values={{ mod: MOD }}
                 components={{ mod: <Kbd>{MOD}</Kbd>, j: <Kbd>J</Kbd> }}
               />
             </Feature>
@@ -477,6 +622,7 @@ function buildSteps(t: TFunction): StepConfig[] {
               <Trans
                 t={t}
                 i18nKey="onboarding.moveFast.chatBody"
+                values={{ mod: MOD }}
                 components={{ mod: <Kbd>{MOD}</Kbd>, bkey: <Kbd>B</Kbd> }}
               />
             </Feature>
@@ -484,6 +630,7 @@ function buildSteps(t: TFunction): StepConfig[] {
               <Trans
                 t={t}
                 i18nKey="onboarding.moveFast.projectsBody"
+                values={{ alt: ALT, mod: MOD }}
                 components={{ alt: <Kbd>{ALT}</Kbd>, mod: <Kbd>{MOD}</Kbd>, bkey: <Kbd>B</Kbd> }}
               />
             </Feature>
@@ -539,12 +686,12 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content
-          className="fixed left-[50%] top-[50%] z-50 w-[calc(100vw-2rem)] max-w-4xl max-h-[88vh] translate-x-[-50%] translate-y-[-50%] overflow-hidden border border-border/30 bg-popover shadow-2xl backdrop-blur-xl sm:rounded-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+          className="fixed left-[50%] top-[50%] z-50 flex flex-col w-[calc(100vw-2rem)] max-w-4xl max-h-[88vh] translate-x-[-50%] translate-y-[-50%] overflow-hidden border border-border/30 bg-popover shadow-2xl backdrop-blur-xl sm:rounded-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
           data-testid="onboarding-wizard"
           aria-describedby="onboarding-description"
         >
           {/* Accent glow bar */}
-          <div className={cn('h-1 w-full transition-all duration-500', current.accent.bar)} />
+          <div className={cn('h-1 w-full shrink-0 transition-all duration-500', current.accent.bar)} />
 
           <div className="flex min-h-0">
             {/* ── Left step navigation ── */}
@@ -556,7 +703,7 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">{t('onboarding.productTour')}</p>
               </div>
-              <ol className="space-y-0.5">
+              <ol className="space-y-0.5 min-h-0 overflow-y-auto">
                 {steps.map((s, i) => {
                   const isActive = i === step
                   const isDone = i < step
@@ -621,6 +768,7 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
                       type="button"
                       onClick={() => setStep(i)}
                       aria-label={t('onboarding.stepLabel', { step: i + 1 })}
+                      aria-current={i === step ? 'step' : undefined}
                       className={cn('h-1.5 rounded-full transition-all', i === step ? cn('w-6', s.accent.bar) : 'w-1.5 bg-muted-foreground/30')}
                     />
                   ))}

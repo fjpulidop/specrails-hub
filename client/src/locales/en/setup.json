@@ -166,6 +166,20 @@
       "developer": "Developer",
       "reviewer": "Reviewer"
     },
+    "language": {
+      "nav": "Language",
+      "title": "Choose your language",
+      "subtitle": "Specrails speaks your language",
+      "intro": "Pick the language you want the interface in. It applies instantly — this tour included.",
+      "note": "You can change it any time in Settings → Language."
+    },
+    "theme": {
+      "nav": "Theme",
+      "title": "Pick your look",
+      "subtitle": "Built-in themes, applied instantly",
+      "intro": "Choose how Specrails should look — the theme applies the moment you click.",
+      "note": "You can change it any time in Settings → Appearance."
+    },
     "welcome": {
       "nav": "Welcome",
       "title": "Welcome to Specrails",
@@ -248,7 +262,7 @@
       "title": "Make it your workspace",
       "subtitle": "Everything you need without leaving the window",
       "terminalLabel": "Terminal panel",
-      "terminalBody": "A real VS-Code-style terminal at the bottom (<mod></mod> <j></j>) — WebGL rendering, search, inline images, drag-drop paths and shell integration. Up to 10 sessions per project.",
+      "terminalBody": "A real VS-Code-style terminal at the bottom (<mod>{{mod}}</mod> <j>J</j>) — WebGL rendering, search, inline images, drag-drop paths and shell integration. Up to 10 sessions per project.",
       "codeLabel": "Code explorer",
       "codeBody": "A read-only file tree and Monaco viewer with plain-language AI summaries and “touched by AI” provenance chips, so anyone can follow what changed and why.",
       "integrationsLabel": "Integrations",
@@ -260,21 +274,35 @@
       "desktopLabel": "Desktop or browser",
       "desktopBody": "Run Specrails in your browser, or grab the signed desktop app (macOS & Windows) that bundles its own server and runtimes."
     },
+    "companion": {
+      "nav": "Mobile app",
+      "title": "Take Specrails with you",
+      "subtitle": "SpecRails Companion — your pipelines, on your phone",
+      "intro": "<b>SpecRails Companion</b> is the free mobile app for iPhone and Android that pairs with this desktop over your local network. Browse the specs board, launch and stop rails, follow live job logs and glance at analytics — straight from your phone.",
+      "localLabel": "100% local, like everything else",
+      "localBody": "The app talks directly to this computer over your Wi-Fi — QR pairing with pinned TLS. No cloud relay, no account, and your code never leaves home.",
+      "downloadLabel": "Get the app",
+      "downloadHint": "Scan a code with your phone's camera, or open the link.",
+      "ios": "Download for iPhone",
+      "android": "Download for Android",
+      "pairLabel": "Pairing takes ten seconds",
+      "pairBody": "Once installed, go to Settings → Mobile companion → Pair device and scan the QR code shown there."
+    },
     "moveFast": {
       "nav": "Move fast",
       "title": "Move at the speed of thought",
       "subtitle": "Keyboard-first, everywhere",
       "paletteLabel": "Command palette",
-      "paletteShortcut": "<f>Press</f> <mod></mod> <m>+</m> <k></k> <m>anywhere</m>",
+      "paletteShortcut": "<f>Press</f> <mod>{{mod}}</mod> <m>+</m> <k>K</k> <m>anywhere</m>",
       "paletteBody": "Switch projects, run spec commands, jump to any page and find recent jobs — all with fuzzy search.",
       "terminalLabel": "Terminal panel",
-      "terminalBody": "Toggle with <mod></mod> <j></j>.",
+      "terminalBody": "Toggle with <mod>{{mod}}</mod> <j>J</j>.",
       "shortcutsLabel": "All shortcuts",
-      "shortcutsBody": "Press <q></q> to see the full cheat-sheet.",
+      "shortcutsBody": "Press <q>?</q> to see the full cheat-sheet.",
       "chatLabel": "Chat sidebar",
-      "chatBody": "Toggle the right sidebar with <mod></mod> <bkey></bkey>.",
+      "chatBody": "Toggle the right sidebar with <mod>{{mod}}</mod> <bkey>B</bkey>.",
       "projectsLabel": "Projects sidebar",
-      "projectsBody": "Toggle the left Arc sidebar with <alt></alt> <mod></mod> <bkey></bkey>.",
+      "projectsBody": "Toggle the left Arc sidebar with <alt>{{alt}}</alt> <mod>{{mod}}</mod> <bkey>B</bkey>.",
       "outro": "<b>That's the tour.</b> Add a project from the left sidebar and ship your first spec. You can reopen this walkthrough anytime from Settings."
     }
   }

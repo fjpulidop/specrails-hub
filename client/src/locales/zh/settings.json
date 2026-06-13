@@ -152,6 +152,13 @@
     "budgetHelper": "每个自然月 `surface=file-summary` 支出的上限。用户手动发起的重新生成可超出此限制。"
   },
   "appearance": {
+    "taglines": {
+      "dracula": "经典原版 — 紫色调暗色主题，霓虹色点缀鲜明",
+      "aurora-light": "高级浅色 — 受 Linear 启发的靛蓝配暖白底色",
+      "obsidian-dark": "高级深色 — 近黑蓝调配电光色点缀",
+      "matrix": "磷光终端 — 绿黑底色上的柔和薄荷绿",
+      "specrails": "品牌主题 — 深海军靛蓝配饱和青色点缀"
+    },
     "heading": "外观",
     "themeGroupLabel": "主题",
     "currentlyActive": "当前使用中",

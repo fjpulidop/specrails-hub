@@ -152,6 +152,13 @@
     "budgetHelper": "Plafond de dépense `surface=file-summary` par mois calendaire. Les régénérations lancées par l'utilisateur peuvent le dépasser."
   },
   "appearance": {
+    "taglines": {
+      "dracula": "L'original — sombre teinté de violet aux accents néon éclatants",
+      "aurora-light": "Clair premium — indigo inspiré de Linear sur blanc cassé chaleureux",
+      "obsidian-dark": "Sombre premium — presque noir teinté de bleu aux accents électriques",
+      "matrix": "Terminal phosphore — menthe douce sur fond presque noir verdâtre",
+      "specrails": "Thème de la marque — bleu marine-indigo profond aux accents cyan saturés"
+    },
     "heading": "Apparence",
     "themeGroupLabel": "Thème",
     "currentlyActive": "Actuellement actif",

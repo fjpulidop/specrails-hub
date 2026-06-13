@@ -152,6 +152,13 @@
     "budgetHelper": "Limite de gasto em `surface=file-summary` por mês de calendário. Regenerações iniciadas pelo utilizador podem ignorá-lo."
   },
   "appearance": {
+    "taglines": {
+      "dracula": "O original — escuro com tom púrpura e acentos néon vivos",
+      "aurora-light": "Claro premium — índigo inspirado no Linear sobre branco quente",
+      "obsidian-dark": "Escuro premium — quase preto com tom azulado e acentos elétricos",
+      "matrix": "Terminal de fósforo — menta suave sobre quase preto esverdeado",
+      "specrails": "Tema da marca — azul-marinho-índigo profundo com acentos ciano saturados"
+    },
     "heading": "Aspeto",
     "themeGroupLabel": "Tema",
     "currentlyActive": "Atualmente ativo",

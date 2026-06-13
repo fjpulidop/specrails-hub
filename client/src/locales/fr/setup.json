@@ -166,6 +166,20 @@
       "developer": "Développeur",
       "reviewer": "Relecteur"
     },
+    "language": {
+      "nav": "Langue",
+      "title": "Choisissez votre langue",
+      "subtitle": "Specrails parle votre langue",
+      "intro": "Choisissez la langue de l'interface. Elle s'applique instantanément — cette visite comprise.",
+      "note": "Vous pouvez en changer à tout moment dans Paramètres → Langue."
+    },
+    "theme": {
+      "nav": "Thème",
+      "title": "Trouvez votre style",
+      "subtitle": "Des thèmes intégrés, appliqués instantanément",
+      "intro": "Choisissez l'apparence de Specrails — le thème s'applique dès que vous cliquez.",
+      "note": "Vous pouvez en changer à tout moment dans Paramètres → Apparence."
+    },
     "welcome": {
       "nav": "Bienvenue",
       "title": "Bienvenue dans Specrails",
@@ -248,7 +262,7 @@
       "title": "Faites-en votre espace de travail",
       "subtitle": "Tout ce qu'il vous faut sans quitter la fenêtre",
       "terminalLabel": "Panneau de terminal",
-      "terminalBody": "Un vrai terminal façon VS Code en bas (<mod></mod> <j></j>) — rendu WebGL, recherche, images inline, glisser-déposer de chemins et intégration shell. Jusqu'à 10 sessions par projet.",
+      "terminalBody": "Un vrai terminal façon VS Code en bas (<mod>{{mod}}</mod> <j>J</j>) — rendu WebGL, recherche, images inline, glisser-déposer de chemins et intégration shell. Jusqu'à 10 sessions par projet.",
       "codeLabel": "Explorateur de code",
       "codeBody": "Une arborescence de fichiers en lecture seule et un viewer Monaco avec des résumés IA en langage clair et des puces de provenance « touché par l'IA », pour que chacun puisse suivre ce qui a changé et pourquoi.",
       "integrationsLabel": "Intégrations",
@@ -260,21 +274,35 @@
       "desktopLabel": "Desktop ou navigateur",
       "desktopBody": "Lancez Specrails dans votre navigateur, ou prenez l'application desktop signée (macOS & Windows) qui embarque son propre serveur et ses runtimes."
     },
+    "companion": {
+      "nav": "App mobile",
+      "title": "Emportez Specrails avec vous",
+      "subtitle": "SpecRails Companion — vos pipelines, dans votre poche",
+      "intro": "<b>SpecRails Companion</b> est l'application mobile gratuite pour iPhone et Android qui s'appaire avec cet ordinateur via votre réseau local. Parcourez le tableau des specs, lancez et arrêtez des rails, suivez les logs des jobs en direct et jetez un œil aux analytics — directement depuis votre téléphone.",
+      "localLabel": "100 % local, comme tout le reste",
+      "localBody": "L'application dialogue directement avec cet ordinateur via votre Wi-Fi — appairage par QR avec TLS épinglé. Pas de relais cloud, pas de compte, et votre code ne sort jamais de chez vous.",
+      "downloadLabel": "Téléchargez l'application",
+      "downloadHint": "Scannez un code avec l'appareil photo de votre téléphone, ou ouvrez le lien.",
+      "ios": "Télécharger pour iPhone",
+      "android": "Télécharger pour Android",
+      "pairLabel": "L'appairage prend dix secondes",
+      "pairBody": "Une fois installée, allez dans Paramètres → Compagnon mobile → Appairer un appareil et scannez le code QR qui s'y affiche."
+    },
     "moveFast": {
       "nav": "Aller vite",
       "title": "Avancez à la vitesse de la pensée",
       "subtitle": "Le clavier d'abord, partout",
       "paletteLabel": "Palette de commandes",
-      "paletteShortcut": "<f>Appuyez sur</f> <mod></mod> <m>+</m> <k></k> <m>n'importe où</m>",
+      "paletteShortcut": "<f>Appuyez sur</f> <mod>{{mod}}</mod> <m>+</m> <k>K</k> <m>n'importe où</m>",
       "paletteBody": "Changez de projet, lancez des commandes de spec, sautez vers n'importe quelle page et retrouvez les jobs récents — le tout en recherche floue.",
       "terminalLabel": "Panneau de terminal",
-      "terminalBody": "Basculez avec <mod></mod> <j></j>.",
+      "terminalBody": "Basculez avec <mod>{{mod}}</mod> <j>J</j>.",
       "shortcutsLabel": "Tous les raccourcis",
-      "shortcutsBody": "Appuyez sur <q></q> pour voir l'antisèche complète.",
+      "shortcutsBody": "Appuyez sur <q>?</q> pour voir l'antisèche complète.",
       "chatLabel": "Barre latérale de chat",
-      "chatBody": "Basculez la barre latérale droite avec <mod></mod> <bkey></bkey>.",
+      "chatBody": "Basculez la barre latérale droite avec <mod>{{mod}}</mod> <bkey>B</bkey>.",
       "projectsLabel": "Barre latérale des projets",
-      "projectsBody": "Basculez la barre latérale Arc de gauche avec <alt></alt> <mod></mod> <bkey></bkey>.",
+      "projectsBody": "Basculez la barre latérale Arc de gauche avec <alt>{{alt}}</alt> <mod>{{mod}}</mod> <bkey>B</bkey>.",
       "outro": "<b>La visite est terminée.</b> Ajoutez un projet depuis la barre latérale gauche et livrez votre première spec. Vous pouvez rouvrir cette visite à tout moment depuis les Paramètres."
     }
   }
