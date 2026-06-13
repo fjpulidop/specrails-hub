@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.1](https://github.com/fjpulidop/specrails-desktop/compare/v2.2.0...v2.2.1) (2026-06-13)
+
+
+### Bug Fixes
+
+* **add-spec:** load developer-approved MCP servers when "My approved MCPs" is on ([#382](https://github.com/fjpulidop/specrails-desktop/issues/382)) ([25a15c2](https://github.com/fjpulidop/specrails-desktop/commit/25a15c2868e83c146392764d4ba3d8b1f373ba8d))
+* **jobs:** address audit findings in the live activity strip ([#380](https://github.com/fjpulidop/specrails-desktop/issues/380) follow-up) ([#384](https://github.com/fjpulidop/specrails-desktop/issues/384)) ([8a40447](https://github.com/fjpulidop/specrails-desktop/commit/8a40447682d1d39a8b302cfc6a44d274dbdc41d1))
+
 ## [2.2.0](https://github.com/fjpulidop/specrails-desktop/compare/v2.1.0...v2.2.0) (2026-06-13)
 
 
