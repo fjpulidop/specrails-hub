@@ -78,7 +78,30 @@
     "pipelineTotal": "流水线合计（{{count}} 个阶段）",
     "totalCost": "总成本",
     "totalTokens": "总 token 数",
-    "filesModified": "修改的文件"
+    "filesModified": "修改的文件",
+    "zoneInProgress": "进行中",
+    "zoneFinal": "最终汇总",
+    "zoneFinalPending": "最终汇总 — 完成后计算",
+    "pendingCaption": "完成后计算",
+    "pendingTooltip": "这是提供方的真实数字；任务完成后显示。",
+    "costTooltip": "真实费用由提供方在任务结束时计费。",
+    "liveTooltip": "实时",
+    "explainer": "费用、轮次和令牌是提供方的真实数字，将在任务完成后显示。",
+    "notAvailable": "不可用",
+    "steps_one": "{{count}} 步",
+    "steps_other": "{{count}} 步",
+    "activity": {
+      "editing": "正在编辑 {{arg}}",
+      "writing": "正在写入 {{arg}}",
+      "reading": "正在读取 {{arg}}",
+      "searching": "正在搜索“{{arg}}”",
+      "running": "正在执行：{{arg}}",
+      "thinking": "正在思考…",
+      "reasoning": "正在推理…",
+      "working": "正在处理…",
+      "connecting": "正在连接代理…",
+      "starting": "正在启动…"
+    }
   },
   "ticketHeader": {
     "showMore": "+ 还有 {{count}} 个",

@@ -78,7 +78,30 @@
     "pipelineTotal": "Total del pipeline ({{count}} fases)",
     "totalCost": "Coste total",
     "totalTokens": "Tokens totales",
-    "filesModified": "Archivos modificados"
+    "filesModified": "Archivos modificados",
+    "zoneInProgress": "En curso",
+    "zoneFinal": "Resumen final",
+    "zoneFinalPending": "Resumen final — se calcula al terminar",
+    "pendingCaption": "Se calcula al terminar",
+    "pendingTooltip": "Esta cifra es la real del proveedor; aparece al terminar el job.",
+    "costTooltip": "El coste real lo factura el proveedor al cerrar el job.",
+    "liveTooltip": "En vivo",
+    "explainer": "Las cifras de coste, turnos y tokens son las reales del proveedor y aparecen al terminar.",
+    "notAvailable": "No disponible",
+    "steps_one": "{{count}} paso",
+    "steps_other": "{{count}} pasos",
+    "activity": {
+      "editing": "Editando {{arg}}",
+      "writing": "Escribiendo {{arg}}",
+      "reading": "Leyendo {{arg}}",
+      "searching": "Buscando “{{arg}}”",
+      "running": "Ejecutando: {{arg}}",
+      "thinking": "Pensando…",
+      "reasoning": "Razonando…",
+      "working": "Trabajando…",
+      "connecting": "Conectando con el agente…",
+      "starting": "Iniciando…"
+    }
   },
   "ticketHeader": {
     "showMore": "+ {{count}} más",

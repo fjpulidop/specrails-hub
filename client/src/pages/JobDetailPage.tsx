@@ -130,6 +130,22 @@ export default function JobDetailPage() {
         initPhases[def.key] = ((msg.phases as Record<string, string>)?.[def.key] as PhaseState) ?? 'idle'
       }
       setPhases(initPhases)
+    } else if (msg.type === 'event' && msg.jobId === id) {
+      // Live stream frames (assistant / item.completed / turn.completed …). The
+      // server broadcasts every parsed JSONL line here; the JobStatusPanel
+      // activity signal is built from them. Without this branch the panel froze
+      // at the open-time snapshot. Mirrors JobDetailModal's handler.
+      const eventRow: EventRow = {
+        id: Date.now(),
+        job_id: id ?? '',
+        seq: (msg.seq as number) ?? 0,
+        event_type: msg.event_type as string,
+        source: msg.source as string,
+        payload: msg.payload as string,
+        timestamp: msg.timestamp as string,
+      }
+      pendingEventsRef.current.push(eventRow)
+      if (!rafIdRef.current) rafIdRef.current = requestAnimationFrame(flushEvents)
     } else if (msg.type === 'log' && msg.processId === id) {
       const syntheticEvent: EventRow = {
         id: Date.now(),
@@ -417,6 +433,8 @@ export default function JobDetailPage() {
           events={events}
           defaultOpen={job.status === 'completed' || job.status === 'running'}
           pipelineTotals={pipelineTotals ?? undefined}
+          phases={phases}
+          phaseDefinitions={phaseDefinitions}
         />
       )}
 

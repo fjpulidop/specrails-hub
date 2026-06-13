@@ -2,13 +2,13 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '../../test-utils'
 import { JobStatusPanel } from '../JobStatusPanel'
-import type { JobSummary, EventRow } from '../../types'
+import type { JobSummary, EventRow, PhaseDefinition } from '../../types'
 
 const completedJob: JobSummary = {
   id: 'job-1',
   command: '/specrails:implement --spec SPEA-001',
   started_at: '2024-03-21T10:00:00Z',
-  finished_at: '2024-03-21T10:01:02Z',  // 62s wall-clock
+  finished_at: '2024-03-21T10:01:02Z', // 62s wall-clock
   status: 'completed',
   duration_ms: 62000,
   total_cost_usd: 0.0234,
@@ -31,34 +31,10 @@ const failedJob: JobSummary = {
 }
 
 const eventsWithFiles: EventRow[] = [
-  {
-    id: 1,
-    job_id: 'job-1',
-    event_type: 'log',
-    payload: JSON.stringify({ line: 'Writing file: src/components/MyComponent.tsx' }),
-    created_at: '2024-03-21T10:01:00Z',
-  },
-  {
-    id: 2,
-    job_id: 'job-1',
-    event_type: 'log',
-    payload: JSON.stringify({ line: 'Editing src/hooks/useHook.ts' }),
-    created_at: '2024-03-21T10:02:00Z',
-  },
-  {
-    id: 3,
-    job_id: 'job-1',
-    event_type: 'log',
-    payload: '{ invalid json }', // Should be skipped gracefully
-    created_at: '2024-03-21T10:03:00Z',
-  },
-  {
-    id: 4,
-    job_id: 'job-1',
-    event_type: 'phase', // Not a log event — should be skipped
-    payload: JSON.stringify({ phase: 'developer' }),
-    created_at: '2024-03-21T10:04:00Z',
-  },
+  { id: 1, job_id: 'job-1', seq: 1, event_type: 'log', payload: JSON.stringify({ line: 'Writing file: src/components/MyComponent.tsx' }), timestamp: '2024-03-21T10:01:00Z' },
+  { id: 2, job_id: 'job-1', seq: 2, event_type: 'log', payload: JSON.stringify({ line: 'Editing src/hooks/useHook.ts' }), timestamp: '2024-03-21T10:02:00Z' },
+  { id: 3, job_id: 'job-1', seq: 3, event_type: 'log', payload: '{ invalid json }', timestamp: '2024-03-21T10:03:00Z' },
+  { id: 4, job_id: 'job-1', seq: 4, event_type: 'phase', payload: JSON.stringify({ phase: 'developer' }), timestamp: '2024-03-21T10:04:00Z' },
 ]
 
 describe('JobStatusPanel', () => {
@@ -66,9 +42,12 @@ describe('JobStatusPanel', () => {
     vi.clearAllMocks()
   })
 
-  it('renders "Job completed" for completed status', () => {
+  // ── Terminal (completed / failed) ──────────────────────────────────────────
+
+  it('renders "Job completed" with the Final summary zone', () => {
     render(<JobStatusPanel job={completedJob} events={[]} />)
     expect(screen.getByText('Job completed')).toBeInTheDocument()
+    expect(screen.getByText('Final summary')).toBeInTheDocument()
   })
 
   it('renders "Job failed" for failed status', () => {
@@ -76,62 +55,28 @@ describe('JobStatusPanel', () => {
     expect(screen.getByText('Job failed')).toBeInTheDocument()
   })
 
-  it('renders duration chip in header for completed job', () => {
+  it('renders duration chip + card for completed job', () => {
     render(<JobStatusPanel job={completedJob} events={[]} />)
-    // Wall-clock: 10:00:00 → 10:01:02 = 62s → "1m 2s" — appears in both header chip AND metric card
-    const durationTexts = screen.getAllByText('1m 2s')
-    expect(durationTexts.length).toBeGreaterThanOrEqual(1)
+    // Wall-clock 10:00:00 → 10:01:02 = 62s → "1m 2s" (header chip + metric card)
+    expect(screen.getAllByText('1m 2s').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders cost chip in header for completed job', () => {
     render(<JobStatusPanel job={completedJob} events={[]} />)
-    // $0.0234 appears in both header chip AND metric card
-    const costTexts = screen.getAllByText('$0.0234')
-    expect(costTexts.length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('$0.0234').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('does not render duration chip when finished_at is null', () => {
-    render(<JobStatusPanel job={failedJob} events={[]} />)
-    expect(screen.queryByText(/\ds$/)).not.toBeInTheDocument()
+  it('prefixes ~ for an estimated (codex) cost', () => {
+    render(<JobStatusPanel job={{ ...completedJob, total_cost_usd_estimated: 1 }} events={[]} />)
+    expect(screen.getAllByText('~$0.0234').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('does not render cost chip when total_cost_usd is null', () => {
-    render(<JobStatusPanel job={failedJob} events={[]} />)
-    expect(screen.queryByText(/^\$/)).not.toBeInTheDocument()
-  })
-
-  it('renders expanded content by default (defaultOpen=true)', () => {
+  it('renders the four metric labels in the terminal grid', () => {
     render(<JobStatusPanel job={completedJob} events={[]} />)
     expect(screen.getByText('Duration')).toBeInTheDocument()
     expect(screen.getByText('Cost')).toBeInTheDocument()
     expect(screen.getByText('Turns')).toBeInTheDocument()
     expect(screen.getByText('Tokens')).toBeInTheDocument()
-  })
-
-  it('collapses content when defaultOpen=false', () => {
-    render(<JobStatusPanel job={completedJob} events={[]} defaultOpen={false} />)
-    expect(screen.queryByText('Duration')).not.toBeInTheDocument()
-  })
-
-  it('toggles open/closed when header button is clicked', () => {
-    render(<JobStatusPanel job={completedJob} events={[]} />)
-    // Initially open
-    expect(screen.getByText('Duration')).toBeInTheDocument()
-
-    // Click to close
-    fireEvent.click(screen.getByRole('button'))
-    expect(screen.queryByText('Duration')).not.toBeInTheDocument()
-
-    // Click to re-open
-    fireEvent.click(screen.getByRole('button'))
-    expect(screen.getByText('Duration')).toBeInTheDocument()
-  })
-
-  it('renders metric values in expanded state', () => {
-    render(<JobStatusPanel job={completedJob} events={[]} />)
-    // Wall-clock duration in metric card: 10:00:00 → 10:01:02 = "1m 2s"
-    const durationValues = screen.getAllByText('1m 2s')
-    expect(durationValues.length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders turns value', () => {
@@ -141,12 +86,11 @@ describe('JobStatusPanel', () => {
 
   it('renders tokens value in k format', () => {
     render(<JobStatusPanel job={completedJob} events={[]} />)
-    // tokens_in: 5000 + tokens_out: 3000 = 8000 → 8.0k
+    // 5000 + 3000 = 8000 → 8.0k
     expect(screen.getByText('8.0k')).toBeInTheDocument()
   })
 
   it('includes cache tokens in the authoritative Tokens total', () => {
-    // Real total = in + out + cache_read + cache_create (cache dominates).
     const cacheHeavy: JobSummary = {
       ...completedJob,
       tokens_in: 5000,
@@ -155,39 +99,50 @@ describe('JobStatusPanel', () => {
       tokens_cache_create: 2_000,
     }
     render(<JobStatusPanel job={cacheHeavy} events={[]} />)
-    // 5000 + 3000 + 90000 + 2000 = 100000 → 100.0k (NOT 8.0k)
     expect(screen.getByText('100.0k')).toBeInTheDocument()
     expect(screen.queryByText('8.0k')).not.toBeInTheDocument()
   })
 
-  it('renders "—" for null metric values', () => {
+  it('shows em-dash + "Not available" for null terminal metrics', () => {
     render(<JobStatusPanel job={failedJob} events={[]} />)
-    const dashes = screen.getAllByText('—')
-    expect(dashes.length).toBeGreaterThanOrEqual(3) // duration, cost, turns, tokens all null
+    // duration —, cost —, turns —, tokens — = 4 em-dashes
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(4)
+    // cost/turns/tokens each carry a "Not available" caption (duration does not)
+    expect(screen.getAllByText('Not available').length).toBe(3)
   })
+
+  it('does not render a cost chip when total_cost_usd is null', () => {
+    render(<JobStatusPanel job={failedJob} events={[]} />)
+    expect(screen.queryByText(/^\$/)).not.toBeInTheDocument()
+  })
+
+  // ── Expand / collapse ───────────────────────────────────────────────────────
+
+  it('collapses content when defaultOpen=false', () => {
+    render(<JobStatusPanel job={completedJob} events={[]} defaultOpen={false} />)
+    expect(screen.queryByText('Final summary')).not.toBeInTheDocument()
+  })
+
+  it('toggles open/closed when the header button is clicked', () => {
+    render(<JobStatusPanel job={completedJob} events={[]} />)
+    expect(screen.getByText('Duration')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button'))
+    expect(screen.queryByText('Duration')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button'))
+    expect(screen.getByText('Duration')).toBeInTheDocument()
+  })
+
+  // ── Modified files (terminal) ───────────────────────────────────────────────
 
   it('extracts modified files from log events', () => {
     render(<JobStatusPanel job={completedJob} events={eventsWithFiles} />)
-    // The regex extracts the full path like "src/components/MyComponent.tsx"
     expect(screen.getByText('src/components/MyComponent.tsx')).toBeInTheDocument()
+    expect(screen.getByText('src/hooks/useHook.ts')).toBeInTheDocument()
   })
 
-  it('shows files count chip in header when files are extracted', () => {
+  it('shows files count chip when files are extracted', () => {
     render(<JobStatusPanel job={completedJob} events={eventsWithFiles} />)
-    // 2 files extracted → "2 files" chip
     expect(screen.getByText('2 files')).toBeInTheDocument()
-  })
-
-  it('shows singular "file" when only 1 file modified', () => {
-    const singleFileEvents: EventRow[] = [{
-      id: 1,
-      job_id: 'job-1',
-      event_type: 'log',
-      payload: JSON.stringify({ line: 'Writing index.ts' }),
-      created_at: '2024-03-21T10:00:00Z',
-    }]
-    render(<JobStatusPanel job={completedJob} events={singleFileEvents} />)
-    expect(screen.getByText('1 file')).toBeInTheDocument()
   })
 
   it('does not show files section when no files extracted', () => {
@@ -195,55 +150,41 @@ describe('JobStatusPanel', () => {
     expect(screen.queryByText('Files modified')).not.toBeInTheDocument()
   })
 
-  it('renders modified file paths in expanded state', () => {
-    render(<JobStatusPanel job={completedJob} events={eventsWithFiles} />)
-    expect(screen.getByText('src/components/MyComponent.tsx')).toBeInTheDocument()
-    expect(screen.getByText('src/hooks/useHook.ts')).toBeInTheDocument()
-  })
-
-  it('skips non-log event types when extracting files', () => {
-    // Only the log event should be processed
-    const nonLogEvents: EventRow[] = [{
-      id: 1,
-      job_id: 'job-1',
-      event_type: 'phase',
-      payload: JSON.stringify({ line: 'Writing fake.ts' }),
-      created_at: '2024-03-21T10:00:00Z',
-    }]
-    render(<JobStatusPanel job={completedJob} events={nonLogEvents} />)
-    expect(screen.queryByText('fake.ts')).not.toBeInTheDocument()
-    expect(screen.queryByText('Files modified')).not.toBeInTheDocument()
-  })
-
-  it('skips events with invalid JSON payload', () => {
-    const badEvents: EventRow[] = [{
-      id: 1,
-      job_id: 'job-1',
-      event_type: 'log',
-      payload: 'not valid json at all',
-      created_at: '2024-03-21T10:00:00Z',
-    }]
-    // Should not throw
+  it('skips non-log events and invalid JSON when extracting files', () => {
+    const badEvents: EventRow[] = [
+      { id: 1, job_id: 'job-1', seq: 1, event_type: 'phase', payload: JSON.stringify({ line: 'Writing fake.ts' }), timestamp: '' },
+      { id: 2, job_id: 'job-1', seq: 2, event_type: 'log', payload: 'not valid json', timestamp: '' },
+    ]
     render(<JobStatusPanel job={completedJob} events={badEvents} />)
     expect(screen.queryByText('Files modified')).not.toBeInTheDocument()
   })
 
-  describe('running', () => {
-    function makeAssistantEvent(seq: number, input?: number, output?: number): EventRow {
-      const message =
-        input == null && output == null
-          ? {}
-          : { usage: { input_tokens: input ?? 0, output_tokens: output ?? 0 } }
-      return {
-        id: seq,
-        job_id: 'job-running',
-        seq,
-        event_type: 'assistant',
-        payload: JSON.stringify({ message }),
-        timestamp: new Date(2024, 0, 1, 10, 0, seq).toISOString(),
-      } as EventRow
-    }
+  // ── Pipeline totals ─────────────────────────────────────────────────────────
 
+  it('renders the pipeline total block when provided', () => {
+    render(
+      <JobStatusPanel
+        job={completedJob}
+        events={[]}
+        pipelineTotals={{
+          totalCostUsd: 1.2,
+          totalTokensIn: 100_000,
+          totalTokensOut: 50_000,
+          totalTokensCacheRead: 800_000,
+          totalTokensCacheCreate: 50_000,
+          jobCount: 3,
+        }}
+      />,
+    )
+    expect(screen.getByText('Pipeline total (3 phases)')).toBeInTheDocument()
+    expect(screen.getByText('$1.2000')).toBeInTheDocument()
+    // 1,000,000 tokens → 1000.0k
+    expect(screen.getByText('1000.0k')).toBeInTheDocument()
+  })
+
+  // ── Running (HONEST live state) ─────────────────────────────────────────────
+
+  describe('running', () => {
     const runningJob: JobSummary = {
       id: 'job-running',
       command: '/specrails:implement #24',
@@ -257,69 +198,153 @@ describe('JobStatusPanel', () => {
       num_turns: null,
     }
 
-    it('renders "Job in progress" header with spinner', () => {
+    function assistantTool(seq: number, name: string, input: Record<string, unknown>): EventRow {
+      return { id: seq, job_id: 'job-running', seq, event_type: 'assistant', payload: JSON.stringify({ message: { content: [{ type: 'tool_use', name, input }] } }), timestamp: '' }
+    }
+    function assistantText(seq: number): EventRow {
+      return { id: seq, job_id: 'job-running', seq, event_type: 'assistant', payload: JSON.stringify({ message: { content: [{ type: 'text', text: 'hello' }] } }), timestamp: '' }
+    }
+    function codexItem(seq: number, item: Record<string, unknown>): EventRow {
+      return { id: seq, job_id: 'job-running', seq, event_type: 'item.completed', payload: JSON.stringify({ item }), timestamp: '' }
+    }
+
+    it('renders "Job in progress" with the In progress + pending zones', () => {
       render(<JobStatusPanel job={runningJob} events={[]} />)
       expect(screen.getByText('Job in progress')).toBeInTheDocument()
+      expect(screen.getByText('In progress')).toBeInTheDocument()
+      expect(screen.getByText('Final summary — calculated when finished')).toBeInTheDocument()
     })
 
-    it('shows em-dash for Cost while running', () => {
+    it('NEVER shows a live/approximate cost, turns or tokens number while running', () => {
+      const events = [assistantTool(1, 'Edit', { file_path: 'a.ts' }), assistantTool(2, 'Write', { file_path: 'b.ts' })]
+      render(<JobStatusPanel job={runningJob} events={events} />)
+      // Pending cards hold em-dashes, never numbers, and carry the honest caption.
+      expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3)
+      expect(screen.getAllByText('Calculated when finished').length).toBe(3)
+      // No tilde-prefixed approximate numbers anywhere.
+      expect(screen.queryByText(/^~/)).not.toBeInTheDocument()
+      // No cost chip in the running header.
+      expect(screen.queryByText(/^\$/)).not.toBeInTheDocument()
+    })
+
+    it('shows the connecting state before any frame arrives', () => {
       render(<JobStatusPanel job={runningJob} events={[]} />)
-      // The Cost cell renders inside the metric grid.
-      const costLabel = screen.getByText('Cost')
-      const valueEl = costLabel.parentElement?.querySelector('p:last-child')
-      expect(valueEl?.textContent).toBe('—')
+      expect(screen.getByText('Connecting to the agent…')).toBeInTheDocument()
     })
 
-    it('aggregates Turns and Tokens from streamed assistant events', () => {
-      const events: EventRow[] = [
-        makeAssistantEvent(1, 100, 50),
-        makeAssistantEvent(2, 200, 75),
-        makeAssistantEvent(3, 300, 100),
+    it('counts steps and labels the current claude tool action', () => {
+      const events = [
+        assistantTool(1, 'Read', { file_path: 'src/x.ts' }),
+        assistantTool(2, 'Edit', { file_path: 'src/queue-manager.ts' }),
       ]
       render(<JobStatusPanel job={runningJob} events={events} />)
-      // Live (still-running) values are marked approximate with a ~ prefix.
-      expect(screen.getByText('~3')).toBeInTheDocument() // Turns
-      // (100+50) + (200+75) + (300+100) = 825 → "~0.8k"
-      expect(screen.getByText('~0.8k')).toBeInTheDocument()
+      expect(screen.getByText('Editing queue-manager.ts')).toBeInTheDocument()
+      expect(screen.getByText('2 steps')).toBeInTheDocument()
     })
 
-    it('tolerates missing or partial usage fields without NaN', () => {
-      const events: EventRow[] = [
-        makeAssistantEvent(1, 100, 50),
-        makeAssistantEvent(2), // no usage
-        { ...makeAssistantEvent(3, 50, 25), payload: JSON.stringify({ message: { usage: { input_tokens: 50 } } }) },
+    it('shows the steps chip (singular) in the running header', () => {
+      render(<JobStatusPanel job={runningJob} events={[assistantText(1)]} />)
+      expect(screen.getByText('1 step')).toBeInTheDocument()
+    })
+
+    it('labels a bare assistant text frame as Thinking', () => {
+      render(<JobStatusPanel job={runningJob} events={[assistantText(1)]} />)
+      expect(screen.getByText('Thinking…')).toBeInTheDocument()
+    })
+
+    it('maps Bash to a Running action with the first command token', () => {
+      render(<JobStatusPanel job={runningJob} events={[assistantTool(1, 'Bash', { command: 'npm test --silent' })]} />)
+      expect(screen.getByText('Running: npm')).toBeInTheDocument()
+    })
+
+    it('maps Grep to a Searching action', () => {
+      render(<JobStatusPanel job={runningJob} events={[assistantTool(1, 'Grep', { pattern: 'TODO' })]} />)
+      expect(screen.getByText('Searching “TODO”')).toBeInTheDocument()
+    })
+
+    it('falls back to Working for an unknown tool', () => {
+      render(<JobStatusPanel job={runningJob} events={[assistantTool(1, 'SomeMcpTool', {})]} />)
+      expect(screen.getByText('Working…')).toBeInTheDocument()
+    })
+
+    it('derives activity from codex item.completed frames', () => {
+      const events = [
+        codexItem(1, { type: 'agent_reasoning' }),
+        codexItem(2, { type: 'local_shell_call', command: 'cargo test' }),
       ]
       render(<JobStatusPanel job={runningJob} events={events} />)
-      expect(screen.getByText('~3')).toBeInTheDocument()
-      // 100+50 + 0 + 50 = 200 → "~0.2k"
-      expect(screen.getByText('~0.2k')).toBeInTheDocument()
+      expect(screen.getByText('Running: cargo')).toBeInTheDocument()
+      expect(screen.getByText('2 steps')).toBeInTheDocument()
     })
 
-    it('aggregator scales to thousands of events without NaN', () => {
-      const events: EventRow[] = []
-      let expectedTokens = 0
-      for (let i = 1; i <= 1000; i++) {
-        const inT = i % 7 === 0 ? undefined : 10 + (i % 5)
-        const outT = i % 11 === 0 ? undefined : 5 + (i % 3)
-        events.push(makeAssistantEvent(i, inT, outT))
-        expectedTokens += (inT ?? 0) + (outT ?? 0)
-      }
+    it('labels a codex agent_message as Thinking and counts unknown items as steps', () => {
+      const events = [
+        codexItem(1, { type: 'agent_message', text: 'hi' }),
+        codexItem(2, { type: 'something_else' }),
+      ]
       render(<JobStatusPanel job={runningJob} events={events} />)
-      expect(screen.getByText('~1000')).toBeInTheDocument()
-      const expectedDisplay = `~${(expectedTokens / 1000).toFixed(1)}k`
-      expect(screen.getByText(expectedDisplay)).toBeInTheDocument()
+      expect(screen.getByText('Thinking…')).toBeInTheDocument()
+      expect(screen.getByText('2 steps')).toBeInTheDocument()
     })
 
-    it('switches header from running to completed on status change without remount', () => {
-      const startedAt = new Date(Date.now() - 5000).toISOString()
-      const events: EventRow[] = [makeAssistantEvent(1, 100, 50)]
-      const { rerender } = render(
+    it('tolerates unparseable frames without throwing', () => {
+      const events: EventRow[] = [
+        { id: 1, job_id: 'job-running', seq: 1, event_type: 'assistant', payload: '{ not json', timestamp: '' },
+        { id: 2, job_id: 'job-running', seq: 2, event_type: 'result', payload: '{}', timestamp: '' },
+      ]
+      render(<JobStatusPanel job={runningJob} events={events} />)
+      // The assistant frame still counts as a step; result does not.
+      expect(screen.getByText('1 step')).toBeInTheDocument()
+    })
+
+    it('shows the phase pill from the running phase definition', () => {
+      const phaseDefinitions: PhaseDefinition[] = [
+        { key: 'arch', label: 'Architect', description: '' },
+        { key: 'dev', label: 'Developer', description: '' },
+      ]
+      render(
         <JobStatusPanel
-          job={{ ...runningJob, started_at: startedAt }}
-          events={events}
+          job={runningJob}
+          events={[assistantText(1)]}
+          phases={{ arch: 'done', dev: 'running' }}
+          phaseDefinitions={phaseDefinitions}
         />,
       )
+      expect(screen.getByText('Developer')).toBeInTheDocument()
+    })
+
+    it('shows the Starting pill when no phase is running and no frames yet', () => {
+      render(
+        <JobStatusPanel
+          job={runningJob}
+          events={[]}
+          phases={{ dev: 'idle' }}
+          phaseDefinitions={[{ key: 'dev', label: 'Developer', description: '' }]}
+        />,
+      )
+      expect(screen.getByText('Starting…')).toBeInTheDocument()
+    })
+
+    it('renders the auto-hiding explainer line', () => {
+      render(<JobStatusPanel job={runningJob} events={[]} />)
+      expect(screen.getByText(/the provider's real figures and appear when the job finishes/i)).toBeInTheDocument()
+    })
+
+    it('resets the step accumulator when the job id changes', () => {
+      const { rerender } = render(<JobStatusPanel job={runningJob} events={[assistantText(1), assistantText(2)]} />)
+      expect(screen.getByText('2 steps')).toBeInTheDocument()
+      const otherJob = { ...runningJob, id: 'job-other' }
+      rerender(<JobStatusPanel job={otherJob} events={[assistantText(1)]} />)
+      expect(screen.getByText('1 step')).toBeInTheDocument()
+    })
+
+    it('reveals authoritative metrics on running → completed without remount', () => {
+      const startedAt = new Date(Date.now() - 5000).toISOString()
+      const events = [assistantTool(1, 'Edit', { file_path: 'a.ts' })]
+      const { rerender } = render(<JobStatusPanel job={{ ...runningJob, started_at: startedAt }} events={events} />)
       expect(screen.getByText('Job in progress')).toBeInTheDocument()
+      // While running there is no real cost shown.
+      expect(screen.queryByText('$0.4200')).not.toBeInTheDocument()
 
       const completed: JobSummary = {
         ...runningJob,
@@ -333,8 +358,9 @@ describe('JobStatusPanel', () => {
       }
       rerender(<JobStatusPanel job={completed} events={events} />)
       expect(screen.getByText('Job completed')).toBeInTheDocument()
-      // Cost appears in both the header chip and the metric grid.
+      // The real numbers resolve at exit (header chip + grid card).
       expect(screen.getAllByText('$0.4200').length).toBeGreaterThan(0)
+      expect(screen.getByText('Final summary')).toBeInTheDocument()
     })
   })
 })

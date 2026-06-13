@@ -78,7 +78,30 @@
     "pipelineTotal": "パイプライン合計（{{count}} フェーズ）",
     "totalCost": "合計コスト",
     "totalTokens": "合計トークン",
-    "filesModified": "変更ファイル"
+    "filesModified": "変更ファイル",
+    "zoneInProgress": "進行中",
+    "zoneFinal": "最終サマリー",
+    "zoneFinalPending": "最終サマリー — 完了時に計算",
+    "pendingCaption": "完了時に計算",
+    "pendingTooltip": "これはプロバイダーの実際の数値です。ジョブ完了時に表示されます。",
+    "costTooltip": "実際のコストはジョブ終了時にプロバイダーが請求します。",
+    "liveTooltip": "ライブ",
+    "explainer": "コスト・ターン・トークンはプロバイダーの実際の数値で、完了時に表示されます。",
+    "notAvailable": "利用不可",
+    "steps_one": "{{count}} ステップ",
+    "steps_other": "{{count}} ステップ",
+    "activity": {
+      "editing": "{{arg}} を編集中",
+      "writing": "{{arg}} を書き込み中",
+      "reading": "{{arg}} を読み込み中",
+      "searching": "「{{arg}}」を検索中",
+      "running": "実行中: {{arg}}",
+      "thinking": "思考中…",
+      "reasoning": "推論中…",
+      "working": "作業中…",
+      "connecting": "エージェントに接続中…",
+      "starting": "起動中…"
+    }
   },
   "ticketHeader": {
     "showMore": "+ 他 {{count}} 件",
