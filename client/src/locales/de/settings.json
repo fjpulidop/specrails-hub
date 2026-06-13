@@ -152,6 +152,13 @@
     "budgetHelper": "Obergrenze für `surface=file-summary`-Ausgaben pro Kalendermonat. Von Nutzern angestoßene Neugenerierungen können sie überschreiten."
   },
   "appearance": {
+    "taglines": {
+      "dracula": "Das Original — dunkel mit Violettstich und lebhaften Neon-Akzenten",
+      "aurora-light": "Premium hell — Linear-inspiriertes Indigo auf warmem Cremeweiß",
+      "obsidian-dark": "Premium dunkel — fast schwarz mit Blaustich und elektrischen Akzenten",
+      "matrix": "Phosphor-Terminal — sanftes Mint auf grünlichem Fast-Schwarz",
+      "specrails": "Marken-Theme — tiefes Marine-Indigo mit satten Cyan-Akzenten"
+    },
     "heading": "Erscheinungsbild",
     "themeGroupLabel": "Theme",
     "currentlyActive": "Derzeit aktiv",

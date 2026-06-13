@@ -166,6 +166,20 @@
       "developer": "Developer",
       "reviewer": "Revisor"
     },
+    "language": {
+      "nav": "Idioma",
+      "title": "Escolha o seu idioma",
+      "subtitle": "O Specrails fala a sua língua",
+      "intro": "Escolha o idioma em que quer a interface. Aplica-se de imediato — incluindo este tour.",
+      "note": "Pode mudá-lo a qualquer momento em Definições → Idioma."
+    },
+    "theme": {
+      "nav": "Tema",
+      "title": "Escolha o seu visual",
+      "subtitle": "Temas incorporados, aplicados de imediato",
+      "intro": "Escolha o aspeto do Specrails — o tema aplica-se assim que clica.",
+      "note": "Pode mudá-lo a qualquer momento em Definições → Aspeto."
+    },
     "welcome": {
       "nav": "Boas-vindas",
       "title": "Bem-vindo ao Specrails",
@@ -248,7 +262,7 @@
       "title": "Faça dele o seu espaço de trabalho",
       "subtitle": "Tudo o que precisa sem sair da janela",
       "terminalLabel": "Painel de terminal",
-      "terminalBody": "Um terminal a sério ao estilo do VS Code na parte inferior (<mod></mod> <j></j>) — renderização WebGL, pesquisa, imagens inline, arrastar e largar caminhos e integração com a shell. Até 10 sessões por projeto.",
+      "terminalBody": "Um terminal a sério ao estilo do VS Code na parte inferior (<mod>{{mod}}</mod> <j>J</j>) — renderização WebGL, pesquisa, imagens inline, arrastar e largar caminhos e integração com a shell. Até 10 sessões por projeto.",
       "codeLabel": "Explorador de código",
       "codeBody": "Uma árvore de ficheiros só de leitura e um visualizador Monaco com resumos de IA em linguagem simples e chips de proveniência “tocado por IA”, para que qualquer pessoa acompanhe o que mudou e porquê.",
       "integrationsLabel": "Integrações",
@@ -260,21 +274,35 @@
       "desktopLabel": "Desktop ou browser",
       "desktopBody": "Use o Specrails no browser, ou descarregue a app desktop assinada (macOS e Windows) que inclui o seu próprio servidor e runtimes."
     },
+    "companion": {
+      "nav": "App móvel",
+      "title": "Leve o Specrails consigo",
+      "subtitle": "SpecRails Companion — os seus pipelines, no seu telemóvel",
+      "intro": "O <b>SpecRails Companion</b> é a app móvel gratuita para iPhone e Android que se emparelha com este desktop através da sua rede local. Navegue pelo quadro de specs, lance e pare rails, acompanhe os logs dos jobs em direto e espreite as analytics — diretamente do seu telemóvel.",
+      "localLabel": "100% local, como tudo o resto",
+      "localBody": "A app comunica diretamente com este computador através do seu Wi-Fi — emparelhamento por QR com certificado TLS fixado. Sem relay na cloud, sem conta, e o seu código nunca sai de casa.",
+      "downloadLabel": "Obtenha a app",
+      "downloadHint": "Leia um código com a câmara do seu telemóvel ou abra o link.",
+      "ios": "Descarregar para iPhone",
+      "android": "Descarregar para Android",
+      "pairLabel": "Emparelhar demora dez segundos",
+      "pairBody": "Depois de instalada, vá a Definições → Companion móvel → Emparelhar dispositivo e leia o código QR aí apresentado."
+    },
     "moveFast": {
       "nav": "Avançar depressa",
       "title": "Avance à velocidade do pensamento",
       "subtitle": "Primeiro o teclado, em todo o lado",
       "paletteLabel": "Paleta de comandos",
-      "paletteShortcut": "<f>Prima</f> <mod></mod> <m>+</m> <k></k> <m>em qualquer lado</m>",
+      "paletteShortcut": "<f>Prima</f> <mod>{{mod}}</mod> <m>+</m> <k>K</k> <m>em qualquer lado</m>",
       "paletteBody": "Mude de projeto, execute comandos de spec, salte para qualquer página e encontre jobs recentes — tudo com pesquisa difusa.",
       "terminalLabel": "Painel de terminal",
-      "terminalBody": "Alterne com <mod></mod> <j></j>.",
+      "terminalBody": "Alterne com <mod>{{mod}}</mod> <j>J</j>.",
       "shortcutsLabel": "Todos os atalhos",
-      "shortcutsBody": "Prima <q></q> para ver a folha de consulta completa.",
+      "shortcutsBody": "Prima <q>?</q> para ver a folha de consulta completa.",
       "chatLabel": "Barra lateral de chat",
-      "chatBody": "Alterne a barra lateral direita com <mod></mod> <bkey></bkey>.",
+      "chatBody": "Alterne a barra lateral direita com <mod>{{mod}}</mod> <bkey>B</bkey>.",
       "projectsLabel": "Barra lateral de projetos",
-      "projectsBody": "Alterne a barra lateral Arc esquerda com <alt></alt> <mod></mod> <bkey></bkey>.",
+      "projectsBody": "Alterne a barra lateral Arc esquerda com <alt>{{alt}}</alt> <mod>{{mod}}</mod> <bkey>B</bkey>.",
       "outro": "<b>E o tour fica por aqui.</b> Adicione um projeto na barra lateral esquerda e entregue a sua primeira spec. Pode reabrir esta apresentação a qualquer momento nas Definições."
     }
   }

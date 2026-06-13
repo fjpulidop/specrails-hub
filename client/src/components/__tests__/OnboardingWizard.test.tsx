@@ -1,15 +1,22 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { screen, fireEvent, waitFor } from '@testing-library/react'
 import { render } from '../../test-utils'
 import { OnboardingWizard, hasSeenOnboarding, resetOnboarding } from '../OnboardingWizard'
+import { ThemeProvider } from '../../context/ThemeContext'
+import { LanguageProvider } from '../../context/LanguageContext'
+import i18n, { DEFAULT_LANGUAGE } from '../../lib/i18n'
+import { COMPANION_IOS_URL, COMPANION_ANDROID_URL } from '../../lib/companion'
 
 const STEP_TITLES = [
+  'Choose your language',
+  'Pick your look',
   'Welcome to Specrails',
   'Turn ideas into specs',
   'Run the pipeline on rails',
   'Bring your own agent',
   'Track every cent',
   'Make it your workspace',
+  'Take Specrails with you',
   'Move at the speed of thought',
 ]
 
@@ -46,7 +53,7 @@ describe('OnboardingWizard', () => {
     expect(screen.getByText(STEP_TITLES[0])).toBeTruthy()
   })
 
-  it('navigates through all 7 steps', () => {
+  it('navigates through all 10 steps', () => {
     render(<OnboardingWizard open={true} onClose={onClose} />)
     expect(screen.getByText(STEP_TITLES[0])).toBeTruthy()
     for (let i = 1; i < STEP_TITLES.length; i++) {
@@ -104,6 +111,87 @@ describe('OnboardingWizard', () => {
     expect(navButtons).toHaveLength(STEP_TITLES.length)
     fireEvent.click(navButtons[STEP_TITLES.length - 1]) // jump to last step
     expect(screen.getByText(STEP_TITLES[STEP_TITLES.length - 1])).toBeTruthy()
+  })
+
+  it('degrades gracefully without theme/language providers — copy renders, grids do not', () => {
+    render(<OnboardingWizard open={true} onClose={onClose} />)
+    expect(screen.getByText(STEP_TITLES[0])).toBeTruthy()
+    expect(screen.queryByTestId('language-card-en')).toBeNull()
+    fireEvent.click(screen.getByTestId('onboarding-next'))
+    expect(screen.getByText(STEP_TITLES[1])).toBeTruthy()
+    expect(screen.queryByTestId('theme-card-specrails')).toBeNull()
+  })
+
+  it('renders the keyboard keys inside the shortcut chips (regression: empty <Kbd>)', () => {
+    render(<OnboardingWizard open={true} onClose={onClose} />)
+    const navButtons = screen.getAllByRole('button', { name: /^Go to step/ })
+    fireEvent.click(navButtons[9]) // move-fast step
+    // jsdom has no Mac platform, so the modifier resolves to Ctrl / Alt.
+    expect(screen.getAllByText('Ctrl').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('K').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('J').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('B').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('?').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Alt').length).toBeGreaterThan(0)
+  })
+
+  it('companion step shows iOS and Android download links', () => {
+    render(<OnboardingWizard open={true} onClose={onClose} />)
+    const navButtons = screen.getAllByRole('button', { name: /^Go to step/ })
+    fireEvent.click(navButtons[8]) // companion step
+    expect(screen.getByText(STEP_TITLES[8])).toBeTruthy()
+    const ios = screen.getByTestId('companion-ios-link')
+    const android = screen.getByTestId('companion-android-link')
+    expect(ios).toHaveAttribute('href', COMPANION_IOS_URL)
+    expect(ios).toHaveAttribute('target', '_blank')
+    expect(ios).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(android).toHaveAttribute('href', COMPANION_ANDROID_URL)
+    expect(android).toHaveAttribute('target', '_blank')
+    expect(android).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+})
+
+describe('OnboardingWizard interactive steps (with providers)', () => {
+  let onClose: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    onClose = vi.fn()
+    localStorage.clear()
+    document.documentElement.removeAttribute('data-theme')
+  })
+
+  afterEach(async () => {
+    await i18n.changeLanguage(DEFAULT_LANGUAGE)
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('language step hot-switches the app language from the wizard', async () => {
+    render(
+      <LanguageProvider>
+        <OnboardingWizard open={true} onClose={onClose} />
+      </LanguageProvider>
+    )
+    expect(screen.getByTestId('language-card-en')).toHaveAttribute('data-selected', 'true')
+    fireEvent.click(screen.getByTestId('language-card-es'))
+    await waitFor(() =>
+      expect(screen.getByTestId('language-card-es')).toHaveAttribute('data-selected', 'true')
+    )
+    expect(i18n.language).toBe('es')
+  })
+
+  it('theme step applies the clicked theme to the document', async () => {
+    render(
+      <ThemeProvider>
+        <OnboardingWizard open={true} onClose={onClose} />
+      </ThemeProvider>
+    )
+    fireEvent.click(screen.getByTestId('onboarding-next')) // → theme step
+    fireEvent.click(screen.getByTestId('theme-card-matrix'))
+    await waitFor(() =>
+      expect(screen.getByTestId('theme-card-matrix')).toHaveAttribute('data-selected', 'true')
+    )
+    expect(document.documentElement.dataset.theme).toBe('matrix')
   })
 })
 

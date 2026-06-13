@@ -152,6 +152,13 @@
     "budgetHelper": "Tetto alla spesa `surface=file-summary` per mese di calendario. Le rigenerazioni avviate dall'utente possono superarlo."
   },
   "appearance": {
+    "taglines": {
+      "dracula": "L'originale — scuro con sfumature viola e vividi accenti neon",
+      "aurora-light": "Chiaro premium — indaco ispirato a Linear su bianco caldo",
+      "obsidian-dark": "Scuro premium — quasi nero con sfumature blu e accenti elettrici",
+      "matrix": "Terminale al fosforo — menta tenue su quasi nero verdastro",
+      "specrails": "Tema del brand — blu navy-indaco profondo con accenti ciano saturi"
+    },
     "heading": "Aspetto",
     "themeGroupLabel": "Tema",
     "currentlyActive": "Attualmente attivo",

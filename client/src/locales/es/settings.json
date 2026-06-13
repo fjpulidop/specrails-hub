@@ -152,6 +152,13 @@
     "budgetHelper": "Tope de gasto de `surface=file-summary` por mes natural. Las regeneraciones iniciadas por el usuario pueden sobrepasarlo."
   },
   "appearance": {
+    "taglines": {
+      "dracula": "El original — oscuro con tinte púrpura y acentos neón vivos",
+      "aurora-light": "Claro premium — índigo inspirado en Linear sobre blanco cálido",
+      "obsidian-dark": "Oscuro premium — casi negro con tinte azul y acentos eléctricos",
+      "matrix": "Terminal de fósforo — menta suave sobre casi negro verdoso",
+      "specrails": "Tema de marca — azul marino-índigo profundo con acentos cian saturados"
+    },
     "heading": "Apariencia",
     "themeGroupLabel": "Tema",
     "currentlyActive": "Activo actualmente",

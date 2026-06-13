@@ -152,6 +152,13 @@
     "budgetHelper": "Cap on `surface=file-summary` spend per calendar month. User-initiated regenerations can override."
   },
   "appearance": {
+    "taglines": {
+      "dracula": "The original — dark purple-tinted with vivid neon accents",
+      "aurora-light": "Premium light — Linear-inspired indigo on warm off-white",
+      "obsidian-dark": "Premium dark — near-black blue-tinted with electric accents",
+      "matrix": "Phosphor terminal — soft mint on green-tinted near-black",
+      "specrails": "Brand theme — deep navy-indigo with saturated cyan accents"
+    },
     "heading": "Appearance",
     "themeGroupLabel": "Theme",
     "currentlyActive": "Currently active",

@@ -152,6 +152,13 @@
     "budgetHelper": "暦月ごとの `surface=file-summary` 支出の上限。ユーザーが開始した再生成は上限を超えられます。"
   },
   "appearance": {
+    "taglines": {
+      "dracula": "オリジナル — 紫がかったダークにネオンのアクセント",
+      "aurora-light": "プレミアムライト — Linear風のインディゴと温かみのあるオフホワイト",
+      "obsidian-dark": "プレミアムダーク — 青みがかった漆黒にエレクトリックなアクセント",
+      "matrix": "蛍光ターミナル — 緑がかった漆黒にソフトミント",
+      "specrails": "ブランドテーマ — 深いネイビーインディゴに鮮やかなシアン"
+    },
     "heading": "外観",
     "themeGroupLabel": "テーマ",
     "currentlyActive": "現在アクティブ",

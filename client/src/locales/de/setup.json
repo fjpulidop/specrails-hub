@@ -166,6 +166,20 @@
       "developer": "Entwickler",
       "reviewer": "Reviewer"
     },
+    "language": {
+      "nav": "Sprache",
+      "title": "Wählen Sie Ihre Sprache",
+      "subtitle": "Specrails spricht Ihre Sprache",
+      "intro": "Wählen Sie die Sprache für die Oberfläche. Sie gilt sofort – diese Tour eingeschlossen.",
+      "note": "Sie können sie jederzeit unter Einstellungen → Sprache ändern."
+    },
+    "theme": {
+      "nav": "Theme",
+      "title": "Wählen Sie Ihren Look",
+      "subtitle": "Integrierte Themes, sofort angewendet",
+      "intro": "Wählen Sie, wie Specrails aussehen soll — das Theme wird sofort beim Klick angewendet.",
+      "note": "Sie können es jederzeit unter Einstellungen → Erscheinungsbild ändern."
+    },
     "welcome": {
       "nav": "Willkommen",
       "title": "Willkommen bei Specrails",
@@ -248,7 +262,7 @@
       "title": "Machen Sie es zu Ihrem Arbeitsbereich",
       "subtitle": "Alles Nötige, ohne das Fenster zu verlassen",
       "terminalLabel": "Terminal-Panel",
-      "terminalBody": "Ein echtes Terminal im VS-Code-Stil am unteren Rand (<mod></mod> <j></j>) – WebGL-Rendering, Suche, Inline-Bilder, Drag-and-drop-Pfade und Shell-Integration. Bis zu 10 Sessions pro Projekt.",
+      "terminalBody": "Ein echtes Terminal im VS-Code-Stil am unteren Rand (<mod>{{mod}}</mod> <j>J</j>) – WebGL-Rendering, Suche, Inline-Bilder, Drag-and-drop-Pfade und Shell-Integration. Bis zu 10 Sessions pro Projekt.",
       "codeLabel": "Code-Explorer",
       "codeBody": "Ein schreibgeschützter Dateibaum und Monaco-Viewer mit verständlichen KI-Zusammenfassungen und „Von KI berührt“-Herkunfts-Chips – so kann jeder nachvollziehen, was sich warum geändert hat.",
       "integrationsLabel": "Integrationen",
@@ -260,21 +274,35 @@
       "desktopLabel": "Desktop oder Browser",
       "desktopBody": "Nutzen Sie Specrails im Browser oder holen Sie sich die signierte Desktop-App (macOS & Windows) mit eigenem Server und eigenen Runtimes."
     },
+    "companion": {
+      "nav": "Mobile App",
+      "title": "Nehmen Sie Specrails überallhin mit",
+      "subtitle": "SpecRails Companion – Ihre Pipelines auf Ihrem Smartphone",
+      "intro": "<b>SpecRails Companion</b> ist die kostenlose Mobile-App für iPhone und Android, die sich über Ihr lokales Netzwerk mit diesem Desktop koppelt. Durchstöbern Sie das Specs-Board, starten und stoppen Sie Rails, verfolgen Sie Live-Job-Logs und werfen Sie einen Blick auf die Analytics – direkt vom Smartphone.",
+      "localLabel": "100 % lokal, wie alles andere",
+      "localBody": "Die App spricht über Ihr WLAN direkt mit diesem Rechner – QR-Kopplung mit TLS-Pinning. Kein Cloud-Relay, kein Konto, und Ihr Code verlässt nie Ihre vier Wände.",
+      "downloadLabel": "Holen Sie sich die App",
+      "downloadHint": "Scannen Sie einen Code mit der Kamera Ihres Smartphones oder öffnen Sie den Link.",
+      "ios": "Für iPhone laden",
+      "android": "Für Android laden",
+      "pairLabel": "Die Kopplung dauert zehn Sekunden",
+      "pairBody": "Gehen Sie nach der Installation zu Einstellungen → Mobile Companion → Gerät koppeln und scannen Sie den dort angezeigten QR-Code."
+    },
     "moveFast": {
       "nav": "Schnell arbeiten",
       "title": "In Gedankengeschwindigkeit arbeiten",
       "subtitle": "Keyboard-first, überall",
       "paletteLabel": "Befehlspalette",
-      "paletteShortcut": "<f>Drücken Sie</f> <mod></mod> <m>+</m> <k></k> <m>überall</m>",
+      "paletteShortcut": "<f>Drücken Sie</f> <mod>{{mod}}</mod> <m>+</m> <k>K</k> <m>überall</m>",
       "paletteBody": "Projekte wechseln, Spec-Befehle ausführen, zu jeder Seite springen und letzte Jobs finden – alles mit Fuzzy-Suche.",
       "terminalLabel": "Terminal-Panel",
-      "terminalBody": "Umschalten mit <mod></mod> <j></j>.",
+      "terminalBody": "Umschalten mit <mod>{{mod}}</mod> <j>J</j>.",
       "shortcutsLabel": "Alle Shortcuts",
-      "shortcutsBody": "Drücken Sie <q></q> für die vollständige Übersicht.",
+      "shortcutsBody": "Drücken Sie <q>?</q> für die vollständige Übersicht.",
       "chatLabel": "Chat-Seitenleiste",
-      "chatBody": "Rechte Seitenleiste umschalten mit <mod></mod> <bkey></bkey>.",
+      "chatBody": "Rechte Seitenleiste umschalten mit <mod>{{mod}}</mod> <bkey>B</bkey>.",
       "projectsLabel": "Projekt-Seitenleiste",
-      "projectsBody": "Linke Arc-Seitenleiste umschalten mit <alt></alt> <mod></mod> <bkey></bkey>.",
+      "projectsBody": "Linke Arc-Seitenleiste umschalten mit <alt>{{alt}}</alt> <mod>{{mod}}</mod> <bkey>B</bkey>.",
       "outro": "<b>Das war die Tour.</b> Fügen Sie über die linke Seitenleiste ein Projekt hinzu und liefern Sie Ihre erste Spec aus. Diese Tour lässt sich jederzeit über die Einstellungen erneut öffnen."
     }
   }
