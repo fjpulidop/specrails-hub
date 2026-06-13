@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/fjpulidop/specrails-desktop/compare/v2.1.0...v2.2.0) (2026-06-13)
+
+
+### Features
+
+* **jobs:** honest live Job Detail metrics (no fake numbers) ([#380](https://github.com/fjpulidop/specrails-desktop/issues/380)) ([3837662](https://github.com/fjpulidop/specrails-desktop/commit/38376626a7133fe78c5d0cafa6fd601c560c346b))
+
 ## [2.1.0](https://github.com/fjpulidop/specrails-desktop/compare/v2.0.0...v2.1.0) (2026-06-13)
 
 
