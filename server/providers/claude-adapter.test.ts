@@ -101,6 +101,34 @@ describe('claudeAdapter.buildArgs', () => {
     ])
   })
 
+  it('emits isolated --setting-sources project,local by default (no loadUserEnv)', () => {
+    const args = claudeAdapter.buildArgs('chat-turn', { prompt: 'x', model: 'sonnet' })
+    const i = args.indexOf('--setting-sources')
+    expect(i).toBeGreaterThan(-1)
+    expect(args[i + 1]).toBe('project,local')
+  })
+
+  it('emits --setting-sources user,project,local when loadUserEnv is set (My approved MCPs)', () => {
+    const args = claudeAdapter.buildArgs('chat-turn', {
+      prompt: 'x',
+      model: 'sonnet',
+      loadUserEnv: true,
+    })
+    const i = args.indexOf('--setting-sources')
+    expect(i).toBeGreaterThan(-1)
+    expect(args[i + 1]).toBe('user,project,local')
+    // exactly one --setting-sources flag (no duplicate from COMMON_FLAGS)
+    expect(args.filter((a) => a === '--setting-sources')).toHaveLength(1)
+  })
+
+  it('loadUserEnv flows through rail-job and spec-gen actions too', () => {
+    for (const action of ['rail-job', 'spec-gen'] as const) {
+      const args = claudeAdapter.buildArgs(action, { prompt: 'x', model: 'sonnet', loadUserEnv: true })
+      const i = args.indexOf('--setting-sources')
+      expect(args[i + 1], `${action} setting-sources`).toBe('user,project,local')
+    }
+  })
+
   it('chat-turn honours maxTurns and extraArgs', () => {
     const args = claudeAdapter.buildArgs('chat-turn', {
       prompt: 'hello',

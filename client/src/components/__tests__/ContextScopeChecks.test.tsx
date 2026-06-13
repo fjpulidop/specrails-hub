@@ -23,30 +23,32 @@ describe('ContextScopeChecks', () => {
     expect(screen.getByLabelText('Enrich with Contract Layer')).toBeInTheDocument()
   })
 
-  it('My approved MCPs toggle is disabled in Quick mode, enabled in Explore', () => {
+  it('My approved MCPs toggle is enabled in both Quick and Explore', () => {
     const { rerender } = render(<ContextScopeChecks scope={baseScope} mode="quick" onChange={() => {}} defaultOpen />)
-    expect((screen.getByLabelText('My approved MCPs') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByLabelText('My approved MCPs') as HTMLButtonElement).disabled).toBe(false)
     rerender(<ContextScopeChecks scope={baseScope} mode="explore" onChange={() => {}} defaultOpen />)
     expect((screen.getByLabelText('My approved MCPs') as HTMLButtonElement).disabled).toBe(false)
   })
 
-  it('emits userMcp partial when the My approved MCPs toggle is clicked', () => {
+  it('emits userMcp partial when the My approved MCPs toggle is clicked (Explore)', () => {
     const onChange = vi.fn()
     render(<ContextScopeChecks scope={baseScope} mode="explore" onChange={onChange} defaultOpen />)
     fireEvent.click(screen.getByLabelText('My approved MCPs'))
     expect(onChange).toHaveBeenLastCalledWith({ ...baseScope, userMcp: true })
   })
 
-  it('MCPs toggle is disabled in Quick mode', () => {
-    render(<ContextScopeChecks scope={baseScope} mode="quick" onChange={() => {}} defaultOpen />)
-    const mcp = screen.getByLabelText('Project MCPs') as HTMLButtonElement
-    expect(mcp.disabled).toBe(true)
+  it('emits userMcp partial when the My approved MCPs toggle is clicked (Quick)', () => {
+    const onChange = vi.fn()
+    render(<ContextScopeChecks scope={baseScope} mode="quick" onChange={onChange} defaultOpen />)
+    fireEvent.click(screen.getByLabelText('My approved MCPs'))
+    expect(onChange).toHaveBeenLastCalledWith({ ...baseScope, userMcp: true })
   })
 
-  it('MCPs toggle is enabled in Explore mode', () => {
-    render(<ContextScopeChecks scope={baseScope} mode="explore" onChange={() => {}} defaultOpen />)
-    const mcp = screen.getByLabelText('Project MCPs') as HTMLButtonElement
-    expect(mcp.disabled).toBe(false)
+  it('Project MCPs toggle is enabled in both Quick and Explore', () => {
+    const { rerender } = render(<ContextScopeChecks scope={baseScope} mode="quick" onChange={() => {}} defaultOpen />)
+    expect((screen.getByLabelText('Project MCPs') as HTMLButtonElement).disabled).toBe(false)
+    rerender(<ContextScopeChecks scope={baseScope} mode="explore" onChange={() => {}} defaultOpen />)
+    expect((screen.getByLabelText('Project MCPs') as HTMLButtonElement).disabled).toBe(false)
   })
 
   it('emits the correct partial when toggled independently', () => {
@@ -58,11 +60,11 @@ describe('ContextScopeChecks', () => {
     expect(onChange).toHaveBeenLastCalledWith({ ...baseScope, full: true })
   })
 
-  it('does not flip mcp in Quick mode even if scope says true', () => {
+  it('reflects mcp scope in Quick mode (toggle is now active in both modes)', () => {
     const scope: ContextScope = { specrails: false, openspec: false, full: false, mcp: true, contractRefine: false }
     render(<ContextScopeChecks scope={scope} mode="quick" onChange={() => {}} defaultOpen />)
     const mcp = screen.getByLabelText('Project MCPs')
-    expect(mcp).toHaveAttribute('aria-checked', 'false')
+    expect(mcp).toHaveAttribute('aria-checked', 'true')
   })
 
   it('shows summary chip when collapsed', () => {
