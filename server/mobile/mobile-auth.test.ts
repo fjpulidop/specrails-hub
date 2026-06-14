@@ -80,4 +80,21 @@ describe('mobile-auth', () => {
     }
     expect(lastStatus).toBe(429)
   })
+
+  it('sweeps stale per-IP tracking once the window elapses (bounds the map)', () => {
+    createDevice(db, { name: 'A', platform: 'ios', tokenHash: hashToken('tok'), certFingerprint: 'fp' })
+    let now = 1000
+    const mw = createMobileAuthMiddleware({ db, currentFingerprint: () => 'fp', ratePerMinute: 2, clock: () => now })
+    const fire = (ip: string): number => {
+      const { res, captured } = fakeRes()
+      mw(fakeReq({ headers: { authorization: 'Bearer tok' }, remoteAddress: ip }), res, () => { captured.status = 200 })
+      return captured.status
+    }
+    fire('9.9.9.9'); fire('9.9.9.9')
+    expect(fire('9.9.9.9')).toBe(429) // window exhausted
+    // Advance past the 60s window → the next request runs the sweep (evicting
+    // the now-stale '9.9.9.9' entry) and the IP gets a fresh window.
+    now += 61_000
+    expect(fire('9.9.9.9')).toBe(200)
+  })
 })

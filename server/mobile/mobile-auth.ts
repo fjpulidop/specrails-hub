@@ -57,6 +57,10 @@ export function createMobileAuthMiddleware(opts: MobileAuthOptions) {
   const clock = opts.clock ?? (() => Date.now())
   const lastTouch = new Map<string, number>()
   const ipHits = new Map<string, number[]>()
+  // Periodically evict stale keys so these maps can't grow unbounded under a
+  // multi-source flood (each per-IP timestamp array self-bounds to the 60s
+  // window, but the Map KEYS would otherwise live forever, one per distinct IP).
+  let lastSweep = clock()
 
   return function mobileAuth(req: Request, res: Response, next: NextFunction): void {
     // 1. Refuse browser-origin requests outright.
@@ -68,6 +72,16 @@ export function createMobileAuthMiddleware(opts: MobileAuthOptions) {
     // 2. Coarse per-IP rate limit.
     const ip = req.socket?.remoteAddress ?? 'unknown'
     const now = clock()
+    // Sweep stale tracking at most once per window (cheap, amortized O(1)).
+    if (now - lastSweep > 60_000) {
+      lastSweep = now
+      for (const [k, v] of ipHits) {
+        if (v.length === 0 || now - v[v.length - 1] >= 60_000) ipHits.delete(k)
+      }
+      for (const [k, t] of lastTouch) {
+        if (now - t >= 3_600_000) lastTouch.delete(k) // drop device touch-cache after 1h idle
+      }
+    }
     const hits = (ipHits.get(ip) ?? []).filter((t) => now - t < 60_000)
     hits.push(now)
     ipHits.set(ip, hits)
