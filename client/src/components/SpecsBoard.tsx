@@ -713,11 +713,11 @@ export function SpecsBoard({
             ref={setDoneNodeRef}
             data-testid="specs-board-done-bucket"
             className={`px-4 pt-2 pb-3 space-y-1.5 transition-colors duration-150 ${
-              isDoneOver ? 'bg-emerald-500/[0.04]' : ''
+              isDoneOver ? 'bg-emerald-500/[0.04] aurora-light:bg-accent-success/10' : ''
             } ${showTodoBucket ? 'border-t border-border/30 mt-1' : ''}`}
           >
             <div className="flex items-center gap-2 py-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400/70" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400/70 aurora-light:text-accent-success" />
               <span className="text-[11px] font-medium text-muted-foreground">{t('status.done')}</span>
               <span className="text-[10px] text-muted-foreground/60 bg-muted/20 rounded-full px-1.5 py-0.5">
                 {activeLabels.size > 0

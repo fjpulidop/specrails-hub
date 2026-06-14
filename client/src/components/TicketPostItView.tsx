@@ -30,50 +30,50 @@ const STATUS_PALETTE: Record<TicketStatus, PostItPalette> = {
     cornerBg: 'bg-accent-secondary/20',
   },
   todo: {
-    bg: 'bg-slate-700/40',
-    border: 'border-slate-600/40',
+    bg: 'bg-slate-700/40 aurora-light:bg-muted',
+    border: 'border-slate-600/40 aurora-light:border-border',
     shadow: 'shadow-[0_2px_8px_rgba(100,116,139,0.15)]',
     hoverShadow: 'hover:shadow-[0_4px_20px_rgba(100,116,139,0.25)]',
-    titleText: 'text-slate-200',
-    metaText: 'text-slate-400',
-    cornerBg: 'bg-slate-600/30',
+    titleText: 'text-slate-200 aurora-light:text-foreground',
+    metaText: 'text-slate-400 aurora-light:text-muted-foreground',
+    cornerBg: 'bg-slate-600/30 aurora-light:bg-muted-foreground/20',
   },
   in_progress: {
-    bg: 'bg-blue-900/35',
-    border: 'border-blue-500/35',
+    bg: 'bg-blue-900/35 aurora-light:bg-accent-info/10',
+    border: 'border-blue-500/35 aurora-light:border-accent-info/30',
     shadow: 'shadow-[0_2px_8px_rgba(59,130,246,0.12)]',
     hoverShadow: 'hover:shadow-[0_4px_20px_rgba(59,130,246,0.25)]',
-    titleText: 'text-blue-100',
-    metaText: 'text-blue-300/70',
-    cornerBg: 'bg-blue-500/20',
+    titleText: 'text-blue-100 aurora-light:text-foreground',
+    metaText: 'text-blue-300/70 aurora-light:text-accent-info',
+    cornerBg: 'bg-blue-500/20 aurora-light:bg-accent-info/20',
   },
   done: {
-    bg: 'bg-emerald-900/30',
-    border: 'border-emerald-500/30',
+    bg: 'bg-emerald-900/30 aurora-light:bg-accent-success/10',
+    border: 'border-emerald-500/30 aurora-light:border-accent-success/30',
     shadow: 'shadow-[0_2px_8px_rgba(16,185,129,0.1)]',
     hoverShadow: 'hover:shadow-[0_4px_20px_rgba(16,185,129,0.2)]',
-    titleText: 'text-emerald-200/80',
-    metaText: 'text-emerald-400/60',
-    cornerBg: 'bg-emerald-500/15',
+    titleText: 'text-emerald-200/80 aurora-light:text-accent-success',
+    metaText: 'text-emerald-400/60 aurora-light:text-accent-success/70',
+    cornerBg: 'bg-emerald-500/15 aurora-light:bg-accent-success/20',
   },
   cancelled: {
-    bg: 'bg-red-950/25',
-    border: 'border-red-800/25',
+    bg: 'bg-red-950/25 aurora-light:bg-destructive/10',
+    border: 'border-red-800/25 aurora-light:border-destructive/30',
     shadow: 'shadow-[0_2px_8px_rgba(239,68,68,0.06)]',
     hoverShadow: 'hover:shadow-[0_4px_20px_rgba(239,68,68,0.12)]',
-    titleText: 'text-red-300/50',
-    metaText: 'text-red-400/40',
-    cornerBg: 'bg-red-800/15',
+    titleText: 'text-red-300/50 aurora-light:text-destructive/70',
+    metaText: 'text-red-400/40 aurora-light:text-destructive/60',
+    cornerBg: 'bg-red-800/15 aurora-light:bg-destructive/20',
   },
 }
 
 // ─── Priority indicator ─────────────────────────────────────────────────────
 
 const PRIORITY_INDICATOR: Record<TicketPriority, { icon: typeof AlertTriangle | null; className: string; label: string }> = {
-  critical: { icon: AlertTriangle, className: 'text-red-400', label: 'Critical' },
-  high: { icon: ArrowUp, className: 'text-orange-400', label: 'High' },
+  critical: { icon: AlertTriangle, className: 'text-red-400 aurora-light:text-destructive', label: 'Critical' },
+  high: { icon: ArrowUp, className: 'text-orange-400 aurora-light:text-accent-warning', label: 'High' },
   medium: { icon: null, className: '', label: '' },
-  low: { icon: ChevronUp, className: 'text-gray-500 rotate-180', label: 'Low' },
+  low: { icon: ChevronUp, className: 'text-gray-500 rotate-180 aurora-light:text-muted-foreground', label: 'Low' },
 }
 
 // ─── Slight random rotations for paper feel ─────────────────────────────────
@@ -127,10 +127,10 @@ export function TicketPostItView({
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center space-y-1.5">
-        <AlertTriangle className="w-6 h-6 text-red-400 mx-auto" />
-        <p className="text-sm font-medium text-red-400">{t('errors.loadFailed')}</p>
-        <p className="text-xs text-red-400/70">{error}</p>
+      <div className="rounded-lg border border-red-500/30 aurora-light:border-destructive/30 bg-red-500/10 aurora-light:bg-destructive/10 p-6 text-center space-y-1.5">
+        <AlertTriangle className="w-6 h-6 text-red-400 aurora-light:text-destructive mx-auto" />
+        <p className="text-sm font-medium text-red-400 aurora-light:text-destructive">{t('errors.loadFailed')}</p>
+        <p className="text-xs text-red-400/70 aurora-light:text-destructive/80">{error}</p>
       </div>
     )
   }
@@ -257,7 +257,7 @@ function PostItCard({ ticket, onClick }: PostItCardProps) {
         className={cn(
           'text-xs font-medium leading-snug line-clamp-3 mt-1',
           palette.titleText,
-          ticket.status === 'done' && 'line-through decoration-emerald-500/40',
+          ticket.status === 'done' && 'line-through decoration-emerald-500/40 aurora-light:decoration-accent-success/50',
         )}
       >
         {ticket.title}

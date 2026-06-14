@@ -175,10 +175,10 @@ export function TicketListView({
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center space-y-1.5">
-        <AlertTriangle className="w-6 h-6 text-red-400 mx-auto" />
-        <p className="text-sm font-medium text-red-400">{t('errors.loadFailed')}</p>
-        <p className="text-xs text-red-400/70">{error}</p>
+      <div className="rounded-lg border border-red-500/30 aurora-light:border-destructive/30 bg-red-500/10 aurora-light:bg-destructive/10 p-6 text-center space-y-1.5">
+        <AlertTriangle className="w-6 h-6 text-red-400 aurora-light:text-destructive mx-auto" />
+        <p className="text-sm font-medium text-red-400 aurora-light:text-destructive">{t('errors.loadFailed')}</p>
+        <p className="text-xs text-red-400/70 aurora-light:text-destructive/80">{error}</p>
       </div>
     )
   }

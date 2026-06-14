@@ -171,7 +171,7 @@ function KanbanCard({
             className={cn(
               'text-xs font-medium leading-snug line-clamp-2',
               ticket.status === 'done'
-                ? 'text-foreground/50 line-through decoration-emerald-500/40'
+                ? 'text-foreground/50 line-through decoration-emerald-500/40 aurora-light:decoration-accent-success/50'
                 : ticket.status === 'cancelled'
                   ? 'text-foreground/40 line-through decoration-muted-foreground/40'
                   : 'text-foreground/80',
@@ -436,10 +436,10 @@ export function TicketGridView({
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center space-y-1.5">
-        <AlertTriangle className="w-6 h-6 text-red-400 mx-auto" />
-        <p className="text-sm font-medium text-red-400">{t('errors.loadFailed')}</p>
-        <p className="text-xs text-red-400/70">{error}</p>
+      <div className="rounded-lg border border-red-500/30 aurora-light:border-destructive/30 bg-red-500/10 aurora-light:bg-destructive/10 p-6 text-center space-y-1.5">
+        <AlertTriangle className="w-6 h-6 text-red-400 aurora-light:text-destructive mx-auto" />
+        <p className="text-sm font-medium text-red-400 aurora-light:text-destructive">{t('errors.loadFailed')}</p>
+        <p className="text-xs text-red-400/70 aurora-light:text-destructive/80">{error}</p>
       </div>
     )
   }
@@ -492,7 +492,7 @@ export function TicketGridView({
 
       {/* Cancelled tickets row (if any) */}
       {columnTickets.cancelled.length > 0 && (
-        <div className="mt-3 rounded-lg bg-red-950/10 p-2">
+        <div className="mt-3 rounded-lg bg-red-950/10 aurora-light:bg-destructive/8 p-2">
           <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider px-1 mb-1.5">
             {t('gridView.cancelledSection', { count: columnTickets.cancelled.length })}
           </p>

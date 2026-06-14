@@ -30,10 +30,10 @@ const STATUS_BADGE: Record<JobStatus, { variant: BadgeVariant; labelKey: string;
 const ALL_STATUSES: JobStatus[] = ['running', 'completed', 'failed', 'canceled', 'zombie_terminated', 'queued', 'skipped']
 
 const PRIORITY_STYLES: Record<JobPriority, { className: string; labelKey: string }> = {
-  critical: { className: 'bg-red-500/15 text-red-400 border-red-500/30', labelKey: 'recent.priority.critical' },
-  high: { className: 'bg-orange-500/15 text-orange-400 border-orange-500/30', labelKey: 'recent.priority.high' },
+  critical: { className: 'bg-red-500/15 aurora-light:bg-destructive/10 text-red-400 aurora-light:text-destructive border-red-500/30 aurora-light:border-destructive/30', labelKey: 'recent.priority.critical' },
+  high: { className: 'bg-orange-500/15 aurora-light:bg-accent-warning/10 text-orange-400 aurora-light:text-accent-warning border-orange-500/30 aurora-light:border-accent-warning/30', labelKey: 'recent.priority.high' },
   normal: { className: '', labelKey: 'recent.priority.normal' },
-  low: { className: 'bg-gray-500/15 text-gray-400 border-gray-500/30', labelKey: 'recent.priority.low' },
+  low: { className: 'bg-gray-500/15 aurora-light:bg-muted text-gray-400 aurora-light:text-muted-foreground border-gray-500/30 aurora-light:border-border', labelKey: 'recent.priority.low' },
 }
 
 function formatCost(cost: number | null | undefined): string | null {

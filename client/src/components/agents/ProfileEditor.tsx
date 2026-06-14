@@ -313,7 +313,7 @@ export function ProfileEditor({
       />
       {/* Live validation summary */}
       {validationIssues.length > 0 && (
-        <div className="px-3 py-2 text-xs rounded-md border border-yellow-500/30 bg-yellow-500/10 text-yellow-500">
+        <div className="px-3 py-2 text-xs rounded-md border border-yellow-500/30 aurora-light:border-accent-warning/30 bg-yellow-500/10 aurora-light:bg-accent-warning/10 text-yellow-500 aurora-light:text-accent-warning">
           <div className="font-medium mb-1">{t('profileEditor.validationSummary', { count: validationIssues.length })}</div>
           <ul className="list-disc list-inside space-y-0.5">
             {validationIssues.map((issue, i) => (
@@ -419,7 +419,7 @@ export function ProfileEditor({
                       className={
                         'text-[10px] px-1.5 py-0.5 rounded ' +
                         (a.kind === 'custom'
-                          ? 'bg-purple-500/15 text-purple-400'
+                          ? 'bg-purple-500/15 aurora-light:bg-accent-secondary/15 text-purple-400 aurora-light:text-accent-secondary'
                           : 'bg-muted text-muted-foreground')
                       }
                     >
@@ -482,7 +482,7 @@ export function ProfileEditor({
           {t('profileEditor.routing.explainer')}
         </p>
         {agentsMissingRouting.length > 0 && (
-          <div className="mb-2 px-3 py-2 text-xs rounded-md border border-yellow-500/30 bg-yellow-500/10 text-yellow-500">
+          <div className="mb-2 px-3 py-2 text-xs rounded-md border border-yellow-500/30 aurora-light:border-accent-warning/30 bg-yellow-500/10 aurora-light:bg-accent-warning/10 text-yellow-500 aurora-light:text-accent-warning">
             <div className="font-medium mb-1">{t('profileEditor.routing.untargetedTitle')}</div>
             <div>
               <Trans
@@ -594,7 +594,7 @@ function AgentRow({
       <ModelSelect value={agent.model ?? 'sonnet'} onChange={onModel} />
       <button
         type="button"
-        className="p-1 hover:bg-red-500/20 text-red-400 rounded disabled:opacity-30 disabled:cursor-not-allowed opacity-0 group-hover:opacity-100 transition-opacity"
+        className="p-1 hover:bg-red-500/20 aurora-light:hover:bg-destructive/15 text-red-400 aurora-light:text-destructive rounded disabled:opacity-30 disabled:cursor-not-allowed opacity-0 group-hover:opacity-100 transition-opacity"
         onClick={onRemove}
         disabled={!canRemove}
         title={
@@ -702,7 +702,7 @@ function RoutingRow({
         {canRemove && (
           <button
             type="button"
-            className="p-1 hover:bg-red-500/20 text-red-400 rounded"
+            className="p-1 hover:bg-red-500/20 aurora-light:hover:bg-destructive/15 text-red-400 aurora-light:text-destructive rounded"
             onClick={onRemove}
             title={t('common:actions.remove')}
           >

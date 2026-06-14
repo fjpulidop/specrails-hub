@@ -79,13 +79,13 @@ export default function AgentsPage() {
   return (
     <div className="flex flex-col h-full">
       {showUpgradeBanner && (
-        <div className="flex-shrink-0 flex items-start gap-3 px-6 py-3 border-b border-yellow-500/30 bg-yellow-500/10">
-          <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+        <div className="flex-shrink-0 flex items-start gap-3 px-6 py-3 border-b border-yellow-500/30 aurora-light:border-accent-warning/30 bg-yellow-500/10 aurora-light:bg-accent-warning/10">
+          <AlertTriangle className="w-4 h-4 text-yellow-500 aurora-light:text-accent-warning mt-0.5 flex-shrink-0" />
           <div className="text-xs">
-            <div className="font-medium text-yellow-500">
+            <div className="font-medium text-yellow-500 aurora-light:text-accent-warning">
               {t('page.banner.title', { required: coreStatus!.required })}
             </div>
-            <div className="text-yellow-500/80 mt-0.5">
+            <div className="text-yellow-500/80 aurora-light:text-accent-warning mt-0.5">
               <Trans
                 t={t}
                 i18nKey="page.banner.body"
@@ -93,7 +93,7 @@ export default function AgentsPage() {
                   version: coreStatus!.version ?? t('page.banner.unknownVersion'),
                   command: 'npx specrails-core@latest update',
                 }}
-                components={{ code: <code className="px-1 rounded bg-yellow-500/20" /> }}
+                components={{ code: <code className="px-1 rounded bg-yellow-500/20 aurora-light:bg-accent-warning/20" /> }}
               />
             </div>
           </div>

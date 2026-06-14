@@ -88,11 +88,11 @@ export function RailControls({ mode, status, activeJobId, ticketCount, ultracode
         variant="ghost"
         className={`h-5 w-5 p-0 rounded-full transition-all duration-200 ${
           status === 'running'
-            ? 'text-red-400 hover:text-red-300 hover:bg-red-400/10'
+            ? 'text-red-400 aurora-light:text-destructive hover:text-red-300 aurora-light:hover:text-destructive hover:bg-red-400/10 aurora-light:hover:bg-destructive/10'
             : status === 'failed'
-              ? 'text-amber-400 hover:text-emerald-300 hover:bg-emerald-400/10'
+              ? 'text-amber-400 aurora-light:text-accent-warning hover:text-emerald-300 aurora-light:hover:text-accent-success hover:bg-emerald-400/10 aurora-light:hover:bg-accent-success/10'
               : canPlay
-                ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-400/10'
+                ? 'text-emerald-400 aurora-light:text-accent-success hover:text-emerald-300 aurora-light:hover:text-accent-success hover:bg-emerald-400/10 aurora-light:hover:bg-accent-success/10'
                 : 'text-muted-foreground/30 cursor-not-allowed'
         }`}
         onClick={onToggle}

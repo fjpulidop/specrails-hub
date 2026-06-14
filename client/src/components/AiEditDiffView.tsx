@@ -26,7 +26,7 @@ export function AiEditDiffView({ original, proposed, className }: Props) {
           return (
             <span
               key={i}
-              className="bg-green-500/20 text-green-200 rounded px-0.5"
+              className="bg-green-500/20 aurora-light:bg-accent-success/15 text-green-200 aurora-light:text-accent-success rounded px-0.5"
               aria-label={t('diffView.inserted')}
             >
               {p.value}
@@ -39,7 +39,7 @@ export function AiEditDiffView({ original, proposed, className }: Props) {
           return (
             <span
               key={i}
-              className="bg-red-500/15 text-red-300/90 line-through decoration-red-400/60 rounded px-0.5 opacity-80"
+              className="bg-red-500/15 aurora-light:bg-destructive/12 text-red-300/90 aurora-light:text-destructive line-through decoration-red-400/60 aurora-light:decoration-destructive/60 rounded px-0.5 opacity-80"
               aria-label={t('diffView.removed')}
             >
               {p.value}

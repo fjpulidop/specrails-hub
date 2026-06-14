@@ -314,15 +314,15 @@ export function JobStatusPanel({
   const frameClass = isRunning
     ? 'border-accent-info/20 bg-accent-info/5'
     : isSuccess
-      ? 'border-emerald-500/20 bg-emerald-500/5'
-      : 'border-red-500/20 bg-red-500/5'
+      ? 'border-emerald-500/20 aurora-light:border-accent-success/30 bg-emerald-500/5 aurora-light:bg-accent-success/5'
+      : 'border-red-500/20 aurora-light:border-destructive/30 bg-red-500/5 aurora-light:bg-destructive/5'
 
   const HeaderIcon = isRunning ? Loader2 : isSuccess ? CheckCircle2 : XCircle
   const headerIconClass = isRunning
     ? 'w-4 h-4 text-accent-info shrink-0 animate-spin'
     : isSuccess
-      ? 'w-4 h-4 text-emerald-400 shrink-0'
-      : 'w-4 h-4 text-red-400 shrink-0'
+      ? 'w-4 h-4 text-emerald-400 aurora-light:text-accent-success shrink-0'
+      : 'w-4 h-4 text-red-400 aurora-light:text-destructive shrink-0'
 
   return (
     <div className={cn('mx-4 my-2 rounded-xl border transition-colors duration-500', frameClass)}>
@@ -342,7 +342,7 @@ export function JobStatusPanel({
             stepsLabel && <span className="tabular-nums">{stepsLabel}</span>
           ) : (
             <>
-              {costValue && <span className="tabular-nums text-yellow-400">{costValue}</span>}
+              {costValue && <span className="tabular-nums text-yellow-400 aurora-light:text-accent-warning">{costValue}</span>}
               {modifiedFiles.length > 0 && (
                 <span>{t('statusPanel.filesCount', { count: modifiedFiles.length })}</span>
               )}
@@ -440,7 +440,7 @@ export function JobStatusPanel({
                 <FinalMetric
                   label={t('statusPanel.cost')}
                   value={costValue}
-                  valueClass="text-yellow-400"
+                  valueClass="text-yellow-400 aurora-light:text-accent-warning"
                   naCaption={t('statusPanel.notAvailable')}
                 />
                 <FinalMetric
@@ -465,7 +465,7 @@ export function JobStatusPanel({
                     <SummaryMetric
                       label={t('statusPanel.totalCost')}
                       value={`$${pipelineTotals.totalCostUsd.toFixed(4)}`}
-                      valueClass="text-yellow-400"
+                      valueClass="text-yellow-400 aurora-light:text-accent-warning"
                     />
                     <SummaryMetric
                       label={t('statusPanel.totalTokens')}
@@ -488,7 +488,7 @@ export function JobStatusPanel({
                     {modifiedFiles.map((f) => (
                       <code
                         key={f}
-                        className="text-[10px] font-mono bg-muted/30 px-2 py-0.5 rounded text-cyan-400/80"
+                        className="text-[10px] font-mono bg-muted/30 px-2 py-0.5 rounded text-cyan-400/80 aurora-light:text-accent-info"
                       >
                         {f}
                       </code>

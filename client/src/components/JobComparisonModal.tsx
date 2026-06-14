@@ -40,8 +40,8 @@ function CompareRow({ label, a, b, highlight }: RowProps) {
   return (
     <div className="grid grid-cols-3 gap-2 py-2 border-b border-border/20 last:border-0 text-xs">
       <span className="text-muted-foreground">{label}</span>
-      <span className={`font-mono text-right ${highlight === 'a' ? 'text-emerald-400 font-semibold' : ''}`}>{a}</span>
-      <span className={`font-mono text-right ${highlight === 'b' ? 'text-emerald-400 font-semibold' : ''}`}>{b}</span>
+      <span className={`font-mono text-right ${highlight === 'a' ? 'text-emerald-400 aurora-light:text-accent-success font-semibold' : ''}`}>{a}</span>
+      <span className={`font-mono text-right ${highlight === 'b' ? 'text-emerald-400 aurora-light:text-accent-success font-semibold' : ''}`}>{b}</span>
     </div>
   )
 }
@@ -83,8 +83,8 @@ export function JobComparisonModal({ jobIds, onClose }: JobComparisonModalProps)
         </code>
         <div className="flex items-center justify-center gap-1 text-[10px]">
           {job.status === 'completed'
-            ? <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-            : <XCircle className="w-3 h-3 text-rose-400" />
+            ? <CheckCircle2 className="w-3 h-3 text-emerald-400 aurora-light:text-accent-success" />
+            : <XCircle className="w-3 h-3 text-rose-400 aurora-light:text-destructive" />
           }
           <span className="capitalize text-muted-foreground">{t(`statusLabel.${job.status}`, { defaultValue: job.status })}</span>
         </div>
@@ -123,7 +123,7 @@ export function JobComparisonModal({ jobIds, onClose }: JobComparisonModalProps)
         )}
 
         {error && (
-          <p className="text-xs text-red-400">{t('comparison.loadFailed', { error })}</p>
+          <p className="text-xs text-red-400 aurora-light:text-destructive">{t('comparison.loadFailed', { error })}</p>
         )}
 
         {data && (() => {

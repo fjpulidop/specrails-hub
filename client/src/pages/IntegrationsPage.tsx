@@ -324,9 +324,9 @@ function ActiveToggle({ pluginName, active }: { pluginName: string; active: bool
 function CachedButDisabledNotice({ keys }: { keys: string[] }) {
   const { t } = useTranslation('integrations')
   return (
-    <div className="text-[11px] rounded-md border border-yellow-500/30 bg-yellow-500/5 p-2 leading-relaxed space-y-1">
+    <div className="text-[11px] rounded-md border border-yellow-500/30 aurora-light:border-accent-warning/30 bg-yellow-500/5 aurora-light:bg-accent-warning/10 p-2 leading-relaxed space-y-1">
       <div className="flex items-start gap-1.5">
-        <AlertTriangle className="w-3 h-3 text-yellow-500 mt-0.5 flex-shrink-0" />
+        <AlertTriangle className="w-3 h-3 text-yellow-500 aurora-light:text-accent-warning mt-0.5 flex-shrink-0" />
         <span>
           <Trans
             t={t}
@@ -409,9 +409,9 @@ function ConflictResolver({ pluginName, conflicts }: { pluginName: string; confl
     }
   }
   return (
-    <div className="text-[11px] rounded-md border border-yellow-500/30 bg-yellow-500/5 p-2 leading-relaxed space-y-1.5">
+    <div className="text-[11px] rounded-md border border-yellow-500/30 aurora-light:border-accent-warning/30 bg-yellow-500/5 aurora-light:bg-accent-warning/10 p-2 leading-relaxed space-y-1.5">
       <div className="flex items-start gap-1.5">
-        <AlertTriangle className="w-3 h-3 text-yellow-500 mt-0.5 flex-shrink-0" />
+        <AlertTriangle className="w-3 h-3 text-yellow-500 aurora-light:text-accent-warning mt-0.5 flex-shrink-0" />
         <span>
           <Trans
             t={t}
@@ -428,7 +428,7 @@ function ConflictResolver({ pluginName, conflicts }: { pluginName: string; confl
             type="button"
             disabled={busy === key}
             onClick={() => disable(key)}
-            className="text-[10px] px-2 py-0.5 rounded border border-yellow-500/40 hover:bg-yellow-500/10 disabled:opacity-50 flex items-center gap-1"
+            className="text-[10px] px-2 py-0.5 rounded border border-yellow-500/40 aurora-light:border-accent-warning/40 hover:bg-yellow-500/10 aurora-light:hover:bg-accent-warning/10 disabled:opacity-50 flex items-center gap-1"
           >
             {busy === key && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
             <Trans t={t} i18nKey="conflict.disableButton" values={{ key }} components={{ code: <code /> }} />
@@ -451,10 +451,10 @@ function OrphanCard({ plugin, onRemoved }: { plugin: PluginCard; onRemoved: () =
     } finally { setBusy(false) }
   }
   return (
-    <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4 flex flex-col gap-3">
+    <div className="rounded-lg border border-yellow-500/30 aurora-light:border-accent-warning/30 bg-yellow-500/5 aurora-light:bg-accent-warning/10 p-4 flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <h3 className="text-sm font-semibold">{plugin.name}</h3>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-500">
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 aurora-light:bg-accent-warning/15 text-yellow-500 aurora-light:text-accent-warning">
           {t('orphan.badge')}
         </span>
       </div>
@@ -556,8 +556,8 @@ function InstallDialog({ pluginName, onClose }: { pluginName: string; onClose: (
       {preview && (
         <>
           {preview.platformNote && (
-            <div className="flex items-start gap-2 p-2.5 rounded-md border border-yellow-500/30 bg-yellow-500/5 text-[11px] leading-relaxed">
-              <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 mt-0.5 flex-shrink-0" />
+            <div className="flex items-start gap-2 p-2.5 rounded-md border border-yellow-500/30 aurora-light:border-accent-warning/30 bg-yellow-500/5 aurora-light:bg-accent-warning/10 text-[11px] leading-relaxed">
+              <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 aurora-light:text-accent-warning mt-0.5 flex-shrink-0" />
               <span>{preview.platformNote}</span>
             </div>
           )}

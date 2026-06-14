@@ -310,8 +310,8 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
               <DialogTitle>{t('featureProposal.issueCreated')}</DialogTitle>
             </DialogHeader>
             <div className="py-6 text-center space-y-3">
-              <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mx-auto">
-                <CheckCircle className="w-6 h-6 text-green-500" />
+              <div className="w-12 h-12 rounded-full bg-green-500/20 aurora-light:bg-accent-success/15 flex items-center justify-center mx-auto">
+                <CheckCircle className="w-6 h-6 text-green-500 aurora-light:text-accent-success" />
               </div>
               <h3 className="text-sm font-semibold">{t('featureProposal.issueCreated')}</h3>
               {state.issueUrl && (
@@ -339,7 +339,7 @@ export function FeatureProposalModal({ open, onClose }: FeatureProposalModalProp
               <DialogTitle>{t('featureProposal.errorTitle')}</DialogTitle>
             </DialogHeader>
             <div className="py-4 space-y-2">
-              <p className="text-xs text-red-400">{state.errorMessage ?? t('featureProposal.errorFallback')}</p>
+              <p className="text-xs text-red-400 aurora-light:text-destructive">{state.errorMessage ?? t('featureProposal.errorFallback')}</p>
             </div>
             <DialogFooter>
               <Button variant="ghost" size="sm" onClick={() => { reset(); setIdea(''); setRefinementInput('') }}>{t('featureProposal.tryAgain')}</Button>

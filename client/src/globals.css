@@ -1,6 +1,15 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Aurora Light is the only light theme. Components were authored for the dark
+ * default, so a handful of hardcoded palette colours (light text / neon code /
+ * dark-tinted backgrounds) are unreadable on its light surface. This variant
+ * lets us add `aurora-light:<class>` overrides that apply ONLY under
+ * <html data-theme="aurora-light"> — the four dark themes stay byte-identical.
+ * The `[data-theme] &` form (no :where) keeps the override at higher specificity
+ * than the base utility so it reliably wins. */
+@custom-variant aurora-light ([data-theme="aurora-light"] &);
+
 /* ─────────────────────────────────────────────────────────────────────────────
  * Theme system
  *
@@ -758,3 +767,39 @@
   .u-update-card .u-check path { stroke-dashoffset: 0; }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Aurora Light — premium readability polish (scoped; dark themes untouched)
+ *
+ * Every `prose prose-invert …` surface (spec description in TicketDetailModal,
+ * chat bubbles, setup/log markdown, …) assumes a DARK background: prose-invert
+ * paints body/headings in light grays and the shared recipe hardcodes inline
+ * code as neon `text-cyan-300`. On Aurora Light's near-white surface that text
+ * washes out and the code glows ("azul fosforito"). Re-point the *inverted*
+ * prose variables to dark ink + readable accents so every prose surface reads
+ * crisply — and only under aurora-light.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="aurora-light"] .prose-invert {
+  --tw-prose-invert-body:          var(--color-foreground);
+  --tw-prose-invert-headings:      var(--color-foreground);
+  --tw-prose-invert-lead:          var(--color-muted-foreground);
+  --tw-prose-invert-links:         var(--color-accent-info);
+  --tw-prose-invert-bold:          var(--color-foreground);
+  --tw-prose-invert-counters:      var(--color-muted-foreground);
+  --tw-prose-invert-bullets:       var(--color-muted-foreground);
+  --tw-prose-invert-hr:            var(--color-border);
+  --tw-prose-invert-quotes:        var(--color-foreground);
+  --tw-prose-invert-quote-borders: var(--color-border);
+  --tw-prose-invert-captions:      var(--color-muted-foreground);
+  --tw-prose-invert-code:          var(--color-foreground);
+  --tw-prose-invert-pre-code:      var(--color-foreground);
+  --tw-prose-invert-pre-bg:        var(--color-muted);
+  --tw-prose-invert-th-borders:    var(--color-border);
+  --tw-prose-invert-td-borders:    var(--color-border);
+}
+/* Inline code (`prose-code:text-cyan-300` utility) — tame the neon to a deep,
+ * readable magenta-ink. Direct-child `code` only, so fenced ``` blocks keep the
+ * pre-code colour above. Higher specificity than the utility, so it wins. */
+[data-theme="aurora-light"] .prose-invert :not(pre) > code {
+  color: var(--color-accent-secondary);
+}

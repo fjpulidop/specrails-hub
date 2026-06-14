@@ -308,7 +308,7 @@ export function TicketDetailModal({
         className={
           embedded
             ? 'relative w-full h-full rounded-xl bg-card border border-border/40 shadow-2xl shadow-black/50 flex flex-col overflow-hidden'
-            : 'relative w-full max-w-5xl m-4 rounded-xl bg-card border border-border/40 shadow-2xl shadow-black/50 flex flex-col animate-in fade-in zoom-in-95 duration-200 h-[90vh]'
+            : 'relative w-full max-w-[67rem] m-4 rounded-xl bg-card border border-border/40 shadow-2xl shadow-black/50 flex flex-col animate-in fade-in zoom-in-95 duration-200 h-[90vh]'
         }
         style={dragOffset !== 0 ? { transform: `translateX(${dragOffset}px)`, transition: 'none' } : { transition: 'transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1)' }}
       >
@@ -495,7 +495,7 @@ export function TicketDetailModal({
             </div>
 
             {/* Sidebar */}
-            <div className="sm:w-48 sm:border-l border-t sm:border-t-0 border-border/30 px-4 py-4 space-y-4 bg-muted/5">
+            <div className="sm:w-56 sm:border-l border-t sm:border-t-0 border-border/30 px-4 py-4 space-y-4 bg-muted/5">
               {/* Go to Jira ticket — only when the spec is Jira-backed */}
               {ticket.jira_url && ticket.jira_key && (
                 <button
@@ -663,7 +663,7 @@ export function TicketDetailModal({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
+              className="h-7 text-xs text-red-400 aurora-light:text-destructive hover:text-red-300 aurora-light:hover:text-destructive hover:bg-red-500/10 aurora-light:hover:bg-destructive/10"
               onClick={() => setShowDeleteConfirm(true)}
             >
               <Trash2 className="w-3 h-3 mr-1" />
