@@ -63,5 +63,20 @@
     "categoryCount_other": "{{count}} categorias",
     "summary": "{{documents}} em {{categories}}.",
     "loadError": "Falha ao carregar o documento"
+  },
+  "jiraCard": {
+    "title": "Jira",
+    "category": "Acompanhamento de tickets",
+    "description": "Apoie as specs deste projeto num quadro Jira — sincronização bidirecional do estado e um comentário quando um rail termina.",
+    "connectedDescription": "Sincronizado com {{key}}. As specs refletem o seu quadro Jira nos dois sentidos.",
+    "connect": "Conectar",
+    "connected": "Conectado",
+    "manage": "Gerir",
+    "modalTitle": "Conectar ao Jira",
+    "manageTitle": "Ligação Jira",
+    "bullet1": "Sincronização bidirecional do estado com o seu quadro Jira.",
+    "bullet2": "Publica um comentário quando um rail termina.",
+    "bullet3": "O seu backlog do Jira aparece como specs no quadro.",
+    "requires": "Requer uma conta Jira Cloud ou Data Center."
   }
 }

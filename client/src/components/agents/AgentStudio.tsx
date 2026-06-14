@@ -394,7 +394,7 @@ export function AgentStudio({
               variant="ghost"
               onClick={() => setConfirmDelete(true)}
               disabled={saving}
-              className="text-red-400 hover:text-red-300"
+              className="text-red-400 hover:text-red-300 aurora-light:text-destructive aurora-light:hover:text-destructive"
             >
               <Trash2 className="w-3.5 h-3.5 mr-1" />
               {t('common:actions.delete')}
@@ -409,7 +409,7 @@ export function AgentStudio({
 
       {/* Error strip */}
       {error && (
-        <div className="flex items-center gap-2 px-4 py-2 text-xs border-b border-red-500/30 bg-red-500/10 text-red-400">
+        <div className="flex items-center gap-2 px-4 py-2 text-xs border-b border-red-500/30 aurora-light:border-destructive/30 bg-red-500/10 aurora-light:bg-destructive/10 text-red-400 aurora-light:text-destructive">
           <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
           {error}
         </div>
@@ -417,12 +417,12 @@ export function AgentStudio({
 
       {/* Validation hints */}
       {isCreate && id.length > 0 && !nameValid && (
-        <div className="px-4 py-1.5 text-[11px] border-b border-yellow-500/30 bg-yellow-500/10 text-yellow-500">
+        <div className="px-4 py-1.5 text-[11px] border-b border-yellow-500/30 aurora-light:border-accent-warning/30 bg-yellow-500/10 aurora-light:bg-accent-warning/10 text-yellow-500 aurora-light:text-accent-warning">
           <Trans t={t} i18nKey="studio.validation.namePattern" components={{ code: <code /> }} />
         </div>
       )}
       {!hasFrontmatter && (
-        <div className="px-4 py-1.5 text-[11px] border-b border-yellow-500/30 bg-yellow-500/10 text-yellow-500">
+        <div className="px-4 py-1.5 text-[11px] border-b border-yellow-500/30 aurora-light:border-accent-warning/30 bg-yellow-500/10 aurora-light:bg-accent-warning/10 text-yellow-500 aurora-light:text-accent-warning">
           <Trans t={t} i18nKey="studio.validation.missingFrontmatter" components={{ code: <code /> }} />
         </div>
       )}
@@ -432,7 +432,7 @@ export function AgentStudio({
         <div className="flex-1 flex flex-col min-h-0">
           <div className="px-4 py-1.5 border-b border-border text-[11px] font-mono text-muted-foreground flex items-center justify-between">
             <span>.claude/agents/{isCreate ? id || 'custom-…' : agentId}.md</span>
-            {dirty && <span className="text-yellow-500">{t('studio.unsaved')}</span>}
+            {dirty && <span className="text-yellow-500 aurora-light:text-accent-warning">{t('studio.unsaved')}</span>}
           </div>
           <textarea
             value={body}
@@ -497,7 +497,7 @@ export function AgentStudio({
             </div>
             <div className="flex-1 overflow-auto p-3 min-h-0">
               {testError && (
-                <div className="px-3 py-2 text-xs rounded border border-red-500/30 bg-red-500/10 text-red-400 mb-2">
+                <div className="px-3 py-2 text-xs rounded border border-red-500/30 aurora-light:border-destructive/30 bg-red-500/10 aurora-light:bg-destructive/10 text-red-400 aurora-light:text-destructive mb-2">
                   {testError}
                 </div>
               )}

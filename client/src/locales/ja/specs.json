@@ -110,5 +110,14 @@
     "selected_one": "{{count}} 件のラベル",
     "selected_other": "{{count}} 件のラベル",
     "clear": "クリア"
+  },
+  "epicFilter": {
+    "all": "すべてのエピック",
+    "ariaLabel": "エピックで絞り込み"
+  },
+  "sprintFilter": {
+    "current": "現在",
+    "all": "すべてのスプリント",
+    "ariaLabel": "スプリントで絞り込み"
   }
 }

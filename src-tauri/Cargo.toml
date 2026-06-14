@@ -15,7 +15,12 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["devtools"] }
+# NOTE: devtools/Inspect Element is intentionally NOT force-enabled here. Tauri
+# auto-enables devtools in debug builds (debug_assertions), so dev keeps the
+# inspector while release builds ship WITHOUT it — this both removes the
+# "embedded web page" Inspect Element entry from production and avoids shipping
+# the WKWebView private devtools API (a macOS App Store blocker).
+tauri = { version = "2", features = [] }
 tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-process = "2"

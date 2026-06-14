@@ -3,7 +3,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { formatDistanceToNow } from 'date-fns'
 import { Trans, useTranslation } from 'react-i18next'
-import { X, Pencil, Trash2, Save, Plus, XCircle, MessageSquare, ArrowRight, ArrowLeft, Columns2 } from 'lucide-react'
+import { X, Pencil, Trash2, Save, Plus, XCircle, MessageSquare, ArrowRight, ArrowLeft, Columns2, ExternalLink } from 'lucide-react'
+import { openExternalUrl } from '../lib/tauri-shell'
 import { toast } from 'sonner'
 import { getDateFnsLocale } from '../lib/i18n'
 import { Button } from './ui/button'
@@ -13,6 +14,9 @@ import { TicketFilesTouched } from './code-explorer/TicketFilesTouched'
 import { TicketSpendingLine } from './TicketSpendingLine'
 import { useMinimizedChats } from '../context/MinimizedChatsContext'
 import { useTicketDetailModal } from '../context/TicketDetailModalContext'
+import { useJiraConnection } from '../hooks/useJiraConnection'
+import { DiscardSpecDialog } from './jira/DiscardSpecDialog'
+import { JiraSpecDetailsPanel } from './jira/JiraSpecDetailsPanel'
 import { parseAcceptanceCriteria } from './explore-spec/acceptance-criteria'
 import { useDesktop } from '../hooks/useDesktop'
 import { SmashActions } from './specs-smash/SmashActions'
@@ -33,6 +37,13 @@ const PRIORITY_OPTIONS: { value: TicketPriority; labelKey: string; className: st
   { value: 'medium', labelKey: 'priority.medium', className: 'text-yellow-400' },
   { value: 'low', labelKey: 'priority.low', className: 'text-slate-400' },
 ]
+
+/** Browser URL of a spec's parent Jira epic, derived from the issue's jira_url. */
+function epicUrl(ticket: LocalTicket): string | null {
+  if (!ticket.jira_epic_key) return null
+  if (ticket.jira_url) return ticket.jira_url.replace(/\/browse\/[^/]+$/, `/browse/${ticket.jira_epic_key}`)
+  return null
+}
 
 const SOURCE_LABEL_KEYS: Record<string, string> = {
   manual: 'source.manual',
@@ -84,6 +95,7 @@ export function TicketDetailModal({
   embedded = false,
 }: TicketDetailModalProps) {
   const { t } = useTranslation('tickets')
+  const { t: tj } = useTranslation('jira')
   const { activeProjectId, projects } = useDesktop()
   const { enterSplit, state: splitState } = useTicketDetailModal()
   const inSplit = splitState.originSide !== null
@@ -124,7 +136,18 @@ export function TicketDetailModal({
 
   // Confirmation dialog
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showDiscard, setShowDiscard] = useState(false)
+  const [showJiraSaveConfirm, setShowJiraSaveConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // In a Jira-synced project, a Jira-backed spec is "moved to" the configured
+  // discard status instead of being deleted. Otherwise the button stays Delete.
+  const jira = useJiraConnection()
+  const canDiscard =
+    jira.connected && !!jira.discardStatus && ticket.source === 'jira' && !!ticket.jira_key
+  // Saving a Jira-backed spec writes the edits back to the Jira issue — require
+  // an explicit confirmation so Save never silently mutates the Jira ticket.
+  const isJiraBacked = jira.connected && ticket.source === 'jira' && !!ticket.jira_key
 
   // Attachments (synced from ticket prop)
   const [attachments, setAttachments] = useState<Attachment[]>(ticket.attachments ?? [])
@@ -299,7 +322,7 @@ export function TicketDetailModal({
         className={
           embedded
             ? 'relative w-full h-full rounded-xl bg-card border border-border/40 shadow-2xl shadow-black/50 flex flex-col overflow-hidden'
-            : 'relative w-full max-w-5xl m-4 rounded-xl bg-card border border-border/40 shadow-2xl shadow-black/50 flex flex-col animate-in fade-in zoom-in-95 duration-200 h-[90vh]'
+            : 'relative w-full max-w-[67rem] m-4 rounded-xl bg-card border border-border/40 shadow-2xl shadow-black/50 flex flex-col animate-in fade-in zoom-in-95 duration-200 h-[90vh]'
         }
         style={dragOffset !== 0 ? { transform: `translateX(${dragOffset}px)`, transition: 'none' } : { transition: 'transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1)' }}
       >
@@ -486,7 +509,36 @@ export function TicketDetailModal({
             </div>
 
             {/* Sidebar */}
-            <div className="sm:w-48 sm:border-l border-t sm:border-t-0 border-border/30 px-4 py-4 space-y-4 bg-muted/5">
+            <div className="sm:w-56 sm:border-l border-t sm:border-t-0 border-border/30 px-4 py-4 space-y-4 bg-muted/5">
+              {/* Go to Jira ticket — only when the spec is Jira-backed */}
+              {ticket.jira_url && ticket.jira_key && (
+                <button
+                  type="button"
+                  onClick={() => { void openExternalUrl(ticket.jira_url!) }}
+                  data-testid="jira-go-to-ticket"
+                  className="w-full inline-flex items-center justify-center gap-1.5 h-7 rounded border border-accent-info/50 bg-accent-info/10 px-2 text-xs font-medium text-accent-info hover:bg-accent-info/20 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                  {tj('detail.goToTicket', { key: ticket.jira_key })}
+                </button>
+              )}
+              {/* Parent Jira epic — only when the issue has one */}
+              {ticket.jira_epic_key && (
+                <div data-testid="jira-epic">
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1.5">
+                    {tj('detail.epic')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => { const u = epicUrl(ticket); if (u) void openExternalUrl(u) }}
+                    title={ticket.jira_epic_name ?? ticket.jira_epic_key}
+                    className="w-full inline-flex items-center gap-1.5 rounded border border-accent-highlight/40 bg-accent-highlight/5 px-2 py-1.5 text-left text-xs hover:bg-accent-highlight/10 transition-colors"
+                  >
+                    <span className="font-mono text-accent-highlight shrink-0">{ticket.jira_epic_key}</span>
+                    {ticket.jira_epic_name && <span className="truncate text-foreground/80">{ticket.jira_epic_name}</span>}
+                  </button>
+                </div>
+              )}
               {/* Priority selector */}
               <div>
                 <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1.5">
@@ -586,6 +638,11 @@ export function TicketDetailModal({
                 onOpenTicket={(id) => onOpenTicket?.(id)}
               />
 
+              {/* Jira details + Development (read-only) — only for Jira-backed specs */}
+              {ticket.source === 'jira' && ticket.jira_key && (
+                <JiraSpecDetailsPanel localId={ticket.id} />
+              )}
+
               {/* Continue Editing lives in the modal header — see top of component. */}
 
               {/* Metadata */}
@@ -622,20 +679,33 @@ export function TicketDetailModal({
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              <Trash2 className="w-3 h-3 mr-1" />
-              {t('common:actions.delete')}
-            </Button>
+            {canDiscard ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-accent-info hover:bg-accent-info/10"
+                onClick={() => setShowDiscard(true)}
+                data-testid="jira-move-to-button"
+              >
+                <ArrowRight className="w-3 h-3 mr-1" />
+                {tj('discard.moveButton', { status: jira.discardStatus })}
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-red-400 aurora-light:text-destructive hover:text-red-300 aurora-light:hover:text-destructive hover:bg-red-500/10 aurora-light:hover:bg-destructive/10"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="w-3 h-3 mr-1" />
+                {t('common:actions.delete')}
+              </Button>
+            )}
             {isDirty && (
               <Button
                 size="sm"
                 className="h-7 text-xs"
-                onClick={handleSave}
+                onClick={() => { if (isJiraBacked) setShowJiraSaveConfirm(true); else void handleSave() }}
                 disabled={saving || !title.trim()}
               >
                 <Save className="w-3 h-3 mr-1" />
@@ -667,6 +737,36 @@ export function TicketDetailModal({
             <Button variant="destructive" size="sm" onClick={handleDelete}>
               <Trash2 className="w-3.5 h-3.5 mr-1.5" />
               {t('common:actions.delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Jira "Move to <status>" — replaces delete for Jira-backed specs */}
+      {canDiscard && jira.discardStatus && (
+        <DiscardSpecDialog
+          open={showDiscard}
+          onOpenChange={setShowDiscard}
+          ticket={{ id: ticket.id, title: ticket.title, jira_key: ticket.jira_key }}
+          discardStatus={jira.discardStatus}
+          onDiscarded={onClose}
+        />
+      )}
+
+      {/* Save confirmation — Save on a Jira-backed spec writes back to the issue */}
+      <Dialog open={showJiraSaveConfirm} onOpenChange={setShowJiraSaveConfirm}>
+        <DialogContent className="max-w-md" data-testid="jira-save-confirm">
+          <DialogHeader>
+            <DialogTitle>{tj('detail.saveTitle')}</DialogTitle>
+            <DialogDescription>{tj('detail.saveBody', { key: ticket.jira_key ?? `#${ticket.id}` })}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShowJiraSaveConfirm(false)}>
+              {t('common:actions.cancel')}
+            </Button>
+            <Button size="sm" onClick={() => { setShowJiraSaveConfirm(false); void handleSave() }} disabled={saving} data-testid="jira-save-confirm-btn">
+              <Save className="w-3.5 h-3.5 mr-1.5" />
+              {tj('detail.saveConfirm')}
             </Button>
           </DialogFooter>
         </DialogContent>

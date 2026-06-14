@@ -59,19 +59,22 @@ describe('providerSupportsSection', () => {
     expect(providerSupportsSection('claude', 'integrations')).toBe(true)
   })
 
-  it('codex does NOT support agents or integrations', () => {
+  it('codex does NOT support agents, but DOES support integrations (Jira)', () => {
     expect(providerSupportsSection('codex', 'agents')).toBe(false)
-    expect(providerSupportsSection('codex', 'integrations')).toBe(false)
+    // integrations now hosts the provider-agnostic Jira card → visible on Codex.
+    expect(providerSupportsSection('codex', 'integrations')).toBe(true)
   })
 
-  it('null/undefined does NOT support claude-only sections', () => {
+  it('null/undefined does NOT support the claude-only agents section', () => {
     expect(providerSupportsSection(null, 'agents')).toBe(false)
-    expect(providerSupportsSection(undefined, 'integrations')).toBe(false)
+    expect(providerSupportsSection(undefined, 'agents')).toBe(false)
+    // integrations is no longer claude-only.
+    expect(providerSupportsSection(undefined, 'integrations')).toBe(true)
   })
 
-  it('unknown provider does NOT support claude-only sections', () => {
+  it('unknown provider does NOT support the claude-only agents section', () => {
     expect(providerSupportsSection('openai', 'agents')).toBe(false)
-    expect(providerSupportsSection('', 'integrations')).toBe(false)
+    expect(providerSupportsSection('', 'integrations')).toBe(true)
   })
 })
 
@@ -89,14 +92,14 @@ describe('sectionVisibleForProviders', () => {
     expect(sectionVisibleForProviders('integrations', ['claude'])).toBe(true)
   })
 
-  it('codex-only project hides agents and integrations', () => {
+  it('codex-only project hides agents but shows integrations (Jira)', () => {
     expect(sectionVisibleForProviders('agents', ['codex'])).toBe(false)
-    expect(sectionVisibleForProviders('integrations', ['codex'])).toBe(false)
+    expect(sectionVisibleForProviders('integrations', ['codex'])).toBe(true)
   })
 
-  it('[claude, codex] multi-provider hides agents and integrations (intersection)', () => {
+  it('[claude, codex] multi-provider hides agents (intersection) but shows integrations', () => {
     expect(sectionVisibleForProviders('agents', ['claude', 'codex'])).toBe(false)
-    expect(sectionVisibleForProviders('integrations', ['claude', 'codex'])).toBe(false)
+    expect(sectionVisibleForProviders('integrations', ['claude', 'codex'])).toBe(true)
   })
 
   it('empty array defaults to claude (everything visible)', () => {

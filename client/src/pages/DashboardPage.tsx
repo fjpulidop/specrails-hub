@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { useTickets } from '../hooks/useTickets'
 import { SpecsBoard } from '../components/SpecsBoard'
+import { JiraDiscardProvider } from '../context/JiraDiscardContext'
 import { RailsBoard, type RailState, applyRailJobOutcome, isRailSortId, extractRailId } from '../components/RailsBoard'
 import { DashboardSplitter } from '../components/DashboardSplitter'
 import { useDashboardSplit } from '../hooks/useDashboardSplit'
@@ -424,7 +425,10 @@ export default function DashboardPage() {
           t.source === 'get-backlog-specs' ||
           t.source === 'explore-draft' ||
           t.source === 'specs-smash' ||
-          t.source === 'free-prompt') &&
+          t.source === 'free-prompt' ||
+          // Jira-backed specs are materialized into local-tickets.json with
+          // source:'jira' — they must show on the board like any other spec.
+          t.source === 'jira') &&
         !railTicketIds.has(t.id),
     )
   }, [tickets, railTicketIds])
@@ -813,6 +817,7 @@ export default function DashboardPage() {
   const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
 
   return (
+    <JiraDiscardProvider>
     <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div ref={dashboardContainerRef} className="flex h-full overflow-hidden">
         {/* Left panel: Specs board */}
@@ -968,5 +973,6 @@ export default function DashboardPage() {
         )
       })()}
     </DndContext>
+    </JiraDiscardProvider>
   )
 }

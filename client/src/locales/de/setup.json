@@ -35,7 +35,13 @@
       "installedForEngines_one": "Für {{count}} Engine installiert",
       "installedForEngines_other": "Für {{count}} Engines installiert",
       "learnMore": "Erfahren Sie, wie Sie das Beste aus specrails herausholen:",
-      "continueToProject": "Weiter zum Projekt"
+      "continueToProject": "Weiter zum Projekt",
+      "jira": {
+        "title": "Ein Jira-Board verbinden",
+        "subtitle": "Optional — hinterlege die Specs dieses Projekts mit einem Jira-Board. Du kannst das auch später in den Einstellungen tun.",
+        "configure": "Jira einrichten",
+        "optional": "optional"
+      }
     },
     "error": {
       "title": "Setup fehlgeschlagen",
@@ -147,7 +153,8 @@
   "welcome": {
     "title": "Willkommen bei <spec>spec</spec><rails>rails</rails>",
     "description": "Specrails verwaltet mehrere Projekte über eine einzige Oberfläche. Fügen Sie Ihr erstes Projekt hinzu, um loszulegen.",
-    "addFirstProject": "Erstes Projekt hinzufügen"
+    "addFirstProject": "Erstes Projekt hinzufügen",
+    "jiraHint": "Verbinde jedes Projekt mit seinem eigenen Jira-Board — Specs bleiben in beide Richtungen synchron."
   },
   "onboarding": {
     "productTour": "Produkttour",
@@ -304,6 +311,10 @@
       "projectsLabel": "Projekt-Seitenleiste",
       "projectsBody": "Linke Arc-Seitenleiste umschalten mit <alt>{{alt}}</alt> <mod>{{mod}}</mod> <bkey>B</bkey>.",
       "outro": "<b>Das war die Tour.</b> Fügen Sie über die linke Seitenleiste ein Projekt hinzu und liefern Sie Ihre erste Spec aus. Diese Tour lässt sich jederzeit über die Einstellungen erneut öffnen."
+    },
+    "jira": {
+      "label": "Jira-Integration",
+      "body": "Hinterlege jedes Projekt mit einem <b>Jira-Board</b> — jede Spec wird zu einem Jira-Vorgang, in beide Richtungen synchronisiert: Der Status folgt dem Rail und am Ende eines Jobs wird ein Kommentar gepostet. Richte es pro Projekt beim Hinzufügen ein oder jederzeit in den Einstellungen."
     }
   }
 }

@@ -22,9 +22,9 @@ export const MODEL_OPTIONS: ModelOption[] = [
 
 function tierBadgeClass(color: ModelOption['tierColor']): string {
   switch (color) {
-    case 'neutral': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-    case 'accent':  return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-    case 'green':   return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+    case 'neutral': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 aurora-light:bg-accent-info/10 aurora-light:text-accent-info'
+    case 'accent':  return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 aurora-light:bg-accent-primary/10 aurora-light:text-accent-primary'
+    case 'green':   return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 aurora-light:bg-accent-success/10 aurora-light:text-accent-success'
   }
 }
 

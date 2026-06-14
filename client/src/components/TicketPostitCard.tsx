@@ -265,6 +265,16 @@ export function TicketPostitCard({
                 {t('badges.raw')}
               </Badge>
             )}
+            {ticket.jira_key && (
+              <Badge
+                variant="outline"
+                className="h-4 px-1.5 text-[9px] font-mono border-accent-info/50 text-accent-info"
+                title={ticket.jira_key}
+                data-testid={`jira-badge-${ticket.id}`}
+              >
+                {ticket.jira_key}
+              </Badge>
+            )}
             {ticket.priority && !isDraft && (
               <Badge variant={PRIORITY_VARIANT[ticket.priority]} className="h-4 px-1.5 text-[9px] uppercase">
                 {t(`priority.${ticket.priority}`)}

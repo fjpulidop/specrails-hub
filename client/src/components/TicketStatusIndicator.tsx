@@ -30,21 +30,21 @@ const STATUS_CONFIG: Record<TicketStatus, StatusConfig> = {
     pulsing: false,
   },
   in_progress: {
-    dotClass: 'bg-blue-400',
+    dotClass: 'bg-blue-400 aurora-light:bg-accent-info',
     textClass: 'text-foreground font-semibold',
     borderClass: 'border-l-[3px] border-solid border-blue-500 pl-3',
     labelKey: 'status.inProgress',
     pulsing: true,
   },
   done: {
-    dotClass: 'text-emerald-400',
-    textClass: 'text-emerald-400/80',
+    dotClass: 'text-emerald-400 aurora-light:text-accent-success',
+    textClass: 'text-emerald-400/80 aurora-light:text-accent-success',
     borderClass: 'border-l-[3px] border-solid border-emerald-500 pl-3',
     labelKey: 'status.done',
     pulsing: false,
   },
   cancelled: {
-    dotClass: 'text-red-400/60',
+    dotClass: 'text-red-400/60 aurora-light:text-destructive/70',
     textClass: 'text-muted-foreground/50',
     borderClass: 'pl-3',
     labelKey: 'status.cancelled',
@@ -134,10 +134,10 @@ export function TicketStatusBadge({ status, className }: TicketStatusBadgeProps)
     <span
       className={cn(
         'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border',
-        status === 'todo' && 'bg-slate-500/10 border-slate-500/30 text-slate-400',
-        status === 'in_progress' && 'bg-blue-500/10 border-blue-500/30 text-blue-400',
-        status === 'done' && 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
-        status === 'cancelled' && 'bg-red-500/10 border-red-500/30 text-red-400/60',
+        status === 'todo' && 'bg-slate-500/10 border-slate-500/30 text-slate-400 aurora-light:bg-muted aurora-light:border-border aurora-light:text-muted-foreground',
+        status === 'in_progress' && 'bg-blue-500/10 border-blue-500/30 text-blue-400 aurora-light:bg-accent-info/10 aurora-light:border-accent-info/30 aurora-light:text-accent-info',
+        status === 'done' && 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 aurora-light:bg-accent-success/10 aurora-light:border-accent-success/30 aurora-light:text-accent-success',
+        status === 'cancelled' && 'bg-red-500/10 border-red-500/30 text-red-400/60 aurora-light:bg-destructive/10 aurora-light:border-destructive/30 aurora-light:text-destructive/70',
         className
       )}
     >

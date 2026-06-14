@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Check, Send, Loader2, Minus, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, Check, Send, Loader2, Minus, Sparkles, X, Plug } from 'lucide-react'
 import { toast } from 'sonner'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useChatContext, type ChatConversation } from '../../hooks/useChat'
 import { useSpecDraftStream } from '../../hooks/useSpecDraftStream'
 import { useDesktop } from '../../hooks/useDesktop'
+import { useJiraConnection } from '../../hooks/useJiraConnection'
 import { getApiBase } from '../../lib/api'
 import { API_ORIGIN } from '../../lib/origin'
 import { markSpecGenInFlight, unmarkSpecGenInFlight } from '../../lib/spec-gen-suppression'
@@ -133,6 +134,10 @@ export function ExploreSpecShell({
   contextScope,
 }: ExploreSpecShellProps) {
   const { t } = useTranslation('explore')
+  const { t: tj } = useTranslation('jira')
+  // On a Jira-backed project a committed Explore spec is always created in Jira;
+  // the indicator makes that explicit. (Private specs use Save as Draft.)
+  const jira = useJiraConnection()
   const chat = useChatContext()
   const { activeProjectId } = useDesktop()
   const [conversationId, setConversationId] = useState<string | null>(
@@ -676,6 +681,16 @@ export function ExploreSpecShell({
             >
               {t('shell.review')}
             </Button>
+          )}
+          {jira.connected && !isRealSpecEdit && (
+            <span
+              className="inline-flex items-center gap-1.5 text-[11px] text-accent-info mr-1"
+              data-testid="jira-create-indicator"
+              title={tj('addSpec.willCreate', { key: jira.jiraProjectKey ?? '' })}
+            >
+              <Plug className="w-3 h-3 shrink-0" />
+              <span className="hidden lg:inline">{tj('addSpec.willCreate', { key: jira.jiraProjectKey ?? '' })}</span>
+            </span>
           )}
           <Button
             size="sm"

@@ -272,6 +272,9 @@ export function createRailsRouter(): Router {
           })
           jobIds.push(job.id)
           c.railJobs.set(job.id, { railIndex, mode, ticketIds: [ticketId] })
+          // Jira write-back: push In Progress for any Jira-linked ticket (inert
+          // for non-Jira projects). Best-effort — never blocks the launch.
+          try { c.jiraSyncManager.onRailLaunch([ticketId], job.id) } catch { /* non-fatal */ }
         }
         jobId = jobIds[0]
 
@@ -296,6 +299,9 @@ export function createRailsRouter(): Router {
       const job = c.queueManager.enqueue(command, 'normal', { profileName: resolvedProfile, provider: railProvider })
       jobId = job.id
       c.railJobs.set(jobId, { railIndex, mode, ticketIds: [...rail.ticketIds] })
+      // Jira write-back: push In Progress for any Jira-linked ticket (inert for
+      // non-Jira projects). Best-effort — never blocks the launch.
+      try { c.jiraSyncManager.onRailLaunch([...rail.ticketIds], jobId) } catch { /* non-fatal */ }
 
       const startMsg: RailJobStartedMessage = {
         type: 'rail.job_started',

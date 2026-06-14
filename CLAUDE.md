@@ -419,3 +419,36 @@ A read-only **Code** section per project for non-developers: virtualised file tr
 **v1 limitations (out of scope)**: in-app editing, per-symbol summaries, narrative diff view, conversational "ask the AI about this file", directory-level summaries, multi-ticket attribution (primary ticket only). The Monaco viewer surfaces an "Edit in external editor" button that copies the absolute path as a stopgap.
 
 **Rollback**: set both flags off. `file_provenance` rows and `<project>/.specrails/file-summaries/` files remain on disk; migrations are additive.
+
+### Jira integration (spec = Jira issue)
+
+Per-project, hot-swappable integration where a project's specs are backed by a **Jira board** instead of the local `local-tickets.json`. **Each project syncs with its own Jira board** (all Jira state is per-project in `jobs.sqlite`). Gated by `SPECRAILS_JIRA_SECTION` (server, default ON, `="false"` 404s the routes + skips sync) and `VITE_FEATURE_JIRA` (client). Inert until a project configures a connection. Full design + corner-case catalogue: `docs/jira-integration-plan.md`. See [[jira-integration-plan]] memory.
+
+**Central design — "Desktop is the sync layer; core is untouched":** the local store stays the canonical READ cache that specrails-core reads unchanged. On connect, Desktop writes `<project>/.specrails/backlog-config.json` `{provider:"local", write_access:false}` (`server/jira/jira-backlog-config.ts`) so core enters its READ-ONLY branch — it reads the materialized cache but never mutates status nor talks to Jira. Desktop's `applyJobOutcomeToTickets` + a durable outbox are the sole status authority. **ZERO specrails-core changes.**
+
+**Server (`server/jira/`)**:
+- `jira-sync-manager.ts` — `JiraSyncManager`, one per `ProjectContext` (constructed in `project-registry.ts` BEFORE QueueManager so the `onJobFinished` closure can call it). Owns the inbound poll loop, the durable outbox drainer, and the write-back hooks. Inert when no connection.
+- `jira-client.ts` — REST client. Cloud (v3, Basic `email:token`, ADF bodies) vs Data Center (v2, Bearer PAT, wiki-string bodies), branched by `detectDeployment`. Every call returns a normalised `JiraResult<T>` whose `code` (`auth|permission|not_found|rate_limit|validation|server|network`) drives retry/dead-letter.
+- `jira-status-resolver.ts` — the hard part. Two-tier resolution (explicit per-project `statusMap` → `statusCategory.key` fallback `new|indeterminate|done` + cancel/ship lexicons) + `walkToCategory` BFS over workflow-gated transitions (per-hop `getTransitions`) + `buildTransitionFields` (resolution/required-screen handling). Pure (callbacks, no HTTP).
+- `jira-materializer.ts` — inbound issues → `local-tickets.json`, SURGICAL merge via `mutateStore` (preserves un-linked local specs), collision-safe `#id` allocation (UNION of store `next_id` and `jira_links` max), frozen-status guard (never reverts an id with a pending outbox op).
+- `jira-db.ts` — per-project tables (migration 29): `jira_connection` (token stored AES-256-GCM-encrypted), `jira_links` (keyed on the IMMUTABLE Jira numeric id, never the mutable `PROJ-123` key; local id monotonic + tombstoned), `jira_outbox` (durable transactional queue, idempotent on `idempotency_key`, FIFO-per-issue via `claimDrainable`).
+- `jira-credential-store.ts` — `SecretStore` interface; v1 backend = AES-256-GCM (`node:crypto`) under a `~/.specrails/jira-secret.key` 0600 keyfile. v2 keychain swap is one file. Token redacted to `hasToken` for the client.
+- `jira-adf.ts` — ADF build/flatten + the invisible comment self-marker (`[specrails:job=…:ticket=…]`) that makes completion comments idempotent.
+
+**Lifecycle hooks (the two write-back chokepoints):**
+- `rails-router.ts` launch handler → `jiraSyncManager.onRailLaunch(ticketIds, jobId)`: enqueues an In Progress transition AND writes `in_progress` to the local cache (because `write_access:false` stops core from writing it — the app MUST emit it; verified neither server nor core does otherwise).
+- `project-registry.ts` `onJobFinished` (after the local `applyJobOutcomeToTickets` + broadcast loop) → `jiraSyncManager.onJobOutcome(...)`: enqueues the status transition (Done / revert→To Do) + a completion comment (job id, cost, duration). `needs_review` → comment + no transition (no Jira equivalent). The local mutation stays SYNCHRONOUS; only the durable outbox enqueue happens here, wrapped so a Jira failure never breaks job exit.
+
+**Outbox drain** (`drainOnce`): idempotency-first (re-GET issue, no-op if already in target category), comment dedup by scanning for the self-marker, 401→pause project + `jira.auth_expired`, 403→dead-letter naming the op, 404→tombstone link, 429→honour `Retry-After`, no_path/blocked→dead-letter + `jira.degraded`, server/network→backoff retry. Crash recovery: `resetInflight` on start.
+
+**Inbound = polling only** (the server binds `127.0.0.1`, no public ingress; Jira webhooks need a public URL). `POST /rest/api/3/search/jql` (legacy `GET /search` is dead), high-water mark derived from Jira's own `updated` timestamps (self-corrects clock skew) + 2-min overlap + `nextPageToken`.
+
+**REST (`server/jira-router.ts`)** mounted at `/api/projects/:projectId/jira`: `GET/PATCH/DELETE /connection`, the wizard probes `POST /test|/discover-projects|/discover-statuses|/connect`, `POST /sync|/resume`, `GET /outbox` + `POST /outbox/:id/retry`, `POST /specs` (Add Spec → create Jira issue), `GET /links`. **WS events**: `jira.synced`, `jira.sync_error`, `jira.auth_expired`, `jira.outbox_changed`, `jira.degraded` (all project-scoped).
+
+**Auth v1 = token-paste** (Cloud Basic email+token / DC Bearer PAT) — zero backend, credential stays on-device, covers Cloud + DC. OAuth 3LO deferred to v2 (needs a hosted token-broker). **Guardrail**: do NOT add a `jira-sync` value to `ai_invocations.surface` (sync ops have no model/token/cost).
+
+**Client**: `client/src/components/jira/JiraConnectWizard.tsx` — the reusable step-by-step connect flow (Test → pick project → optional status map → Connect), with optional `onSkip` ("do it later") + an explicit `apiBase` for the setup context. Mounted in two places: `client/src/components/settings/JiraSettingsSection.tsx` (project `SettingsPage` — wizard when disconnected; connected card with hot-swap toggle, Sync now, dead-letter retry, disconnect), and the **Add-Project setup wizard's Done step** (`SetupWizard.tsx` `CompleteStep`: a "Configure Jira (optional)" CTA → inline sub-screen with the wizard; both a successful connect and "do it later" go straight to the project; gated by `FEATURE_JIRA`, `apiBase=/api/projects/<id>` since the project isn't active yet). `WelcomeScreen` shows a one-line Jira hint. `client/src/lib/jira-api.ts` is the API client (every method takes an optional `apiBase`). `SpecCard` renders a `jira_key` badge. New i18n namespace `jira` (all 8 locales) + `setup` keys `wizard.complete.jira.*` / `welcome.jiraHint`. `LocalTicket` gains additive `jira_key`/`jira_url` + `source:'jira'`.
+
+**Hot-swap**: `source` is per-ticket, not per-board. Toggling enable/disable (or disconnect) never re-homes existing specs; write-back is gated on the per-ticket Jira link, captured at launch.
+
+**Rollback**: set the flags off, or Disconnect (restores `backlog-config.json` `write_access:true`). Migration 29 + `jira_*` rows are additive and harmless when unused.

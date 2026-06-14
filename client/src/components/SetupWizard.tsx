@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect, memo } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
-import { Check, ArrowRight, Package, Bot, ChevronLeft, Settings2 } from 'lucide-react'
+import { Check, ArrowRight, Package, Bot, ChevronLeft, Settings2, Plug } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import i18n from '../lib/i18n'
@@ -14,6 +14,8 @@ import { type DesktopProject, projectProviders } from '../hooks/useDesktop'
 import { providerLabel } from '../lib/provider-capabilities'
 import { usePrerequisites, type SetupPrerequisitesStatus } from '../hooks/usePrerequisites'
 import { PrerequisitesPanel } from './PrerequisitesPanel'
+import { FEATURE_JIRA } from '../lib/feature-flags'
+import { JiraConnectWizard } from './jira/JiraConnectWizard'
 
 // ─── Wizard step types ────────────────────────────────────────────────────────
 //
@@ -319,24 +321,24 @@ function SummaryCard({ summary }: { summary: SetupSummary }) {
   const { t } = useTranslation('setup')
   const isCodex = summary.provider === 'codex'
   return (
-    <div className="w-full rounded-lg border border-border/50 bg-muted/20 p-4">
-      <div className="text-[11px] font-semibold text-foreground mb-2">{providerLabel(summary.provider)}</div>
-      <div className="grid grid-cols-3 gap-4 text-center">
+    <div className="w-full rounded-lg border border-border/50 bg-muted/20 p-3">
+      <div className="text-[11px] font-semibold text-foreground mb-1.5">{providerLabel(summary.provider)}</div>
+      <div className="grid grid-cols-3 gap-2 text-center">
         <div>
-          <div className="text-2xl font-bold text-accent-primary">{summary.agents}</div>
+          <div className="text-xl font-bold text-accent-primary leading-tight">{summary.agents}</div>
           <div className="text-[10px] text-muted-foreground">{isCodex ? t('wizard.summary.agentSkills') : t('wizard.summary.agents')}</div>
         </div>
         <div>
-          <div className="text-2xl font-bold text-accent-success">{summary.specrailsCommands}</div>
+          <div className="text-xl font-bold text-accent-success leading-tight">{summary.specrailsCommands}</div>
           <div className="text-[10px] text-muted-foreground">{isCodex ? t('wizard.summary.skills') : '/specrails:*'}</div>
         </div>
         <div>
-          <div className="text-2xl font-bold text-accent-info">{summary.opsxCommands}</div>
+          <div className="text-xl font-bold text-accent-info leading-tight">{summary.opsxCommands}</div>
           <div className="text-[10px] text-muted-foreground">{isCodex ? t('wizard.summary.openspecSkills') : '/opsx:*'}</div>
         </div>
       </div>
       {summary.legacySrRemoved > 0 && (
-        <p className="mt-3 text-xs text-muted-foreground text-center">
+        <p className="mt-2 text-xs text-muted-foreground text-center">
           <Trans
             t={t}
             i18nKey="wizard.summary.legacyRemoved"
@@ -351,30 +353,52 @@ function SummaryCard({ summary }: { summary: SetupSummary }) {
 
 function CompleteStep({
   projectName,
+  projectId,
   summaries,
   onGoToProject,
 }: {
   projectName: string
+  projectId: string
   summaries: SetupSummary[]
   onGoToProject: () => void
 }) {
   const { t } = useTranslation('setup')
   const list = summaries.length > 0 ? summaries : [{ ...EMPTY_SUMMARY }]
+  // Optional Jira sub-screen, shown only when the user opts in from the Done
+  // step. Both a successful connect and "do it later" go straight to the project.
+  const [showJira, setShowJira] = useState(false)
+
+  if (showJira && FEATURE_JIRA) {
+    return (
+      <div className="flex flex-col h-full max-w-lg mx-auto px-6 py-8 gap-4 overflow-auto">
+        <div className="text-center space-y-1">
+          <h2 className="text-lg font-semibold">{t('wizard.complete.jira.title')}</h2>
+          <p className="text-sm text-muted-foreground">{t('wizard.complete.jira.subtitle')}</p>
+        </div>
+        <JiraConnectWizard
+          apiBase={`/api/projects/${projectId}`}
+          onConnected={onGoToProject}
+          onSkip={onGoToProject}
+        />
+      </div>
+    )
+  }
+
   return (
-    <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto px-6 gap-6 overflow-auto py-8">
-      <div className="w-16 h-16 rounded-2xl bg-accent-success/20 flex items-center justify-center">
-        <Check className="w-8 h-8 text-accent-success" />
+    <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto px-6 gap-4 overflow-auto py-5">
+      <div className="w-11 h-11 rounded-2xl bg-accent-success/20 flex items-center justify-center shrink-0">
+        <Check className="w-6 h-6 text-accent-success" />
       </div>
 
-      <div className="text-center space-y-3">
-        <h2 className="text-lg font-semibold">
+      <div className="text-center space-y-1.5">
+        <h2 className="text-base font-semibold">
           <Trans
             t={t}
             i18nKey="wizard.complete.welcome"
             components={{ spec: <span className="text-accent-primary" />, rails: <span className="text-accent-secondary" /> }}
           />
         </h2>
-        <p className="text-sm text-muted-foreground max-w-sm">
+        <p className="text-[13px] text-muted-foreground max-w-sm">
           <Trans
             t={t}
             i18nKey="wizard.complete.configured"
@@ -384,22 +408,40 @@ function CompleteStep({
         </p>
       </div>
 
-      {list.length > 1 && (
-        <p className="text-[11px] text-muted-foreground">{t('wizard.complete.installedForEngines', { count: list.length })}</p>
-      )}
-      {list.map((s, i) => (
-        <SummaryCard key={s.provider ?? i} summary={s} />
-      ))}
+      {/* Engine summaries: side-by-side when more than one so the screen fits
+          without scrolling. */}
+      <div className="w-full space-y-2">
+        {list.length > 1 && (
+          <p className="text-[11px] text-muted-foreground text-center">{t('wizard.complete.installedForEngines', { count: list.length })}</p>
+        )}
+        <div className={cn('grid gap-3', list.length > 1 ? 'sm:grid-cols-2' : 'grid-cols-1')}>
+          {list.map((s, i) => (
+            <SummaryCard key={s.provider ?? i} summary={s} />
+          ))}
+        </div>
+      </div>
 
-      <div className="text-center space-y-1">
-        <p className="text-xs text-muted-foreground">
-          {t('wizard.complete.learnMore')}
-        </p>
+      {/* Compact, single-line optional Jira CTA (no full card → no overflow). */}
+      {FEATURE_JIRA && (
+        <button
+          type="button"
+          onClick={() => setShowJira(true)}
+          data-testid="setup-jira-cta"
+          className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-muted/10 px-3 py-1.5 text-xs font-medium text-foreground/80 hover:text-foreground hover:border-border transition-colors"
+        >
+          <Plug className="w-3.5 h-3.5 text-accent-info" />
+          {t('wizard.complete.jira.configure')}
+          <span className="font-normal text-muted-foreground">· {t('wizard.complete.jira.optional')}</span>
+        </button>
+      )}
+
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span>{t('wizard.complete.learnMore')}</span>
         <a
           href="https://specrails.dev/docs"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs text-accent-primary hover:underline"
+          className="text-accent-primary hover:underline"
         >
           specrails.dev/docs
         </a>
@@ -825,6 +867,7 @@ export function SetupWizard({ project, onComplete: rawOnComplete, onSkip: rawOnS
         {wizardStep.step === 'complete' && (
           <CompleteStep
             projectName={project.name}
+            projectId={project.id}
             summaries={wizardStep.summaries}
             onGoToProject={onComplete}
           />

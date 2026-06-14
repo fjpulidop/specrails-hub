@@ -15,10 +15,10 @@ interface SpecComparePickerProps {
 }
 
 const PRIORITY_STYLES: Record<TicketPriority, string> = {
-  critical: 'bg-red-500/15 text-red-400 border-red-500/30',
-  high: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
+  critical: 'bg-red-500/15 aurora-light:bg-destructive/10 text-red-400 aurora-light:text-destructive border-red-500/30 aurora-light:border-destructive/30',
+  high: 'bg-orange-500/15 aurora-light:bg-accent-warning/10 text-orange-400 aurora-light:text-accent-warning border-orange-500/30 aurora-light:border-accent-warning/30',
   medium: '',
-  low: 'bg-gray-500/15 text-gray-400 border-gray-500/30',
+  low: 'bg-gray-500/15 aurora-light:bg-muted text-gray-400 aurora-light:text-muted-foreground border-gray-500/30 aurora-light:border-border',
 }
 
 function formatRelTime(dateStr: string): string {

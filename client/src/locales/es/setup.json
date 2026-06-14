@@ -35,7 +35,13 @@
       "installedForEngines_one": "Instalado para {{count}} motor",
       "installedForEngines_other": "Instalado para {{count}} motores",
       "learnMore": "Aprende a sacar el máximo partido a specrails:",
-      "continueToProject": "Continuar al proyecto"
+      "continueToProject": "Continuar al proyecto",
+      "jira": {
+        "title": "Conecta un tablero de Jira",
+        "subtitle": "Opcional — respalda las specs de este proyecto con un tablero de Jira. También puedes hacerlo más tarde en Ajustes.",
+        "configure": "Configurar Jira",
+        "optional": "opcional"
+      }
     },
     "error": {
       "title": "La configuración ha fallado",
@@ -147,7 +153,8 @@
   "welcome": {
     "title": "Bienvenido a <spec>spec</spec><rails>rails</rails>",
     "description": "Specrails gestiona varios proyectos desde una única interfaz. Añade tu primer proyecto para empezar.",
-    "addFirstProject": "Añade tu primer proyecto"
+    "addFirstProject": "Añade tu primer proyecto",
+    "jiraHint": "Conecta cada proyecto a su propio tablero de Jira — las specs se sincronizan en ambos sentidos."
   },
   "onboarding": {
     "productTour": "Tour del producto",
@@ -304,6 +311,10 @@
       "projectsLabel": "Barra lateral de proyectos",
       "projectsBody": "Alterna la barra lateral Arc izquierda con <alt>{{alt}}</alt> <mod>{{mod}}</mod> <bkey>B</bkey>.",
       "outro": "<b>Fin del tour.</b> Añade un proyecto desde la barra lateral izquierda y publica tu primera spec. Puedes reabrir este recorrido cuando quieras desde Ajustes."
+    },
+    "jira": {
+      "label": "Integración con Jira",
+      "body": "Respalda cualquier proyecto con un <b>tablero de Jira</b> — cada spec es un issue de Jira, sincronizado en ambos sentidos: el estado sigue al rail y se publica un comentario al terminar un job. Configúralo por proyecto al añadirlo, o cuando quieras en Ajustes."
     }
   }
 }

@@ -101,7 +101,7 @@ export function CreateTicketModal({ open, allLabels, onClose, onCreate }: Create
           {/* Title */}
           <div>
             <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1">
-              {t('fields.title')} <span className="text-red-400">*</span>
+              {t('fields.title')} <span className="text-red-400 aurora-light:text-destructive">*</span>
             </label>
             <input
               ref={titleRef}

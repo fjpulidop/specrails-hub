@@ -35,7 +35,13 @@
       "installedForEngines_one": "Installed for {{count}} engine",
       "installedForEngines_other": "Installed for {{count}} engines",
       "learnMore": "Learn how to get the most out of specrails:",
-      "continueToProject": "Continue to project"
+      "continueToProject": "Continue to project",
+      "jira": {
+        "title": "Connect a Jira board",
+        "subtitle": "Optional — back this project's specs with a Jira board. You can also do it later in Settings.",
+        "configure": "Configure Jira",
+        "optional": "optional"
+      }
     },
     "error": {
       "title": "Setup failed",
@@ -147,7 +153,8 @@
   "welcome": {
     "title": "Welcome to <spec>spec</spec><rails>rails</rails>",
     "description": "Specrails manages multiple projects from a single interface. Add your first project to get started.",
-    "addFirstProject": "Add your first project"
+    "addFirstProject": "Add your first project",
+    "jiraHint": "Connect each project to its own Jira board — specs stay in sync, both ways."
   },
   "onboarding": {
     "productTour": "Product tour",
@@ -304,6 +311,10 @@
       "projectsLabel": "Projects sidebar",
       "projectsBody": "Toggle the left Arc sidebar with <alt>{{alt}}</alt> <mod>{{mod}}</mod> <bkey>B</bkey>.",
       "outro": "<b>That's the tour.</b> Add a project from the left sidebar and ship your first spec. You can reopen this walkthrough anytime from Settings."
+    },
+    "jira": {
+      "label": "Jira integration",
+      "body": "Back any project with a <b>Jira board</b> — each spec becomes a Jira issue, kept in sync both ways: status follows the rail, and a comment is posted when a job finishes. Configure it per project when you add it, or anytime in Settings."
     }
   }
 }

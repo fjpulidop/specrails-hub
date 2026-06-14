@@ -1,6 +1,15 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Aurora Light is the only light theme. Components were authored for the dark
+ * default, so a handful of hardcoded palette colours (light text / neon code /
+ * dark-tinted backgrounds) are unreadable on its light surface. This variant
+ * lets us add `aurora-light:<class>` overrides that apply ONLY under
+ * <html data-theme="aurora-light"> — the four dark themes stay byte-identical.
+ * The `[data-theme] &` form (no :where) keeps the override at higher specificity
+ * than the base utility so it reliably wins. */
+@custom-variant aurora-light ([data-theme="aurora-light"] &);
+
 /* ─────────────────────────────────────────────────────────────────────────────
  * Theme system
  *
@@ -86,7 +95,7 @@
   --color-secondary:              hsl(220 18% 92%);
   --color-secondary-foreground:   hsl(230 28% 14%);
   --color-muted:                  hsl(220 18% 94%);
-  --color-muted-foreground:       hsl(225 14% 42%);
+  --color-muted-foreground:       hsl(225 16% 35%);  /* darker: readable secondary text on light bg */
   --color-accent:                 hsl(220 18% 92%);
   --color-accent-foreground:      hsl(230 28% 14%);
   --color-destructive:            hsl(0 72% 50%);
@@ -95,12 +104,12 @@
   --color-input:                  hsl(220 18% 94%);
   --color-ring:                   hsl(255 75% 56%);
 
-  --color-accent-primary:    hsl(255 75% 56%);  /* indigo */
-  --color-accent-info:       hsl(195 80% 42%);  /* deep cyan, readable on light bg */
-  --color-accent-success:    hsl(150 65% 36%);  /* emerald */
-  --color-accent-secondary:  hsl(330 75% 52%);  /* magenta-pink, deeper than dracula's */
-  --color-accent-warning:    hsl(35 90% 48%);   /* amber */
-  --color-accent-highlight:  hsl(45 95% 48%);   /* gold */
+  --color-accent-primary:    hsl(255 70% 50%);  /* indigo — slightly deeper for text contrast */
+  --color-accent-info:       hsl(205 58% 40%);  /* muted steel-blue — not neon, readable on light bg */
+  --color-accent-success:    hsl(150 65% 33%);  /* emerald */
+  --color-accent-secondary:  hsl(330 72% 45%);  /* magenta-pink, deeper for readability on light */
+  --color-accent-warning:    hsl(32 90% 40%);   /* amber — darker so text reads on light bg */
+  --color-accent-highlight:  hsl(40 85% 36%);   /* gold/bronze — readable on light bg */
   --color-surface:            hsl(220 22% 96%);
   --color-background-deep:    hsl(220 18% 94%);
 
@@ -270,21 +279,36 @@
   }
 
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 10px;
+    height: 10px;
   }
 
+  /* Transparent track: a solid track paints a RECTANGLE down the edge that
+   * overlaps the container's rounded corners (looks "embedded-web" ugly inside
+   * modals). Keeping it transparent + insetting the thumb makes the scrollbar a
+   * floating rounded pill that never collides with the border radius. */
   ::-webkit-scrollbar-track {
-    background: var(--color-background);
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
     background: var(--color-scrollbar-thumb);
-    border-radius: 3px;
+    border-radius: 9999px;
+    /* The transparent border + padding-box clip insets the visible thumb away
+     * from the edges (and thus away from the rounded corners). */
+    border: 2px solid transparent;
+    background-clip: padding-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-scrollbar-thumb-hover);
+    background-clip: padding-box;
+  }
+
+  /* Firefox (WebKitGTK builds fall back here too). */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar-thumb) transparent;
   }
 }
 
@@ -758,3 +782,39 @@
   .u-update-card .u-check path { stroke-dashoffset: 0; }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Aurora Light — premium readability polish (scoped; dark themes untouched)
+ *
+ * Every `prose prose-invert …` surface (spec description in TicketDetailModal,
+ * chat bubbles, setup/log markdown, …) assumes a DARK background: prose-invert
+ * paints body/headings in light grays and the shared recipe hardcodes inline
+ * code as neon `text-cyan-300`. On Aurora Light's near-white surface that text
+ * washes out and the code glows ("azul fosforito"). Re-point the *inverted*
+ * prose variables to dark ink + readable accents so every prose surface reads
+ * crisply — and only under aurora-light.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="aurora-light"] .prose-invert {
+  --tw-prose-invert-body:          var(--color-foreground);
+  --tw-prose-invert-headings:      var(--color-foreground);
+  --tw-prose-invert-lead:          var(--color-muted-foreground);
+  --tw-prose-invert-links:         var(--color-accent-info);
+  --tw-prose-invert-bold:          var(--color-foreground);
+  --tw-prose-invert-counters:      var(--color-muted-foreground);
+  --tw-prose-invert-bullets:       var(--color-muted-foreground);
+  --tw-prose-invert-hr:            var(--color-border);
+  --tw-prose-invert-quotes:        var(--color-foreground);
+  --tw-prose-invert-quote-borders: var(--color-border);
+  --tw-prose-invert-captions:      var(--color-muted-foreground);
+  --tw-prose-invert-code:          var(--color-foreground);
+  --tw-prose-invert-pre-code:      var(--color-foreground);
+  --tw-prose-invert-pre-bg:        var(--color-muted);
+  --tw-prose-invert-th-borders:    var(--color-border);
+  --tw-prose-invert-td-borders:    var(--color-border);
+}
+/* Inline code (`prose-code:text-cyan-300` utility) — tame the neon to a deep,
+ * readable magenta-ink. Direct-child `code` only, so fenced ``` blocks keep the
+ * pre-code colour above. Higher specificity than the utility, so it wins. */
+[data-theme="aurora-light"] .prose-invert :not(pre) > code {
+  color: var(--color-accent-secondary);
+}

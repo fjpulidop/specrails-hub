@@ -40,6 +40,7 @@ import { ContractRefineTrackerProvider } from './hooks/useContractRefineTracker'
 import { SmashTrackerProvider } from './context/SmashTrackerContext'
 import { useOsNotifications } from './hooks/useOsNotifications'
 import { useDesktopUpdateNotifier } from './hooks/useDesktopUpdateNotifier'
+import { useSuppressNativeContextMenu } from './hooks/useSuppressNativeContextMenu'
 import { WS_URL } from './lib/ws-url'
 import { TerminalsProvider, useTerminals } from './context/TerminalsContext'
 import { MinimizedChatsProvider } from './context/MinimizedChatsContext'
@@ -366,6 +367,7 @@ function ThemedToaster() {
 
 export default function App() {
   useDesktopUpdateNotifier()
+  useSuppressNativeContextMenu()
 
   return (
     <div

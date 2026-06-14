@@ -285,7 +285,7 @@ export default function DesktopAnalyticsPage() {
 
         {/* Error */}
         {error && (
-          <div className="rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-xs text-red-400">
+          <div className="rounded-lg border border-red-400/30 aurora-light:border-destructive/30 bg-red-400/10 aurora-light:bg-destructive/10 p-3 text-xs text-red-400 aurora-light:text-destructive">
             {t('desktop.failedToLoad', { error })}
           </div>
         )}

@@ -164,7 +164,10 @@ describe('SpecsBoard', () => {
   it('shows ticket count badge when there are tickets', () => {
     const tickets = [makeTicket({ id: 1 }), makeTicket({ id: 2 }), makeTicket({ id: 3 })]
     render(<SpecsBoard tickets={tickets} isLoading={false} onTicketClick={onTicketClick} />)
-    expect(screen.getByText('3')).toBeInTheDocument()
+    // Scope to the header count badge (the ToDo/Done tabs also render counts).
+    const heading = screen.getByText('Spec')
+    const headerDiv = heading.closest('div.flex')!
+    expect(headerDiv.querySelector('.rounded-full')).toHaveTextContent('3')
   })
 
   it('does not show active specs count badge when no tickets', () => {

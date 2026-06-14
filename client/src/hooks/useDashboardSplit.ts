@@ -57,8 +57,9 @@ function clampToViewport(width: number, viewport: number): number {
   return Math.min(Math.max(width, MIN_LEFT_PX), maxLeft)
 }
 
-/** Default dashboard split ratio — left (Specs) share of the viewport. */
-export const DEFAULT_LEFT_RATIO = 0.6
+/** Default dashboard split ratio — left (Specs) share of the viewport. Specs get
+ *  70% (rails ~30%) so the specs toolbar (tabs + filters + sort) isn't cramped. */
+export const DEFAULT_LEFT_RATIO = 0.70
 
 /**
  * Default splitter position the first time a project is opened (no stored

@@ -12,3 +12,14 @@ export function isCodeExplorerEnabled(): boolean {
 export function isBrowserCaptureEnabled(): boolean {
   return process.env.SPECRAILS_BROWSER_CAPTURE !== 'false'
 }
+
+/**
+ * Jira integration ("spec = Jira issue", per-project hot-swap local↔Jira).
+ * Server-side default ON; set SPECRAILS_JIRA_SECTION="false" to 404 the routes
+ * and skip all sync (emergency rollback). The feature is inert until a project
+ * actually configures a Jira connection, so default-on is safe. The client gates
+ * separately on VITE_FEATURE_JIRA.
+ */
+export function isJiraEnabled(): boolean {
+  return process.env.SPECRAILS_JIRA_SECTION !== 'false'
+}

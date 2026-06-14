@@ -63,5 +63,20 @@
     "categoryCount_other": "{{count}} categorías",
     "summary": "{{documents}} en {{categories}}.",
     "loadError": "No se pudo cargar el documento"
+  },
+  "jiraCard": {
+    "title": "Jira",
+    "category": "Seguimiento de incidencias",
+    "description": "Respalda las specs de este proyecto con un tablero de Jira — sincronización bidireccional del estado y un comentario al terminar un rail.",
+    "connectedDescription": "Sincronizado con {{key}}. Las specs reflejan tu tablero de Jira en ambos sentidos.",
+    "connect": "Conectar",
+    "connected": "Conectado",
+    "manage": "Gestionar",
+    "modalTitle": "Conectar con Jira",
+    "manageTitle": "Conexión de Jira",
+    "bullet1": "Sincronización bidireccional del estado con tu tablero de Jira.",
+    "bullet2": "Publica un comentario al terminar un rail.",
+    "bullet3": "Tu backlog de Jira aparece como specs en el tablero.",
+    "requires": "Requiere una cuenta de Jira Cloud o Data Center."
   }
 }

@@ -1,6 +1,7 @@
 import { useTranslation, Trans } from 'react-i18next'
 import { FolderOpen, Terminal } from 'lucide-react'
 import { Button } from './ui/button'
+import { FEATURE_JIRA } from '../lib/feature-flags'
 
 interface WelcomeScreenProps {
   onAddProject: () => void
@@ -25,6 +26,11 @@ export function WelcomeScreen({ onAddProject }: WelcomeScreenProps) {
         <p className="text-sm text-muted-foreground max-w-sm">
           {t('welcome.description')}
         </p>
+        {FEATURE_JIRA && (
+          <p className="text-xs text-muted-foreground/80 max-w-sm">
+            {t('welcome.jiraHint')}
+          </p>
+        )}
       </div>
 
       <Button onClick={onAddProject} size="sm" className="gap-2">

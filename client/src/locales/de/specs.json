@@ -110,5 +110,14 @@
     "selected_one": "{{count}} Label",
     "selected_other": "{{count}} Labels",
     "clear": "zurücksetzen"
+  },
+  "epicFilter": {
+    "all": "Alle Epics",
+    "ariaLabel": "Nach Epic filtern"
+  },
+  "sprintFilter": {
+    "current": "Aktuell",
+    "all": "Alle Sprints",
+    "ariaLabel": "Nach Sprint filtern"
   }
 }

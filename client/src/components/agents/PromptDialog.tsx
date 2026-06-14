@@ -63,7 +63,7 @@ export function PromptDialog({
             className="text-sm font-mono"
           />
           {trimmed.length > 0 && !matchesPattern && inputInvalidHint && (
-            <p className="text-[11px] text-yellow-500">{inputInvalidHint}</p>
+            <p className="text-[11px] text-yellow-500 aurora-light:text-accent-warning">{inputInvalidHint}</p>
           )}
         </div>
         <DialogFooter>

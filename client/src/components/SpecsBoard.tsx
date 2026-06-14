@@ -10,11 +10,16 @@ import { TicketContextMenu } from './TicketContextMenu'
 import type { TicketStatus, TicketPriority } from '../types'
 import type { RailState } from './RailsBoard'
 import { SpecLabelFilterDropdown } from './SpecLabelFilterDropdown'
-import { SpecStatusFilter, type SpecStatusFilterValue } from './SpecStatusFilter'
+import { SpecEpicFilterDropdown } from './SpecEpicFilterDropdown'
+import { SpecSprintFilterDropdown } from './SpecSprintFilterDropdown'
+
+/** Which spec bucket the board shows. The ToDo/Done navbar tabs drive this. */
+type SpecStatusFilterValue = 'all' | 'todo' | 'done'
 import { SpecSortControl } from './SpecSortControl'
 import { SpecsViewTierToggle } from './SpecsViewTierToggle'
 import type { SpecsViewTier } from '../lib/specs-view-tier'
 import { applySpecSort } from '../lib/spec-sort'
+import { cn } from '../lib/utils'
 import type { SpecSortMode, SpecSortDir } from '../types/spec-sort'
 import { ProposeSpecModal, type ExploreLaunchPayload } from './ProposeSpecModal'
 import { ExploreSpecShell } from './explore-spec/ExploreSpecShell'
@@ -114,59 +119,26 @@ interface ExploreState {
   contextScope?: import('../types/context-scope').ContextScope
 }
 
-const DONE_SORT_MODE_KEY = (projectId: string) => `specrails-desktop:done-spec-sort-mode:${projectId}`
-const DONE_SORT_DIR_KEY = (projectId: string) => `specrails-desktop:done-spec-sort-dir:${projectId}`
-const DONE_VIEW_TIER_KEY = (projectId: string) => `specrails-desktop:done-spec-view-tier:${projectId}`
+const STATUS_TAB_KEY = (projectId: string) => `specrails-desktop:spec-status-tab:${projectId}`
 
-function isSpecSortMode(value: unknown): value is SpecSortMode {
-  return value === 'default' || value === 'ticket-id' || value === 'priority'
-}
-
-function isSpecSortDir(value: unknown): value is SpecSortDir {
-  return value === 'asc' || value === 'desc'
-}
-
-function isSpecsViewTier(value: unknown): value is SpecsViewTier {
-  return value === 'row' || value === 'postit'
-}
-
-function loadDoneSort(projectId: string | null): { mode: SpecSortMode; dir: SpecSortDir } {
-  if (!projectId) return { mode: 'default', dir: 'desc' }
+/** Persisted ToDo/Done tab selection. Defaults to 'todo' so the board opens on
+ *  the active specs; 'done' is one click away (no scrolling the whole list). */
+function loadStatusTab(projectId: string | null): SpecStatusFilterValue {
+  if (!projectId) return 'todo'
   try {
-    const mode = localStorage.getItem(DONE_SORT_MODE_KEY(projectId))
-    const dir = localStorage.getItem(DONE_SORT_DIR_KEY(projectId))
-    return {
-      mode: isSpecSortMode(mode) ? mode : 'default',
-      dir: isSpecSortDir(dir) ? dir : 'desc',
-    }
+    const v = localStorage.getItem(STATUS_TAB_KEY(projectId))
+    return v === 'done' ? 'done' : 'todo'
   } catch {
-    return { mode: 'default', dir: 'desc' }
+    return 'todo'
   }
 }
-
-function saveDoneSort(projectId: string | null, mode: SpecSortMode, dir: SpecSortDir): void {
+function saveStatusTab(projectId: string | null, v: SpecStatusFilterValue): void {
   if (!projectId) return
   try {
-    localStorage.setItem(DONE_SORT_MODE_KEY(projectId), mode)
-    localStorage.setItem(DONE_SORT_DIR_KEY(projectId), dir)
-  } catch {}
-}
-
-function loadDoneViewTier(projectId: string | null): SpecsViewTier {
-  if (!projectId) return 'row'
-  try {
-    const tier = localStorage.getItem(DONE_VIEW_TIER_KEY(projectId))
-    return isSpecsViewTier(tier) ? tier : 'row'
+    localStorage.setItem(STATUS_TAB_KEY(projectId), v)
   } catch {
-    return 'row'
+    /* ignore */
   }
-}
-
-function saveDoneViewTier(projectId: string | null, tier: SpecsViewTier): void {
-  if (!projectId) return
-  try {
-    localStorage.setItem(DONE_VIEW_TIER_KEY(projectId), tier)
-  } catch {}
 }
 
 /** Returns true when at least one draft field carries a meaningful value. */
@@ -237,10 +209,14 @@ export function SpecsBoard({
   const [proposeOpen, setProposeOpen] = useState(false)
   const [explore, setExplore] = useState<ExploreState | null>(null)
   const [activeLabels, setActiveLabels] = useState<Set<string>>(new Set())
-  const [statusFilter, setStatusFilter] = useState<SpecStatusFilterValue>('all')
+  const [activeEpic, setActiveEpic] = useState<string | null>(null)
+  const [activeSprint, setActiveSprint] = useState<string | null>(null)
   const { activeProjectId } = useDesktop()
-  const [doneSort, setDoneSort] = useState(() => loadDoneSort(activeProjectId))
-  const [doneViewTier, setDoneViewTier] = useState<SpecsViewTier>(() => loadDoneViewTier(activeProjectId))
+  const [statusFilter, setStatusFilter] = useState<SpecStatusFilterValue>(() => loadStatusTab(activeProjectId))
+  const handleStatusTabChange = useCallback((v: SpecStatusFilterValue) => {
+    setStatusFilter(v)
+    saveStatusTab(activeProjectId, v)
+  }, [activeProjectId])
   const { minimize } = useMinimizedChats()
   // SMASH: build lookup maps so each SpecCard renders the épica badge / child
   // pill without re-scanning the full ticket list per render.
@@ -268,39 +244,54 @@ export function SpecsBoard({
 
   useEffect(() => {
     setActiveLabels(new Set())
-    setDoneSort(loadDoneSort(activeProjectId))
-    setDoneViewTier(loadDoneViewTier(activeProjectId))
+    setActiveEpic(null)
+    setActiveSprint(null)
+    setStatusFilter(loadStatusTab(activeProjectId))
   }, [activeProjectId])
 
   const handleLabelsChange = useCallback((next: Set<string>) => {
     setActiveLabels(next)
   }, [])
 
-  const handleDoneSortChange = useCallback((mode: SpecSortMode, dir: SpecSortDir) => {
-    setDoneSort({ mode, dir })
-    saveDoneSort(activeProjectId, mode, dir)
-  }, [activeProjectId])
+  const matchesFilters = useCallback(
+    (t: LocalTicket): boolean => {
+      if (activeEpic !== null && t.jira_epic_key !== activeEpic) return false
+      if (activeSprint !== null && t.jira_sprint_id !== activeSprint) return false
+      if (activeLabels.size > 0 && !(t.labels ?? []).some((l) => activeLabels.has(l))) return false
+      return true
+    },
+    [activeLabels, activeEpic, activeSprint],
+  )
 
-  const handleDoneViewTierChange = useCallback((tier: SpecsViewTier) => {
-    setDoneViewTier(tier)
-    saveDoneViewTier(activeProjectId, tier)
-  }, [activeProjectId])
-
+  const noFilters = activeLabels.size === 0 && activeEpic === null && activeSprint === null
   const filteredTickets = useMemo(() => {
-    if (activeLabels.size === 0) return tickets
-    return tickets.filter((t) => (t.labels ?? []).some((l) => activeLabels.has(l)))
-  }, [tickets, activeLabels])
+    if (noFilters) return tickets
+    return tickets.filter(matchesFilters)
+  }, [tickets, noFilters, matchesFilters])
 
   const filteredDoneTickets = useMemo(() => {
-    if (activeLabels.size === 0) return doneTickets
-    return doneTickets.filter((t) => (t.labels ?? []).some((l) => activeLabels.has(l)))
-  }, [doneTickets, activeLabels])
+    if (noFilters) return doneTickets
+    return doneTickets.filter(matchesFilters)
+  }, [doneTickets, noFilters, matchesFilters])
 
+  // Epics / sprints are only present on Jira-backed specs → these filters are
+  // implicitly Jira-only (hidden when no spec carries that data).
+  const hasEpics = useMemo(
+    () => tickets.some((t) => t.jira_epic_key) || doneTickets.some((t) => t.jira_epic_key),
+    [tickets, doneTickets],
+  )
+  const hasSprints = useMemo(
+    () => tickets.some((t) => t.jira_sprint_id) || doneTickets.some((t) => t.jira_sprint_id),
+    [tickets, doneTickets],
+  )
+
+  // Done specs follow the SAME general sort as the active board (the Done tab no
+  // longer has its own sort/view controls — see the toolbar above).
   const visibleDoneTickets = useMemo(() => {
-    return doneSort.mode === 'default'
+    return sortMode === 'default'
       ? filteredDoneTickets
-      : applySpecSort(filteredDoneTickets, doneSort.mode, doneSort.dir)
-  }, [filteredDoneTickets, doneSort])
+      : applySpecSort(filteredDoneTickets, sortMode, sortDir)
+  }, [filteredDoneTickets, sortMode, sortDir])
 
   // Snapshot of the live shell so we can auto-minimize the current session
   // before restoring another (mutual-exclusion: only one shell visible at
@@ -463,53 +454,100 @@ export function SpecsBoard({
   // the bottom (always). `todo` / `done` show only that bucket.
   const showTodoBucket = statusFilter === 'all' || statusFilter === 'todo'
   const showDoneBucket = statusFilter === 'all' || statusFilter === 'done'
-  const statusCounts = useMemo(
-    () => ({
-      all: tickets.length + doneTickets.length,
-      todo: tickets.length,
-      done: doneTickets.length,
-    }),
-    [tickets.length, doneTickets.length],
-  )
 
   return (
     <div className="flex flex-col h-full" onClick={handleBackgroundClick}>
-      {/* Header */}
+      {/* Header — a single row (aligns with the rails header): title + the
+          ToDo/Done state tabs, a separator, then filters + sort + view + add. */}
       <div className="flex items-center px-4 h-12 border-b border-border/40 shrink-0 gap-2">
         <div className="flex items-center gap-2 shrink-0">
           <FileText className="w-4 h-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold text-accent-primary">{t('board.title')}</h2>
           {tickets.length + doneTickets.length > 0 && (
             <span className="text-[10px] text-muted-foreground bg-muted/30 rounded-full px-1.5 py-0.5">
-              {activeLabels.size > 0
+              {!noFilters
                 ? `${filteredTickets.length + filteredDoneTickets.length}/${tickets.length + doneTickets.length}`
                 : tickets.length + doneTickets.length}
             </span>
           )}
         </div>
-        <SpecStatusFilter
-          value={statusFilter}
-          onChange={setStatusFilter}
-          counts={statusCounts}
-        />
+
+        {/* ToDo / Done state tabs — inline beside the title */}
+        <div className="flex items-center gap-1 shrink-0" role="tablist">
+          {(['todo', 'done'] as const).map((tab) => {
+            const active = statusFilter === tab
+            return (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => handleStatusTabChange(tab)}
+                data-testid={`specs-tab-${tab}`}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                  active
+                    ? 'bg-accent-primary/15 text-accent-primary'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/40',
+                )}
+              >
+                {t(`statusFilter.${tab}`)}
+                <span className="text-[10px] tabular-nums opacity-70">
+                  {tab === 'todo' ? filteredTickets.length : filteredDoneTickets.length}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Separator between the state tabs and the filters */}
+        <div className="h-5 w-px bg-border/60 shrink-0" aria-hidden />
+
+        {/* Filters are direct children (NO overflow wrapper — an overflow
+            ancestor clips their absolute dropdown panels). */}
         <SpecLabelFilterDropdown
           tickets={[...tickets, ...doneTickets]}
           active={activeLabels}
           onChange={handleLabelsChange}
         />
+        {hasEpics && (
+          <SpecEpicFilterDropdown
+            tickets={[...tickets, ...doneTickets]}
+            active={activeEpic}
+            onChange={setActiveEpic}
+          />
+        )}
+        {hasSprints && (
+          <SpecSprintFilterDropdown
+            tickets={[...tickets, ...doneTickets]}
+            active={activeSprint}
+            onChange={setActiveSprint}
+          />
+        )}
+
+        {/* Separator between the Jira/label filters and the sort/view controls.
+            `ml-auto` pushes the whole action cluster to the right edge. */}
+        <div className="h-5 w-px bg-border/60 shrink-0 ml-auto" aria-hidden />
+
         <SpecSortControl
           mode={sortMode}
           dir={sortDir}
           onChange={onSortChange}
-          className="ml-auto"
+          className="shrink-0"
         />
         {onViewTierChange && (
-          <SpecsViewTierToggle tier={viewTier} onChange={onViewTierChange} />
+          <div className="shrink-0">
+            <SpecsViewTierToggle tier={viewTier} onChange={onViewTierChange} />
+          </div>
         )}
+
+        {/* Separator before the primary Add action */}
+        <div className="h-5 w-px bg-border/60 shrink-0" aria-hidden />
+
         <Button
           size="sm"
           variant="outline"
-          className="h-7 text-xs gap-1 shrink-0"
+          className="h-7 text-xs gap-1 shrink-0 border-accent-primary/50 text-accent-primary hover:bg-accent-primary/10 hover:text-accent-primary"
           onClick={() => setProposeOpen(true)}
           data-tour="add-spec-btn"
         >
@@ -627,28 +665,11 @@ export function SpecsBoard({
             ref={setDoneNodeRef}
             data-testid="specs-board-done-bucket"
             className={`px-4 pt-2 pb-3 space-y-1.5 transition-colors duration-150 ${
-              isDoneOver ? 'bg-emerald-500/[0.04]' : ''
+              isDoneOver ? 'bg-emerald-500/[0.04] aurora-light:bg-accent-success/10' : ''
             } ${showTodoBucket ? 'border-t border-border/30 mt-1' : ''}`}
           >
-            <div className="flex items-center gap-2 py-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400/70" />
-              <span className="text-[11px] font-medium text-muted-foreground">{t('status.done')}</span>
-              <span className="text-[10px] text-muted-foreground/60 bg-muted/20 rounded-full px-1.5 py-0.5">
-                {activeLabels.size > 0
-                  ? `${visibleDoneTickets.length}/${doneTickets.length}`
-                  : doneTickets.length}
-              </span>
-              {doneTickets.length > 0 && (
-                <div className="ml-auto flex items-center gap-2">
-                  <SpecSortControl
-                    mode={doneSort.mode}
-                    dir={doneSort.dir}
-                    onChange={handleDoneSortChange}
-                  />
-                  <SpecsViewTierToggle tier={doneViewTier} onChange={handleDoneViewTierChange} />
-                </div>
-              )}
-            </div>
+            {/* No per-Done header: the Done TAB labels this bucket and the board
+                toolbar's sort + list/postit toggle now drive it too. */}
             {visibleDoneTickets.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
                 <CheckCircle2 className="w-6 h-6 mb-2 opacity-15" />
@@ -660,7 +681,7 @@ export function SpecsBoard({
                       : t('board.emptyNoCompleted')}
                 </p>
               </div>
-            ) : doneViewTier === 'postit' && onMoveToRail ? (
+            ) : viewTier === 'postit' && onMoveToRail ? (
               <SortableContext items={visibleDoneTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                 <div
                   data-testid="specs-board-done-postit-grid"

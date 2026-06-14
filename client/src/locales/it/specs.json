@@ -110,5 +110,14 @@
     "selected_one": "{{count}} etichetta",
     "selected_other": "{{count}} etichette",
     "clear": "cancella"
+  },
+  "epicFilter": {
+    "all": "Tutte le epiche",
+    "ariaLabel": "Filtra per epica"
+  },
+  "sprintFilter": {
+    "current": "Attuale",
+    "all": "Tutti gli sprint",
+    "ariaLabel": "Filtra per sprint"
   }
 }

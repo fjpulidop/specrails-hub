@@ -19,6 +19,7 @@ import { getTerminalManager } from './terminal-manager'
 import { BrowserCaptureManager } from './browser-capture-manager'
 import { removeExploreCwd } from './explore-cwd-manager'
 import { resolveTicketStoragePath, mutateStore, applyJobOutcomeToTickets, type JobOutcome } from './ticket-store'
+import { JiraSyncManager } from './jira/jira-sync-manager'
 import type { WsMessage, TicketUpdatedMessage, RailUpdatedMessage } from './types'
 import { getRails, setRailTickets } from './rails-store'
 import {
@@ -52,6 +53,7 @@ export interface ProjectContext {
   specLauncherManager: SpecLauncherManager
   ticketWatcher: TicketWatcher
   browserCaptureManager: BrowserCaptureManager
+  jiraSyncManager: JiraSyncManager
   broadcast: (msg: WsMessage) => void
   /** Maps jobId → rail metadata for active rail-launched jobs */
   railJobs: Map<string, { railIndex: number; mode: string; ticketIds: number[] }>
@@ -140,6 +142,8 @@ export class ProjectRegistry {
       try { ctx.specLauncherManager.shutdown() } catch { /* ignore */ }
       // Tear down the embedded browser (closes pages + persistent context).
       void ctx.browserCaptureManager.shutdown().catch(() => { /* ignore */ })
+      // Stop the Jira sync poll/drain timers (no children, just intervals).
+      try { ctx.jiraSyncManager.stop() } catch { /* ignore */ }
       // Kill any terminal sessions belonging to this project
       try { getTerminalManager().killAllForProject(id) } catch { /* ignore */ }
       // Close the ticket file watcher
@@ -201,6 +205,7 @@ export class ProjectRegistry {
       try { ctx.agentRefineManager.shutdown() } catch { /* ignore */ }
       try { ctx.specLauncherManager.shutdown() } catch { /* ignore */ }
       void ctx.browserCaptureManager.shutdown().catch(() => { /* ignore */ })
+      try { ctx.jiraSyncManager.stop() } catch { /* ignore */ }
       // Release chokidar watchers + abort in-flight generations so a restart
       // does not leak handles/children — mirror removeProject()'s per-project teardown.
       try { ctx.fileSummaryManager.dispose() } catch { /* ignore */ }
@@ -251,6 +256,14 @@ export class ProjectRegistry {
 
     const webhookManager = this._webhookManager
     const railJobs = new Map<string, { railIndex: number; mode: string; ticketIds: number[] }>()
+    // Jira sync (per-project, inert until a connection is configured). Constructed
+    // before QueueManager so the onJobFinished closure can reference it.
+    const jiraSyncManager = new JiraSyncManager({
+      db,
+      projectId: project.id,
+      projectPath: project.path,
+      broadcast: boundBroadcast,
+    })
     const queueManager = new QueueManager(boundBroadcast, db, undefined, project.path, {
       zombieTimeoutMs: projectZombieTimeout,
       provider: project.provider ?? 'claude',
@@ -324,6 +337,27 @@ export class ProjectRegistry {
                 projectId: project.id,
                 timestamp: ticket.updated_at,
               } as TicketUpdatedMessage)
+            }
+            // Jira write-back (inert for non-Jira projects): enqueue the status
+            // transition + completion comment per linked ticket. The LOCAL mutation
+            // above stays synchronous; only the durable outbox enqueue happens here,
+            // wrapped so a Jira failure can never break the job-exit handler.
+            if (status === 'completed' || status === 'failed' || status === 'canceled' || status === 'zombie_terminated') {
+              try {
+                const needsReviewIds = completedTicketIds.filter(
+                  (tid) => store.tickets[String(tid)]?.needs_review === true
+                )
+                jiraSyncManager.onJobOutcome({
+                  ticketIds: completedTicketIds,
+                  status,
+                  jobId,
+                  costUsd: costUsd ?? null,
+                  durationMs: jobRow?.duration_ms ?? null,
+                  needsReviewIds,
+                })
+              } catch (err) {
+                console.error('[project-registry] jira onJobOutcome failed:', err)
+              }
             }
           } catch (err) {
             console.error('[project-registry] failed to apply job outcome to tickets:', err)
@@ -438,6 +472,10 @@ export class ProjectRegistry {
 
     const ticketWatcher = new TicketWatcher(project.path, project.id, boundBroadcast)
     ticketWatcher.start()
+    // Suppress the file-watcher echo for the Jira sync's own writes (the every-60s
+    // poll would otherwise trigger a full-board refresh = flicker). Late-bound
+    // because the JiraSyncManager is constructed before the watcher.
+    jiraSyncManager.setLocalWriteNotifier((rev) => ticketWatcher.notifyDesktopWrite(rev))
 
     // BrowserCaptureManager — "Add Spec from browser". Constructed for every
     // project regardless of the feature flag; the routes + WS endpoint 404 when
@@ -450,7 +488,7 @@ export class ProjectRegistry {
       broadcast: boundBroadcast,
     })
 
-    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, agentRefineManager, fileSummaryManager, specLauncherManager, ticketWatcher, browserCaptureManager, broadcast: boundBroadcast, railJobs }
+    const ctx: ProjectContext = { project, db, queueManager, chatManager, setupManager, proposalManager, agentRefineManager, fileSummaryManager, specLauncherManager, ticketWatcher, browserCaptureManager, jiraSyncManager, broadcast: boundBroadcast, railJobs }
     this._contexts.set(project.id, ctx)
     return ctx
   }

@@ -5,6 +5,7 @@ import { createRailsRouter } from './rails-router'
 import { createProfilesRouter } from './profiles-router'
 import { createPluginsRouter } from './plugins-router'
 import { createCodeExplorerRouter } from './code-explorer-router'
+import { createJiraRouter } from './jira-router'
 import { resolveTicketStoragePath } from './ticket-store'
 import { registerJobsRoutes } from './project-router-jobs'
 import { registerSpendingRoutes } from './project-router-spending'
@@ -91,6 +92,10 @@ export function createProjectRouter(registry: ProjectRegistry): Router {
   // Mount plugins router under each project (per-project marketplace)
   const pluginsRouter = createPluginsRouter()
   router.use('/:projectId/plugins', pluginsRouter)
+
+  // Mount Jira router under each project (per-project Jira board sync)
+  const jiraRouter = createJiraRouter()
+  router.use('/:projectId/jira', jiraRouter)
 
   // Mount Code-Explorer router. FileSummaryManager comes from ProjectContext.
   const codeRouterByCtx = new WeakMap<object, Router>()

@@ -63,5 +63,20 @@
     "categoryCount_other": "{{count}} 个分类",
     "summary": "共 {{documents}}，分布在 {{categories}}中。",
     "loadError": "加载文档失败"
+  },
+  "jiraCard": {
+    "title": "Jira",
+    "category": "事务跟踪",
+    "description": "用 Jira 看板支撑此项目的规格——状态双向同步，并在 rail 结束时发布完成评论。",
+    "connectedDescription": "已与 {{key}} 同步。规格与你的 Jira 看板双向镜像。",
+    "connect": "连接",
+    "connected": "已连接",
+    "manage": "管理",
+    "modalTitle": "连接到 Jira",
+    "manageTitle": "Jira 连接",
+    "bullet1": "与你的 Jira 看板进行状态双向同步。",
+    "bullet2": "rail 结束时发布完成评论。",
+    "bullet3": "你的 Jira 待办会作为规格出现在看板上。",
+    "requires": "需要 Jira Cloud 或 Data Center 账户。"
   }
 }

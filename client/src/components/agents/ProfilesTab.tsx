@@ -305,7 +305,7 @@ export function ProfilesTab() {
               components={{ code: <code className="text-foreground" /> }}
             />
           </div>
-          {error && <div className="mt-3 text-xs text-red-400">{error}</div>}
+          {error && <div className="mt-3 text-xs text-red-400 aurora-light:text-destructive">{error}</div>}
         </div>
       </div>
       </>
@@ -366,7 +366,7 @@ export function ProfilesTab() {
                   {!p.isDefault && (
                     <button
                       type="button"
-                      className="p-1 hover:bg-red-500/20 text-red-400 rounded"
+                      className="p-1 hover:bg-red-500/20 text-red-400 aurora-light:text-destructive rounded"
                       title={t('common:actions.delete')}
                       onClick={(e) => {
                         e.stopPropagation()
@@ -386,7 +386,7 @@ export function ProfilesTab() {
       {/* Right: editor */}
       <main className="flex-1 overflow-auto">
         {error && (
-          <div className="mx-4 mt-4 px-3 py-2 text-xs rounded border border-red-500/30 bg-red-500/10 text-red-400">
+          <div className="mx-4 mt-4 px-3 py-2 text-xs rounded border border-red-500/30 aurora-light:border-destructive/30 bg-red-500/10 aurora-light:bg-destructive/10 text-red-400 aurora-light:text-destructive">
             {error}
           </div>
         )}
@@ -410,7 +410,7 @@ export function ProfilesTab() {
                 </Button>
                 {saving && <span className="text-xs text-muted-foreground">{t('common:states.saving')}</span>}
                 {validationIssues.length > 0 && (
-                  <span className="text-xs text-yellow-500">
+                  <span className="text-xs text-yellow-500 aurora-light:text-accent-warning">
                     {t('profiles.editorFooter.issuesToResolve', { count: validationIssues.length })}
                   </span>
                 )}

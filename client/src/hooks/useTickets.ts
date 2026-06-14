@@ -23,6 +23,28 @@ interface TicketWsMessage {
 const GLOW_DURATION_MS = 3000
 const CONTRACT_LAYER_MARKER = '\n\n---\n\n## Contract Layer\n\n'
 
+/** Cheap deep-equality for two tickets (both come from the same API shape). */
+function ticketsEqual(a: LocalTicket, b: LocalTicket): boolean {
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
+/**
+ * Merge a freshly-fetched ticket list into the current one WITHOUT churning
+ * object references for unchanged rows. Reuses each previous ticket object when
+ * its content is byte-identical, and returns the SAME `prev` array reference
+ * when nothing changed at all — so React skips re-rendering the board entirely.
+ * Order and membership follow `fetched` (authoritative).
+ */
+export function reconcileTickets(prev: LocalTicket[], fetched: LocalTicket[]): LocalTicket[] {
+  const prevById = new Map(prev.map((t) => [t.id, t]))
+  const merged = fetched.map((f) => {
+    const p = prevById.get(f.id)
+    return p && ticketsEqual(p, f) ? p : f
+  })
+  const sameAsPrev = merged.length === prev.length && merged.every((m, i) => m === prev[i])
+  return sameAsPrev ? prev : merged
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useTickets() {
@@ -77,7 +99,12 @@ export function useTickets() {
         }
 
         knownIdsRef.current = new Set(fetched.map((t) => t.id))
-        setTickets(fetched)
+        // Non-destructive merge: reuse existing ticket object references for
+        // rows that are byte-identical so React doesn't re-render unchanged
+        // cards (and returns the SAME array when nothing changed at all). This
+        // keeps a background refetch — e.g. the Jira poll — from flickering the
+        // whole board.
+        setTickets((prev) => reconcileTickets(prev, fetched))
 
         if (newIds.size > 0 && oldIds.size > 0) {
           setNewTicketIds(newIds)

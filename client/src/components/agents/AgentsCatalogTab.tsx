@@ -478,7 +478,7 @@ export function AgentsCatalogTab() {
             />
           </div>
           {genError && (
-            <div className="px-3 py-2 text-xs rounded border border-red-500/30 bg-red-500/10 text-red-400">
+            <div className="px-3 py-2 text-xs rounded border border-red-500/30 aurora-light:border-destructive/30 bg-red-500/10 aurora-light:bg-destructive/10 text-red-400 aurora-light:text-destructive">
               {genError}
             </div>
           )}
@@ -671,7 +671,7 @@ export function AgentsCatalogTab() {
       {/* Right: selected body */}
       <main className="flex-1 min-w-0 overflow-auto">
         {error && (
-          <div className="m-4 px-3 py-2 text-xs rounded border border-red-500/30 bg-red-500/10 text-red-400">
+          <div className="m-4 px-3 py-2 text-xs rounded border border-red-500/30 aurora-light:border-destructive/30 bg-red-500/10 aurora-light:bg-destructive/10 text-red-400 aurora-light:text-destructive">
             {error}
           </div>
         )}
@@ -841,7 +841,7 @@ function KindBadge({ kind }: { kind: 'upstream' | 'custom' }) {
       className={
         'text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ' +
         (kind === 'custom'
-          ? 'bg-purple-500/15 text-purple-400'
+          ? 'bg-purple-500/15 aurora-light:bg-accent-secondary/15 text-purple-400 aurora-light:text-accent-secondary'
           : 'bg-muted text-muted-foreground')
       }
     >

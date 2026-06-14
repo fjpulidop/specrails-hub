@@ -75,12 +75,12 @@ export function ActiveJobCard({ activeJob, phases, phaseDefinitions }: ActiveJob
   }
 
   return (
-    <Card className="border-blue-500/30 bg-blue-500/5">
+    <Card className="border-blue-500/30 aurora-light:border-accent-info/30 bg-blue-500/5 aurora-light:bg-accent-info/5">
       <CardContent className="p-4 space-y-3">
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
-            <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+            <Loader2 className="w-4 h-4 text-blue-400 aurora-light:text-accent-info animate-spin shrink-0" />
             <code className="text-xs font-mono text-foreground truncate">{formatCommandForProvider(activeJob.command, activeProvider)}</code>
           </div>
           <Badge variant="running" className="shrink-0">{t('statusLabel.running')}</Badge>

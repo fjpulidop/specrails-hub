@@ -5,6 +5,8 @@ import { Trash2, ChevronRight, Circle, CheckCircle2, AlertCircle, Flag, ArrowUp,
 import { cn } from '../lib/utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
 import { Button } from './ui/button'
+import { useJiraDiscard } from '../context/JiraDiscardContext'
+import { DiscardSpecDialog } from './jira/DiscardSpecDialog'
 import type { TicketStatus, TicketPriority, LocalTicket } from '../types'
 
 // ─── Status and Priority display maps ─────────────────────────────────────────
@@ -13,14 +15,14 @@ const STATUS_ITEMS: { value: TicketStatus; labelKey: string; icon: React.ReactNo
   {
     value: 'todo',
     labelKey: 'ticketStatus.todo',
-    icon: <Circle className="w-3.5 h-3.5 text-slate-400" />,
-    className: 'text-slate-400',
+    icon: <Circle className="w-3.5 h-3.5 text-slate-400 aurora-light:text-muted-foreground" />,
+    className: 'text-slate-400 aurora-light:text-muted-foreground',
   },
   {
     value: 'done',
     labelKey: 'ticketStatus.done',
-    icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />,
-    className: 'text-emerald-400',
+    icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 aurora-light:text-accent-success" />,
+    className: 'text-emerald-400 aurora-light:text-accent-success',
   },
 ]
 
@@ -28,33 +30,33 @@ const PRIORITY_ITEMS: { value: TicketPriority; labelKey: string; icon: React.Rea
   {
     value: 'critical',
     labelKey: 'priority.critical',
-    icon: <AlertCircle className="w-3.5 h-3.5 text-red-400" />,
-    className: 'text-red-400',
+    icon: <AlertCircle className="w-3.5 h-3.5 text-red-400 aurora-light:text-destructive" />,
+    className: 'text-red-400 aurora-light:text-destructive',
   },
   {
     value: 'high',
     labelKey: 'priority.high',
-    icon: <ArrowUp className="w-3.5 h-3.5 text-orange-400" />,
-    className: 'text-orange-400',
+    icon: <ArrowUp className="w-3.5 h-3.5 text-orange-400 aurora-light:text-accent-warning" />,
+    className: 'text-orange-400 aurora-light:text-accent-warning',
   },
   {
     value: 'medium',
     labelKey: 'priority.medium',
-    icon: <ArrowRight className="w-3.5 h-3.5 text-yellow-400" />,
-    className: 'text-yellow-400',
+    icon: <ArrowRight className="w-3.5 h-3.5 text-yellow-400 aurora-light:text-accent-warning" />,
+    className: 'text-yellow-400 aurora-light:text-accent-warning',
   },
   {
     value: 'low',
     labelKey: 'priority.low',
-    icon: <ArrowDown className="w-3.5 h-3.5 text-slate-400" />,
-    className: 'text-slate-400',
+    icon: <ArrowDown className="w-3.5 h-3.5 text-slate-400 aurora-light:text-muted-foreground" />,
+    className: 'text-slate-400 aurora-light:text-muted-foreground',
   },
 ]
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface TicketContextMenuProps {
-  ticket: Pick<LocalTicket, 'id' | 'title' | 'status' | 'priority'>
+  ticket: Pick<LocalTicket, 'id' | 'title' | 'status' | 'priority' | 'source' | 'jira_key'>
   onDelete: (ticketId: number) => void
   onStatusChange: (ticketId: number, status: TicketStatus) => void
   onPriorityChange: (ticketId: number, priority: TicketPriority) => void
@@ -79,6 +81,9 @@ interface ContextMenuPortalProps {
   onStatusChange: (status: TicketStatus) => void
   onPriorityChange: (priority: TicketPriority) => void
   onDeleteRequest: () => void
+  /** When set, the first item is "Move to <label>" instead of Delete (Jira). */
+  discardLabel?: string
+  onDiscardRequest?: () => void
   onClose: () => void
 }
 
@@ -90,6 +95,8 @@ function ContextMenuPortal({
   onStatusChange,
   onPriorityChange,
   onDeleteRequest,
+  discardLabel,
+  onDiscardRequest,
   onClose,
 }: ContextMenuPortalProps) {
   const { t } = useTranslation('tickets')
@@ -121,16 +128,29 @@ function ContextMenuPortal({
       style={{ left: adjustedPos.x, top: adjustedPos.y }}
       className="fixed z-[200] min-w-[180px] rounded-lg border border-border/50 bg-popover shadow-xl text-xs py-1"
     >
-      {/* Delete */}
-      <button
-        role="menuitem"
-        type="button"
-        onClick={() => { onDeleteRequest(); onClose() }}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-400 hover:bg-red-500/10 transition-colors"
-      >
-        <Trash2 className="w-3.5 h-3.5 shrink-0" />
-        {t('contextMenu.deleteTicket')}
-      </button>
+      {/* Move to <status> (Jira-backed spec) — else Delete */}
+      {discardLabel && onDiscardRequest ? (
+        <button
+          role="menuitem"
+          type="button"
+          onClick={() => { onDiscardRequest(); onClose() }}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-accent-info hover:bg-accent-info/10 transition-colors"
+          data-testid="jira-move-to-menuitem"
+        >
+          <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+          {discardLabel}
+        </button>
+      ) : (
+        <button
+          role="menuitem"
+          type="button"
+          onClick={() => { onDeleteRequest(); onClose() }}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-400 aurora-light:text-destructive hover:bg-red-500/10 transition-colors"
+        >
+          <Trash2 className="w-3.5 h-3.5 shrink-0" />
+          {t('contextMenu.deleteTicket')}
+        </button>
+      )}
 
       <div className="my-1 h-px bg-border/40" role="separator" />
 
@@ -258,10 +278,16 @@ export function TicketContextMenu({
   className,
 }: TicketContextMenuProps) {
   const { t } = useTranslation('tickets')
+  const { t: tj } = useTranslation('jira')
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState<MenuPosition>({ x: 0, y: 0 })
   const [activeSubmenu, setActiveSubmenu] = useState<ActiveSubmenu>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showDiscard, setShowDiscard] = useState(false)
+
+  // Jira-synced project + Jira-backed spec + configured status → "Move to <status>"
+  const { discardStatus } = useJiraDiscard()
+  const canDiscard = !!discardStatus && ticket.source === 'jira' && !!ticket.jira_key
 
   const closeMenu = useCallback(() => {
     setMenuOpen(false)
@@ -318,10 +344,21 @@ export function TicketContextMenu({
             onStatusChange={(status) => onStatusChange(ticket.id, status)}
             onPriorityChange={(priority) => onPriorityChange(ticket.id, priority)}
             onDeleteRequest={() => setShowDeleteConfirm(true)}
+            discardLabel={canDiscard ? tj('discard.moveButton', { status: discardStatus }) : undefined}
+            onDiscardRequest={canDiscard ? () => setShowDiscard(true) : undefined}
             onClose={closeMenu}
           />,
           document.body
         )}
+
+      {canDiscard && discardStatus && (
+        <DiscardSpecDialog
+          open={showDiscard}
+          onOpenChange={setShowDiscard}
+          ticket={{ id: ticket.id, title: ticket.title, jira_key: ticket.jira_key }}
+          discardStatus={discardStatus}
+        />
+      )}
 
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent className="max-w-sm">

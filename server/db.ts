@@ -594,6 +594,87 @@ const MIGRATIONS: Migration[] = [
       );
     `)
   },
+
+  // Migration 29: Jira integration (per-project). Each project syncs with its
+  // own Jira board, so every Jira table lives here in the per-project jobs.sqlite
+  // and is keyed by nothing but its own rows. See docs/jira-integration-plan.md.
+  //   - jira_connection: one row, the connection config (token stored encrypted).
+  //   - jira_links: spec↔issue map keyed on the IMMUTABLE Jira numeric id.
+  //   - jira_outbox: durable transactional write-back queue (status + comments).
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS jira_connection (
+        project_id        TEXT PRIMARY KEY,
+        base_url          TEXT NOT NULL,
+        deployment        TEXT NOT NULL,
+        api_version       TEXT NOT NULL,
+        auth_scheme       TEXT NOT NULL,
+        account_email     TEXT,
+        jira_project_key  TEXT NOT NULL,
+        jira_project_id   TEXT NOT NULL,
+        encrypted_token   TEXT,
+        enabled           INTEGER NOT NULL DEFAULT 1,
+        status_map        TEXT,
+        high_water_ms     INTEGER,
+        created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS jira_links (
+        local_id          INTEGER PRIMARY KEY,
+        jira_issue_id     TEXT NOT NULL UNIQUE,
+        jira_key          TEXT,
+        jira_project_id   TEXT NOT NULL,
+        deployment        TEXT NOT NULL,
+        status_category   TEXT,
+        state             TEXT NOT NULL DEFAULT 'linked',
+        tombstoned        INTEGER NOT NULL DEFAULT 0,
+        created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_jira_links_issue ON jira_links(jira_issue_id);
+
+      CREATE TABLE IF NOT EXISTS jira_outbox (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        jira_issue_id     TEXT NOT NULL,
+        op_type           TEXT NOT NULL,
+        idempotency_key   TEXT NOT NULL UNIQUE,
+        payload           TEXT NOT NULL,
+        state             TEXT NOT NULL DEFAULT 'pending',
+        attempts          INTEGER NOT NULL DEFAULT 0,
+        next_attempt_at   TEXT,
+        last_error        TEXT,
+        dead_reason       TEXT,
+        created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_jira_outbox_state ON jira_outbox(state);
+      CREATE INDEX IF NOT EXISTS idx_jira_outbox_issue ON jira_outbox(jira_issue_id);
+    `)
+  },
+
+  // Migration 30: Jira sprint custom-field id. The field that holds an issue's
+  // sprint(s) is a custom field whose id varies per instance; we discover it
+  // (schema com.pyxis.greenhopper.jira:gh-sprint) and cache it here. NULL =
+  // not yet checked, 'none' = checked and no sprint field exists, '<id>' = found.
+  (db) => {
+    try {
+      db.exec(`ALTER TABLE jira_connection ADD COLUMN sprint_field_id TEXT`)
+    } catch {
+      // Column may already exist on a partially-migrated DB — no-op.
+    }
+  },
+
+  // Migration 31: Jira discard target status. The user-configured status name to
+  // which a discarded spec's issue is transitioned (instead of being deleted) in
+  // a Jira-synced project. NULL/empty = not configured (delete behaves normally).
+  (db) => {
+    try {
+      db.exec(`ALTER TABLE jira_connection ADD COLUMN discard_status TEXT`)
+    } catch {
+      // Column may already exist on a partially-migrated DB — no-op.
+    }
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {

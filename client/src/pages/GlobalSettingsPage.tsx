@@ -314,7 +314,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
-      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
@@ -528,7 +528,7 @@ export default function SettingsDialog({ open, onClose, onOpenOnboarding }: Sett
                           <div className="flex items-center gap-1 shrink-0">
                             <button
                               onClick={() => void handleToggleWebhook(wh.id, !wh.enabled)}
-                              className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${wh.enabled ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-muted text-muted-foreground'}`}
+                              className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${wh.enabled ? 'bg-green-500/10 aurora-light:bg-accent-success/10 text-green-600 aurora-light:text-accent-success dark:text-green-400' : 'bg-muted text-muted-foreground'}`}
                               title={wh.enabled ? t('webhooks.disable') : t('webhooks.enable')}
                             >
                               {wh.enabled ? t('webhooks.statusOn') : t('webhooks.statusOff')}

@@ -1,0 +1,126 @@
+{
+  "section": {
+    "title": "Jira",
+    "subtitle": "Specs dieses Projekts mit einem Jira-Board synchronisieren",
+    "connectCta": "Mit Jira verbinden"
+  },
+  "wizard": {
+    "step": "Schritt {{current}} von {{total}}",
+    "step1Title": "Verbinde dein Jira-Konto",
+    "step2Title": "Wähle ein Jira-Projekt",
+    "step3Title": "Status zuordnen (optional)",
+    "step4Title": "Prüfen und verbinden",
+    "next": "Weiter",
+    "back": "Zurück",
+    "cancel": "Abbrechen",
+    "connect": "Verbinden",
+    "connecting": "Verbinde…",
+    "later": "Später erledigen"
+  },
+  "creds": {
+    "baseUrlLabel": "Jira-URL",
+    "baseUrlPlaceholder": "https://dein-unternehmen.atlassian.net",
+    "baseUrlHelp": "Die URL deiner Jira-Cloud-Site oder deines Data-Center-Servers.",
+    "emailLabel": "Konto-E-Mail",
+    "emailPlaceholder": "du@unternehmen.com",
+    "emailHelp": "Für Jira Cloud erforderlich — die E-Mail deines Atlassian-Kontos.",
+    "tokenLabel": "API-Token",
+    "tokenHelp": "Erstelle einen unter id.atlassian.com → Sicherheit → API-Tokens. Er wird verschlüsselt auf diesem Gerät gespeichert und verlässt es nie.",
+    "test": "Verbindung testen",
+    "testing": "Teste…",
+    "testOk": "Verbunden als {{name}}",
+    "retest": "Erneut testen"
+  },
+  "project": {
+    "searchPlaceholder": "Projekte suchen…",
+    "manualLabel": "Oder gib einen Projektschlüssel ein",
+    "manualPlaceholder": "PROJ",
+    "selected": "{{key}} — {{name}}",
+    "none": "Keine Projekte gefunden",
+    "loading": "Projekte werden geladen…"
+  },
+  "mapping": {
+    "intro": "Status werden automatisch nach Kategorie zugeordnet (To Do / In Arbeit / Fertig). Überschreibe einen Status, wenn dein Workflow eigene Namen verwendet.",
+    "auto": "Automatisch (nach Kategorie)",
+    "todo": "Backlog / To Do",
+    "inProgress": "In Arbeit",
+    "done": "Fertig",
+    "cancelled": "Abgebrochen",
+    "loading": "Status werden geladen…"
+  },
+  "review": {
+    "site": "Site",
+    "project": "Projekt",
+    "account": "Konto",
+    "type": "Typ",
+    "cloud": "Jira Cloud",
+    "dc": "Jira Data Center"
+  },
+  "status": {
+    "connected": "Verbunden mit {{key}}",
+    "enabledLabel": "Synchronisierung aktiviert",
+    "enabledHelp": "Wenn aktiviert, werden Specs mit Jira synchronisiert und Rail-Ergebnisse aktualisieren die verknüpften Vorgänge.",
+    "pausedHelp": "Die Synchronisierung ist pausiert. Specs bleiben auf dem Board, aktualisieren Jira aber nicht mehr.",
+    "syncNow": "Jetzt synchronisieren",
+    "syncing": "Synchronisiere…",
+    "syncedToast": "{{count}} Vorgang/Vorgänge aus Jira synchronisiert",
+    "disconnect": "Trennen",
+    "disconnectConfirm": "Dieses Projekt von Jira trennen? Bestehende Specs bleiben auf dem Board; die Synchronisierung stoppt.",
+    "disconnectedToast": "Von Jira getrennt"
+  },
+  "outbox": {
+    "title": "Ausstehende Jira-Updates",
+    "pending": "{{count}} ausstehend",
+    "dead": "{{count}} benötigen Aufmerksamkeit",
+    "allSynced": "Alle Updates synchronisiert",
+    "retry": "Erneut versuchen",
+    "deadHelp": "Diese konnten nicht automatisch angewendet werden (z. B. hat dein Workflow keinen passenden Übergang). Korrigiere in Jira und versuche es erneut.",
+    "opTransition": "Status-Update",
+    "opComment": "Kommentar",
+    "opCreate": "Vorgang erstellen"
+  },
+  "authExpired": {
+    "title": "Jira getrennt",
+    "body": "Dein Jira-Token ist abgelaufen oder wurde widerrufen. Verbinde dich erneut, um {{count}} ausstehende(s) Update(s) zu synchronisieren.",
+    "reconnect": "Erneut verbinden"
+  },
+  "badge": {
+    "label": "Jira",
+    "openInJira": "In Jira öffnen"
+  },
+  "addSpec": {
+    "willCreate": "Wird in Jira erstellt · {{key}}"
+  },
+  "detail": {
+    "saveTitle": "Jira-Vorgang aktualisieren",
+    "saveBody": "Beim Speichern wird der Jira-Vorgang {{key}} mit diesen Änderungen aktualisiert.",
+    "saveConfirm": "Speichern und Jira aktualisieren",
+    "detailsTitle": "Jira-Details",
+    "developmentTitle": "Entwicklung",
+    "dev": {
+      "pullRequests": "Pull Requests",
+      "branches": "Branches",
+      "commits": "Commits"
+    },
+    "goToTicket": "Zum Ticket {{key}}",
+    "epic": "Epic"
+  },
+  "discard": {
+    "moveButton": "Verschieben nach {{status}}",
+    "title": "Spec nach {{status}} verschieben?",
+    "body": "Das Jira-Ticket {{key}} dieser Spec wird nach „{{status}}“ verschoben, statt gelöscht zu werden. Optional einen Grund angeben.",
+    "commentLabel": "Grund (optional)",
+    "commentPlaceholder": "Warum verschiebst du diese Spec?",
+    "confirm": "Nach {{status}} verschieben",
+    "moving": "Wird verschoben…",
+    "movedToast": "{{key}} nach {{status}} verschoben",
+    "configLabel": "Beim Verwerfen Ticket verschieben nach",
+    "configHelp": "Wenn du eine mit Jira verknüpfte Spec verwirfst, wird ihr Ticket in diesen Status verschoben, statt gelöscht zu werden.",
+    "configNone": "Keiner — normal löschen",
+    "reviewLabel": "Verwerfen verschiebt nach"
+  },
+  "errors": {
+    "generic": "Etwas ist schiefgelaufen",
+    "testFirst": "Teste zuerst die Verbindung"
+  }
+}

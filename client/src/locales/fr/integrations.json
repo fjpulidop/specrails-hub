@@ -63,5 +63,20 @@
     "categoryCount_other": "{{count}} catégories",
     "summary": "{{documents}} répartis dans {{categories}}.",
     "loadError": "Échec du chargement du document"
+  },
+  "jiraCard": {
+    "title": "Jira",
+    "category": "Suivi des tickets",
+    "description": "Adossez les specs de ce projet à un tableau Jira — synchronisation bidirectionnelle du statut, plus un commentaire à la fin d'un rail.",
+    "connectedDescription": "Synchronisé avec {{key}}. Les specs reflètent votre tableau Jira dans les deux sens.",
+    "connect": "Connecter",
+    "connected": "Connecté",
+    "manage": "Gérer",
+    "modalTitle": "Se connecter à Jira",
+    "manageTitle": "Connexion Jira",
+    "bullet1": "Synchronisation bidirectionnelle du statut avec votre tableau Jira.",
+    "bullet2": "Publie un commentaire à la fin d'un rail.",
+    "bullet3": "Votre backlog Jira apparaît comme des specs sur le tableau.",
+    "requires": "Nécessite un compte Jira Cloud ou Data Center."
   }
 }

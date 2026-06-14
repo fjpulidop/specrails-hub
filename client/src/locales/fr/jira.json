@@ -1,0 +1,126 @@
+{
+  "section": {
+    "title": "Jira",
+    "subtitle": "Synchronisez les specs de ce projet avec un tableau Jira",
+    "connectCta": "Se connecter à Jira"
+  },
+  "wizard": {
+    "step": "Étape {{current}} sur {{total}}",
+    "step1Title": "Connectez votre compte Jira",
+    "step2Title": "Choisissez un projet Jira",
+    "step3Title": "Associer les statuts (facultatif)",
+    "step4Title": "Vérifier et connecter",
+    "next": "Suivant",
+    "back": "Retour",
+    "cancel": "Annuler",
+    "connect": "Connecter",
+    "connecting": "Connexion…",
+    "later": "Le faire plus tard"
+  },
+  "creds": {
+    "baseUrlLabel": "URL Jira",
+    "baseUrlPlaceholder": "https://votre-entreprise.atlassian.net",
+    "baseUrlHelp": "L'URL de votre site Jira Cloud ou serveur Data Center.",
+    "emailLabel": "E-mail du compte",
+    "emailPlaceholder": "vous@entreprise.com",
+    "emailHelp": "Requis pour Jira Cloud — l'e-mail de votre compte Atlassian.",
+    "tokenLabel": "Jeton API",
+    "tokenHelp": "Créez-en un sur id.atlassian.com → Sécurité → Jetons API. Il est stocké chiffré sur cette machine et n'en sort jamais.",
+    "test": "Tester la connexion",
+    "testing": "Test en cours…",
+    "testOk": "Connecté en tant que {{name}}",
+    "retest": "Retester"
+  },
+  "project": {
+    "searchPlaceholder": "Rechercher des projets…",
+    "manualLabel": "Ou saisissez une clé de projet",
+    "manualPlaceholder": "PROJ",
+    "selected": "{{key}} — {{name}}",
+    "none": "Aucun projet trouvé",
+    "loading": "Chargement des projets…"
+  },
+  "mapping": {
+    "intro": "Les statuts sont associés automatiquement par catégorie (À faire / En cours / Terminé). Remplacez un état si votre workflow utilise des noms personnalisés.",
+    "auto": "Automatique (par catégorie)",
+    "todo": "Backlog / À faire",
+    "inProgress": "En cours",
+    "done": "Terminé",
+    "cancelled": "Annulé",
+    "loading": "Chargement des statuts…"
+  },
+  "review": {
+    "site": "Site",
+    "project": "Projet",
+    "account": "Compte",
+    "type": "Type",
+    "cloud": "Jira Cloud",
+    "dc": "Jira Data Center"
+  },
+  "status": {
+    "connected": "Connecté à {{key}}",
+    "enabledLabel": "Synchronisation activée",
+    "enabledHelp": "Lorsqu'elle est activée, les specs se synchronisent avec Jira et les résultats des rails mettent à jour les tickets liés.",
+    "pausedHelp": "La synchronisation est en pause. Les specs restent sur le tableau mais ne mettent plus Jira à jour.",
+    "syncNow": "Synchroniser maintenant",
+    "syncing": "Synchronisation…",
+    "syncedToast": "{{count}} ticket(s) synchronisé(s) depuis Jira",
+    "disconnect": "Déconnecter",
+    "disconnectConfirm": "Déconnecter ce projet de Jira ? Les specs existantes restent sur le tableau ; la synchronisation s'arrête.",
+    "disconnectedToast": "Déconnecté de Jira"
+  },
+  "outbox": {
+    "title": "Mises à jour Jira en attente",
+    "pending": "{{count}} en attente",
+    "dead": "{{count}} à vérifier",
+    "allSynced": "Toutes les mises à jour sont synchronisées",
+    "retry": "Réessayer",
+    "deadHelp": "Celles-ci n'ont pas pu être appliquées automatiquement (p. ex. votre workflow n'a pas de transition correspondante). Corrigez dans Jira, puis réessayez.",
+    "opTransition": "Mise à jour du statut",
+    "opComment": "Commentaire",
+    "opCreate": "Créer un ticket"
+  },
+  "authExpired": {
+    "title": "Jira déconnecté",
+    "body": "Votre jeton Jira a expiré ou a été révoqué. Reconnectez-vous pour synchroniser {{count}} mise(s) à jour en attente.",
+    "reconnect": "Se reconnecter"
+  },
+  "badge": {
+    "label": "Jira",
+    "openInJira": "Ouvrir dans Jira"
+  },
+  "addSpec": {
+    "willCreate": "Sera créé dans Jira · {{key}}"
+  },
+  "detail": {
+    "saveTitle": "Mettre à jour le ticket Jira",
+    "saveBody": "L'enregistrement mettra à jour le ticket Jira {{key}} avec ces modifications.",
+    "saveConfirm": "Enregistrer et mettre à jour Jira",
+    "detailsTitle": "Détails Jira",
+    "developmentTitle": "Développement",
+    "dev": {
+      "pullRequests": "Pull requests",
+      "branches": "Branches",
+      "commits": "Commits"
+    },
+    "goToTicket": "Aller au ticket {{key}}",
+    "epic": "Épopée"
+  },
+  "discard": {
+    "moveButton": "Déplacer vers {{status}}",
+    "title": "Déplacer la spec vers {{status}} ?",
+    "body": "Le ticket Jira {{key}} de cette spec sera déplacé vers « {{status}} » au lieu d'être supprimé. Ajoutez un motif facultatif.",
+    "commentLabel": "Motif (facultatif)",
+    "commentPlaceholder": "Pourquoi déplacez-vous cette spec ?",
+    "confirm": "Déplacer vers {{status}}",
+    "moving": "Déplacement…",
+    "movedToast": "{{key}} déplacé vers {{status}}",
+    "configLabel": "À l'abandon, déplacer le ticket vers",
+    "configHelp": "Lorsque vous abandonnez une spec liée à Jira, son ticket est déplacé vers ce statut au lieu d'être supprimé.",
+    "configNone": "Aucun — supprimer normalement",
+    "reviewLabel": "L'abandon déplace vers"
+  },
+  "errors": {
+    "generic": "Une erreur s'est produite",
+    "testFirst": "Testez d'abord la connexion"
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "section": {
+    "title": "Jira",
+    "subtitle": "このプロジェクトのスペックを Jira ボードと同期します",
+    "connectCta": "Jira に接続"
+  },
+  "wizard": {
+    "step": "ステップ {{current}} / {{total}}",
+    "step1Title": "Jira アカウントに接続",
+    "step2Title": "Jira プロジェクトを選択",
+    "step3Title": "ステータスを対応付け（任意）",
+    "step4Title": "確認して接続",
+    "next": "次へ",
+    "back": "戻る",
+    "cancel": "キャンセル",
+    "connect": "接続",
+    "connecting": "接続中…",
+    "later": "後で行う"
+  },
+  "creds": {
+    "baseUrlLabel": "Jira の URL",
+    "baseUrlPlaceholder": "https://your-company.atlassian.net",
+    "baseUrlHelp": "Jira Cloud サイトまたは Data Center サーバーの URL。",
+    "emailLabel": "アカウントのメール",
+    "emailPlaceholder": "you@company.com",
+    "emailHelp": "Jira Cloud では必須です — Atlassian アカウントのメールアドレス。",
+    "tokenLabel": "API トークン",
+    "tokenHelp": "id.atlassian.com → セキュリティ → API トークンで作成します。このマシンに暗号化して保存され、外部に出ることはありません。",
+    "test": "接続をテスト",
+    "testing": "テスト中…",
+    "testOk": "{{name}} として接続しました",
+    "retest": "再テスト"
+  },
+  "project": {
+    "searchPlaceholder": "プロジェクトを検索…",
+    "manualLabel": "またはプロジェクトキーを入力",
+    "manualPlaceholder": "PROJ",
+    "selected": "{{key}} — {{name}}",
+    "none": "プロジェクトが見つかりません",
+    "loading": "プロジェクトを読み込み中…"
+  },
+  "mapping": {
+    "intro": "ステータスはカテゴリ（To Do / 進行中 / 完了）で自動的に対応付けられます。ワークフローが独自の名前を使う場合は上書きできます。",
+    "auto": "自動（カテゴリ別）",
+    "todo": "バックログ / To Do",
+    "inProgress": "進行中",
+    "done": "完了",
+    "cancelled": "キャンセル",
+    "loading": "ステータスを読み込み中…"
+  },
+  "review": {
+    "site": "サイト",
+    "project": "プロジェクト",
+    "account": "アカウント",
+    "type": "種類",
+    "cloud": "Jira Cloud",
+    "dc": "Jira Data Center"
+  },
+  "status": {
+    "connected": "{{key}} に接続済み",
+    "enabledLabel": "同期を有効化",
+    "enabledHelp": "有効にすると、スペックが Jira と同期し、rail の結果がリンクされた課題を更新します。",
+    "pausedHelp": "同期は一時停止中です。スペックはボードに残りますが、Jira は更新されなくなります。",
+    "syncNow": "今すぐ同期",
+    "syncing": "同期中…",
+    "syncedToast": "Jira から {{count}} 件の課題を同期しました",
+    "disconnect": "切断",
+    "disconnectConfirm": "このプロジェクトを Jira から切断しますか？既存のスペックはボードに残り、同期は停止します。",
+    "disconnectedToast": "Jira から切断しました"
+  },
+  "outbox": {
+    "title": "保留中の Jira 更新",
+    "pending": "{{count}} 件保留中",
+    "dead": "{{count}} 件は対応が必要",
+    "allSynced": "すべての更新が同期されました",
+    "retry": "再試行",
+    "deadHelp": "これらは自動で適用できませんでした（例：ワークフローに一致する遷移がない）。Jira で修正してから再試行してください。",
+    "opTransition": "ステータス更新",
+    "opComment": "コメント",
+    "opCreate": "課題を作成"
+  },
+  "authExpired": {
+    "title": "Jira が切断されました",
+    "body": "Jira トークンが失効または取り消されました。再接続して保留中の {{count}} 件の更新を同期してください。",
+    "reconnect": "再接続"
+  },
+  "badge": {
+    "label": "Jira",
+    "openInJira": "Jira で開く"
+  },
+  "addSpec": {
+    "willCreate": "Jira に作成されます · {{key}}"
+  },
+  "detail": {
+    "saveTitle": "Jira 課題を更新",
+    "saveBody": "保存すると、Jira 課題 {{key}} がこの変更で更新されます。",
+    "saveConfirm": "保存して Jira を更新",
+    "detailsTitle": "Jira の詳細",
+    "developmentTitle": "開発",
+    "dev": {
+      "pullRequests": "プルリクエスト",
+      "branches": "ブランチ",
+      "commits": "コミット"
+    },
+    "goToTicket": "チケット {{key}} を開く",
+    "epic": "エピック"
+  },
+  "discard": {
+    "moveButton": "{{status}} に移動",
+    "title": "仕様を {{status}} に移動しますか？",
+    "body": "この仕様の Jira 課題 {{key}} は削除されず、「{{status}}」に移動されます。任意で理由を追加できます。",
+    "commentLabel": "理由（任意）",
+    "commentPlaceholder": "この仕様を移動する理由は？",
+    "confirm": "{{status}} に移動",
+    "moving": "移動中…",
+    "movedToast": "{{key}} を {{status}} に移動しました",
+    "configLabel": "破棄時に課題を移動する先",
+    "configHelp": "Jira と連携した仕様を破棄すると、その課題は削除されず、このステータスに移動されます。",
+    "configNone": "なし — 通常どおり削除",
+    "reviewLabel": "破棄時の移動先"
+  },
+  "errors": {
+    "generic": "問題が発生しました",
+    "testFirst": "先に接続をテストしてください"
+  }
+}

@@ -63,5 +63,20 @@
     "categoryCount_other": "{{count}} categories",
     "summary": "{{documents}} across {{categories}}.",
     "loadError": "Failed to load document"
+  },
+  "jiraCard": {
+    "title": "Jira",
+    "category": "Issue tracking",
+    "description": "Back this project's specs with a Jira board — two-way sync of status, plus a completion comment when a rail finishes.",
+    "connectedDescription": "Synced with {{key}}. Specs mirror your Jira board both ways.",
+    "connect": "Connect",
+    "connected": "Connected",
+    "manage": "Manage",
+    "modalTitle": "Connect to Jira",
+    "manageTitle": "Jira connection",
+    "bullet1": "Two-way status sync with your Jira board.",
+    "bullet2": "Posts a completion comment when a rail finishes.",
+    "bullet3": "Your Jira backlog appears as specs on the board.",
+    "requires": "Requires a Jira Cloud or Data Center account."
   }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Sparkles, Send, Zap, MessagesSquare, Globe, Ratio, PenLine } from 'lucide-react'
+import { Sparkles, Send, Zap, MessagesSquare, Globe, Ratio, PenLine, Plug } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
@@ -19,6 +19,7 @@ import { getLastEngine, setLastEngine } from '../lib/last-engine'
 import { useContextScope } from '../hooks/useContextScope'
 import { useContextBudget } from '../hooks/useContextBudget'
 import { useQuickContractRefineLast } from '../hooks/useQuickContractRefineLast'
+import { useJiraConnection } from '../hooks/useJiraConnection'
 import { quickHintForScope, tierFromScope, submitAccentForTier, type ContextScope, type SpecMode } from '../types/context-scope'
 import { BrowserCaptureModal } from './browser-capture/BrowserCaptureModal'
 import { CapturedDomPanel } from './browser-capture/CapturedDomPanel'
@@ -89,6 +90,10 @@ function genPendingId(): string {
 
 export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: ProposeSpecModalProps) {
   const { t } = useTranslation('addspec')
+  const { t: tj } = useTranslation('jira')
+  // On a Jira-backed project, new specs are always created in Jira; the indicator
+  // makes that explicit. (Private/not-yet-official specs use Save as Draft.)
+  const jira = useJiraConnection()
   const { activeProjectId, projects } = useDesktop()
   const tracker = useSpecGenTracker()
   const [mode, setMode] = useState<SpecMode>('quick')
@@ -637,6 +642,14 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
                     <CapturedDomPanel dom={c.dom} onRemove={() => removeCapture(c)} />
                   </div>
                 ))}
+              </div>
+            )}
+            {jira.connected && mode === 'quick' && (
+              <div className="flex items-center justify-end text-[11px]" data-testid="jira-create-indicator">
+                <span className="inline-flex items-center gap-1 text-accent-info">
+                  <Plug className="w-3 h-3" />
+                  {tj('addSpec.willCreate', { key: jira.jiraProjectKey ?? '' })}
+                </span>
               </div>
             )}
             <div className="flex items-center justify-end">

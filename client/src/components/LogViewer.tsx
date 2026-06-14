@@ -419,9 +419,9 @@ const LogLine = memo(function LogLine({ line, even }: { line: FormattedLine; eve
       className={cn(
         'flex items-start gap-2 group px-2 py-0.5 rounded-sm',
         !isDiff && (even ? 'bg-muted/20' : 'bg-transparent'),
-        line.type === 'result' && 'bg-emerald-500/5 border-l-2 border-emerald-500/40 mt-2 py-2',
-        isDiffAdd    && 'bg-emerald-500/8 border-l-2 border-emerald-500/50',
-        isDiffRemove && 'bg-red-500/8 border-l-2 border-red-500/50',
+        line.type === 'result' && 'bg-emerald-500/5 aurora-light:bg-accent-success/10 border-l-2 border-emerald-500/40 aurora-light:border-accent-success/40 mt-2 py-2',
+        isDiffAdd    && 'bg-emerald-500/8 aurora-light:bg-accent-success/10 border-l-2 border-emerald-500/50 aurora-light:border-accent-success/50',
+        isDiffRemove && 'bg-red-500/8 aurora-light:bg-destructive/10 border-l-2 border-red-500/50 aurora-light:border-destructive/50',
         isDiffMeta   && 'bg-accent-primary/5 border-l-2 border-accent-primary/30',
         isDiffHunk   && 'bg-accent-info/5 border-l-2 border-accent-info/30',
       )}
@@ -462,14 +462,14 @@ const LogLine = memo(function LogLine({ line, even }: { line: FormattedLine; eve
         <span
           className={cn(
             'flex-1 break-all leading-relaxed whitespace-pre-wrap font-mono',
-            line.type === 'tool-use'    && 'text-cyan-400/80 text-[11px]',
-            line.type === 'stderr'      && 'text-orange-400',
-            line.type === 'result'      && 'text-emerald-400 font-medium',
+            line.type === 'tool-use'    && 'text-cyan-400/80 aurora-light:text-accent-info text-[11px]',
+            line.type === 'stderr'      && 'text-orange-400 aurora-light:text-accent-warning',
+            line.type === 'result'      && 'text-emerald-400 aurora-light:text-accent-success font-medium',
             line.type === 'log'         && 'text-foreground/60',
             line.type === 'plain'       && 'text-foreground/70',
             line.type === 'tool-result' && 'text-muted-foreground/50',
-            isDiffAdd    && 'text-emerald-400',
-            isDiffRemove && 'text-red-400',
+            isDiffAdd    && 'text-emerald-400 aurora-light:text-accent-success',
+            isDiffRemove && 'text-red-400 aurora-light:text-destructive',
             isDiffMeta   && 'text-accent-primary/80',
             isDiffHunk   && 'text-accent-info/80',
           )}

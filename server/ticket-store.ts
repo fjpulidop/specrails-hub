@@ -47,7 +47,23 @@ export interface Ticket {
   created_by: string
   // 'hub' is a persisted on-disk value (tickets.json) shared with specrails-core —
   // legacy wire value kept for compat, do not rename.
-  source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'hub' | 'explore-draft' | 'specs-smash' | 'free-prompt'
+  // 'jira' marks a spec materialized from a Jira issue (see server/jira/). The
+  // jira_key / jira_url fields below are additive — specrails-core ignores them.
+  source: 'manual' | 'product-backlog' | 'propose-spec' | 'get-backlog-specs' | 'hub' | 'explore-draft' | 'specs-smash' | 'free-prompt' | 'jira'
+  /** Display key of the linked Jira issue (e.g. "PROJ-123"), null for local specs. */
+  jira_key?: string | null
+  /** Browser URL of the linked Jira issue, null for local specs. */
+  jira_url?: string | null
+  /** Key of the Jira parent epic (e.g. "PROJ-5"), when the issue has one. */
+  jira_epic_key?: string | null
+  /** Summary/name of the Jira parent epic, when the issue has one. */
+  jira_epic_name?: string | null
+  /** Id of the issue's (active) Jira sprint, when it has one. */
+  jira_sprint_id?: string | null
+  /** Name of the issue's (active) Jira sprint, when it has one. */
+  jira_sprint_name?: string | null
+  /** State of that sprint: 'active' (the current sprint) | 'future' | 'closed'. */
+  jira_sprint_state?: string | null
   /**
    * App-managed review flag. Set when a job had already marked this spec `done`
    * (the agent reached its Ship phase) but the job then failed / was canceled /
