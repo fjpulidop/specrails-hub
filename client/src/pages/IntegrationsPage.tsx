@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
 import { Puzzle, AlertTriangle, CheckCircle2, XCircle, Trash2, Download, Loader2 } from 'lucide-react'
 import { getApiBase } from '../lib/api'
-import { useDesktop } from '../hooks/useDesktop'
+import { useDesktop, projectProviders } from '../hooks/useDesktop'
 import { useSharedWebSocket } from '../hooks/useSharedWebSocket'
 import { useProjectCache } from '../hooks/useProjectCache'
+import { JiraIntegrationCard } from '../components/jira/JiraIntegrationCard'
+import { FEATURE_JIRA } from '../lib/feature-flags'
 
 interface PluginRequirement {
   name: string
@@ -56,7 +58,11 @@ interface PluginEvent {
 
 export default function IntegrationsPage() {
   const { t } = useTranslation('integrations')
-  const { activeProjectId } = useDesktop()
+  const { activeProjectId, projects } = useDesktop()
+  // Plugins (Serena) are Claude-only — hide them on Codex-only projects. Jira is
+  // provider-agnostic and shows for every project.
+  const activeProject = projects.find((p) => p.id === activeProjectId)
+  const showPlugins = activeProject ? projectProviders(activeProject).includes('claude') : true
   const { registerHandler, unregisterHandler } = useSharedWebSocket()
   const projectIdRef = useRef(activeProjectId)
   useEffect(() => { projectIdRef.current = activeProjectId }, [activeProjectId])
@@ -121,14 +127,13 @@ export default function IntegrationsPage() {
       <div className="flex-1 overflow-auto p-6">
         {isFirstLoad && isLoading ? (
           <SkeletonGrid />
-        ) : error ? (
+        ) : error && showPlugins ? (
           <ErrorState onRetry={refresh} />
-        ) : (plugins?.length ?? 0) === 0 ? (
-          <EmptyState />
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {active.map((p) => (
+              <JiraIntegrationCard activeProjectId={activeProjectId} />
+              {showPlugins && active.map((p) => (
                 <Card
                   key={p.name}
                   plugin={p}
@@ -138,7 +143,7 @@ export default function IntegrationsPage() {
                 />
               ))}
             </div>
-            {orphans.length > 0 && (
+            {showPlugins && orphans.length > 0 && (
               <div className="mt-10">
                 <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
                   <AlertTriangle className="w-3.5 h-3.5" /> {t('page.deprecated')}
@@ -150,6 +155,7 @@ export default function IntegrationsPage() {
                 </div>
               </div>
             )}
+            {!FEATURE_JIRA && (!showPlugins || active.length === 0) && <EmptyState />}
           </>
         )}
       </div>

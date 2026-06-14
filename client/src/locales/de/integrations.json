@@ -63,5 +63,16 @@
     "categoryCount_other": "{{count}} Kategorien",
     "summary": "{{documents}} in {{categories}}.",
     "loadError": "Dokument konnte nicht geladen werden"
+  },
+  "jiraCard": {
+    "title": "Jira",
+    "category": "Vorgangsverfolgung",
+    "description": "Hinterlege die Specs dieses Projekts mit einem Jira-Board — bidirektionale Statussynchronisierung plus ein Kommentar am Ende eines Rails.",
+    "connectedDescription": "Synchronisiert mit {{key}}. Specs spiegeln dein Jira-Board in beide Richtungen.",
+    "connect": "Verbinden",
+    "connected": "Verbunden",
+    "manage": "Verwalten",
+    "modalTitle": "Mit Jira verbinden",
+    "manageTitle": "Jira-Verbindung"
   }
 }

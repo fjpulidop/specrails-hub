@@ -43,7 +43,9 @@ export type SidebarSection =
 /** Sections whose backing feature is Claude-only (no Codex equivalent yet). */
 const CLAUDE_ONLY_SECTIONS: ReadonlySet<SidebarSection> = new Set<SidebarSection>([
   'agents',
-  'integrations',
+  // 'integrations' is NOT Claude-only: it hosts the provider-agnostic Jira card
+  // (shown for every project). Claude-only entries inside it (Serena plugin) are
+  // filtered per-provider by IntegrationsPage, not by hiding the whole section.
 ])
 
 /** True when a single provider supports a given sidebar section. */

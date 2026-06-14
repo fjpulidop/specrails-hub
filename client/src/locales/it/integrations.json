@@ -63,5 +63,16 @@
     "categoryCount_other": "{{count}} categorie",
     "summary": "{{documents}} in {{categories}}.",
     "loadError": "Impossibile caricare il documento"
+  },
+  "jiraCard": {
+    "title": "Jira",
+    "category": "Tracciamento ticket",
+    "description": "Appoggia le spec di questo progetto a una board Jira — sincronizzazione bidirezionale dello stato e un commento al termine di un rail.",
+    "connectedDescription": "Sincronizzato con {{key}}. Le spec rispecchiano la tua board Jira in entrambe le direzioni.",
+    "connect": "Connetti",
+    "connected": "Connesso",
+    "manage": "Gestisci",
+    "modalTitle": "Connetti a Jira",
+    "manageTitle": "Connessione Jira"
   }
 }

@@ -1,63 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card'
 import { Button } from '../ui/button'
-import { useDesktop } from '../../hooks/useDesktop'
-import { FEATURE_JIRA } from '../../lib/feature-flags'
-import { JiraConnectWizard } from '../jira/JiraConnectWizard'
 import { jiraApi, type ConnectionState, type OutboxOp } from '../../lib/jira-api'
 
 /**
- * Per-project Jira setup + status surface in the project SettingsPage. Renders
- * the shared step-by-step `JiraConnectWizard` when not connected, and a status
- * card (hot-swap toggle, sync, dead-letter list, disconnect) once connected.
+ * Connected-state management for a project's Jira board: status header, the
+ * hot-swap enable toggle, Sync now, the dead-letter list with retry, and
+ * disconnect. Shared by the Integrations Jira card (and previously the Settings
+ * section). `state.connection` must be present.
  */
-export function JiraSettingsSection() {
-  const { t } = useTranslation('jira')
-  const { activeProjectId } = useDesktop()
-
-  const [conn, setConn] = useState<ConnectionState | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  const reload = useCallback(async () => {
-    try {
-      setConn(await jiraApi.getConnection())
-    } catch {
-      setConn({ connected: false })
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!FEATURE_JIRA || !activeProjectId) return
-    setLoading(true)
-    void reload()
-  }, [activeProjectId, reload])
-
-  if (!FEATURE_JIRA) return null
-
-  return (
-    <Card className="mt-6" data-testid="jira-settings">
-      <CardHeader>
-        <CardTitle>{t('section.title')}</CardTitle>
-        <CardDescription>{t('section.subtitle')}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <p className="text-sm text-muted-foreground">…</p>
-        ) : conn?.connected && conn.connection ? (
-          <JiraConnected state={conn} onChanged={reload} />
-        ) : (
-          <JiraConnectWizard onConnected={reload} />
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-function JiraConnected({ state, onChanged }: { state: ConnectionState; onChanged: () => void }) {
+export function JiraConnectedCard({ state, onChanged }: { state: ConnectionState; onChanged: () => void }) {
   const { t } = useTranslation('jira')
   const connection = state.connection!
   const [enabled, setEnabled] = useState(connection.enabled)
@@ -131,7 +84,7 @@ function JiraConnected({ state, onChanged }: { state: ConnectionState; onChanged
   const pending = counts.pending + counts.inflight
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="jira-connected">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-foreground">{t('status.connected', { key: connection.jiraProjectKey })}</p>

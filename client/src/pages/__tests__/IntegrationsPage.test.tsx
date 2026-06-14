@@ -4,9 +4,12 @@ import { render, screen, waitFor, fireEvent } from '../../test-utils'
 import IntegrationsPage from '../IntegrationsPage'
 
 vi.mock('../../hooks/useDesktop', () => ({
+  // projectProviders is imported by IntegrationsPage from this module too.
+  projectProviders: (p: { provider?: string; providers?: string[] }) =>
+    p.providers && p.providers.length > 0 ? p.providers : [p.provider ?? 'claude'],
   useDesktop: () => ({
     activeProjectId: 'proj-1',
-    projects: [],
+    projects: [{ id: 'proj-1', provider: 'claude', providers: ['claude'] }],
     isLoading: false,
     setupProjectIds: new Set(),
     setActiveProjectId: vi.fn(),
@@ -40,6 +43,27 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+/**
+ * URL-routed fetch so the Jira card's GET /jira/connection (which always fires
+ * on mount) never shifts the plugin fetch ordering. `pluginsBody` is what
+ * GET /plugins returns; `previewBody` (optional) what preview-install returns.
+ */
+function routeFetch(pluginsBody: unknown, previewBody?: unknown) {
+  fetchMock.mockImplementation((url: string) => {
+    const u = String(url)
+    if (u.includes('/jira/connection')) {
+      return Promise.resolve({ ok: true, text: async () => JSON.stringify({ connected: false }) })
+    }
+    if (u.includes('preview-install')) {
+      return Promise.resolve({ ok: true, json: async () => previewBody ?? {} })
+    }
+    if (u.endsWith('/plugins')) {
+      return Promise.resolve({ ok: true, json: async () => pluginsBody })
+    }
+    return Promise.resolve({ ok: true, json: async () => ({}) })
+  })
+}
+
 const sampleCatalog = {
   plugins: [
     {
@@ -54,8 +78,15 @@ const sampleCatalog = {
 }
 
 describe('IntegrationsPage', () => {
-  it('renders cards for plugins from the catalog', async () => {
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => sampleCatalog })
+  it('always shows the Jira integration card', async () => {
+    routeFetch(sampleCatalog)
+    render(<IntegrationsPage />)
+    await waitFor(() => expect(screen.getByTestId('jira-integration-card')).toBeInTheDocument())
+    expect(screen.getByTestId('jira-connect-btn')).toBeInTheDocument()
+  })
+
+  it('renders cards for plugins from the catalog (Claude project)', async () => {
+    routeFetch(sampleCatalog)
     render(<IntegrationsPage />)
     await waitFor(() => {
       expect(screen.getByText('serena')).toBeInTheDocument()
@@ -64,16 +95,11 @@ describe('IntegrationsPage', () => {
   })
 
   it('opens install dialog and fetches preview', async () => {
-    fetchMock
-      .mockResolvedValueOnce({ ok: true, json: async () => sampleCatalog })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          pluginName: 'serena',
-          files: [{ path: '.mcp.json', op: 'create', summary: '+ mcpServers.serena' }],
-          requirements: [{ name: 'uv', installed: true, executable: true, meetsMinimum: true, version: '0.1.0' }],
-        }),
-      })
+    routeFetch(sampleCatalog, {
+      pluginName: 'serena',
+      files: [{ path: '.mcp.json', op: 'create', summary: '+ mcpServers.serena' }],
+      requirements: [{ name: 'uv', installed: true, executable: true, meetsMinimum: true, version: '0.1.0' }],
+    })
     render(<IntegrationsPage />)
     await waitFor(() => screen.getByText('serena'))
     fireEvent.click(screen.getByRole('button', { name: /install/i }))
@@ -84,16 +110,8 @@ describe('IntegrationsPage', () => {
   })
 
   it('shows installed state with uninstall button', async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        plugins: [{
-          ...sampleCatalog.plugins[0],
-          status: 'installed',
-          installedAt: 'now',
-          health: 'ok',
-        }],
-      }),
+    routeFetch({
+      plugins: [{ ...sampleCatalog.plugins[0], status: 'installed', installedAt: 'now', health: 'ok' }],
     })
     render(<IntegrationsPage />)
     await waitFor(() => {
@@ -102,16 +120,11 @@ describe('IntegrationsPage', () => {
   })
 
   it('shows Auto-install button when uv prerequisite is missing', async () => {
-    fetchMock
-      .mockResolvedValueOnce({ ok: true, json: async () => sampleCatalog })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          pluginName: 'serena',
-          files: [{ path: '.mcp.json', op: 'create' }],
-          requirements: [{ name: 'uv', installed: false, executable: false, meetsMinimum: false, minVersion: '0.1.0' }],
-        }),
-      })
+    routeFetch(sampleCatalog, {
+      pluginName: 'serena',
+      files: [{ path: '.mcp.json', op: 'create' }],
+      requirements: [{ name: 'uv', installed: false, executable: false, meetsMinimum: false, minVersion: '0.1.0' }],
+    })
     render(<IntegrationsPage />)
     await waitFor(() => screen.getByText('serena'))
     fireEvent.click(screen.getByRole('button', { name: /install$/i }))
@@ -120,32 +133,52 @@ describe('IntegrationsPage', () => {
     })
   })
 
-  it('renders empty state when no plugins are bundled', async () => {
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ plugins: [] }) })
+  it('shows the Jira card (not an empty state) when no plugins are bundled', async () => {
+    routeFetch({ plugins: [] })
     render(<IntegrationsPage />)
-    await waitFor(() => {
-      expect(screen.getByText(/no plugins are bundled/i)).toBeInTheDocument()
-    })
+    await waitFor(() => expect(screen.getByTestId('jira-integration-card')).toBeInTheDocument())
+    expect(screen.queryByText('serena')).toBeNull()
   })
 
   it('renders orphan section', async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        plugins: [{
-          name: 'old-thing',
-          version: '0.1.0',
-          description: 'gone',
-          whatItDoes: [],
-          requirements: [],
-          status: 'orphan',
-        }],
-      }),
+    routeFetch({
+      plugins: [{
+        name: 'old-thing',
+        version: '0.1.0',
+        description: 'gone',
+        whatItDoes: [],
+        requirements: [],
+        status: 'orphan',
+      }],
     })
     render(<IntegrationsPage />)
     await waitFor(() => {
       expect(screen.getByText(/Deprecated/i)).toBeInTheDocument()
     })
     expect(screen.getByRole('button', { name: /remove orphan/i })).toBeInTheDocument()
+  })
+
+  it('hides Claude-only plugins on a Codex-only project but still shows Jira', async () => {
+    vi.resetModules()
+    vi.doMock('../../hooks/useDesktop', () => ({
+      projectProviders: () => ['codex'],
+      useDesktop: () => ({
+        activeProjectId: 'proj-1',
+        projects: [{ id: 'proj-1', provider: 'codex', providers: ['codex'] }],
+        isLoading: false,
+        setupProjectIds: new Set(),
+        setActiveProjectId: vi.fn(),
+        startSetupWizard: vi.fn(),
+        completeSetupWizard: vi.fn(),
+        addProject: vi.fn(),
+        removeProject: vi.fn(),
+      }),
+    }))
+    routeFetch(sampleCatalog)
+    const { default: CodexPage } = await import('../IntegrationsPage')
+    render(<CodexPage />)
+    await waitFor(() => expect(screen.getByTestId('jira-integration-card')).toBeInTheDocument())
+    expect(screen.queryByText('serena')).toBeNull()
+    vi.doUnmock('../../hooks/useDesktop')
   })
 })

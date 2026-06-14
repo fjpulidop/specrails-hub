@@ -63,5 +63,16 @@
     "categoryCount_other": "{{count}} カテゴリ",
     "summary": "{{categories}}にわたって{{documents}}。",
     "loadError": "ドキュメントの読み込みに失敗しました"
+  },
+  "jiraCard": {
+    "title": "Jira",
+    "category": "課題トラッキング",
+    "description": "このプロジェクトのスペックを Jira ボードで裏付け — ステータスを双方向同期し、rail 完了時にコメントを投稿します。",
+    "connectedDescription": "{{key}} と同期済み。スペックは Jira ボードと双方向でミラーされます。",
+    "connect": "接続",
+    "connected": "接続済み",
+    "manage": "管理",
+    "modalTitle": "Jira に接続",
+    "manageTitle": "Jira 接続"
   }
 }
