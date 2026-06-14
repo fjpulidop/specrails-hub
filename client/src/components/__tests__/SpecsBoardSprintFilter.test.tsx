@@ -13,12 +13,12 @@ vi.mock('@dnd-kit/sortable', () => ({
 vi.mock('@dnd-kit/utilities', () => ({ CSS: { Transform: { toString: () => '' }, Translate: { toString: () => '' } } }))
 vi.mock('../ProposeSpecModal', () => ({ ProposeSpecModal: () => null }))
 
-function makeTicket(id: number, title: string, sprintId?: string, sprintName?: string): LocalTicket {
+function makeTicket(id: number, title: string, sprintId?: string, sprintName?: string, sprintState?: string): LocalTicket {
   return {
     id, title, description: '', status: 'todo', priority: 'medium', labels: [], assignee: null,
     prerequisites: [], metadata: {}, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z',
     created_by: 'tester', source: sprintId ? 'jira' : 'manual',
-    ...(sprintId ? { jira_sprint_id: sprintId, jira_sprint_name: sprintName ?? sprintId } : {}),
+    ...(sprintId ? { jira_sprint_id: sprintId, jira_sprint_name: sprintName ?? sprintId, jira_sprint_state: sprintState } : {}),
   }
 }
 
@@ -46,6 +46,19 @@ describe('SpecsBoard sprint filter', () => {
     expect(screen.getByText('Spec in S42')).toBeInTheDocument()
     expect(screen.getByText('Another S42 spec')).toBeInTheDocument()
     expect(screen.queryByText('Spec in S43')).toBeNull()
+  })
+
+  it('flags the active sprint as "Current" in the dropdown', () => {
+    const tickets = [
+      makeTicket(1, 'Closed spec', '42', 'Sprint 42', 'closed'),
+      makeTicket(2, 'Active spec', '43', 'Sprint 43', 'active'),
+    ]
+    render(<SpecsBoard tickets={tickets} doneTickets={[]} isLoading={false} onTicketClick={onTicketClick} />)
+    fireEvent.click(screen.getByTestId('spec-sprint-filter-dropdown'))
+    // Exactly one "Current" badge, on the active sprint.
+    const badges = screen.getAllByTestId('spec-sprint-current-badge')
+    expect(badges).toHaveLength(1)
+    expect(badges[0]).toHaveTextContent('Current')
   })
 
   it('clears the filter with "All sprints"', () => {

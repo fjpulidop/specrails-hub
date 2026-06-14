@@ -116,6 +116,7 @@
     "ariaLabel": "Filtrer par épopée"
   },
   "sprintFilter": {
+    "current": "Actuel",
     "all": "Tous les sprints",
     "ariaLabel": "Filtrer par sprint"
   }

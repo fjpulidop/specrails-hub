@@ -244,14 +244,14 @@ describe('extractSprint', () => {
   }
 
   it('returns null/null when there is no sprint field id', () => {
-    expect(extractSprint(withSprint([{ id: 1, name: 'S1', state: 'active' }]), null)).toEqual({ id: null, name: null })
-    expect(extractSprint(withSprint([{ id: 1, name: 'S1' }]), 'none')).toEqual({ id: null, name: null })
+    expect(extractSprint(withSprint([{ id: 1, name: 'S1', state: 'active' }]), null)).toEqual({ id: null, name: null, state: null })
+    expect(extractSprint(withSprint([{ id: 1, name: 'S1' }]), 'none')).toEqual({ id: null, name: null, state: null })
   })
 
   it('returns null/null when the field is absent or not an array', () => {
-    expect(extractSprint(makeIssue({}), FIELD)).toEqual({ id: null, name: null })
-    expect(extractSprint(withSprint('not-an-array'), FIELD)).toEqual({ id: null, name: null })
-    expect(extractSprint(withSprint([]), FIELD)).toEqual({ id: null, name: null })
+    expect(extractSprint(makeIssue({}), FIELD)).toEqual({ id: null, name: null, state: null })
+    expect(extractSprint(withSprint('not-an-array'), FIELD)).toEqual({ id: null, name: null, state: null })
+    expect(extractSprint(withSprint([]), FIELD)).toEqual({ id: null, name: null, state: null })
   })
 
   it('prefers the ACTIVE sprint when several are present', () => {
@@ -264,17 +264,23 @@ describe('extractSprint', () => {
         ]),
         FIELD,
       ),
-    ).toEqual({ id: '11', name: 'Now' })
+    ).toEqual({ id: '11', name: 'Now', state: 'active' })
   })
 
   it('falls back to the last sprint when none is active', () => {
     expect(
       extractSprint(withSprint([{ id: 10, name: 'A', state: 'closed' }, { id: 11, name: 'B', state: 'closed' }]), FIELD),
-    ).toEqual({ id: '11', name: 'B' })
+    ).toEqual({ id: '11', name: 'B', state: 'closed' })
   })
 
   it('uses the id as the name when name is missing', () => {
-    expect(extractSprint(withSprint([{ id: 7 }]), FIELD)).toEqual({ id: '7', name: '7' })
+    expect(extractSprint(withSprint([{ id: 7 }]), FIELD)).toEqual({ id: '7', name: '7', state: null })
+  })
+
+  it('lowercases the active sprint state for the "current" marker', () => {
+    expect(extractSprint(withSprint([{ id: 9, name: 'Cur', state: 'ACTIVE' }]), FIELD)).toEqual({
+      id: '9', name: 'Cur', state: 'active',
+    })
   })
 })
 

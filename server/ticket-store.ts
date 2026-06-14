@@ -62,6 +62,8 @@ export interface Ticket {
   jira_sprint_id?: string | null
   /** Name of the issue's (active) Jira sprint, when it has one. */
   jira_sprint_name?: string | null
+  /** State of that sprint: 'active' (the current sprint) | 'future' | 'closed'. */
+  jira_sprint_state?: string | null
   /**
    * App-managed review flag. Set when a job had already marked this spec `done`
    * (the agent reached its Ship phase) but the job then failed / was canceled /

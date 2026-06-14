@@ -87,17 +87,18 @@ export function extractEpic(issue: JiraIssue): { key: string | null; name: strin
 export function extractSprint(
   issue: JiraIssue,
   sprintFieldId: string | null,
-): { id: string | null; name: string | null } {
-  if (!sprintFieldId || sprintFieldId === 'none') return { id: null, name: null }
+): { id: string | null; name: string | null; state: string | null } {
+  if (!sprintFieldId || sprintFieldId === 'none') return { id: null, name: null, state: null }
   const raw = (issue.fields as Record<string, unknown>)[sprintFieldId]
-  if (!Array.isArray(raw) || raw.length === 0) return { id: null, name: null }
+  if (!Array.isArray(raw) || raw.length === 0) return { id: null, name: null, state: null }
   const objs = raw.filter((s): s is { id?: unknown; name?: unknown; state?: unknown } => !!s && typeof s === 'object')
-  if (objs.length === 0) return { id: null, name: null }
+  if (objs.length === 0) return { id: null, name: null, state: null }
   const active = objs.find((s) => typeof s.state === 'string' && s.state.toLowerCase() === 'active')
   const chosen = active ?? objs[objs.length - 1]
   const id = chosen.id != null ? String(chosen.id) : null
   const name = typeof chosen.name === 'string' ? chosen.name : id
-  return { id, name }
+  const state = typeof chosen.state === 'string' ? chosen.state.toLowerCase() : null
+  return { id, name, state }
 }
 
 /** Map a Jira issue to a full Ticket. `existing` preserves created_at and local-only fields. */
@@ -108,6 +109,7 @@ export function mapIssueToTicket(
   existing?: Ticket
 ): Ticket {
   const now = new Date().toISOString()
+  const sprint = extractSprint(issue, conn.sprintFieldId)
   return {
     id: localId,
     title: issue.fields.summary || `(${issue.key})`,
@@ -133,8 +135,9 @@ export function mapIssueToTicket(
     jira_url: issueUrl(conn.baseUrl, issue.key),
     jira_epic_key: extractEpic(issue).key,
     jira_epic_name: extractEpic(issue).name,
-    jira_sprint_id: extractSprint(issue, conn.sprintFieldId).id,
-    jira_sprint_name: extractSprint(issue, conn.sprintFieldId).name,
+    jira_sprint_id: sprint.id,
+    jira_sprint_name: sprint.name,
+    jira_sprint_state: sprint.state,
   }
 }
 
@@ -164,6 +167,7 @@ function sameJiraContent(a: Ticket, b: Ticket): boolean {
     (a.jira_epic_name ?? null) === (b.jira_epic_name ?? null) &&
     (a.jira_sprint_id ?? null) === (b.jira_sprint_id ?? null) &&
     (a.jira_sprint_name ?? null) === (b.jira_sprint_name ?? null) &&
+    (a.jira_sprint_state ?? null) === (b.jira_sprint_state ?? null) &&
     a.labels.length === b.labels.length &&
     a.labels.every((l, i) => l === b.labels[i])
   )

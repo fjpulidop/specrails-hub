@@ -116,6 +116,7 @@
     "ariaLabel": "Filtrar por épico"
   },
   "sprintFilter": {
+    "current": "Atual",
     "all": "Todos os sprints",
     "ariaLabel": "Filtrar por sprint"
   }

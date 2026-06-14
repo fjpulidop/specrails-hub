@@ -116,6 +116,7 @@
     "ariaLabel": "エピックで絞り込み"
   },
   "sprintFilter": {
+    "current": "現在",
     "all": "すべてのスプリント",
     "ariaLabel": "スプリントで絞り込み"
   }

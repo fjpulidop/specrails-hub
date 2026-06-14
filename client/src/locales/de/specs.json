@@ -116,6 +116,7 @@
     "ariaLabel": "Nach Epic filtern"
   },
   "sprintFilter": {
+    "current": "Aktuell",
     "all": "Alle Sprints",
     "ariaLabel": "Nach Sprint filtern"
   }

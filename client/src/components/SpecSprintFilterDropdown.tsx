@@ -16,6 +16,8 @@ interface SprintEntry {
   id: string
   name: string
   count: number
+  /** True when this is the board's active ("current") sprint. */
+  active: boolean
 }
 
 /**
@@ -33,11 +35,19 @@ export function SpecSprintFilterDropdown({ tickets, active, onChange, className 
     const map = new Map<string, SprintEntry>()
     for (const tk of tickets) {
       if (!tk.jira_sprint_id) continue
+      const isActive = tk.jira_sprint_state === 'active'
       const cur = map.get(tk.jira_sprint_id)
-      if (cur) cur.count += 1
-      else map.set(tk.jira_sprint_id, { id: tk.jira_sprint_id, name: tk.jira_sprint_name ?? tk.jira_sprint_id, count: 1 })
+      if (cur) {
+        cur.count += 1
+        if (isActive) cur.active = true
+      } else {
+        map.set(tk.jira_sprint_id, { id: tk.jira_sprint_id, name: tk.jira_sprint_name ?? tk.jira_sprint_id, count: 1, active: isActive })
+      }
     }
-    return Array.from(map.values()).sort((a, b) => (b.count !== a.count ? b.count - a.count : a.name.localeCompare(b.name)))
+    // Current sprint first, then by count, then name.
+    return Array.from(map.values()).sort((a, b) =>
+      a.active !== b.active ? (a.active ? -1 : 1) : b.count !== a.count ? b.count - a.count : a.name.localeCompare(b.name),
+    )
   }, [tickets])
 
   useEffect(() => {
@@ -127,6 +137,14 @@ export function SpecSprintFilterDropdown({ tickets, active, onChange, className 
                   {selected && <Check className="w-3 h-3 text-accent-info" />}
                 </span>
                 <span className="truncate text-foreground/80">{e.name}</span>
+                {e.active && (
+                  <span
+                    data-testid="spec-sprint-current-badge"
+                    className="shrink-0 rounded-full bg-accent-success/15 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-accent-success"
+                  >
+                    {t('sprintFilter.current')}
+                  </span>
+                )}
                 <span className="ml-auto text-[10px] text-muted-foreground/60">{e.count}</span>
               </button>
             )

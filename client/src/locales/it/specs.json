@@ -116,6 +116,7 @@
     "ariaLabel": "Filtra per epica"
   },
   "sprintFilter": {
+    "current": "Attuale",
     "all": "Tutti gli sprint",
     "ariaLabel": "Filtra per sprint"
   }

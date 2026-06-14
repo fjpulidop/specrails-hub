@@ -116,6 +116,7 @@
     "ariaLabel": "按史诗筛选"
   },
   "sprintFilter": {
+    "current": "当前",
     "all": "所有冲刺",
     "ariaLabel": "按冲刺筛选"
   }
