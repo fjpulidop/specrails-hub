@@ -503,38 +503,52 @@ export function SpecsBoard({
         {/* Separator between the state tabs and the rest of the toolbar */}
         <div className="h-5 w-px bg-border/60 shrink-0" aria-hidden />
 
-        <SpecLabelFilterDropdown
-          tickets={[...tickets, ...doneTickets]}
-          active={activeLabels}
-          onChange={handleLabelsChange}
-        />
-        {hasEpics && (
-          <SpecEpicFilterDropdown
+        {/* Filters cluster — flexes + scrolls on narrow panels so the action
+            controls (sort/view/add) and the tabs always stay visible. */}
+        <div className="flex items-center gap-2 min-w-0 flex-1 overflow-x-auto">
+          <SpecLabelFilterDropdown
             tickets={[...tickets, ...doneTickets]}
-            active={activeEpic}
-            onChange={setActiveEpic}
+            active={activeLabels}
+            onChange={handleLabelsChange}
           />
-        )}
-        {hasSprints && (
-          <SpecSprintFilterDropdown
-            tickets={[...tickets, ...doneTickets]}
-            active={activeSprint}
-            onChange={setActiveSprint}
-          />
-        )}
+          {hasEpics && (
+            <SpecEpicFilterDropdown
+              tickets={[...tickets, ...doneTickets]}
+              active={activeEpic}
+              onChange={setActiveEpic}
+            />
+          )}
+          {hasSprints && (
+            <SpecSprintFilterDropdown
+              tickets={[...tickets, ...doneTickets]}
+              active={activeSprint}
+              onChange={setActiveSprint}
+            />
+          )}
+        </div>
+
+        {/* Separator between the Jira/label filters and the sort/view controls */}
+        <div className="h-5 w-px bg-border/60 shrink-0" aria-hidden />
+
         <SpecSortControl
           mode={sortMode}
           dir={sortDir}
           onChange={onSortChange}
-          className="ml-auto"
+          className="shrink-0"
         />
         {onViewTierChange && (
-          <SpecsViewTierToggle tier={viewTier} onChange={onViewTierChange} />
+          <div className="shrink-0">
+            <SpecsViewTierToggle tier={viewTier} onChange={onViewTierChange} />
+          </div>
         )}
+
+        {/* Separator before the primary Add action */}
+        <div className="h-5 w-px bg-border/60 shrink-0" aria-hidden />
+
         <Button
           size="sm"
           variant="outline"
-          className="h-7 text-xs gap-1 shrink-0"
+          className="h-7 text-xs gap-1 shrink-0 border-accent-primary/50 text-accent-primary hover:bg-accent-primary/10 hover:text-accent-primary"
           onClick={() => setProposeOpen(true)}
           data-tour="add-spec-btn"
         >

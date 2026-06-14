@@ -150,7 +150,7 @@ export function RailsBoard({ rails, ticketMap, providers, onModeChange, onProfil
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onAddRail() }}
-          className="flex items-center gap-1 h-7 px-2.5 text-xs font-medium rounded-md border border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+          className="flex items-center gap-1 h-7 px-2.5 text-xs font-medium rounded-md border border-accent-primary/50 text-accent-primary hover:bg-accent-primary/10 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
           {t('common:actions.add')}
