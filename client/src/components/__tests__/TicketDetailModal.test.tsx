@@ -28,6 +28,8 @@ vi.mock('../../hooks/useDesktop', () => ({
     completeSetupWizard: vi.fn(),
   }),
 }))
+const mockOpenExternalUrl = vi.fn()
+vi.mock('../../lib/tauri-shell', () => ({ openExternalUrl: (u: string) => mockOpenExternalUrl(u) }))
 
 import { TicketDetailModal } from '../TicketDetailModal'
 import type { LocalTicket } from '../../types'
@@ -66,6 +68,22 @@ function makeDefaultProps(overrides: Partial<{
 describe('TicketDetailModal', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  describe('Jira "Go to Ticket" button', () => {
+    it('shows the button for a Jira-backed spec and opens it in the default browser', () => {
+      const ticket = makeTicket({ source: 'jira', jira_key: 'SKILLS-17', jira_url: 'https://acme.atlassian.net/browse/SKILLS-17' })
+      render(<TicketDetailModal {...makeDefaultProps({ ticket })} />)
+      const btn = screen.getByTestId('jira-go-to-ticket')
+      expect(btn).toHaveTextContent('SKILLS-17')
+      fireEvent.click(btn)
+      expect(mockOpenExternalUrl).toHaveBeenCalledWith('https://acme.atlassian.net/browse/SKILLS-17')
+    })
+
+    it('does not show the button for a non-Jira spec', () => {
+      render(<TicketDetailModal {...makeDefaultProps({ ticket: makeTicket({ source: 'manual' }) })} />)
+      expect(screen.queryByTestId('jira-go-to-ticket')).not.toBeInTheDocument()
+    })
   })
 
   describe('rendering', () => {

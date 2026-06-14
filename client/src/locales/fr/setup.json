@@ -37,10 +37,10 @@
       "learnMore": "Apprenez à tirer le meilleur de specrails :",
       "continueToProject": "Continuer vers le projet",
       "jira": {
-        "title": "Connect a Jira board",
-        "subtitle": "Optional — back this project's specs with a Jira board. You can also do it later in Settings.",
-        "configure": "Configure Jira",
-        "optional": "optional"
+        "title": "Connecter un tableau Jira",
+        "subtitle": "Facultatif — adossez les specs de ce projet à un tableau Jira. Vous pourrez aussi le faire plus tard dans les Paramètres.",
+        "configure": "Configurer Jira",
+        "optional": "facultatif"
       }
     },
     "error": {
@@ -154,7 +154,7 @@
     "title": "Bienvenue dans <spec>spec</spec><rails>rails</rails>",
     "description": "Specrails gère plusieurs projets depuis une seule interface. Ajoutez votre premier projet pour commencer.",
     "addFirstProject": "Ajouter votre premier projet",
-    "jiraHint": "Connect each project to its own Jira board — specs stay in sync, both ways."
+    "jiraHint": "Connectez chaque projet à son propre tableau Jira — les specs restent synchronisées dans les deux sens."
   },
   "onboarding": {
     "productTour": "Visite guidée",
@@ -313,8 +313,8 @@
       "outro": "<b>La visite est terminée.</b> Ajoutez un projet depuis la barre latérale gauche et livrez votre première spec. Vous pouvez rouvrir cette visite à tout moment depuis les Paramètres."
     },
     "jira": {
-      "label": "Jira integration",
-      "body": "Back any project with a <b>Jira board</b> — each spec becomes a Jira issue, kept in sync both ways: status follows the rail, and a comment is posted when a job finishes. Configure it per project when you add it, or anytime in Settings."
+      "label": "Intégration Jira",
+      "body": "Adossez n'importe quel projet à un <b>tableau Jira</b> — chaque spec devient un ticket Jira, synchronisé dans les deux sens : le statut suit le rail et un commentaire est publié à la fin d'un job. Configurez-le par projet lors de l'ajout, ou à tout moment dans les Paramètres."
     }
   }
 }

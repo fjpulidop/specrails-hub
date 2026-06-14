@@ -37,10 +37,10 @@
       "learnMore": "Scopri come ottenere il massimo da specrails:",
       "continueToProject": "Continua al progetto",
       "jira": {
-        "title": "Connect a Jira board",
-        "subtitle": "Optional — back this project's specs with a Jira board. You can also do it later in Settings.",
-        "configure": "Configure Jira",
-        "optional": "optional"
+        "title": "Collega una board Jira",
+        "subtitle": "Facoltativo — appoggia le spec di questo progetto a una board Jira. Puoi farlo anche più tardi nelle Impostazioni.",
+        "configure": "Configura Jira",
+        "optional": "facoltativo"
       }
     },
     "error": {
@@ -154,7 +154,7 @@
     "title": "Benvenuto in <spec>spec</spec><rails>rails</rails>",
     "description": "Specrails gestisce più progetti da un'unica interfaccia. Aggiungi il tuo primo progetto per iniziare.",
     "addFirstProject": "Aggiungi il tuo primo progetto",
-    "jiraHint": "Connect each project to its own Jira board — specs stay in sync, both ways."
+    "jiraHint": "Collega ogni progetto alla sua board Jira — le spec restano sincronizzate in entrambe le direzioni."
   },
   "onboarding": {
     "productTour": "Tour del prodotto",
@@ -313,8 +313,8 @@
       "outro": "<b>Il tour finisce qui.</b> Aggiungi un progetto dalla sidebar sinistra e rilascia la tua prima spec. Puoi riaprire questa guida in qualsiasi momento dalle Impostazioni."
     },
     "jira": {
-      "label": "Jira integration",
-      "body": "Back any project with a <b>Jira board</b> — each spec becomes a Jira issue, kept in sync both ways: status follows the rail, and a comment is posted when a job finishes. Configure it per project when you add it, or anytime in Settings."
+      "label": "Integrazione Jira",
+      "body": "Appoggia qualsiasi progetto a una <b>board Jira</b> — ogni spec diventa un ticket Jira, sincronizzato in entrambe le direzioni: lo stato segue il rail e viene pubblicato un commento al termine di un job. Configuralo per progetto quando lo aggiungi, o in qualsiasi momento nelle Impostazioni."
     }
   }
 }

@@ -47,69 +47,47 @@ function makeTicket(id: number, title: string, status: LocalTicket['status'] = '
   }
 }
 
-describe('SpecsBoard status filter', () => {
+// The ToDo / Done navbar tabs replaced the old status-filter dropdown so users
+// can switch buckets without scrolling the whole list. Default = ToDo.
+describe('SpecsBoard ToDo / Done tabs', () => {
   const onTicketClick = vi.fn()
 
-  it('defaults to "All" and renders both active and Done buckets', () => {
+  it('defaults to the ToDo tab — shows active specs, hides the Done bucket', () => {
     const tickets = [makeTicket(1, 'Active one'), makeTicket(2, 'Active two')]
     const doneTickets = [makeTicket(10, 'Done one', 'done')]
-    render(
-      <SpecsBoard
-        tickets={tickets}
-        doneTickets={doneTickets}
-        isLoading={false}
-        onTicketClick={onTicketClick}
-      />,
-    )
+    render(<SpecsBoard tickets={tickets} doneTickets={doneTickets} isLoading={false} onTicketClick={onTicketClick} />)
     expect(screen.getByText('Active one')).toBeInTheDocument()
     expect(screen.getByText('Active two')).toBeInTheDocument()
-    expect(screen.getByText('Done one')).toBeInTheDocument()
-    expect(screen.getByTestId('specs-board-done-bucket')).toBeInTheDocument()
-  })
-
-  it('switching to "ToDo" hides the Done bucket', () => {
-    const tickets = [makeTicket(1, 'Active one')]
-    const doneTickets = [makeTicket(10, 'Done one', 'done')]
-    render(
-      <SpecsBoard
-        tickets={tickets}
-        doneTickets={doneTickets}
-        isLoading={false}
-        onTicketClick={onTicketClick}
-      />,
-    )
-    fireEvent.click(screen.getByTestId('spec-status-filter'))
-    fireEvent.click(screen.getByRole('option', { name: /todo/i }))
-    expect(screen.getByText('Active one')).toBeInTheDocument()
     expect(screen.queryByText('Done one')).toBeNull()
     expect(screen.queryByTestId('specs-board-done-bucket')).toBeNull()
   })
 
-  it('switching to "Done" hides the active bucket', () => {
+  it('clicking the Done tab shows the Done bucket and hides active specs', () => {
     const tickets = [makeTicket(1, 'Active one')]
     const doneTickets = [makeTicket(10, 'Done one', 'done')]
-    render(
-      <SpecsBoard
-        tickets={tickets}
-        doneTickets={doneTickets}
-        isLoading={false}
-        onTicketClick={onTicketClick}
-      />,
-    )
-    fireEvent.click(screen.getByTestId('spec-status-filter'))
-    fireEvent.click(screen.getByRole('option', { name: /^done/i }))
+    render(<SpecsBoard tickets={tickets} doneTickets={doneTickets} isLoading={false} onTicketClick={onTicketClick} />)
+    fireEvent.click(screen.getByTestId('specs-tab-done'))
     expect(screen.queryByText('Active one')).toBeNull()
     expect(screen.getByText('Done one')).toBeInTheDocument()
     expect(screen.getByTestId('specs-board-done-bucket')).toBeInTheDocument()
   })
 
-  it('done bucket renders even when there are no active specs in "All" mode', () => {
+  it('clicking the ToDo tab returns to active specs and hides Done', () => {
+    const tickets = [makeTicket(1, 'Active one')]
     const doneTickets = [makeTicket(10, 'Done one', 'done')]
-    render(
-      <SpecsBoard tickets={[]} doneTickets={doneTickets} isLoading={false} onTicketClick={onTicketClick} />,
-    )
-    expect(screen.getByText('Done one')).toBeInTheDocument()
-    expect(screen.getByTestId('specs-board-done-bucket')).toBeInTheDocument()
+    render(<SpecsBoard tickets={tickets} doneTickets={doneTickets} isLoading={false} onTicketClick={onTicketClick} />)
+    fireEvent.click(screen.getByTestId('specs-tab-done'))
+    fireEvent.click(screen.getByTestId('specs-tab-todo'))
+    expect(screen.getByText('Active one')).toBeInTheDocument()
+    expect(screen.queryByText('Done one')).toBeNull()
+  })
+
+  it('shows per-bucket counts on the tabs', () => {
+    const tickets = [makeTicket(1, 'a'), makeTicket(2, 'b')]
+    const doneTickets = [makeTicket(10, 'c', 'done')]
+    render(<SpecsBoard tickets={tickets} doneTickets={doneTickets} isLoading={false} onTicketClick={onTicketClick} />)
+    expect(screen.getByTestId('specs-tab-todo')).toHaveTextContent('2')
+    expect(screen.getByTestId('specs-tab-done')).toHaveTextContent('1')
   })
 
   it('renders independent sort and view controls inside the Done bucket', () => {
@@ -123,7 +101,7 @@ describe('SpecsBoard status filter', () => {
         onMoveToRail={() => {}}
       />,
     )
-
+    fireEvent.click(screen.getByTestId('specs-tab-done'))
     const doneBucket = screen.getByTestId('specs-board-done-bucket')
     expect(within(doneBucket).getByLabelText('Sort mode')).toHaveTextContent('Default')
     fireEvent.click(within(doneBucket).getByLabelText('Post-it view'))

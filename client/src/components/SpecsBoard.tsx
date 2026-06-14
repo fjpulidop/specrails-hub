@@ -10,11 +10,14 @@ import { TicketContextMenu } from './TicketContextMenu'
 import type { TicketStatus, TicketPriority } from '../types'
 import type { RailState } from './RailsBoard'
 import { SpecLabelFilterDropdown } from './SpecLabelFilterDropdown'
-import { SpecStatusFilter, type SpecStatusFilterValue } from './SpecStatusFilter'
+
+/** Which spec bucket the board shows. The ToDo/Done navbar tabs drive this. */
+type SpecStatusFilterValue = 'all' | 'todo' | 'done'
 import { SpecSortControl } from './SpecSortControl'
 import { SpecsViewTierToggle } from './SpecsViewTierToggle'
 import type { SpecsViewTier } from '../lib/specs-view-tier'
 import { applySpecSort } from '../lib/spec-sort'
+import { cn } from '../lib/utils'
 import type { SpecSortMode, SpecSortDir } from '../types/spec-sort'
 import { ProposeSpecModal, type ExploreLaunchPayload } from './ProposeSpecModal'
 import { ExploreSpecShell } from './explore-spec/ExploreSpecShell'
@@ -117,6 +120,27 @@ interface ExploreState {
 const DONE_SORT_MODE_KEY = (projectId: string) => `specrails-desktop:done-spec-sort-mode:${projectId}`
 const DONE_SORT_DIR_KEY = (projectId: string) => `specrails-desktop:done-spec-sort-dir:${projectId}`
 const DONE_VIEW_TIER_KEY = (projectId: string) => `specrails-desktop:done-spec-view-tier:${projectId}`
+const STATUS_TAB_KEY = (projectId: string) => `specrails-desktop:spec-status-tab:${projectId}`
+
+/** Persisted ToDo/Done tab selection. Defaults to 'todo' so the board opens on
+ *  the active specs; 'done' is one click away (no scrolling the whole list). */
+function loadStatusTab(projectId: string | null): SpecStatusFilterValue {
+  if (!projectId) return 'todo'
+  try {
+    const v = localStorage.getItem(STATUS_TAB_KEY(projectId))
+    return v === 'done' ? 'done' : 'todo'
+  } catch {
+    return 'todo'
+  }
+}
+function saveStatusTab(projectId: string | null, v: SpecStatusFilterValue): void {
+  if (!projectId) return
+  try {
+    localStorage.setItem(STATUS_TAB_KEY(projectId), v)
+  } catch {
+    /* ignore */
+  }
+}
 
 function isSpecSortMode(value: unknown): value is SpecSortMode {
   return value === 'default' || value === 'ticket-id' || value === 'priority'
@@ -237,8 +261,12 @@ export function SpecsBoard({
   const [proposeOpen, setProposeOpen] = useState(false)
   const [explore, setExplore] = useState<ExploreState | null>(null)
   const [activeLabels, setActiveLabels] = useState<Set<string>>(new Set())
-  const [statusFilter, setStatusFilter] = useState<SpecStatusFilterValue>('all')
   const { activeProjectId } = useDesktop()
+  const [statusFilter, setStatusFilter] = useState<SpecStatusFilterValue>(() => loadStatusTab(activeProjectId))
+  const handleStatusTabChange = useCallback((v: SpecStatusFilterValue) => {
+    setStatusFilter(v)
+    saveStatusTab(activeProjectId, v)
+  }, [activeProjectId])
   const [doneSort, setDoneSort] = useState(() => loadDoneSort(activeProjectId))
   const [doneViewTier, setDoneViewTier] = useState<SpecsViewTier>(() => loadDoneViewTier(activeProjectId))
   const { minimize } = useMinimizedChats()
@@ -270,6 +298,7 @@ export function SpecsBoard({
     setActiveLabels(new Set())
     setDoneSort(loadDoneSort(activeProjectId))
     setDoneViewTier(loadDoneViewTier(activeProjectId))
+    setStatusFilter(loadStatusTab(activeProjectId))
   }, [activeProjectId])
 
   const handleLabelsChange = useCallback((next: Set<string>) => {
@@ -487,11 +516,6 @@ export function SpecsBoard({
             </span>
           )}
         </div>
-        <SpecStatusFilter
-          value={statusFilter}
-          onChange={setStatusFilter}
-          counts={statusCounts}
-        />
         <SpecLabelFilterDropdown
           tickets={[...tickets, ...doneTickets]}
           active={activeLabels}
@@ -516,6 +540,32 @@ export function SpecsBoard({
           <Plus className="w-3.5 h-3.5" />
           {t('common:actions.add')}
         </Button>
+      </div>
+
+      {/* ToDo / Done tabs — switch buckets without scrolling the whole list. */}
+      <div className="flex items-center gap-1 px-4 py-1.5 border-b border-border/40 shrink-0" role="tablist">
+        {(['todo', 'done'] as const).map((tab) => {
+          const active = statusFilter === tab
+          return (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => handleStatusTabChange(tab)}
+              data-testid={`specs-tab-${tab}`}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                active
+                  ? 'bg-accent-primary/15 text-accent-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/40',
+              )}
+            >
+              {t(`statusFilter.${tab}`)}
+              <span className="text-[10px] tabular-nums opacity-70">{statusCounts[tab]}</span>
+            </button>
+          )
+        })}
       </div>
 
       {/* Content area — single scrollable list. Status filter decides which

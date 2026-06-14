@@ -84,7 +84,7 @@ describe('SpecsBoard label filter dropdown', () => {
     expect(screen.queryByText('Ui one')).toBeNull()
   })
 
-  it('multi-select uses OR semantics across both active and Done buckets', () => {
+  it('multi-select uses OR semantics in both the ToDo and Done buckets', () => {
     const tickets = [
       makeTicket(1, 'Auth one', ['auth']),
       makeTicket(2, 'Api one', ['api']),
@@ -101,9 +101,12 @@ describe('SpecsBoard label filter dropdown', () => {
     const panel = openLabelDropdown()
     fireEvent.click(within(panel).getByText('auth'))
     fireEvent.click(within(panel).getByText('api'))
+    // ToDo tab (default): label filter ORs across the active bucket.
     expect(screen.getByText('Auth one')).toBeInTheDocument()
     expect(screen.getByText('Api one')).toBeInTheDocument()
     expect(screen.queryByText('Ui one')).toBeNull()
+    // The same filter applies to the Done bucket — switch to the Done tab.
+    fireEvent.click(screen.getByTestId('specs-tab-done'))
     expect(screen.getByText('Done auth')).toBeInTheDocument()
     expect(screen.getByText('Done api')).toBeInTheDocument()
     expect(screen.queryByText('Done ui')).toBeNull()

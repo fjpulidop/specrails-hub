@@ -362,6 +362,15 @@ export function TicketListView({
                           {t('badges.subSpec')}
                         </span>
                       )}
+                      {ticket.jira_key && (
+                        <span
+                          className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-mono border border-accent-info/50 text-accent-info shrink-0"
+                          title={ticket.jira_key}
+                          data-testid={`jira-badge-list-${ticket.id}`}
+                        >
+                          {ticket.jira_key}
+                        </span>
+                      )}
                     </div>
 
                     {/* Priority / Draft pill */}

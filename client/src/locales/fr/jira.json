@@ -1,99 +1,102 @@
 {
   "section": {
     "title": "Jira",
-    "subtitle": "Sync this project's specs with a Jira board",
-    "connectCta": "Connect to Jira"
+    "subtitle": "Synchronisez les specs de ce projet avec un tableau Jira",
+    "connectCta": "Se connecter à Jira"
   },
   "wizard": {
-    "step": "Step {{current}} of {{total}}",
-    "step1Title": "Connect your Jira account",
-    "step2Title": "Choose a Jira project",
-    "step3Title": "Map statuses (optional)",
-    "step4Title": "Review & connect",
-    "next": "Next",
-    "back": "Back",
-    "cancel": "Cancel",
-    "connect": "Connect",
-    "connecting": "Connecting…",
-    "later": "Do it later"
+    "step": "Étape {{current}} sur {{total}}",
+    "step1Title": "Connectez votre compte Jira",
+    "step2Title": "Choisissez un projet Jira",
+    "step3Title": "Associer les statuts (facultatif)",
+    "step4Title": "Vérifier et connecter",
+    "next": "Suivant",
+    "back": "Retour",
+    "cancel": "Annuler",
+    "connect": "Connecter",
+    "connecting": "Connexion…",
+    "later": "Le faire plus tard"
   },
   "creds": {
-    "baseUrlLabel": "Jira URL",
-    "baseUrlPlaceholder": "https://your-company.atlassian.net",
-    "baseUrlHelp": "Your Jira Cloud site or Data Center server URL.",
-    "emailLabel": "Account email",
-    "emailPlaceholder": "you@company.com",
-    "emailHelp": "Required for Jira Cloud — the email of your Atlassian account.",
-    "tokenLabel": "API token",
-    "tokenHelp": "Create one at id.atlassian.com → Security → API tokens. It is stored encrypted on this machine and never leaves it.",
-    "test": "Test connection",
-    "testing": "Testing…",
-    "testOk": "Connected as {{name}}",
-    "retest": "Re-test"
+    "baseUrlLabel": "URL Jira",
+    "baseUrlPlaceholder": "https://votre-entreprise.atlassian.net",
+    "baseUrlHelp": "L'URL de votre site Jira Cloud ou serveur Data Center.",
+    "emailLabel": "E-mail du compte",
+    "emailPlaceholder": "vous@entreprise.com",
+    "emailHelp": "Requis pour Jira Cloud — l'e-mail de votre compte Atlassian.",
+    "tokenLabel": "Jeton API",
+    "tokenHelp": "Créez-en un sur id.atlassian.com → Sécurité → Jetons API. Il est stocké chiffré sur cette machine et n'en sort jamais.",
+    "test": "Tester la connexion",
+    "testing": "Test en cours…",
+    "testOk": "Connecté en tant que {{name}}",
+    "retest": "Retester"
   },
   "project": {
-    "searchPlaceholder": "Search projects…",
-    "manualLabel": "Or enter a project key",
+    "searchPlaceholder": "Rechercher des projets…",
+    "manualLabel": "Ou saisissez une clé de projet",
     "manualPlaceholder": "PROJ",
     "selected": "{{key}} — {{name}}",
-    "none": "No projects found",
-    "loading": "Loading projects…"
+    "none": "Aucun projet trouvé",
+    "loading": "Chargement des projets…"
   },
   "mapping": {
-    "intro": "Statuses are matched automatically by category (To Do / In Progress / Done). Override any state if your workflow uses custom names.",
-    "auto": "Automatic (by category)",
-    "todo": "Backlog / To Do",
-    "inProgress": "In Progress",
-    "done": "Done",
-    "cancelled": "Cancelled",
-    "loading": "Loading statuses…"
+    "intro": "Les statuts sont associés automatiquement par catégorie (À faire / En cours / Terminé). Remplacez un état si votre workflow utilise des noms personnalisés.",
+    "auto": "Automatique (par catégorie)",
+    "todo": "Backlog / À faire",
+    "inProgress": "En cours",
+    "done": "Terminé",
+    "cancelled": "Annulé",
+    "loading": "Chargement des statuts…"
   },
   "review": {
     "site": "Site",
-    "project": "Project",
-    "account": "Account",
+    "project": "Projet",
+    "account": "Compte",
     "type": "Type",
     "cloud": "Jira Cloud",
     "dc": "Jira Data Center"
   },
   "status": {
-    "connected": "Connected to {{key}}",
-    "enabledLabel": "Sync enabled",
-    "enabledHelp": "When on, specs sync with Jira and rail outcomes update the linked issues.",
-    "pausedHelp": "Sync is paused. Specs stay on the board but no longer update Jira.",
-    "syncNow": "Sync now",
-    "syncing": "Syncing…",
-    "syncedToast": "Synced {{count}} issue(s) from Jira",
-    "disconnect": "Disconnect",
-    "disconnectConfirm": "Disconnect this project from Jira? Existing specs stay on the board; sync stops.",
-    "disconnectedToast": "Disconnected from Jira"
+    "connected": "Connecté à {{key}}",
+    "enabledLabel": "Synchronisation activée",
+    "enabledHelp": "Lorsqu'elle est activée, les specs se synchronisent avec Jira et les résultats des rails mettent à jour les tickets liés.",
+    "pausedHelp": "La synchronisation est en pause. Les specs restent sur le tableau mais ne mettent plus Jira à jour.",
+    "syncNow": "Synchroniser maintenant",
+    "syncing": "Synchronisation…",
+    "syncedToast": "{{count}} ticket(s) synchronisé(s) depuis Jira",
+    "disconnect": "Déconnecter",
+    "disconnectConfirm": "Déconnecter ce projet de Jira ? Les specs existantes restent sur le tableau ; la synchronisation s'arrête.",
+    "disconnectedToast": "Déconnecté de Jira"
   },
   "outbox": {
-    "title": "Pending Jira updates",
-    "pending": "{{count}} pending",
-    "dead": "{{count}} need attention",
-    "allSynced": "All updates synced",
-    "retry": "Retry",
-    "deadHelp": "These couldn't be applied automatically (e.g. your workflow has no matching transition). Fix in Jira, then retry.",
-    "opTransition": "Status update",
-    "opComment": "Comment",
-    "opCreate": "Create issue"
+    "title": "Mises à jour Jira en attente",
+    "pending": "{{count}} en attente",
+    "dead": "{{count}} à vérifier",
+    "allSynced": "Toutes les mises à jour sont synchronisées",
+    "retry": "Réessayer",
+    "deadHelp": "Celles-ci n'ont pas pu être appliquées automatiquement (p. ex. votre workflow n'a pas de transition correspondante). Corrigez dans Jira, puis réessayez.",
+    "opTransition": "Mise à jour du statut",
+    "opComment": "Commentaire",
+    "opCreate": "Créer un ticket"
   },
   "authExpired": {
-    "title": "Jira disconnected",
-    "body": "Your Jira token expired or was revoked. Reconnect to sync {{count}} pending update(s).",
-    "reconnect": "Reconnect"
+    "title": "Jira déconnecté",
+    "body": "Votre jeton Jira a expiré ou a été révoqué. Reconnectez-vous pour synchroniser {{count}} mise(s) à jour en attente.",
+    "reconnect": "Se reconnecter"
   },
   "badge": {
     "label": "Jira",
-    "openInJira": "Open in Jira"
+    "openInJira": "Ouvrir dans Jira"
   },
   "addSpec": {
-    "willCreate": "Will be created in Jira · {{key}}",
-    "keepLocal": "Create as a local spec instead"
+    "willCreate": "Sera créé dans Jira · {{key}}",
+    "keepLocal": "Créer plutôt une spec locale"
+  },
+  "detail": {
+    "goToTicket": "Aller au ticket {{key}}"
   },
   "errors": {
-    "generic": "Something went wrong",
-    "testFirst": "Test the connection first"
+    "generic": "Une erreur s'est produite",
+    "testFirst": "Testez d'abord la connexion"
   }
 }

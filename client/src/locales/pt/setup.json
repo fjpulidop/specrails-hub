@@ -37,10 +37,10 @@
       "learnMore": "Saiba como tirar o máximo partido do specrails:",
       "continueToProject": "Continuar para o projeto",
       "jira": {
-        "title": "Connect a Jira board",
-        "subtitle": "Optional — back this project's specs with a Jira board. You can also do it later in Settings.",
-        "configure": "Configure Jira",
-        "optional": "optional"
+        "title": "Ligar um quadro Jira",
+        "subtitle": "Opcional — apoie as specs deste projeto num quadro Jira. Também pode fazê-lo mais tarde nas Definições.",
+        "configure": "Configurar Jira",
+        "optional": "opcional"
       }
     },
     "error": {
@@ -154,7 +154,7 @@
     "title": "Bem-vindo ao <spec>spec</spec><rails>rails</rails>",
     "description": "O Specrails gere vários projetos a partir de uma única interface. Adicione o seu primeiro projeto para começar.",
     "addFirstProject": "Adicione o seu primeiro projeto",
-    "jiraHint": "Connect each project to its own Jira board — specs stay in sync, both ways."
+    "jiraHint": "Ligue cada projeto ao seu próprio quadro Jira — as specs ficam sincronizadas nos dois sentidos."
   },
   "onboarding": {
     "productTour": "Tour do produto",
@@ -313,8 +313,8 @@
       "outro": "<b>E o tour fica por aqui.</b> Adicione um projeto na barra lateral esquerda e entregue a sua primeira spec. Pode reabrir esta apresentação a qualquer momento nas Definições."
     },
     "jira": {
-      "label": "Jira integration",
-      "body": "Back any project with a <b>Jira board</b> — each spec becomes a Jira issue, kept in sync both ways: status follows the rail, and a comment is posted when a job finishes. Configure it per project when you add it, or anytime in Settings."
+      "label": "Integração com o Jira",
+      "body": "Apoie qualquer projeto num <b>quadro Jira</b> — cada spec torna-se um ticket Jira, sincronizado nos dois sentidos: o estado segue o rail e é publicado um comentário quando um job termina. Configure por projeto ao adicioná-lo, ou a qualquer momento nas Definições."
     }
   }
 }

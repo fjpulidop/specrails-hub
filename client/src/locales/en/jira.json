@@ -92,6 +92,9 @@
     "willCreate": "Will be created in Jira · {{key}}",
     "keepLocal": "Create as a local spec instead"
   },
+  "detail": {
+    "goToTicket": "Go to Ticket {{key}}"
+  },
   "errors": {
     "generic": "Something went wrong",
     "testFirst": "Test the connection first"

@@ -37,10 +37,10 @@
       "learnMore": "specrails を最大限に活用する方法:",
       "continueToProject": "プロジェクトへ進む",
       "jira": {
-        "title": "Connect a Jira board",
-        "subtitle": "Optional — back this project's specs with a Jira board. You can also do it later in Settings.",
-        "configure": "Configure Jira",
-        "optional": "optional"
+        "title": "Jira ボードを接続",
+        "subtitle": "任意 — このプロジェクトのスペックを Jira ボードで裏付けます。後で設定からも行えます。",
+        "configure": "Jira を設定",
+        "optional": "任意"
       }
     },
     "error": {
@@ -154,7 +154,7 @@
     "title": "<spec>spec</spec><rails>rails</rails> へようこそ",
     "description": "Specrails は複数のプロジェクトを単一のインターフェースで管理します。最初のプロジェクトを追加して始めましょう。",
     "addFirstProject": "最初のプロジェクトを追加",
-    "jiraHint": "Connect each project to its own Jira board — specs stay in sync, both ways."
+    "jiraHint": "各プロジェクトを専用の Jira ボードに接続 — スペックは双方向で同期され続けます。"
   },
   "onboarding": {
     "productTour": "プロダクトツアー",
@@ -313,8 +313,8 @@
       "outro": "<b>ツアーは以上です。</b>左サイドバーからプロジェクトを追加して、最初のスペックを出荷しましょう。このウォークスルーは設定からいつでも再表示できます。"
     },
     "jira": {
-      "label": "Jira integration",
-      "body": "Back any project with a <b>Jira board</b> — each spec becomes a Jira issue, kept in sync both ways: status follows the rail, and a comment is posted when a job finishes. Configure it per project when you add it, or anytime in Settings."
+      "label": "Jira 連携",
+      "body": "任意のプロジェクトを <b>Jira ボード</b> で裏付けます — 各スペックは Jira の課題になり、双方向で同期されます。ステータスは rail に追従し、job 完了時にコメントが投稿されます。追加時にプロジェクトごとに設定するか、いつでも設定から構成できます。"
     }
   }
 }

@@ -3,7 +3,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { formatDistanceToNow } from 'date-fns'
 import { Trans, useTranslation } from 'react-i18next'
-import { X, Pencil, Trash2, Save, Plus, XCircle, MessageSquare, ArrowRight, ArrowLeft, Columns2 } from 'lucide-react'
+import { X, Pencil, Trash2, Save, Plus, XCircle, MessageSquare, ArrowRight, ArrowLeft, Columns2, ExternalLink } from 'lucide-react'
+import { openExternalUrl } from '../lib/tauri-shell'
 import { toast } from 'sonner'
 import { getDateFnsLocale } from '../lib/i18n'
 import { Button } from './ui/button'
@@ -84,6 +85,7 @@ export function TicketDetailModal({
   embedded = false,
 }: TicketDetailModalProps) {
   const { t } = useTranslation('tickets')
+  const { t: tj } = useTranslation('jira')
   const { activeProjectId, projects } = useDesktop()
   const { enterSplit, state: splitState } = useTicketDetailModal()
   const inSplit = splitState.originSide !== null
@@ -487,6 +489,18 @@ export function TicketDetailModal({
 
             {/* Sidebar */}
             <div className="sm:w-48 sm:border-l border-t sm:border-t-0 border-border/30 px-4 py-4 space-y-4 bg-muted/5">
+              {/* Go to Jira ticket — only when the spec is Jira-backed */}
+              {ticket.jira_url && ticket.jira_key && (
+                <button
+                  type="button"
+                  onClick={() => { void openExternalUrl(ticket.jira_url!) }}
+                  data-testid="jira-go-to-ticket"
+                  className="w-full inline-flex items-center justify-center gap-1.5 h-7 rounded border border-accent-info/50 bg-accent-info/10 px-2 text-xs font-medium text-accent-info hover:bg-accent-info/20 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                  {tj('detail.goToTicket', { key: ticket.jira_key })}
+                </button>
+              )}
               {/* Priority selector */}
               <div>
                 <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1.5">
