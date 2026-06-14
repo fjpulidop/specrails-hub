@@ -520,14 +520,6 @@ export function SpecsBoard({
   // the bottom (always). `todo` / `done` show only that bucket.
   const showTodoBucket = statusFilter === 'all' || statusFilter === 'todo'
   const showDoneBucket = statusFilter === 'all' || statusFilter === 'done'
-  const statusCounts = useMemo(
-    () => ({
-      all: tickets.length + doneTickets.length,
-      todo: tickets.length,
-      done: doneTickets.length,
-    }),
-    [tickets.length, doneTickets.length],
-  )
 
   return (
     <div className="flex flex-col h-full" onClick={handleBackgroundClick}>
@@ -538,7 +530,7 @@ export function SpecsBoard({
           <h2 className="text-sm font-semibold text-accent-primary">{t('board.title')}</h2>
           {tickets.length + doneTickets.length > 0 && (
             <span className="text-[10px] text-muted-foreground bg-muted/30 rounded-full px-1.5 py-0.5">
-              {activeLabels.size > 0
+              {!noFilters
                 ? `${filteredTickets.length + filteredDoneTickets.length}/${tickets.length + doneTickets.length}`
                 : tickets.length + doneTickets.length}
             </span>
@@ -604,7 +596,9 @@ export function SpecsBoard({
               )}
             >
               {t(`statusFilter.${tab}`)}
-              <span className="text-[10px] tabular-nums opacity-70">{statusCounts[tab]}</span>
+              <span className="text-[10px] tabular-nums opacity-70">
+                {tab === 'todo' ? filteredTickets.length : filteredDoneTickets.length}
+              </span>
             </button>
           )
         })}
