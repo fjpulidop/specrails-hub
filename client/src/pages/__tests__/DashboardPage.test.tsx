@@ -116,6 +116,22 @@ describe('DashboardPage', () => {
     }
   })
 
+  it('includes Jira-sourced specs on the spec board', () => {
+    // Regression: Jira-backed specs are materialized with source:'jira'. They
+    // must pass the board's source allow-list like any other spec.
+    const original = mockTickets
+    mockTickets = [
+      ...original,
+      { ...original[0], id: 100, title: 'SKILLS-17', source: 'jira', jira_key: 'SKILLS-17' },
+    ]
+    try {
+      render(<DashboardPage />)
+      expect(screen.getByTestId('specs-board-ticket-count')).toHaveTextContent('2')
+    } finally {
+      mockTickets = original
+    }
+  })
+
   it('shows Rails board with rail rows', () => {
     render(<DashboardPage />)
     expect(screen.getByText('Rail 1')).toBeInTheDocument()

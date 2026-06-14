@@ -424,7 +424,10 @@ export default function DashboardPage() {
           t.source === 'get-backlog-specs' ||
           t.source === 'explore-draft' ||
           t.source === 'specs-smash' ||
-          t.source === 'free-prompt') &&
+          t.source === 'free-prompt' ||
+          // Jira-backed specs are materialized into local-tickets.json with
+          // source:'jira' — they must show on the board like any other spec.
+          t.source === 'jira') &&
         !railTicketIds.has(t.id),
     )
   }, [tickets, railTicketIds])
