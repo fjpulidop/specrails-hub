@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.0](https://github.com/fjpulidop/specrails-desktop/compare/v2.3.0...v2.4.0) (2026-06-14)
+
+
+### Features
+
+* **jira:** Jira integration — spec = Jira issue, per-project hot-swap ([#388](https://github.com/fjpulidop/specrails-desktop/issues/388)) ([7f010f6](https://github.com/fjpulidop/specrails-desktop/commit/7f010f6c22d22c147f8bc80b086555353cbe8ad8))
+
 ## [2.3.0](https://github.com/fjpulidop/specrails-desktop/compare/v2.2.1...v2.3.0) (2026-06-14)
 
 
