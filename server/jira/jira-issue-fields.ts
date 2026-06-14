@@ -39,6 +39,28 @@ const TEAM = [':atlassian-team', ':rm-teams-custom-field-team']
 const SPRINT = 'com.pyxis.greenhopper.jira:gh-sprint'
 const RANK = [':gh-lexo-rank', ':lexorank']
 
+/**
+ * Custom-field schema.custom substrings whose VALUE is an internal serialized
+ * blob (not human content) — must never render as a "field". The Development
+ * summary field is the prime case: its branches/PRs/commits are surfaced in the
+ * dedicated Development section via the dev-status API, not as a raw blob row.
+ */
+const SKIP_CUSTOM_SCHEMA = [
+  'jira-development-integration-plugin', // Development summary (devsummary / devsummarycf)
+  ':devsummary',
+  ':global-rank',
+  ':aozoraplugin', // misc internal aggregates seen on some instances
+]
+
+function isSkippedCustomSchema(custom?: string): boolean {
+  return !!custom && SKIP_CUSTOM_SCHEMA.some((s) => custom.includes(s))
+}
+
+/** A populated string value that is actually a serialized object/map blob. */
+function looksLikeSerializedBlob(value: string): boolean {
+  return /^\s*[{[]/.test(value)
+}
+
 export function indexFieldMeta(meta: JiraFieldMeta[]): Map<string, JiraFieldMeta> {
   const m = new Map<string, JiraFieldMeta>()
   for (const f of meta) if (f && typeof f.id === 'string') m.set(f.id, f)
@@ -304,10 +326,14 @@ export function formatIssueFields(input: {
     if (handled.has(key) || SKIP_SYSTEM_FIELDS.has(key) || !key.startsWith('customfield_')) continue
     const meta = ctx.meta.get(key)
     const schema = meta?.schema
+    // Skip internal serialized-blob custom fields (e.g. the Development summary —
+    // its PRs/branches/commits are surfaced in the Development section instead).
+    if (isSkippedCustomSchema(schema?.custom)) continue
     const value =
       Array.isArray(f[key]) ? arrayDisplay(f[key] as unknown[], schema?.items)
       : scalarDisplay(f[key], schema?.type)
-    if (value != null) sweep.push({ label: labelFor(key, ctx), value })
+    // Defensive: a value that is a serialized object/map blob is not human content.
+    if (value != null && !looksLikeSerializedBlob(value)) sweep.push({ label: labelFor(key, ctx), value })
   }
   sweep.sort((a, b) => a.label.localeCompare(b.label))
   rows.push(...sweep)

@@ -1162,3 +1162,26 @@ describe('normalizeRepositoryCommits', () => {
     expect(commits[0].id).toBe('ok')
   })
 })
+
+describe('internal blob fields are never rendered', () => {
+  it('skips the Development summary custom field (devsummary schema)', () => {
+    const fields = {
+      customfield_10000: '{pullrequest={dataType=pullrequest, state=DRAFT, stateCount=1}, json={"cachedValue":{}}}',
+    }
+    const meta: JiraFieldMeta[] = [
+      { id: 'customfield_10000', name: 'Development', schema: { type: 'string', custom: 'com.atlassian.jira.plugins.jira-development-integration-plugin:devsummarycf' } },
+    ]
+    const rows = format(fields, { fieldMeta: meta })
+    expect(byLabel(rows, 'Development')).toBeUndefined()
+    expect(rows).toHaveLength(0)
+  })
+
+  it('drops any custom field whose value is a serialized object/map blob', () => {
+    const fields = { customfield_10001: '{foo=bar, baz=1}', customfield_10002: '[1,2,3]' }
+    const meta: JiraFieldMeta[] = [
+      { id: 'customfield_10001', name: 'Blobby', schema: { type: 'string' } },
+      { id: 'customfield_10002', name: 'Arrayish', schema: { type: 'string' } },
+    ]
+    expect(format(fields, { fieldMeta: meta })).toHaveLength(0)
+  })
+})

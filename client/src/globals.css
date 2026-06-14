@@ -279,21 +279,36 @@
   }
 
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 10px;
+    height: 10px;
   }
 
+  /* Transparent track: a solid track paints a RECTANGLE down the edge that
+   * overlaps the container's rounded corners (looks "embedded-web" ugly inside
+   * modals). Keeping it transparent + insetting the thumb makes the scrollbar a
+   * floating rounded pill that never collides with the border radius. */
   ::-webkit-scrollbar-track {
-    background: var(--color-background);
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
     background: var(--color-scrollbar-thumb);
-    border-radius: 3px;
+    border-radius: 9999px;
+    /* The transparent border + padding-box clip insets the visible thumb away
+     * from the edges (and thus away from the rounded corners). */
+    border: 2px solid transparent;
+    background-clip: padding-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-scrollbar-thumb-hover);
+    background-clip: padding-box;
+  }
+
+  /* Firefox (WebKitGTK builds fall back here too). */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar-thumb) transparent;
   }
 }
 

@@ -156,9 +156,9 @@ export function JiraConnectedCard({ state, onChanged }: { state: ConnectionState
           aria-label={t('status.enabledLabel')}
           disabled={busy}
           onClick={toggle}
-          className={`relative h-6 w-11 rounded-full transition-colors ${enabled ? 'bg-accent-success' : 'bg-muted'}`}
+          className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${enabled ? 'bg-accent-success' : 'bg-input'}`}
         >
-          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          <span className={`inline-block h-3.5 w-3.5 rounded-full bg-background shadow-sm transition-transform ${enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
         </button>
       </div>
 
