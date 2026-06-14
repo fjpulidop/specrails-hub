@@ -664,6 +664,17 @@ const MIGRATIONS: Migration[] = [
       // Column may already exist on a partially-migrated DB — no-op.
     }
   },
+
+  // Migration 31: Jira discard target status. The user-configured status name to
+  // which a discarded spec's issue is transitioned (instead of being deleted) in
+  // a Jira-synced project. NULL/empty = not configured (delete behaves normally).
+  (db) => {
+    try {
+      db.exec(`ALTER TABLE jira_connection ADD COLUMN discard_status TEXT`)
+    } catch {
+      // Column may already exist on a partially-migrated DB — no-op.
+    }
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {

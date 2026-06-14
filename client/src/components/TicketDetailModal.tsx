@@ -14,6 +14,8 @@ import { TicketFilesTouched } from './code-explorer/TicketFilesTouched'
 import { TicketSpendingLine } from './TicketSpendingLine'
 import { useMinimizedChats } from '../context/MinimizedChatsContext'
 import { useTicketDetailModal } from '../context/TicketDetailModalContext'
+import { useJiraConnection } from '../hooks/useJiraConnection'
+import { DiscardSpecDialog } from './jira/DiscardSpecDialog'
 import { parseAcceptanceCriteria } from './explore-spec/acceptance-criteria'
 import { useDesktop } from '../hooks/useDesktop'
 import { SmashActions } from './specs-smash/SmashActions'
@@ -133,7 +135,14 @@ export function TicketDetailModal({
 
   // Confirmation dialog
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showDiscard, setShowDiscard] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // In a Jira-synced project, a Jira-backed spec is "moved to" the configured
+  // discard status instead of being deleted. Otherwise the button stays Delete.
+  const jira = useJiraConnection()
+  const canDiscard =
+    jira.connected && !!jira.discardStatus && ticket.source === 'jira' && !!ticket.jira_key
 
   // Attachments (synced from ticket prop)
   const [attachments, setAttachments] = useState<Attachment[]>(ticket.attachments ?? [])
@@ -660,15 +669,28 @@ export function TicketDetailModal({
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs text-red-400 aurora-light:text-destructive hover:text-red-300 aurora-light:hover:text-destructive hover:bg-red-500/10 aurora-light:hover:bg-destructive/10"
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              <Trash2 className="w-3 h-3 mr-1" />
-              {t('common:actions.delete')}
-            </Button>
+            {canDiscard ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-accent-info hover:bg-accent-info/10"
+                onClick={() => setShowDiscard(true)}
+                data-testid="jira-move-to-button"
+              >
+                <ArrowRight className="w-3 h-3 mr-1" />
+                {tj('discard.moveButton', { status: jira.discardStatus })}
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-red-400 aurora-light:text-destructive hover:text-red-300 aurora-light:hover:text-destructive hover:bg-red-500/10 aurora-light:hover:bg-destructive/10"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="w-3 h-3 mr-1" />
+                {t('common:actions.delete')}
+              </Button>
+            )}
             {isDirty && (
               <Button
                 size="sm"
@@ -709,6 +731,17 @@ export function TicketDetailModal({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Jira "Move to <status>" — replaces delete for Jira-backed specs */}
+      {canDiscard && jira.discardStatus && (
+        <DiscardSpecDialog
+          open={showDiscard}
+          onOpenChange={setShowDiscard}
+          ticket={{ id: ticket.id, title: ticket.title, jira_key: ticket.jira_key }}
+          discardStatus={jira.discardStatus}
+          onDiscarded={onClose}
+        />
+      )}
     </>
   )
 

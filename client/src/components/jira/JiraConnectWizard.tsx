@@ -55,9 +55,10 @@ export function JiraConnectWizard({ onConnected, onSkip, apiBase }: JiraConnectW
   const [selectedName, setSelectedName] = useState('')
   const [loadingProjects, setLoadingProjects] = useState(false)
 
-  // Step 3: status map
+  // Step 3: status map + discard ("move-to") status
   const [statuses, setStatuses] = useState<JiraStatusOption[]>([])
   const [statusMap, setStatusMap] = useState<Partial<Record<SpecLogicalState, string>>>({})
+  const [discardStatus, setDiscardStatus] = useState('')
 
   const [connecting, setConnecting] = useState(false)
   const credsInput = () => ({ baseUrl: baseUrl.trim(), accountEmail: email.trim() || null, token })
@@ -108,6 +109,7 @@ export function JiraConnectWizard({ onConnected, onSkip, apiBase }: JiraConnectW
           ...credsInput(),
           jiraProjectKey: selectedKey.trim(),
           statusMap: Object.keys(cleanMap).length ? (cleanMap as Partial<Record<SpecLogicalState, string>>) : null,
+          discardStatus: discardStatus.trim() || null,
         },
         apiBase
       )
@@ -213,6 +215,19 @@ export function JiraConnectWizard({ onConnected, onSkip, apiBase }: JiraConnectW
               </select>
             </Field>
           ))}
+          <Field label={t('discard.configLabel')} help={t('discard.configHelp')}>
+            <select
+              value={discardStatus}
+              onChange={(e) => setDiscardStatus(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              data-testid="jira-discard-status-select"
+            >
+              <option value="">{t('discard.configNone')}</option>
+              {statuses.map((st) => (
+                <option key={st.id} value={st.name}>{st.name}</option>
+              ))}
+            </select>
+          </Field>
           <div className="flex justify-between">
             <Button size="sm" variant="ghost" onClick={() => setStep(2)}>{t('wizard.back')}</Button>
             <Button size="sm" onClick={() => setStep(4)}>{t('wizard.next')}</Button>
@@ -228,6 +243,7 @@ export function JiraConnectWizard({ onConnected, onSkip, apiBase }: JiraConnectW
             <Row label={t('review.project')} value={selectedName ? `${selectedKey} — ${selectedName}` : selectedKey} />
             <Row label={t('review.account')} value={displayName ?? email} />
             <Row label={t('review.type')} value={deployment === 'cloud' ? t('review.cloud') : t('review.dc')} />
+            <Row label={t('discard.reviewLabel')} value={discardStatus || t('discard.configNone')} />
           </dl>
           <div className="flex justify-between">
             <Button size="sm" variant="ghost" onClick={() => setStep(3)}>{t('wizard.back')}</Button>

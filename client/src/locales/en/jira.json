@@ -95,6 +95,20 @@
     "goToTicket": "Go to Ticket {{key}}",
     "epic": "Epic"
   },
+  "discard": {
+    "moveButton": "Move to {{status}}",
+    "title": "Move spec to {{status}}?",
+    "body": "This spec's Jira issue {{key}} will be moved to \"{{status}}\" instead of being deleted. Add an optional reason for the move.",
+    "commentLabel": "Reason (optional)",
+    "commentPlaceholder": "Why are you moving this spec?",
+    "confirm": "Move to {{status}}",
+    "moving": "Moving…",
+    "movedToast": "Moved {{key}} to {{status}}",
+    "configLabel": "On discard, move issue to",
+    "configHelp": "When you discard a Jira-backed spec, its issue is moved to this status instead of being deleted.",
+    "configNone": "None — delete normally",
+    "reviewLabel": "Discard moves to"
+  },
   "errors": {
     "generic": "Something went wrong",
     "testFirst": "Test the connection first"

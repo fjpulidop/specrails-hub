@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
-import { jiraApi, type ConnectionState, type OutboxOp } from '../../lib/jira-api'
+import { jiraApi, type ConnectionState, type JiraStatusOption, type OutboxOp } from '../../lib/jira-api'
 
 /**
  * Connected-state management for a project's Jira board: status header, the
@@ -17,6 +17,8 @@ export function JiraConnectedCard({ state, onChanged }: { state: ConnectionState
   const [syncing, setSyncing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [deadOps, setDeadOps] = useState<OutboxOp[]>([])
+  const [statuses, setStatuses] = useState<JiraStatusOption[]>([])
+  const [discardStatus, setDiscardStatus] = useState(connection.discardStatus ?? '')
   const counts = state.outbox ?? { pending: 0, inflight: 0, done: 0, dead: 0 }
 
   const loadDead = useCallback(async () => {
@@ -31,6 +33,28 @@ export function JiraConnectedCard({ state, onChanged }: { state: ConnectionState
   useEffect(() => {
     void loadDead()
   }, [loadDead])
+
+  // Load the board's statuses for the discard "move-to" picker (best-effort).
+  useEffect(() => {
+    let cancelled = false
+    jiraApi
+      .listStatuses()
+      .then(({ statuses: list }) => { if (!cancelled) setStatuses(list) })
+      .catch(() => { if (!cancelled) setStatuses([]) })
+    return () => { cancelled = true }
+  }, [])
+
+  async function changeDiscardStatus(next: string) {
+    const prev = discardStatus
+    setDiscardStatus(next)
+    try {
+      await jiraApi.patchConnection({ discardStatus: next || null })
+      onChanged()
+    } catch (e) {
+      setDiscardStatus(prev)
+      toast.error(errMsg(e, t))
+    }
+  }
 
   async function toggle() {
     const next = !enabled
@@ -113,6 +137,25 @@ export function JiraConnectedCard({ state, onChanged }: { state: ConnectionState
         >
           <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
         </button>
+      </div>
+
+      <div className="rounded-md border border-border p-3">
+        <p className="text-sm font-medium">{t('discard.configLabel')}</p>
+        <p className="mt-0.5 mb-2 text-xs text-muted-foreground">{t('discard.configHelp')}</p>
+        <select
+          value={discardStatus}
+          onChange={(e) => void changeDiscardStatus(e.target.value)}
+          className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          data-testid="jira-discard-status-select"
+        >
+          <option value="">{t('discard.configNone')}</option>
+          {statuses.map((st) => (
+            <option key={st.id} value={st.name}>{st.name}</option>
+          ))}
+          {discardStatus && !statuses.some((s) => s.name === discardStatus) && (
+            <option value={discardStatus}>{discardStatus}</option>
+          )}
+        </select>
       </div>
 
       <div className="flex items-center gap-2">

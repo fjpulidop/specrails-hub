@@ -19,6 +19,8 @@ export interface JiraConnectionPublic {
   enabled: boolean
   statusMap: Partial<Record<SpecLogicalState, string>> | null
   highWaterMs: number | null
+  /** Status a discarded spec's issue is moved to (null = not configured). */
+  discardStatus: string | null
   hasToken: boolean
 }
 
@@ -107,7 +109,11 @@ export const jiraApi = {
   },
 
   connect(
-    input: JiraTestInput & { jiraProjectKey: string; statusMap?: Partial<Record<SpecLogicalState, string>> | null },
+    input: JiraTestInput & {
+      jiraProjectKey: string
+      statusMap?: Partial<Record<SpecLogicalState, string>> | null
+      discardStatus?: string | null
+    },
     apiBase?: string
   ): Promise<{ connection: JiraConnectionPublic }> {
     return fetch(`${base(apiBase)}/jira/connect`, jsonPost(input)).then((r) => asJson(r))
@@ -119,6 +125,28 @@ export const jiraApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled }),
     }).then((r) => asJson(r))
+  },
+
+  /** Patch the connection (enabled and/or the discard "move-to" status). */
+  patchConnection(
+    patch: { enabled?: boolean; discardStatus?: string | null },
+    apiBase?: string
+  ): Promise<{ connection: JiraConnectionPublic }> {
+    return fetch(`${base(apiBase)}/jira/connection`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }).then((r) => asJson(r))
+  },
+
+  /** The connected project's real statuses (post-connect discard-status picker). */
+  listStatuses(apiBase?: string): Promise<{ statuses: JiraStatusOption[] }> {
+    return fetch(`${base(apiBase)}/jira/statuses`).then((r) => asJson(r))
+  },
+
+  /** Move a Jira-backed spec to the configured discard status (+ optional reason). */
+  discardSpec(localId: number, comment: string | null, apiBase?: string): Promise<{ ok: true }> {
+    return fetch(`${base(apiBase)}/jira/specs/${localId}/discard`, jsonPost({ comment })).then((r) => asJson(r))
   },
 
   disconnect(apiBase?: string): Promise<{ connected: false }> {

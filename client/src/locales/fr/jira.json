@@ -95,6 +95,20 @@
     "goToTicket": "Aller au ticket {{key}}",
     "epic": "Épopée"
   },
+  "discard": {
+    "moveButton": "Déplacer vers {{status}}",
+    "title": "Déplacer la spec vers {{status}} ?",
+    "body": "Le ticket Jira {{key}} de cette spec sera déplacé vers « {{status}} » au lieu d'être supprimé. Ajoutez un motif facultatif.",
+    "commentLabel": "Motif (facultatif)",
+    "commentPlaceholder": "Pourquoi déplacez-vous cette spec ?",
+    "confirm": "Déplacer vers {{status}}",
+    "moving": "Déplacement…",
+    "movedToast": "{{key}} déplacé vers {{status}}",
+    "configLabel": "À l'abandon, déplacer le ticket vers",
+    "configHelp": "Lorsque vous abandonnez une spec liée à Jira, son ticket est déplacé vers ce statut au lieu d'être supprimé.",
+    "configNone": "Aucun — supprimer normalement",
+    "reviewLabel": "L'abandon déplace vers"
+  },
   "errors": {
     "generic": "Une erreur s'est produite",
     "testFirst": "Testez d'abord la connexion"

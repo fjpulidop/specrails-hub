@@ -12,7 +12,7 @@ import { mutateStore, readStore, resolveTicketStoragePath, type Ticket, type Tic
 import type { WsMessage } from '../types'
 import { JiraClient, detectDeployment, type FetchImpl } from './jira-client'
 import { writeJiraBacklogConfig, writeLocalBacklogConfig } from './jira-backlog-config'
-import { commentMarker, bodyContainsMarker } from './jira-adf'
+import { commentMarker, discardCommentMarker, bodyContainsMarker } from './jira-adf'
 import { issueUrl, upsertIssuesIntoStore } from './jira-materializer'
 import {
   buildTransitionFields,
@@ -35,6 +35,7 @@ import {
   markOutboxRetry,
   resetInflight,
   setConnectionEnabled,
+  setDiscardStatus,
   setHighWater,
   setSprintFieldId,
   tombstoneLink,
@@ -194,6 +195,7 @@ export class JiraSyncManager {
     token: string
     jiraProjectKey: string
     statusMap?: Partial<Record<SpecLogicalState, string>> | null
+    discardStatus?: string | null
   }): Promise<{ ok: true; connection: JiraConnection } | { ok: false; error: string; status?: number }> {
     const detected = detectDeployment(input.baseUrl)
     const probe = new JiraClient({
@@ -232,6 +234,9 @@ export class JiraSyncManager {
       enabled: true,
       statusMap: input.statusMap ?? null,
     })
+    if (input.discardStatus !== undefined) {
+      setDiscardStatus(this.db, this.projectId, input.discardStatus)
+    }
     writeJiraBacklogConfig(this.projectPath)
     // Discover the sprint custom-field id (best-effort) so sprint capture works
     // from the first poll. Non-fatal — the poll re-discovers if this fails.
@@ -309,6 +314,33 @@ export class JiraSyncManager {
     } else {
       writeLocalBacklogConfig(this.projectPath)
     }
+  }
+
+  /** Configure (or clear) the status a discarded spec is moved to. */
+  setDiscardStatus(status: string | null): void {
+    setDiscardStatus(this.db, this.projectId, status)
+  }
+
+  /**
+   * List the connected project's real statuses (for the post-connect "move on
+   * discard" picker). Uses the stored credentials — no creds needed from caller.
+   */
+  async listStatusesForConnection(): Promise<
+    { ok: true; statuses: Array<{ id: string; name: string; category: string }> } | { ok: false; error: string }
+  > {
+    const conn = getConnection(this.db, this.projectId)
+    if (!conn) return { ok: false, error: 'No Jira connection configured' }
+    const client = this.buildClient()
+    if (!client) return { ok: false, error: 'No Jira credentials' }
+    const res = await client.getProjectStatuses(conn.jiraProjectKey)
+    if (!res.ok) return { ok: false, error: res.error }
+    const seen = new Map<string, { id: string; name: string; category: string }>()
+    for (const group of res.data) {
+      for (const s of group.statuses) {
+        if (!seen.has(s.id)) seen.set(s.id, { id: s.id, name: s.name, category: s.statusCategory?.key ?? 'indeterminate' })
+      }
+    }
+    return { ok: true, statuses: Array.from(seen.values()) }
   }
 
   /** Remove the connection entirely and restore local backlog config. */
@@ -581,6 +613,50 @@ export class JiraSyncManager {
     void this.drainOnce().catch(() => undefined)
   }
 
+  /**
+   * "Discard" a Jira-backed spec: instead of a destructive local delete, move the
+   * linked issue to the user-configured discard status and (optionally) post a
+   * reason comment. The local cache is optimistically flipped to `cancelled` so
+   * the spec leaves the active board immediately; the inbound poll later
+   * reconciles it to the issue's real status (protected meanwhile by the
+   * pending-transition frozen guard).
+   */
+  discardSpec(
+    localId: number,
+    comment: string | null
+  ): { ok: true } | { ok: false; reason: 'not-active' | 'no-link' | 'not-configured' } {
+    if (!this.isActive()) return { ok: false, reason: 'not-active' }
+    const link = getLinkByLocalId(this.db, localId)
+    if (!link || link.tombstoned) return { ok: false, reason: 'no-link' }
+    const conn = getConnection(this.db, this.projectId)
+    const target = conn?.discardStatus ?? null
+    if (!target) return { ok: false, reason: 'not-configured' }
+
+    // Distinct per-action nonce so a re-discard isn't deduped by idempotency key.
+    const nonce = Date.now().toString(36)
+    const ops: EnqueueOutboxInput[] = []
+    const trimmed = (comment ?? '').trim()
+    if (trimmed) {
+      ops.push({
+        jiraIssueId: link.jiraIssueId,
+        opType: 'comment',
+        idempotencyKey: `discard:${localId}:${nonce}:comment`,
+        payload: { jiraIssueId: link.jiraIssueId, text: trimmed, marker: discardCommentMarker(localId, nonce) },
+      })
+    }
+    ops.push({
+      jiraIssueId: link.jiraIssueId,
+      opType: 'transition',
+      idempotencyKey: `discard:${localId}:${nonce}:transition`,
+      payload: { localId, jiraIssueId: link.jiraIssueId, logicalState: 'cancelled' as SpecLogicalState, targetStatus: target },
+    })
+    enqueueMany(this.db, ops)
+    this.writeLocalStatus([localId], 'cancelled')
+    this.broadcastOutboxState()
+    void this.drainOnce().catch(() => undefined)
+    return { ok: true }
+  }
+
   // ─── Outbox drain ──────────────────────────────────────────────────────────
 
   async drainOnce(): Promise<void> {
@@ -637,7 +713,7 @@ export class JiraSyncManager {
     client: JiraClient,
     conn: JiraConnection,
     op: OutboxRow,
-    payload: { jiraIssueId: string; logicalState: SpecLogicalState }
+    payload: { jiraIssueId: string; logicalState: SpecLogicalState; targetStatus?: string }
   ): Promise<void> {
     // Re-GET the live issue for idempotency-first: skip if already in target category.
     const issue = await client.getIssue(payload.jiraIssueId, ['status'])
@@ -655,7 +731,9 @@ export class JiraSyncManager {
 
     const currentCategory: JiraStatusCategory =
       (issue.data.fields.status?.statusCategory?.key as JiraStatusCategory) ?? 'indeterminate'
-    const explicitTarget = conn.statusMap?.[payload.logicalState]
+    // A per-op explicit target (e.g. the discard "move-to" status) wins over the
+    // connection's per-logical-state status map.
+    const explicitTarget = payload.targetStatus ?? conn.statusMap?.[payload.logicalState]
 
     const outcome: WalkOutcome = await walkToCategory({
       state: payload.logicalState,

@@ -95,6 +95,20 @@
     "goToTicket": "チケット {{key}} を開く",
     "epic": "エピック"
   },
+  "discard": {
+    "moveButton": "{{status}} に移動",
+    "title": "仕様を {{status}} に移動しますか？",
+    "body": "この仕様の Jira 課題 {{key}} は削除されず、「{{status}}」に移動されます。任意で理由を追加できます。",
+    "commentLabel": "理由（任意）",
+    "commentPlaceholder": "この仕様を移動する理由は？",
+    "confirm": "{{status}} に移動",
+    "moving": "移動中…",
+    "movedToast": "{{key}} を {{status}} に移動しました",
+    "configLabel": "破棄時に課題を移動する先",
+    "configHelp": "Jira と連携した仕様を破棄すると、その課題は削除されず、このステータスに移動されます。",
+    "configNone": "なし — 通常どおり削除",
+    "reviewLabel": "破棄時の移動先"
+  },
   "errors": {
     "generic": "問題が発生しました",
     "testFirst": "先に接続をテストしてください"

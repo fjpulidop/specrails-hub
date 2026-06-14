@@ -95,6 +95,20 @@
     "goToTicket": "前往工单 {{key}}",
     "epic": "史诗"
   },
+  "discard": {
+    "moveButton": "移动到 {{status}}",
+    "title": "将规格移动到 {{status}}？",
+    "body": "此规格的 Jira 工单 {{key}} 将被移动到“{{status}}”，而不是被删除。可选择填写原因。",
+    "commentLabel": "原因（可选）",
+    "commentPlaceholder": "为什么要移动此规格？",
+    "confirm": "移动到 {{status}}",
+    "moving": "正在移动…",
+    "movedToast": "已将 {{key}} 移动到 {{status}}",
+    "configLabel": "丢弃时将工单移动到",
+    "configHelp": "当你丢弃一个关联 Jira 的规格时，其工单将被移动到此状态，而不是被删除。",
+    "configNone": "无 — 正常删除",
+    "reviewLabel": "丢弃时移动到"
+  },
   "errors": {
     "generic": "出了点问题",
     "testFirst": "请先测试连接"

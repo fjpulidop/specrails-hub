@@ -35,6 +35,15 @@ export function commentMarker(jobId: string, ticketId: number): string {
   return `[specrails:job=${jobId}:ticket=${ticketId}]`
 }
 
+/**
+ * Idempotency marker for a user-initiated "discard / move-to" comment. The
+ * `nonce` (captured at enqueue) makes each discard distinct so a later re-discard
+ * of the same spec posts a fresh comment instead of being deduped away.
+ */
+export function discardCommentMarker(ticketId: number, nonce: string): string {
+  return `[specrails:discard=${nonce}:ticket=${ticketId}]`
+}
+
 /** True when an ADF doc or wiki string already contains the given marker. */
 export function bodyContainsMarker(body: unknown, marker: string): boolean {
   if (typeof body === 'string') return body.includes(marker)

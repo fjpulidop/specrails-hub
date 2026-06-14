@@ -35,6 +35,7 @@ interface ConnectionRowRaw {
   status_map: string | null
   high_water_ms: number | null
   sprint_field_id: string | null
+  discard_status: string | null
   created_at: string
   updated_at: string
 }
@@ -61,6 +62,7 @@ function mapConnection(r: ConnectionRowRaw): JiraConnection {
     statusMap,
     highWaterMs: r.high_water_ms,
     sprintFieldId: r.sprint_field_id ?? null,
+    discardStatus: r.discard_status ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }
@@ -187,6 +189,15 @@ export function setHighWater(db: DbInstance, projectId: string, highWaterMs: num
 export function setSprintFieldId(db: DbInstance, projectId: string, fieldId: string): void {
   db.prepare('UPDATE jira_connection SET sprint_field_id = ?, updated_at = ? WHERE project_id = ?').run(
     fieldId,
+    new Date().toISOString(),
+    projectId
+  )
+}
+
+/** Set (or clear with null) the discard target status name. */
+export function setDiscardStatus(db: DbInstance, projectId: string, status: string | null): void {
+  db.prepare('UPDATE jira_connection SET discard_status = ?, updated_at = ? WHERE project_id = ?').run(
+    status && status.trim() ? status.trim() : null,
     new Date().toISOString(),
     projectId
   )

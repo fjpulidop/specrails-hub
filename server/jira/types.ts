@@ -48,6 +48,11 @@ export interface JiraConnection {
    * discovered, 'none' = no sprint field exists, '<id>' = the field id.
    */
   sprintFieldId: string | null
+  /**
+   * User-configured status NAME a discarded spec's issue is moved to (instead of
+   * a destructive delete) in a Jira-synced project. null = not configured.
+   */
+  discardStatus: string | null
   createdAt: string
   updatedAt: string
 }

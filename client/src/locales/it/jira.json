@@ -95,6 +95,20 @@
     "goToTicket": "Vai al ticket {{key}}",
     "epic": "Epica"
   },
+  "discard": {
+    "moveButton": "Sposta in {{status}}",
+    "title": "Spostare la spec in {{status}}?",
+    "body": "Il ticket Jira {{key}} di questa spec verrà spostato in \"{{status}}\" invece di essere eliminato. Aggiungi un motivo facoltativo.",
+    "commentLabel": "Motivo (facoltativo)",
+    "commentPlaceholder": "Perché stai spostando questa spec?",
+    "confirm": "Sposta in {{status}}",
+    "moving": "Spostamento…",
+    "movedToast": "{{key}} spostato in {{status}}",
+    "configLabel": "Allo scarto, sposta il ticket in",
+    "configHelp": "Quando scarti una spec collegata a Jira, il suo ticket viene spostato in questo stato invece di essere eliminato.",
+    "configNone": "Nessuno — elimina normalmente",
+    "reviewLabel": "Lo scarto sposta in"
+  },
   "errors": {
     "generic": "Qualcosa è andato storto",
     "testFirst": "Prova prima la connessione"

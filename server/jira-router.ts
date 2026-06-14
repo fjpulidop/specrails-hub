@@ -104,7 +104,7 @@ export function createJiraRouter(): Router {
   // POST /connect — wizard final step: validate + persist + start sync.
   router.post('/connect', async (req: Request, res: Response) => {
     const c = ctx(req)
-    const { baseUrl, accountEmail, token, jiraProjectKey, statusMap } = req.body ?? {}
+    const { baseUrl, accountEmail, token, jiraProjectKey, statusMap, discardStatus } = req.body ?? {}
     if (!isNonEmptyString(baseUrl) || !isNonEmptyString(token) || !isNonEmptyString(jiraProjectKey)) {
       res.status(400).json({ error: 'baseUrl, token and jiraProjectKey are required' })
       return
@@ -116,6 +116,7 @@ export function createJiraRouter(): Router {
       token,
       jiraProjectKey: jiraProjectKey.trim(),
       statusMap: cleanMap,
+      discardStatus: isNonEmptyString(discardStatus) ? discardStatus.trim() : null,
     })
     if (!result.ok) {
       res.status(result.status === 401 ? 401 : 400).json({ error: result.error })
@@ -124,7 +125,8 @@ export function createJiraRouter(): Router {
     res.status(201).json({ connection: getConnectionPublic(c.db, c.project.id) })
   })
 
-  // PATCH /connection — toggle enabled (hot-swap local↔Jira) or update status map.
+  // PATCH /connection — toggle enabled (hot-swap local↔Jira) and/or update the
+  // discard "move-to" status. `discardStatus: ''`/null clears it.
   router.patch('/connection', (req: Request, res: Response) => {
     const c = ctx(req)
     const existing = getConnectionPublic(c.db, c.project.id)
@@ -132,11 +134,25 @@ export function createJiraRouter(): Router {
       res.status(404).json({ error: 'No Jira connection configured' })
       return
     }
-    const { enabled } = req.body ?? {}
+    const { enabled, discardStatus } = req.body ?? {}
     if (typeof enabled === 'boolean') {
       c.jiraSyncManager.setEnabled(enabled)
     }
+    if (discardStatus !== undefined) {
+      c.jiraSyncManager.setDiscardStatus(isNonEmptyString(discardStatus) ? discardStatus.trim() : null)
+    }
     res.json({ connection: getConnectionPublic(c.db, c.project.id) })
+  })
+
+  // GET /statuses — the connected project's real statuses (post-connect picker
+  // for the discard "move-to" status). Uses the stored credentials.
+  router.get('/statuses', async (req: Request, res: Response) => {
+    const result = await ctx(req).jiraSyncManager.listStatusesForConnection()
+    if (!result.ok) {
+      res.status(400).json({ error: result.error })
+      return
+    }
+    res.json({ statuses: result.statuses })
   })
 
   // DELETE /connection — remove the connection + restore local backlog config.
@@ -210,6 +226,26 @@ export function createJiraRouter(): Router {
       return
     }
     res.status(201).json({ localId: result.localId, jiraKey: result.jiraKey })
+  })
+
+  // POST /specs/:localId/discard — "Move to <discard status>": transition the
+  // linked issue to the configured discard status (+ optional reason comment)
+  // instead of a destructive delete. Body: { comment?: string }.
+  router.post('/specs/:localId/discard', (req: Request, res: Response) => {
+    const c = ctx(req)
+    const localId = parseInt(req.params.localId as string, 10)
+    if (Number.isNaN(localId)) {
+      res.status(400).json({ error: 'Invalid spec id' })
+      return
+    }
+    const comment = isNonEmptyString(req.body?.comment) ? req.body.comment : null
+    const result = c.jiraSyncManager.discardSpec(localId, comment)
+    if (!result.ok) {
+      const status = result.reason === 'no-link' ? 404 : 409
+      res.status(status).json({ error: result.reason })
+      return
+    }
+    res.status(202).json({ ok: true })
   })
 
   // GET /links — the spec↔issue map (for the badge / diagnostics).

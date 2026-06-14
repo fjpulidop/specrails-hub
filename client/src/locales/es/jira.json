@@ -95,6 +95,20 @@
     "goToTicket": "Ir al ticket {{key}}",
     "epic": "Épica"
   },
+  "discard": {
+    "moveButton": "Mover a {{status}}",
+    "title": "¿Mover la spec a {{status}}?",
+    "body": "El ticket de Jira {{key}} de esta spec se moverá a «{{status}}» en lugar de borrarse. Añade un motivo opcional.",
+    "commentLabel": "Motivo (opcional)",
+    "commentPlaceholder": "¿Por qué mueves esta spec?",
+    "confirm": "Mover a {{status}}",
+    "moving": "Moviendo…",
+    "movedToast": "{{key}} movido a {{status}}",
+    "configLabel": "Al descartar, mover el ticket a",
+    "configHelp": "Cuando descartas una spec vinculada a Jira, su ticket se mueve a este estado en lugar de borrarse.",
+    "configNone": "Ninguno — borrar normalmente",
+    "reviewLabel": "Descartar mueve a"
+  },
   "errors": {
     "generic": "Algo salió mal",
     "testFirst": "Prueba la conexión primero"

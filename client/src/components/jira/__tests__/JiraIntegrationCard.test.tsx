@@ -17,6 +17,8 @@ vi.mock('../../../lib/jira-api', () => ({
     discoverProjects: vi.fn(),
     discoverStatuses: vi.fn(),
     connect: vi.fn(),
+    listStatuses: vi.fn(),
+    patchConnection: vi.fn(),
   },
 }))
 
@@ -48,6 +50,8 @@ describe('JiraIntegrationCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     api.listOutbox.mockResolvedValue({ ops: [], counts: { pending: 0, inflight: 0, done: 0, dead: 0 } })
+    api.listStatuses.mockResolvedValue({ statuses: [] })
+    api.patchConnection.mockResolvedValue({ connection: connectedState.connection })
   })
 
   it('renders a Connect button and opens the wizard modal when not connected', async () => {

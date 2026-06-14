@@ -95,6 +95,20 @@
     "goToTicket": "Zum Ticket {{key}}",
     "epic": "Epic"
   },
+  "discard": {
+    "moveButton": "Verschieben nach {{status}}",
+    "title": "Spec nach {{status}} verschieben?",
+    "body": "Das Jira-Ticket {{key}} dieser Spec wird nach „{{status}}“ verschoben, statt gelöscht zu werden. Optional einen Grund angeben.",
+    "commentLabel": "Grund (optional)",
+    "commentPlaceholder": "Warum verschiebst du diese Spec?",
+    "confirm": "Nach {{status}} verschieben",
+    "moving": "Wird verschoben…",
+    "movedToast": "{{key}} nach {{status}} verschoben",
+    "configLabel": "Beim Verwerfen Ticket verschieben nach",
+    "configHelp": "Wenn du eine mit Jira verknüpfte Spec verwirfst, wird ihr Ticket in diesen Status verschoben, statt gelöscht zu werden.",
+    "configNone": "Keiner — normal löschen",
+    "reviewLabel": "Verwerfen verschiebt nach"
+  },
   "errors": {
     "generic": "Etwas ist schiefgelaufen",
     "testFirst": "Teste zuerst die Verbindung"
