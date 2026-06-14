@@ -1,13 +1,12 @@
 import fs from 'fs'
 import path from 'path'
 import { ChildProcess } from 'child_process'
-import { createInterface } from 'readline'
 import { createHash, randomUUID } from 'crypto'
 import treeKill from 'tree-kill'
-import { spawnAiCli } from './util/cli-prompt'
 import { testCustomAgent } from './agent-generator'
 import { recordInvocation } from './ai-invocations'
 import { finaliseInvocationResult } from './result-event'
+import { runAiCliInvocation } from './spawn-lifecycle'
 import { getAdapter, type ProviderAdapter, type AdapterEvent } from './providers'
 import type { DbInstance } from './db'
 import type {
@@ -264,174 +263,156 @@ export class AgentRefineManager {
     })
 
     let drafted = false
-    const child = spawnAiCli(this._adapter.binary, args, {
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      cwd: this._projectPath,
-    })
-    this._activeProcesses.set(refineId, child)
     this._bodyBuffers.set(refineId, '')
-
-    let capturedSessionId: string | null = null
-    const adapterEvents: AdapterEvent[] = []
     const turnStartedAt = new Date().toISOString()
-    const reader = createInterface({ input: child.stdout!, crlfDelay: Infinity })
+    const spawnState: { err: Error | null } = { err: null }
 
-    reader.on('line', (line) => {
-      const ev = this._adapter.parseStreamLine(line)
-      if (!ev) return
-      adapterEvents.push(ev)
-
-      switch (ev.kind) {
-        case 'session-started':
-          if (!capturedSessionId) capturedSessionId = ev.sessionId
-          break
-        case 'result': {
-          const sid = (ev.payload as { session_id?: string }).session_id
-          if (sid && !capturedSessionId) capturedSessionId = sid
-          break
-        }
-        case 'text-delta': {
-          if (!drafted) {
-            drafted = true
-            updateRefineSession(this._db, refineId, { phase: 'drafting' })
-            this._emitPhase(refineId, 'drafting')
-          }
-          const prev = this._bodyBuffers.get(refineId) ?? ''
-          const next = prev + ev.text
-          this._bodyBuffers.set(refineId, next)
-          this._broadcast({
-            type: 'agent_refine_stream',
-            projectId: '',
-            refineId,
-            delta: ev.text,
-            timestamp: new Date().toISOString(),
-          })
-          updateRefineSession(this._db, refineId, { draft_body: next })
-          break
-        }
-        case 'tool-use':
-          this._broadcast({
-            type: 'agent_refine_stream',
-            projectId: '',
-            refineId,
-            delta: `<!--tool:${ev.name}-->`,
-            timestamp: new Date().toISOString(),
-          })
-          break
-        case 'other':
-          break
-      }
-    })
-
-    let stderr = ''
-    child.stderr!.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
-
-    return new Promise<void>((resolve) => {
-      child.on('error', (err) => {
-        this._activeProcesses.delete(refineId)
-        this._bodyBuffers.delete(refineId)
-        if (this._disposed) { resolve(); return } // M12: project removed mid-flight; DB closing
-        this._emitError(refineId, `Failed to launch claude: ${err.message}`)
-        updateRefineSession(this._db, refineId, { status: 'error', phase: 'idle' })
-        resolve()
-      })
-      child.on('close', (code) => {
-        this._activeProcesses.delete(refineId)
-        const fullDraft = this._bodyBuffers.get(refineId) ?? ''
-        this._bodyBuffers.delete(refineId)
-        if (this._disposed) { resolve(); return } // M12: project removed mid-flight; DB closing
-
-        // ai_invocations capture (surface='ai-edit'). One row per refine turn.
-        if (this._projectId) {
-          try {
-            const invStatus = code === 0 && fullDraft.trim() ? 'success' : 'failed'
-            const { result: normalised, estimated } = finaliseInvocationResult(
-              this._adapter,
-              adapterEvents,
-              { fallbackModel: refineModel },
-            )
-            recordInvocation(this._db, {
-              id: randomUUID(),
-              project_id: this._projectId,
-              provider: this._adapter.id,
-              surface: 'ai-edit',
-              surface_ref_id: refineId,
-              status: invStatus,
-              started_at: turnStartedAt,
-              finished_at: new Date().toISOString(),
-              total_cost_usd_estimated: estimated,
-              ...normalised,
+    // Spawn / stream / settlement is owned by the shared spawn-lifecycle; the
+    // refine-specific draft buffering, accounting, validation and history all
+    // stay here unchanged.
+    const run = await runAiCliInvocation({
+      adapter: this._adapter,
+      action,
+      buildOpts: { prompt, model: refineModel, sessionId: session.session_id ?? undefined },
+      cwd: this._projectPath,
+      onSpawn: (child) => this._activeProcesses.set(refineId, child),
+      onSpawnError: (err) => { spawnState.err = err },
+      onEvent: (ev) => {
+        switch (ev.kind) {
+          case 'text-delta': {
+            if (!drafted) {
+              drafted = true
+              updateRefineSession(this._db, refineId, { phase: 'drafting' })
+              this._emitPhase(refineId, 'drafting')
+            }
+            const prev = this._bodyBuffers.get(refineId) ?? ''
+            const next = prev + ev.text
+            this._bodyBuffers.set(refineId, next)
+            this._broadcast({
+              type: 'agent_refine_stream',
+              projectId: '',
+              refineId,
+              delta: ev.text,
+              timestamp: new Date().toISOString(),
             })
-            this._broadcast({ type: 'spending.invalidated', projectId: this._projectId })
-          } catch (err) {
-            console.error('[agent-refine-manager] recordInvocation failed:', err)
+            updateRefineSession(this._db, refineId, { draft_body: next })
+            break
           }
+          case 'tool-use':
+            this._broadcast({
+              type: 'agent_refine_stream',
+              projectId: '',
+              refineId,
+              delta: `<!--tool:${ev.name}-->`,
+              timestamp: new Date().toISOString(),
+            })
+            break
+          default:
+            break
         }
-
-        if (code !== 0 || !fullDraft.trim()) {
-          this._emitError(
-            refineId,
-            code !== 0
-              ? `claude exited with code ${code}${stderr ? `: ${stderr.slice(-300)}` : ''}`
-              : 'claude returned empty output',
-          )
-          updateRefineSession(this._db, refineId, { status: 'error', phase: 'idle' })
-          resolve()
-          return
-        }
-
-        // Validation phase.
-        updateRefineSession(this._db, refineId, { phase: 'validating' })
-        this._emitPhase(refineId, 'validating')
-        const stripped = stripToolMarkers(fullDraft)
-        const validation = validateAgentBody(stripped, this._adapter.id)
-        if (!validation.ok) {
-          this._emitError(refineId, `Frontmatter invalid: ${validation.error}`)
-          updateRefineSession(this._db, refineId, { status: 'error', phase: 'idle', draft_body: stripped })
-          resolve()
-          return
-        }
-
-        // Append assistant turn to history (use stripped body — markers gone).
-        this._appendHistory(refineId, {
-          role: 'assistant',
-          content: stripped,
-          timestamp: Date.now(),
-        })
-
-        const patch = {
-          status: 'ready' as const,
-          phase: 'done' as AgentRefinePhase,
-          draft_body: stripped,
-          ...(capturedSessionId ? { session_id: capturedSessionId } : {}),
-        }
-        updateRefineSession(this._db, refineId, patch)
-        this._broadcast({
-          type: 'agent_refine_ready',
-          projectId: '',
-          refineId,
-          draftBody: stripped,
-          timestamp: new Date().toISOString(),
-        })
-        this._emitPhase(refineId, 'done')
-
-        // Smart-mode auto-test: only run if enabled, body changed since last
-        // test, and >5s elapsed. Best-effort; failures are non-fatal.
-        const session2 = getRefineSession(this._db, refineId)
-        if (session2 && session2.auto_test === 1) {
-          const draftHash = sha256(stripped)
-          const recent =
-            session2.last_test_at !== null && Date.now() - session2.last_test_at < SMART_TEST_DEBOUNCE_MS
-          const sameBody = session2.last_test_hash === draftHash
-          if (!recent && !sameBody) {
-            void this._runAutoTest(refineId, session2.agent_id, stripped, draftHash)
-          }
-        }
-
-        resolve()
-      })
+      },
     })
+
+    this._activeProcesses.delete(refineId)
+    const fullDraft = this._bodyBuffers.get(refineId) ?? ''
+    this._bodyBuffers.delete(refineId)
+    if (this._disposed) return // M12: project removed mid-flight; DB closing
+
+    if (run.spawnFailed) {
+      this._emitError(refineId, `Failed to launch claude: ${spawnState.err?.message ?? 'spawn error'}`)
+      updateRefineSession(this._db, refineId, { status: 'error', phase: 'idle' })
+      return
+    }
+
+    const capturedSessionId = run.sessionId
+    const adapterEvents = run.events
+    const code = run.code
+    const stderr = run.stderrTail
+
+    // ai_invocations capture (surface='ai-edit'). One row per refine turn.
+    if (this._projectId) {
+      try {
+        const invStatus = code === 0 && fullDraft.trim() ? 'success' : 'failed'
+        const { result: normalised, estimated } = finaliseInvocationResult(
+          this._adapter,
+          adapterEvents,
+          { fallbackModel: refineModel },
+        )
+        recordInvocation(this._db, {
+          id: randomUUID(),
+          project_id: this._projectId,
+          provider: this._adapter.id,
+          surface: 'ai-edit',
+          surface_ref_id: refineId,
+          status: invStatus,
+          started_at: turnStartedAt,
+          finished_at: new Date().toISOString(),
+          total_cost_usd_estimated: estimated,
+          ...normalised,
+        })
+        this._broadcast({ type: 'spending.invalidated', projectId: this._projectId })
+      } catch (err) {
+        console.error('[agent-refine-manager] recordInvocation failed:', err)
+      }
+    }
+
+    if (code !== 0 || !fullDraft.trim()) {
+      this._emitError(
+        refineId,
+        code !== 0
+          ? `claude exited with code ${code}${stderr ? `: ${stderr.slice(-300)}` : ''}`
+          : 'claude returned empty output',
+      )
+      updateRefineSession(this._db, refineId, { status: 'error', phase: 'idle' })
+      return
+    }
+
+    // Validation phase.
+    updateRefineSession(this._db, refineId, { phase: 'validating' })
+    this._emitPhase(refineId, 'validating')
+    const stripped = stripToolMarkers(fullDraft)
+    const validation = validateAgentBody(stripped, this._adapter.id)
+    if (!validation.ok) {
+      this._emitError(refineId, `Frontmatter invalid: ${validation.error}`)
+      updateRefineSession(this._db, refineId, { status: 'error', phase: 'idle', draft_body: stripped })
+      return
+    }
+
+    // Append assistant turn to history (use stripped body — markers gone).
+    this._appendHistory(refineId, {
+      role: 'assistant',
+      content: stripped,
+      timestamp: Date.now(),
+    })
+
+    const patch = {
+      status: 'ready' as const,
+      phase: 'done' as AgentRefinePhase,
+      draft_body: stripped,
+      ...(capturedSessionId ? { session_id: capturedSessionId } : {}),
+    }
+    updateRefineSession(this._db, refineId, patch)
+    this._broadcast({
+      type: 'agent_refine_ready',
+      projectId: '',
+      refineId,
+      draftBody: stripped,
+      timestamp: new Date().toISOString(),
+    })
+    this._emitPhase(refineId, 'done')
+
+    // Smart-mode auto-test: only run if enabled, body changed since last
+    // test, and >5s elapsed. Best-effort; failures are non-fatal.
+    const session2 = getRefineSession(this._db, refineId)
+    if (session2 && session2.auto_test === 1) {
+      const draftHash = sha256(stripped)
+      const recent =
+        session2.last_test_at !== null && Date.now() - session2.last_test_at < SMART_TEST_DEBOUNCE_MS
+      const sameBody = session2.last_test_hash === draftHash
+      if (!recent && !sameBody) {
+        void this._runAutoTest(refineId, session2.agent_id, stripped, draftHash)
+      }
+    }
   }
 
   private async _runAutoTest(
