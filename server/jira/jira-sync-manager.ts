@@ -436,7 +436,12 @@ export class JiraSyncManager {
     return new Set(rows.map((r) => r.localId))
   }
 
-  async pollOnce(): Promise<{ upserted: number } | null> {
+  /**
+   * Inbound poll. `full=true` ignores the high-water mark and re-fetches the
+   * whole backlog — used by the manual "Sync now" so it back-fills any fields
+   * the cache is missing (e.g. sprint/epic data added after the last sync).
+   */
+  async pollOnce(full = false): Promise<{ upserted: number } | null> {
     let conn = getConnection(this.db, this.projectId)
     if (!conn || !conn.enabled) return null
     const client = this.buildClient()
@@ -448,6 +453,12 @@ export class JiraSyncManager {
       const fieldId = await this.discoverSprintField(client)
       if (fieldId !== null) {
         setSprintFieldId(this.db, this.projectId, fieldId)
+        // First time we find a real sprint field on an ALREADY-synced connection:
+        // reset the high-water so this poll re-fetches every issue and back-fills
+        // the sprint (and epic) data the cache is missing. One-time full re-sync.
+        if (fieldId !== 'none' && conn.highWaterMs && conn.highWaterMs > 0) {
+          setHighWater(this.db, this.projectId, 0)
+        }
         conn = getConnection(this.db, this.projectId) ?? conn
       }
     }
@@ -456,7 +467,7 @@ export class JiraSyncManager {
 
     const frozen = this.frozenLocalIds()
     let jql = `project = "${conn.jiraProjectKey}" ORDER BY updated ASC`
-    if (conn.highWaterMs && conn.highWaterMs > 0) {
+    if (!full && conn.highWaterMs && conn.highWaterMs > 0) {
       const since = formatJqlDate(conn.highWaterMs - POLL_OVERLAP_MS)
       jql = `project = "${conn.jiraProjectKey}" AND updated >= "${since}" ORDER BY updated ASC`
     }

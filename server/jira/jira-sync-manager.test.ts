@@ -585,6 +585,53 @@ describe('pollOnce()', () => {
     expect(sent?.body.jql).toMatch(/updated >=/)
   })
 
+  it('pollOnce(true) does a FULL sync (no updated >= clause) even with a high-water', async () => {
+    seedConnection()
+    setHighWater(db, PROJECT_ID, Date.UTC(2025, 5, 1, 12, 0))
+    const fake = makeFakeFetch()
+    fake.on('POST', '/search/jql', { status: 200, body: { issues: [] } })
+    const mgr = makeManager(fake.fetchImpl)
+    await mgr.pollOnce(true)
+    const sent = fake.calls.find((c) => c.url.includes('/search/jql'))
+    expect(sent?.body.jql).not.toMatch(/updated >=/)
+  })
+
+  it('discovers the sprint field, requests it in search, and resets the high-water to back-fill', async () => {
+    seedConnection()
+    setHighWater(db, PROJECT_ID, Date.UTC(2025, 5, 1, 12, 0))
+    const fake = makeFakeFetch()
+    fake.on('GET', '/field', {
+      status: 200,
+      body: [
+        { id: 'summary', name: 'Summary' },
+        { id: 'customfield_10020', name: 'Sprint', schema: { custom: 'com.pyxis.greenhopper.jira:gh-sprint' } },
+      ],
+    })
+    fake.on('POST', '/search/jql', { status: 200, body: { issues: [] } })
+    const mgr = makeManager(fake.fetchImpl)
+    await mgr.pollOnce()
+    // Field id cached.
+    expect(getConnection(db, PROJECT_ID)?.sprintFieldId).toBe('customfield_10020')
+    // Requested in the search.
+    const sent = fake.calls.find((c) => c.url.includes('/search/jql'))
+    expect(sent?.body.fields).toContain('customfield_10020')
+    // High-water reset → this poll did a full sync (no updated >= clause).
+    expect(sent?.body.jql).not.toMatch(/updated >=/)
+  })
+
+  it('caches "none" when the instance has no sprint field (and keeps the high-water)', async () => {
+    seedConnection()
+    setHighWater(db, PROJECT_ID, Date.UTC(2025, 5, 1, 12, 0))
+    const fake = makeFakeFetch()
+    fake.on('GET', '/field', { status: 200, body: [{ id: 'summary', name: 'Summary' }] })
+    fake.on('POST', '/search/jql', { status: 200, body: { issues: [] } })
+    const mgr = makeManager(fake.fetchImpl)
+    await mgr.pollOnce()
+    expect(getConnection(db, PROJECT_ID)?.sprintFieldId).toBe('none')
+    const sent = fake.calls.find((c) => c.url.includes('/search/jql'))
+    expect(sent?.body.jql).toMatch(/updated >=/) // not reset
+  })
+
   it('401 → onAuth401 broadcasts jira.auth_expired and returns null', async () => {
     seedConnection()
     const fake = makeFakeFetch()

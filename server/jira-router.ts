@@ -154,9 +154,10 @@ export function createJiraRouter(): Router {
 
   // ─── Sync + outbox management ───────────────────────────────────────────────
 
-  // POST /sync — trigger an immediate inbound poll.
+  // POST /sync — manual "Sync now": a FULL re-fetch (ignores the high-water) so
+  // it back-fills any data the cache is missing (e.g. sprint/epic fields).
   router.post('/sync', async (req: Request, res: Response) => {
-    const result = await ctx(req).jiraSyncManager.pollOnce()
+    const result = await ctx(req).jiraSyncManager.pollOnce(true)
     res.json({ ok: true, upserted: result?.upserted ?? 0 })
   })
 
