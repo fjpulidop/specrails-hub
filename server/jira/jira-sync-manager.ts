@@ -64,6 +64,12 @@ export interface JiraSyncManagerOpts {
   fetchImpl?: FetchImpl
   /** When false, timers are not started (tests drive pollOnce/drainOnce directly). */
   startTimers?: boolean
+  /**
+   * Called after every local-tickets.json write the manager makes, with the new
+   * store revision. Wired to TicketWatcher.notifyDesktopWrite so a poll/sync
+   * write does NOT trigger the watcher's full-board refresh (the 60s flicker).
+   */
+  notifyLocalWrite?: (revision: number) => void
 }
 
 export type JobOutcomeStatus = 'completed' | 'failed' | 'canceled' | 'zombie_terminated'
@@ -74,6 +80,7 @@ export class JiraSyncManager {
   private projectPath: string
   private broadcast: (msg: WsMessage) => void
   private fetchImpl?: FetchImpl
+  private notifyLocalWriteCb?: (revision: number) => void
   private pollTimer: NodeJS.Timeout | null = null
   private drainTimer: NodeJS.Timeout | null = null
   /** When set, the outbox is paused pending re-auth (401). */
@@ -85,7 +92,22 @@ export class JiraSyncManager {
     this.projectPath = opts.projectPath
     this.broadcast = opts.broadcast
     this.fetchImpl = opts.fetchImpl
+    this.notifyLocalWriteCb = opts.notifyLocalWrite
     if (opts.startTimers !== false) this.start()
+  }
+
+  /** Suppress the file-watcher echo for a local write we just made. */
+  private notifyLocalWrite(revision: number): void {
+    try {
+      this.notifyLocalWriteCb?.(revision)
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  /** Late-bind the watcher notifier (the TicketWatcher is constructed after us). */
+  setLocalWriteNotifier(fn: (revision: number) => void): void {
+    this.notifyLocalWriteCb = fn
   }
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────────
@@ -312,6 +334,7 @@ export class JiraSyncManager {
       ? full.data
       : ({ id: created.data.id, key: created.data.key, fields: { summary: input.title, labels: input.labels ?? [] } } as JiraIssue)
     const r = upsertIssuesIntoStore(this.db, this.projectPath, conn, [issue], new Set())
+    if (r.wrote) this.notifyLocalWrite(r.revision)
     const localId = r.changedLocalIds[0]
     const t = readTicket(this.projectPath, localId)
     if (t) this.broadcast({ type: 'ticket_created', ticket: t, projectId: this.projectId, timestamp: t.updated_at } as WsMessage)
@@ -361,7 +384,7 @@ export class JiraSyncManager {
     })
 
     let updated: Ticket | undefined
-    mutateStore(file, (s) => {
+    const promoteStore = mutateStore(file, (s) => {
       const t = s.tickets[String(localId)]
       if (t) {
         t.source = 'jira'
@@ -371,6 +394,7 @@ export class JiraSyncManager {
         updated = t
       }
     })
+    this.notifyLocalWrite(promoteStore.revision)
     if (updated) {
       this.broadcast({ type: 'ticket_updated', ticket: updated as unknown as never, projectId: this.projectId, timestamp: updated.updated_at } as WsMessage)
     }
@@ -417,6 +441,10 @@ export class JiraSyncManager {
       const issues: JiraIssue[] = res.data.issues ?? []
       if (issues.length > 0) {
         const r = upsertIssuesIntoStore(this.db, this.projectPath, conn, issues, frozen)
+        // Suppress the watcher echo for our own write (avoids the full-board
+        // refresh flicker). When nothing changed, `wrote` is false and we also
+        // skip the granular broadcasts below — the board stays perfectly still.
+        if (r.wrote) this.notifyLocalWrite(r.revision)
         totalUpserted += r.upserted
         if (r.maxUpdatedMs > maxUpdated) maxUpdated = r.maxUpdatedMs
         for (const localId of r.changedLocalIds) {
@@ -698,6 +726,7 @@ export class JiraSyncManager {
           }
         }
       })
+      this.notifyLocalWrite(store.revision)
       for (const id of ids) {
         const t = store.tickets[id]
         if (t) this.broadcast({ type: 'ticket_updated', ticket: t as unknown as never, projectId: this.projectId, timestamp: t.updated_at } as WsMessage)

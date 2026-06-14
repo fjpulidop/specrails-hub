@@ -135,10 +135,9 @@ export function ExploreSpecShell({
 }: ExploreSpecShellProps) {
   const { t } = useTranslation('explore')
   const { t: tj } = useTranslation('jira')
+  // On a Jira-backed project a committed Explore spec is always created in Jira;
+  // the indicator makes that explicit. (Private specs use Save as Draft.)
   const jira = useJiraConnection()
-  // Add Spec → Jira: a committed Explore spec is created in Jira by default on a
-  // Jira-backed project; this escape hatch keeps it local.
-  const [createLocal, setCreateLocal] = useState(false)
   const chat = useChatContext()
   const { activeProjectId } = useDesktop()
   const [conversationId, setConversationId] = useState<string | null>(
@@ -543,7 +542,6 @@ export function ExploreSpecShell({
           labels: draft.labels,
           priority: draft.priority,
           acceptanceCriteria: draft.acceptanceCriteria.filter((c) => c.trim().length > 0),
-          ...(jira.connected ? { createLocal } : {}),
           // Server migrates pendingSpecId/<id>/* → ticket/<realId>/* so the
           // attachments uploaded during the conversation end up bound to the
           // freshly-created ticket.
@@ -685,22 +683,14 @@ export function ExploreSpecShell({
             </Button>
           )}
           {jira.connected && !isRealSpecEdit && (
-            <label
-              className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer mr-1"
+            <span
+              className="inline-flex items-center gap-1.5 text-[11px] text-accent-info mr-1"
               data-testid="jira-create-indicator"
               title={tj('addSpec.willCreate', { key: jira.jiraProjectKey ?? '' })}
             >
-              <Plug className="w-3 h-3 text-accent-info shrink-0" />
-              <span className="hidden lg:inline text-accent-info">{tj('addSpec.willCreate', { key: jira.jiraProjectKey ?? '' })}</span>
-              <input
-                type="checkbox"
-                checked={createLocal}
-                onChange={(e) => setCreateLocal(e.target.checked)}
-                className="w-3 h-3 rounded ml-1"
-                data-testid="jira-create-local"
-              />
-              <span className="hidden lg:inline">{tj('addSpec.keepLocal')}</span>
-            </label>
+              <Plug className="w-3 h-3 shrink-0" />
+              <span className="hidden lg:inline">{tj('addSpec.willCreate', { key: jira.jiraProjectKey ?? '' })}</span>
+            </span>
           )}
           <Button
             size="sm"

@@ -89,8 +89,7 @@
     "openInJira": "Jira で開く"
   },
   "addSpec": {
-    "willCreate": "Jira に作成されます · {{key}}",
-    "keepLocal": "代わりにローカルスペックとして作成"
+    "willCreate": "Jira に作成されます · {{key}}"
   },
   "detail": {
     "goToTicket": "チケット {{key}} を開く"

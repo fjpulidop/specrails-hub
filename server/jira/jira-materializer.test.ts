@@ -452,7 +452,9 @@ describe('upsertIssuesIntoStore', () => {
     expect(store.tickets[String(localId)].status).toBe('todo') // preserved, NOT done
     // existing priority (low) preserved over the inbound high
     expect(store.tickets[String(localId)].priority).toBe('low')
-    expect(result.changedLocalIds).toEqual([localId])
+    // Frozen + everything else identical ⇒ no actual change ⇒ no write/broadcast.
+    expect(result.changedLocalIds).toEqual([])
+    expect(result.wrote).toBe(false)
   })
 
   it('frozen flag has no effect when the ticket does not yet exist (first insert)', () => {
@@ -538,8 +540,121 @@ describe('upsertIssuesIntoStore', () => {
     const high = 123456
     const c = makeConn({ highWaterMs: high })
     const result = upsertIssuesIntoStore(db, projectPath, c, [])
-    expect(result).toEqual({ changedLocalIds: [], maxUpdatedMs: high, upserted: 0 })
+    expect(result).toMatchObject({ changedLocalIds: [], maxUpdatedMs: high, upserted: 0, wrote: false })
     const store = readStore(storePath())
     expect(Object.keys(store.tickets)).toHaveLength(0)
+  })
+})
+
+// ─── upsertIssuesIntoStore — change detection (B) ────────────────────────────
+
+describe('upsertIssuesIntoStore — change detection (B)', () => {
+  const conn = () => makeConn()
+  const storePath = () => resolveTicketStoragePath(projectPath)
+
+  it('first materialize of a new issue writes, reports the id, and bumps the revision', () => {
+    // The store does not exist yet → an empty store reads at revision 0.
+    const emptyRevision = readStore(storePath()).revision
+    expect(emptyRevision).toBe(0)
+
+    const result = upsertIssuesIntoStore(db, projectPath, conn(), [
+      makeIssue({ id: '800', key: 'PROJ-1', summary: 'New issue', statusCategoryKey: 'new' }),
+    ])
+    const localId = getLinkByIssueId(db, '800')!.localId
+
+    expect(result.wrote).toBe(true)
+    expect(result.changedLocalIds).toEqual([localId])
+
+    const store = readStore(storePath())
+    expect(store.revision).toBe(result.revision)
+    expect(store.revision).toBeGreaterThan(emptyRevision)
+  })
+
+  it('re-materializing the SAME unchanged issue is a no-op (no write, no revision bump, updated_at preserved)', () => {
+    const c = conn()
+    const issue = makeIssue({ id: '801', key: 'PROJ-1', summary: 'Stable', statusCategoryKey: 'new' })
+    const first = upsertIssuesIntoStore(db, projectPath, c, [issue])
+    const localId = getLinkByIssueId(db, '801')!.localId
+
+    const before = readStore(storePath())
+    const updatedAtBefore = before.tickets[String(localId)].updated_at
+
+    // Identical issue (same id/key/summary/status) → nothing changes.
+    const result = upsertIssuesIntoStore(db, projectPath, c, [
+      makeIssue({ id: '801', key: 'PROJ-1', summary: 'Stable', statusCategoryKey: 'new' }),
+    ])
+
+    expect(result.wrote).toBe(false)
+    expect(result.changedLocalIds).toEqual([])
+    // Revision is returned unchanged AND the on-disk store was not rewritten.
+    expect(result.revision).toBe(first.revision)
+    expect(result.revision).toBe(before.revision)
+
+    const after = readStore(storePath())
+    expect(after.revision).toBe(before.revision)
+    // The ticket's updated_at is NOT bumped — the row was left exactly as-is.
+    expect(after.tickets[String(localId)].updated_at).toBe(updatedAtBefore)
+  })
+
+  it('re-materializing with a real change writes and reports the id', () => {
+    const c = conn()
+    upsertIssuesIntoStore(db, projectPath, c, [
+      makeIssue({ id: '802', key: 'PROJ-1', summary: 'Before', statusCategoryKey: 'new' }),
+    ])
+    const localId = getLinkByIssueId(db, '802')!.localId
+
+    // New summary + status → a genuine content change.
+    const result = upsertIssuesIntoStore(db, projectPath, c, [
+      makeIssue({ id: '802', key: 'PROJ-1', summary: 'After', statusCategoryKey: 'done', statusName: 'Done' }),
+    ])
+
+    expect(result.wrote).toBe(true)
+    expect(result.changedLocalIds).toEqual([localId])
+
+    const store = readStore(storePath())
+    expect(store.tickets[String(localId)].title).toBe('After')
+    expect(store.tickets[String(localId)].status).toBe('done')
+  })
+
+  it('a batch where only ONE issue changed reports only that id', () => {
+    const c = conn()
+    upsertIssuesIntoStore(db, projectPath, c, [
+      makeIssue({ id: '810', key: 'PROJ-1', summary: 'One', statusCategoryKey: 'new' }),
+      makeIssue({ id: '811', key: 'PROJ-2', summary: 'Two', statusCategoryKey: 'new' }),
+      makeIssue({ id: '812', key: 'PROJ-3', summary: 'Three', statusCategoryKey: 'new' }),
+    ])
+    const changedLocalId = getLinkByIssueId(db, '811')!.localId
+
+    // Re-poll: only issue 811's summary changed; 810 and 812 are byte-identical.
+    const result = upsertIssuesIntoStore(db, projectPath, c, [
+      makeIssue({ id: '810', key: 'PROJ-1', summary: 'One', statusCategoryKey: 'new' }),
+      makeIssue({ id: '811', key: 'PROJ-2', summary: 'Two (edited)', statusCategoryKey: 'new' }),
+      makeIssue({ id: '812', key: 'PROJ-3', summary: 'Three', statusCategoryKey: 'new' }),
+    ])
+
+    expect(result.wrote).toBe(true)
+    expect(result.changedLocalIds).toEqual([changedLocalId])
+
+    const store = readStore(storePath())
+    expect(store.tickets[String(changedLocalId)].title).toBe('Two (edited)')
+  })
+
+  it('advances maxUpdatedMs even when nothing was written (newer timestamp, identical content)', () => {
+    const c = conn()
+    upsertIssuesIntoStore(db, projectPath, c, [
+      makeIssue({ id: '820', key: 'PROJ-1', summary: 'Stable', statusCategoryKey: 'new', updated: '2024-01-01T00:00:00.000Z' }),
+    ])
+
+    // Same content but a newer Jira `updated` than the high water (still 0/old).
+    const newer = '2024-09-09T09:09:09.000Z'
+    const result = upsertIssuesIntoStore(db, projectPath, c, [
+      makeIssue({ id: '820', key: 'PROJ-1', summary: 'Stable', statusCategoryKey: 'new', updated: newer }),
+    ])
+
+    // No content change → no write …
+    expect(result.wrote).toBe(false)
+    expect(result.changedLocalIds).toEqual([])
+    // … but the high-water mark still advances to the newer Jira timestamp.
+    expect(result.maxUpdatedMs).toBe(Date.parse(newer))
   })
 })

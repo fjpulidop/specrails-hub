@@ -91,10 +91,9 @@ function genPendingId(): string {
 export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: ProposeSpecModalProps) {
   const { t } = useTranslation('addspec')
   const { t: tj } = useTranslation('jira')
+  // On a Jira-backed project, new specs are always created in Jira; the indicator
+  // makes that explicit. (Private/not-yet-official specs use Save as Draft.)
   const jira = useJiraConnection()
-  // Add Spec → Jira: when the project is Jira-backed, new Quick specs are created
-  // in Jira by default; this escape hatch keeps one local.
-  const [createLocal, setCreateLocal] = useState(false)
   const { activeProjectId, projects } = useDesktop()
   const tracker = useSpecGenTracker()
   const [mode, setMode] = useState<SpecMode>('quick')
@@ -373,7 +372,6 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
               contractRefine: scope.contractRefine,
             },
             contractRefine: scope.contractRefine,
-            ...(jira.connected ? { createLocal } : {}),
           }),
         })
       } catch (err) {
@@ -647,21 +645,11 @@ export function ProposeSpecModal({ open, onClose, tickets, onExploreLaunch }: Pr
               </div>
             )}
             {jira.connected && mode === 'quick' && (
-              <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px]" data-testid="jira-create-indicator">
+              <div className="flex items-center justify-end text-[11px]" data-testid="jira-create-indicator">
                 <span className="inline-flex items-center gap-1 text-accent-info">
                   <Plug className="w-3 h-3" />
                   {tj('addSpec.willCreate', { key: jira.jiraProjectKey ?? '' })}
                 </span>
-                <label className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={createLocal}
-                    onChange={(e) => setCreateLocal(e.target.checked)}
-                    className="w-3 h-3 rounded"
-                    data-testid="jira-create-local"
-                  />
-                  {tj('addSpec.keepLocal')}
-                </label>
               </div>
             )}
             <div className="flex items-center justify-end">

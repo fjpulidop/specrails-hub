@@ -89,8 +89,7 @@
     "openInJira": "在 Jira 中打开"
   },
   "addSpec": {
-    "willCreate": "将在 Jira 中创建 · {{key}}",
-    "keepLocal": "改为创建本地规格"
+    "willCreate": "将在 Jira 中创建 · {{key}}"
   },
   "detail": {
     "goToTicket": "前往工单 {{key}}"

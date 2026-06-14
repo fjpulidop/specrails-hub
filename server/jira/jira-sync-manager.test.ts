@@ -653,6 +653,92 @@ describe('pollOnce()', () => {
   })
 })
 
+// ─── Watcher-echo suppression (notifyLocalWrite) ──────────────────────────────
+
+describe('notifyLocalWrite (watcher-echo suppression)', () => {
+  it('pollOnce that materializes a NEW issue calls notifyLocalWrite with a revision number', async () => {
+    seedConnection()
+    const fake = makeFakeFetch()
+    fake.on('POST', '/search/jql', {
+      status: 200,
+      body: {
+        issues: [
+          issue({ id: '60001', key: 'ACME-601', fields: { summary: 'Fresh', updated: '2025-06-04T10:00:00.000Z', status: { name: 'To Do', statusCategory: { key: 'new' } } } }),
+        ],
+      },
+    })
+    const notifyLocalWrite = vi.fn()
+    const mgr = makeManager(fake.fetchImpl, { notifyLocalWrite })
+    const res = await mgr.pollOnce()
+    expect(res).toEqual({ upserted: 1 })
+
+    expect(notifyLocalWrite).toHaveBeenCalledTimes(1)
+    expect(typeof notifyLocalWrite.mock.calls[0][0]).toBe('number')
+  })
+
+  it('re-polling IDENTICAL issues does not notify, broadcast jira.synced, or ticket_updated the second time', async () => {
+    seedConnection()
+    const fake = makeFakeFetch()
+    const identical = {
+      status: 200,
+      body: {
+        issues: [
+          issue({ id: '61001', key: 'ACME-611', fields: { summary: 'Stable', updated: '2025-06-04T10:00:00.000Z', status: { name: 'To Do', statusCategory: { key: 'new' } } } }),
+        ],
+      },
+    }
+    // Queue the SAME response twice — first materializes, second is a byte-identical no-op.
+    fake.on('POST', '/search/jql', identical, identical)
+    const notifyLocalWrite = vi.fn()
+    const mgr = makeManager(fake.fetchImpl, { notifyLocalWrite })
+
+    // First poll materializes.
+    await mgr.pollOnce()
+    expect(notifyLocalWrite).toHaveBeenCalledTimes(1)
+    expect(typesOf()).toContain('jira.synced')
+    expect(typesOf().filter((t) => t === 'ticket_updated').length).toBe(1)
+
+    // Reset capture, then poll the identical payload again.
+    notifyLocalWrite.mockClear()
+    broadcasts = []
+    const res2 = await mgr.pollOnce()
+    expect(res2).toEqual({ upserted: 0 })
+
+    // wrote:false → no notify, no jira.synced, no ticket_updated on the second poll.
+    expect(notifyLocalWrite).not.toHaveBeenCalled()
+    expect(typesOf()).not.toContain('jira.synced')
+    expect(typesOf()).not.toContain('ticket_updated')
+  })
+
+  it('onRailLaunch on a linked ticket calls notifyLocalWrite (writeLocalStatus wrote in_progress)', () => {
+    seedConnection()
+    seedLinkedTicket(71, '71007', 'todo')
+    const { fetchImpl } = makeFakeFetch()
+    const notifyLocalWrite = vi.fn()
+    const mgr = makeManager(fetchImpl, { notifyLocalWrite })
+    mgr.onRailLaunch([71], 'job-71')
+
+    const store = readStore(resolveTicketStoragePath(projectPath))
+    expect(store.tickets['71'].status).toBe('in_progress')
+    expect(notifyLocalWrite).toHaveBeenCalledTimes(1)
+    expect(typeof notifyLocalWrite.mock.calls[0][0]).toBe('number')
+  })
+
+  it('setLocalWriteNotifier late-binds the notifier so a subsequent write calls it', () => {
+    seedConnection()
+    seedLinkedTicket(72, '72007', 'todo')
+    const { fetchImpl } = makeFakeFetch()
+    // Construct WITHOUT the opt, then bind late.
+    const mgr = makeManager(fetchImpl)
+    const notifyLocalWrite = vi.fn()
+    mgr.setLocalWriteNotifier(notifyLocalWrite)
+
+    mgr.onRailLaunch([72], 'job-72')
+    expect(notifyLocalWrite).toHaveBeenCalledTimes(1)
+    expect(typeof notifyLocalWrite.mock.calls[0][0]).toBe('number')
+  })
+})
+
 // ─── onRailLaunch() ───────────────────────────────────────────────────────────
 
 describe('onRailLaunch()', () => {

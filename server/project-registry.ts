@@ -472,6 +472,10 @@ export class ProjectRegistry {
 
     const ticketWatcher = new TicketWatcher(project.path, project.id, boundBroadcast)
     ticketWatcher.start()
+    // Suppress the file-watcher echo for the Jira sync's own writes (the every-60s
+    // poll would otherwise trigger a full-board refresh = flicker). Late-bound
+    // because the JiraSyncManager is constructed before the watcher.
+    jiraSyncManager.setLocalWriteNotifier((rev) => ticketWatcher.notifyDesktopWrite(rev))
 
     // BrowserCaptureManager — "Add Spec from browser". Constructed for every
     // project regardless of the feature flag; the routes + WS endpoint 404 when

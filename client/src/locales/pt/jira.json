@@ -89,8 +89,7 @@
     "openInJira": "Abrir no Jira"
   },
   "addSpec": {
-    "willCreate": "Será criado no Jira · {{key}}",
-    "keepLocal": "Criar como spec local"
+    "willCreate": "Será criado no Jira · {{key}}"
   },
   "detail": {
     "goToTicket": "Ir para o ticket {{key}}"

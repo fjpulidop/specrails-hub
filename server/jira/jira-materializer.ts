@@ -12,6 +12,7 @@
 import type { DbInstance } from '../db'
 import {
   mutateStore,
+  readStore,
   resolveTicketStoragePath,
   type Ticket,
   type TicketPriority,
@@ -100,6 +101,36 @@ export interface MaterializeResult {
   changedLocalIds: number[]
   maxUpdatedMs: number
   upserted: number
+  /** Store revision AFTER the write (== the prior revision when nothing changed
+   *  and no write happened). The sync-manager passes this to the TicketWatcher's
+   *  echo-suppression so a poll never triggers a full-board refresh/flicker. */
+  revision: number
+  /** True when the local store file was actually written this call. */
+  wrote: boolean
+}
+
+/** Compare the Jira-derived content of two tickets, ignoring updated_at. */
+function sameJiraContent(a: Ticket, b: Ticket): boolean {
+  return (
+    a.title === b.title &&
+    a.description === b.description &&
+    a.status === b.status &&
+    a.priority === b.priority &&
+    a.assignee === b.assignee &&
+    (a.jira_key ?? null) === (b.jira_key ?? null) &&
+    (a.jira_url ?? null) === (b.jira_url ?? null) &&
+    a.labels.length === b.labels.length &&
+    a.labels.every((l, i) => l === b.labels[i])
+  )
+}
+
+/** Apply the frozen-id guard to a freshly mapped ticket (preserve local status). */
+function applyFrozen(mapped: Ticket, existing: Ticket | undefined, frozen: boolean): Ticket {
+  if (existing && frozen) {
+    mapped.status = existing.status
+    mapped.priority = existing.priority ?? mapped.priority
+  }
+  return mapped
 }
 
 /**
@@ -117,21 +148,38 @@ export function upsertIssuesIntoStore(
   frozenLocalIds: Set<number> = new Set()
 ): MaterializeResult {
   const ticketFile = resolveTicketStoragePath(projectPath)
-  const changedLocalIds: number[] = []
   let maxUpdatedMs = conn.highWaterMs ?? 0
-  let upserted = 0
 
-  // Resolve/allocate links up-front (outside the store lock) so we know each
-  // issue's local id. Allocation must be collision-safe vs the store's next_id,
-  // so we do the actual minting inside the mutateStore callback below.
-  mutateStore(ticketFile, (store) => {
+  // ── Pre-pass (no lock): decide whether ANYTHING actually changed ──────────
+  // The high-water + 2-min overlap means most polls return issues that are
+  // byte-identical to what we already cached. Writing the store anyway bumps its
+  // revision and makes the file-watcher fire a full-board refresh → the every-60s
+  // flicker. So when nothing changed we skip the write (and the broadcasts)
+  // entirely and return the unchanged revision.
+  const preStore = readStore(ticketFile)
+  let anyChange = false
+  for (const issue of issues) {
+    const u = issue.fields.updated ? Date.parse(issue.fields.updated) : 0
+    if (!Number.isNaN(u) && u > maxUpdatedMs) maxUpdatedMs = u
+    const link = getLinkByIssueId(db, issue.id)
+    if (!link) { anyChange = true; continue }
+    if (issue.key && issue.key !== link.jiraKey) { anyChange = true; continue }
+    const existing = preStore.tickets[String(link.localId)]
+    if (!existing) { anyChange = true; continue }
+    const mapped = applyFrozen(mapIssueToTicket(issue, link.localId, conn, existing), existing, frozenLocalIds.has(link.localId))
+    if (!sameJiraContent(existing, mapped)) anyChange = true
+  }
+  if (!anyChange) {
+    return { changedLocalIds: [], maxUpdatedMs, upserted: 0, revision: preStore.revision, wrote: false }
+  }
+
+  // ── Write pass (locked): persist only the tickets that actually changed ────
+  const changedLocalIds: number[] = []
+  const store = mutateStore(ticketFile, (s) => {
     for (const issue of issues) {
-      const updatedMs = issue.fields.updated ? Date.parse(issue.fields.updated) : 0
-      if (!Number.isNaN(updatedMs) && updatedMs > maxUpdatedMs) maxUpdatedMs = updatedMs
-
       let link = getLinkByIssueId(db, issue.id)
       if (!link) {
-        const localId = Math.max(store.next_id, nextJiraLocalId(db))
+        const localId = Math.max(s.next_id, nextJiraLocalId(db))
         link = insertLinkWithId(db, {
           localId,
           jiraIssueId: issue.id,
@@ -139,7 +187,7 @@ export function upsertIssuesIntoStore(
           jiraProjectId: conn.jiraProjectId,
           deployment: conn.deployment,
         })
-        if (localId >= store.next_id) store.next_id = localId + 1
+        if (localId >= s.next_id) s.next_id = localId + 1
       } else if (issue.key && issue.key !== link.jiraKey) {
         // Issue moved/renamed — refresh the display key (link keyed on immutable id).
         db.prepare('UPDATE jira_links SET jira_key = ?, updated_at = ? WHERE jira_issue_id = ?').run(
@@ -150,21 +198,18 @@ export function upsertIssuesIntoStore(
       }
 
       const localId = link.localId
-      const existing = store.tickets[String(localId)]
-      const mapped = mapIssueToTicket(issue, localId, conn, existing)
-      // Frozen ids: keep the locally-authoritative status (an in-flight write).
-      if (existing && frozenLocalIds.has(localId)) {
-        mapped.status = existing.status
-        mapped.priority = existing.priority ?? mapped.priority
-      }
-      store.tickets[String(localId)] = mapped
+      const existing = s.tickets[String(localId)]
+      const mapped = applyFrozen(mapIssueToTicket(issue, localId, conn, existing), existing, frozenLocalIds.has(localId))
+      // Unchanged tickets are left exactly as-is — no reassignment (keeps their
+      // updated_at) and no ticket_updated broadcast.
+      if (existing && sameJiraContent(existing, mapped)) continue
+      s.tickets[String(localId)] = mapped
       changedLocalIds.push(localId)
-      upserted++
       updateLinkStatusCategory(db, issue.id, issueStatusCategory(issue))
     }
   })
 
-  return { changedLocalIds, maxUpdatedMs, upserted }
+  return { changedLocalIds, maxUpdatedMs, upserted: changedLocalIds.length, revision: store.revision, wrote: true }
 }
 
 function nextJiraLocalId(db: DbInstance): number {
