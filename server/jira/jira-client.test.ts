@@ -920,7 +920,7 @@ describe('getComments', () => {
     const { fetchImpl, requests } = makeFetch({ body: { comments } })
     const res = await new JiraClient(cloudCfg()).getComments('PROJ-1')
     expect(requests[0].method).toBe('GET')
-    expect(requests[0].url).toBe('https://acme.atlassian.net/rest/api/3/issue/PROJ-1/comment')
+    expect(requests[0].url).toBe('https://acme.atlassian.net/rest/api/3/issue/PROJ-1/comment?expand=properties')
     if (res.ok) expect(res.data.comments).toEqual(comments)
   })
 })

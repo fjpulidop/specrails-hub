@@ -134,12 +134,15 @@ export function createJiraRouter(): Router {
       res.status(404).json({ error: 'No Jira connection configured' })
       return
     }
-    const { enabled, discardStatus } = req.body ?? {}
+    const { enabled, discardStatus, statusMap } = req.body ?? {}
     if (typeof enabled === 'boolean') {
       c.jiraSyncManager.setEnabled(enabled)
     }
     if (discardStatus !== undefined) {
       c.jiraSyncManager.setDiscardStatus(isNonEmptyString(discardStatus) ? discardStatus.trim() : null)
+    }
+    if (statusMap !== undefined) {
+      c.jiraSyncManager.setStatusMap(sanitizeStatusMap(statusMap))
     }
     res.json({ connection: getConnectionPublic(c.db, c.project.id) })
   })

@@ -12,7 +12,7 @@ import { mutateStore, readStore, resolveTicketStoragePath, type Ticket, type Tic
 import type { WsMessage } from '../types'
 import { JiraClient, detectDeployment, type FetchImpl } from './jira-client'
 import { writeJiraBacklogConfig, writeLocalBacklogConfig } from './jira-backlog-config'
-import { commentMarker, discardCommentMarker, bodyContainsMarker } from './jira-adf'
+import { commentMarker, discardCommentMarker, commentHasMarker } from './jira-adf'
 import { issueUrl, upsertIssuesIntoStore } from './jira-materializer'
 import {
   buildTransitionFields,
@@ -38,6 +38,7 @@ import {
   setDiscardStatus,
   setHighWater,
   setSprintFieldId,
+  setStatusMap,
   tombstoneLink,
   upsertConnection,
   type EnqueueOutboxInput,
@@ -319,6 +320,11 @@ export class JiraSyncManager {
   /** Configure (or clear) the status a discarded spec is moved to. */
   setDiscardStatus(status: string | null): void {
     setDiscardStatus(this.db, this.projectId, status)
+  }
+
+  /** Replace (or clear) the per-logical-state status map (post-connect edit). */
+  setStatusMap(statusMap: Partial<Record<SpecLogicalState, string>> | null): void {
+    setStatusMap(this.db, this.projectId, statusMap)
   }
 
   /**
@@ -689,10 +695,11 @@ export class JiraSyncManager {
   }
 
   private async executeComment(client: JiraClient, op: OutboxRow, payload: { jiraIssueId: string; text: string; marker: string }): Promise<void> {
-    // Idempotency: skip if a comment with this op's marker already exists.
+    // Idempotency: skip if a comment already carries this op's marker (stored as
+    // an invisible comment property, with a legacy body-scan fallback).
     const existing = await client.getComments(payload.jiraIssueId)
     if (existing.ok) {
-      const dup = existing.data.comments.some((c) => bodyContainsMarker(c.body, payload.marker))
+      const dup = existing.data.comments.some((c) => commentHasMarker(c, payload.marker))
       if (dup) {
         markOutboxDone(this.db, op.id)
         return
@@ -700,8 +707,9 @@ export class JiraSyncManager {
     } else if (this.handleHardError(op, existing.code, existing.status, existing.retryAfterMs, existing.error)) {
       return
     }
-    const textWithMarker = `${payload.text}\n\n${payload.marker}`
-    const res = await client.addComment(payload.jiraIssueId, textWithMarker)
+    // Post the user-facing text only; the marker rides along as a hidden
+    // comment property so it never appears in the rendered comment.
+    const res = await client.addComment(payload.jiraIssueId, payload.text, payload.marker)
     if (res.ok) {
       markOutboxDone(this.db, op.id)
       return

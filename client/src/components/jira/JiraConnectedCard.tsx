@@ -2,7 +2,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
-import { jiraApi, type ConnectionState, type JiraStatusOption, type OutboxOp } from '../../lib/jira-api'
+import { jiraApi, type ConnectionState, type JiraStatusOption, type OutboxOp, type SpecLogicalState } from '../../lib/jira-api'
+
+const STATE_KEYS: SpecLogicalState[] = ['todo', 'in_progress', 'done', 'cancelled']
+const STATE_LABEL: Record<SpecLogicalState, string> = {
+  todo: 'todo',
+  in_progress: 'inProgress',
+  done: 'done',
+  cancelled: 'cancelled',
+}
 
 /**
  * Connected-state management for a project's Jira board: status header, the
@@ -19,6 +27,7 @@ export function JiraConnectedCard({ state, onChanged }: { state: ConnectionState
   const [deadOps, setDeadOps] = useState<OutboxOp[]>([])
   const [statuses, setStatuses] = useState<JiraStatusOption[]>([])
   const [discardStatus, setDiscardStatus] = useState(connection.discardStatus ?? '')
+  const [statusMap, setStatusMap] = useState<Partial<Record<SpecLogicalState, string>>>(connection.statusMap ?? {})
   const counts = state.outbox ?? { pending: 0, inflight: 0, done: 0, dead: 0 }
 
   const loadDead = useCallback(async () => {
@@ -52,6 +61,20 @@ export function JiraConnectedCard({ state, onChanged }: { state: ConnectionState
       onChanged()
     } catch (e) {
       setDiscardStatus(prev)
+      toast.error(errMsg(e, t))
+    }
+  }
+
+  async function changeStatusMap(state: SpecLogicalState, value: string) {
+    const prev = statusMap
+    const next = { ...statusMap, [state]: value || undefined }
+    setStatusMap(next)
+    const clean = Object.fromEntries(Object.entries(next).filter(([, v]) => v)) as Partial<Record<SpecLogicalState, string>>
+    try {
+      await jiraApi.patchConnection({ statusMap: Object.keys(clean).length ? clean : null })
+      onChanged()
+    } catch (e) {
+      setStatusMap(prev)
       toast.error(errMsg(e, t))
     }
   }
@@ -137,6 +160,32 @@ export function JiraConnectedCard({ state, onChanged }: { state: ConnectionState
         >
           <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
         </button>
+      </div>
+
+      <div className="rounded-md border border-border p-3" data-testid="jira-status-map">
+        <p className="text-sm font-medium">{t('wizard.step3Title')}</p>
+        <p className="mt-0.5 mb-2 text-xs text-muted-foreground">{t('mapping.intro')}</p>
+        <div className="space-y-2">
+          {STATE_KEYS.map((s) => (
+            <label key={s} className="flex items-center justify-between gap-3">
+              <span className="text-xs text-muted-foreground">{t(`mapping.${STATE_LABEL[s]}`)}</span>
+              <select
+                value={statusMap[s] ?? ''}
+                onChange={(e) => void changeStatusMap(s, e.target.value)}
+                className="w-44 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                data-testid={`jira-statusmap-${s}`}
+              >
+                <option value="">{t('mapping.auto')}</option>
+                {statuses.map((st) => (
+                  <option key={st.id} value={st.name}>{st.name}</option>
+                ))}
+                {statusMap[s] && !statuses.some((st) => st.name === statusMap[s]) && (
+                  <option value={statusMap[s]}>{statusMap[s]}</option>
+                )}
+              </select>
+            </label>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-md border border-border p-3">

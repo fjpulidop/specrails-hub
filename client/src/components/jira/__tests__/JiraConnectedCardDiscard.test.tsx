@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '../../../test-utils'
+import { render, screen, fireEvent, waitFor, within } from '../../../test-utils'
 
 const toastError = vi.fn()
 const toastSuccess = vi.fn()
@@ -68,7 +68,7 @@ describe('JiraConnectedCard — discard status picker', () => {
     expect(select.value).toBe('')
     await waitFor(() => {
       for (const st of STATUSES) {
-        expect(screen.getByRole('option', { name: st.name })).toBeInTheDocument()
+        expect(within(select).getByRole('option', { name: st.name })).toBeInTheDocument()
       }
     })
   })
@@ -85,7 +85,7 @@ describe('JiraConnectedCard — discard status picker', () => {
     render(<JiraConnectedCard state={makeState(null)} onChanged={onChanged} />)
 
     const select = (await screen.findByTestId('jira-discard-status-select')) as HTMLSelectElement
-    await waitFor(() => expect(screen.getByRole('option', { name: 'Cancelled' })).toBeInTheDocument())
+    await waitFor(() => expect(within(select).getByRole('option', { name: 'Cancelled' })).toBeInTheDocument())
 
     fireEvent.change(select, { target: { value: 'Cancelled' } })
 
@@ -105,5 +105,18 @@ describe('JiraConnectedCard — discard status picker', () => {
 
     await waitFor(() => expect(api.patchConnection).toHaveBeenCalledWith({ discardStatus: null }))
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1))
+  })
+
+  it('patches the status map when a logical-state mapping changes', async () => {
+    const onChanged = vi.fn()
+    render(<JiraConnectedCard state={makeState(null)} onChanged={onChanged} />)
+
+    const todo = (await screen.findByTestId('jira-statusmap-todo')) as HTMLSelectElement
+    await waitFor(() => expect(within(todo).getByRole('option', { name: 'To Do' })).toBeInTheDocument())
+
+    fireEvent.change(todo, { target: { value: 'To Do' } })
+
+    await waitFor(() => expect(api.patchConnection).toHaveBeenCalledWith({ statusMap: { todo: 'To Do' } }))
+    await waitFor(() => expect(onChanged).toHaveBeenCalled())
   })
 })

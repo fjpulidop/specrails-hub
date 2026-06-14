@@ -203,6 +203,20 @@ export function setDiscardStatus(db: DbInstance, projectId: string, status: stri
   )
 }
 
+/** Replace (or clear with null/empty) the per-logical-state status map. */
+export function setStatusMap(
+  db: DbInstance,
+  projectId: string,
+  statusMap: Partial<Record<SpecLogicalState, string>> | null
+): void {
+  const json = statusMap && Object.keys(statusMap).length ? JSON.stringify(statusMap) : null
+  db.prepare('UPDATE jira_connection SET status_map = ?, updated_at = ? WHERE project_id = ?').run(
+    json,
+    new Date().toISOString(),
+    projectId
+  )
+}
+
 export function deleteConnection(db: DbInstance, projectId: string): void {
   db.prepare('DELETE FROM jira_connection WHERE project_id = ?').run(projectId)
 }

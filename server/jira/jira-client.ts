@@ -4,7 +4,7 @@
 // normalised `JiraResult<T>` whose error `code` drives the outbox's
 // retry/dead-letter decisions. No throwing across the boundary.
 
-import { bodyForDeployment } from './jira-adf'
+import { bodyForDeployment, SPECRAILS_COMMENT_PROP_KEY } from './jira-adf'
 import type {
   JiraDeployment,
   JiraErrorCode,
@@ -231,16 +231,26 @@ export class JiraClient {
     return this.request('POST', '/issue', { fields })
   }
 
-  /** POST /issue/{id}/comment — add a comment (ADF on Cloud, wiki on DC). */
-  addComment(issueIdOrKey: string, text: string): Promise<JiraResult<{ id: string }>> {
-    return this.request('POST', `/issue/${encodeURIComponent(issueIdOrKey)}/comment`, {
-      body: bodyForDeployment(text, this.cfg.deployment),
-    })
+  /**
+   * POST /issue/{id}/comment — add a comment (ADF on Cloud, wiki on DC). The
+   * optional idempotency `marker` is stored as an INVISIBLE comment property
+   * (never in the body), so users never see it. Cloud + DC both accept the
+   * `properties` array on comment creation.
+   */
+  addComment(issueIdOrKey: string, text: string, marker?: string): Promise<JiraResult<{ id: string }>> {
+    const payload: Record<string, unknown> = { body: bodyForDeployment(text, this.cfg.deployment) }
+    if (marker) payload.properties = [{ key: SPECRAILS_COMMENT_PROP_KEY, value: { marker } }]
+    return this.request('POST', `/issue/${encodeURIComponent(issueIdOrKey)}/comment`, payload)
   }
 
-  /** GET /issue/{id}/comment — used to dedup completion comments via the self-marker. */
-  getComments(issueIdOrKey: string): Promise<JiraResult<{ comments: Array<{ id: string; body: unknown }> }>> {
-    return this.request('GET', `/issue/${encodeURIComponent(issueIdOrKey)}/comment`)
+  /**
+   * GET /issue/{id}/comment?expand=properties — used to dedup comments via the
+   * self-marker (invisible comment property, with a legacy body fallback).
+   */
+  getComments(
+    issueIdOrKey: string
+  ): Promise<JiraResult<{ comments: Array<{ id: string; body: unknown; properties?: Array<{ key: string; value?: unknown }> }> }>> {
+    return this.request('GET', `/issue/${encodeURIComponent(issueIdOrKey)}/comment?expand=properties`)
   }
 }
 

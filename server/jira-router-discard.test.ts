@@ -22,6 +22,7 @@ type JiraSyncManagerStub = {
   connect: ReturnType<typeof vi.fn>
   setEnabled: ReturnType<typeof vi.fn>
   setDiscardStatus: ReturnType<typeof vi.fn>
+  setStatusMap: ReturnType<typeof vi.fn>
   listStatusesForConnection: ReturnType<typeof vi.fn>
   discardSpec: ReturnType<typeof vi.fn>
   disconnect: ReturnType<typeof vi.fn>
@@ -46,6 +47,7 @@ function makeStub(): JiraSyncManagerStub {
     connect: vi.fn(),
     setEnabled: vi.fn(),
     setDiscardStatus: vi.fn(),
+    setStatusMap: vi.fn(),
     listStatusesForConnection: vi.fn(),
     discardSpec: vi.fn(),
     disconnect: vi.fn(),
@@ -193,6 +195,24 @@ describe('PATCH /connection — discardStatus', () => {
     expect(res.status).toBe(200)
     expect(res.body.connection.jiraProjectKey).toBe('PROJ')
     expect(syncStub.setDiscardStatus).not.toHaveBeenCalled()
+  })
+
+  it('calls setStatusMap with the sanitized map when statusMap is provided', async () => {
+    seedConnection()
+    const res = await request(app)
+      .patch('/jira/connection')
+      .send({ statusMap: { todo: 'Backlog', done: 'Shipped', bogus: 'x' } })
+    expect(res.status).toBe(200)
+    expect(syncStub.setStatusMap).toHaveBeenCalledWith({ todo: 'Backlog', done: 'Shipped' })
+  })
+
+  it('calls setStatusMap(null) when statusMap is empty, and not at all when omitted', async () => {
+    seedConnection()
+    await request(app).patch('/jira/connection').send({ statusMap: {} })
+    expect(syncStub.setStatusMap).toHaveBeenCalledWith(null)
+    syncStub.setStatusMap.mockClear()
+    await request(app).patch('/jira/connection').send({ enabled: true })
+    expect(syncStub.setStatusMap).not.toHaveBeenCalled()
   })
 })
 

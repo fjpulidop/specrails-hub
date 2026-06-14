@@ -127,9 +127,13 @@ export const jiraApi = {
     }).then((r) => asJson(r))
   },
 
-  /** Patch the connection (enabled and/or the discard "move-to" status). */
+  /** Patch the connection (enabled, status map, and/or the discard status). */
   patchConnection(
-    patch: { enabled?: boolean; discardStatus?: string | null },
+    patch: {
+      enabled?: boolean
+      discardStatus?: string | null
+      statusMap?: Partial<Record<SpecLogicalState, string>> | null
+    },
     apiBase?: string
   ): Promise<{ connection: JiraConnectionPublic }> {
     return fetch(`${base(apiBase)}/jira/connection`, {

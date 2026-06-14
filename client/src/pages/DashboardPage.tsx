@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { useTickets } from '../hooks/useTickets'
 import { SpecsBoard } from '../components/SpecsBoard'
+import { JiraDiscardProvider } from '../context/JiraDiscardContext'
 import { RailsBoard, type RailState, applyRailJobOutcome, isRailSortId, extractRailId } from '../components/RailsBoard'
 import { DashboardSplitter } from '../components/DashboardSplitter'
 import { useDashboardSplit } from '../hooks/useDashboardSplit'
@@ -816,6 +817,7 @@ export default function DashboardPage() {
   const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
 
   return (
+    <JiraDiscardProvider>
     <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div ref={dashboardContainerRef} className="flex h-full overflow-hidden">
         {/* Left panel: Specs board */}
@@ -971,5 +973,6 @@ export default function DashboardPage() {
         )
       })()}
     </DndContext>
+    </JiraDiscardProvider>
   )
 }
