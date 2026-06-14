@@ -11,6 +11,7 @@ import type { TicketStatus, TicketPriority } from '../types'
 import type { RailState } from './RailsBoard'
 import { SpecLabelFilterDropdown } from './SpecLabelFilterDropdown'
 import { SpecEpicFilterDropdown } from './SpecEpicFilterDropdown'
+import { SpecSprintFilterDropdown } from './SpecSprintFilterDropdown'
 
 /** Which spec bucket the board shows. The ToDo/Done navbar tabs drive this. */
 type SpecStatusFilterValue = 'all' | 'todo' | 'done'
@@ -263,6 +264,7 @@ export function SpecsBoard({
   const [explore, setExplore] = useState<ExploreState | null>(null)
   const [activeLabels, setActiveLabels] = useState<Set<string>>(new Set())
   const [activeEpic, setActiveEpic] = useState<string | null>(null)
+  const [activeSprint, setActiveSprint] = useState<string | null>(null)
   const { activeProjectId } = useDesktop()
   const [statusFilter, setStatusFilter] = useState<SpecStatusFilterValue>(() => loadStatusTab(activeProjectId))
   const handleStatusTabChange = useCallback((v: SpecStatusFilterValue) => {
@@ -299,6 +301,7 @@ export function SpecsBoard({
   useEffect(() => {
     setActiveLabels(new Set())
     setActiveEpic(null)
+    setActiveSprint(null)
     setDoneSort(loadDoneSort(activeProjectId))
     setDoneViewTier(loadDoneViewTier(activeProjectId))
     setStatusFilter(loadStatusTab(activeProjectId))
@@ -321,26 +324,32 @@ export function SpecsBoard({
   const matchesFilters = useCallback(
     (t: LocalTicket): boolean => {
       if (activeEpic !== null && t.jira_epic_key !== activeEpic) return false
+      if (activeSprint !== null && t.jira_sprint_id !== activeSprint) return false
       if (activeLabels.size > 0 && !(t.labels ?? []).some((l) => activeLabels.has(l))) return false
       return true
     },
-    [activeLabels, activeEpic],
+    [activeLabels, activeEpic, activeSprint],
   )
 
+  const noFilters = activeLabels.size === 0 && activeEpic === null && activeSprint === null
   const filteredTickets = useMemo(() => {
-    if (activeLabels.size === 0 && activeEpic === null) return tickets
+    if (noFilters) return tickets
     return tickets.filter(matchesFilters)
-  }, [tickets, activeLabels, activeEpic, matchesFilters])
+  }, [tickets, noFilters, matchesFilters])
 
   const filteredDoneTickets = useMemo(() => {
-    if (activeLabels.size === 0 && activeEpic === null) return doneTickets
+    if (noFilters) return doneTickets
     return doneTickets.filter(matchesFilters)
-  }, [doneTickets, activeLabels, activeEpic, matchesFilters])
+  }, [doneTickets, noFilters, matchesFilters])
 
-  // Epics are only present on Jira-backed specs → the epic filter is implicitly
-  // Jira-only (hidden when no spec has an epic).
+  // Epics / sprints are only present on Jira-backed specs → these filters are
+  // implicitly Jira-only (hidden when no spec carries that data).
   const hasEpics = useMemo(
     () => tickets.some((t) => t.jira_epic_key) || doneTickets.some((t) => t.jira_epic_key),
+    [tickets, doneTickets],
+  )
+  const hasSprints = useMemo(
+    () => tickets.some((t) => t.jira_sprint_id) || doneTickets.some((t) => t.jira_sprint_id),
     [tickets, doneTickets],
   )
 
@@ -545,6 +554,13 @@ export function SpecsBoard({
             tickets={[...tickets, ...doneTickets]}
             active={activeEpic}
             onChange={setActiveEpic}
+          />
+        )}
+        {hasSprints && (
+          <SpecSprintFilterDropdown
+            tickets={[...tickets, ...doneTickets]}
+            active={activeSprint}
+            onChange={setActiveSprint}
           />
         )}
         <SpecSortControl

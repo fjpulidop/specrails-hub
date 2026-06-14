@@ -114,5 +114,9 @@
   "epicFilter": {
     "all": "すべてのエピック",
     "ariaLabel": "エピックで絞り込み"
+  },
+  "sprintFilter": {
+    "all": "すべてのスプリント",
+    "ariaLabel": "スプリントで絞り込み"
   }
 }

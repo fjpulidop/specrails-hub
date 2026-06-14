@@ -58,6 +58,10 @@ export interface Ticket {
   jira_epic_key?: string | null
   /** Summary/name of the Jira parent epic, when the issue has one. */
   jira_epic_name?: string | null
+  /** Id of the issue's (active) Jira sprint, when it has one. */
+  jira_sprint_id?: string | null
+  /** Name of the issue's (active) Jira sprint, when it has one. */
+  jira_sprint_name?: string | null
   /**
    * App-managed review flag. Set when a job had already marked this spec `done`
    * (the agent reached its Ship phase) but the job then failed / was canceled /

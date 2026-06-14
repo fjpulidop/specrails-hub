@@ -286,6 +286,10 @@ export interface LocalTicket {
   jira_epic_key?: string | null
   /** Name of the Jira parent epic, when the issue has one. */
   jira_epic_name?: string | null
+  /** Id of the issue's (active) Jira sprint, when it has one. */
+  jira_sprint_id?: string | null
+  /** Name of the issue's (active) Jira sprint, when it has one. */
+  jira_sprint_name?: string | null
   /** Desktop-managed: set when a job that had already marked this spec `done` then
    *  failed/was canceled/zombie-killed. The board shows a "review" badge on the
    *  Done card. Cleared on the next clean completion. */

@@ -114,5 +114,9 @@
   "epicFilter": {
     "all": "Todas las épicas",
     "ariaLabel": "Filtrar por épica"
+  },
+  "sprintFilter": {
+    "all": "Todos los sprints",
+    "ariaLabel": "Filtrar por sprint"
   }
 }

@@ -126,6 +126,11 @@ export class JiraClient {
     return this.request('GET', `/project/${encodeURIComponent(keyOrId)}/statuses`)
   }
 
+  /** GET /field — all fields; used to discover the sprint custom field id. */
+  getFields(): Promise<JiraResult<Array<{ id: string; name?: string; schema?: { custom?: string } }>>> {
+    return this.request('GET', '/field')
+  }
+
   /**
    * List projects the credential can see (for the setup wizard's project picker).
    * Cloud: paginated GET /project/search. DC/Server: GET /project (full list).

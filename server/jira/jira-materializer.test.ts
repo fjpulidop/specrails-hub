@@ -12,6 +12,7 @@ import {
   mapPriority,
   issueUrl,
   extractEpic,
+  extractSprint,
   mapIssueToTicket,
   upsertIssuesIntoStore,
 } from './jira-materializer'
@@ -32,6 +33,7 @@ function makeConn(overrides: Partial<JiraConnection> = {}): JiraConnection {
     enabled: true,
     statusMap: null,
     highWaterMs: null,
+    sprintFieldId: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
     ...overrides,
@@ -231,9 +233,62 @@ describe('extractEpic', () => {
   })
 })
 
+// ─── extractSprint ───────────────────────────────────────────────────────────
+
+describe('extractSprint', () => {
+  const FIELD = 'customfield_10020'
+  function withSprint(value: unknown): JiraIssue {
+    const i = makeIssue({ id: '950', key: 'PROJ-95' })
+    ;(i.fields as Record<string, unknown>)[FIELD] = value
+    return i
+  }
+
+  it('returns null/null when there is no sprint field id', () => {
+    expect(extractSprint(withSprint([{ id: 1, name: 'S1', state: 'active' }]), null)).toEqual({ id: null, name: null })
+    expect(extractSprint(withSprint([{ id: 1, name: 'S1' }]), 'none')).toEqual({ id: null, name: null })
+  })
+
+  it('returns null/null when the field is absent or not an array', () => {
+    expect(extractSprint(makeIssue({}), FIELD)).toEqual({ id: null, name: null })
+    expect(extractSprint(withSprint('not-an-array'), FIELD)).toEqual({ id: null, name: null })
+    expect(extractSprint(withSprint([]), FIELD)).toEqual({ id: null, name: null })
+  })
+
+  it('prefers the ACTIVE sprint when several are present', () => {
+    expect(
+      extractSprint(
+        withSprint([
+          { id: 10, name: 'Past', state: 'closed' },
+          { id: 11, name: 'Now', state: 'active' },
+          { id: 12, name: 'Next', state: 'future' },
+        ]),
+        FIELD,
+      ),
+    ).toEqual({ id: '11', name: 'Now' })
+  })
+
+  it('falls back to the last sprint when none is active', () => {
+    expect(
+      extractSprint(withSprint([{ id: 10, name: 'A', state: 'closed' }, { id: 11, name: 'B', state: 'closed' }]), FIELD),
+    ).toEqual({ id: '11', name: 'B' })
+  })
+
+  it('uses the id as the name when name is missing', () => {
+    expect(extractSprint(withSprint([{ id: 7 }]), FIELD)).toEqual({ id: '7', name: '7' })
+  })
+})
+
 // ─── mapIssueToTicket ────────────────────────────────────────────────────────
 
 describe('mapIssueToTicket', () => {
+  it('captures the active sprint id + name from the configured field', () => {
+    const issue = makeIssue({ id: '960', key: 'PROJ-96' })
+    ;(issue.fields as Record<string, unknown>)['customfield_10020'] = [{ id: 42, name: 'Sprint 42', state: 'active' }]
+    const t = mapIssueToTicket(issue, 96, makeConn({ sprintFieldId: 'customfield_10020' }))
+    expect(t.jira_sprint_id).toBe('42')
+    expect(t.jira_sprint_name).toBe('Sprint 42')
+  })
+
   it('captures the parent epic key + name', () => {
     const issue = makeIssue({ id: '777', key: 'PROJ-77' })
     ;(issue.fields as Record<string, unknown>).parent = { key: 'PROJ-5', fields: { summary: 'Epic five', issuetype: { name: 'Epic' } } }

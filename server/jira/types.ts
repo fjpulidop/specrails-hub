@@ -43,6 +43,11 @@ export interface JiraConnection {
   statusMap: Partial<Record<SpecLogicalState, string>> | null
   /** Poll high-water mark — epoch ms of the max observed Jira `updated`. */
   highWaterMs: number | null
+  /**
+   * Cached id of the sprint custom field (varies per instance). null = not yet
+   * discovered, 'none' = no sprint field exists, '<id>' = the field id.
+   */
+  sprintFieldId: string | null
   createdAt: string
   updatedAt: string
 }

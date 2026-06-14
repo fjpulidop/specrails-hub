@@ -77,6 +77,29 @@ export function extractEpic(issue: JiraIssue): { key: string | null; name: strin
   return { key: parent.key, name: parent.fields?.summary ?? parent.key }
 }
 
+/**
+ * Extract the issue's sprint from the (instance-specific) sprint custom field.
+ * The value is an array of sprint objects `[{ id, name, state }]`; we prefer the
+ * ACTIVE sprint, else the last one listed (Jira orders past→future). Returns
+ * null/null when there's no sprint field or no sprint. Tolerant of the value
+ * being absent, a non-array, or legacy string entries.
+ */
+export function extractSprint(
+  issue: JiraIssue,
+  sprintFieldId: string | null,
+): { id: string | null; name: string | null } {
+  if (!sprintFieldId || sprintFieldId === 'none') return { id: null, name: null }
+  const raw = (issue.fields as Record<string, unknown>)[sprintFieldId]
+  if (!Array.isArray(raw) || raw.length === 0) return { id: null, name: null }
+  const objs = raw.filter((s): s is { id?: unknown; name?: unknown; state?: unknown } => !!s && typeof s === 'object')
+  if (objs.length === 0) return { id: null, name: null }
+  const active = objs.find((s) => typeof s.state === 'string' && s.state.toLowerCase() === 'active')
+  const chosen = active ?? objs[objs.length - 1]
+  const id = chosen.id != null ? String(chosen.id) : null
+  const name = typeof chosen.name === 'string' ? chosen.name : id
+  return { id, name }
+}
+
 /** Map a Jira issue to a full Ticket. `existing` preserves created_at and local-only fields. */
 export function mapIssueToTicket(
   issue: JiraIssue,
@@ -110,6 +133,8 @@ export function mapIssueToTicket(
     jira_url: issueUrl(conn.baseUrl, issue.key),
     jira_epic_key: extractEpic(issue).key,
     jira_epic_name: extractEpic(issue).name,
+    jira_sprint_id: extractSprint(issue, conn.sprintFieldId).id,
+    jira_sprint_name: extractSprint(issue, conn.sprintFieldId).name,
   }
 }
 
@@ -137,6 +162,8 @@ function sameJiraContent(a: Ticket, b: Ticket): boolean {
     (a.jira_url ?? null) === (b.jira_url ?? null) &&
     (a.jira_epic_key ?? null) === (b.jira_epic_key ?? null) &&
     (a.jira_epic_name ?? null) === (b.jira_epic_name ?? null) &&
+    (a.jira_sprint_id ?? null) === (b.jira_sprint_id ?? null) &&
+    (a.jira_sprint_name ?? null) === (b.jira_sprint_name ?? null) &&
     a.labels.length === b.labels.length &&
     a.labels.every((l, i) => l === b.labels[i])
   )

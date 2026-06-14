@@ -114,5 +114,9 @@
   "epicFilter": {
     "all": "Toutes les épopées",
     "ariaLabel": "Filtrer par épopée"
+  },
+  "sprintFilter": {
+    "all": "Tous les sprints",
+    "ariaLabel": "Filtrer par sprint"
   }
 }

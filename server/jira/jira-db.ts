@@ -34,6 +34,7 @@ interface ConnectionRowRaw {
   enabled: number
   status_map: string | null
   high_water_ms: number | null
+  sprint_field_id: string | null
   created_at: string
   updated_at: string
 }
@@ -59,6 +60,7 @@ function mapConnection(r: ConnectionRowRaw): JiraConnection {
     enabled: r.enabled === 1,
     statusMap,
     highWaterMs: r.high_water_ms,
+    sprintFieldId: r.sprint_field_id ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }
@@ -176,6 +178,15 @@ export function setConnectionEnabled(db: DbInstance, projectId: string, enabled:
 export function setHighWater(db: DbInstance, projectId: string, highWaterMs: number): void {
   db.prepare('UPDATE jira_connection SET high_water_ms = ?, updated_at = ? WHERE project_id = ?').run(
     highWaterMs,
+    new Date().toISOString(),
+    projectId
+  )
+}
+
+/** Cache the discovered sprint custom-field id ('none' when none exists). */
+export function setSprintFieldId(db: DbInstance, projectId: string, fieldId: string): void {
+  db.prepare('UPDATE jira_connection SET sprint_field_id = ?, updated_at = ? WHERE project_id = ?').run(
+    fieldId,
     new Date().toISOString(),
     projectId
   )

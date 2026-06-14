@@ -114,5 +114,9 @@
   "epicFilter": {
     "all": "所有史诗",
     "ariaLabel": "按史诗筛选"
+  },
+  "sprintFilter": {
+    "all": "所有冲刺",
+    "ariaLabel": "按冲刺筛选"
   }
 }

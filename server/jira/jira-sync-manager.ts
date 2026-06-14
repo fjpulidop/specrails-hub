@@ -36,6 +36,7 @@ import {
   resetInflight,
   setConnectionEnabled,
   setHighWater,
+  setSprintFieldId,
   tombstoneLink,
   upsertConnection,
   type EnqueueOutboxInput,
@@ -169,6 +170,18 @@ export class JiraSyncManager {
     })
   }
 
+  /**
+   * Discover the sprint custom-field id (schema gh-sprint). Returns the field
+   * id, 'none' when no sprint field exists, or null when it couldn't be
+   * determined (transient failure → caller leaves it unchecked to retry).
+   */
+  private async discoverSprintField(client: JiraClient): Promise<string | null> {
+    const res = await client.getFields()
+    if (!res.ok) return null
+    const field = res.data.find((f) => f.schema?.custom === 'com.pyxis.greenhopper.jira:gh-sprint')
+    return field ? field.id : 'none'
+  }
+
   // ─── Connect / disconnect ──────────────────────────────────────────────────
 
   /**
@@ -220,11 +233,19 @@ export class JiraSyncManager {
       statusMap: input.statusMap ?? null,
     })
     writeJiraBacklogConfig(this.projectPath)
+    // Discover the sprint custom-field id (best-effort) so sprint capture works
+    // from the first poll. Non-fatal — the poll re-discovers if this fails.
+    try {
+      const fieldId = await this.discoverSprintField(probe)
+      if (fieldId !== null) setSprintFieldId(this.db, this.projectId, fieldId)
+    } catch {
+      /* non-fatal */
+    }
     this.authPaused = false
     this.start()
     // Kick an immediate first sync (best-effort).
     void this.pollOnce().catch(() => undefined)
-    return { ok: true, connection }
+    return { ok: true, connection: getConnection(this.db, this.projectId) ?? connection }
   }
 
   private throwawayClient(input: { baseUrl: string; accountEmail: string | null; token: string }): JiraClient {
@@ -416,10 +437,22 @@ export class JiraSyncManager {
   }
 
   async pollOnce(): Promise<{ upserted: number } | null> {
-    const conn = getConnection(this.db, this.projectId)
+    let conn = getConnection(this.db, this.projectId)
     if (!conn || !conn.enabled) return null
     const client = this.buildClient()
     if (!client) return null
+
+    // Lazily discover the sprint custom-field id for connections made before the
+    // feature existed (null = not yet checked). Persist 'none' when there's none.
+    if (conn.sprintFieldId === null) {
+      const fieldId = await this.discoverSprintField(client)
+      if (fieldId !== null) {
+        setSprintFieldId(this.db, this.projectId, fieldId)
+        conn = getConnection(this.db, this.projectId) ?? conn
+      }
+    }
+    const searchFields =
+      conn.sprintFieldId && conn.sprintFieldId !== 'none' ? [...SEARCH_FIELDS, conn.sprintFieldId] : SEARCH_FIELDS
 
     const frozen = this.frozenLocalIds()
     let jql = `project = "${conn.jiraProjectKey}" ORDER BY updated ASC`
@@ -432,7 +465,7 @@ export class JiraSyncManager {
     let totalUpserted = 0
     let maxUpdated = conn.highWaterMs ?? 0
     for (let page = 0; page < 50; page++) {
-      const res = await client.searchJql({ jql, fields: SEARCH_FIELDS, nextPageToken, maxResults: 100 })
+      const res = await client.searchJql({ jql, fields: searchFields, nextPageToken, maxResults: 100 })
       if (!res.ok) {
         if (res.code === 'auth') this.onAuth401()
         else this.broadcast({ type: 'jira.sync_error', projectId: this.projectId, reason: res.error })

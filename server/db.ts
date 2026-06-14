@@ -652,6 +652,18 @@ const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_jira_outbox_issue ON jira_outbox(jira_issue_id);
     `)
   },
+
+  // Migration 30: Jira sprint custom-field id. The field that holds an issue's
+  // sprint(s) is a custom field whose id varies per instance; we discover it
+  // (schema com.pyxis.greenhopper.jira:gh-sprint) and cache it here. NULL =
+  // not yet checked, 'none' = checked and no sprint field exists, '<id>' = found.
+  (db) => {
+    try {
+      db.exec(`ALTER TABLE jira_connection ADD COLUMN sprint_field_id TEXT`)
+    } catch {
+      // Column may already exist on a partially-migrated DB — no-op.
+    }
+  },
 ]
 
 function applyMigrations(db: DbInstance): void {
