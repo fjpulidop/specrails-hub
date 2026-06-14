@@ -843,6 +843,155 @@ describe('ChatManager', () => {
     })
   })
 
+  // ─── Persistent-stdin Explore fast-path (big bet #3, flag-gated) ───────────
+
+  describe('persistent-stdin Explore', () => {
+    function createMockChildWithStdin() {
+      const child = createMockChildProcess()
+      const writes: string[] = []
+      child.stdin = {
+        writes,
+        destroyed: false,
+        write(chunk: string | Buffer) { writes.push(chunk.toString()); return true },
+      }
+      return child
+    }
+
+    beforeEach(() => {
+      process.env.SPECRAILS_EXPLORE_PERSISTENT_STDIN = '1'
+    })
+    afterEach(() => {
+      delete process.env.SPECRAILS_EXPLORE_PERSISTENT_STDIN
+    })
+
+    // sendMessage suspends on its first await and installs the persistent turn
+    // handlers + writes stdin only after those microtasks flush. Mirror real
+    // life (the child responds AFTER the stdin write) by pushing output only
+    // once a macrotask has elapsed, so handlers are guaranteed to be installed.
+    async function driveTurn(child: any, lines: string[]) {
+      await new Promise((r) => setImmediate(r))
+      for (const l of lines) pushLine(child, l)
+    }
+
+    it('reuses ONE child across turns and frames each turn to stdin', async () => {
+      const cmP = new ChatManager(broadcast, db, undefined, undefined, 'claude', 'proj-pstdin')
+      const convId = 'conv-pstdin-1'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const child = createMockChildWithStdin()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+
+      // Turn 1 — ends on the result event, NOT process close.
+      const t1 = cmP.sendMessage(convId, 'first turn', { lightweight: true })
+      await driveTurn(child, [assistantEvent('answer one'), resultEvent('sess-p1')])
+      await t1
+
+      // Turn 2 — same long-lived child, no re-spawn.
+      const t2 = cmP.sendMessage(convId, 'second turn', { lightweight: true })
+      await driveTurn(child, [assistantEvent('answer two'), resultEvent('sess-p1')])
+      await t2
+
+      expect(vi.mocked(mockSpawn)).toHaveBeenCalledTimes(1) // persistent: one spawn, two turns
+      const doneMsgs = getBroadcastedByType(broadcast, 'chat_done')
+      expect(doneMsgs).toHaveLength(2)
+      expect(doneMsgs[0].fullText).toBe('answer one')
+      expect(doneMsgs[1].fullText).toBe('answer two')
+
+      // Each turn framed as a stream-json user message on stdin.
+      expect(child.stdin.writes).toHaveLength(2)
+      const first = JSON.parse(child.stdin.writes[0].trim())
+      expect(first.type).toBe('user')
+      expect(first.message.content).toContain('first turn')
+    })
+
+    it('spawns with --input-format stream-json and no -p prompt argument', async () => {
+      const cmP = new ChatManager(broadcast, db, undefined, undefined, 'claude', 'proj-pstdin-args')
+      const convId = 'conv-pstdin-args'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const child = createMockChildWithStdin()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const t = cmP.sendMessage(convId, 'hi', { lightweight: true })
+      await driveTurn(child, [assistantEvent('ok'), resultEvent('sess-x')])
+      await t
+      const args = vi.mocked(mockSpawn).mock.calls[0][1] as string[]
+      expect(args).toContain('--input-format')
+      expect(args).toContain('stream-json')
+      // No `-p <prompt>` value — `-p` is a bare flag, prompt arrives via stdin.
+      const pIdx = args.indexOf('-p')
+      expect(pIdx).toBeGreaterThan(-1)
+      expect(args[pIdx + 1]).toBe('--input-format')
+    })
+
+    it('records an explore-spec invocation and persists session_id on result', async () => {
+      const projectId = 'proj-pstdin-inv'
+      const cmP = new ChatManager(broadcast, db, undefined, undefined, 'claude', projectId)
+      const convId = 'conv-pstdin-inv'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const child = createMockChildWithStdin()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const t = cmP.sendMessage(convId, 'hello', { lightweight: true })
+      await driveTurn(child, [
+        assistantEvent('hi back'),
+        JSON.stringify({
+          type: 'result', session_id: 'sess-keep', total_cost_usd: 0.1, num_turns: 1,
+          model: 'sonnet', duration_ms: 900, usage: { input_tokens: 4, output_tokens: 2 },
+        }),
+      ])
+      await t
+
+      const rows = db.prepare('SELECT * FROM ai_invocations WHERE project_id = ?').all(projectId) as any[]
+      expect(rows).toHaveLength(1)
+      expect(rows[0].surface).toBe('explore-spec')
+      expect(rows[0].status).toBe('success')
+      const conv = getConversation(db, convId)
+      expect(conv?.session_id).toBe('sess-keep')
+    })
+
+    it('surfaces a chat_error and records failed when the persistent child dies before result', async () => {
+      const projectId = 'proj-pstdin-crash'
+      const cmP = new ChatManager(broadcast, db, undefined, undefined, 'claude', projectId)
+      const convId = 'conv-pstdin-crash'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const child = createMockChildWithStdin()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const t = cmP.sendMessage(convId, 'hello', { lightweight: true })
+      await new Promise((r) => setImmediate(r)) // let handlers install
+      await finishProcess(child, 1) // close before any result event
+      await t
+
+      const errors = getBroadcastedByType(broadcast, 'chat_error')
+      expect(errors.length).toBeGreaterThan(0)
+      const rows = db.prepare('SELECT * FROM ai_invocations WHERE project_id = ?').all(projectId) as any[]
+      expect(rows).toHaveLength(1)
+      expect(rows[0].status).toBe('failed')
+    })
+
+    it('shutdown() tears down the persistent child', async () => {
+      const cmP = new ChatManager(broadcast, db, undefined, undefined, 'claude', 'proj-pstdin-sd')
+      const convId = 'conv-pstdin-sd'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const child = createMockChildWithStdin()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const t = cmP.sendMessage(convId, 'hi', { lightweight: true })
+      await driveTurn(child, [assistantEvent('ok'), resultEvent('sess-sd')])
+      await t
+      cmP.shutdown()
+      expect(child.kill).toHaveBeenCalled()
+    })
+
+    it('forgetExploreLifecycle() kills the parked persistent child', async () => {
+      const cmP = new ChatManager(broadcast, db, undefined, undefined, 'claude', 'proj-pstdin-forget')
+      const convId = 'conv-pstdin-forget'
+      createConversation(db, { id: convId, model: 'sonnet', kind: 'explore' })
+      const child = createMockChildWithStdin()
+      vi.mocked(mockSpawn).mockReturnValue(child as any)
+      const t = cmP.sendMessage(convId, 'hi', { lightweight: true })
+      await driveTurn(child, [assistantEvent('ok'), resultEvent('sess-f')])
+      await t
+      cmP.forgetExploreLifecycle(convId)
+      expect(child.kill).toHaveBeenCalled()
+    })
+  })
+
   // ─── Explore Spec acceleration: spawn cwd resolution ──────────────────────
 
   describe('Explore spawn cwd', () => {

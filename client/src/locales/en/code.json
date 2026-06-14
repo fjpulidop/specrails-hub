@@ -49,7 +49,12 @@
     "noContent": "No content available.",
     "pathCopied": "Path copied",
     "copyPathFailed": "Could not copy path",
-    "budgetPrompt": "Override the budget cap?"
+    "budgetPrompt": "Override the budget cap?",
+    "edit": "Edit",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "File saved",
+    "saveFailed": "Save failed"
   },
   "summary": {
     "generationFailed": "Summary generation failed",

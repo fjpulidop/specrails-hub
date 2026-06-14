@@ -49,7 +49,12 @@
     "noContent": "无可用内容。",
     "pathCopied": "路径已复制",
     "copyPathFailed": "无法复制路径",
-    "budgetPrompt": "要超出预算上限继续吗？"
+    "budgetPrompt": "要超出预算上限继续吗？",
+    "edit": "编辑",
+    "save": "保存",
+    "saving": "保存中…",
+    "saved": "文件已保存",
+    "saveFailed": "保存失败"
   },
   "summary": {
     "generationFailed": "摘要生成失败",

@@ -6,9 +6,11 @@ import { ensureMonacoEnvironment, defineMonacoThemeFor } from '../../lib/monaco-
 interface InnerProps {
   content: string
   language: string
+  readOnly: boolean
+  onChange?: (value: string) => void
 }
 
-function InnerEditor({ content, language }: InnerProps) {
+function InnerEditor({ content, language, readOnly, onChange }: InnerProps) {
   const { t } = useTranslation('code')
   const theme = useActiveTheme()
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -17,16 +19,20 @@ function InnerEditor({ content, language }: InnerProps) {
   const [loadError, setLoadError] = useState(false)
 
   // The create effect runs once but monaco-editor loads ASYNC. Read the latest
-  // content/language/theme from refs at create time so a file switched (or theme
-  // changed) before the chunk resolved is not rendered with the stale initial
-  // values — the [content]/[language]/[theme] update effects below no-op while
-  // editorRef is still null.
+  // content/language/theme/readOnly/onChange from refs at create time so a file
+  // switched (or theme/mode changed) before the chunk resolved is not rendered
+  // with stale initial values — the update effects below no-op while editorRef
+  // is still null.
   const contentRef = useRef(content)
   const languageRef = useRef(language)
   const themeRef = useRef(theme)
+  const readOnlyRef = useRef(readOnly)
+  const onChangeRef = useRef(onChange)
   useEffect(() => { contentRef.current = content }, [content])
   useEffect(() => { languageRef.current = language }, [language])
   useEffect(() => { themeRef.current = theme }, [theme])
+  useEffect(() => { readOnlyRef.current = readOnly }, [readOnly])
+  useEffect(() => { onChangeRef.current = onChange }, [onChange])
 
   useEffect(() => {
     let disposed = false
@@ -38,13 +44,19 @@ function InnerEditor({ content, language }: InnerProps) {
       const editor = monaco.editor.create(hostRef.current, {
         value: contentRef.current,
         language: languageRef.current,
-        readOnly: true,
+        readOnly: readOnlyRef.current,
         theme: monacoTheme,
         minimap: { enabled: false },
         lineNumbers: 'on',
         scrollBeyondLastLine: false,
         automaticLayout: true,
         fontSize: 13,
+      })
+      // Emit edits back to the owner (edit mode). Reading via getValue keeps the
+      // editor uncontrolled, so the parent's echo of the same draft never resets
+      // the cursor (the setValue effect below is guarded on inequality).
+      editor.onDidChangeModelContent(() => {
+        onChangeRef.current?.(editor.getValue())
       })
       editorRef.current = editor
     }).catch(() => {
@@ -63,9 +75,16 @@ function InnerEditor({ content, language }: InnerProps) {
   }, [])
 
   useEffect(() => {
-    const editor = editorRef.current as { setValue?: (v: string) => void } | null
-    editor?.setValue?.(content)
+    const editor = editorRef.current as { setValue?: (v: string) => void; getValue?: () => string } | null
+    // Only overwrite when the incoming content genuinely differs (a fresh file
+    // load), NOT when it is the editor echoing the user's own keystrokes back.
+    if (editor && editor.getValue?.() !== content) editor.setValue?.(content)
   }, [content])
+
+  useEffect(() => {
+    const editor = editorRef.current as { updateOptions?: (o: { readOnly: boolean }) => void } | null
+    editor?.updateOptions?.({ readOnly })
+  }, [readOnly])
 
   useEffect(() => {
     const monaco = monacoRef.current
@@ -104,9 +123,13 @@ const LazyInner = lazy(async () => ({ default: InnerEditor }))
 export interface CodeViewerMonacoProps {
   content: string
   language: string
+  /** Read-only by default; pass false to enable in-app editing. */
+  readOnly?: boolean
+  /** Called with the full editor value on every edit (edit mode only). */
+  onChange?: (value: string) => void
 }
 
-export function CodeViewerMonaco({ content, language }: CodeViewerMonacoProps) {
+export function CodeViewerMonaco({ content, language, readOnly = true, onChange }: CodeViewerMonacoProps) {
   const { t } = useTranslation('code')
   return (
     <Suspense
@@ -116,7 +139,7 @@ export function CodeViewerMonaco({ content, language }: CodeViewerMonacoProps) {
         </div>
       }
     >
-      <LazyInner content={content} language={language} />
+      <LazyInner content={content} language={language} readOnly={readOnly} onChange={onChange} />
     </Suspense>
   )
 }

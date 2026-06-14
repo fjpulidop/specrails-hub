@@ -49,7 +49,12 @@
     "noContent": "No hay contenido disponible.",
     "pathCopied": "Ruta copiada",
     "copyPathFailed": "No se pudo copiar la ruta",
-    "budgetPrompt": "¿Ignorar el límite de presupuesto?"
+    "budgetPrompt": "¿Ignorar el límite de presupuesto?",
+    "edit": "Editar",
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "saved": "Archivo guardado",
+    "saveFailed": "Error al guardar"
   },
   "summary": {
     "generationFailed": "Error al generar el resumen",

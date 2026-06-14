@@ -14,6 +14,8 @@ import { randomUUID } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import { ChildProcess } from 'node:child_process'
 import { spawnAiCli } from './util/cli-prompt'
+import { runAiCliInvocation } from './spawn-lifecycle'
+import { getAdapter } from './providers/registry'
 import {
   buildContractRefineSystemPrompt,
   parseContractLayerBlock,
@@ -303,14 +305,37 @@ export async function runContractRefine(
   )
 
   const startedAt = now().toISOString()
-  let child: ChildProcess
-  try {
-    child = spawn('claude', args, {
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      cwd,
-    })
-  } catch (err) {
+  // Spawn/stream/timeout/settlement is owned by the shared spawn-lifecycle; the
+  // contract-refine-specific raw parse (fullText from assistant text blocks,
+  // the raw result event) and ALL finalize/record/broadcast logic stay here,
+  // byte-for-byte, so behaviour is unchanged (it still records via the legacy
+  // recordSafely path).
+  let fullText = ''
+  let resultEvent: Record<string, unknown> | null = null
+  const run = await runAiCliInvocation({
+    adapter: getAdapter('claude'),
+    binary: 'claude',
+    argv: args,
+    cwd,
+    env: process.env,
+    spawn,
+    timeoutMs,
+    onStdoutLine: (line) => {
+      let parsed: Record<string, unknown> | null = null
+      try { parsed = JSON.parse(line) } catch { return }
+      if (!parsed) return
+      const type = parsed.type as string
+      if (type === 'result') {
+        resultEvent = parsed
+      } else if (type === 'assistant') {
+        const message = parsed.message as { content?: Array<{ type: string; text?: string }> } | undefined
+        for (const b of (message?.content ?? [])) {
+          if (b.type === 'text' && typeof b.text === 'string') fullText += b.text
+        }
+      }
+    },
+  })
+  if (run.spawnFailed) {
     recordSafely(deps, conversationId, ticketId, conversation.model, startedAt, now().toISOString(), 'failed', null)
     deps.broadcast({
       type: 'explore.contract_refine_failed',
@@ -321,8 +346,7 @@ export async function runContractRefine(
     })
     return { ok: false, reason: 'crashed', ticketId, conversationId }
   }
-
-  const result = await readRefineChildOutput(child, timeoutMs)
+  const result = { fullText, resultEvent, code: run.code, timedOut: run.timedOut }
   const finishedAt = now().toISOString()
   console.log(`[contract-refine-runner] spawn done code=${result.code} timedOut=${result.timedOut} hasResult=${!!result.resultEvent} textBytes=${result.fullText.length}`)
 

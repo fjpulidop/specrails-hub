@@ -49,7 +49,12 @@
     "noContent": "Nessun contenuto disponibile.",
     "pathCopied": "Percorso copiato",
     "copyPathFailed": "Impossibile copiare il percorso",
-    "budgetPrompt": "Ignorare il limite di budget?"
+    "budgetPrompt": "Ignorare il limite di budget?",
+    "edit": "Modifica",
+    "save": "Salva",
+    "saving": "Salvataggio…",
+    "saved": "File salvato",
+    "saveFailed": "Salvataggio non riuscito"
   },
   "summary": {
     "generationFailed": "Generazione del riepilogo non riuscita",

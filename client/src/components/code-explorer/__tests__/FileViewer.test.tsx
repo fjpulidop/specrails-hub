@@ -1,4 +1,4 @@
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { FileViewer, type SummaryAction } from '../FileViewer'
 import { SharedWebSocketContext } from '../../../hooks/useSharedWebSocket'
@@ -91,6 +91,45 @@ describe('FileViewer', () => {
     expect(screen.getByTestId('file-provenance-timeline')).toBeInTheDocument()
     expect(screen.getByText('spec #42')).toBeInTheDocument()
     expect(screen.getByText('job-abcdef12')).toBeInTheDocument()
+  })
+
+  it('edits a text file and saves it via PUT /code/file', async () => {
+    const fetchMock = vi.fn((_url: string, opts?: { method?: string }) => {
+      if (opts?.method === 'PUT') {
+        return Promise.resolve({ ok: true, json: async () => ({ ok: true, bytes: 18 }) })
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ content: 'export const x = 1', language: 'typescript', summary: null, summaryStale: false }),
+      })
+    })
+    global.fetch = fetchMock as never
+    render(wrap(<FileViewer relPath="src/x.ts" />))
+    await waitFor(() => expect(screen.getByTestId('monaco-stub')).toBeInTheDocument())
+
+    // Enter edit mode → Save/Cancel appear.
+    fireEvent.click(screen.getByText('Edit'))
+    expect(screen.getByText('Save')).toBeInTheDocument()
+    expect(screen.getByText('Cancel')).toBeInTheDocument()
+
+    // Save → PUTs the (unchanged-by-stub) draft to /code/file.
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save'))
+    })
+    const putCall = fetchMock.mock.calls.find((c) => (c[1] as { method?: string } | undefined)?.method === 'PUT')
+    expect(putCall).toBeTruthy()
+    expect(String(putCall![0])).toContain('/code/file')
+    expect(JSON.parse((putCall![1] as { body: string }).body)).toEqual({ path: 'src/x.ts', content: 'export const x = 1' })
+  })
+
+  it('does not show the Edit affordance for a binary file', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ binary: true, sizeBytes: 100, mime: 'image/png' }),
+    }) as never
+    render(wrap(<FileViewer relPath="img/x.png" />))
+    await waitFor(() => expect(screen.getByTestId('file-binary')).toBeInTheDocument())
+    expect(screen.queryByText('Edit')).not.toBeInTheDocument()
   })
 
   it('regenerate flow prompts for budget override on skipped=budget', async () => {
