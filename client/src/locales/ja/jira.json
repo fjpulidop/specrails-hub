@@ -92,6 +92,13 @@
     "willCreate": "Jira に作成されます · {{key}}"
   },
   "detail": {
+    "detailsTitle": "Jira の詳細",
+    "developmentTitle": "開発",
+    "dev": {
+      "pullRequests": "プルリクエスト",
+      "branches": "ブランチ",
+      "commits": "コミット"
+    },
     "goToTicket": "チケット {{key}} を開く",
     "epic": "エピック"
   },

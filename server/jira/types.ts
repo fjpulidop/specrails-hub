@@ -169,3 +169,65 @@ export interface JiraStatus {
   name: string
   statusCategory?: { key: string }
 }
+
+/** An issue fetched with `fields=*all` — the fields map is open (system + custom). */
+export interface JiraRawIssue {
+  id: string
+  key: string
+  fields: Record<string, unknown>
+}
+
+/** Full `/field` metadata that drives the generic read-only field renderer. */
+export interface JiraFieldMeta {
+  id: string
+  name?: string
+  schema?: { type?: string; items?: string; custom?: string; system?: string }
+}
+
+// ─── Read-only "Jira details" + "Development" panel (spec detail modal) ──────────
+
+/** One rendered, populated issue field row. `value` is already a display string. */
+export interface JiraDetailField {
+  label: string
+  value: string
+  /** Browse link when the field references another issue (parent/subtask/link/epic). */
+  href?: string
+}
+
+export interface JiraDevCommit {
+  id: string
+  displayId: string
+  message: string
+  url: string
+  author: string | null
+  timestamp: string | null
+}
+
+export interface JiraDevPullRequest {
+  id: string
+  title: string
+  url: string
+  status: string
+  sourceBranch: string | null
+  destBranch: string | null
+  author: string | null
+  lastUpdate: string | null
+}
+
+export interface JiraDevBranch {
+  name: string
+  url: string
+  createPullRequestUrl: string | null
+  repo: string | null
+  repoUrl: string | null
+  lastCommit: JiraDevCommit | null
+}
+
+export interface JiraSpecDetails {
+  fields: JiraDetailField[]
+  development: {
+    pullRequests: JiraDevPullRequest[]
+    branches: JiraDevBranch[]
+    commits: JiraDevCommit[]
+  }
+}

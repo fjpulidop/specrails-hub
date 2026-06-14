@@ -15,6 +15,12 @@ import { writeJiraBacklogConfig, writeLocalBacklogConfig } from './jira-backlog-
 import { commentMarker, discardCommentMarker, commentHasMarker } from './jira-adf'
 import { issueUrl, upsertIssuesIntoStore } from './jira-materializer'
 import {
+  formatIssueFields,
+  normalizeBranches,
+  normalizePullRequests,
+  normalizeRepositoryCommits,
+} from './jira-issue-fields'
+import {
   buildTransitionFields,
   walkToCategory,
   type WalkOutcome,
@@ -43,9 +49,11 @@ import {
   upsertConnection,
   type EnqueueOutboxInput,
 } from './jira-db'
+import type { DevStatusDataType, JiraClient as JiraClientT } from './jira-client'
 import type {
   JiraConnection,
   JiraIssue,
+  JiraSpecDetails,
   JiraStatusCategory,
   JiraTransition,
   OutboxRow,
@@ -873,6 +881,72 @@ export class JiraSyncManager {
 
   private broadcastDegraded(jiraKey: string | null, reason: string): void {
     this.broadcast({ type: 'jira.degraded', projectId: this.projectId, jiraKey, reason })
+  }
+
+  // ─── Read-only details panel (issue fields + Development) ───────────────────
+
+  /**
+   * Build the read-only "Jira details" + "Development" payload for a Jira-backed
+   * spec. Resilient: the issue fetch is load-bearing, but a /field or dev-status
+   * failure still returns the fields (with humanized labels / empty development).
+   */
+  async getSpecDetails(
+    localId: number
+  ): Promise<{ ok: true; details: JiraSpecDetails } | { ok: false; reason: 'not-active' | 'no-link' | 'issue-error'; status?: number }> {
+    if (!this.isActive()) return { ok: false, reason: 'not-active' }
+    const link = getLinkByLocalId(this.db, localId)
+    if (!link || link.tombstoned) return { ok: false, reason: 'no-link' }
+    const conn = getConnection(this.db, this.projectId)
+    const client = this.buildClient()
+    if (!conn || !client) return { ok: false, reason: 'not-active' }
+
+    // 1) Fields — load-bearing.
+    const issueRes = await client.getIssueRaw(link.jiraIssueId)
+    if (!issueRes.ok) {
+      if (issueRes.code === 'auth') this.onAuth401()
+      if (issueRes.code === 'not_found') tombstoneLink(this.db, link.jiraIssueId)
+      return { ok: false, reason: 'issue-error', status: issueRes.status }
+    }
+    // 2) /field metadata — best effort.
+    const metaRes = await client.getFieldsFull()
+    const fieldMeta = metaRes.ok ? metaRes.data : []
+    // 3) Materialized ticket flags suppress already-shown info (no extra HTTP).
+    const ticket = readStore(resolveTicketStoragePath(this.projectPath)).tickets[String(localId)]
+    const fields = formatIssueFields({
+      fields: issueRes.data.fields,
+      fieldMeta,
+      baseUrl: conn.baseUrl,
+      alreadyShown: { hasEpicKey: !!ticket?.jira_epic_key, hasSprintName: !!ticket?.jira_sprint_name },
+    })
+    // 4) Development — best effort, fully isolated.
+    const development = await this.fetchDevelopment(client, link.jiraIssueId).catch(() => ({
+      pullRequests: [],
+      branches: [],
+      commits: [],
+    }))
+    return { ok: true, details: { fields, development } }
+  }
+
+  /** Two-call dev-status fetch (summary → detail per applicationType). Never throws. */
+  private async fetchDevelopment(client: JiraClientT, issueId: string): Promise<JiraSpecDetails['development']> {
+    const empty = { pullRequests: [], branches: [], commits: [] }
+    const summary = await client.getDevStatusSummary(issueId)
+    if (!summary.ok) {
+      if (summary.code === 'auth') this.onAuth401()
+      return empty
+    }
+    const appTypesFor = (key: string): string[] => Object.keys(summary.data.summary?.[key]?.byInstanceType ?? {})
+    const development = { pullRequests: [] as JiraSpecDetails['development']['pullRequests'], branches: [] as JiraSpecDetails['development']['branches'], commits: [] as JiraSpecDetails['development']['commits'] }
+    const collect = async (key: string, dataType: DevStatusDataType, sink: (d: import('./jira-client').JiraDevDetailRaw) => void) => {
+      for (const app of appTypesFor(key)) {
+        const res = await client.getDevStatusDetail(issueId, app, dataType)
+        if (res.ok) sink(res.data)
+      }
+    }
+    await collect('pullrequest', 'pullrequest', (d) => development.pullRequests.push(...normalizePullRequests(d)))
+    await collect('branch', 'branch', (d) => development.branches.push(...normalizeBranches(d)))
+    await collect('repository', 'repository', (d) => development.commits.push(...normalizeRepositoryCommits(d)))
+    return development
   }
 
   // ─── Read helpers for the router ───────────────────────────────────────────

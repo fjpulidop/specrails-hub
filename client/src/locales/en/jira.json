@@ -92,6 +92,13 @@
     "willCreate": "Will be created in Jira · {{key}}"
   },
   "detail": {
+    "detailsTitle": "Jira details",
+    "developmentTitle": "Development",
+    "dev": {
+      "pullRequests": "Pull requests",
+      "branches": "Branches",
+      "commits": "Commits"
+    },
     "goToTicket": "Go to Ticket {{key}}",
     "epic": "Epic"
   },

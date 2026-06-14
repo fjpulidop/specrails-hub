@@ -16,6 +16,7 @@ import { useMinimizedChats } from '../context/MinimizedChatsContext'
 import { useTicketDetailModal } from '../context/TicketDetailModalContext'
 import { useJiraConnection } from '../hooks/useJiraConnection'
 import { DiscardSpecDialog } from './jira/DiscardSpecDialog'
+import { JiraSpecDetailsPanel } from './jira/JiraSpecDetailsPanel'
 import { parseAcceptanceCriteria } from './explore-spec/acceptance-criteria'
 import { useDesktop } from '../hooks/useDesktop'
 import { SmashActions } from './specs-smash/SmashActions'
@@ -632,6 +633,11 @@ export function TicketDetailModal({
                 allTickets={allTickets ?? []}
                 onOpenTicket={(id) => onOpenTicket?.(id)}
               />
+
+              {/* Jira details + Development (read-only) — only for Jira-backed specs */}
+              {ticket.source === 'jira' && ticket.jira_key && (
+                <JiraSpecDetailsPanel localId={ticket.id} />
+              )}
 
               {/* Continue Editing lives in the modal header — see top of component. */}
 

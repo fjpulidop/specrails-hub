@@ -8,7 +8,9 @@ import { bodyForDeployment, SPECRAILS_COMMENT_PROP_KEY } from './jira-adf'
 import type {
   JiraDeployment,
   JiraErrorCode,
+  JiraFieldMeta,
   JiraIssue,
+  JiraRawIssue,
   JiraResult,
   JiraStatus,
   JiraTransition,
@@ -68,13 +70,28 @@ export class JiraClient {
     return `${base}/rest/api/${this.cfg.apiVersion}${path}`
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<JiraResult<T>> {
+  /** Build a URL for a NON `/rest/api` endpoint (e.g. `/rest/dev-status/1.0/...`). */
+  private urlRaw(restPath: string): string {
+    return `${this.cfg.baseUrl.replace(/\/+$/, '')}${restPath}`
+  }
+
+  /** REST v2/v3 request under `/rest/api/{version}`. */
+  private request<T>(method: string, path: string, body?: unknown): Promise<JiraResult<T>> {
+    return this.requestUrl<T>(method, this.url(path), body)
+  }
+
+  /** Request to an absolute REST path (for APIs outside `/rest/api`). */
+  private requestRaw<T>(method: string, restPath: string, body?: unknown): Promise<JiraResult<T>> {
+    return this.requestUrl<T>(method, this.urlRaw(restPath), body)
+  }
+
+  private async requestUrl<T>(method: string, fullUrl: string, body?: unknown): Promise<JiraResult<T>> {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
     const timeout = controller
       ? setTimeout(() => controller.abort(), this.cfg.timeoutMs ?? 20000)
       : null
     try {
-      const res = await this.fetchImpl(this.url(path), {
+      const res = await this.fetchImpl(fullUrl, {
         method,
         headers: {
           Authorization: this.authHeader(),
@@ -252,6 +269,50 @@ export class JiraClient {
   ): Promise<JiraResult<{ comments: Array<{ id: string; body: unknown; properties?: Array<{ key: string; value?: unknown }> }> }>> {
     return this.request('GET', `/issue/${encodeURIComponent(issueIdOrKey)}/comment?expand=properties`)
   }
+
+  // ─── Read-only details panel (issue fields + Development) ────────────────────
+
+  /** GET /issue/{id}?fields=*all — the full system + custom field map (untyped). */
+  getIssueRaw(idOrKey: string): Promise<JiraResult<JiraRawIssue>> {
+    return this.request('GET', `/issue/${encodeURIComponent(idOrKey)}?fields=*all`)
+  }
+
+  /** GET /field — full field metadata (name + schema) for the generic renderer. */
+  getFieldsFull(): Promise<JiraResult<JiraFieldMeta[]>> {
+    return this.request('GET', '/field')
+  }
+
+  /**
+   * GET /rest/dev-status/1.0/issue/summary?issueId=<numericId> — dev-panel counts
+   * + the connected applicationType(s). `issueId` MUST be the immutable numeric
+   * id (JiraLink.jiraIssueId), not the PROJ-123 key. No data => 200 zero counts.
+   */
+  getDevStatusSummary(issueId: string): Promise<JiraResult<JiraDevSummaryRaw>> {
+    return this.requestRaw('GET', `/rest/dev-status/1.0/issue/summary?issueId=${encodeURIComponent(issueId)}`)
+  }
+
+  /**
+   * GET /rest/dev-status/1.0/issue/detail — the actual PR/branch/repository
+   * records for one (applicationType, dataType). A wrong applicationType returns
+   * 200 with empty detail[]; derive it from getDevStatusSummary byInstanceType.
+   */
+  getDevStatusDetail(issueId: string, applicationType: string, dataType: DevStatusDataType): Promise<JiraResult<JiraDevDetailRaw>> {
+    const qp = new URLSearchParams({ issueId, applicationType, dataType })
+    return this.requestRaw('GET', `/rest/dev-status/1.0/issue/detail?${qp.toString()}`)
+  }
+}
+
+export type DevStatusDataType = 'pullrequest' | 'branch' | 'repository'
+
+export interface JiraDevSummaryRaw {
+  errors?: unknown[]
+  configErrors?: unknown[]
+  summary?: Record<string, { overall?: { count?: number }; byInstanceType?: Record<string, { count?: number; name?: string }> }>
+}
+
+export interface JiraDevDetailRaw {
+  errors?: unknown[]
+  detail?: Array<{ pullRequests?: unknown[]; branches?: unknown[]; repositories?: unknown[]; _instance?: { name?: string; type?: string } }>
 }
 
 function parseRetryAfter(value: string): number | undefined {

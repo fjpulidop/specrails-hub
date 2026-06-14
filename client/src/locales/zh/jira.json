@@ -92,6 +92,13 @@
     "willCreate": "将在 Jira 中创建 · {{key}}"
   },
   "detail": {
+    "detailsTitle": "Jira 详情",
+    "developmentTitle": "开发",
+    "dev": {
+      "pullRequests": "拉取请求",
+      "branches": "分支",
+      "commits": "提交"
+    },
     "goToTicket": "前往工单 {{key}}",
     "epic": "史诗"
   },

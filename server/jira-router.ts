@@ -251,6 +251,24 @@ export function createJiraRouter(): Router {
     res.status(202).json({ ok: true })
   })
 
+  // GET /specs/:localId/details — read-only "Jira details" + "Development" payload
+  // for the spec detail modal. Resilient: dev-status failures still return fields.
+  router.get('/specs/:localId/details', async (req: Request, res: Response) => {
+    const c = ctx(req)
+    const localId = parseInt(req.params.localId as string, 10)
+    if (Number.isNaN(localId)) {
+      res.status(400).json({ error: 'Invalid spec id' })
+      return
+    }
+    const result = await c.jiraSyncManager.getSpecDetails(localId)
+    if (!result.ok) {
+      const status = result.reason === 'no-link' ? 404 : result.reason === 'not-active' ? 409 : (result.status ?? 502)
+      res.status(status).json({ error: result.reason })
+      return
+    }
+    res.json(result.details)
+  })
+
   // GET /links — the spec↔issue map (for the badge / diagnostics).
   router.get('/links', (req: Request, res: Response) => {
     res.json({ links: ctx(req).jiraSyncManager.listLinks() })

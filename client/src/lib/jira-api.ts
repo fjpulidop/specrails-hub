@@ -49,6 +49,42 @@ export interface JiraStatusOption {
   category: string
 }
 
+export interface JiraDetailField {
+  label: string
+  value: string
+  href?: string
+}
+export interface JiraDevCommit {
+  id: string
+  displayId: string
+  message: string
+  url: string
+  author: string | null
+  timestamp: string | null
+}
+export interface JiraDevPullRequest {
+  id: string
+  title: string
+  url: string
+  status: string
+  sourceBranch: string | null
+  destBranch: string | null
+  author: string | null
+  lastUpdate: string | null
+}
+export interface JiraDevBranch {
+  name: string
+  url: string
+  createPullRequestUrl: string | null
+  repo: string | null
+  repoUrl: string | null
+  lastCommit: JiraDevCommit | null
+}
+export interface JiraSpecDetails {
+  fields: JiraDetailField[]
+  development: { pullRequests: JiraDevPullRequest[]; branches: JiraDevBranch[]; commits?: JiraDevCommit[] }
+}
+
 export interface JiraProjectOption {
   id: string
   key: string
@@ -151,6 +187,11 @@ export const jiraApi = {
   /** Move a Jira-backed spec to the configured discard status (+ optional reason). */
   discardSpec(localId: number, comment: string | null, apiBase?: string): Promise<{ ok: true }> {
     return fetch(`${base(apiBase)}/jira/specs/${localId}/discard`, jsonPost({ comment })).then((r) => asJson(r))
+  },
+
+  /** Read-only "Jira details" + "Development" payload for the spec detail modal. */
+  getSpecDetails(localId: number, apiBase?: string): Promise<JiraSpecDetails> {
+    return fetch(`${base(apiBase)}/jira/specs/${localId}/details`).then((r) => asJson<JiraSpecDetails>(r))
   },
 
   disconnect(apiBase?: string): Promise<{ connected: false }> {
