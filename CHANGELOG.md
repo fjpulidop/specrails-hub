@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/fjpulidop/specrails-desktop/compare/v2.2.1...v2.3.0) (2026-06-14)
+
+
+### Features
+
+* four roadmap big bets (spawn-lifecycle, project-router split, persistent-stdin Explore, Code Explorer editing) ([#386](https://github.com/fjpulidop/specrails-desktop/issues/386)) ([5e35a0f](https://github.com/fjpulidop/specrails-desktop/commit/5e35a0f47b1a85b2c636205faef6cf6c63b61436))
+
 ## [2.2.1](https://github.com/fjpulidop/specrails-desktop/compare/v2.2.0...v2.2.1) (2026-06-13)
 
 
