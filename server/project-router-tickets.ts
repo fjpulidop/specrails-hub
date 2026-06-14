@@ -1421,10 +1421,25 @@ export function registerTicketsRoutes(deps: ProjectRoutesDeps): void {
       if (!updated) {
         res.status(404).json({ error: 'Ticket not found' }); return
       }
-      const { broadcast, ticketWatcher } = ctx(req)
+      const { broadcast, ticketWatcher, jiraSyncManager } = ctx(req)
       ticketWatcher.notifyDesktopWrite(store.revision)
       const msg: TicketUpdatedMessage = { type: 'ticket_updated', ticket: updated as unknown as LocalTicket, projectId: ctx(req).project.id, timestamp: new Date().toISOString() }
       broadcast(msg)
+      // Write the edited fields back to Jira for Jira-backed specs (no-op
+      // otherwise). Uses the FINAL stored values (e.g. acceptance-criteria
+      // folding) for the fields that were actually changed. Never breaks the
+      // local save — a Jira hiccup only fails the enqueue, which is caught.
+      try {
+        const u = updated as Ticket
+        const changes: { title?: string; description?: string; priority?: string | null; labels?: string[] } = {}
+        if (title !== undefined) changes.title = u.title
+        if (description !== undefined || acceptanceCriteria !== undefined) changes.description = u.description
+        if (priority !== undefined) changes.priority = u.priority ?? null
+        if (labels !== undefined) changes.labels = u.labels
+        if (Object.keys(changes).length > 0) jiraSyncManager?.onSpecEdited(Number(ticketId), changes)
+      } catch (e) {
+        console.error('[project-router] jira write-back enqueue failed:', e)
+      }
       res.json({ ticket: updated, revision: store.revision })
     } catch (err) {
       console.error('[project-router] ticket update error:', err)

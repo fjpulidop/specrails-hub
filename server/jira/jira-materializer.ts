@@ -173,11 +173,21 @@ function sameJiraContent(a: Ticket, b: Ticket): boolean {
   )
 }
 
-/** Apply the frozen-id guard to a freshly mapped ticket (preserve local status). */
+/**
+ * Apply the frozen-id guard to a freshly mapped ticket. A frozen id has a pending
+ * outbound write (a status transition OR a field write-back), so inbound Jira
+ * data must NOT clobber the locally-edited fields before that write lands — the
+ * poll would otherwise revert the user's edit. We preserve the editable fields
+ * (status/priority/title/description/labels) and let Jira-owned fields
+ * (key/url/epic/sprint/assignee) flow through.
+ */
 function applyFrozen(mapped: Ticket, existing: Ticket | undefined, frozen: boolean): Ticket {
   if (existing && frozen) {
     mapped.status = existing.status
     mapped.priority = existing.priority ?? mapped.priority
+    mapped.title = existing.title
+    mapped.description = existing.description
+    mapped.labels = existing.labels
   }
   return mapped
 }

@@ -500,35 +500,34 @@ export function SpecsBoard({
           })}
         </div>
 
-        {/* Separator between the state tabs and the rest of the toolbar */}
+        {/* Separator between the state tabs and the filters */}
         <div className="h-5 w-px bg-border/60 shrink-0" aria-hidden />
 
-        {/* Filters cluster — flexes + scrolls on narrow panels so the action
-            controls (sort/view/add) and the tabs always stay visible. */}
-        <div className="flex items-center gap-2 min-w-0 flex-1 overflow-x-auto">
-          <SpecLabelFilterDropdown
+        {/* Filters are direct children (NO overflow wrapper — an overflow
+            ancestor clips their absolute dropdown panels). */}
+        <SpecLabelFilterDropdown
+          tickets={[...tickets, ...doneTickets]}
+          active={activeLabels}
+          onChange={handleLabelsChange}
+        />
+        {hasEpics && (
+          <SpecEpicFilterDropdown
             tickets={[...tickets, ...doneTickets]}
-            active={activeLabels}
-            onChange={handleLabelsChange}
+            active={activeEpic}
+            onChange={setActiveEpic}
           />
-          {hasEpics && (
-            <SpecEpicFilterDropdown
-              tickets={[...tickets, ...doneTickets]}
-              active={activeEpic}
-              onChange={setActiveEpic}
-            />
-          )}
-          {hasSprints && (
-            <SpecSprintFilterDropdown
-              tickets={[...tickets, ...doneTickets]}
-              active={activeSprint}
-              onChange={setActiveSprint}
-            />
-          )}
-        </div>
+        )}
+        {hasSprints && (
+          <SpecSprintFilterDropdown
+            tickets={[...tickets, ...doneTickets]}
+            active={activeSprint}
+            onChange={setActiveSprint}
+          />
+        )}
 
-        {/* Separator between the Jira/label filters and the sort/view controls */}
-        <div className="h-5 w-px bg-border/60 shrink-0" aria-hidden />
+        {/* Separator between the Jira/label filters and the sort/view controls.
+            `ml-auto` pushes the whole action cluster to the right edge. */}
+        <div className="h-5 w-px bg-border/60 shrink-0 ml-auto" aria-hidden />
 
         <SpecSortControl
           mode={sortMode}

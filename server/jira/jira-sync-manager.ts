@@ -12,7 +12,7 @@ import { mutateStore, readStore, resolveTicketStoragePath, type Ticket, type Tic
 import type { WsMessage } from '../types'
 import { JiraClient, detectDeployment, type FetchImpl } from './jira-client'
 import { writeJiraBacklogConfig, writeLocalBacklogConfig } from './jira-backlog-config'
-import { commentMarker, discardCommentMarker, commentHasMarker } from './jira-adf'
+import { commentMarker, discardCommentMarker, commentHasMarker, bodyForDeployment } from './jira-adf'
 import { issueUrl, upsertIssuesIntoStore } from './jira-materializer'
 import {
   formatIssueFields,
@@ -65,6 +65,15 @@ const DRAIN_INTERVAL_MS = 10_000
 const POLL_OVERLAP_MS = 2 * 60_000
 const MAX_DRAIN_BATCH = 8
 const SEARCH_FIELDS = ['summary', 'description', 'labels', 'status', 'priority', 'assignee', 'updated', 'issuetype', 'parent']
+
+/** Local priority → Jira priority NAME (standard scheme; best-effort). A custom
+ *  scheme that rejects the name is retried without priority in executeUpdate. */
+const PRIORITY_TO_JIRA: Record<string, string> = {
+  critical: 'Highest',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+}
 
 export interface JiraSyncManagerOpts {
   db: DbInstance
@@ -476,7 +485,7 @@ export class JiraSyncManager {
       .prepare(
         `SELECT DISTINCT l.local_id AS localId
            FROM jira_outbox o JOIN jira_links l ON l.jira_issue_id = o.jira_issue_id
-          WHERE o.state IN ('pending','inflight') AND o.op_type = 'transition'`
+          WHERE o.state IN ('pending','inflight') AND o.op_type IN ('transition','update')`
       )
       .all() as Array<{ localId: number }>
     return new Set(rows.map((r) => r.localId))
@@ -578,6 +587,46 @@ export class JiraSyncManager {
     enqueueMany(this.db, ops)
     this.writeLocalStatus(linkedIds, 'in_progress')
     this.broadcastOutboxState()
+  }
+
+  /**
+   * Called after a Jira-backed spec is edited + saved locally. Pushes the changed
+   * editable fields (summary/description/labels/priority) to the Jira issue via a
+   * durable 'update' op. No-op for non-Jira / unlinked specs. While the op is
+   * pending the id is frozen, so the inbound poll won't revert the local edit.
+   * Status is intentionally NOT written here (Jira status needs a transition).
+   */
+  onSpecEdited(
+    localId: number,
+    changes: { title?: string; description?: string; priority?: string | null; labels?: string[] },
+  ): void {
+    if (!this.isActive()) return
+    const link = getLinkByLocalId(this.db, localId)
+    if (!link || link.tombstoned) return
+    const conn = getConnection(this.db, this.projectId)
+    if (!conn) return
+
+    const fields: Record<string, unknown> = {}
+    if (typeof changes.title === 'string' && changes.title.trim()) fields.summary = changes.title.trim().slice(0, 250)
+    if (typeof changes.description === 'string') fields.description = bodyForDeployment(changes.description, conn.deployment)
+    if (changes.labels !== undefined) fields.labels = (changes.labels ?? []).filter((l) => typeof l === 'string')
+    if (changes.priority) {
+      const name = PRIORITY_TO_JIRA[changes.priority]
+      if (name) fields.priority = { name }
+    }
+    if (Object.keys(fields).length === 0) return
+
+    const nonce = Date.now().toString(36)
+    enqueueMany(this.db, [
+      {
+        jiraIssueId: link.jiraIssueId,
+        opType: 'update',
+        idempotencyKey: `update:${localId}:${nonce}`,
+        payload: { jiraIssueId: link.jiraIssueId, fields },
+      },
+    ])
+    this.broadcastOutboxState()
+    void this.drainOnce().catch(() => undefined)
   }
 
   /**
@@ -694,12 +743,36 @@ export class JiraSyncManager {
         await this.executeComment(client, op, payload)
       } else if (op.opType === 'transition') {
         await this.executeTransition(client, conn, op, payload)
+      } else if (op.opType === 'update') {
+        await this.executeUpdate(client, op, payload)
       } else {
         markOutboxDead(this.db, op.id, `unsupported op type ${op.opType}`)
       }
     } catch (err) {
       this.retryOrDead(op, err instanceof Error ? err.message : String(err))
     }
+  }
+
+  private async executeUpdate(client: JiraClient, op: OutboxRow, payload: { jiraIssueId: string; fields: Record<string, unknown> }): Promise<void> {
+    let res = await client.updateIssue(payload.jiraIssueId, payload.fields)
+    // The priority NAME may not match the instance's scheme. Don't let that lose
+    // the title/description/labels edit — retry once without priority.
+    if (!res.ok && res.code === 'validation' && 'priority' in payload.fields) {
+      const { priority: _drop, ...rest } = payload.fields
+      void _drop
+      if (Object.keys(rest).length > 0) res = await client.updateIssue(payload.jiraIssueId, rest)
+    }
+    if (res.ok) {
+      markOutboxDone(this.db, op.id)
+      return
+    }
+    if (res.code === 'not_found') {
+      tombstoneLink(this.db, payload.jiraIssueId)
+      markOutboxDead(this.db, op.id, 'issue deleted or inaccessible')
+      this.broadcastDegraded(null, 'linked Jira issue no longer reachable')
+      return
+    }
+    this.handleHardError(op, res.code, res.status, res.retryAfterMs, res.error)
   }
 
   private async executeComment(client: JiraClient, op: OutboxRow, payload: { jiraIssueId: string; text: string; marker: string }): Promise<void> {

@@ -249,6 +249,15 @@ export class JiraClient {
   }
 
   /**
+   * PUT /issue/{id} — update editable fields (summary/description/labels/
+   * priority) when a Jira-backed spec is edited locally. The `fields` object is
+   * already rendered for the deployment by the caller. 204 on success.
+   */
+  updateIssue(idOrKey: string, fields: Record<string, unknown>): Promise<JiraResult<void>> {
+    return this.request('PUT', `/issue/${encodeURIComponent(idOrKey)}`, { fields })
+  }
+
+  /**
    * POST /issue/{id}/comment — add a comment (ADF on Cloud, wiki on DC). The
    * optional idempotency `marker` is stored as an INVISIBLE comment property
    * (never in the body), so users never see it. Cloud + DC both accept the

@@ -16,7 +16,7 @@ export type JiraStatusCategory = 'new' | 'indeterminate' | 'done'
 export type SpecLogicalState = 'todo' | 'in_progress' | 'done' | 'cancelled'
 
 /** Outbox operation kinds. */
-export type OutboxOpType = 'transition' | 'comment' | 'create'
+export type OutboxOpType = 'transition' | 'comment' | 'create' | 'update'
 
 export type OutboxState = 'pending' | 'inflight' | 'done' | 'dead'
 
