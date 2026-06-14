@@ -110,5 +110,9 @@
     "selected_one": "{{count}} label",
     "selected_other": "{{count}} labels",
     "clear": "clear"
+  },
+  "epicFilter": {
+    "all": "All epics",
+    "ariaLabel": "Filter by epic"
   }
 }

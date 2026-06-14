@@ -110,5 +110,9 @@
     "selected_one": "{{count}} etiqueta",
     "selected_other": "{{count}} etiquetas",
     "clear": "limpar"
+  },
+  "epicFilter": {
+    "all": "Todos os épicos",
+    "ariaLabel": "Filtrar por épico"
   }
 }

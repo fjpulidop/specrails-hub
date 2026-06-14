@@ -110,5 +110,9 @@
     "selected_one": "{{count}} label",
     "selected_other": "{{count}} labels",
     "clear": "effacer"
+  },
+  "epicFilter": {
+    "all": "Toutes les épopées",
+    "ariaLabel": "Filtrer par épopée"
   }
 }
