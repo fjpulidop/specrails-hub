@@ -73,6 +73,10 @@
     "connected": "Connecté",
     "manage": "Gérer",
     "modalTitle": "Se connecter à Jira",
-    "manageTitle": "Connexion Jira"
+    "manageTitle": "Connexion Jira",
+    "bullet1": "Synchronisation bidirectionnelle du statut avec votre tableau Jira.",
+    "bullet2": "Publie un commentaire à la fin d'un rail.",
+    "bullet3": "Votre backlog Jira apparaît comme des specs sur le tableau.",
+    "requires": "Nécessite un compte Jira Cloud ou Data Center."
   }
 }

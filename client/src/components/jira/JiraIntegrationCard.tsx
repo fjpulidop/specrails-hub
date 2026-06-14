@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, Plug } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
-import { Button } from '../ui/button'
 import { FEATURE_JIRA } from '../../lib/feature-flags'
 import { jiraApi, type ConnectionState } from '../../lib/jira-api'
 import { JiraConnectWizard } from './JiraConnectWizard'
@@ -42,7 +41,7 @@ export function JiraIntegrationCard({ activeProjectId }: { activeProjectId: stri
   const connected = !!(conn?.connected && conn.connection)
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-3" data-testid="jira-integration-card">
+    <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-3 h-full" data-testid="jira-integration-card">
       <div className="flex items-start gap-2">
         <div className="grid place-items-center w-9 h-9 rounded-md bg-accent-info/15 text-accent-info shrink-0">
           <Plug className="w-4 h-4" />
@@ -66,18 +65,36 @@ export function JiraIntegrationCard({ activeProjectId }: { activeProjectId: stri
           : t('jiraCard.description')}
       </p>
 
-      <div className="mt-auto flex items-center gap-2 pt-1">
+      <ul className="text-xs space-y-1 list-disc pl-4 text-foreground/80">
+        <li>{t('jiraCard.bullet1')}</li>
+        <li>{t('jiraCard.bullet2')}</li>
+        <li>{t('jiraCard.bullet3')}</li>
+      </ul>
+
+      <div className="text-[10px] text-muted-foreground">{t('jiraCard.requires')}</div>
+
+      <div className="mt-auto pt-2 flex items-center justify-end gap-2">
         {loading ? (
           <span className="text-xs text-muted-foreground">…</span>
         ) : connected ? (
-          <Button size="sm" variant="outline" onClick={() => setManageOpen(true)} data-testid="jira-manage-btn">
+          <button
+            type="button"
+            onClick={() => setManageOpen(true)}
+            data-testid="jira-manage-btn"
+            className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/30 inline-flex items-center gap-1.5"
+          >
             {t('jiraCard.manage')}
-          </Button>
+          </button>
         ) : (
-          <Button size="sm" onClick={() => setWizardOpen(true)} data-testid="jira-connect-btn">
-            <Plug className="w-3.5 h-3.5 mr-1" />
+          <button
+            type="button"
+            onClick={() => setWizardOpen(true)}
+            data-testid="jira-connect-btn"
+            className="text-xs px-3 py-1.5 rounded-md bg-accent-primary text-white hover:opacity-90 inline-flex items-center gap-1.5"
+          >
+            <Plug className="w-3.5 h-3.5" />
             {t('jiraCard.connect')}
-          </Button>
+          </button>
         )}
       </div>
 

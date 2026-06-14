@@ -73,6 +73,10 @@
     "connected": "Verbunden",
     "manage": "Verwalten",
     "modalTitle": "Mit Jira verbinden",
-    "manageTitle": "Jira-Verbindung"
+    "manageTitle": "Jira-Verbindung",
+    "bullet1": "Bidirektionale Statussynchronisierung mit deinem Jira-Board.",
+    "bullet2": "Postet einen Kommentar, wenn ein Rail abschließt.",
+    "bullet3": "Dein Jira-Backlog erscheint als Specs auf dem Board.",
+    "requires": "Erfordert ein Jira-Cloud- oder Data-Center-Konto."
   }
 }

@@ -73,6 +73,10 @@
     "connected": "Connected",
     "manage": "Manage",
     "modalTitle": "Connect to Jira",
-    "manageTitle": "Jira connection"
+    "manageTitle": "Jira connection",
+    "bullet1": "Two-way status sync with your Jira board.",
+    "bullet2": "Posts a completion comment when a rail finishes.",
+    "bullet3": "Your Jira backlog appears as specs on the board.",
+    "requires": "Requires a Jira Cloud or Data Center account."
   }
 }

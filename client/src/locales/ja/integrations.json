@@ -73,6 +73,10 @@
     "connected": "接続済み",
     "manage": "管理",
     "modalTitle": "Jira に接続",
-    "manageTitle": "Jira 接続"
+    "manageTitle": "Jira 接続",
+    "bullet1": "Jira ボードとステータスを双方向同期。",
+    "bullet2": "rail 完了時にコメントを投稿。",
+    "bullet3": "Jira のバックログがボードにスペックとして表示されます。",
+    "requires": "Jira Cloud または Data Center のアカウントが必要です。"
   }
 }

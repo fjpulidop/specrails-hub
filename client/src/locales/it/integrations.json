@@ -73,6 +73,10 @@
     "connected": "Connesso",
     "manage": "Gestisci",
     "modalTitle": "Connetti a Jira",
-    "manageTitle": "Connessione Jira"
+    "manageTitle": "Connessione Jira",
+    "bullet1": "Sincronizzazione bidirezionale dello stato con la tua board Jira.",
+    "bullet2": "Pubblica un commento al termine di un rail.",
+    "bullet3": "Il tuo backlog Jira appare come spec sulla board.",
+    "requires": "Richiede un account Jira Cloud o Data Center."
   }
 }
