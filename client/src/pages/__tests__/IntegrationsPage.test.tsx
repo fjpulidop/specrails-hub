@@ -82,7 +82,9 @@ describe('IntegrationsPage', () => {
     routeFetch(sampleCatalog)
     render(<IntegrationsPage />)
     await waitFor(() => expect(screen.getByTestId('jira-integration-card')).toBeInTheDocument())
-    expect(screen.getByTestId('jira-connect-btn')).toBeInTheDocument()
+    // The Connect button only appears after the async GET /jira/connection
+    // resolves — wait for it (findBy) rather than asserting synchronously.
+    expect(await screen.findByTestId('jira-connect-btn')).toBeInTheDocument()
   })
 
   it('renders cards for plugins from the catalog (Claude project)', async () => {
