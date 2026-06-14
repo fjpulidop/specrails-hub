@@ -8,12 +8,12 @@
 // and stays completely inert until the project configures a Jira connection.
 
 import type { DbInstance } from '../db'
-import { mutateStore, readStore, resolveTicketStoragePath, type TicketStatus } from '../ticket-store'
+import { mutateStore, readStore, resolveTicketStoragePath, type Ticket, type TicketStatus } from '../ticket-store'
 import type { WsMessage } from '../types'
 import { JiraClient, detectDeployment, type FetchImpl } from './jira-client'
 import { writeJiraBacklogConfig, writeLocalBacklogConfig } from './jira-backlog-config'
 import { commentMarker, bodyContainsMarker } from './jira-adf'
-import { upsertIssuesIntoStore } from './jira-materializer'
+import { issueUrl, upsertIssuesIntoStore } from './jira-materializer'
 import {
   buildTransitionFields,
   walkToCategory,
@@ -27,6 +27,7 @@ import {
   getConnection,
   getDecryptedToken,
   getLinkByLocalId,
+  insertLinkWithId,
   listLinks,
   listOutbox,
   markOutboxDead,
@@ -315,6 +316,65 @@ export class JiraSyncManager {
     const t = readTicket(this.projectPath, localId)
     if (t) this.broadcast({ type: 'ticket_created', ticket: t, projectId: this.projectId, timestamp: t.updated_at } as WsMessage)
     return { ok: true, localId, jiraKey: created.data.key }
+  }
+
+  /**
+   * Promote an existing LOCAL ticket to a Jira issue (Add Spec on a Jira-backed
+   * project). Creates the issue, links it to the SAME local id (no new id minted,
+   * no duplicate ticket), and flips the cached ticket to `source:'jira'` with its
+   * key/url. Idempotent: a ticket already linked is a no-op. Best-effort — on
+   * failure the ticket simply stays local and the caller surfaces a warning.
+   */
+  async promoteTicketToJira(
+    localId: number
+  ): Promise<{ ok: true; jiraKey: string | null; alreadyLinked?: boolean } | { ok: false; error: string }> {
+    if (!this.isActive()) return { ok: false, error: 'jira not active' }
+    const existing = getLinkByLocalId(this.db, localId)
+    if (existing && !existing.tombstoned) return { ok: true, jiraKey: existing.jiraKey, alreadyLinked: true }
+    const conn = getConnection(this.db, this.projectId)
+    if (!conn) return { ok: false, error: 'no jira connection' }
+    const client = this.buildClient()
+    if (!client) return { ok: false, error: 'no jira credentials' }
+
+    const file = resolveTicketStoragePath(this.projectPath)
+    const ticket = readStore(file).tickets[String(localId)]
+    if (!ticket) return { ok: false, error: 'ticket not found' }
+
+    const created = await client.createIssue({
+      projectKey: conn.jiraProjectKey,
+      issueType: 'Task',
+      summary: ticket.title,
+      description: ticket.description || undefined,
+      labels: ticket.labels,
+    })
+    if (!created.ok) {
+      if (created.code === 'auth') this.onAuth401()
+      return { ok: false, error: created.error || 'jira issue create failed' }
+    }
+
+    insertLinkWithId(this.db, {
+      localId,
+      jiraIssueId: created.data.id,
+      jiraKey: created.data.key,
+      jiraProjectId: conn.jiraProjectId,
+      deployment: conn.deployment,
+    })
+
+    let updated: Ticket | undefined
+    mutateStore(file, (s) => {
+      const t = s.tickets[String(localId)]
+      if (t) {
+        t.source = 'jira'
+        t.jira_key = created.data.key
+        t.jira_url = issueUrl(conn.baseUrl, created.data.key)
+        t.updated_at = new Date().toISOString()
+        updated = t
+      }
+    })
+    if (updated) {
+      this.broadcast({ type: 'ticket_updated', ticket: updated as unknown as never, projectId: this.projectId, timestamp: updated.updated_at } as WsMessage)
+    }
+    return { ok: true, jiraKey: created.data.key }
   }
 
   // ─── Inbound poll ──────────────────────────────────────────────────────────

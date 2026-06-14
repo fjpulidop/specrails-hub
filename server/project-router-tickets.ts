@@ -105,6 +105,31 @@ import {
   resolveDefaultSpecModel,
 } from './project-router-helpers'
 
+/**
+ * Add Spec on a Jira-backed project: promote the freshly-created LOCAL ticket to
+ * a Jira issue (best-effort, server-side). The per-spec `createLocal` escape
+ * hatch keeps it local. On any failure the ticket simply stays local and a
+ * non-fatal warning is broadcast — a spec is never lost to a Jira error.
+ */
+async function maybePromoteSpecToJira(
+  c: ProjectContext,
+  ticketId: number,
+  createLocal: boolean,
+  broadcast: (m: unknown) => void,
+): Promise<void> {
+  // jiraSyncManager is always present in production (constructed per project);
+  // guard defensively so partial test contexts and a disabled feature are no-ops.
+  if (createLocal || !c.jiraSyncManager?.isActive()) return
+  try {
+    const r = await c.jiraSyncManager.promoteTicketToJira(ticketId)
+    if (!r.ok) {
+      broadcast({ type: 'jira.sync_error', projectId: c.project.id, reason: `Kept as a local spec — couldn't create it in Jira: ${r.error}` })
+    }
+  } catch (err) {
+    console.error('[project-router] jira promote failed:', err)
+  }
+}
+
 export function registerTicketsRoutes(deps: ProjectRoutesDeps): void {
   const { router, registry, ctx, ticketPath } = deps
   // ─── Tickets ──────────────────────────────────────────────────────────────────
@@ -548,6 +573,10 @@ export function registerTicketsRoutes(deps: ProjectRoutesDeps): void {
           }
           broadcast(doneMsg)
 
+          // Add Spec → Jira: promote the new ticket to a Jira issue when the
+          // project is Jira-backed (unless the user opted to keep it local).
+          void maybePromoteSpecToJira(ctx(req), created!.id, req.body?.createLocal === true, broadcast as (m: unknown) => void)
+
           // Quick mode Contract Refine: when toggle is on in the request body
           // AND the project setting + kill switch permit it, fire the no-resume
           // Quick refine path asynchronously. Claude-only today — codex
@@ -961,6 +990,10 @@ export function registerTicketsRoutes(deps: ProjectRoutesDeps): void {
       }
 
       res.status(201).json({ ticket: created!, revision: store.revision })
+
+      // Add Spec (Explore) → Jira: promote the committed ticket to a Jira issue
+      // when the project is Jira-backed (unless the user opted to keep it local).
+      void maybePromoteSpecToJira(ctx(req), created!.id, body.createLocal === true, broadcast as (m: unknown) => void)
 
       // Fire Contract Refine post-commit (fire-and-forget). Toggle + kill-switch
       // are checked inside runContractRefine. Claude-only today — codex

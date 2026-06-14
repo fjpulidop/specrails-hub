@@ -88,6 +88,10 @@
     "label": "Jira",
     "openInJira": "Open in Jira"
   },
+  "addSpec": {
+    "willCreate": "Will be created in Jira · {{key}}",
+    "keepLocal": "Create as a local spec instead"
+  },
   "errors": {
     "generic": "Something went wrong",
     "testFirst": "Test the connection first"
