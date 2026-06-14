@@ -92,6 +92,9 @@
     "willCreate": "Wird in Jira erstellt · {{key}}"
   },
   "detail": {
+    "saveTitle": "Jira-Vorgang aktualisieren",
+    "saveBody": "Beim Speichern wird der Jira-Vorgang {{key}} mit diesen Änderungen aktualisiert.",
+    "saveConfirm": "Speichern und Jira aktualisieren",
     "detailsTitle": "Jira-Details",
     "developmentTitle": "Entwicklung",
     "dev": {

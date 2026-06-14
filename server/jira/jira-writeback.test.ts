@@ -170,6 +170,32 @@ describe('executeUpdate — drain', () => {
   })
 })
 
+describe('safety invariant: local-tickets.json changes never push to Jira', () => {
+  it('the inbound poll materializes issues WITHOUT enqueuing any outbox op', async () => {
+    const fake = makeFakeFetch()
+    fake.on('POST', '/search/jql', {
+      status: 200,
+      body: { issues: [{ id: 'I-7', key: 'ACME-7', fields: { summary: 'From Jira', status: { statusCategory: { key: 'new' } } } }] },
+    })
+    const mgr = makeManager(fake.fetchImpl)
+    await mgr.pollOnce(true)
+    // The issue was written into the local store…
+    const tickets = Object.values(readStore(resolveTicketStoragePath(projectPath)).tickets)
+    expect(tickets.some((t) => t.jira_key === 'ACME-7')).toBe(true)
+    // …and the sync enqueued ZERO outbound Jira writes.
+    expect(listOutbox(db, {})).toHaveLength(0)
+  })
+
+  it('editing local-tickets.json directly does NOT enqueue a Jira write', () => {
+    seedLinked(8, 'I-8')
+    mutateStore(resolveTicketStoragePath(projectPath), (s) => {
+      s.tickets['8'].title = 'Edited straight in the file (e.g. by specrails-core)'
+    })
+    // Nothing watches the file to push — only the explicit onSpecEdited path does.
+    expect(listOutbox(db, {})).toHaveLength(0)
+  })
+})
+
 describe('frozen guard — the poll does not revert a pending edit', () => {
   it('preserves the locally-edited title while an update op is pending', async () => {
     const fake = makeFakeFetch()
@@ -179,7 +205,7 @@ describe('frozen guard — the poll does not revert a pending edit', () => {
     mgr.onSpecEdited(5, { title: 'Edited locally' })
     await flush() // let the internal drain attempt settle (op stays pending → frozen)
     // Inbound poll returns the OLD Jira title.
-    fake.on('GET', '/search/jql', {
+    fake.on('POST', '/search/jql', {
       status: 200,
       body: { issues: [{ id: 'I-5', key: 'ACME-5', fields: { summary: 'Old Jira title', status: { statusCategory: { key: 'new' } } } }] },
     })

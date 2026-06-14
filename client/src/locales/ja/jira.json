@@ -92,6 +92,9 @@
     "willCreate": "Jira に作成されます · {{key}}"
   },
   "detail": {
+    "saveTitle": "Jira 課題を更新",
+    "saveBody": "保存すると、Jira 課題 {{key}} がこの変更で更新されます。",
+    "saveConfirm": "保存して Jira を更新",
     "detailsTitle": "Jira の詳細",
     "developmentTitle": "開発",
     "dev": {

@@ -92,6 +92,9 @@
     "willCreate": "将在 Jira 中创建 · {{key}}"
   },
   "detail": {
+    "saveTitle": "更新 Jira 工单",
+    "saveBody": "保存后将用这些更改更新 Jira 工单 {{key}}。",
+    "saveConfirm": "保存并更新 Jira",
     "detailsTitle": "Jira 详情",
     "developmentTitle": "开发",
     "dev": {

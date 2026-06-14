@@ -92,6 +92,9 @@
     "willCreate": "Sera créé dans Jira · {{key}}"
   },
   "detail": {
+    "saveTitle": "Mettre à jour le ticket Jira",
+    "saveBody": "L'enregistrement mettra à jour le ticket Jira {{key}} avec ces modifications.",
+    "saveConfirm": "Enregistrer et mettre à jour Jira",
     "detailsTitle": "Détails Jira",
     "developmentTitle": "Développement",
     "dev": {

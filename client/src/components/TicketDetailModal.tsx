@@ -137,6 +137,7 @@ export function TicketDetailModal({
   // Confirmation dialog
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showDiscard, setShowDiscard] = useState(false)
+  const [showJiraSaveConfirm, setShowJiraSaveConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
 
   // In a Jira-synced project, a Jira-backed spec is "moved to" the configured
@@ -144,6 +145,9 @@ export function TicketDetailModal({
   const jira = useJiraConnection()
   const canDiscard =
     jira.connected && !!jira.discardStatus && ticket.source === 'jira' && !!ticket.jira_key
+  // Saving a Jira-backed spec writes the edits back to the Jira issue — require
+  // an explicit confirmation so Save never silently mutates the Jira ticket.
+  const isJiraBacked = jira.connected && ticket.source === 'jira' && !!ticket.jira_key
 
   // Attachments (synced from ticket prop)
   const [attachments, setAttachments] = useState<Attachment[]>(ticket.attachments ?? [])
@@ -701,7 +705,7 @@ export function TicketDetailModal({
               <Button
                 size="sm"
                 className="h-7 text-xs"
-                onClick={handleSave}
+                onClick={() => { if (isJiraBacked) setShowJiraSaveConfirm(true); else void handleSave() }}
                 disabled={saving || !title.trim()}
               >
                 <Save className="w-3 h-3 mr-1" />
@@ -748,6 +752,25 @@ export function TicketDetailModal({
           onDiscarded={onClose}
         />
       )}
+
+      {/* Save confirmation — Save on a Jira-backed spec writes back to the issue */}
+      <Dialog open={showJiraSaveConfirm} onOpenChange={setShowJiraSaveConfirm}>
+        <DialogContent className="max-w-md" data-testid="jira-save-confirm">
+          <DialogHeader>
+            <DialogTitle>{tj('detail.saveTitle')}</DialogTitle>
+            <DialogDescription>{tj('detail.saveBody', { key: ticket.jira_key ?? `#${ticket.id}` })}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShowJiraSaveConfirm(false)}>
+              {t('common:actions.cancel')}
+            </Button>
+            <Button size="sm" onClick={() => { setShowJiraSaveConfirm(false); void handleSave() }} disabled={saving} data-testid="jira-save-confirm-btn">
+              <Save className="w-3.5 h-3.5 mr-1.5" />
+              {tj('detail.saveConfirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 
