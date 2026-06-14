@@ -86,7 +86,7 @@
   --color-secondary:              hsl(220 18% 92%);
   --color-secondary-foreground:   hsl(230 28% 14%);
   --color-muted:                  hsl(220 18% 94%);
-  --color-muted-foreground:       hsl(225 14% 42%);
+  --color-muted-foreground:       hsl(225 16% 35%);  /* darker: readable secondary text on light bg */
   --color-accent:                 hsl(220 18% 92%);
   --color-accent-foreground:      hsl(230 28% 14%);
   --color-destructive:            hsl(0 72% 50%);
@@ -95,12 +95,12 @@
   --color-input:                  hsl(220 18% 94%);
   --color-ring:                   hsl(255 75% 56%);
 
-  --color-accent-primary:    hsl(255 75% 56%);  /* indigo */
-  --color-accent-info:       hsl(195 80% 42%);  /* deep cyan, readable on light bg */
-  --color-accent-success:    hsl(150 65% 36%);  /* emerald */
-  --color-accent-secondary:  hsl(330 75% 52%);  /* magenta-pink, deeper than dracula's */
-  --color-accent-warning:    hsl(35 90% 48%);   /* amber */
-  --color-accent-highlight:  hsl(45 95% 48%);   /* gold */
+  --color-accent-primary:    hsl(255 70% 50%);  /* indigo — slightly deeper for text contrast */
+  --color-accent-info:       hsl(205 58% 40%);  /* muted steel-blue — not neon, readable on light bg */
+  --color-accent-success:    hsl(150 65% 33%);  /* emerald */
+  --color-accent-secondary:  hsl(330 72% 45%);  /* magenta-pink, deeper for readability on light */
+  --color-accent-warning:    hsl(32 90% 40%);   /* amber — darker so text reads on light bg */
+  --color-accent-highlight:  hsl(40 85% 36%);   /* gold/bronze — readable on light bg */
   --color-surface:            hsl(220 22% 96%);
   --color-background-deep:    hsl(220 18% 94%);
 

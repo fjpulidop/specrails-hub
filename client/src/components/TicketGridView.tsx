@@ -40,33 +40,33 @@ const COLUMNS: ColumnConfig[] = [
   {
     status: 'todo',
     titleKey: 'status.todo',
-    headerClass: 'text-slate-400 border-b-slate-500/40',
+    headerClass: 'text-muted-foreground border-b-border',
     emptyKey: 'gridView.emptyTodo',
-    columnBg: 'bg-slate-800/20',
+    columnBg: 'bg-muted/20',
   },
   {
     status: 'in_progress',
     titleKey: 'status.inProgress',
-    headerClass: 'text-blue-400 border-b-blue-500/40',
+    headerClass: 'text-accent-info border-b-accent-info/40',
     emptyKey: 'gridView.emptyInProgress',
-    columnBg: 'bg-blue-900/10',
+    columnBg: 'bg-accent-info/5',
   },
   {
     status: 'done',
     titleKey: 'status.done',
-    headerClass: 'text-emerald-400 border-b-emerald-500/40',
+    headerClass: 'text-accent-success border-b-accent-success/40',
     emptyKey: 'gridView.emptyDone',
-    columnBg: 'bg-emerald-900/10',
+    columnBg: 'bg-accent-success/5',
   },
 ]
 
-// ─── Priority badge ─────────────────────────────────────────────────────────
+// ─── Priority badge (semantic tokens → adapts to every theme) ────────────────
 
 const PRIORITY_STYLES: Record<TicketPriority, { className: string }> = {
-  critical: { className: 'bg-red-500/15 text-red-400 border-red-500/30' },
-  high: { className: 'bg-orange-500/15 text-orange-400 border-orange-500/30' },
+  critical: { className: 'bg-destructive/15 text-destructive border-destructive/30' },
+  high: { className: 'bg-accent-warning/15 text-accent-warning border-accent-warning/30' },
   medium: { className: '' },
-  low: { className: 'bg-gray-500/15 text-gray-400 border-gray-500/30' },
+  low: { className: 'bg-muted text-muted-foreground border-border' },
 }
 
 // ─── Sortable kanban card ───────────────────────────────────────────────────
