@@ -643,6 +643,12 @@ export function initDb(dbPath: string): DbInstance {
   const db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
+  // Under load, QueueManager / ChatManager / FileSummaryManager write the same
+  // per-project DB concurrently with /analytics reads. Wait up to 5s on a lock
+  // instead of throwing SQLITE_BUSY, and cap the WAL so a long checkpoint can't
+  // grow it without bound.
+  db.pragma('busy_timeout = 5000')
+  db.pragma('journal_size_limit = 10000000') // ~10 MB
 
   applyMigrations(db)
 

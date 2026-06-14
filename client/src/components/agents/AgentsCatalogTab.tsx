@@ -7,6 +7,7 @@ import { Input } from '../ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { AgentStudio } from './AgentStudio'
 import { AiRefineOverlay } from './AiRefineOverlay'
+import { ShellErrorBoundary } from '../ShellErrorBoundary'
 import { AGENT_TEMPLATES, ALL_TEMPLATE_CATEGORIES, type AgentTemplateCategory } from './agentTemplates'
 import { useMinimizedChats, usePendingRestore } from '../../context/MinimizedChatsContext'
 import { useDesktop } from '../../hooks/useDesktop'
@@ -189,6 +190,7 @@ export function AgentsCatalogTab() {
   // AI Refine overlay view
   if (refine.kind === 'open') {
     return (
+      <ShellErrorBoundary onClose={() => setRefine({ kind: 'closed' })}>
       <AiRefineOverlay
         // Per-session key — switching to a different refine session must
         // remount so useAgentRefine state and the composer don't leak.
@@ -229,6 +231,7 @@ export function AgentsCatalogTab() {
           setStudio({ kind: 'edit', agentId: refine.agentId, draftFromRefine: refineId })
         }}
       />
+      </ShellErrorBoundary>
     )
   }
 

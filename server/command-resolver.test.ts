@@ -119,6 +119,22 @@ Do this: $ARGUMENTS`
     expect(result).toBe('Do this:')
   })
 
+  it('rejects path-traversal segments and never reads outside the commands dir', () => {
+    const dir = createTempDir()
+    fs.writeFileSync(path.join(dir, 'secret.md'), 'TOP SECRET', 'utf-8')
+    // Without the guard, `..:..:secret` joins to <dir>/.claude/commands/../../secret.md = <dir>/secret.md
+    const malicious = '/..:..:secret arg'
+    const result = resolveCommand(malicious, dir)
+    expect(result).toBe(malicious) // unresolved — guard refused to traverse
+    expect(result).not.toContain('TOP SECRET')
+  })
+
+  it('rejects a segment containing a path separator', () => {
+    const dir = createTempDir()
+    const result = resolveCommand('/specrails:sub/evil hi', dir)
+    expect(result).toBe('/specrails:sub/evil hi')
+  })
+
   it('commands directory takes priority over skills directory', () => {
     const dir = createTempDir()
     writeCommandFile(

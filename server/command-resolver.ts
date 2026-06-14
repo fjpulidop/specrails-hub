@@ -53,6 +53,16 @@ ${commandArgs}`.trim()
 }
 
 /**
+ * A `:`-separated command segment is safe iff it is a plain identifier: no path
+ * separators, no `.`/`..`, no NUL. Anything else could escape the
+ * commands/skills directory once joined into the lookup path.
+ */
+function isSafeSegment(seg: string): boolean {
+  if (seg.length === 0 || seg === '.' || seg === '..') return false
+  return !/[/\\\0]/.test(seg)
+}
+
+/**
  * Try to find a command/skill .md file for the given command path parts
  * within the given base directory. Returns the resolved path or null.
  */
@@ -85,6 +95,13 @@ export function resolveCommand(command: string, cwd: string): string {
 
   const builtIn = builtInCommand(commandPath, commandArgs)
   if (builtIn) return builtIn
+
+  // Path-traversal guard: each segment is joined verbatim into
+  // `<baseDir>/.claude/commands/<...parts>.md`, so a segment like `..`, one
+  // containing a path separator, or an absolute fragment would escape the
+  // commands/skills directory and read an arbitrary file. Reject and leave the
+  // command unresolved (defense-in-depth even though the input is user-typed).
+  if (!parts.every(isSafeSegment)) return command
 
   // 1. Check the project directory
   let resolvedPath = findCommandFile(cwd, parts)

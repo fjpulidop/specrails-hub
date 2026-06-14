@@ -18,6 +18,7 @@ import { applySpecSort } from '../lib/spec-sort'
 import type { SpecSortMode, SpecSortDir } from '../types/spec-sort'
 import { ProposeSpecModal, type ExploreLaunchPayload } from './ProposeSpecModal'
 import { ExploreSpecShell } from './explore-spec/ExploreSpecShell'
+import { ShellErrorBoundary } from './ShellErrorBoundary'
 import { useMinimizedChats, usePendingRestore } from '../context/MinimizedChatsContext'
 import { useDesktop } from '../hooks/useDesktop'
 import i18n from '../lib/i18n'
@@ -728,6 +729,7 @@ export function SpecsBoard({
       />
 
       {explore && activeProjectId && (
+        <ShellErrorBoundary onClose={() => setExplore(null)}>
         <ExploreSpecShell
           // Bind component identity to the session so restoring a different
           // chip remounts the shell from scratch — without this, internal
@@ -779,6 +781,7 @@ export function SpecsBoard({
             onTicketCreated?.(ticket)
           }}
         />
+        </ShellErrorBoundary>
       )}
     </div>
   )

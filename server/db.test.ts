@@ -54,6 +54,12 @@ describe('db', () => {
       expect(names).toContain('schema_migrations')
     })
 
+    it('sets busy_timeout and journal_size_limit for concurrent-write resilience', () => {
+      const db = makeDb()
+      expect(db.pragma('busy_timeout', { simple: true })).toBe(5000)
+      expect(db.pragma('journal_size_limit', { simple: true })).toBe(10000000)
+    })
+
     it('creates the rail_meta table (migration 28) with rail_index + name', () => {
       const db = makeDb()
       const cols = (db.prepare('PRAGMA table_info(rail_meta)').all() as { name: string }[]).map((c) => c.name)
