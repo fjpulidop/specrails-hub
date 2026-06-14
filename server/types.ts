@@ -1023,6 +1023,46 @@ export type WsMessage =
   | FileSummaryUpdatedMessage | FileSummaryFailedMessage | FileSummarySkippedMessage
   | MobilePairRequestedMessage | MobileDevicePairedMessage
   | MobileDeviceRevokedMessage | MobileGatewayStateMessage
+  | JiraSyncedMessage | JiraSyncErrorMessage | JiraAuthExpiredMessage
+  | JiraOutboxChangedMessage | JiraDegradedMessage
+
+/** Inbound poll completed: N issues materialized into the local cache. */
+export interface JiraSyncedMessage {
+  type: 'jira.synced'
+  projectId: string
+  upserted: number
+  at: number
+}
+
+/** A poll or drain hit a non-fatal error (surfaced as a toast). */
+export interface JiraSyncErrorMessage {
+  type: 'jira.sync_error'
+  projectId: string
+  reason: string
+}
+
+/** The project's token returned 401 — outbox paused, re-auth required. */
+export interface JiraAuthExpiredMessage {
+  type: 'jira.auth_expired'
+  projectId: string
+  pending: number
+}
+
+/** Outbox state changed (drain/enqueue/dead-letter) — dashboards refetch. */
+export interface JiraOutboxChangedMessage {
+  type: 'jira.outbox_changed'
+  projectId: string
+  pending: number
+  dead: number
+}
+
+/** An outbound op was dead-lettered (workflow gap / required field / 403). */
+export interface JiraDegradedMessage {
+  type: 'jira.degraded'
+  projectId: string
+  jiraKey: string | null
+  reason: string
+}
 
 export interface FileProvenanceUpdatedMessage {
   type: 'file.provenance_updated'

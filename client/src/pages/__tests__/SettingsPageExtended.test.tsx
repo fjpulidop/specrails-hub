@@ -191,12 +191,18 @@ describe('SettingsPage - extended coverage', () => {
   it('saves daily budget successfully', async () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => mockConfig }) // GET /config
-      .mockResolvedValueOnce({ ok: true, json: async () => ({}) })        // GET /budget
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ pipelineTelemetryEnabled: false, orchestratorModel: 'sonnet' }) }) // GET /settings
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ agents: [] }) }) // GET /agent-models
-      .mockResolvedValueOnce({ ok: true })                                 // PATCH budget save
+    // URL+method routed (order-independent) so any additional mount-time fetch
+    // (e.g. the Jira settings section's GET /jira/connection) cannot shift a
+    // brittle mockResolvedValueOnce sequence.
+    global.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      const u = String(url)
+      const method = opts?.method ?? 'GET'
+      if (u.endsWith('/budget') && method === 'PATCH') return Promise.resolve({ ok: true, json: async () => ({}) })
+      if (u.endsWith('/config')) return Promise.resolve({ ok: true, json: async () => mockConfig })
+      if (u.endsWith('/budget')) return Promise.resolve({ ok: true, json: async () => ({}) })
+      if (u.endsWith('/settings')) return Promise.resolve({ ok: true, json: async () => ({ pipelineTelemetryEnabled: false, orchestratorModel: 'sonnet' }) })
+      return Promise.resolve({ ok: true, json: async () => ({ agents: [] }), text: async () => '{}' })
+    })
     render(<SettingsPage />)
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/e\.g\. 5\.00/i)).toBeInTheDocument()
@@ -235,12 +241,16 @@ describe('SettingsPage - extended coverage', () => {
   it('removes daily budget when input is blank', async () => {
     const user = userEvent.setup()
     const { toast } = await import('sonner')
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...mockConfig, dailyBudgetUsd: 5.0 }) })  // GET /config
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ dailyBudgetUsd: 5.0 }) })                   // GET /budget
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ pipelineTelemetryEnabled: false, orchestratorModel: 'sonnet' }) }) // GET /settings
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ agents: [] }) })                             // GET /agent-models
-      .mockResolvedValueOnce({ ok: true })                                                                  // PATCH /budget
+    // URL+method routed (order-independent) — see note in the save test above.
+    global.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      const u = String(url)
+      const method = opts?.method ?? 'GET'
+      if (u.endsWith('/budget') && method === 'PATCH') return Promise.resolve({ ok: true, json: async () => ({}) })
+      if (u.endsWith('/config')) return Promise.resolve({ ok: true, json: async () => ({ ...mockConfig, dailyBudgetUsd: 5.0 }) })
+      if (u.endsWith('/budget')) return Promise.resolve({ ok: true, json: async () => ({ dailyBudgetUsd: 5.0 }) })
+      if (u.endsWith('/settings')) return Promise.resolve({ ok: true, json: async () => ({ pipelineTelemetryEnabled: false, orchestratorModel: 'sonnet' }) })
+      return Promise.resolve({ ok: true, json: async () => ({ agents: [] }), text: async () => '{}' })
+    })
     render(<SettingsPage />)
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/e\.g\. 5\.00/i)).toBeInTheDocument()

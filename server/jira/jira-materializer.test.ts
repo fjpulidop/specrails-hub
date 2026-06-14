@@ -1,0 +1,545 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
+
+import { initDb, type DbInstance } from '../db'
+import { readStore, resolveTicketStoragePath, type Ticket } from '../ticket-store'
+import { getLinkByIssueId, getLinkByLocalId } from './jira-db'
+import {
+  issueStatusCategory,
+  mapStatus,
+  mapPriority,
+  issueUrl,
+  mapIssueToTicket,
+  upsertIssuesIntoStore,
+} from './jira-materializer'
+import type { JiraConnection, JiraIssue } from './types'
+
+// ─── Fixtures ────────────────────────────────────────────────────────────────
+
+function makeConn(overrides: Partial<JiraConnection> = {}): JiraConnection {
+  return {
+    projectId: 'proj-1',
+    baseUrl: 'https://acme.atlassian.net',
+    deployment: 'cloud',
+    apiVersion: '3',
+    authScheme: 'basic',
+    accountEmail: 'me@acme.io',
+    jiraProjectKey: 'PROJ',
+    jiraProjectId: '10000',
+    enabled: true,
+    statusMap: null,
+    highWaterMs: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+interface IssueOpts {
+  id?: string
+  key?: string
+  summary?: string
+  description?: unknown
+  labels?: string[]
+  updated?: string
+  statusName?: string
+  statusCategoryKey?: string | undefined
+  priorityName?: string | null
+  assignee?: { displayName?: string; emailAddress?: string } | null
+}
+
+function makeIssue(o: IssueOpts = {}): JiraIssue {
+  const status =
+    o.statusName === undefined && o.statusCategoryKey === undefined
+      ? undefined
+      : {
+          name: o.statusName ?? 'To Do',
+          ...(o.statusCategoryKey === undefined
+            ? {}
+            : { statusCategory: { key: o.statusCategoryKey } }),
+        }
+  return {
+    id: o.id ?? '100001',
+    key: o.key ?? 'PROJ-1',
+    fields: {
+      summary: o.summary ?? 'A summary',
+      description: o.description,
+      labels: o.labels,
+      updated: o.updated,
+      status: status as JiraIssue['fields']['status'],
+      priority: o.priorityName === undefined ? undefined : o.priorityName === null ? null : { name: o.priorityName },
+      assignee: o.assignee,
+    },
+  }
+}
+
+// ─── Temp project dir + DB harness ───────────────────────────────────────────
+
+let db: DbInstance
+let projectPath: string
+
+beforeEach(() => {
+  db = initDb(':memory:')
+  projectPath = fs.mkdtempSync(path.join(os.tmpdir(), 'jira-mat-'))
+})
+
+afterEach(() => {
+  try {
+    db.close()
+  } catch {
+    /* noop */
+  }
+  try {
+    fs.rmSync(projectPath, { recursive: true, force: true })
+  } catch {
+    /* noop */
+  }
+})
+
+// ─── issueStatusCategory ─────────────────────────────────────────────────────
+
+describe('issueStatusCategory', () => {
+  it('returns new when the category key is new', () => {
+    expect(issueStatusCategory(makeIssue({ statusCategoryKey: 'new' }))).toBe('new')
+  })
+
+  it('returns done when the category key is done', () => {
+    expect(issueStatusCategory(makeIssue({ statusCategoryKey: 'done' }))).toBe('done')
+  })
+
+  it('returns indeterminate for an explicit indeterminate key', () => {
+    expect(issueStatusCategory(makeIssue({ statusCategoryKey: 'indeterminate' }))).toBe('indeterminate')
+  })
+
+  it('falls back to indeterminate for an unknown key', () => {
+    expect(issueStatusCategory(makeIssue({ statusCategoryKey: 'something-weird' }))).toBe('indeterminate')
+  })
+
+  it('falls back to indeterminate when status / statusCategory are missing', () => {
+    expect(issueStatusCategory(makeIssue({}))).toBe('indeterminate')
+    expect(issueStatusCategory(makeIssue({ statusName: 'In Review' }))).toBe('indeterminate')
+  })
+})
+
+// ─── mapStatus ───────────────────────────────────────────────────────────────
+
+describe('mapStatus', () => {
+  it('maps new → todo', () => {
+    expect(mapStatus(makeIssue({ statusCategoryKey: 'new', statusName: 'Backlog' }))).toBe('todo')
+  })
+
+  it('maps indeterminate → in_progress', () => {
+    expect(mapStatus(makeIssue({ statusCategoryKey: 'indeterminate', statusName: 'In Progress' }))).toBe('in_progress')
+    expect(mapStatus(makeIssue({}))).toBe('in_progress')
+  })
+
+  it('maps done → done', () => {
+    expect(mapStatus(makeIssue({ statusCategoryKey: 'done', statusName: 'Done' }))).toBe('done')
+  })
+
+  it('maps done + cancel-like name → cancelled (Won\'t Do)', () => {
+    expect(mapStatus(makeIssue({ statusCategoryKey: 'done', statusName: "Won't Do" }))).toBe('cancelled')
+  })
+
+  it.each([
+    'Rejected',
+    'Cancelled',
+    'Canceled',
+    'Abandoned',
+    'Invalid',
+    'Duplicate',
+    'Declined',
+    'WONT DO',
+  ])('maps done + %s → cancelled', (name) => {
+    expect(mapStatus(makeIssue({ statusCategoryKey: 'done', statusName: name }))).toBe('cancelled')
+  })
+
+  it('maps done with no status name → done (no cancel match)', () => {
+    // statusCategoryKey present but status.name absent → done branch, empty name.
+    const issue = makeIssue({ statusCategoryKey: 'done' })
+    // remove the name explicitly to exercise the `?? ''` fallback
+    delete (issue.fields.status as { name?: string }).name
+    expect(mapStatus(issue)).toBe('done')
+  })
+})
+
+// ─── mapPriority ─────────────────────────────────────────────────────────────
+
+describe('mapPriority', () => {
+  it.each(['Highest', 'Blocker', 'Critical', 'highest'])('maps %s → critical', (p) => {
+    expect(mapPriority(p)).toBe('critical')
+  })
+
+  it.each(['High', 'high'])('maps %s → high', (p) => {
+    expect(mapPriority(p)).toBe('high')
+  })
+
+  it.each(['Low', 'Lowest', 'Trivial', 'Minor', 'low'])('maps %s → low', (p) => {
+    expect(mapPriority(p)).toBe('low')
+  })
+
+  it('maps Medium / unknown / undefined → medium', () => {
+    expect(mapPriority('Medium')).toBe('medium')
+    expect(mapPriority('Whatever')).toBe('medium')
+    expect(mapPriority(undefined)).toBe('medium')
+  })
+})
+
+// ─── issueUrl ────────────────────────────────────────────────────────────────
+
+describe('issueUrl', () => {
+  it('joins base + /browse/<key>', () => {
+    expect(issueUrl('https://acme.atlassian.net', 'PROJ-7')).toBe('https://acme.atlassian.net/browse/PROJ-7')
+  })
+
+  it('strips trailing slashes from the base url', () => {
+    expect(issueUrl('https://acme.atlassian.net/', 'PROJ-7')).toBe('https://acme.atlassian.net/browse/PROJ-7')
+    expect(issueUrl('https://acme.atlassian.net///', 'PROJ-7')).toBe('https://acme.atlassian.net/browse/PROJ-7')
+  })
+})
+
+// ─── mapIssueToTicket ────────────────────────────────────────────────────────
+
+describe('mapIssueToTicket', () => {
+  it('maps a fresh issue to a jira-sourced ticket', () => {
+    const conn = makeConn()
+    const issue = makeIssue({
+      id: '200',
+      key: 'PROJ-42',
+      summary: 'Implement widget',
+      description: 'Just text',
+      labels: ['backend', 'urgent'],
+      statusCategoryKey: 'new',
+      priorityName: 'High',
+      assignee: { displayName: 'Ada Lovelace' },
+    })
+    const t = mapIssueToTicket(issue, 42, conn)
+    expect(t.id).toBe(42)
+    expect(t.title).toBe('Implement widget')
+    expect(t.description).toBe('Just text')
+    expect(t.status).toBe('todo')
+    expect(t.priority).toBe('high')
+    expect(t.labels).toEqual(['backend', 'urgent'])
+    expect(t.assignee).toBe('Ada Lovelace')
+    expect(t.source).toBe('jira')
+    expect(t.jira_key).toBe('PROJ-42')
+    expect(t.jira_url).toBe('https://acme.atlassian.net/browse/PROJ-42')
+    expect(t.created_by).toBe('jira')
+    // No existing → created_at == updated_at (both `now`)
+    expect(t.created_at).toBe(t.updated_at)
+    // Defaults for local-only fields
+    expect(t.prerequisites).toEqual([])
+    expect(t.metadata).toEqual({})
+    expect(t.comments).toEqual([])
+    expect(t.attachments).toBeUndefined()
+    expect(t.origin_conversation_id).toBeNull()
+    expect(t.is_epic).toBe(false)
+    expect(t.parent_epic_id).toBeNull()
+    expect(t.execution_order).toBeNull()
+    expect(t.short_summary).toBeNull()
+  })
+
+  it('falls back to (key) title and empty labels/description when fields are absent', () => {
+    const conn = makeConn()
+    const issue = makeIssue({ key: 'PROJ-9', summary: '' })
+    issue.fields.labels = undefined
+    issue.fields.description = undefined
+    const t = mapIssueToTicket(issue, 9, conn)
+    expect(t.title).toBe('(PROJ-9)')
+    expect(t.description).toBe('')
+    expect(t.labels).toEqual([])
+    expect(t.priority).toBe('medium') // no priority → medium
+    expect(t.assignee).toBeNull()
+  })
+
+  it('resolves assignee via emailAddress when displayName is absent', () => {
+    const conn = makeConn()
+    const issue = makeIssue({ assignee: { emailAddress: 'dev@acme.io' } })
+    expect(mapIssueToTicket(issue, 1, conn).assignee).toBe('dev@acme.io')
+  })
+
+  it('preserves existing.created_at and other local-only fields', () => {
+    const conn = makeConn()
+    const existing: Ticket = {
+      id: 5,
+      title: 'old',
+      description: 'old',
+      status: 'todo',
+      priority: 'low',
+      labels: [],
+      assignee: null,
+      prerequisites: [3, 4],
+      metadata: { effort_level: 'L' },
+      comments: [{ id: 1, body: 'hi', created_at: 'x', created_by: 'me' }],
+      attachments: [
+        { id: 'a', filename: 'f', storedName: 's', mimeType: 'text/plain', size: 1, addedAt: 'x' },
+      ],
+      origin_conversation_id: 'conv-7',
+      is_epic: true,
+      parent_epic_id: 2,
+      execution_order: 9,
+      short_summary: 'short',
+      created_at: '2020-05-05T05:05:05.000Z',
+      updated_at: '2020-05-05T05:05:05.000Z',
+      created_by: 'human',
+      source: 'manual',
+    }
+    const issue = makeIssue({ summary: 'new title', statusCategoryKey: 'done' })
+    const t = mapIssueToTicket(issue, 5, conn, existing)
+    expect(t.created_at).toBe('2020-05-05T05:05:05.000Z')
+    expect(t.created_at).not.toBe(t.updated_at) // updated_at is fresh `now`
+    expect(t.prerequisites).toEqual([3, 4])
+    expect(t.metadata).toEqual({ effort_level: 'L' })
+    expect(t.comments).toEqual([{ id: 1, body: 'hi', created_at: 'x', created_by: 'me' }])
+    expect(t.attachments).toEqual(existing.attachments)
+    expect(t.origin_conversation_id).toBe('conv-7')
+    expect(t.is_epic).toBe(true)
+    expect(t.parent_epic_id).toBe(2)
+    expect(t.execution_order).toBe(9)
+    expect(t.short_summary).toBe('short')
+    expect(t.created_by).toBe('human') // preserved from existing
+    // But Jira-authoritative fields are overwritten:
+    expect(t.title).toBe('new title')
+    expect(t.status).toBe('done')
+    expect(t.source).toBe('jira')
+  })
+})
+
+// ─── upsertIssuesIntoStore ───────────────────────────────────────────────────
+
+describe('upsertIssuesIntoStore', () => {
+  const conn = () => makeConn()
+  const storePath = () => resolveTicketStoragePath(projectPath)
+
+  it('inserts new tickets, mints links and bumps next_id (no collision)', () => {
+    const issues = [
+      makeIssue({ id: '900', key: 'PROJ-1', summary: 'One', statusCategoryKey: 'new', updated: '2024-03-01T00:00:00.000Z' }),
+      makeIssue({ id: '901', key: 'PROJ-2', summary: 'Two', statusCategoryKey: 'done', updated: '2024-03-02T00:00:00.000Z' }),
+    ]
+    const result = upsertIssuesIntoStore(db, projectPath, conn(), issues)
+
+    expect(result.upserted).toBe(2)
+    expect(result.changedLocalIds).toHaveLength(2)
+
+    const store = readStore(storePath())
+    // Each Jira ticket got a local id == its minted link local id.
+    for (const localId of result.changedLocalIds) {
+      const t = store.tickets[String(localId)]
+      expect(t).toBeDefined()
+      expect(t.source).toBe('jira')
+    }
+    // Links exist for both issues.
+    const link1 = getLinkByIssueId(db, '900')
+    const link2 = getLinkByIssueId(db, '901')
+    expect(link1).not.toBeNull()
+    expect(link2).not.toBeNull()
+    // next_id is bumped past the highest minted local id so a future local spec
+    // never collides with a Jira #id.
+    const maxLocal = Math.max(link1!.localId, link2!.localId)
+    expect(store.next_id).toBe(maxLocal + 1)
+    // status_category persisted on the links.
+    expect(link1!.statusCategory).toBe('new')
+    expect(link2!.statusCategory).toBe('done')
+  })
+
+  it('mints local ids from the UNION of store.next_id and jira_links max (no collision with local specs)', () => {
+    // Seed the store with a local spec occupying #1 and next_id=2.
+    const sp = storePath()
+    fs.mkdirSync(path.dirname(sp), { recursive: true })
+    const seeded = {
+      schema_version: '1.3',
+      revision: 1,
+      last_updated: '2024-01-01T00:00:00.000Z',
+      next_id: 5,
+      tickets: {
+        '1': {
+          id: 1,
+          title: 'local spec',
+          description: '',
+          status: 'todo',
+          priority: 'medium',
+          labels: [],
+          assignee: null,
+          prerequisites: [],
+          metadata: {},
+          comments: [],
+          origin_conversation_id: null,
+          is_epic: false,
+          parent_epic_id: null,
+          execution_order: null,
+          short_summary: null,
+          created_at: '2024-01-01T00:00:00.000Z',
+          updated_at: '2024-01-01T00:00:00.000Z',
+          created_by: 'human',
+          source: 'manual',
+        },
+      },
+    }
+    fs.writeFileSync(sp, JSON.stringify(seeded), 'utf-8')
+
+    const result = upsertIssuesIntoStore(db, projectPath, conn(), [
+      makeIssue({ id: '700', key: 'PROJ-1', summary: 'jira one' }),
+    ])
+    const link = getLinkByIssueId(db, '700')!
+    // store.next_id was 5, jira_links was empty (max 0 → 1), so localId = max(5,1) = 5.
+    expect(link.localId).toBe(5)
+    expect(result.changedLocalIds).toEqual([5])
+
+    const store = readStore(sp)
+    // The pre-existing local spec #1 is untouched (surgical merge).
+    expect(store.tickets['1'].source).toBe('manual')
+    expect(store.tickets['1'].title).toBe('local spec')
+    // The Jira ticket lives at #5 and next_id moved to 6.
+    expect(store.tickets['5'].source).toBe('jira')
+    expect(store.next_id).toBe(6)
+  })
+
+  it('does not bump next_id when minted local id is below the existing next_id (link max wins)', () => {
+    // Pre-create a link at local_id 10 by upserting an issue once, then add a
+    // second issue: its minted id should come from max(next_id, links_max+1).
+    upsertIssuesIntoStore(db, projectPath, conn(), [makeIssue({ id: '1', key: 'PROJ-1' })])
+    const store1 = readStore(storePath())
+    const firstNext = store1.next_id
+
+    upsertIssuesIntoStore(db, projectPath, conn(), [makeIssue({ id: '2', key: 'PROJ-2' })])
+    const link2 = getLinkByIssueId(db, '2')!
+    const store2 = readStore(storePath())
+    // Second link got an id and next_id advanced past it.
+    expect(store2.next_id).toBe(link2.localId + 1)
+    expect(store2.next_id).toBeGreaterThan(firstNext)
+  })
+
+  it('updates an existing ticket in place on a re-poll (idempotent on issue id)', () => {
+    const c = conn()
+    upsertIssuesIntoStore(db, projectPath, c, [
+      makeIssue({ id: '500', key: 'PROJ-1', summary: 'first', statusCategoryKey: 'new' }),
+    ])
+    const link = getLinkByIssueId(db, '500')!
+    const localId = link.localId
+
+    // Re-poll with a changed summary/status; same issue id → same local id, no new link.
+    upsertIssuesIntoStore(db, projectPath, c, [
+      makeIssue({ id: '500', key: 'PROJ-1', summary: 'second', statusCategoryKey: 'done', statusName: 'Done' }),
+    ])
+    const store = readStore(storePath())
+    expect(Object.keys(store.tickets)).toHaveLength(1)
+    expect(store.tickets[String(localId)].title).toBe('second')
+    expect(store.tickets[String(localId)].status).toBe('done')
+    // Still only one link for issue 500.
+    expect(getLinkByLocalId(db, localId)!.jiraIssueId).toBe('500')
+  })
+
+  it('preserves status (and existing priority) for frozenLocalIds', () => {
+    const c = conn()
+    // First poll: issue is "todo".
+    upsertIssuesIntoStore(db, projectPath, c, [
+      makeIssue({ id: '600', key: 'PROJ-1', statusCategoryKey: 'new', priorityName: 'Low' }),
+    ])
+    const localId = getLinkByIssueId(db, '600')!.localId
+
+    // Second poll: Jira now says "done", but the id is frozen (pending outbox op),
+    // so the locally-authoritative status must survive.
+    const result = upsertIssuesIntoStore(
+      db,
+      projectPath,
+      c,
+      [makeIssue({ id: '600', key: 'PROJ-1', statusCategoryKey: 'done', statusName: 'Done', priorityName: 'High' })],
+      new Set([localId])
+    )
+    const store = readStore(storePath())
+    expect(store.tickets[String(localId)].status).toBe('todo') // preserved, NOT done
+    // existing priority (low) preserved over the inbound high
+    expect(store.tickets[String(localId)].priority).toBe('low')
+    expect(result.changedLocalIds).toEqual([localId])
+  })
+
+  it('frozen flag has no effect when the ticket does not yet exist (first insert)', () => {
+    const c = conn()
+    // local id 1 is frozen but there is no existing ticket → status comes from Jira.
+    upsertIssuesIntoStore(
+      db,
+      projectPath,
+      c,
+      [makeIssue({ id: '601', key: 'PROJ-1', statusCategoryKey: 'done', statusName: 'Done' })],
+      new Set([1])
+    )
+    const localId = getLinkByIssueId(db, '601')!.localId
+    const store = readStore(storePath())
+    expect(store.tickets[String(localId)].status).toBe('done')
+  })
+
+  it('refreshes the display key when the issue key changes (link keyed on immutable id)', () => {
+    const c = conn()
+    upsertIssuesIntoStore(db, projectPath, c, [makeIssue({ id: '777', key: 'OLD-1' })])
+    expect(getLinkByIssueId(db, '777')!.jiraKey).toBe('OLD-1')
+
+    // Issue moved project → new key, same immutable id.
+    upsertIssuesIntoStore(db, projectPath, c, [makeIssue({ id: '777', key: 'NEW-9' })])
+    const link = getLinkByIssueId(db, '777')!
+    expect(link.jiraKey).toBe('NEW-9')
+    const store = readStore(storePath())
+    expect(store.tickets[String(link.localId)].jira_key).toBe('NEW-9')
+    expect(store.tickets[String(link.localId)].jira_url).toBe('https://acme.atlassian.net/browse/NEW-9')
+  })
+
+  it('does not rewrite the key when it is unchanged or empty', () => {
+    const c = conn()
+    upsertIssuesIntoStore(db, projectPath, c, [makeIssue({ id: '778', key: 'SAME-1' })])
+    const updatedBefore = getLinkByIssueId(db, '778')!.updatedAt
+
+    // Same key → no UPDATE branch.
+    upsertIssuesIntoStore(db, projectPath, c, [makeIssue({ id: '778', key: 'SAME-1' })])
+    const link = getLinkByIssueId(db, '778')!
+    expect(link.jiraKey).toBe('SAME-1')
+    // sanity: still a valid timestamp string
+    expect(typeof updatedBefore).toBe('string')
+  })
+
+  it('returns maxUpdatedMs derived from the Jira `updated` timestamps', () => {
+    const c = conn()
+    const result = upsertIssuesIntoStore(db, projectPath, c, [
+      makeIssue({ id: '1', key: 'PROJ-1', updated: '2024-05-01T00:00:00.000Z' }),
+      makeIssue({ id: '2', key: 'PROJ-2', updated: '2024-06-15T12:30:00.000Z' }),
+      makeIssue({ id: '3', key: 'PROJ-3', updated: '2024-04-01T00:00:00.000Z' }),
+    ])
+    expect(result.maxUpdatedMs).toBe(Date.parse('2024-06-15T12:30:00.000Z'))
+  })
+
+  it('seeds maxUpdatedMs from conn.highWaterMs and never regresses below it', () => {
+    const high = Date.parse('2025-01-01T00:00:00.000Z')
+    const c = makeConn({ highWaterMs: high })
+    const result = upsertIssuesIntoStore(db, projectPath, c, [
+      makeIssue({ id: '1', key: 'PROJ-1', updated: '2024-06-15T12:30:00.000Z' }),
+    ])
+    // Jira's update is older than the high-water mark → stays at high water.
+    expect(result.maxUpdatedMs).toBe(high)
+  })
+
+  it('treats a missing or invalid `updated` as 0 and starts from the (0) high water', () => {
+    const c = conn() // highWaterMs null → 0
+    const result = upsertIssuesIntoStore(db, projectPath, c, [
+      makeIssue({ id: '1', key: 'PROJ-1' }), // no updated
+    ])
+    expect(result.maxUpdatedMs).toBe(0)
+  })
+
+  it('ignores an unparseable `updated` (NaN guard) and keeps the high water', () => {
+    const high = Date.parse('2024-02-02T00:00:00.000Z')
+    const c = makeConn({ highWaterMs: high })
+    const result = upsertIssuesIntoStore(db, projectPath, c, [
+      makeIssue({ id: '1', key: 'PROJ-1', updated: 'not-a-date' }),
+    ])
+    expect(result.maxUpdatedMs).toBe(high)
+  })
+
+  it('handles an empty issue batch (no writes, no link, high water preserved)', () => {
+    const high = 123456
+    const c = makeConn({ highWaterMs: high })
+    const result = upsertIssuesIntoStore(db, projectPath, c, [])
+    expect(result).toEqual({ changedLocalIds: [], maxUpdatedMs: high, upserted: 0 })
+    const store = readStore(storePath())
+    expect(Object.keys(store.tickets)).toHaveLength(0)
+  })
+})

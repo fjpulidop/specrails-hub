@@ -226,6 +226,28 @@ describe('SetupWizard', () => {
       })
     })
 
+    it('offers an optional Jira step on the complete screen and "do it later" continues to the project', async () => {
+      const project = makeProject()
+      const onComplete = vi.fn()
+      render(<SetupWizard project={project} onComplete={onComplete} onSkip={vi.fn()} />)
+      fireEvent.click(screen.getByRole('button', { name: /^install$/i }))
+      await waitFor(() => expect(screen.getByText(/installing specrails/i)).toBeInTheDocument())
+      act(() => {
+        getWsHandler()({
+          type: 'setup_install_done',
+          projectId: project.id,
+          summary: { agents: 4, specrailsCommands: 8, opsxCommands: 3, legacySrRemoved: 0 },
+        })
+      })
+      await waitFor(() => expect(screen.getByTestId('setup-jira-cta')).toBeInTheDocument())
+
+      // Opt into the Jira sub-screen, then bail with "do it later" → go to project.
+      fireEvent.click(screen.getByRole('button', { name: /configure jira/i }))
+      await waitFor(() => expect(screen.getByTestId('jira-wizard')).toBeInTheDocument())
+      fireEvent.click(screen.getByTestId('jira-later'))
+      expect(onComplete).toHaveBeenCalledTimes(1)
+    })
+
     it('shows error step on setup_error message', async () => {
       const project = makeProject()
       render(<SetupWizard project={project} onComplete={vi.fn()} onSkip={vi.fn()} />)

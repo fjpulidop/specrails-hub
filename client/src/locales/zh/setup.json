@@ -35,7 +35,13 @@
       "installedForEngines_one": "已为 {{count}} 个引擎安装",
       "installedForEngines_other": "已为 {{count}} 个引擎安装",
       "learnMore": "了解如何充分利用 specrails：",
-      "continueToProject": "进入项目"
+      "continueToProject": "进入项目",
+      "jira": {
+        "title": "Connect a Jira board",
+        "subtitle": "Optional — back this project's specs with a Jira board. You can also do it later in Settings.",
+        "configure": "Configure Jira",
+        "optional": "optional"
+      }
     },
     "error": {
       "title": "设置失败",
@@ -147,7 +153,8 @@
   "welcome": {
     "title": "欢迎使用 <spec>spec</spec><rails>rails</rails>",
     "description": "Specrails 让你在一个界面中管理多个项目。添加第一个项目即可开始。",
-    "addFirstProject": "添加你的第一个项目"
+    "addFirstProject": "添加你的第一个项目",
+    "jiraHint": "Connect each project to its own Jira board — specs stay in sync, both ways."
   },
   "onboarding": {
     "productTour": "产品导览",
@@ -304,6 +311,10 @@
       "projectsLabel": "项目侧边栏",
       "projectsBody": "用 <alt>{{alt}}</alt> <mod>{{mod}}</mod> <bkey>B</bkey> 切换左侧 Arc 侧边栏。",
       "outro": "<b>导览到此结束。</b>从左侧边栏添加一个项目，交付你的第一个 spec。你随时可以在设置中重新打开本导览。"
+    },
+    "jira": {
+      "label": "Jira integration",
+      "body": "Back any project with a <b>Jira board</b> — each spec becomes a Jira issue, kept in sync both ways: status follows the rail, and a comment is posted when a job finishes. Configure it per project when you add it, or anytime in Settings."
     }
   }
 }

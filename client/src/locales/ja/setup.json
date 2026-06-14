@@ -35,7 +35,13 @@
       "installedForEngines_one": "{{count}} 個のエンジンにインストールしました",
       "installedForEngines_other": "{{count}} 個のエンジンにインストールしました",
       "learnMore": "specrails を最大限に活用する方法:",
-      "continueToProject": "プロジェクトへ進む"
+      "continueToProject": "プロジェクトへ進む",
+      "jira": {
+        "title": "Connect a Jira board",
+        "subtitle": "Optional — back this project's specs with a Jira board. You can also do it later in Settings.",
+        "configure": "Configure Jira",
+        "optional": "optional"
+      }
     },
     "error": {
       "title": "セットアップに失敗しました",
@@ -147,7 +153,8 @@
   "welcome": {
     "title": "<spec>spec</spec><rails>rails</rails> へようこそ",
     "description": "Specrails は複数のプロジェクトを単一のインターフェースで管理します。最初のプロジェクトを追加して始めましょう。",
-    "addFirstProject": "最初のプロジェクトを追加"
+    "addFirstProject": "最初のプロジェクトを追加",
+    "jiraHint": "Connect each project to its own Jira board — specs stay in sync, both ways."
   },
   "onboarding": {
     "productTour": "プロダクトツアー",
@@ -304,6 +311,10 @@
       "projectsLabel": "プロジェクトサイドバー",
       "projectsBody": "<alt>{{alt}}</alt> <mod>{{mod}}</mod> <bkey>B</bkey> で左の Arc サイドバーを切り替え。",
       "outro": "<b>ツアーは以上です。</b>左サイドバーからプロジェクトを追加して、最初のスペックを出荷しましょう。このウォークスルーは設定からいつでも再表示できます。"
+    },
+    "jira": {
+      "label": "Jira integration",
+      "body": "Back any project with a <b>Jira board</b> — each spec becomes a Jira issue, kept in sync both ways: status follows the rail, and a comment is posted when a job finishes. Configure it per project when you add it, or anytime in Settings."
     }
   }
 }

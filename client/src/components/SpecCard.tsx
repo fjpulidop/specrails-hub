@@ -199,6 +199,16 @@ export function SpecCard({
           {t('badges.raw')}
         </Badge>
       ) : null}
+      {ticket.jira_key ? (
+        <Badge
+          variant="outline"
+          className="text-[9px] shrink-0 font-mono border-accent-info/50 text-accent-info"
+          title={ticket.jira_key}
+          data-testid={`jira-badge-${ticket.id}`}
+        >
+          {ticket.jira_key}
+        </Badge>
+      ) : null}
       {isDraft ? (
         <Badge variant="outline" className="text-[9px] shrink-0 border-accent-secondary/60 text-accent-secondary">
           {t('common:status.draft')}

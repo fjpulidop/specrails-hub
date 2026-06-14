@@ -22,3 +22,11 @@ export const FEATURE_CODE_EXPLORER = (() => {
   if (typeof override === 'string') return override !== 'false'
   return true
 })()
+
+/** Gates the Jira integration UI (settings section + spec badges). Default ON. */
+export const FEATURE_JIRA = (() => {
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+  const override = env?.VITE_FEATURE_JIRA
+  if (typeof override === 'string') return override !== 'false'
+  return true
+})()

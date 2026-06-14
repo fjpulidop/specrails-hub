@@ -91,6 +91,13 @@ describe('SpecCard', () => {
     expect(screen.queryByTestId('needs-review-badge-42')).not.toBeInTheDocument()
   })
 
+  it('renders a Jira badge when jira_key is set', () => {
+    render(<SpecCard ticket={makeTicket({ jira_key: 'ACME-7' })} onClick={onClickMock} />)
+    const badge = screen.getByTestId('jira-badge-42')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveTextContent('ACME-7')
+  })
+
   it('calls onClick when card is clicked', () => {
     const ticket = makeTicket()
     render(<SpecCard ticket={ticket} onClick={onClickMock} />)

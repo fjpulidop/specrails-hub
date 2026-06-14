@@ -9,6 +9,7 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import type { ProjectConfig } from '../types'
 import { TerminalSettingsSection } from '../components/settings/TerminalSettingsSection'
+import { JiraSettingsSection } from '../components/settings/JiraSettingsSection'
 
 interface ProjectSettings {
   pipelineTelemetryEnabled: boolean
@@ -445,6 +446,8 @@ export default function SettingsPage() {
       </Card>
 
       <TerminalSettingsSection mode="project" />
+
+      <JiraSettingsSection />
 
     </div>
   )

@@ -44,6 +44,7 @@ import { Button } from './ui/button'
 import { LanguagePickerGrid } from './pickers/LanguagePickerGrid'
 import { ThemePickerGrid } from './pickers/ThemePickerGrid'
 import { COMPANION_IOS_URL, COMPANION_ANDROID_URL } from '../lib/companion'
+import { FEATURE_JIRA } from '../lib/feature-flags'
 
 const ONBOARDING_KEY = 'specrails-desktop:onboarding-dismissed'
 
@@ -409,6 +410,11 @@ function buildSteps(t: TFunction): StepConfig[] {
               {t('onboarding.authorSpecs.compareBody')}
             </Feature>
           </div>
+          {FEATURE_JIRA && (
+            <Callout accent={ACCENTS.info} label={t('onboarding.jira.label')}>
+              <Trans t={t} i18nKey="onboarding.jira.body" components={{ b: <span className="text-foreground font-medium" /> }} />
+            </Callout>
+          )}
         </div>
       ),
     },
@@ -686,14 +692,19 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content
-          className="fixed left-[50%] top-[50%] z-50 flex flex-col w-[calc(100vw-2rem)] max-w-4xl max-h-[88vh] translate-x-[-50%] translate-y-[-50%] overflow-hidden border border-border/30 bg-popover shadow-2xl backdrop-blur-xl sm:rounded-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+          // Fixed height (not just max-h) so EVERY step is exactly the same size —
+          // the dialog never resizes between steps, which keeps the footer's
+          // Back / Next / Skip buttons pinned in the same place. Wider + taller
+          // than before for a roomier tour; the per-step body scrolls internally
+          // when it overflows instead of growing the dialog.
+          className="fixed left-[50%] top-[50%] z-50 flex flex-col w-[calc(100vw-2rem)] max-w-5xl h-[min(88vh,820px)] translate-x-[-50%] translate-y-[-50%] overflow-hidden border border-border/30 bg-popover shadow-2xl backdrop-blur-xl sm:rounded-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
           data-testid="onboarding-wizard"
           aria-describedby="onboarding-description"
         >
           {/* Accent glow bar */}
           <div className={cn('h-1 w-full shrink-0 transition-all duration-500', current.accent.bar)} />
 
-          <div className="flex min-h-0">
+          <div className="flex min-h-0 flex-1">
             {/* ── Left step navigation ── */}
             <nav className="hidden md:flex w-60 shrink-0 flex-col border-r border-border/30 bg-card/20 p-4">
               <div className="px-2 mb-5">

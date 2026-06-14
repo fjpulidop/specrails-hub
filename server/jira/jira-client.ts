@@ -1,0 +1,274 @@
+// Jira REST client. Single internal model rendered to the right dialect per
+// deployment: Cloud (REST v3, Basic auth, ADF bodies) vs Data Center/Server
+// (REST v2, Bearer PAT, plain wiki-string bodies). Every call returns a
+// normalised `JiraResult<T>` whose error `code` drives the outbox's
+// retry/dead-letter decisions. No throwing across the boundary.
+
+import { bodyForDeployment } from './jira-adf'
+import type {
+  JiraDeployment,
+  JiraErrorCode,
+  JiraIssue,
+  JiraResult,
+  JiraStatus,
+  JiraTransition,
+} from './types'
+
+export type FetchImpl = (url: string, init?: any) => Promise<{
+  status: number
+  ok: boolean
+  headers: { get(name: string): string | null }
+  text(): Promise<string>
+  json(): Promise<any>
+}>
+
+export interface JiraClientConfig {
+  baseUrl: string
+  deployment: JiraDeployment
+  apiVersion: '2' | '3'
+  authScheme: 'basic' | 'bearer'
+  /** Cloud Basic: base64(email:token). DC Bearer: the raw PAT. */
+  accountEmail?: string | null
+  token: string
+  fetchImpl?: FetchImpl
+  timeoutMs?: number
+}
+
+function classify(status: number): JiraErrorCode {
+  if (status === 401) return 'auth'
+  if (status === 403) return 'permission'
+  if (status === 404) return 'not_found'
+  if (status === 429) return 'rate_limit'
+  if (status >= 400 && status < 500) return 'validation'
+  return 'server'
+}
+
+export class JiraClient {
+  private cfg: JiraClientConfig
+  private fetchImpl: FetchImpl
+
+  constructor(cfg: JiraClientConfig) {
+    this.cfg = cfg
+    // Node 18+ exposes a global fetch (undici); injectable for tests.
+    this.fetchImpl = cfg.fetchImpl ?? ((globalThis as any).fetch as FetchImpl)
+  }
+
+  get deployment(): JiraDeployment {
+    return this.cfg.deployment
+  }
+
+  private authHeader(): string {
+    if (this.cfg.authScheme === 'bearer') return `Bearer ${this.cfg.token}`
+    const raw = `${this.cfg.accountEmail ?? ''}:${this.cfg.token}`
+    return `Basic ${Buffer.from(raw, 'utf-8').toString('base64')}`
+  }
+
+  private url(path: string): string {
+    const base = this.cfg.baseUrl.replace(/\/+$/, '')
+    return `${base}/rest/api/${this.cfg.apiVersion}${path}`
+  }
+
+  private async request<T>(method: string, path: string, body?: unknown): Promise<JiraResult<T>> {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
+    const timeout = controller
+      ? setTimeout(() => controller.abort(), this.cfg.timeoutMs ?? 20000)
+      : null
+    try {
+      const res = await this.fetchImpl(this.url(path), {
+        method,
+        headers: {
+          Authorization: this.authHeader(),
+          Accept: 'application/json',
+          ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        },
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        ...(controller ? { signal: controller.signal } : {}),
+      })
+      if (res.ok) {
+        const text = await res.text()
+        const data = text ? (JSON.parse(text) as T) : (undefined as unknown as T)
+        return { ok: true, data, status: res.status }
+      }
+      const errText = await res.text().catch(() => '')
+      const code = classify(res.status)
+      const retryAfter = res.headers.get('Retry-After')
+      const retryAfterMs = retryAfter ? parseRetryAfter(retryAfter) : undefined
+      return { ok: false, status: res.status, code, error: truncate(errText), ...(retryAfterMs ? { retryAfterMs } : {}) }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return { ok: false, status: 0, code: 'network', error: msg }
+    } finally {
+      if (timeout) clearTimeout(timeout)
+    }
+  }
+
+  // ─── Connectivity / metadata ───────────────────────────────────────────────
+
+  /** GET /myself — validates the credential and identifies the account. */
+  myself(): Promise<JiraResult<{ accountId?: string; displayName?: string; emailAddress?: string }>> {
+    return this.request('GET', '/myself')
+  }
+
+  /** GET /project/{key} — validates the project and returns name/id for confirmation. */
+  getProject(keyOrId: string): Promise<JiraResult<{ id: string; key: string; name: string; lead?: { displayName?: string } }>> {
+    return this.request('GET', `/project/${encodeURIComponent(keyOrId)}`)
+  }
+
+  /** GET /mypermissions — probe write capability so config-time warns the user. */
+  myPermissions(permissions: string[], projectKey?: string): Promise<JiraResult<{ permissions: Record<string, { havePermission: boolean }> }>> {
+    const qp = new URLSearchParams({ permissions: permissions.join(',') })
+    if (projectKey) qp.set('projectKey', projectKey)
+    return this.request('GET', `/mypermissions?${qp.toString()}`)
+  }
+
+  /** GET /project/{key}/statuses — the project's real status list per issue type. */
+  getProjectStatuses(keyOrId: string): Promise<JiraResult<Array<{ name: string; statuses: JiraStatus[] }>>> {
+    return this.request('GET', `/project/${encodeURIComponent(keyOrId)}/statuses`)
+  }
+
+  /**
+   * List projects the credential can see (for the setup wizard's project picker).
+   * Cloud: paginated GET /project/search. DC/Server: GET /project (full list).
+   */
+  async searchProjects(query?: string): Promise<JiraResult<Array<{ id: string; key: string; name: string }>>> {
+    if (this.cfg.apiVersion === '2') {
+      const res = await this.request<Array<{ id: string; key: string; name: string }>>('GET', '/project')
+      if (!res.ok) return res
+      const filtered = query
+        ? res.data.filter((p) => `${p.key} ${p.name}`.toLowerCase().includes(query.toLowerCase()))
+        : res.data
+      return { ok: true, data: filtered.slice(0, 50), status: res.status }
+    }
+    const qp = new URLSearchParams({ maxResults: '50' })
+    if (query) qp.set('query', query)
+    const res = await this.request<{ values: Array<{ id: string; key: string; name: string }> }>(
+      'GET',
+      `/project/search?${qp.toString()}`
+    )
+    if (!res.ok) return res
+    return { ok: true, data: res.data.values ?? [], status: res.status }
+  }
+
+  // ─── Search (inbound poll) ─────────────────────────────────────────────────
+
+  /**
+   * POST /search/jql — the current paginated search (legacy GET /search was
+   * removed Oct 2025). Always pass an explicit `fields` array; page via
+   * `nextPageToken`. On DC v2 this falls back to the classic /search.
+   */
+  searchJql(args: {
+    jql: string
+    fields: string[]
+    nextPageToken?: string
+    maxResults?: number
+    reconcileIssues?: string[]
+  }): Promise<JiraResult<{ issues: JiraIssue[]; nextPageToken?: string; isLast?: boolean }>> {
+    if (this.cfg.apiVersion === '2') {
+      // DC/Server: classic search with startAt/maxResults.
+      return this.request('POST', '/search', {
+        jql: args.jql,
+        fields: args.fields,
+        maxResults: args.maxResults ?? 100,
+        startAt: args.nextPageToken ? parseInt(args.nextPageToken, 10) || 0 : 0,
+      })
+    }
+    return this.request('POST', '/search/jql', {
+      jql: args.jql,
+      fields: args.fields,
+      maxResults: args.maxResults ?? 100,
+      ...(args.nextPageToken ? { nextPageToken: args.nextPageToken } : {}),
+      ...(args.reconcileIssues ? { reconcileIssues: args.reconcileIssues } : {}),
+    })
+  }
+
+  /** GET /issue/{idOrKey} — re-resolve by immutable id (key may have changed). */
+  getIssue(idOrKey: string, fields?: string[]): Promise<JiraResult<JiraIssue>> {
+    const qp = fields ? `?fields=${encodeURIComponent(fields.join(','))}` : ''
+    return this.request('GET', `/issue/${encodeURIComponent(idOrKey)}${qp}`)
+  }
+
+  // ─── Lifecycle (outbound) ──────────────────────────────────────────────────
+
+  /** GET /issue/{id}/transitions?expand=transitions.fields — discover edges + screens. */
+  getTransitions(issueIdOrKey: string): Promise<JiraResult<{ transitions: JiraTransition[] }>> {
+    return this.request('GET', `/issue/${encodeURIComponent(issueIdOrKey)}/transitions?expand=transitions.fields`)
+  }
+
+  /** POST /issue/{id}/transitions — apply a transition, optionally with fields. */
+  transitionIssue(
+    issueIdOrKey: string,
+    transitionId: string,
+    fields?: Record<string, unknown>
+  ): Promise<JiraResult<void>> {
+    return this.request('POST', `/issue/${encodeURIComponent(issueIdOrKey)}/transitions`, {
+      transition: { id: transitionId },
+      ...(fields && Object.keys(fields).length > 0 ? { fields } : {}),
+    })
+  }
+
+  /** POST /issue — create an issue. Description rendered per deployment. */
+  createIssue(args: {
+    projectKey: string
+    issueType: string
+    summary: string
+    description?: string
+    labels?: string[]
+    priority?: string
+  }): Promise<JiraResult<{ id: string; key: string }>> {
+    const fields: Record<string, unknown> = {
+      project: { key: args.projectKey },
+      issuetype: { name: args.issueType },
+      summary: args.summary.slice(0, 250),
+    }
+    if (args.description) fields.description = bodyForDeployment(args.description, this.cfg.deployment)
+    if (args.labels && args.labels.length > 0) fields.labels = args.labels
+    if (args.priority) fields.priority = { name: args.priority }
+    return this.request('POST', '/issue', { fields })
+  }
+
+  /** POST /issue/{id}/comment — add a comment (ADF on Cloud, wiki on DC). */
+  addComment(issueIdOrKey: string, text: string): Promise<JiraResult<{ id: string }>> {
+    return this.request('POST', `/issue/${encodeURIComponent(issueIdOrKey)}/comment`, {
+      body: bodyForDeployment(text, this.cfg.deployment),
+    })
+  }
+
+  /** GET /issue/{id}/comment — used to dedup completion comments via the self-marker. */
+  getComments(issueIdOrKey: string): Promise<JiraResult<{ comments: Array<{ id: string; body: unknown }> }>> {
+    return this.request('GET', `/issue/${encodeURIComponent(issueIdOrKey)}/comment`)
+  }
+}
+
+function parseRetryAfter(value: string): number | undefined {
+  const seconds = Number(value)
+  if (!Number.isNaN(seconds)) return Math.max(0, seconds * 1000)
+  const date = Date.parse(value)
+  if (!Number.isNaN(date)) return Math.max(0, date - Date.now())
+  return undefined
+}
+
+function truncate(s: string, max = 500): string {
+  return s.length > max ? `${s.slice(0, max)}…` : s
+}
+
+/**
+ * Detect Cloud vs Data Center from the base URL host. `*.atlassian.net` ⇒ Cloud
+ * (v3, Basic, ADF); otherwise DC/Server (v2, Bearer, wiki). A `probe` caller can
+ * still override after hitting /myself, but the host heuristic is the default.
+ */
+export function detectDeployment(baseUrl: string): {
+  deployment: JiraDeployment
+  apiVersion: '2' | '3'
+  authScheme: 'basic' | 'bearer'
+} {
+  let host = ''
+  try {
+    host = new URL(baseUrl).host.toLowerCase()
+  } catch {
+    host = baseUrl.toLowerCase()
+  }
+  const isCloud = host.endsWith('.atlassian.net') || host.endsWith('.jira.com')
+  return isCloud
+    ? { deployment: 'cloud', apiVersion: '3', authScheme: 'basic' }
+    : { deployment: 'dc', apiVersion: '2', authScheme: 'bearer' }
+}
