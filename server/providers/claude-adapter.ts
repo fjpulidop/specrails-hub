@@ -109,6 +109,25 @@ function buildClaudeArgs(action: SpawnAction, opts: SpawnOptions): string[] {
       if (opts.extraArgs) args.push(...opts.extraArgs)
       return args
     }
+    case 'chat-stream': {
+      // Persistent multi-turn transport: one child stays alive and reads
+      // newline-delimited stream-json user messages from stdin (no `-p
+      // <prompt>` argument — the prompt arrives over stdin). The system prompt
+      // is fixed once at spawn (the Explore lightweight prompt is byte-stable,
+      // so this is sound). `--max-turns` is intentionally omitted: it would
+      // terminate the whole process after N agentic turns and end the session.
+      args.push('--model', model)
+      args.push(...commonFlags)
+      if (opts.systemPrompt) args.push('--system-prompt', opts.systemPrompt)
+      // When the conversation already has a session (a re-spawn after idle-kill
+      // or crash), resume it so the persistent child restores prior context
+      // instead of starting a fresh thread. Absent on the very first turn.
+      if (opts.sessionId) args.push('--resume', opts.sessionId)
+      args.push('-p')
+      args.push('--input-format', 'stream-json')
+      if (opts.extraArgs) args.push(...opts.extraArgs)
+      return args
+    }
     case 'rail-job': {
       // QueueManager spawns with `--append-system-prompt` (not `--system-prompt`)
       // because the slash command in the prompt brings its own system prompt;
@@ -291,6 +310,7 @@ export const claudeAdapter: ProviderAdapter = {
     nativeOtelEnv: true,
     profileEnvSupport: true,
     systemPromptArg: true,
+    persistentStdin: true,
   },
   modelCatalog: () => CLAUDE_MODELS,
   defaultModel: () => 'sonnet',

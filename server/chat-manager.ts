@@ -19,6 +19,8 @@ import {
 } from './context-scope'
 import { buildUserMcpArgs } from './user-mcp-config'
 import { binaryOnPath } from './binary-probe'
+import { ExploreStdinSessions, isExplorePersistentStdinEnabled } from './explore-stdin-session'
+import type { ChatConversationRow } from './types'
 
 const COMMAND_INSTRUCTION =
   'When you want to suggest a SpecRails command for the user to execute, wrap it in a command block like this: ' +
@@ -103,6 +105,10 @@ export class ChatManager {
     onSlot: () => void
     onTimeout: () => void
   }>
+
+  /** Persistent-stdin Explore transport (big bet #3, flag-gated default OFF).
+   *  Holds long-lived claude children that survive between turns. */
+  private _stdinSessions = new ExploreStdinSessions()
 
   private _cwd: string | undefined
   private _projectName: string | undefined
@@ -194,6 +200,9 @@ export class ChatManager {
       if (child?.pid) {
         try { treeKill(child.pid, 'SIGTERM') } catch { /* best-effort */ }
       }
+      // Persistent-stdin children live OUTSIDE _activeProcesses between turns —
+      // idle-kill must reach them too (the next turn re-spawns with --resume).
+      this._stdinSessions.kill(conversationId)
     }, EXPLORE_IDLE_KILL_MS)
   }
 
@@ -272,6 +281,8 @@ export class ChatManager {
       if (child?.pid) {
         try { treeKill(child.pid, 'SIGTERM') } catch { /* best-effort */ }
       }
+      // Reclaim the slot from a persistent-stdin child parked between turns.
+      this._stdinSessions.kill(victim)
       this._clearIdleTimer(victim)
       this._exploreLifecycle.delete(victim)
       if (this._countStreamingExplore() < EXPLORE_MAX_CONCURRENCY) return 'ok'
@@ -626,6 +637,23 @@ export class ChatManager {
     // not pipeline jobs. Telemetry is scoped to QueueManager pipeline runs only.
     // spawnAiCli reroutes multi-line argv values through stdin on Windows.
     const spawnCwd = this._resolveSpawnCwd(conversation.kind, conversationScope, adapter.id)
+
+    // Big bet #3 fast-path: persistent-stdin multi-turn for Explore (claude
+    // only, flag-gated default OFF). Reuses a single long-lived child across
+    // turns so turns 2+ skip spawn + session rehydration. Full fallback to the
+    // legacy spawn-per-turn path below when disabled / unsupported.
+    if (
+      isExplorePersistentStdinEnabled() &&
+      conversation.kind === 'explore' &&
+      adapter.capabilities.persistentStdin === true
+    ) {
+      return await this._streamPersistentExploreTurn({
+        conversationId, conversation, adapter, binary, model, systemPrompt,
+        scopeFlags, spawnCwd, promptForAdapter, isFirstTurn, userText,
+        lightweight, conversationScope,
+      })
+    }
+
     const child = spawnAiCli(binary, args, {
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -960,6 +988,247 @@ export class ChatManager {
     }
   }
 
+  /**
+   * Persistent-stdin Explore turn (big bet #3). Reuses one long-lived claude
+   * child per conversation via `--input-format stream-json`: the user turn is
+   * written to the child's stdin, and the turn ends on the `result` event
+   * (NOT process close — the child stays alive for the next turn). Mirrors the
+   * legacy close-handler's finalisation (spec-draft parse, persist, session
+   * capture, chat_done, invocation accounting, lifecycle) without crash-respawn
+   * — a dead persistent child is evicted and the next turn re-spawns with
+   * `--resume`. Only reached when the flag is on; the legacy path is untouched.
+   */
+  private async _streamPersistentExploreTurn(p: {
+    conversationId: string
+    conversation: ChatConversationRow
+    adapter: ProviderAdapter
+    binary: string
+    model: string
+    systemPrompt: string
+    scopeFlags: string[]
+    spawnCwd: string | undefined
+    promptForAdapter: string
+    isFirstTurn: boolean
+    userText: string
+    lightweight: boolean
+    conversationScope: ContextScope | null
+  }): Promise<void> {
+    const {
+      conversationId, conversation, adapter, binary, model, systemPrompt,
+      scopeFlags, spawnCwd, promptForAdapter, isFirstTurn, userText,
+      lightweight, conversationScope,
+    } = p
+
+    const sessionArgs = adapter.buildArgs('chat-stream', {
+      prompt: '',
+      systemPrompt,
+      model,
+      sessionId: conversation.session_id ?? undefined,
+      extraArgs: scopeFlags,
+      loadUserEnv: adapter.id === 'claude' && !!conversationScope?.userMcp,
+    })
+
+    const { child } = this._stdinSessions.getOrSpawn(conversationId, {
+      binary, args: sessionArgs, cwd: spawnCwd, env: process.env,
+    })
+    this._activeProcesses.set(conversationId, child)
+    this._buffers.set(conversationId, '')
+    this._emittedProposals.set(conversationId, new Set())
+    this._streamFilters.set(conversationId, { inBlock: false, pendingTail: '' })
+
+    const adapterEvents: AdapterEvent[] = []
+    let capturedSessionId: string | null = null
+    let stderrBuf = ''
+    const turnStartedAt = new Date().toISOString()
+
+    const emitDelta = (newText: string) => {
+      const prev = this._buffers.get(conversationId) ?? ''
+      this._buffers.set(conversationId, prev + newText)
+      const filter = this._streamFilters.get(conversationId)
+      const visibleDelta = filter ? filterDraftBlocksLive(filter, newText) : newText
+      if (visibleDelta) {
+        this._broadcast({
+          type: 'chat_stream',
+          conversationId,
+          delta: visibleDelta,
+          timestamp: new Date().toISOString(),
+        })
+      }
+      const proposals = extractCommandProposals(this._buffers.get(conversationId) ?? '')
+      const emitted = this._emittedProposals.get(conversationId)
+      if (emitted) {
+        for (const proposal of proposals) {
+          if (!emitted.has(proposal)) {
+            emitted.add(proposal)
+            this._broadcast({
+              type: 'chat_command_proposal',
+              conversationId,
+              command: proposal,
+              timestamp: new Date().toISOString(),
+            })
+          }
+        }
+      }
+    }
+
+    const recordInv = (status: 'success' | 'failed' | 'aborted') => {
+      if (!this._projectId) return
+      try {
+        const { result, estimated } = finaliseInvocationResult(adapter, adapterEvents, {
+          fallbackModel: model,
+        })
+        recordInvocation(this._db, {
+          id: randomUUID(),
+          project_id: this._projectId,
+          provider: adapter.id,
+          surface: 'explore-spec',
+          surface_ref_id: conversationId,
+          conversation_id: conversationId,
+          status,
+          started_at: turnStartedAt,
+          finished_at: new Date().toISOString(),
+          total_cost_usd_estimated: estimated,
+          ...result,
+        })
+        this._broadcast({ type: 'spending.invalidated', projectId: this._projectId })
+      } catch (err) {
+        console.error('[chat-manager] recordInvocation failed:', err)
+      }
+    }
+
+    const cleanupTurnState = () => {
+      this._activeProcesses.delete(conversationId)
+      this._buffers.delete(conversationId)
+      this._emittedProposals.delete(conversationId)
+      this._streamFilters.delete(conversationId)
+    }
+
+    const markStreamingEnded = (success: boolean) => {
+      const life = this._exploreLifecycle.get(conversationId)
+      if (life) {
+        life.isStreaming = false
+        life.lastActivityAt = Date.now()
+        if (success) life.crashCount = 0
+        if (life.isMinimized) this._startIdleTimer(conversationId)
+      }
+      this._drainExploreQueue()
+    }
+
+    return new Promise<void>((resolve) => {
+      let settled = false
+
+      const finishTurn = () => {
+        if (settled) return
+        settled = true
+        this._stdinSessions.clearHandlers(conversationId)
+        const fullText = this._buffers.get(conversationId) ?? ''
+        const wasAborting = this._abortingConversations.has(conversationId)
+        cleanupTurnState()
+        this._abortingConversations.delete(conversationId)
+        markStreamingEnded(true)
+        recordInv(wasAborting ? 'aborted' : 'success')
+
+        const parsed = parseSpecDraftBlocks(fullText)
+        const persistedText = parsed.blocks.length > 0 ? parsed.stripped : fullText
+        if (parsed.blocks.length > 0) {
+          const prevState = this._specDraftStates.get(conversationId)
+          const nextState = applyBlocks(prevState, parsed.blocks)
+          this._specDraftStates.set(conversationId, nextState)
+          this._broadcast({
+            type: 'spec_draft.update',
+            conversationId,
+            draft: nextState.draft,
+            ready: nextState.ready,
+            chips: nextState.chips,
+            changedFields: nextState.lastChangedFields as string[],
+            timestamp: new Date().toISOString(),
+          })
+        }
+        if (persistedText) {
+          addMessage(this._db, { conversation_id: conversationId, role: 'assistant', content: persistedText })
+        }
+        if (capturedSessionId) {
+          updateConversation(this._db, conversationId, { session_id: capturedSessionId })
+        }
+        this._broadcast({
+          type: 'chat_done',
+          conversationId,
+          fullText: persistedText,
+          timestamp: new Date().toISOString(),
+        })
+        if (isFirstTurn && fullText && !lightweight) {
+          this._autoTitle(conversationId, userText, fullText)
+        }
+        resolve()
+      }
+
+      const onClose = (code: number | null) => {
+        // The persistent child died (crash / idle-kill / shutdown). If the turn
+        // already finished on its `result` event, ignore. No crash-respawn —
+        // the session is evicted by the transport; the next turn re-spawns with
+        // `--resume`, so no persisted state is lost.
+        if (settled) return
+        settled = true
+        this._stdinSessions.clearHandlers(conversationId)
+        const wasAborting = this._abortingConversations.has(conversationId)
+        cleanupTurnState()
+        this._abortingConversations.delete(conversationId)
+        markStreamingEnded(false)
+        recordInv(wasAborting ? 'aborted' : 'failed')
+        if (wasAborting) {
+          resolve()
+          return
+        }
+        const stderrTail = stderrBuf.trim().slice(-500)
+        this._broadcast({
+          type: 'chat_error',
+          conversationId,
+          error: stderrTail
+            ? `${binary} exited with code ${code ?? 'unknown'}: ${stderrTail}`
+            : `Process exited with code ${code ?? 'unknown'}`,
+          timestamp: new Date().toISOString(),
+        })
+        resolve()
+      }
+
+      const onLine = (line: string) => {
+        const ev = adapter.parseStreamLine(line)
+        if (!ev) return
+        adapterEvents.push(ev)
+        switch (ev.kind) {
+          case 'text-delta':
+            emitDelta(ev.text)
+            break
+          case 'session-started':
+            if (ev.sessionId) capturedSessionId = ev.sessionId
+            break
+          case 'result': {
+            const sid = (ev.payload as { session_id?: string }).session_id
+            if (sid) capturedSessionId = sid
+            finishTurn()
+            break
+          }
+          default:
+            break
+        }
+      }
+
+      this._stdinSessions.setHandlers(conversationId, {
+        onLine,
+        onStderr: (s) => {
+          stderrBuf += s
+          console.error(`[chat-manager] ${binary} stderr (${conversationId}):`, s.trim())
+        },
+        onClose,
+      })
+
+      if (!this._stdinSessions.writeTurn(conversationId, promptForAdapter)) {
+        // stdin already gone (child died between spawn and write) — fail the turn.
+        onClose(null)
+      }
+    })
+  }
+
   abort(conversationId: string): void {
     const child = this._activeProcesses.get(conversationId)
     if (!child || !child.pid) return
@@ -989,6 +1258,7 @@ export class ChatManager {
       clearTimeout(this._exploreQueue[idx].timeoutTimer)
       this._exploreQueue.splice(idx, 1)
     }
+    this._stdinSessions.kill(conversationId)
     this._exploreLifecycle.delete(conversationId)
   }
 
@@ -1005,6 +1275,8 @@ export class ChatManager {
         try { treeKill(child.pid, 'SIGTERM') } catch { /* best-effort */ }
       }
     }
+    // Persistent-stdin children outlive individual turns — tear them down too.
+    this._stdinSessions.killAll()
     for (const id of this._exploreLifecycle.keys()) {
       this._clearIdleTimer(id)
     }

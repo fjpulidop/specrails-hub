@@ -12,6 +12,7 @@ export type ProviderId = string
 export type SpawnAction =
   | 'chat-turn'
   | 'chat-resume'
+  | 'chat-stream'
   | 'rail-job'
   | 'spec-gen'
   | 'agent-refine'
@@ -87,6 +88,13 @@ export interface ProviderCapabilities {
   /** CLI accepts a `--system-prompt`-style flag. When false, the adapter folds
    *  the system prompt into the user prompt before spawning. */
   systemPromptArg: boolean
+  /**
+   * CLI supports a persistent multi-turn stdin transport (claude
+   * `--input-format stream-json` keeping one child alive across turns). When
+   * true, the Explore fast-path may reuse a single long-lived child instead of
+   * respawning per turn. Optional — absent/false means spawn-per-turn only.
+   */
+  persistentStdin?: boolean
 }
 
 export interface ProviderAdapter {

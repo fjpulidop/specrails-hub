@@ -104,6 +104,12 @@ function buildCodexArgs(action: SpawnAction, opts: SpawnOptions): string[] {
       if (opts.extraArgs) args.push(...opts.extraArgs)
       return args
     }
+    case 'chat-stream': {
+      // Codex has no persistent stdin multi-turn transport; the Explore
+      // fast-path gates on capabilities.persistentStdin, so this is never
+      // reached. Throw defensively rather than emit a broken argv.
+      throw new Error('codex does not support persistent stdin streaming (chat-stream)')
+    }
     case 'rail-job': {
       // Rail jobs are headless implementation pipelines. They must run repo
       // inspection, edits, tests, and git probes without interactive approval.
