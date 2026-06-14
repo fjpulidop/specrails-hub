@@ -591,6 +591,81 @@ export function createCodeExplorerRouter(deps: CodeExplorerDeps): Router {
     })
   })
 
+  // In-app editing (v1): overwrite an existing text file with new content.
+  // Same guards as the read path — traversal, deny-list, gitignore, size, and
+  // binary refusal — so the editor can never write outside the tree, clobber a
+  // secret/lockfile, or corrupt a binary. Creating new files / renames is out of
+  // scope here. After a write the existing hash-gated `summaryStale` flag makes
+  // the next GET /file surface the summary as stale (regenerate via the existing
+  // POST /file/regenerate-summary).
+  router.put('/file', (req: Request, res: Response) => {
+    const body = (req.body ?? {}) as { path?: unknown; content?: unknown }
+    const relRaw = typeof body.path === 'string' ? body.path : undefined
+    const content = typeof body.content === 'string' ? body.content : undefined
+    if (!relRaw || content === undefined) {
+      res.status(400).json({ error: 'path and content are required' })
+      return
+    }
+    const guard = resolveSafePath(deps.projectPath, relRaw)
+    if (!guard) {
+      res.status(400).json({ error: 'path traversal not allowed' })
+      return
+    }
+    if (isDeniedRelPath(relRaw)) {
+      res.status(403).json({ error: 'path is excluded by the code-explorer deny-list' })
+      return
+    }
+    const rel = normalizeRel(relRaw)
+    if (isGitIgnored(deps.projectPath, rel)) {
+      res.status(403).json({ error: 'path is gitignored' })
+      return
+    }
+    if (Buffer.byteLength(content, 'utf8') > MAX_FILE_BYTES) {
+      res.status(413).json({ error: 'file too large' })
+      return
+    }
+    if (/[\x00-\x08\x0e-\x1f]/.test(content)) {
+      res.status(415).json({ error: 'binary content not allowed' })
+      return
+    }
+    const abs = guard
+    let stat: fs.Stats
+    try {
+      stat = fs.statSync(abs)
+    } catch {
+      res.status(404).json({ error: 'file not found (in-app editing only overwrites existing files)' })
+      return
+    }
+    if (!stat.isFile()) {
+      res.status(400).json({ error: 'path is not a regular file' })
+      return
+    }
+    // Refuse to overwrite a binary file as text (would corrupt it).
+    try {
+      const fd = fs.openSync(abs, 'r')
+      try {
+        const head = Buffer.alloc(Math.min(BINARY_PROBE_BYTES, stat.size))
+        fs.readSync(fd, head, 0, head.length, 0)
+        if (head.includes(0)) {
+          res.status(415).json({ error: 'cannot edit a binary file' })
+          return
+        }
+      } finally {
+        fs.closeSync(fd)
+      }
+    } catch {
+      res.status(500).json({ error: 'failed to read file' })
+      return
+    }
+    try {
+      fs.writeFileSync(abs, content, 'utf8')
+    } catch {
+      res.status(500).json({ error: 'failed to write file' })
+      return
+    }
+    res.json({ ok: true, bytes: Buffer.byteLength(content, 'utf8'), path: rel })
+  })
+
   router.get('/summary', async (req: Request, res: Response) => {
     const relRaw = req.query.path as string | undefined
     if (!relRaw || typeof relRaw !== 'string') {

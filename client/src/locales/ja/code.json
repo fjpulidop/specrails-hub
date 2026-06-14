@@ -49,7 +49,12 @@
     "noContent": "表示できる内容がありません。",
     "pathCopied": "パスをコピーしました",
     "copyPathFailed": "パスをコピーできませんでした",
-    "budgetPrompt": "予算上限を超過して実行しますか？"
+    "budgetPrompt": "予算上限を超過して実行しますか？",
+    "edit": "編集",
+    "save": "保存",
+    "saving": "保存中…",
+    "saved": "ファイルを保存しました",
+    "saveFailed": "保存に失敗しました"
   },
   "summary": {
     "generationFailed": "要約の生成に失敗しました",

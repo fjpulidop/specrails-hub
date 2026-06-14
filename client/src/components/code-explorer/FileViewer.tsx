@@ -196,6 +196,7 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
     setRegenerating(false)
     setBudgetPromptOpen(false)
     setMarkdownMode('preview')
+    setEditing(false) // switching files exits edit mode (discards the unsaved draft)
   }, [relPath])
 
   const reqIdRef = useRef(0)
@@ -301,6 +302,41 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
   const markdown = useMemo(() => isMarkdown(relPath, file?.language), [relPath, file?.language])
   const [markdownMode, setMarkdownMode] = useState<'preview' | 'raw'>('preview')
 
+  // In-app editing (v1): toggle an editable Monaco over the current text file.
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const editable = file?.content !== undefined && !file.binary && !file.tooLarge && file.reason !== 'not-found'
+
+  const startEditing = useCallback(() => {
+    setDraft(file?.content ?? '')
+    setMarkdownMode('raw') // edit the source, not the rendered preview
+    setEditing(true)
+  }, [file])
+
+  const handleSave = useCallback(async () => {
+    setSaving(true)
+    try {
+      const res = await fetch(`${getApiBase()}/code/file`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: relPath, content: draft }),
+      })
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string }
+        toast.error(j.error ?? t('viewer.saveFailed'))
+        return
+      }
+      toast.success(t('viewer.saved'))
+      setEditing(false)
+      fetchFile() // refresh content + summaryStale
+    } catch {
+      toast.error(t('viewer.saveFailed'))
+    } finally {
+      setSaving(false)
+    }
+  }, [relPath, draft, t, fetchFile])
+
   const summary = file?.summary ?? null
   const stale = !!file?.summaryStale
   const provenance = file?.provenance ?? []
@@ -401,7 +437,37 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
             </div>
           )}
         </div>
-        <span />
+        <div className="flex items-center gap-1 text-[11px] shrink-0">
+          {editable && !editing && (
+            <button
+              type="button"
+              onClick={startEditing}
+              className="px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            >
+              {t('viewer.edit')}
+            </button>
+          )}
+          {editing && (
+            <>
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                className="px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-50"
+              >
+                {t('actions.cancel', { ns: 'common' })}
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="px-2 py-1 rounded-md bg-accent-primary/20 text-accent-primary hover:bg-accent-primary/30 disabled:opacity-50"
+              >
+                {saving ? t('viewer.saving') : t('viewer.save')}
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <div className="flex-1 overflow-hidden">
         {missing ? (
@@ -417,7 +483,14 @@ export function FileViewer({ relPath, onFilterJob, onSummaryActionChange, onCopy
             {t('viewer.tooLarge', { size: Math.round((file.sizeBytes ?? 0) / 1024 / 1024) })}
           </div>
         ) : file?.content !== undefined ? (
-          markdown && markdownMode === 'preview' ? (
+          editing ? (
+            <CodeViewerMonaco
+              content={draft}
+              language={file.language ?? 'plaintext'}
+              readOnly={false}
+              onChange={setDraft}
+            />
+          ) : markdown && markdownMode === 'preview' ? (
             <div
               className="h-full overflow-auto px-6 py-4 prose prose-invert prose-sm max-w-none prose-p:my-2 prose-headings:mt-4 prose-headings:mb-2 prose-pre:bg-muted/40 prose-pre:rounded-md prose-code:before:content-none prose-code:after:content-none"
               data-testid="markdown-preview"

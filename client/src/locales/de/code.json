@@ -49,7 +49,12 @@
     "noContent": "Kein Inhalt verfügbar.",
     "pathCopied": "Pfad kopiert",
     "copyPathFailed": "Pfad konnte nicht kopiert werden",
-    "budgetPrompt": "Budgetgrenze außer Kraft setzen?"
+    "budgetPrompt": "Budgetgrenze außer Kraft setzen?",
+    "edit": "Bearbeiten",
+    "save": "Speichern",
+    "saving": "Speichern…",
+    "saved": "Datei gespeichert",
+    "saveFailed": "Speichern fehlgeschlagen"
   },
   "summary": {
     "generationFailed": "Generierung der Zusammenfassung fehlgeschlagen",

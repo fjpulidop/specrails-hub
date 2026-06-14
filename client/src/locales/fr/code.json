@@ -49,7 +49,12 @@
     "noContent": "Aucun contenu disponible.",
     "pathCopied": "Chemin copié",
     "copyPathFailed": "Impossible de copier le chemin",
-    "budgetPrompt": "Outrepasser le plafond de budget ?"
+    "budgetPrompt": "Outrepasser le plafond de budget ?",
+    "edit": "Modifier",
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "saved": "Fichier enregistré",
+    "saveFailed": "Échec de l'enregistrement"
   },
   "summary": {
     "generationFailed": "Échec de la génération du résumé",
