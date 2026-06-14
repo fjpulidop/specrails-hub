@@ -119,9 +119,6 @@ interface ExploreState {
   contextScope?: import('../types/context-scope').ContextScope
 }
 
-const DONE_SORT_MODE_KEY = (projectId: string) => `specrails-desktop:done-spec-sort-mode:${projectId}`
-const DONE_SORT_DIR_KEY = (projectId: string) => `specrails-desktop:done-spec-sort-dir:${projectId}`
-const DONE_VIEW_TIER_KEY = (projectId: string) => `specrails-desktop:done-spec-view-tier:${projectId}`
 const STATUS_TAB_KEY = (projectId: string) => `specrails-desktop:spec-status-tab:${projectId}`
 
 /** Persisted ToDo/Done tab selection. Defaults to 'todo' so the board opens on
@@ -142,57 +139,6 @@ function saveStatusTab(projectId: string | null, v: SpecStatusFilterValue): void
   } catch {
     /* ignore */
   }
-}
-
-function isSpecSortMode(value: unknown): value is SpecSortMode {
-  return value === 'default' || value === 'ticket-id' || value === 'priority'
-}
-
-function isSpecSortDir(value: unknown): value is SpecSortDir {
-  return value === 'asc' || value === 'desc'
-}
-
-function isSpecsViewTier(value: unknown): value is SpecsViewTier {
-  return value === 'row' || value === 'postit'
-}
-
-function loadDoneSort(projectId: string | null): { mode: SpecSortMode; dir: SpecSortDir } {
-  if (!projectId) return { mode: 'default', dir: 'desc' }
-  try {
-    const mode = localStorage.getItem(DONE_SORT_MODE_KEY(projectId))
-    const dir = localStorage.getItem(DONE_SORT_DIR_KEY(projectId))
-    return {
-      mode: isSpecSortMode(mode) ? mode : 'default',
-      dir: isSpecSortDir(dir) ? dir : 'desc',
-    }
-  } catch {
-    return { mode: 'default', dir: 'desc' }
-  }
-}
-
-function saveDoneSort(projectId: string | null, mode: SpecSortMode, dir: SpecSortDir): void {
-  if (!projectId) return
-  try {
-    localStorage.setItem(DONE_SORT_MODE_KEY(projectId), mode)
-    localStorage.setItem(DONE_SORT_DIR_KEY(projectId), dir)
-  } catch {}
-}
-
-function loadDoneViewTier(projectId: string | null): SpecsViewTier {
-  if (!projectId) return 'row'
-  try {
-    const tier = localStorage.getItem(DONE_VIEW_TIER_KEY(projectId))
-    return isSpecsViewTier(tier) ? tier : 'row'
-  } catch {
-    return 'row'
-  }
-}
-
-function saveDoneViewTier(projectId: string | null, tier: SpecsViewTier): void {
-  if (!projectId) return
-  try {
-    localStorage.setItem(DONE_VIEW_TIER_KEY(projectId), tier)
-  } catch {}
 }
 
 /** Returns true when at least one draft field carries a meaningful value. */
@@ -271,8 +217,6 @@ export function SpecsBoard({
     setStatusFilter(v)
     saveStatusTab(activeProjectId, v)
   }, [activeProjectId])
-  const [doneSort, setDoneSort] = useState(() => loadDoneSort(activeProjectId))
-  const [doneViewTier, setDoneViewTier] = useState<SpecsViewTier>(() => loadDoneViewTier(activeProjectId))
   const { minimize } = useMinimizedChats()
   // SMASH: build lookup maps so each SpecCard renders the épica badge / child
   // pill without re-scanning the full ticket list per render.
@@ -302,24 +246,12 @@ export function SpecsBoard({
     setActiveLabels(new Set())
     setActiveEpic(null)
     setActiveSprint(null)
-    setDoneSort(loadDoneSort(activeProjectId))
-    setDoneViewTier(loadDoneViewTier(activeProjectId))
     setStatusFilter(loadStatusTab(activeProjectId))
   }, [activeProjectId])
 
   const handleLabelsChange = useCallback((next: Set<string>) => {
     setActiveLabels(next)
   }, [])
-
-  const handleDoneSortChange = useCallback((mode: SpecSortMode, dir: SpecSortDir) => {
-    setDoneSort({ mode, dir })
-    saveDoneSort(activeProjectId, mode, dir)
-  }, [activeProjectId])
-
-  const handleDoneViewTierChange = useCallback((tier: SpecsViewTier) => {
-    setDoneViewTier(tier)
-    saveDoneViewTier(activeProjectId, tier)
-  }, [activeProjectId])
 
   const matchesFilters = useCallback(
     (t: LocalTicket): boolean => {
@@ -353,11 +285,13 @@ export function SpecsBoard({
     [tickets, doneTickets],
   )
 
+  // Done specs follow the SAME general sort as the active board (the Done tab no
+  // longer has its own sort/view controls — see the toolbar above).
   const visibleDoneTickets = useMemo(() => {
-    return doneSort.mode === 'default'
+    return sortMode === 'default'
       ? filteredDoneTickets
-      : applySpecSort(filteredDoneTickets, doneSort.mode, doneSort.dir)
-  }, [filteredDoneTickets, doneSort])
+      : applySpecSort(filteredDoneTickets, sortMode, sortDir)
+  }, [filteredDoneTickets, sortMode, sortDir])
 
   // Snapshot of the live shell so we can auto-minimize the current session
   // before restoring another (mutual-exclusion: only one shell visible at
@@ -523,7 +457,8 @@ export function SpecsBoard({
 
   return (
     <div className="flex flex-col h-full" onClick={handleBackgroundClick}>
-      {/* Header */}
+      {/* Header — a single row (aligns with the rails header): title + the
+          ToDo/Done state tabs, a separator, then filters + sort + view + add. */}
       <div className="flex items-center px-4 h-12 border-b border-border/40 shrink-0 gap-2">
         <div className="flex items-center gap-2 shrink-0">
           <FileText className="w-4 h-4 text-muted-foreground" />
@@ -536,6 +471,38 @@ export function SpecsBoard({
             </span>
           )}
         </div>
+
+        {/* ToDo / Done state tabs — inline beside the title */}
+        <div className="flex items-center gap-1 shrink-0" role="tablist">
+          {(['todo', 'done'] as const).map((tab) => {
+            const active = statusFilter === tab
+            return (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => handleStatusTabChange(tab)}
+                data-testid={`specs-tab-${tab}`}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                  active
+                    ? 'bg-accent-primary/15 text-accent-primary'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/40',
+                )}
+              >
+                {t(`statusFilter.${tab}`)}
+                <span className="text-[10px] tabular-nums opacity-70">
+                  {tab === 'todo' ? filteredTickets.length : filteredDoneTickets.length}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Separator between the state tabs and the rest of the toolbar */}
+        <div className="h-5 w-px bg-border/60 shrink-0" aria-hidden />
+
         <SpecLabelFilterDropdown
           tickets={[...tickets, ...doneTickets]}
           active={activeLabels}
@@ -574,34 +541,6 @@ export function SpecsBoard({
           <Plus className="w-3.5 h-3.5" />
           {t('common:actions.add')}
         </Button>
-      </div>
-
-      {/* ToDo / Done tabs — switch buckets without scrolling the whole list. */}
-      <div className="flex items-center gap-1 px-4 py-1.5 border-b border-border/40 shrink-0" role="tablist">
-        {(['todo', 'done'] as const).map((tab) => {
-          const active = statusFilter === tab
-          return (
-            <button
-              key={tab}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => handleStatusTabChange(tab)}
-              data-testid={`specs-tab-${tab}`}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                active
-                  ? 'bg-accent-primary/15 text-accent-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/40',
-              )}
-            >
-              {t(`statusFilter.${tab}`)}
-              <span className="text-[10px] tabular-nums opacity-70">
-                {tab === 'todo' ? filteredTickets.length : filteredDoneTickets.length}
-              </span>
-            </button>
-          )
-        })}
       </div>
 
       {/* Content area — single scrollable list. Status filter decides which
@@ -716,25 +655,8 @@ export function SpecsBoard({
               isDoneOver ? 'bg-emerald-500/[0.04] aurora-light:bg-accent-success/10' : ''
             } ${showTodoBucket ? 'border-t border-border/30 mt-1' : ''}`}
           >
-            <div className="flex items-center gap-2 py-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400/70 aurora-light:text-accent-success" />
-              <span className="text-[11px] font-medium text-muted-foreground">{t('status.done')}</span>
-              <span className="text-[10px] text-muted-foreground/60 bg-muted/20 rounded-full px-1.5 py-0.5">
-                {activeLabels.size > 0
-                  ? `${visibleDoneTickets.length}/${doneTickets.length}`
-                  : doneTickets.length}
-              </span>
-              {doneTickets.length > 0 && (
-                <div className="ml-auto flex items-center gap-2">
-                  <SpecSortControl
-                    mode={doneSort.mode}
-                    dir={doneSort.dir}
-                    onChange={handleDoneSortChange}
-                  />
-                  <SpecsViewTierToggle tier={doneViewTier} onChange={handleDoneViewTierChange} />
-                </div>
-              )}
-            </div>
+            {/* No per-Done header: the Done TAB labels this bucket and the board
+                toolbar's sort + list/postit toggle now drive it too. */}
             {visibleDoneTickets.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
                 <CheckCircle2 className="w-6 h-6 mb-2 opacity-15" />
@@ -746,7 +668,7 @@ export function SpecsBoard({
                       : t('board.emptyNoCompleted')}
                 </p>
               </div>
-            ) : doneViewTier === 'postit' && onMoveToRail ? (
+            ) : viewTier === 'postit' && onMoveToRail ? (
               <SortableContext items={visibleDoneTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                 <div
                   data-testid="specs-board-done-postit-grid"

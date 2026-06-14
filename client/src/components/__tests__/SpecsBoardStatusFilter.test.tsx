@@ -90,7 +90,7 @@ describe('SpecsBoard ToDo / Done tabs', () => {
     expect(screen.getByTestId('specs-tab-done')).toHaveTextContent('1')
   })
 
-  it('renders independent sort and view controls inside the Done bucket', () => {
+  it('renders the Done bucket using the general view tier, with no per-Done controls', () => {
     const doneTickets = [makeTicket(10, 'Done one', 'done')]
     render(
       <SpecsBoard
@@ -99,12 +99,32 @@ describe('SpecsBoard ToDo / Done tabs', () => {
         isLoading={false}
         onTicketClick={onTicketClick}
         onMoveToRail={() => {}}
+        viewTier="postit"
       />,
     )
     fireEvent.click(screen.getByTestId('specs-tab-done'))
     const doneBucket = screen.getByTestId('specs-board-done-bucket')
-    expect(within(doneBucket).getByLabelText('Sort mode')).toHaveTextContent('Default')
-    fireEvent.click(within(doneBucket).getByLabelText('Post-it view'))
+    // The general view tier (postit) drives the Done bucket…
     expect(within(doneBucket).getByTestId('specs-board-done-postit-grid')).toBeInTheDocument()
+    // …and the Done bucket no longer has its own sort/view controls.
+    expect(within(doneBucket).queryByLabelText('Sort mode')).toBeNull()
+  })
+
+  it('honours the general row view tier in the Done bucket', () => {
+    const doneTickets = [makeTicket(10, 'Done one', 'done')]
+    render(
+      <SpecsBoard
+        tickets={[]}
+        doneTickets={doneTickets}
+        isLoading={false}
+        onTicketClick={onTicketClick}
+        onMoveToRail={() => {}}
+        viewTier="row"
+      />,
+    )
+    fireEvent.click(screen.getByTestId('specs-tab-done'))
+    const doneBucket = screen.getByTestId('specs-board-done-bucket')
+    expect(within(doneBucket).queryByTestId('specs-board-done-postit-grid')).toBeNull()
+    expect(within(doneBucket).getByText('Done one')).toBeInTheDocument()
   })
 })
