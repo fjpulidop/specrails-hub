@@ -92,7 +92,8 @@
     "willCreate": "Jira に作成されます · {{key}}"
   },
   "detail": {
-    "goToTicket": "チケット {{key}} を開く"
+    "goToTicket": "チケット {{key}} を開く",
+    "epic": "エピック"
   },
   "errors": {
     "generic": "問題が発生しました",

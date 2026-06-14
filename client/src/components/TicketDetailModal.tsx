@@ -35,6 +35,13 @@ const PRIORITY_OPTIONS: { value: TicketPriority; labelKey: string; className: st
   { value: 'low', labelKey: 'priority.low', className: 'text-slate-400' },
 ]
 
+/** Browser URL of a spec's parent Jira epic, derived from the issue's jira_url. */
+function epicUrl(ticket: LocalTicket): string | null {
+  if (!ticket.jira_epic_key) return null
+  if (ticket.jira_url) return ticket.jira_url.replace(/\/browse\/[^/]+$/, `/browse/${ticket.jira_epic_key}`)
+  return null
+}
+
 const SOURCE_LABEL_KEYS: Record<string, string> = {
   manual: 'source.manual',
   'product-backlog': 'source.productBacklog',
@@ -500,6 +507,23 @@ export function TicketDetailModal({
                   <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                   {tj('detail.goToTicket', { key: ticket.jira_key })}
                 </button>
+              )}
+              {/* Parent Jira epic — only when the issue has one */}
+              {ticket.jira_epic_key && (
+                <div data-testid="jira-epic">
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block mb-1.5">
+                    {tj('detail.epic')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => { const u = epicUrl(ticket); if (u) void openExternalUrl(u) }}
+                    title={ticket.jira_epic_name ?? ticket.jira_epic_key}
+                    className="w-full inline-flex items-center gap-1.5 rounded border border-accent-highlight/40 bg-accent-highlight/5 px-2 py-1.5 text-left text-xs hover:bg-accent-highlight/10 transition-colors"
+                  >
+                    <span className="font-mono text-accent-highlight shrink-0">{ticket.jira_epic_key}</span>
+                    {ticket.jira_epic_name && <span className="truncate text-foreground/80">{ticket.jira_epic_name}</span>}
+                  </button>
+                </div>
               )}
               {/* Priority selector */}
               <div>

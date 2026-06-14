@@ -92,7 +92,8 @@
     "willCreate": "Wird in Jira erstellt · {{key}}"
   },
   "detail": {
-    "goToTicket": "Zum Ticket {{key}}"
+    "goToTicket": "Zum Ticket {{key}}",
+    "epic": "Epic"
   },
   "errors": {
     "generic": "Etwas ist schiefgelaufen",

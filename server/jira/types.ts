@@ -127,6 +127,10 @@ export interface JiraIssue {
     priority?: { name: string } | null
     assignee?: { displayName?: string; emailAddress?: string } | null
     issuetype?: { name: string }
+    parent?: {
+      key: string
+      fields?: { summary?: string; issuetype?: { name?: string } }
+    }
   }
 }
 

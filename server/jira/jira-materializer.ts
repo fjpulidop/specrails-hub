@@ -63,6 +63,20 @@ export function issueUrl(baseUrl: string, key: string): string {
   return `${baseUrl.replace(/\/+$/, '')}/browse/${key}`
 }
 
+/**
+ * Extract the parent epic from an issue. In modern Jira (company- and
+ * team-managed) the epic is the issue's `parent`. We only treat the parent as an
+ * epic when its issue type is Epic (when that info is present); otherwise we keep
+ * the parent reference anyway (most spec-issues' parent is the epic).
+ */
+export function extractEpic(issue: JiraIssue): { key: string | null; name: string | null } {
+  const parent = issue.fields.parent
+  if (!parent?.key) return { key: null, name: null }
+  const typeName = parent.fields?.issuetype?.name
+  if (typeName && typeName.toLowerCase() !== 'epic') return { key: null, name: null }
+  return { key: parent.key, name: parent.fields?.summary ?? parent.key }
+}
+
 /** Map a Jira issue to a full Ticket. `existing` preserves created_at and local-only fields. */
 export function mapIssueToTicket(
   issue: JiraIssue,
@@ -94,6 +108,8 @@ export function mapIssueToTicket(
     source: 'jira',
     jira_key: issue.key,
     jira_url: issueUrl(conn.baseUrl, issue.key),
+    jira_epic_key: extractEpic(issue).key,
+    jira_epic_name: extractEpic(issue).name,
   }
 }
 
@@ -119,6 +135,8 @@ function sameJiraContent(a: Ticket, b: Ticket): boolean {
     a.assignee === b.assignee &&
     (a.jira_key ?? null) === (b.jira_key ?? null) &&
     (a.jira_url ?? null) === (b.jira_url ?? null) &&
+    (a.jira_epic_key ?? null) === (b.jira_epic_key ?? null) &&
+    (a.jira_epic_name ?? null) === (b.jira_epic_name ?? null) &&
     a.labels.length === b.labels.length &&
     a.labels.every((l, i) => l === b.labels[i])
   )

@@ -84,6 +84,27 @@ describe('TicketDetailModal', () => {
       render(<TicketDetailModal {...makeDefaultProps({ ticket: makeTicket({ source: 'manual' }) })} />)
       expect(screen.queryByTestId('jira-go-to-ticket')).not.toBeInTheDocument()
     })
+
+    it('shows the parent epic and opens it in Jira when the spec has one', () => {
+      const ticket = makeTicket({
+        source: 'jira',
+        jira_key: 'SKILLS-17',
+        jira_url: 'https://acme.atlassian.net/browse/SKILLS-17',
+        jira_epic_key: 'SKILLS-1',
+        jira_epic_name: 'Onboarding revamp',
+      })
+      render(<TicketDetailModal {...makeDefaultProps({ ticket })} />)
+      const epic = screen.getByTestId('jira-epic')
+      expect(epic).toHaveTextContent('SKILLS-1')
+      expect(epic).toHaveTextContent('Onboarding revamp')
+      fireEvent.click(screen.getByRole('button', { name: /Onboarding revamp/ }))
+      expect(mockOpenExternalUrl).toHaveBeenCalledWith('https://acme.atlassian.net/browse/SKILLS-1')
+    })
+
+    it('does not show the epic block when the spec has no epic', () => {
+      render(<TicketDetailModal {...makeDefaultProps({ ticket: makeTicket({ source: 'jira', jira_key: 'X-1', jira_url: 'https://a.atlassian.net/browse/X-1' }) })} />)
+      expect(screen.queryByTestId('jira-epic')).not.toBeInTheDocument()
+    })
   })
 
   describe('rendering', () => {

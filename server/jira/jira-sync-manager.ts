@@ -53,7 +53,7 @@ const POLL_INTERVAL_MS = 60_000
 const DRAIN_INTERVAL_MS = 10_000
 const POLL_OVERLAP_MS = 2 * 60_000
 const MAX_DRAIN_BATCH = 8
-const SEARCH_FIELDS = ['summary', 'description', 'labels', 'status', 'priority', 'assignee', 'updated', 'issuetype']
+const SEARCH_FIELDS = ['summary', 'description', 'labels', 'status', 'priority', 'assignee', 'updated', 'issuetype', 'parent']
 
 export interface JiraSyncManagerOpts {
   db: DbInstance

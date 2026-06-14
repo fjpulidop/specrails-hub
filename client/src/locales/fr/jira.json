@@ -92,7 +92,8 @@
     "willCreate": "Sera créé dans Jira · {{key}}"
   },
   "detail": {
-    "goToTicket": "Aller au ticket {{key}}"
+    "goToTicket": "Aller au ticket {{key}}",
+    "epic": "Épopée"
   },
   "errors": {
     "generic": "Une erreur s'est produite",

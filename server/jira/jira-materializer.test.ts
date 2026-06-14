@@ -11,6 +11,7 @@ import {
   mapStatus,
   mapPriority,
   issueUrl,
+  extractEpic,
   mapIssueToTicket,
   upsertIssuesIntoStore,
 } from './jira-materializer'
@@ -200,9 +201,47 @@ describe('issueUrl', () => {
   })
 })
 
+// ─── extractEpic ─────────────────────────────────────────────────────────────
+
+describe('extractEpic', () => {
+  function withParent(parent: unknown): JiraIssue {
+    const i = makeIssue({ id: '900', key: 'PROJ-9' })
+    ;(i.fields as Record<string, unknown>).parent = parent
+    return i
+  }
+
+  it('returns null/null when the issue has no parent', () => {
+    expect(extractEpic(makeIssue({}))).toEqual({ key: null, name: null })
+  })
+
+  it('captures a parent whose issue type is Epic', () => {
+    expect(
+      extractEpic(withParent({ key: 'PROJ-1', fields: { summary: 'Big epic', issuetype: { name: 'Epic' } } }))
+    ).toEqual({ key: 'PROJ-1', name: 'Big epic' })
+  })
+
+  it('ignores a parent that is not an Epic (e.g. a parent story for a subtask)', () => {
+    expect(
+      extractEpic(withParent({ key: 'PROJ-2', fields: { summary: 'A story', issuetype: { name: 'Story' } } }))
+    ).toEqual({ key: null, name: null })
+  })
+
+  it('captures the parent when issue type is absent (falls back to the key as name)', () => {
+    expect(extractEpic(withParent({ key: 'PROJ-3', fields: {} }))).toEqual({ key: 'PROJ-3', name: 'PROJ-3' })
+  })
+})
+
 // ─── mapIssueToTicket ────────────────────────────────────────────────────────
 
 describe('mapIssueToTicket', () => {
+  it('captures the parent epic key + name', () => {
+    const issue = makeIssue({ id: '777', key: 'PROJ-77' })
+    ;(issue.fields as Record<string, unknown>).parent = { key: 'PROJ-5', fields: { summary: 'Epic five', issuetype: { name: 'Epic' } } }
+    const t = mapIssueToTicket(issue, 77, makeConn())
+    expect(t.jira_epic_key).toBe('PROJ-5')
+    expect(t.jira_epic_name).toBe('Epic five')
+  })
+
   it('maps a fresh issue to a jira-sourced ticket', () => {
     const conn = makeConn()
     const issue = makeIssue({

@@ -54,6 +54,10 @@ export interface Ticket {
   jira_key?: string | null
   /** Browser URL of the linked Jira issue, null for local specs. */
   jira_url?: string | null
+  /** Key of the Jira parent epic (e.g. "PROJ-5"), when the issue has one. */
+  jira_epic_key?: string | null
+  /** Summary/name of the Jira parent epic, when the issue has one. */
+  jira_epic_name?: string | null
   /**
    * App-managed review flag. Set when a job had already marked this spec `done`
    * (the agent reached its Ship phase) but the job then failed / was canceled /

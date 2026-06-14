@@ -92,7 +92,8 @@
     "willCreate": "将在 Jira 中创建 · {{key}}"
   },
   "detail": {
-    "goToTicket": "前往工单 {{key}}"
+    "goToTicket": "前往工单 {{key}}",
+    "epic": "史诗"
   },
   "errors": {
     "generic": "出了点问题",
